@@ -1054,16 +1054,16 @@ export const SCREENS = [
     設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
-  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: 'P1 種類のタブが5本で、設計の6本から「質問」が抜けている。質問は文のあとにボタンを2つ出し、押された選択肢ごとにタグ付与・シナリオ開始・フォームを分ける道具で、代わりにカルーセルのボタンや自動応答で受けると押した人を取りこぼす。P1 左の縦帯はテンプレートの category という文字から自動で生えているだけで /api/folders を一度も呼んでいない。作る・名前を変える・消すのどれもできない', verdictSource: 'templates-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 種類のタブが設計より1つ少ない（**「質問」が無い**。#572 で `NNDMR` として入ったので、取り込み後に数え直す）。P2 フォルダを作る導線は #493 が担当。1440・1920とも横スクロール0', verdictSource: 'templates-v6/W7LBc.txt + templates-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
-    verdict: 'needs_fix', verdictNote: 'P1 メッセージを作る面が設計とそろわない。差し込みと吹き出しの上限、保存してテンプレート化の扱いが違う', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 メッセージを作る面が設計とそろわない（本文の上限、ボタンの編集、URLの扱いの表）。1440・1920とも横スクロール0', verdictSource: 'templates-v6/GFlD7.txt + templates-v6/design-qa.md',
     steps: [{ click: 'テンプレートを作る' }],
     verdictHead: 'c275749d',
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'needs_fix', verdictNote: 'P1 カルーセルを作る面が設計とそろわない', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 カルーセルを作る面が設計とそろわない（カードごとの並べ替え、画像の比率）。1440・1920とも横スクロール0', verdictSource: 'templates-v6/FRkls.txt + templates-v6/design-qa.md',
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
     verdictHead: 'c275749d',
   },
@@ -1082,19 +1082,19 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
-    verdict: 'needs_fix', verdictNote: 'P1 リッチメッセージを作る面が設計とそろわない', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 リッチメッセージを作る面が設計とそろわない（領域の分け方の見本）。1440・1920とも横スクロール0', verdictSource: 'templates-v6/j9ixI.txt + templates-v6/design-qa.md',
     steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
     verdictHead: 'c275749d',
   },
   {
     ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
-    verdict: 'needs_fix', verdictNote: 'P1 クーポンそのものを作れない。入力欄は名前・特典内容の自由記入・クーポンを開くURLの3つだけ（broadcast-asset-manager.tsx:76）で、どこか別で作ったクーポンのURLを貼るだけ。設計の 画像1029×1029／使える期間／使い方のご案内／使える回数（1人1回・何回でも）／だれに見えるか／抽選（当たる確率・当選人数の上限）／クーポンコード／使われたときに実行すること が全部無い。**抽選の上限が無いまま配ると全員に当たる**', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。P1 クーポンそのものが作れない。** 実装の入力欄は **名前・特典内容の自由記入・クーポンを開くURL の3つだけ**（`broadcast-asset-manager.tsx:76`）で、**どこか別で作ったクーポンのURLを貼るだけ**。設計が持つ 画像（1029×1029）／使える期間／**使える回数（1人1回・何回でも）**／だれに見えるか／抽選（確率・当選上限）／クーポンコード／使われたときに実行すること は**どれも無い**（本文を数えて「使える回数」「使用期限」「1人あたり」いずれも0件）。**クーポンは配ったあとに効き方が変わるもの**なので、回数と期間が無いと配ったあとに止められない。1440・1920とも横スクロール0', verdictSource: 'templates-v6/hsBtl.txt + templates-v6/design-qa.md',
     steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
     verdictHead: 'c275749d',
   },
   {
     ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
-    verdict: 'needs_fix', verdictNote: 'P1 リサーチで質問を1問も作れない（説明とURLだけ）。設計は10問まで、種類（1つだけ選ぶ・いくつでも・自由に書く）と、答えの残し先（友だち情報欄・タグ）まで決める', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。P1 リサーチも名前とURLしか作れない**（`hsBtl` と同じ作り）。設計の**選択肢**と**集計**は本文を数えて0件。**答えを受け取る先が無いまま「リサーチ」と名乗っている**ので、押した人の答えがどこにも残らない。1440・1920とも横スクロール0', verdictSource: 'templates-v6/J3GxEZ.txt + templates-v6/design-qa.md',
     steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
     verdictHead: 'c275749d',
   },
@@ -1336,8 +1336,8 @@ export const SCREENS = [
     実装は `/scoring` の**1枚もの**で、帯・付与ルール・ランキングの3つだけ。
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
-  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: 'P2 帯の言葉が設計より薄い。設計は「マイルを持っている友だち1,284人／全体の62%。持っていない人786人」「たまっているマイル486,200／会社としての『あとで返すぶん』です」と、割合・未保有数・意味まで書く。実装は「マイル対象者1,284人」「保有マイル合計486,200mile」で、割合と未保有数と意味の説明が無い。**未取得と0の描き分けは正しい**（残高0の人は0、最終行動が無い人は—。「もうすぐ消えるマイル 未取得 — mile 失効ロットを接続後に表示」）', verdictSource: 'mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: 'P2 たまる決めごとの面が設計とそろわない細部が残る。**止める・再開する操作と「動いています／止めています」は #441 で入って解決している**', verdictSource: 'mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。P1は解決済み。** 日時は日本時間、内部の言葉は出さない。**残高0の人は `0`、最終行動が無い人は `—`** と、**数えて0と取れていないを分けている**（束4の手本）。実装が自分の穴（何が未接続か）を画面に書いているのも良い。P2 設計との細かな差（絞り込みの並び）は残る。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/s98Vfw.txt + mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。P1は解決済み。** P2 設計との細かな差（決めごとの並びと、効いている範囲の見せ方）は残る。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/N46cQ.txt + mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     /*
       **#549 で「マイルの使い道」が入った。**
@@ -1365,7 +1365,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 「だれが」の列が無く、手で動かした記録を誰がやったか追えない（設計は自動／本人／担当者名を出す）。残高の列も無い。帯4つ（この30日の記録・手で動かした分・取り消し・反映を待っている）が無い。「マイルを手で増やす・減らす」と「履歴をCSVで書き出す」の導線が無い。P2 絞り込みが設計のチップ（すべて/付いた/使った/手で動かした/取り消し）でなくセレクト6つ。ページ送りが無い。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖',
     verdictSource: 'mileage-v6/MvZm5-1920.png', verdictHead: '05c5b103',
   },
-  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 構造は設計とそろっており、残るのは実データの接続', verdictSource: 'mileage-v6/BmoGY.txt + mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     /*
       **#441 で `/mileage/friends/detail` が入った。**
@@ -1403,7 +1403,7 @@ export const SCREENS = [
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
-    verdict: 'match', verdictNote: '一致', verdictSource: 'mileage-v6/design-qa.md',
+    verdict: 'match', verdictNote: '**development `c275749d` で撮った。設計と一致。** 読込・空・失敗が分かれ、**実装が設計より2点足している**（未取得と実値0の言い分け、取れていない理由を言葉で出す）。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/k8VCU-error.txt + mileage-v6/design-qa.md',
     route: '/mileage?tab=earning-rules',
     states: { apis: ['**/api/mileage/rules*', '**/api/mileage/overview*'], kinds: ['loading', 'empty', 'error'] },
     verdictHead: 'c275749d',
@@ -1514,10 +1514,10 @@ export const SCREENS = [
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
-  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: 'P1 画面の名前がメニューと違う（メニューと上の帯は「NEN配信」、見出しは「フォロー配信」）。押した名前と着いた先の名前が違うと、着いた場所が合っているか確かめられない。P1 押せない操作が理由なしに3つ置いてある（マニュアル・並び替え・フォルダを追加。3つとも disabled）。さらに上の帯に押せる「マニュアル」があり、同じ名前が2つあって片方だけ押せる', verdictSource: 'nen-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。P0が4つとも直っている**（失敗の隣に失敗が1件／「発送完了から-3日後」／配信履歴の生UTC／読み込み失敗を0件と言う）。一覧は「誕生日の3日前 10:00」と正しく出る。**P1 編集画面の「何日後に送るか」が誕生日配信では効かない。** 誕生日の3日前は `delay_days` ではなく `birthdayDeliveryTarget`（`nen-engagement.ts:414`）が決めており、編集画面の欄は無関係。**効かない欄を出しているので、直したつもりで直らない。** 欄を隠すか「誕生日配信ではこの欄は使いません」と書くのが要る。P1-1（コラムの状態が英語）とP1-2（きっかけが `ec.order.delivered`）は **#525・#526 で直っているのを確認済み**。1440・1920とも横スクロール0', verdictSource: 'nen-v6/VLMGH.txt + nen-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: '**#525 `deff5ffb` で束3の完了条件を満たした。** 状態が `scheduled` `sent` `draft` のまま出ていたのが、数えて**すべて0件**になった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（回ごとの配信結果への導線）はこの直しの外', verdictSource: 'nen-v6/DEX0k.txt' , verdictHead: 'deff5ffb' },
-  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: 'P1 帯4つ（登録864匹・友だち1,284人のうち62%／今月誕生日72匹／誕生日配信の開封94.6%／クーポン利用38.2%）が無い。一覧の「次の配信」列（9/1に誕生日クーポン／送れません）と「これまでの配信」列（6回）が無い。LINEプレビューが無い。クーポンの決めごととペットの一覧は在る', verdictSource: 'nen-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }], verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'nen-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 ペット・記念日の作りが設計とそろわない。1440・1920とも横スクロール0', verdictSource: 'nen-v6/q4lajm.txt + nen-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }], verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 配信履歴の日時は日本時間で出る（P0解決済み）。構造は設計とそろっており、残るのは実データの接続', verdictSource: 'nen-v6/WeXbL.txt + nen-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
     verdict: 'needs_fix', verdictNote: '**#526 `dfcc9a53` で束3の完了条件を満たした。** きっかけが `ec.order.delivered` `pet.birthday` のような内部の名前で出ていたのが、数えて**すべて0件**になった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の編集の作り（配信条件の組み立て）はこの直しの外', verdictSource: 'nen-v6/HpKyF.txt',
@@ -1533,7 +1533,7 @@ export const SCREENS = [
   },
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
-    verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'nen-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 読込・空・失敗が分かれ、**失敗のとき0件と言わない**（P0解決済み）。残るのは実データの接続', verdictSource: 'nen-v6/i9sQP.txt + nen-v6/design-qa.md',
     states: { apis: ['**/api/nen-campaigns/columns*', '**/api/nen-campaigns/overview*'], kinds: ['loading', 'empty', 'error'] },
     verdictHead: 'c275749d',
   },
