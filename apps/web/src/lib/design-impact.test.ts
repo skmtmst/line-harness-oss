@@ -32,6 +32,7 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',
       'app/page.tsx',
+      'app/reminders/new/page.tsx',
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'app/templates/page.tsx',
