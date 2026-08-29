@@ -45,6 +45,7 @@ describe('共通部品の影響範囲', () => {
       'app/tags/page.tsx',
       'app/tags/searches/edit/page.tsx',
       'app/templates/page.tsx',
+      'app/templates/questions/new/page.tsx',
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
       'components/friend-fields/saved-search-list.tsx',

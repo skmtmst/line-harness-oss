@@ -934,6 +934,30 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+/** 質問テンプレート。シナリオの質問と同じ契約を使う。 */
+export type TemplateQuestion = {
+  intro?: string
+  text: string
+  altText?: string
+  tapMode: 'single' | 'multiple'
+  choices: Array<{
+    label: string
+    behavior: 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
+    url?: string
+    tel?: string
+    email?: string
+    formId?: string
+    scenario?: { op: 'start' | 'stop'; scenarioId?: string | null; restart?: 'from_start' | 'from_read'; rememberPrevious?: boolean }
+    userMessage?: string
+    hideUserMessage?: boolean
+    reply?: string
+    repeatReply?: string
+    addTagIds?: string[]
+    removeTagIds?: string[]
+    field?: { fieldId: string; value: string }
+  }>
+}
+
 /* ---- リッチメニューのボタン（147） ---- */
 
 /**
@@ -2893,6 +2917,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
@@ -2908,6 +2934,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2928,6 +2956,8 @@ export const api = {
       category: string
       messageType: string
       messageContent: string
+      question?: TemplateQuestion | null
+      questionStatus?: 'draft' | 'published'
       /** 162: 選択肢を押したときの動き。 */
       carouselActions?: unknown | null
       /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2941,7 +2971,7 @@ export const api = {
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null

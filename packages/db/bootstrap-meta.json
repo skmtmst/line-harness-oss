@@ -209,7 +209,8 @@
     "201_nen_photo_publication_consent.sql",
     "202_nen_photo_review_decisions.sql",
     "203_saved_search_references.sql",
-    "204_analytics_saved_results.sql"
+    "204_analytics_saved_results.sql",
+    "252_template_questions.sql"
   ],
-  "migrationCount": 210
+  "migrationCount": 211
 }
