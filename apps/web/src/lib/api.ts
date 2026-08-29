@@ -3037,6 +3037,8 @@ export const api = {
     create: (data: {
       name: string
       description?: string | null
+      /** 新しいリマインダを動かすLINEアカウント。 */
+      lineAccountId: string
       triggerType?: ReminderTriggerType
       triggerOffsetMinutes?: number | null
       sendAtTime?: string | null
