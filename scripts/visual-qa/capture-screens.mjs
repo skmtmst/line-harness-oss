@@ -331,6 +331,20 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    友だち一覧。**一覧の既定（配列）を返すと画面ごと落ちる。**
+    画面は `data.items` と `data.total` を読むので、`items` の無い返事だと
+    「もう一度試す」の絵になる（`SHAPES['/api/friends']` と同じ形で返す）。
+  */
+  [/\/api\/friends(\?|$)/, { items: [], total: 0, page: 1, limit: 20 }],
+  /*
+    友だちの帯。**数はすべて0（取れて0件）。** 欄が欠けると
+    帯が `undefined` になるので、`FRIEND_STATS` と同じ欄をそろえる。
+  */
+  [/\/api\/friends\/stats/, {
+    active: 0, total: 0, blockedByThem: 0, hiddenByUs: 0,
+    unanswered: 0, resolved: 0, addedThisMonth: 0, addedLastMonth: 0,
+  }],
+  /*
     統合ユーザー。**一覧の既定（配列）を返すと画面ごと落ちる。**
     画面は `data.rows` と `data.total` を読むので、`rows` の無い返事だと
     `rows.map` で落ちて「もう一度試す」の絵になる。型は

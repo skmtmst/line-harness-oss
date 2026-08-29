@@ -365,8 +365,8 @@ export const SCREENS = [
       上のカードだけ前の数（214人）が残り、**起きない絵**になる。実際にそうなった。
     */
     states: { apis: ['**/api/friends?**', '**/api/friends/stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「条件に合う友だちが見つかりません」を出し、「友だち一覧 0件」と数える。未取得と0件を区別していない。**#520 で直す差分が出ている（未取り込み）**',
-    verdictSource: 'friends-v6/bzDn6-error-1920.png', verdictHead: '728deca0',
+    verdict: 'needs_fix', verdictNote: '**#520 `4848a8f3` で、束1と束4の完了条件を満たした。** 失敗のとき帯は **有効友だち `—人`／ブロック・非表示 `—人`／未対応 `—人`／今月の追加 `—人`** で、補助の数も `—`。**「友だち一覧 0件」と数えなくなった**（未取得と0件を区別している）。読込・空・失敗が分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（列と絞り込みの並び）はこの直しの外。**#520 は `codex/development` 直結の根元PR**なので、親の統合を待たずに取り込める',
+    verdictSource: 'friends-v6/bzDn6-error.txt', verdictHead: '4848a8f3',
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
     verdict: 'needs_fix', verdictNote: 'P1 重複候補の一覧（候補・確信度・一致した根拠・所属アカウント・状態・確認ボタン）が丸ごと無い。アカウント間の重複マトリックスも無い。KPIの名前と粒度が設計と違う（設計は重複候補・確認済み・重複配信の削減・1配信あたりの無駄・根拠不足）。絞り込みと判定ルールが無い',
@@ -528,8 +528,8 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
     states: { apis: ['**/api/scenarios*', '**/api/scenarios/**', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「シナリオがありません。「＋ シナリオを作成」から作ってください。」を出す。持っているシナリオが消えたように見え、押せば同じものをもう1つ作る。#420 で友だち情報欄について直したのと同じ形が、こちらに残っている。帯が—と「取得できませんでした」になるのは設計どおりで正しい。**#519 で直す差分が出ている（未取り込み）**',
-    verdictSource: 'scenarios-v6/q5G45-error-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#519 `a8e00234` で、束1と束4の完了条件を満たした。** 失敗のとき帯は **シナリオ `—`／購読中 `—`** で、札ごとに「取得できませんでした」と理由を書く。本文も「シナリオがありません。「＋ シナリオを作成」から作ってください。」を出さなくなり、**持っているシナリオが消えたようには見えない**。読込・空・失敗が分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（シナリオごとの到達の推移、フォルダの扱い）はこの直しの外',
+    verdictSource: 'scenarios-v6/q5G45-error.txt', verdictHead: 'a8e00234',
   },
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
@@ -1366,6 +1366,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 手で増やす・減らす操作が無い。**間違って付いたマイルを直せない**', verdictSource: 'mileage-v6/design-qa-score-495.md',
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
+    verdictHead: '7d890d3b',
   },
   {
     /*
@@ -1701,8 +1702,8 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「受信Webhookがありません。「新規Webhook」から作成してください。」を出し、作成を誘う。P2 タブが「受信 (Incoming)」「送信 (Outgoing)」と英語を括弧で足しており、誘い文の「新規Webhook」と実際のボタン名「Webhookを追加」も違う。**#515 で直す差分が出ている（未取り込み）**',
-    verdictSource: 'webhooks-v6/f8SBSh-error-1920.png', verdictHead: '0389226d',
+    verdict: 'needs_fix', verdictNote: '**#515 `09054b78` で、束1の完了条件を満たした。** 失敗のとき「受信Webhookを表示できませんでした／**登録内容は消えていません。**再読み込みしても直らない場合はエラー報告へ。」となり、**作成の誘い（「新規Webhook」から作成してください）を同時に出さなくなった**。読込・空・失敗が `data-list-state` で分かれる。この画面は件数の帯を持たないので、束4（未取得と0件）は当てはまらない。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 タブが「受信 (Incoming)」「送信 (Outgoing)」と英語を括弧で足す形（束3）',
+    verdictSource: 'webhooks-v6/f8SBSh-error.txt', verdictHead: '09054b78',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -1829,8 +1830,8 @@ export const SCREENS = [
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
     states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1は #532 head `6cc74968` のコード上で修正済み・画像再確認待ち。失敗を `ListState kind="error"` へ分け、帯と補助データを `—`、APIの内部文言を運用者向け文へ置き換えている。API失敗状態の1440/1920画像で空の作成誘導が同時に出ないことを確認するまで要修正を維持する',
-    verdictSource: 'booking-settings-v6/W6465r-error-1920.png', verdictHead: 'bd8efa54',
+    verdict: 'needs_fix', verdictNote: '**#532 `6cc74968` で、束1と束4の完了条件を満たした（コード上の修正を画像で確認済み）。** 失敗のとき帯は **メニュー `—件`／担当スタッフ `—人`／今月の予約 `—件`／枠の稼働率 `—%`** で、札ごとに「取得できませんでした」。空と失敗が `data-list-state` で分かれ、失敗のとき作成の誘いを出さない。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P1 設計のタブは4本（メニュー／受付枠／休業日／予約のルール）だが、実装はメニューと担当スタッフの2タブで、受付枠と休業日は `/booking/staff/shifts` の別ルートにある',
+    verdictSource: 'booking-settings-v6/W6465r-error.txt', verdictHead: '6cc74968',
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
@@ -1840,8 +1841,8 @@ export const SCREENS = [
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*', '**/api/events/admin/events/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1は #518 head `56793b6a`（件数は #533）でコード上は修正済み・画像再確認待ち。失敗を `ListState kind="error"` へ分け、空の作成誘導を出さず、帯は未取得を `—` とする。API失敗状態の1440/1920画像を確認するまで要修正を維持する',
-    verdictSource: 'events-v6/k5m5Bc-error-1920.png', verdictHead: '6bb950f3',
+    verdict: 'needs_fix', verdictNote: '**#518 → #533 `d1070487` で、束1と束4の完了条件を満たした。** 失敗のとき帯は **イベント `—`／申込 `—`／定員の充足 `—`／承認待ち `—`** で、札ごとに「取得できませんでした」。本文も「表示できませんでした」に分かれ、空の作成誘導を出さない。読込・空・失敗が分かれる。1440・1920とも横スクロール0。**#533 は #518 を含む**ので、この head で両方を見たことになる。**画面全体は要修正のまま**：P1 帯が「数」で「次に何をするか」になっていない（設計の「あと少しで満席 2回（声をかけると埋まります）」は、そのまま行動になる帯）',
+    verdictSource: 'events-v6/k5m5Bc-error.txt', verdictHead: 'd1070487',
   },
 
   // ── 機能30 ログインユーザー ─────────────────────────────
@@ -2115,7 +2116,10 @@ export const CAPTURED_AT = {
   ],
   12: [{ pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' }],
   14: [{ pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' }],
-  26: [{ pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' }],
+  26: [
+    { pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' },
+    { pr: 515, head: '09054b78', on: '2026-08-29', screens: ['f8SBSh'], note: '外部連携の失敗を空と分ける。束1' },
+  ],
   15: [
     { pr: 559, head: '7922c002', on: '2026-08-29', screens: ['g89Tc'], note: '未取得を一括削除で選べないようにした。**#559 は #438 を含む**' },
     { pr: 560, head: '7c1acd0f', on: '2026-08-29', screens: ['g89Tc'], note: '寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている' },
@@ -2151,7 +2155,7 @@ export const CAPTURED_AT = {
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
     { pr: 551, head: '44692a37', on: '2026-08-29', screens: ['s7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo'], note: '公開までの5段。`?stage=` で1枚ずつ開く。届く予定・公開前チェック・公開の3つの口だけモックで405に落とさず、**公開の人数は公開前チェックと同じ数から作る**' },
     
-    { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**' },
+    { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**。**#498 単体（`ac288d48`）では撮り直さない**——`reminders/page.tsx` の blob は違うが、それは #514 が #498 の上でさらに直したため。撮った木のほうが新しく（`ac288d48` は `9a72dba6` の祖先）、#498 で撮り直すと #514 の直りを絵から巻き戻すことになる' },
     { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
@@ -2159,8 +2163,9 @@ export const CAPTURED_AT = {
     
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
-  5: [{ pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
-    
+  5: [
+    { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
+    { pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
     { pr: 521, head: '7d5d74fd', on: '2026-08-29', screens: ['RUxNf'], note: '開始・停止の確認窓。窓は一覧の行に出る' },
     { pr: 522, head: '3c88b8bd', on: '2026-08-29', screens: ['NrBkW'], note: '開始完了の知らせ。`?started=1` で開ける。#521 の上に積んである' },
     { pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['M2b2B'], note: '新しい口は足さず既存の統計を読む' },
@@ -2183,7 +2188,11 @@ export const CAPTURED_AT = {
     { pr: 552, head: '6ce43563', on: '2026-08-29', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5'], note: 'タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）' },
   ],
   32: [{ pr: 482, head: 'b346d467', on: '2026-08-29', screens: ['b3HfZ', 'U0BwS'], note: '緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）' }],
-  3: [{ pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
+  3: [
+    { pr: 520, head: '4848a8f3', on: '2026-08-29', screens: ['bzDn6'], note: '友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**' },
+    { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
+  28: [{ pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' }],
+  29: [{ pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' }],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
