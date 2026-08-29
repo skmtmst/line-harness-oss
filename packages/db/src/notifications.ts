@@ -40,29 +40,57 @@ export interface NotificationCenterCounts {
 
 // --- 通知ルール ---
 
-export async function getNotificationRules(db: D1Database): Promise<NotificationRuleRow[]> {
-  const result = await db.prepare(`SELECT * FROM notification_rules ORDER BY created_at DESC`).all<NotificationRuleRow>();
+export async function getNotificationRules(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<NotificationRuleRow[]> {
+  const result = await db.prepare(
+    `SELECT * FROM notification_rules WHERE line_account_id = ? ORDER BY created_at DESC`,
+  ).bind(lineAccountId).all<NotificationRuleRow>();
   return result.results;
 }
 
-export async function getNotificationRuleById(db: D1Database, id: string): Promise<NotificationRuleRow | null> {
-  return db.prepare(`SELECT * FROM notification_rules WHERE id = ?`).bind(id).first<NotificationRuleRow>();
+export async function getNotificationRuleById(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<NotificationRuleRow | null> {
+  return db.prepare(`SELECT * FROM notification_rules WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).first<NotificationRuleRow>();
 }
 
 export async function createNotificationRule(
   db: D1Database,
-  input: { name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] },
+  input: {
+    lineAccountId: string;
+    name: string;
+    eventType: string;
+    conditions?: Record<string, unknown>;
+    channels?: string[];
+  },
 ): Promise<NotificationRuleRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO notification_rules (id, name, event_type, conditions, channels, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.eventType, JSON.stringify(input.conditions ?? {}), JSON.stringify(input.channels ?? ['dashboard']), now, now).run();
-  return (await getNotificationRuleById(db, id))!;
+  await db.prepare(`INSERT INTO notification_rules
+    (id, name, event_type, conditions, channels, line_account_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      id,
+      input.name,
+      input.eventType,
+      JSON.stringify(input.conditions ?? {}),
+      JSON.stringify(input.channels ?? ['dashboard']),
+      input.lineAccountId,
+      now,
+      now,
+    ).run();
+  return (await getNotificationRuleById(db, id, input.lineAccountId))!;
 }
 
 export async function updateNotificationRule(
   db: D1Database,
   id: string,
+  lineAccountId: string,
   updates: Partial<{ name: string; eventType: string; conditions: Record<string, unknown>; channels: string[]; isActive: boolean }>,
 ): Promise<void> {
   const sets: string[] = [];
@@ -76,24 +104,36 @@ export async function updateNotificationRule(
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
-  await db.prepare(`UPDATE notification_rules SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
+  values.push(lineAccountId);
+  await db.prepare(`UPDATE notification_rules SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+    .bind(...values).run();
 }
 
-export async function deleteNotificationRule(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM notification_rules WHERE id = ?`).bind(id).run();
+export async function deleteNotificationRule(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<void> {
+  await db.prepare(`DELETE FROM notification_rules WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).run();
 }
 
 // --- 通知 ---
 
-export async function getNotifications(db: D1Database, opts: { status?: string; limit?: number } = {}): Promise<NotificationRow[]> {
+export async function getNotifications(
+  db: D1Database,
+  opts: { lineAccountId: string; status?: string; limit?: number },
+): Promise<NotificationRow[]> {
   const limit = opts.limit ?? 100;
   if (opts.status) {
-    const result = await db.prepare(`SELECT * FROM notifications WHERE status = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(opts.status, limit).all<NotificationRow>();
+    const result = await db.prepare(
+      `SELECT * FROM notifications WHERE line_account_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?`,
+    ).bind(opts.lineAccountId, opts.status, limit).all<NotificationRow>();
     return result.results;
   }
-  const result = await db.prepare(`SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?`)
-    .bind(limit).all<NotificationRow>();
+  const result = await db.prepare(
+    `SELECT * FROM notifications WHERE line_account_id = ? ORDER BY created_at DESC LIMIT ?`,
+  ).bind(opts.lineAccountId, limit).all<NotificationRow>();
   return result.results;
 }
 
@@ -224,8 +264,14 @@ export async function markAllNotificationsRead(
 }
 
 /** イベントタイプに一致するアクティブな通知ルールを取得 */
-export async function getActiveNotificationRulesByEvent(db: D1Database, eventType: string): Promise<NotificationRuleRow[]> {
-  const result = await db.prepare(`SELECT * FROM notification_rules WHERE event_type = ? AND is_active = 1`)
-    .bind(eventType).all<NotificationRuleRow>();
+export async function getActiveNotificationRulesByEvent(
+  db: D1Database,
+  eventType: string,
+  lineAccountId: string,
+): Promise<NotificationRuleRow[]> {
+  const result = await db.prepare(
+    `SELECT * FROM notification_rules
+      WHERE event_type = ? AND line_account_id = ? AND is_active = 1`,
+  ).bind(eventType, lineAccountId).all<NotificationRuleRow>();
   return result.results;
 }
