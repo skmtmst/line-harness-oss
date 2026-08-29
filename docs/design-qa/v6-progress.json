@@ -26,7 +26,21 @@
       "needsFix": 0,
       "unjudged": 0,
       "remaining": 5,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 419,
+          "head": "c84baa63",
+          "on": "2026-08-30",
+          "screens": [
+            "vUXKb",
+            "ZN0ov",
+            "JN6mQ",
+            "NjK9q",
+            "Alekb"
+          ],
+          "note": "ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）"
+        }
+      ]
     },
     {
       "feature": 2,
@@ -451,6 +465,17 @@
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
+        {
+          "pr": 431,
+          "head": "2ab18c88",
+          "on": "2026-08-30",
+          "screens": [
+            "uLQQc",
+            "txMO9",
+            "U3SI5"
+          ],
+          "note": "友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている"
+        },
         {
           "pr": 506,
           "head": "5dc99107",
@@ -940,15 +965,15 @@
         },
         {
           "pr": 545,
-          "head": "03022681",
-          "on": "2026-08-29",
+          "head": "c9bb193d",
+          "on": "2026-08-30",
           "screens": [
             "X8JCA5",
             "Se65i",
             "DpxOK",
             "N2gAza"
           ],
-          "note": "顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない"
+          "note": "顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）"
         },
         {
           "pr": 564,

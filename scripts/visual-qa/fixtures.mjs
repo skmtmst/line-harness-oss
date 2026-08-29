@@ -4476,3 +4476,41 @@ export const QUESTION_TEMPLATE_DRAFT = {
     ],
   },
 }
+
+/*
+  お知らせの一覧（`NotificationCenterData`、`packages/shared/src/types.ts:1147`）。
+
+  **`counts` の4つを必ず揃える。** 画面は `counts.all` を読むので、
+  欠けると `undefined.all` でダッシュボードごと落ちる。
+
+  **未読と既読を混ぜる。** どちらか片方だけだと「未読だけ絞る」が
+  効いているのか分からない。`category` は `error` と `update` の
+  両方を入れて、絞り込みの札が動くようにする。
+*/
+export const NOTIFICATION_CENTER = {
+  items: [
+    {
+      id: 'nc-1', eventType: 'broadcast_failed', category: 'error',
+      title: '一斉配信が途中で止まりました',
+      body: '「8月キャンペーンのお知らせ」で3件が送れませんでした。相手のブロックが理由です。',
+      metadata: { broadcastId: 'broadcast-0' }, isRead: false,
+      createdAt: '2026-08-29T23:40:00.000Z',
+    },
+    {
+      id: 'nc-2', eventType: 'line_quota_warning', category: 'error',
+      title: 'LINEの送信枠が残り少なくなっています',
+      body: '今月の残りは 1,240 通です。予約中の配信で 2,100 通を使う予定です。',
+      metadata: null, isRead: false,
+      createdAt: '2026-08-29T12:10:00.000Z',
+    },
+    {
+      id: 'nc-3', eventType: 'release_note', category: 'update',
+      title: '質問テンプレートが使えるようになりました',
+      body: 'シナリオの通に、選択肢つきの質問を差し込めます。',
+      metadata: null, isRead: true,
+      createdAt: '2026-08-28T02:00:00.000Z',
+    },
+  ],
+  counts: { all: 3, error: 2, update: 1, unread: 2 },
+  unreadCount: 2,
+}

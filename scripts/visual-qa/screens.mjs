@@ -169,32 +169,37 @@ export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
-    verdict: 'structure_match_data_pending', verdictNote: '構造一致 / データ未接続', verdictSource: 'dashboard-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**#419 `c84baa63` で撮った。** 「今日やること」の札は 対応が必要な受信 **5件**（LINE 1・メール 4／最長 6日7時間50分）／写真審査 **1件**（確認待ち1・ポイント付与あり）／今日の予約 **0件**（次回 09:00）／出荷予定 **0件**（EC通知から算出）。**数えて0のものは `0件`** で出し、空の札には「出荷予定はまだありません。ECから注文や定期便の通知を受け取ると、ここに並びます。」と**次に何が起きれば埋まるか**を書く。壊れ値・内部語は0件、1440・1920とも横スクロール0。**設計との突き合わせは、通知パネルの実データがつながってから**（#419 がその接続。パネルは押して開く形なので、この行では開いていない）', verdictSource: 'dashboard-v6/vUXKb.txt',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
+    verdictHead: 'c84baa63',
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
-    verdict: 'structure_match_data_pending', verdictNote: '構造一致', verdictSource: 'dashboard-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/ZN0ov.txt',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
+    verdictHead: 'c84baa63',
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
-    verdict: 'structure_match_data_pending', verdictNote: '構造一致 / データ未接続', verdictSource: 'dashboard-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/JN6mQ.txt',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
+    verdictHead: 'c84baa63',
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
-    verdict: 'structure_match_data_pending', verdictNote: '構造一致', verdictSource: 'dashboard-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/NjK9q.txt',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '表示件数' }],
+    verdictHead: 'c84baa63',
   },
   {
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
-    verdict: 'structure_match_data_pending', verdictNote: '構造一致 / データ未接続', verdictSource: 'dashboard-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/Alekb.txt',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
+    verdictHead: 'c84baa63',
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
@@ -900,7 +905,7 @@ export const SCREENS = [
     ①はじめて追加した人 と ②以前からの友だち の2つに分けるだけ。
     流入リンクで出し分ける仕組みがそもそも無い。
   */
-  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信', verdict: 'needs_fix', verdictNote: 'P1 設計は「流入リンクごとに初回案内を並べる一覧」で、店頭QR・広告・紹介にそれぞれ別の初回案内を置いて優先順位で当てる。実装はアカウントに1枚の設定（FriendAddRouting）で、はじめて追加した人と以前からの友だち・ブロック解除した人の2つに分けるだけ。**流入リンクで出し分ける仕組みがそもそも無い**（page.tsx:712「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません。」）。作り込み不足ではなく別の形の機能。実装だけにある「どう振り分けられるか」の流れ図と注意の帯は、設定の効き方が読めるので残すべきもの', verdictSource: 'friend-add-v6/design-qa.md' },
+  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信', verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 「友だちに追加されたときに何を配信するかを決めます。**はじめての人と、以前からの友だち・ブロックを解除した人で分けられます。**」と、2つの相手を先に説明する。1つめの節に「このアカウントを**一度も友だち追加したことがない人**が対象です。」と、誰が入るかを書く。壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は配信内容の下見と、送る条件の重なりをその場で見せる', verdictSource: 'friend-add-v6/uLQQc.txt' , verdictHead: '2ab18c88' },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
     gap: 'drop',
@@ -922,11 +927,12 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
   },
-  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: 'P1 アクション追加が別窓でなく札の列。設計の段の構造に対応していない', verdictSource: 'friend-add-v6/design-qa.md' },
+  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差（配信内容の下見、条件の重なり）は `uLQQc` と同じ', verdictSource: 'friend-add-v6/txMO9.txt' , verdictHead: '2ab18c88' },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
-    verdict: 'needs_fix', verdictNote: 'P1 プレビューとテストの面が設計とそろわない', verdictSource: 'friend-add-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差は `uLQQc` と同じ', verdictSource: 'friend-add-v6/U3SI5.txt',
     mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
+    verdictHead: '2ab18c88',
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
@@ -1594,7 +1600,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**#545 で「送れなかったもの」が入り、未実装ではなくなった。** 失敗理由が行ごとに出る（「相手がブロックしています」「LINEの受け取り上限を超えました」）。**未取得と0件が分かれている**：通常では LINE受付・試行・クリックが `—`（まだ記録していない）、空では帯が **0件**（数えて0）。再試行のボタンは**出していない**——型が `retryAvailable: false` で、画面にも「試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。」と理由を書く。**出せないものを出さない**形で、`TimXl` と同じ。1440・1920とも横スクロール0。P2 設計は届かなかったものを「ブロック中の人／メールで届いた／まだ何もできていない」に分けるが、実装は状態ごとの分けまで。「その日のうちに別の手だてで届けてください」の案内も無い',
     verdictSource: 'line-notify-v6/X8JCA5-normal.txt',
-    verdictHead: '03022681',
+    verdictHead: 'c9bb193d',
   },
   {
     /*
@@ -1608,7 +1614,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**#545 で「記録」が入り、未実装ではなくなった。** 通常・空・失敗の3つが `data-list-state` でも分かれる。**個人の既読はどこにも作っていない**：列は「試行・クリック」で、行は「クリック —」。型（`EcNotificationRun`）にも既読の欄が無く、画面に「個人の既読は、現在の記録からは取得できません。」と書いてある。**所属を確定できない過去分も出さない**（`unassignedHistoricalRowsExcluded: true`、画面にも「選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します」）。空のとき帯は 0件（数えて0）。1440・1920とも横スクロール0。P2 設計の絞り込みチップ（すべて／押された／届かなかった）と「CSVで書き出す」が無い',
     verdictSource: 'line-notify-v6/Se65i-normal.txt',
-    verdictHead: '03022681',
+    verdictHead: 'c9bb193d',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
@@ -1625,7 +1631,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**#545 で作成画面が入り、未実装ではなくなった。** **下書きだけを保存する安全な段階になっている**：ボタンは「下書きに保存」だけで、公開・テスト送信は出さない。「下書きを保存しても通知は始まりません。」「未入力の下書きは公開できません。」「受け取る人が0人だと公開できません。」と、公開できない条件を先に書く。宛先の取り違えも「宛先はお店の人です。あとから顧客向けへは変えられません。」で止める。**本文に画面名の重複は無い**（パンくずのみ）。1440・1920とも横スクロール0。P2 設計との細かな差（受け取る人の選び方の面）は、送信処理が接続されてから見る',
     verdictSource: 'line-notify-v6/N2gAza.txt',
-    verdictHead: '03022681',
+    verdictHead: 'c9bb193d',
   },
 
   // ── 機能25 オートメーション ─────────────────────────────
@@ -2151,7 +2157,7 @@ export const CAPTURED_AT = {
   ],
   24: [
     { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
-    { pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' },
+    { pr: 545, head: 'c9bb193d', on: '2026-08-30', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）' },
     { pr: 564, head: 'ad59fde6', on: '2026-08-29', screens: ['DpxOK'], note: '絞り込みチップを状態で言い分ける。失敗・権限不足は `—`' },
   ],
   17: [
@@ -2224,7 +2230,11 @@ export const CAPTURED_AT = {
   4: [{ pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' }],
   30: [{ pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' }],
   31: [{ pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' }],
-  9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
+  1: [{ pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' }],
+  9: [
+    { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
+    { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },
+  ],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
   20: [{ pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`、head `17b32da7`）。撮り直していない——判定は取り込み前の head のままで、画面のファイルは #445 自身の変更なので中身は同じ' }],
