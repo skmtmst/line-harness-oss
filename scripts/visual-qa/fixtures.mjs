@@ -1059,6 +1059,30 @@ export const WEBINARS = [
 ]
 
 /** 設計 `Q8sHa`・`yxyzQ` の数。申込184・再生142・完了96・CTA52。 */
+/**
+ * ウェビナーの通知とリマインド（`GET /api/webinars/:id/notifications`、設計 `Ho8z4`）。
+ *
+ * **用意していないと、一覧の既定が返って `overview` が無く、画面ごと落ちます。**
+ * 型は `WebinarNotificationSettings` と `WebinarNotificationOverview`
+ * （`components/webinars/webinar-notifications.tsx` の既定値と同じ形）。
+ *
+ * 数は**すべて実値**。取れないものは入れていません。
+ */
+export const WEBINAR_NOTIFICATIONS = {
+  settings: {
+    registrationEnabled: true,
+    dayBeforeEnabled: true,
+    dayBeforeTime: '20:00',
+    hourBeforeEnabled: true,
+    hourBeforeMinutes: 60,
+    startEnabled: true,
+    missedEnabled: true,
+    missedTime: '10:00',
+    completedEnabled: true,
+  },
+  overview: { total: 184, pending: 42, sent: 138, failed: 2, skipped: 1, cancelled: 1 },
+}
+
 export const WEBINAR_ANALYTICS = {
   summary: {
     reservations: 184, viewers: 142, registeredAndJoined: 128,

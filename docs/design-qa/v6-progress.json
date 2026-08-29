@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 200,
-  "unimplemented": 58,
+  "compared": 201,
+  "unimplemented": 57,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 177,
+  "needsFix": 178,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -319,17 +319,27 @@
       "feature": 10,
       "name": "ウェビナー",
       "total": 13,
-      "compared": 8,
-      "unimplemented": 5,
+      "compared": 9,
+      "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 8,
+      "needsFix": 9,
       "unjudged": 0,
       "remaining": 13,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 546,
+          "head": "de0848b9",
+          "on": "2026-08-29",
+          "screens": [
+            "Ho8z4"
+          ],
+          "note": "通知とリマインド。既存の申込と5分ごとの仕掛けを使う"
+        }
+      ]
     },
     {
       "feature": 11,
@@ -958,13 +968,6 @@
       "name": "9-1-I 削除確認",
       "gap": "drop",
       "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
-    },
-    {
-      "feature": 10,
-      "node": "Ho8z4",
-      "name": "10-1-D 通知・リマインド",
-      "gap": "pending",
-      "gapNote": "#546 head `de0848b9` で既存申込・5分cron・Harness Proxyを再利用し、申込直後/前日/開始前/開始時/未視聴/視聴完了、再予約時の旧予定取消、冪等キー、最大5回再送、テスト送信を実装済み。1440/1920と各状態の画像確認待ち"
     },
     {
       "feature": 10,
