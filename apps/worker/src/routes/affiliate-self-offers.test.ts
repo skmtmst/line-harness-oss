@@ -47,8 +47,16 @@ function call(path: string, init?: RequestInit) {
 }
 
 const TOKEN_TO_USER: Record<string, string> = { 'tok-alice': 'U-alice' };
-const FRIENDS: Record<string, { id: string; display_name: string }> = {
-  'U-alice': { id: 'friend-alice', display_name: 'Alice' },
+const FRIENDS: Record<
+  string,
+  { id: string; display_name: string; line_account_id: string; user_id: string | null }
+> = {
+  'U-alice': {
+    id: 'friend-alice',
+    display_name: 'Alice',
+    line_account_id: 'account-main',
+    user_id: 'U-alice',
+  },
 };
 const AFFILIATE = {
   id: 'aff-alice',
