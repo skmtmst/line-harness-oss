@@ -218,16 +218,27 @@ export default function RemindersPage() {
     if (deleting || pendingDelete.length === 0) return
     setDeleting(true)
     setDeleteError('')
+    const deletedIds = new Set<string>()
     try {
       for (const reminder of pendingDelete) {
         const result = await api.reminders.delete(reminder.id)
         if (!result.success) throw new Error(result.error)
+        deletedIds.add(reminder.id)
       }
       setSelected(new Set())
       setPendingDelete([])
       await loadReminders()
-    } catch (caught) {
-      setDeleteError(caught instanceof Error ? caught.message : '削除に失敗しました')
+    } catch {
+      // 複数削除の途中で失敗しても、削除済みをもう一度送らない。
+      // 未完了分だけを確認画面に残し、そのまま再試行できるようにする。
+      setSelected((previous) => {
+        const remaining = new Set(previous)
+        for (const id of deletedIds) remaining.delete(id)
+        return remaining
+      })
+      setPendingDelete((previous) => previous.filter((reminder) => !deletedIds.has(reminder.id)))
+      setDeleteError('このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      if (deletedIds.size > 0) await loadReminders()
     } finally {
       setDeleting(false)
     }
