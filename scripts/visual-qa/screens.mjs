@@ -1524,54 +1524,44 @@ export const SCREENS = [
     mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
   },
   {
-    /*
-      **撮る支度だけ。** 固定データは `UNDELIVERED_RECORDS`。
-      **届かなかった理由・メール送信の記録は置き場がありません。**
-      連絡先は作り物（`example.com`）だけを置く。
-    */
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
-    gap: 'pending',
-    gapNote: '#545 head `03022681` は土台の#504を含み、`/line-notifications?tab=failures` を実装済み。失敗理由・未取得と0件・安全な再試行導線を画像と操作で確認する',
-    status: 'unimplemented',
-    why: '#504で送れなかったものの一覧を実装済み。#545 headに含まれるため、画像と操作確認待ち',
+    route: '/line-notifications?tab=failures', mode: 'page',
+    states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'needs_fix',
+    verdictNote: '**#545 で「送れなかったもの」が入り、未実装ではなくなった。** 失敗理由が行ごとに出る（「相手がブロックしています」「LINEの受け取り上限を超えました」）。**未取得と0件が分かれている**：通常では LINE受付・試行・クリックが `—`（まだ記録していない）、空では帯が **0件**（数えて0）。再試行のボタンは**出していない**——型が `retryAvailable: false` で、画面にも「試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。」と理由を書く。**出せないものを出さない**形で、`TimXl` と同じ。1440・1920とも横スクロール0。P2 設計は届かなかったものを「ブロック中の人／メールで届いた／まだ何もできていない」に分けるが、実装は状態ごとの分けまで。「その日のうちに別の手だてで届けてください」の案内も無い',
+    verdictSource: 'line-notify-v6/X8JCA5-normal.txt',
+    verdictHead: '03022681',
   },
   {
     /*
-      **撮る支度だけ。ルートも口も、まだ決まっていません。**
-      固定データは `NOTIFICATION_RECORDS`（共通契約に合わせてある）。
-      **だれに送ったか・開封・クリックは、いまの `notifications` に
-      置き場がありません。** そこは `null` にしてある。
-    */
-    /*
-      **設計から「開封」を外しました（2026-08-29）。**
-      LINEは友だち単位の既読を返しません。設計は「開かれた 3,682通・96.2%」
-      「開いていない 140」「読まれた」列を持っていましたが、**どの口からも
-      取れない数**です。列は「押された」に変え、短縮URLで数えられるものだけ
-      残しました。案内文にも理由を書いてあります。
-      控えは `/Volumes/My Passport/Github/pencil-backups/2026-08-29-0400-af63242d.pen-content`。
-
-      **#504 の実装も同じ結論に立っています。**
-      「個人の既読は、現在の記録からは取得できません」と画面に出し、
-      それを見張る試験まで付いています。
+      **個人の既読を作らないことを見る。** 型（`EcNotificationRun`）に
+      既読の欄はどこにも無く、あるのは `clickedAt`（短縮URLを押した時刻）だけ。
+      固定データにも既読は入れていない。
     */
     ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
-    gap: 'pending',
-    gapNote: '#545 head `03022681` は土台の#504を含み、既存 `ec_events` と `messages_log(source=ec_transactional)` を読む記録を実装済み。**開封は作らない**。通常・空・失敗を確認する',
-    status: 'unimplemented',
-    why: '#504で顧客へのお知らせ記録を実装済み。#545 headに含まれるため、画像と操作確認待ち',
+    route: '/line-notifications?tab=history', mode: 'page',
+    states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'needs_fix',
+    verdictNote: '**#545 で「記録」が入り、未実装ではなくなった。** 通常・空・失敗の3つが `data-list-state` でも分かれる。**個人の既読はどこにも作っていない**：列は「試行・クリック」で、行は「クリック —」。型（`EcNotificationRun`）にも既読の欄が無く、画面に「個人の既読は、現在の記録からは取得できません。」と書いてある。**所属を確定できない過去分も出さない**（`unassignedHistoricalRowsExcluded: true`、画面にも「選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します」）。空のとき帯は 0件（数えて0）。1440・1920とも横スクロール0。P2 設計の絞り込みチップ（すべて／押された／届かなかった）と「CSVで書き出す」が無い',
+    verdictSource: 'line-notify-v6/Se65i-normal.txt',
+    verdictHead: '03022681',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
-    gap: 'pending',
-    gapNote: '#545 head `03022681` に既存の通知ルールDB・アカウント別APIを再利用した一覧を実装済み。通常・読込・空・失敗・権限不足と、未取得 `—` / 実値0を1440/1920で比較する',
-    status: 'unimplemented',
-    why: '#545で安全な下書き一覧まで実装済み。スタッフID単位の宛先解決・実送信・実行台帳は未接続で、画像と操作確認前のため未実装判定を維持',
+    route: '/line-notifications?tab=operator', mode: 'page',
+    states: { apis: ['**/api/notifications/rules?**', '**/api/notifications/rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'needs_fix',
+    verdictNote: '**#545 で運用者へのお知らせが入り、未実装ではなくなった。** 通常・読込・空・失敗・**権限不足**の5つが揃い、`data-list-state` でも名前で分かれる。権限不足は「表示する権限がありません／見るには権限が要ります。オーナーか管理者に追加を依頼してください。」。**帯は0件と未取得を分ける**：保存したお知らせ3件・受け取る人を設定済み0件・今日届いた数 **—件**（送信処理を接続後に表示）で、画面にも「0件と未取得を分けています」と書いてある。1440・1920とも横スクロール0。P2 権限不足と失敗のとき、絞り込みチップだけ「すべて 0／下書き 0／受け取る人がいない 0」と0を出す。読めていないので帯と同じく `—` にするか、チップ自体を出さないほうがよい',
+    verdictSource: 'line-notify-v6/DpxOK-forbidden.txt',
+    verdictHead: '03022681',
   },
   {
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
-    gap: 'pending',
-    gapNote: '#545 head `03022681` に下書き作成画面を実装済み。下書き保存・API直叩きの公開拒否・本文タイトル重複なし・横スクロール0を確認する',
-    status: 'unimplemented', why: '#545で作成画面まで実装済み。公開・テスト送信を出さずDBでも停止保存する安全な段階。画像と操作確認待ち',
+    route: '/line-notifications/operator/new', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#545 で作成画面が入り、未実装ではなくなった。** **下書きだけを保存する安全な段階になっている**：ボタンは「下書きに保存」だけで、公開・テスト送信は出さない。「下書きを保存しても通知は始まりません。」「未入力の下書きは公開できません。」「受け取る人が0人だと公開できません。」と、公開できない条件を先に書く。宛先の取り違えも「宛先はお店の人です。あとから顧客向けへは変えられません。」で止める。**本文に画面名の重複は無い**（パンくずのみ）。1440・1920とも横スクロール0。P2 設計との細かな差（受け取る人の選び方の面）は、送信処理が接続されてから見る',
+    verdictSource: 'line-notify-v6/N2gAza.txt',
+    verdictHead: '03022681',
   },
 
   // ── 機能25 オートメーション ─────────────────────────────
@@ -1986,6 +1976,7 @@ export const CAPTURED_AT = {
   26: [{ pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' }],
   15: [{ pr: 559, head: '888e80f9', on: '2026-08-29', screens: ['g89Tc'], note: '使用先の3つの出し分けと「使っていない」の絞り込み。**#559 は #438 を含む**' }],
   16: [{ pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' }],
+  24: [{ pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' }],
   17: [
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },

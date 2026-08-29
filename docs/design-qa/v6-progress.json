@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 209,
-  "unimplemented": 49,
+  "compared": 213,
+  "unimplemented": 45,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 186,
+  "needsFix": 190,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -734,17 +734,30 @@
       "feature": 24,
       "name": "LINE通知",
       "total": 6,
-      "compared": 2,
-      "unimplemented": 4,
+      "compared": 6,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
+      "needsFix": 6,
       "unjudged": 0,
       "remaining": 6,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 545,
+          "head": "03022681",
+          "on": "2026-08-29",
+          "screens": [
+            "X8JCA5",
+            "Se65i",
+            "DpxOK",
+            "N2gAza"
+          ],
+          "note": "顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない"
+        }
+      ]
     },
     {
       "feature": 25,
@@ -1175,34 +1188,6 @@
       "name": "23-1-C EC連携のつなぎ先",
       "gap": "api",
       "gapNote": "つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記"
-    },
-    {
-      "feature": 24,
-      "node": "X8JCA5",
-      "name": "24-1-B 送れなかったもの",
-      "gap": "pending",
-      "gapNote": "#545 head `03022681` は土台の#504を含み、`/line-notifications?tab=failures` を実装済み。失敗理由・未取得と0件・安全な再試行導線を画像と操作で確認する"
-    },
-    {
-      "feature": 24,
-      "node": "Se65i",
-      "name": "24-1-C お知らせの記録",
-      "gap": "pending",
-      "gapNote": "#545 head `03022681` は土台の#504を含み、既存 `ec_events` と `messages_log(source=ec_transactional)` を読む記録を実装済み。**開封は作らない**。通常・空・失敗を確認する"
-    },
-    {
-      "feature": 24,
-      "node": "DpxOK",
-      "name": "24-2 運用者へのお知らせ",
-      "gap": "pending",
-      "gapNote": "#545 head `03022681` に既存の通知ルールDB・アカウント別APIを再利用した一覧を実装済み。通常・読込・空・失敗・権限不足と、未取得 `—` / 実値0を1440/1920で比較する"
-    },
-    {
-      "feature": 24,
-      "node": "N2gAza",
-      "name": "24-2-A 運用者へのお知らせをつくる",
-      "gap": "pending",
-      "gapNote": "#545 head `03022681` に下書き作成画面を実装済み。下書き保存・API直叩きの公開拒否・本文タイトル重複なし・横スクロール0を確認する"
     },
     {
       "feature": 25,

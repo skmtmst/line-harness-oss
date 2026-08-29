@@ -447,6 +447,28 @@ const EMPTY_BODIES = [
  * 包んで返すと画面が読めず、空の状態のつもりで落ちた絵を撮ってしまう。
  */
 const BARE_EMPTY = [
+  /*
+    顧客へのお知らせの記録。**`pagination` は `data` の外にある**
+    （型は `ApiResponse<EcNotificationRunList> & { pagination }`）ので、
+    包まずにそのまま返す。包むと `response.pagination.total` で落ちて
+    **空のはずが失敗の面になる。** 実際そうなった。
+    帯の数は**すべて0**（数えて0）。`coverage` は型どおり、
+    できないことを `false` のままにする。
+  */
+  [/\/api\/ec-commerce\/notification-runs/, {
+    success: true,
+    data: {
+      items: [],
+      summary: { accepted: 0, failed: 0, excluded: 0, pending: 0 },
+      coverage: {
+        source: 'current_ec_events',
+        unassignedHistoricalRowsExcluded: true,
+        attemptHistoryAvailable: false,
+        retryAvailable: false,
+      },
+    },
+    pagination: { total: 0, limit: 20, offset: 0 },
+  }],
   [/\/api\/booking\/admin\/menus/, { menus: [] }],
   [/\/api\/booking\/admin\/staff/, { staff: [] }],
   [/\/api\/booking\/admin\/requests/, { requests: [] }],

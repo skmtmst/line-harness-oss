@@ -3847,6 +3847,91 @@ const execRow = (over) => ({
          「読まれた」列は、いまの記録から出せない。
    **無い：注文番号との結びつき。** `metadata` に入るかは実装しだい。
 */
+/**
+ * 顧客へのお知らせの実行記録（`GET /api/ec-commerce/notification-runs`、
+ * 設計 `Se65i`＝記録／`X8JCA5`＝送れなかったもの）。
+ *
+ * 型は `apps/web/src/lib/api.ts` の `EcNotificationRunList` と
+ * `EcNotificationRun`。**型そのものが「できないこと」を書いています**：
+ * `attemptHistoryAvailable: false`（試行の履歴は残していない）、
+ * `retryAvailable: false`（画面からは送り直せない）、
+ * `unassignedHistoricalRowsExcluded: true`（所属を確定できない過去分は外す）。
+ *
+ * **個人の既読を持たせる場所はどこにもありません。**
+ * あるのは `clickedAt`（短縮URLを押した時刻）だけです。
+ *
+ * `attemptCount` と `nextRetryAt` は `null`（＝まだ数えていない）。
+ * **0にしない。** 0にすると「1度も試していない」と読めてしまいます。
+ */
+const run = (id, name, eventId, friendId, friendName, orderNumber, status, reason, receivedAt, acceptedAt, clickedAt) => ({
+  id, recipientType: 'customer', notificationName: name, source: 'EC連携',
+  sourceEventId: eventId, friendId, friendName, orderNumber, channel: 'line',
+  status, reason, receivedAt, acceptedAt,
+  attemptCount: null, nextRetryAt: null, clickedAt,
+  version: 1, executionMode: 'automatic', retryAvailable: false,
+})
+
+const NOTIFICATION_RUN_ITEMS = [
+  run('ecr-1', '注文ありがとうございます', 'ece-1', 'friend-1', '石田 未来', '#12492', 'accepted', null,
+    '2026-08-25T02:42:00.000Z', '2026-08-25T02:42:08.000Z', null),
+  run('ecr-2', 'ご入金を確認しました', 'ece-2', 'friend-2', '木村 亮', '#12488', 'accepted', null,
+    '2026-08-25T02:20:00.000Z', '2026-08-25T02:20:04.000Z', null),
+  run('ecr-3', 'お荷物を送りました', 'ece-3', 'friend-3', '前田 さくら', '#12471', 'accepted', null,
+    '2026-08-25T01:58:00.000Z', '2026-08-25T01:58:03.000Z', '2026-08-25T02:02:00.000Z'),
+  /* 届かなかったもの。**理由が要る。** */
+  run('ecr-4', 'お荷物を送りました', 'ece-4', 'friend-4', '林 里佳', '#12466', 'failed',
+    '相手がブロックしています', '2026-08-24T09:00:00.000Z', null, null),
+  run('ecr-5', '返金しました', 'ece-5', 'friend-5', '大西 健一', '#12402', 'failed',
+    'LINEの受け取り上限を超えました', '2026-08-24T06:20:00.000Z', null, null),
+  /* 友だちが結び付いていない。**推測で誰かに当てない。** */
+  run('ecr-6', '定期便の発送予定', 'ece-6', '', null, '#12455', 'excluded',
+    'この注文とLINEの友だちを結び付けられませんでした', '2026-08-25T00:40:00.000Z', null, null),
+  /* まだ送っていない。 */
+  run('ecr-7', '注文ありがとうございます', 'ece-7', 'friend-7', '高橋 直人', '#12480', 'pending', null,
+    '2026-08-24T00:15:00.000Z', null, null),
+]
+
+export const EC_NOTIFICATION_RUNS = {
+  items: NOTIFICATION_RUN_ITEMS,
+  summary: { accepted: 3, failed: 2, excluded: 1, pending: 1 },
+  coverage: {
+    source: 'current_ec_events',
+    unassignedHistoricalRowsExcluded: true,
+    attemptHistoryAvailable: false,
+    retryAvailable: false,
+  },
+}
+
+/** 送れなかったものだけ。画面は `view=failures` で読む。 */
+export const EC_NOTIFICATION_FAILURES = {
+  items: NOTIFICATION_RUN_ITEMS.filter((r) => r.status === 'failed'),
+  summary: EC_NOTIFICATION_RUNS.summary,
+  coverage: EC_NOTIFICATION_RUNS.coverage,
+}
+
+/**
+ * 運用者へのお知らせ（`GET /api/notifications/rules`、設計 `DpxOK`）。
+ * 型は `packages/shared/src/types.ts` の `NotificationRule`。
+ */
+export const NOTIFICATION_RULES = [
+  {
+    id: 'nr-1', name: '配信が失敗したとき', eventType: 'broadcast.failed',
+    conditions: { minFailures: 1 }, channels: ['line', 'slack'], isActive: true,
+    createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'nr-2', name: '受信箱に未対応が溜まったとき', eventType: 'inbox.unanswered',
+    conditions: { threshold: 10 }, channels: ['line'], isActive: true,
+    createdAt: '2026-06-10T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    /* 止めているもの。**0件と混ざらないことが要る。** */
+    id: 'nr-3', name: '在庫が少なくなったとき', eventType: 'ec.stock.low',
+    conditions: { threshold: 5 }, channels: ['slack'], isActive: false,
+    createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-07-02T00:00:00.000Z',
+  },
+]
+
 export const NOTIFICATION_RECORDS = {
   summary: {
     sent30d: 3826,
