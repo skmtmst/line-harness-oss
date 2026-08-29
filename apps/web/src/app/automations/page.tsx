@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
+import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -95,8 +98,18 @@ const initialForm: CreateFormState = {
   priority: 0,
 }
 
-export default function AutomationsPage() {
+const AUTOMATION_TABS = [
+  { key: 'running', label: '動いているもの' },
+  { key: 'stopped', label: '止めているもの' },
+  { key: 'runs', label: '動いた記録', href: '/automations/runs' },
+  { key: 'templates', label: '見本' },
+  { key: 'common-actions', label: '共通アクション', href: '/common-actions' },
+] as const
+
+function AutomationsPageHost() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const canManage = useCanManageAutomations()
+  const tab = useMergedTab(AUTOMATION_TABS, 'tab', 'running')
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
@@ -216,8 +229,44 @@ export default function AutomationsPage() {
     }
   }
 
+  const visibleAutomations = automations.filter((item) =>
+    tab === 'stopped' ? !item.isActive : item.isActive,
+  )
+
+  const tabActions = canManage
+    ? <Button variant="primary" href="/automations/new">新しく作る</Button>
+    : null
+
+  if (tab === 'templates') {
+    return (
+      <div>
+        <div className="mb-4" data-v6-design="Tabs">
+          <MergedTabs
+            basePath="/automations"
+            tabs={AUTOMATION_TABS}
+            active={tab}
+            defaultKey="running"
+            actions={tabActions}
+          />
+        </div>
+        {accountLoading
+          ? <ListState kind="loading" title="見本を読み込んでいます" />
+          : <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManage} />}
+      </div>
+    )
+  }
+
   return (
     <div>
+      <div className="mb-4" data-v6-design="Tabs">
+        <MergedTabs
+          basePath="/automations"
+          tabs={AUTOMATION_TABS}
+          active={tab}
+          defaultKey="running"
+          actions={tabActions}
+        />
+      </div>
       <div data-design="Head">
         <Header
           title="オートメーション"
@@ -368,13 +417,15 @@ export default function AutomationsPage() {
           description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
-      ) : automations.length === 0 && !showCreate ? (
+      ) : visibleAutomations.length === 0 && !showCreate ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">オートメーションがありません。「新規ルール」から作成してください。</p>
+          <p className="text-ink-faint">
+            {tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {automations.map((automation) => (
+          {visibleAutomations.map((automation) => (
             <div
               key={automation.id}
               className="bg-canvas rounded-card border border-hairline p-5 hover:shadow-md transition-shadow"
@@ -456,5 +507,13 @@ export default function AutomationsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function AutomationsPage() {
+  return (
+    <Suspense fallback={<ListState kind="loading" title="オートメーションを読み込んでいます" />}>
+      <AutomationsPageHost />
+    </Suspense>
   )
 }

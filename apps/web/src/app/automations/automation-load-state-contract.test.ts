@@ -20,7 +20,7 @@ describe('V6 オートメーション一覧の状態', () => {
 
   it('失敗を0件や作成誘導に見せず、再読み込みできる', () => {
     const errorBranch = PAGE.indexOf("loadStatus === 'error'")
-    const emptyBranch = PAGE.indexOf("automations.length === 0 && !showCreate")
+    const emptyBranch = PAGE.indexOf("visibleAutomations.length === 0 && !showCreate")
     expect(errorBranch).toBeGreaterThan(-1)
     expect(emptyBranch).toBeGreaterThan(errorBranch)
     expect(PAGE).toContain('登録したルールは消えていません。')

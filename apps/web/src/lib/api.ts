@@ -997,6 +997,32 @@ export type SearchConsoleSetup = {
   serviceAccountEmail: string | null
 }
 
+export type AutomationTemplateSummary = {
+  key: string
+  name: string
+  description: string
+  triggerLabel: string
+  actionLabel: string
+}
+
+export type AutomationDraftAction = {
+  id: string
+  type: 'add_tag' | 'start_scenario' | 'send_message'
+  params: Record<string, unknown>
+  onFailure: 'stop'
+}
+
+export type AutomationDraftDetail = {
+  id: string
+  draftVersionId: string
+  name: string
+  description: string | null
+  eventType: 'friend_add' | 'tag_change' | 'message_received'
+  triggerConfig: Record<string, unknown>
+  conditions: Record<string, unknown>
+  actions: AutomationDraftAction[]
+}
+
 /** 集計の期間をクエリにする。省略時はサーバー側の既定（直近30日）に任せる。 */
 function rangeQuery(params?: { from?: string; to?: string; accountId?: string }): string {
   const q = new URLSearchParams()
@@ -2661,6 +2687,34 @@ export const api = {
         `/api/automation-runs${query.size ? `?${query}` : ''}`,
       )
     },
+    templates: (accountId: string) =>
+      fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
+        `/api/automation-templates?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    createDraftFromTemplate: (templateKey: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
+        `/api/automation-templates/${encodeURIComponent(templateKey)}/drafts?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    getDraft: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<AutomationDraftDetail>>(
+        `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    draftResources: (accountId: string) =>
+      fetchApi<ApiResponse<{
+        tags: Array<{ id: string; name: string }>
+        scenarios: Array<{ id: string; name: string }>
+      }>>(`/api/automation-draft-resources?account_id=${encodeURIComponent(accountId)}`),
+    updateDraft: (id: string, accountId: string, data: {
+      expectedDraftVersionId: string
+      name: string
+      eventType: AutomationDraftDetail['eventType']
+      triggerConfig: Record<string, unknown>
+      actions: AutomationDraftAction[]
+    }) => fetchApi<ApiResponse<{ updated: true }>>(
+      `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
   },
   commonActions: {
     resources: (accountId: string, excludeId?: string) => {

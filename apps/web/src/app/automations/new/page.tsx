@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
+import ListState from '@/components/shared/list-state'
 
 const EVENTS = [
   { value: 'message_received', label: 'メッセージを受け取ったとき' },
@@ -19,6 +21,7 @@ const ACTIONS = [
 ] as const
 
 export default function NewAutomationPage() {
+  const [draftId, setDraftId] = useState<string | null | undefined>(undefined)
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>(EVENTS[0].value)
   const [keyword, setKeyword] = useState('')
@@ -32,6 +35,15 @@ export default function NewAutomationPage() {
       if (res.success) setTags(res.data)
     })
   }, [])
+
+  useEffect(() => {
+    setDraftId(new URLSearchParams(window.location.search).get('draftId'))
+  }, [])
+
+  if (draftId === undefined) {
+    return <ListState kind="loading" title="下書きを読み込んでいます" />
+  }
+  if (draftId) return <AutomationDraftEditor draftId={draftId} />
 
   return (
     <CreatePage
