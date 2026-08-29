@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -224,7 +225,13 @@ function SettingCard({
   )
 }
 
-export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
+export default function ScenarioDetailClient({
+  scenarioId,
+  showStarted = false,
+}: {
+  scenarioId: string
+  showStarted?: boolean
+}) {
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -1111,6 +1118,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                一覧へ戻る導線は設計では最下部にあり、ここには置かない
                （下の「シナリオ一覧に戻る」がそれ）。 */
             <div className="flex flex-wrap items-center gap-2">
+              <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
               <button
                 disabled
                 title="マニュアルは準備中です"
@@ -1127,9 +1135,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 一括プレビュー
               </button>
               <button
-                disabled
-                title="一括テスト送信は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
+                disabled={sortedSteps.length === 0}
+                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
                 一括テスト送信
               </button>
@@ -1147,6 +1156,21 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           }
         />
       </div>
+
+      {showStarted ? (
+        <div
+          data-design-node="NrBkW"
+          className="border-success bg-success-bg text-success mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
+          role="status"
+        >
+          <p className="font-semibold">
+            配信を開始しました。条件を満たした友だちから順に配信します。
+          </p>
+          <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
+            開始後の結果を見る
+          </Link>
+        </div>
+      ) : null}
 
       {/*
         同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
@@ -1456,13 +1480,6 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
               分岐を追加
-            </button>
-            <button
-              onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
-              disabled={sortedSteps.length === 0}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-            >
-              一括テスト送信
             </button>
           </div>
         </div>
@@ -1815,6 +1832,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       {testSend && (
         <TestSendDialog
           scenarioId={id}
+          lineAccountId={scenario?.lineAccountId ?? null}
           stepId={testSend.stepId}
           stepLabel={testSend.label}
           onClose={() => setTestSend(null)}

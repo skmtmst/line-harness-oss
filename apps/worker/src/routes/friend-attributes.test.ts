@@ -21,6 +21,7 @@ const searches = {
   updateSavedSearch: vi.fn(),
   deleteSavedSearch: vi.fn(),
   countSavedSearches: vi.fn(),
+  getSavedSearchReferences: vi.fn(),
   SAVED_SEARCH_LIMIT: 50,
   SAVED_SEARCH_SCOPES: ['friends', 'chats', 'bookings'],
   validateSearchConditions: (raw: unknown) => {
@@ -34,6 +35,9 @@ const searches = {
 const accountAccess = {
   getVisibleLineAccountScope: vi.fn(),
 };
+const savedSearchInsights = {
+  getSavedSearchMatchInsights: vi.fn(),
+};
 const folders = {
   getFolders: vi.fn(),
   getFolderById: vi.fn(),
@@ -45,6 +49,7 @@ const folders = {
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
+vi.mock('../services/saved-search-insights.js', () => savedSearchInsights);
 
 const { friendAttributes } = await import('./friend-attributes.js');
 
@@ -122,6 +127,10 @@ beforeEach(() => {
   searches.updateSavedSearch.mockResolvedValue(SEARCH);
   searches.deleteSavedSearch.mockResolvedValue(true);
   searches.countSavedSearches.mockResolvedValue(0);
+  searches.getSavedSearchReferences.mockResolvedValue([]);
+  savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValue(new Map([
+    ['s-1', { matchCount: 7, matchCountError: null }],
+  ]));
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     accounts: [{ id: 'account-1' }],
     ids: ['account-1'],
@@ -319,8 +328,38 @@ describe('保存した検索', () => {
 
   it('条件はJSONを解いて返す', async () => {
     const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
-    const body = (await res.json()) as { data: Array<{ conditions: { all: unknown[] } }> };
+    const body = (await res.json()) as {
+      data: Array<{
+        conditions: { all: unknown[] };
+        matchCount: number | null;
+        usedIn: unknown[];
+        canDelete: boolean;
+      }>;
+    };
     expect(body.data[0].conditions.all).toHaveLength(1);
+    expect(body.data[0]).toMatchObject({ matchCount: 7, usedIn: [], canDelete: true });
+  });
+
+  it('使用先と該当人数を同じ一覧APIで返す', async () => {
+    searches.getSavedSearchReferences.mockResolvedValue([{
+      saved_search_id: 's-1',
+      line_account_id: 'account-1',
+      reference_kind: 'broadcast',
+      reference_id: 'broadcast-1',
+      reference_name: '月末のご案内',
+      reference_mode: 'live',
+      last_used_at: '2026-08-28T10:00:00.000',
+      created_at: '2026-08-28T09:00:00.000',
+    }]);
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
+    const body = (await res.json()) as {
+      data: Array<{ usedIn: Array<{ name: string; mode: string }>; canDelete: boolean }>;
+    };
+    expect(body.data[0]).toMatchObject({
+      usedIn: [{ name: '月末のご案内', mode: 'live' }],
+      canDelete: false,
+    });
+    expect(searches.getSavedSearchReferences).toHaveBeenCalledWith(env.DB, ['s-1'], 'account-1');
   });
 
   it('スタッフ一覧は同じアカウントの共有・本人と本人の旧検索だけを返す', async () => {
@@ -380,6 +419,26 @@ describe('保存した検索', () => {
     expect(wrongScope.status).toBe(404);
     expect(wrongAccount.status).toBe(404);
     expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
+  });
+
+  it('使用中の検索はAPIを直接呼んでも削除できない', async () => {
+    searches.getSavedSearchReferences.mockResolvedValue([{
+      saved_search_id: 's-1',
+      line_account_id: 'account-1',
+      reference_kind: 'automation',
+      reference_id: 'automation-1',
+      reference_name: '休眠顧客フォロー',
+      reference_mode: 'live',
+      last_used_at: null,
+      created_at: '2026-08-28T09:00:00.000',
+    }]);
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE');
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      data: { usedIn: [{ name: '休眠顧客フォロー', mode: 'live' }] },
+    });
     expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
   });
 });

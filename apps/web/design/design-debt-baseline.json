@@ -15,9 +15,9 @@
   },
   "app/analytics/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 9,
-    "direct-th": 18,
-    "direct-secondary-button": 13
+    "arbitrary-value": 8,
+    "direct-th": 3,
+    "direct-secondary-button": 2
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,
@@ -245,7 +245,6 @@
     "direct-secondary-button": 1
   },
   "app/nen-members/page.tsx": {
-    "direct-secondary-button": 3,
     "arbitrary-value": 1
   },
   "app/page.tsx": {
@@ -302,7 +301,7 @@
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 6,
-    "direct-secondary-button": 10,
+    "direct-secondary-button": 9,
     "direct-primary-button": 3,
     "direct-th": 7
   },
@@ -317,9 +316,12 @@
     "direct-primary-button": 1
   },
   "app/scenarios/page.tsx": {
-    "direct-secondary-button": 5,
-    "direct-primary-button": 2,
+    "direct-secondary-button": 3,
+    "direct-primary-button": 1,
     "arbitrary-value": 1
+  },
+  "app/scenarios/results/page.tsx": {
+    "unresolved-classname": 23
   },
   "app/search-console/page.tsx": {
     "arbitrary-value": 11,
@@ -594,7 +596,7 @@
     "direct-th": 10
   },
   "components/friends/advanced-search-dialog.tsx": {
-    "arbitrary-value": 60
+    "arbitrary-value": 57
   },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
@@ -670,8 +672,7 @@
     "direct-primary-button": 3
   },
   "components/scenarios/scenario-list.tsx": {
-    "arbitrary-value": 3,
-    "direct-th": 9
+    "arbitrary-value": 3
   },
   "components/scenarios/schedule-input.tsx": {
     "unresolved-classname": 5
