@@ -203,29 +203,29 @@ export const SCREENS = [
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
-  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT, verdict: 'needs_fix', verdictNote: 'P1 見出しの副題に本名（河野 健太）が出ない。この部品が友だちの詳細を持っていない（データ未接続）。P2 見出しの★が無い。シナリオの札に🔗のアイコンが無く、日時が札の中に入っている（設計は札の外）。受信の吹き出しに最小幅が無く内容ぴったりになる。3カラム（一覧・トーク・顧客情報）と、見出しのアバターの頭文字・担当と対応の専用ドロップダウンは直って設計どおり', verdictSource: 'inbox-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT, verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。** 一覧・トーク・顧客情報の3カラムは設計どおり。**前に挙げた4点のうち3点が直っている**（見出しのアバターが頭文字を出す／副題の並び／担当と対応が専用の選び口になった）。P2 残る差はトークの見出し行に集まる——★が無い、シナリオの札にアイコンが無く日時が札の中、受信の吹き出しに最小幅が無い。P2 見出しの副題に**本名がまだ出ない**（この部品が友だちの詳細を持っていないため。データ未接続）。1440・1920とも横スクロール0', verdictSource: 'inbox-v6/xGLVe.txt + inbox-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
-    verdict: 'needs_fix', verdictNote: 'P2 ひな形1件ごとの★（よく使うに入れる）が無い。右側の「よく使うに登録済み」札と更新日も出ない',
-    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/NfgOs-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 テンプレート選択の面が設計とそろわない（絞り込みと、選んだあとの差し込みの見え方）。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/NfgOs.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
     steps: [...OPEN_CHAT, { click: '顧客情報を閉じる' }],
-    verdict: 'needs_fix', verdictNote: 'P2 見出しの★が無い。担当と対応の並びが逆。「顧客情報を表示」が「顧客情報を開く」。一覧の日時が相対でなく絶対',
-    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/H3lAOB-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 顧客情報パネルを閉じた形は出る。P2 設計との差は、閉じたときのトーク幅の広がり方。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/H3lAOB.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
     steps: [...OPEN_CHAT, { click: '表示項目' }],
-    verdict: 'needs_fix', verdictNote: 'P1 表示項目の中身が設計と違う（設計は対応マーク・担当者／予約・EC／内部メモ、実装はプロフィール／★つき情報／リッチメニュー／友だち情報／フォーム回答）。P2 見出しが「表示・並び順」、初期状態に戻す・完了が無い',
-    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/Xi4x9-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 右パネルの表示設定が設計とそろわない（項目ごとの出し入れ）。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/Xi4x9.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   // 未読の会話が並んだ状態。開かずにそのまま撮る。
   { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読',
-    verdict: 'needs_fix', verdictNote: 'P1 「自分の未読 n」の絞り込みが無い。P2 未読が数字バッジでなく点だけ。新着行の色付けが無い',
-    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/f0zn6-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 新着・担当者別未読の面が設計とそろわない（担当ごとの束ね方）。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/f0zn6.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
@@ -1697,9 +1697,9 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: '**#516 → #552 `6ce43563` で、失敗と空が分かれたまま保たれている。** 失敗は「オートメーションを表示できませんでした／**登録したルールは消えていません。**再読み込みしても直らない場合はエラー報告へ。」で、**帯も全部 `—`**（ルール —・稼働中 —・今月の実行 —・失敗 —）。空は「動いているオートメーションはありません。」で帯は **0件**。読込は `loading`。**束1と束4の完了条件を満たしている。** 1440・1920とも横スクロール0。P2 空だけ `data-list-state` が付かない（タブごとの文に替わったため）。読込・失敗には付いているので、撮影側から状態を確かめられるよう空にも付けてほしい',
     verdictSource: 'automations-v6/Vdbv5-error.txt', verdictHead: '6ce43563',
   },
-  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: 'P2 実装は設計にかなり近い。版（v4）と呼び出し元、古い版のまま呼んでいる先まである。差は、設計がオートメーションと共通アクションを同じタブ帯（5本）にしているのに実装は別ページ（/automations と /common-actions）であること、帯（共通アクション14／呼び出し元38・5機能から／今月2,847回・失敗6／古い版のまま要確認2）が無いこと', verdictSource: 'automations-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: 'P2 共通アクションをつくる面は設計に近い。差は「複製して作る」の扱いと、上のタブ帯の位置', verdictSource: 'automations-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: 'P2 版と使われている場所は設計に近く、古い版のまま呼んでいる先まで出せている。差は帯と、タブ帯の位置', verdictSource: 'automations-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。実装は設計にかなり近い。** 版（v4）と、どこから呼ばれているか、**古い版のまま呼んでいる先**まである（本文に「古い版」4件、「版」8件）。**設計との差1（別ページになっている）は #552 で解消**——タブ帯に「オートメーション / 共通アクション」が入り、件数（4）も付く。P2 残る差は帯の中身。設計は 共通アクション14／呼び出し元38・5機能から／今月2,847回・失敗6／**古い版のまま 要確認2** の4つ。実装は「共通アクション 4／公開中と下書き」まで。**「古い版のまま 要確認」が帯に無い**ので、直し忘れに気づく場所が一覧に無い。P2 「複製して作る」が無い。1440・1920とも横スクロール0', verdictSource: 'automations-v6/xOpDs.txt + automations-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。実装は設計に近い。** P2 残る差は「複製して作る」の扱い。**タブ帯の位置の差は #552 で解消**。1440・1920とも横スクロール0', verdictSource: 'automations-v6/py5CG.txt + automations-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。実装は設計に近く、版と使われている場所、古い版のまま呼んでいる先まで出せている。** P2 残る差は帯（`xOpDs` と同じ）。**タブ帯の位置の差は #552 で解消**。1440・1920とも横スクロール0', verdictSource: 'automations-v6/syWp4.txt + automations-v6/design-qa.md' , verdictHead: 'c275749d' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
