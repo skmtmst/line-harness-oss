@@ -789,10 +789,10 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
-    gap: 'parts',
-    gapNote: '既存 `ConfirmDialog` にルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴は残ることを表示する。`auto_reply_hits` は外部キーを持たず削除後も残るため新規DBは不要',
+    gap: 'pending',
+    gapNote: '#544 head `6053c271` で既存 `ConfirmDialog` を接続済み。ルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴が残ることを表示する。取り込み順は #491 → #544。最新headを画像・操作確認してから未実装を外す',
     status: 'unimplemented',
-    why: '現行はブラウザの `confirm()` から同じDELETEを呼ぶだけで撮影できない。定義を消しても `auto_reply_hits` は設計どおり監査記録として残る。API契約を変えず、同じ削除操作の前に影響を読ませる共通確認窓へ置き換えられる。ただし `auto-replies/page.tsx` を触る #430・#450・#491 の統合順を先に解く',
+    why: '#544でブラウザの `confirm()` を共通確認窓へ置き換え、削除失敗・二重実行も止めた。DB試験でルール削除後も `auto_reply_hits` が残ることを確認済み。#491 → #544 のheadで1440/1920の比較と削除失敗状態を確認するまで未実装扱いを維持する',
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
