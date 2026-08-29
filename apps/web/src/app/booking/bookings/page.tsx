@@ -284,13 +284,12 @@ export default function BookingsPage() {
           >
             受付時間を設定
           </Link>
-          <button
-            disabled
-            title="管理画面から予約を代理で入れる仕組みは準備中です"
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
+          <Link
+            href="/booking/bookings/new"
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium"
           >
-            予約を追加
-          </button>
+            電話の予約を入れる
+          </Link>
         </div>
       </div>
 

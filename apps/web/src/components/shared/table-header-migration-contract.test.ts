@@ -52,8 +52,13 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 2026-08-28: イベント一覧・申込者・キャンセル待ちの17見出しを共通Thへ移した。
-    expect(debt['direct-th']).toBe(290)
+    // 2026-08-29: 統合ユーザー一覧の見出し6つを共通 `Th` へ寄せ、
+    // V6の7列へ増やしても直書きを残さなかった。
+    // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
+    // 共通の `Th` を通すため、この数へは戻さない。
+    // シナリオ一覧の見出し9個も共通の `Th` へ寄せ、両方を合わせて267まで減った。
+    // イベント一覧・申込者・キャンセル待ちの7見出しも共通Thへ移し、260まで減った。
+    expect(debt['direct-th']).toBe(260)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

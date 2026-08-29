@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
+import { friendParamsToSavedConditions } from './saved-search-utils'
+import { TextInput } from '@/components/shared/form-controls'
+import Button from '@/components/shared/button'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -63,6 +66,7 @@ export interface AdvancedSearchResult {
     | 'visibility'
     | 'sort'
     | 'limit'
+    | 'savedSearchId'
   >
   /** 画面に「絞り込み中」を出すための、人が読める形 */
   summary: string[]
@@ -70,12 +74,14 @@ export interface AdvancedSearchResult {
 
 export default function AdvancedSearchDialog({
   open,
+  accountId,
   tags,
   fieldNames,
   onClose,
   onApply,
 }: {
   open: boolean
+  accountId: string | null
   tags: Tag[]
   /** 友だち情報の項目名。取れないときは空でよい（自由入力にする）。 */
   fieldNames: string[]
@@ -91,6 +97,11 @@ export default function AdvancedSearchDialog({
   const [sort, setSort] = useState<'recent' | 'oldest'>('recent')
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [savedNotice, setSavedNotice] = useState('')
 
   const params = useMemo<AdvancedSearchResult['params']>(() => {
     const p: AdvancedSearchResult['params'] = { sort }
@@ -145,10 +156,10 @@ export default function AdvancedSearchDialog({
   const recount = useCallback(async () => {
     setCounting(true)
     // 件数だけ欲しいので1件だけ取る。total は絞り込み後の総数が返る。
-    const res = await api.friends.list({ ...params, limit: 1, includeTags: false })
+    const res = await api.friends.list({ ...params, accountId: accountId ?? undefined, limit: 1, includeTags: false })
     setCounting(false)
     setCount(res.success ? res.data.total : null)
-  }, [params])
+  }, [accountId, params])
 
   useEffect(() => {
     if (!open) return
@@ -176,6 +187,38 @@ export default function AdvancedSearchDialog({
                 ? { kind: 'created_at', from: '', to: '' }
                 : { kind: 'chat_status', value: 'unread' },
     ])
+
+  const save = async () => {
+    if (!accountId) {
+      setSaveError('LINE公式アカウントを選んでください')
+      return
+    }
+    if (!saveName.trim()) {
+      setSaveError('条件名を入力してください')
+      return
+    }
+    setSaving(true)
+    setSaveError('')
+    try {
+      const res = await api.savedSearches.create({
+        name: saveName.trim(),
+        accountId,
+        conditions: friendParamsToSavedConditions(params),
+        isShared: false,
+      })
+      if (!res.success) {
+        setSaveError(res.error)
+        return
+      }
+      setSaveName('')
+      setSaveOpen(false)
+      setSavedNotice('条件を保存しました')
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '条件を保存できませんでした')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div
@@ -412,7 +455,8 @@ export default function AdvancedSearchDialog({
           >
             キャンセル
           </button>
-          <button type="button" onClick={() => { try { localStorage.setItem('friends.savedSearch', JSON.stringify({ params, summary })) } catch { /* 保存できない環境では今回の絞り込みだけ使う */ } }} className="rounded-[9px] border border-[#DADDE2] bg-canvas px-4 py-2 text-sm font-semibold text-[#0067D9] hover:bg-[#F3F8FF]">条件を保存</button>
+          {savedNotice ? <span className="text-xs font-semibold text-v6-accent">{savedNotice}</span> : null}
+          <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
           <button
             type="button"
             onClick={() => onApply({ params, summary })}
@@ -422,6 +466,23 @@ export default function AdvancedSearchDialog({
           </button>
         </div>
       </div>
+      {saveOpen ? (
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-[#101828]/45 p-4" onClick={() => setSaveOpen(false)}>
+          <section className="w-full max-w-md rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card" onClick={(event) => event.stopPropagation()}>
+            <h3 className="text-lg font-bold text-v6-ink">この条件を保存</h3>
+            <p className="mt-1 text-xs leading-5 text-v6-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
+            <label className="mt-4 block text-sm font-semibold text-v6-ink-secondary">
+              条件名
+              <TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" />
+            </label>
+            {saveError ? <p className="mt-3 text-sm text-v6-danger">{saveError}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" onClick={() => setSaveOpen(false)}>キャンセル</Button>
+              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
