@@ -23,7 +23,7 @@ const PERMISSION_GROUPS = [
   { label: '基本', items: [['/', 'ダッシュボード'], ['/chats', '受信箱'], ['/friends', '友だち'], ['/tags', '友だち属性']] },
   { label: '配信', items: [['/scenarios', 'シナリオ配信'], ['/broadcasts', '一斉配信'], ['/reminders', 'リマインダ'], ['/auto-replies', '自動応答'], ['/friend-add-settings', '友だち追加時の配信'], ['/webinars', 'ウェビナー']] },
   { label: 'コンテンツ', items: [['/templates', 'テンプレート'], ['/rich-menus', 'リッチメニュー'], ['/form-submissions', '回答フォーム'], ['/contents/vars', '共通情報'], ['/contents', '登録メディア一覧']] },
-  { label: '成果と分析', items: [['/conversions', '成果とアフィリエイト'], ['/scoring', 'マイル'], ['/inflow-links', '流入と計測'], ['/analytics', '分析']] },
+  { label: '成果と分析', items: [['/conversions', '成果とアフィリエイト'], ['/mileage', 'マイル'], ['/inflow-links', '流入と計測'], ['/analytics', '分析']] },
   { label: '自動化・予約', items: [['/automations', 'オートメーション'], ['/webhooks', '外部連携'], ['/booking/bookings', '予約管理'], ['/booking/menus', '予約設定'], ['/events', 'イベント予約']] },
   { label: 'NEN運用', items: [['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査']] },
 ] as const

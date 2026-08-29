@@ -25,6 +25,7 @@ import {
 import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { recordLineTokenDefaultFallback } from './line-token.js';
 
 // LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
 // これ以上に増やすことはできない。
@@ -406,7 +407,11 @@ export async function processScheduledBroadcasts(
         if (account) {
           const { LineClient: LC } = await import('@line-crm/line-sdk');
           deliveryClient = new LC(account.channel_access_token);
+        } else {
+          recordLineTokenDefaultFallback({ accountId, context: 'broadcast.scheduled' });
         }
+      } else {
+        recordLineTokenDefaultFallback({ accountId: null, context: 'broadcast.scheduled' });
       }
 
       await processBroadcastSend(db, deliveryClient, broadcast.id, workerUrl);
@@ -467,6 +472,9 @@ export async function processQueuedBroadcasts(
       const { getLineAccountById } = await import('@line-crm/db');
       const account = await getLineAccountById(db, accountId);
       if (account) client = new (await import('@line-crm/line-sdk')).LineClient(account.channel_access_token);
+      else recordLineTokenDefaultFallback({ accountId, context: 'broadcast.queued' });
+    } else {
+      recordLineTokenDefaultFallback({ accountId: null, context: 'broadcast.queued' });
     }
 
     try {

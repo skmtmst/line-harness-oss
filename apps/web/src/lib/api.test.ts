@@ -3,13 +3,14 @@ import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 let fetchApi: typeof import('./api').fetchApi
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
+let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let eventsApi: typeof import('./api').eventsApi
 let operationsApi: typeof import('./api').api.operations
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
   const module = await import('./api')
-  ;({ fetchApi, ApiError, extractApiErrorMessage, eventsApi } = module)
+  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi } = module)
   operationsApi = module.api.operations
 })
 
@@ -84,6 +85,19 @@ describe('extractApiErrorMessage', () => {
   )
 })
 
+describe('extractApiErrorCode', () => {
+  it('409や422でもsnake_caseの機械コードだけを取り出す', () => {
+    expect(extractApiErrorCode(JSON.stringify({ error: 'slot_conflict' }))).toBe('slot_conflict')
+    expect(extractApiErrorCode(JSON.stringify({ error: 'slot_not_available' }))).toBe('slot_not_available')
+  })
+
+  it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
+    expect(extractApiErrorCode(JSON.stringify({ error: 'D1_ERROR: no such table' }))).toBeUndefined()
+    expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
+    expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
+  })
+})
+
 describe('fetchApi error response', () => {
   it('Worker の具体的な error を管理画面へ伝える', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
@@ -122,6 +136,19 @@ describe('fetchApi error response', () => {
     ))
 
     await expect(fetchApi('/api/example')).rejects.toThrow('API error: 502')
+  })
+
+  it('409の機械コードを保持しても本文は利用者向けメッセージにしない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ error: 'slot_conflict' }), { status: 409 }),
+    ))
+
+    await expect(fetchApi('/api/booking/admin/bookings', { method: 'POST' })).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 409,
+      code: 'slot_conflict',
+      message: 'API error: 409',
+    })
   })
 
   it('500 の本文は JSON でも表示せず status にフォールバックする', async () => {

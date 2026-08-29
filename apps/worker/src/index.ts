@@ -1265,7 +1265,7 @@ async function scheduled(
       const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
       if (
         purged.events + purged.dailyMetrics + purged.reconciliationRuns
-        + purged.funnelRuns + purged.crossRuns + purged.audiences > 0
+        + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
       ) {
         console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
       }

@@ -67,6 +67,7 @@ export * from './analytics-event-types';
 export * from './analytics-projection';
 export * from './analytics-migration';
 export * from './analytics-funnels';
+export * from './analytics-saved';
 export * from './analytics-funnel-migration';
 export * from './analytics-cross';
 export * from './analytics-overviews';

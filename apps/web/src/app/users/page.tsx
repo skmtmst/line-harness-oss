@@ -33,7 +33,7 @@ export default function UsersPage() {
   // フィルタ変更 / ページ移動で複数リクエストが in-flight になり、
   // 古い応答が後着で UI を上書きする事故を防ぐ。
   const requestSeqRef = useRef(0)
-  // 次の load() で worker キャッシュをバイパスするフラグ。
+  // 次の load() で最新状態を取り直すフラグ。
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -110,13 +110,22 @@ export default function UsersPage() {
   }, [load])
 
   const headerDescription = useMemo(
-    () => 'LINE 画像トークンで人単位にまとめた一覧。重複・X・フォーム回答を一目で。',
+    () => '複数のLINEアカウントにいる同じ人を、元の友だちを残したまま確認します。',
     [],
   )
 
   return (
-    <div className="space-y-4" data-users-design="v4">
-      {!embedded ? <Header title="ユーザー一覧" description={headerDescription} /> : null}
+    <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
+      {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
+
+      <section className="rounded-v6-card border border-hairline bg-canvas px-4 py-3 shadow-v6-card">
+        <p className="text-sm font-bold text-v6-ink">
+          複数の友だちを、1人の顧客として横断管理します。
+        </p>
+        <p className="mt-1 text-xs leading-5 text-v6-ink-secondary">
+          元の友だちは残したまま、登録アカウント・最終接触・重複配信の確認ができます。同じ人か確認が必要なものは「要確認」と表示します。
+        </p>
+      </section>
 
       <SummaryBar />
 
@@ -139,17 +148,11 @@ export default function UsersPage() {
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
           className="rounded-[9px] border border-[#DADDE2] bg-white px-4 text-xs font-semibold text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)] hover:bg-[#F6F6F8] disabled:opacity-50"
-          title="worker キャッシュをバイパスして再集計"
+          title="最新の状態を取得して一覧を更新"
         >
           {refreshing ? '再計算中…' : '再計算'}
         </button>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
-        </div>
-      )}
 
       <UsersTable
         rows={rows}
@@ -157,6 +160,7 @@ export default function UsersPage() {
         page={page}
         pageSize={PAGE_SIZE}
         loading={loading}
+        error={Boolean(error)}
         onPageChange={setPage}
       />
     </div>
