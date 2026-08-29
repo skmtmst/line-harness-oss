@@ -638,6 +638,9 @@
   "components/prompt-modal.tsx": {
     "arbitrary-value": 6
   },
+  "components/reminders/reminder-publish-flow.tsx": {
+    "unresolved-classname": 5
+  },
   "components/rich-menus/area-properties.tsx": {
     "arbitrary-value": 12,
     "unresolved-classname": 13

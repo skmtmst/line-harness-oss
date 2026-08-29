@@ -35,6 +35,11 @@ import type {
   AutomationLog,
   Chat,
   Reminder,
+  ReminderDraftSettings,
+  ReminderDraftVersion,
+  ReminderPreviewResult,
+  ReminderPublishResult,
+  ReminderValidationResult,
   ReminderDeliveryRunStatus,
   ReminderDeliveryRunsResponse,
   ReminderStep,
@@ -2965,6 +2970,42 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
+    createDraft: (settings: ReminderDraftSettings) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>('/api/reminders/drafts', {
+        method: 'POST',
+        body: JSON.stringify(settings),
+      }),
+    getDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`),
+    saveDraft: (id: string, settings: ReminderDraftSettings) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      }),
+    validateDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
+        method: 'POST',
+      }),
+    previewDraft: (id: string, targetDate?: string) =>
+      fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {
+        method: 'POST',
+        body: JSON.stringify(targetDate ? { targetDate } : {}),
+      }),
+    testDraft: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        sent: number
+        recipientName: string
+        replayed: boolean
+        requestId: string | null
+        testedAt: string
+      }>>(
+        `/api/reminders/${id}/test-send`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
+    publishDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderPublishResult>>(`/api/reminders/${id}/publish`, {
+        method: 'POST',
+      }),
     runs: (
       id: string,
       params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number },

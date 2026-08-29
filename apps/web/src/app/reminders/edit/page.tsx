@@ -7,6 +7,9 @@ import type { Reminder, ReminderStep, Tag } from '@line-crm/shared'
 import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import ReminderPublishFlow, {
+  type ReminderPublishStage,
+} from '@/components/reminders/reminder-publish-flow'
 
 /**
  * リマインダの編集。
@@ -41,7 +44,7 @@ function emptyStep(mode: 'time' | 'countdown'): StepDraft {
   }
 }
 
-function ReminderEditInner() {
+function LegacyReminderEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
@@ -449,6 +452,21 @@ function ReminderEditInner() {
       )}
     </main>
   )
+}
+
+const PUBLISH_STAGES = new Set<ReminderPublishStage>(['target', 'preview', 'test', 'confirm', 'done'])
+
+function ReminderEditInner() {
+  const params = useSearchParams()
+  const id = params.get('id') ?? ''
+  const rawStage = params.get('stage')
+  if (rawStage && PUBLISH_STAGES.has(rawStage as ReminderPublishStage)) {
+    if (!id) {
+      return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
+    }
+    return <ReminderPublishFlow reminderId={id} stage={rawStage as ReminderPublishStage} />
+  }
+  return <LegacyReminderEditInner />
 }
 
 export default function ReminderEditPage() {

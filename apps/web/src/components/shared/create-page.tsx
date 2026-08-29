@@ -34,6 +34,8 @@ export interface CreatePageProps {
   aside?: ReactNode
   /** 保存ボタンの文言。設計は画面ごとに「メニューを追加」などと書き分けている */
   saveLabel?: string
+  /** 一覧以外へ続く作成フロー。IDを受けて次の画面を決める。 */
+  successHref?: (id: string | void) => string
   children: ReactNode
 }
 
@@ -46,6 +48,7 @@ export default function CreatePage({
   validate,
   aside,
   saveLabel,
+  successHref,
   children,
 }: CreatePageProps) {
   const router = useRouter()
@@ -71,7 +74,7 @@ export default function CreatePage({
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(id ? `${parent[1]}?highlight=${id}` : parent[1])
+      router.push(successHref ? successHref(id) : id ? `${parent[1]}?highlight=${id}` : parent[1])
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.message)
