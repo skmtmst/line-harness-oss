@@ -259,6 +259,24 @@ async function runSteps(page, steps = [], node = '') {
       await page.waitForTimeout(step.after ?? 300)
       continue
     }
+    if (step.select !== undefined) {
+      /*
+        選ぶ入れ物（`components/shared/select.tsx`）。
+
+        **これは `<select>` ではない。** 見た目をそろえるために、
+        `aria-label` を持つボタンと `role="listbox"` の一覧で作ってある。
+        `selectOption` は効かないので、**開いてから選ぶ**。
+
+        選ぶときは画面に出ている言葉で書く。値のほうは `bs-1` のような
+        内部の id で、人の言葉ではない。
+      */
+      await page.getByRole('button', { name: step.select }).first().click({ timeout: 15_000 })
+      await page.waitForTimeout(200)
+      await page.getByRole('option', { name: step.label, exact: true }).first()
+        .click({ timeout: 15_000 })
+      await page.waitForTimeout(step.after ?? 500)
+      continue
+    }
     const root = step.scope === 'main' ? page.locator('main') : page
     /*
       **押せるものが操作の役を持っているとは限らない。** 表の行に

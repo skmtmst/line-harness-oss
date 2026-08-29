@@ -1663,23 +1663,70 @@ export const SCREENS = [
     verdictSource: 'booking-v6/cpdDi-1920.png', verdictHead: 'ba0bf62d',
   },
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'needs_fix', verdictNote: 'P1 今週の予約の面が設計とそろわない。時間×担当の格子でないため、空きが面で分からない', verdictSource: 'booking-v6/design-qa.md' },
+  /*
+    代理予約の入力を、実際に通す。
+
+    **友だち → メニュー → 担当者 → 日付 → 時間**の順でしか進めない。
+    担当者はメニューを選ぶまで押せず、時間は日付を入れてから空き確認が
+    返って初めて出る。`fill` で流し込めるのは日付だけで、あとの3つは
+    `<select>` なので `select` で選ぶ。
+
+    **`14:00` は返す側で埋まっている枠。** 空き確認では出るが、登録の
+    ときには埋まっている。実物の Worker（`booking.ts:1114`）と同じく、
+    登録の直前にもう一度空きを見て弾く形にしてある。
+  */
   {
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
-    gap: 'pending',
-    gapNote: '#459 head `ba0bf62d` に入力→内容確認→登録完了→競合回復の4段が実装済み。`confirm` 状態を操作して画像確認する',
-    status: 'unimplemented', why: '以前の比較は入力状態だけを撮り「確認なし」と誤判定した。同じheadのコードには `Step = input | confirm | done | conflict` と `data-design-node="GFDqW"` があるため、操作を通した再比較待ち',
+    route: '/booking/bookings/new', mode: 'page',
+    steps: [
+      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { click: '菅野 亮', after: 500 },
+      { select: '予約メニュー', label: 'トリミング（小型犬）' },
+      { select: '担当者', label: '佐々木' },
+      { fill: '日付', text: '2026-09-03', after: 900 },
+      { select: '空いている時間', label: '10:00〜11:45' },
+      { click: '予約内容を確認する', after: 700 },
+    ],
+    verdict: 'needs_fix',
+    verdictNote: '**#459 で入力→確認の段ができた。実際に操作して撮った**（友だち→メニュー→担当→日付→時間→「予約内容を確認する」）。確認の面は**送った値をそのまま出す**：菅野 亮／2026年9月3日(木) 10:00／トリミング（小型犬）／佐々木／¥8,400。料金は担当者ごとの `price` から引くので、指名で変わる分も正しい。送るものも「予約確認LINE 登録後に送信」「リマインダ 予約設定から計算」と、**まだ決まっていないことを決まったように書かない**。1440・1920とも横スクロール0、下の固定帯は本文に重ならない。P2 **重なりの事前警告が無い**。設計は確認の段で「9/02(火) 11:00 は 佐々木 がふさがっています（2件）／このまま入れると、同じ人が同じ時間に2件受けることになります。」と止める。実装は登録を試すまで気づけない（同じ欠けは `Lg8ff` を見る）。P2 「お客様に届く内容」がLINEの吹き出しの形になっていない',
+    verdictSource: 'booking-v6/GFDqW-1440.png',
+    verdictHead: 'ba0bf62d',
   },
   {
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
-    gap: 'pending',
-    gapNote: '#459 head `ba0bf62d` の `done` 状態に実装済み。登録成功レスポンスを返して画像確認する',
-    status: 'unimplemented', why: '以前の比較は完了状態まで操作していなかった。同じheadに `data-design-node="GfceK"` があるため再比較待ち',
+    route: '/booking/bookings/new', mode: 'page',
+    steps: [
+      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { click: '菅野 亮', after: 500 },
+      { select: '予約メニュー', label: 'トリミング（小型犬）' },
+      { select: '担当者', label: '佐々木' },
+      { fill: '日付', text: '2026-09-03', after: 900 },
+      { select: '空いている時間', label: '10:00〜11:45' },
+      { click: '予約内容を確認する', after: 700 },
+      { click: 'この内容で予約を入れる', after: 1200 },
+    ],
+    verdict: 'needs_fix',
+    verdictNote: '**#459 で登録完了までつながった。実際に登録して撮った。** 予約IDは**返事の `booking_id` をそのまま出す**（固定値ではない）。Googleカレンダーも `calendar_sync` の4つの値を読み分ける。1440・1920とも横スクロール0。P1 **設計が完了画面で見せたかった2つが出ない**。ひとつはリマインダの具体時刻「9/01(月) 19:00 に前日のお知らせ ／ 9/02(火) 8:00 に当日のお知らせ」、もうひとつは「成果地点「予約が入った」を1件 数えました。**電話の予約も同じように数えます。**」。代理で入れた予約がLINEの予約と同じ扱いになる、という設計の要点がここで確かめられない。**ただし断り方は正しい**——実装は `—（完了APIへの接続が必要）` と書き、**取得元のない時刻を作らない**',
+    verdictSource: 'booking-v6/GfceK-1440.png',
+    verdictHead: 'ba0bf62d',
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
-    gap: 'pending',
-    gapNote: '#459 head `ba0bf62d` で予約枠の重なり判定と `slot_conflict` / `slot_not_available` の回復画面を実装済み。競合レスポンスで画像確認する',
-    status: 'unimplemented', why: '以前の比較は競合レスポンスを返さず未実装と誤判定した。同じheadに `data-design-node="Lg8ff"` とWorkerの競合判定があるため再比較待ち',
+    route: '/booking/bookings/new', mode: 'page',
+    steps: [
+      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { click: '菅野 亮', after: 500 },
+      { select: '予約メニュー', label: 'トリミング（小型犬）' },
+      { select: '担当者', label: '佐々木' },
+      { fill: '日付', text: '2026-09-03', after: 900 },
+      { select: '空いている時間', label: '14:00〜15:45' },
+      { click: '予約内容を確認する', after: 700 },
+      { click: 'この内容で予約を入れる', after: 1200 },
+    ],
+    verdict: 'needs_fix',
+    verdictNote: '**P1 競合の回復画面に届かない。実際に競合を起こして確かめた。** 埋まった枠を選んで登録すると、画面は確認の段のまま赤帯に **`API error: 409`** と出す。設計・実装の「この時間には予約を入れられません／空いている時間を選び直す」（`page.tsx:346`）は**一度も描かれない**。原因は画面ではなくAPIの受け側：Workerは `{error:\'slot_conflict\'}` を **409** で返す（`booking.ts:1074`。`slot_not_available` は **422**、`:982`）が、`apps/web/src/lib/api.ts:308` の `BODY_MESSAGE_STATUSES` は **400 だけ**を本文の読める状態としているため、本文が捨てられて `ApiError` の文が `API error: 409` になる。`page.tsx:199` の `message.includes(\'slot_conflict\')` は決して真にならない。**運用の人には内部の番号だけが残り、選び直す導線も消える。** 直すなら 409・422 を `BODY_MESSAGE_STATUSES` に足すか、`ApiError.status` で分ける（文字ではなく番号で見る方が確か）。P2 設計は重なりを**登録前に**止める（「9/02(火) 11:00 は 佐々木 がふさがっています（2件）」）。実装は登録を試して初めて分かる',
+    verdictSource: 'booking-v6/Lg8ff-1440.png',
+    verdictHead: 'ba0bf62d',
   },
 
   // ── 機能28 予約設定 ─────────────────────────────────────
@@ -1693,7 +1740,8 @@ export const SCREENS = [
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: 'P1 予約メニューをつくる面が設計とそろわない。予約のルールをメニューの中だけで決める形になっている', verdictSource: 'booking-settings-v6/design-qa.md' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
+    /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
+    states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P1は #532 head `6cc74968` のコード上で修正済み・画像再確認待ち。失敗を `ListState kind="error"` へ分け、帯と補助データを `—`、APIの内部文言を運用者向け文へ置き換えている。API失敗状態の1440/1920画像で空の作成誘導が同時に出ないことを確認するまで要修正を維持する',
     verdictSource: 'booking-settings-v6/W6465r-error-1920.png', verdictHead: 'bd8efa54',
   },
@@ -1976,6 +2024,7 @@ export const CAPTURED_AT = {
   26: [{ pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' }],
   15: [{ pr: 559, head: '888e80f9', on: '2026-08-29', screens: ['g89Tc'], note: '使用先の3つの出し分けと「使っていない」の絞り込み。**#559 は #438 を含む**' }],
   16: [{ pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' }],
+  27: [{ pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' }],
   24: [{ pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' }],
   17: [
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },

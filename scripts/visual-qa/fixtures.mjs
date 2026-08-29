@@ -4182,3 +4182,50 @@ export const AUTOMATION_RUNS = {
   ],
   pagination: { total: 8, limit: 20, offset: 0 },
 }
+
+/*
+  代理予約の担当者（`BookingMenuStaff`）。
+
+  **`BOOKING_STAFF` とは別の型。** あちらは店の従業員そのもの
+  （`name` `sort_order` `is_active`）で、こちらは**メニューに紐づいた
+  担当者**なので `price` と `duration_minutes` を持つ。同じ人でも
+  メニューによって値段が変わるため、メニュー側から引き直す。
+*/
+export const BOOKING_MENU_STAFF = [
+  {
+    id: 'bs-1', display_name: '佐々木', role: 'トリマー',
+    profile_image_url: null, bio: null, is_designation_optional: 0,
+    price: 8400, duration_minutes: 105,
+  },
+  {
+    /* 同じメニューでも指名料が乗る人。**値段は担当者ごとに違う。** */
+    id: 'bs-2', display_name: '山本', role: 'トリマー',
+    profile_image_url: null, bio: null, is_designation_optional: 0,
+    price: 9400, duration_minutes: 105,
+  },
+]
+
+/*
+  空き時間。**問い合わせた日をそのまま返す。**
+
+  固定の日付を返すと、画面が「今日から60日」で組み立てた問い合わせと
+  食い違って、いつか必ず空になる。撮影日に左右されない形にする。
+
+  **`14:00` は、返事を書く側では埋まっている枠。** 空き確認と登録の
+  あいだに他の予約が入る競り合いを、そのまま作る。実物の Worker も
+  登録の直前にもう一度空きを見て `slot_conflict` を返す。
+*/
+export const BOOKING_TAKEN_SLOT = '14:00'
+export function bookingAvailability(date, staffId) {
+  const person = BOOKING_MENU_STAFF.find((item) => item.id === staffId) ?? BOOKING_MENU_STAFF[0]
+  return {
+    by_staff: [{
+      staff_id: person.id,
+      display_name: person.display_name,
+      slots: [
+        { date, start: '10:00', end: '11:45' },
+        { date, start: BOOKING_TAKEN_SLOT, end: '15:45' },
+      ],
+    }],
+  }
+}

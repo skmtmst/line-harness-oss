@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 213,
-  "unimplemented": 45,
+  "compared": 216,
+  "unimplemented": 42,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 190,
+  "needsFix": 193,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -815,17 +815,29 @@
       "feature": 27,
       "name": "予約管理",
       "total": 7,
-      "compared": 4,
-      "unimplemented": 3,
+      "compared": 7,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "needsFix": 7,
       "unjudged": 0,
       "remaining": 7,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 459,
+          "head": "ba0bf62d",
+          "on": "2026-08-29",
+          "screens": [
+            "GFDqW",
+            "GfceK",
+            "Lg8ff"
+          ],
+          "note": "代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない"
+        }
+      ]
     },
     {
       "feature": 28,
@@ -1195,27 +1207,6 @@
       "name": "25-1-C 見本から作る",
       "gap": "api",
       "gapNote": "見本の一覧自体は固定データで作れるが、選択後は公開ではなく下書きを作る必要がある。現行 `POST /api/automations` は `isActive`／下書き状態を受け取らず、`automations.is_active DEFAULT 1` で即時稼働するため、その口へ見本を接続してはいけない。下書き作成API、または版付きV6作成APIへ接続してから実装する。見本は実データIDを持たず、タグ・シナリオ・テンプレートを利用者が選び直す"
-    },
-    {
-      "feature": 27,
-      "node": "GFDqW",
-      "name": "27-1-D 代理予約・内容確認",
-      "gap": "pending",
-      "gapNote": "#459 head `ba0bf62d` に入力→内容確認→登録完了→競合回復の4段が実装済み。`confirm` 状態を操作して画像確認する"
-    },
-    {
-      "feature": 27,
-      "node": "GfceK",
-      "name": "27-1-E 代理予約・登録完了",
-      "gap": "pending",
-      "gapNote": "#459 head `ba0bf62d` の `done` 状態に実装済み。登録成功レスポンスを返して画像確認する"
-    },
-    {
-      "feature": 27,
-      "node": "Lg8ff",
-      "name": "27-1-F 代理予約・予約枠の重なりと入力エラー",
-      "gap": "pending",
-      "gapNote": "#459 head `ba0bf62d` で予約枠の重なり判定と `slot_conflict` / `slot_not_available` の回復画面を実装済み。競合レスポンスで画像確認する"
     },
     {
       "feature": 4,
