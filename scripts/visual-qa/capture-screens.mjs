@@ -313,6 +313,14 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    外部連携のやり取り。**一覧の既定（配列）を返すと落ちる。**
+    画面は `summary` と `items` を読む。数はすべて0（取れて0件）。
+  */
+  [/\/api\/webhooks\/interactions/, {
+    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, averageDurationMs: null },
+    items: [], total: 0, page: 1, limit: 20,
+  }],
+  /*
     友だち追加時の実行結果。**一覧の既定（配列）を返すと落ちる。**
     画面は `data.items.length` を読むので、`items` の無い返事だと
     「もう一度試す」の画面になる。型は `FriendAddEventList`。

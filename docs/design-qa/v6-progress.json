@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 206,
-  "unimplemented": 52,
+  "compared": 207,
+  "unimplemented": 51,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 183,
+  "needsFix": 184,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -744,17 +744,27 @@
       "feature": 26,
       "name": "外部連携",
       "total": 4,
-      "compared": 3,
-      "unimplemented": 1,
+      "compared": 4,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 4,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 547,
+          "head": "48715569",
+          "on": "2026-08-29",
+          "screens": [
+            "KNG00"
+          ],
+          "note": "やり取りの記録。送受信・安全な再送・通常/読込/空/失敗"
+        }
+      ]
     },
     {
       "feature": 27,
@@ -1182,13 +1192,6 @@
       "name": "25-1-C 見本から作る",
       "gap": "api",
       "gapNote": "見本の一覧自体は固定データで作れるが、選択後は公開ではなく下書きを作る必要がある。現行 `POST /api/automations` は `isActive`／下書き状態を受け取らず、`automations.is_active DEFAULT 1` で即時稼働するため、その口へ見本を接続してはいけない。下書き作成API、または版付きV6作成APIへ接続してから実装する。見本は実データIDを持たず、タグ・シナリオ・テンプレートを利用者が選び直す"
-    },
-    {
-      "feature": 26,
-      "node": "KNG00",
-      "name": "26-1-B やり取りの記録",
-      "gap": "pending",
-      "gapNote": "#547 head `48715569` に送受信記録・安全な再送・通常/読込/空/失敗を実装済み。1440px・1920pxで設計と比較する"
     },
     {
       "feature": 27,

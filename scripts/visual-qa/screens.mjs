@@ -1612,16 +1612,18 @@ export const SCREENS = [
   { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: 'P1 こちらで受け取る面が設計とそろわない。見本から作る道が無い', verdictSource: 'webhooks-v6/design-qa.md' },
   {
     /*
-      **撮る支度だけ。** 固定データは `INTEGRATION_RECORDS`。
-      **つなぎ先は名前だけ。** `outgoing_webhooks` は `url` と `secret` を
-      持つので、道も鍵も送った中身も、画面にも画像にも出さない。
+      **#547 で「やり取りの記録」タブが入った。**
+      読む元は `GET /api/webhooks/interactions`。固定データは
+      `INTEGRATION_RECORDS`（この30日1,972回・成功1,966・失敗6・平均0.4秒）。
+      **設計の応答時間は `duration_ms` から出る実値で、作り物ではない。**
     */
     ...WEBHOOK, node: 'KNG00', name: '26-1-B やり取りの記録',
-    route: '/webhooks?tab=interactions',
-    status: 'unimplemented',
-    why: '#547 で実装済み。Claude が 1440px・1920px で比較するまでは未実装扱いを維持する',
-    gap: 'pending',
-    gapNote: '#547 head `48715569` に送受信記録・安全な再送・通常/読込/空/失敗を実装済み。1440px・1920pxで設計と比較する',
+    route: '/webhooks?tab=interactions', mode: 'page',
+    states: { apis: ['**/api/webhooks/interactions?**', '**/api/webhooks/interactions'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'needs_fix',
+    verdictNote: '**#547 でやり取りの記録が入り、未実装ではなくなった。** 読む台帳が無いと書いていたが、Codexが作った。帯4つ（この30日1,972回〈送った1,486・受け取った486〉／成功1,966回99.7%／失敗6回〈やり直す〉／**返事までの時間0.4秒**）と「失敗したものをまとめてやり直す」まで設計どおり。**応答時間は duration_ms からの実値で、作り物ではない**（Pencilから外さなかった判断はこれで正しかった）。**本文と接続情報を一覧に出さない**：「安全のため本文と接続情報は一覧に表示しません」と画面に書いてある。処理中の行はかかった時間が—。P2 帯に「失敗6回・すべてSlack・8/24に集中」の内訳と「いちばん遅くて10.0秒」が出ない（表には10秒の行がある）',
+    verdictSource: 'webhooks-v6/KNG00-normal-1920.png',
+    verdictHead: '48715569',
   },
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
@@ -1962,6 +1964,7 @@ export const CAPTURED_AT = {
   ],
   12: [{ pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' }],
   14: [{ pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' }],
+  26: [{ pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' }],
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
