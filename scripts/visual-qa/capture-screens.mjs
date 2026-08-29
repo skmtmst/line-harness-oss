@@ -313,6 +313,19 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    マイルの使い道。**一覧の既定（配列）を返すと落ちる。**
+    画面は `rewards` と `summary` を読む。数はすべて0（取れて0件）だが、
+    **まだ数えていない `neverRedeemedFriendCount` だけは `null`** のまま。
+  */
+  [/\/api\/mileage\/rewards/, {
+    rewards: [],
+    summary: {
+      publishedCount: 0, redeemedMilesThisMonth: 0,
+      neverRedeemedFriendCount: null,
+      mostRedeemedRewardName: null, mostRedeemedRewardCount: null,
+    },
+  }],
+  /*
     外部連携のやり取り。**一覧の既定（配列）を返すと落ちる。**
     画面は `summary` と `items` を読む。数はすべて0（取れて0件）。
   */

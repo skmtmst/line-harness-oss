@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 207,
-  "unimplemented": 51,
+  "compared": 209,
+  "unimplemented": 49,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 184,
+  "needsFix": 186,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -502,17 +502,27 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 9,
-      "unimplemented": 2,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 1,
-      "needsFix": 7,
+      "needsFix": 9,
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
+        {
+          "pr": 549,
+          "head": "0ae3e094",
+          "on": "2026-08-29",
+          "screens": [
+            "qlVLJ",
+            "p9CcEB"
+          ],
+          "note": "マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている"
+        },
         {
           "pr": 441,
           "head": "05c5b103",
@@ -1087,20 +1097,6 @@
       "name": "16-1-H 支払いを確定する",
       "gap": "api",
       "gapNote": "同上（締める操作）"
-    },
-    {
-      "feature": 17,
-      "node": "qlVLJ",
-      "name": "17-1-B マイルの使い道",
-      "gap": "api",
-      "gapNote": "交換の定義（何と何マイルで替えるか）と、引き換えの記録が要る"
-    },
-    {
-      "feature": 17,
-      "node": "p9CcEB",
-      "name": "17-1-G マイルの使い道をつくる",
-      "gap": "api",
-      "gapNote": "同上"
     },
     {
       "feature": 18,

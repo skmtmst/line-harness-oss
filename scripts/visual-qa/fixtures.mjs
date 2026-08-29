@@ -179,6 +179,103 @@ export const BROADCAST_STATS = {
   openRate: 69.4,
 }
 
+/**
+ * マイルの使い道（`GET /api/mileage/rewards`、設計 `qlVLJ`・`p9CcEB`）。
+ *
+ * 型は `apps/web/src/lib/api.ts` の `MileageRewardOverview` と
+ * `MileageReward`。**確かめたいことを1件ずつ入れてあります。**
+ *
+ *   - **公開版が固定されているか**
+ *     `currentPublishedVersionId` と `currentDraftVersionId` を別々に持つ行を置く。
+ *     直しても公開中の版は動かない、という形が絵で見える。
+ *   - **交換に失敗したときの決めごと**
+ *     `failurePolicy` は `retry`（もう一度試す）・`refund`（マイルを戻す）・
+ *     `manual`（人が確かめる）の3つを1件ずつ。
+ *   - **未取得と0の区別**
+ *     `neverRedeemedFriendCount` は `null`（＝まだ数えていない）。
+ *     `availableCodeCount` は 0（＝数えて0）と `null`（＝上限なし）を分ける。
+ */
+const reward = (
+  id, name, kind, status, sortOrder, version, exchangedThisMonth, availableCodeCount,
+) => ({
+  id, lineAccountId: 'visual-qa-account', programId: 'mp-1',
+  name, description: null, imageUrl: null,
+  rewardKind: kind, status, sortOrder,
+  currentDraftVersionId: version?.draftId ?? null,
+  currentPublishedVersionId: version?.publishedId ?? null,
+  currentVersion: version ? {
+    id: version.publishedId ?? version.draftId,
+    versionNumber: version.number,
+    status: version.publishedId ? 'published' : 'draft',
+    requiredMiles: version.requiredMiles,
+    stockLimit: version.stockLimit ?? null,
+    perFriendLimit: version.perFriendLimit ?? null,
+    startsAt: version.startsAt ?? null,
+    endsAt: version.endsAt ?? null,
+    benefitExpiresDays: version.benefitExpiresDays ?? null,
+    commonActionVersionId: version.commonActionVersionId ?? null,
+    failurePolicy: version.failurePolicy,
+    customerMessage: version.customerMessage,
+    publishedAt: version.publishedAt ?? null,
+  } : null,
+  exchangedThisMonth,
+  availableCodeCount,
+  createdAt: '2026-05-01T00:00:00.000Z',
+  updatedAt: '2026-08-24T02:00:00.000Z',
+})
+
+export const MILEAGE_REWARDS = {
+  rewards: [
+    /* 公開中。**直しかけの版（v3）が別にあり、公開中は v2 のまま。** */
+    reward('mr-1', '送料無料クーポン', 'coupon', 'published', 0, {
+      publishedId: 'mrv-1-2', draftId: 'mrv-1-3', number: 2,
+      requiredMiles: 500, stockLimit: 200, perFriendLimit: 1,
+      startsAt: '2026-08-01T00:00:00.000Z', endsAt: '2026-09-30T14:59:59.000Z',
+      benefitExpiresDays: 30, commonActionVersionId: 'cav-4',
+      failurePolicy: 'retry',
+      customerMessage: 'クーポンをお送りしました。ご注文時にご利用ください。',
+      publishedAt: '2026-08-01T01:00:00.000Z',
+    }, 128, 72),
+    /* 公開中。在庫を数えて0。**「0件」であって未取得ではない。** */
+    reward('mr-2', '500円ぶんのお買い物券', 'coupon', 'published', 1, {
+      publishedId: 'mrv-2-1', number: 1,
+      requiredMiles: 1000, stockLimit: 50, perFriendLimit: 1,
+      benefitExpiresDays: 60, failurePolicy: 'refund',
+      customerMessage: 'お買い物券をお送りしました。',
+      publishedAt: '2026-07-15T01:00:00.000Z',
+    }, 42, 0),
+    /* 公開中。上限なしなので在庫は `null`（＝数える対象がない）。 */
+    reward('mr-3', '先行案内に登録', 'early_access', 'published', 2, {
+      publishedId: 'mrv-3-1', number: 1,
+      requiredMiles: 3000, failurePolicy: 'manual',
+      customerMessage: '先行案内へご登録しました。次回の入荷からお知らせします。',
+      publishedAt: '2026-06-01T01:00:00.000Z',
+    }, 6, null),
+    /* 下書き。**まだ一度も公開していない。** */
+    reward('mr-4', '会員ランクをひとつ上げる', 'rank', 'draft', 3, {
+      draftId: 'mrv-4-1', number: 1,
+      requiredMiles: 8000, failurePolicy: 'manual',
+      customerMessage: '',
+    }, 0, null),
+    /* 止めている。過去の交換は残る。 */
+    reward('mr-5', '旧キャンペーンのクーポン', 'coupon', 'stopped', 4, {
+      publishedId: 'mrv-5-2', number: 2,
+      requiredMiles: 800, stockLimit: 100, perFriendLimit: 1,
+      failurePolicy: 'refund',
+      customerMessage: 'クーポンをお送りしました。',
+      publishedAt: '2026-04-01T01:00:00.000Z',
+    }, 0, 34),
+  ],
+  summary: {
+    publishedCount: 3,
+    redeemedMilesThisMonth: 186_400,
+    /* **まだ数えていない。0人ではない。** */
+    neverRedeemedFriendCount: null,
+    mostRedeemedRewardName: '送料無料クーポン',
+    mostRedeemedRewardCount: 128,
+  },
+}
+
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,
