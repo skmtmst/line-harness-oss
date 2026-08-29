@@ -281,7 +281,7 @@
 | #552 | `6ce43563` | `components/automations/automation-template-gallery.tsx` `automation-draft-editor.tsx` `app/automations/page.tsx`（タブ帯5本と権限） `new/page.tsx` | `WjYAC`（印あり）＋ `gief7` `Rv8Jv` `Vdbv5`（同じページを描き替えるため） | 束10（導線が無い） |
 | #553 | `2fdded68` | `app/scenarios/detail/scenario-detail-client.tsx` | `dqFft` | **束5** |
 | #554 | `875a9ed3` | `app/broadcasts/page.tsx` | `EGMb1` | **束5** |
-| #555 | `e873eeb9` | `components/chats/saved-view-dialog.tsx` | `ANgda`（未入力の赤帯が出るのはこの画面）＋ `tBlkL`（同じ部品） | P0-1 の続き |
+| #555 | `e873eeb9` | `components/chats/saved-view-dialog.tsx` | **`AuSDY`**（未入力エラーはこの画面）＋ `ANgda` `tBlkL` `LHjwD`（同じ部品） | P0-1 の続き |
 | #556 | `6037aeef` | `app/form-submissions/form-kpi-value.tsx` `page.tsx` | `ZOPyc` | **束4** |
 | #557 | `697cee2c` | `components/broadcasts/broadcast-kpi-values.tsx` | `q76C35` | **束4** |
 | #558 | `ef7b5773` | `app/affiliates/affiliate-reward.ts` `tabs.tsx` | `PouPn` `xqT1Z` `jwrbf` | 束6（数が合わない）— **画像確認済み。4項目とも通った** |
@@ -297,11 +297,11 @@
 | #552 | `WjYAC`×2 | `app/automations/page.tsx` を描く `gief7` `Vdbv5`、`new/page.tsx` を描く `Rv8Jv` |
 | #553 | 印なし | `scenario-detail-client.tsx` の標準 `confirm` を持つ `dqFft` |
 | #554 | 印なし | `broadcasts/page.tsx` の標準 `confirm` を持つ `EGMb1` |
-| #555 | 印なし | `saved-view-dialog.tsx` を開く `ANgda`（名前を入れる）と `tBlkL`（保存完了） |
+| #555 | 印なし | `saved-view-dialog.tsx` の未入力エラーを出す `AuSDY`。同じ部品を使う `ANgda` `tBlkL` `LHjwD` も撮り直す |
 | #556 | 印なし | `form-submissions/page.tsx` の帯を持つ `ZOPyc` |
 | #557 | 印なし | `broadcast-kpi-values.tsx` を描く `q76C35` |
 
-**#550〜#557 は、まだ画像で確かめていません。** どれも head が
+**#550〜#557 は、すべて画像で確かめました（2026-08-29）。** どれも head が
 動いていないので、取り込まれた順に `--only` で変わった Node だけ
 撮り直します。
 

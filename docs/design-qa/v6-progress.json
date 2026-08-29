@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 216,
-  "unimplemented": 42,
+  "compared": 219,
+  "unimplemented": 39,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 193,
+  "needsFix": 196,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -53,6 +53,18 @@
             "LHjwD"
           ],
           "note": "保存の成否を窓へ返す直し。**P0は解決**"
+        },
+        {
+          "pr": 555,
+          "head": "e873eeb9",
+          "on": "2026-08-29",
+          "screens": [
+            "ANgda",
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した"
         }
       ]
     },
@@ -127,6 +139,15 @@
       "remaining": 13,
       "capturedAt": [
         {
+          "pr": 553,
+          "head": "2fdded68",
+          "on": "2026-08-29",
+          "screens": [
+            "dqFft"
+          ],
+          "note": "通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm"
+        },
+        {
           "pr": 521,
           "head": "7d5d74fd",
           "on": "2026-08-29",
@@ -169,14 +190,14 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 13,
-      "unimplemented": 2,
+      "compared": 15,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 12,
+      "needsFix": 14,
       "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
@@ -188,6 +209,34 @@
             "bPF0s"
           ],
           "note": "予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける"
+        },
+        {
+          "pr": 557,
+          "head": "697cee2c",
+          "on": "2026-08-29",
+          "screens": [
+            "q76C35"
+          ],
+          "note": "帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た"
+        },
+        {
+          "pr": 554,
+          "head": "875a9ed3",
+          "on": "2026-08-29",
+          "screens": [
+            "EGMb1"
+          ],
+          "note": "配信の削除を画面内の確認窓へ"
+        },
+        {
+          "pr": 550,
+          "head": "f7c5a99e",
+          "on": "2026-08-29",
+          "screens": [
+            "cPk8A",
+            "sqFXf"
+          ],
+          "note": "対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした"
         }
       ]
     },
@@ -409,6 +458,15 @@
             "ZOPyc"
           ],
           "note": "読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る"
+        },
+        {
+          "pr": 556,
+          "head": "6037aeef",
+          "on": "2026-08-29",
+          "screens": [
+            "ZOPyc"
+          ],
+          "note": "回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない"
         }
       ]
     },
@@ -455,15 +513,6 @@
       "remaining": 5,
       "capturedAt": [
         {
-          "pr": 560,
-          "head": "7c1acd0f",
-          "on": "2026-08-29",
-          "screens": [
-            "g89Tc"
-          ],
-          "note": "寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている"
-        },
-        {
           "pr": 559,
           "head": "7922c002",
           "on": "2026-08-29",
@@ -471,6 +520,15 @@
             "g89Tc"
           ],
           "note": "未取得を一括削除で選べないようにした。**#559 は #438 を含む**"
+        },
+        {
+          "pr": 560,
+          "head": "7c1acd0f",
+          "on": "2026-08-29",
+          "screens": [
+            "g89Tc"
+          ],
+          "note": "寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている"
         }
       ]
     },
@@ -745,14 +803,14 @@
       "feature": 25,
       "name": "オートメーション",
       "total": 8,
-      "compared": 7,
-      "unimplemented": 1,
+      "compared": 8,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
+      "needsFix": 7,
       "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
@@ -764,6 +822,18 @@
             "DkPY0"
           ],
           "note": "#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む"
+        },
+        {
+          "pr": 552,
+          "head": "6ce43563",
+          "on": "2026-08-29",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "WjYAC",
+            "Vdbv5"
+          ],
+          "note": "タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）"
         }
       ]
     },
@@ -930,20 +1000,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 6,
-      "node": "cPk8A",
-      "name": "6-1-B 対象条件",
-      "gap": "api",
-      "gapNote": "#510で共通ConditionBuilder・人数確認・実送信は同じSegmentConditionへ統一済み。#542 Draftで旧検索と混ぜない `segment_v1` の保存・検証APIを追加済み。取り込み順は #421 → #542。画面接続は別PRのため、まだ未実装扱い"
-    },
-    {
-      "feature": 6,
-      "node": "sqFXf",
-      "name": "6-1-L 対象条件を編集",
-      "gap": "api",
-      "gapNote": "cPk8Aと同じ。#542 Draftで共通SegmentConditionの保存APIは用意済み。#421 → #542 の取り込み後に、下書き・人数確認・実送信へ同じ形のまま渡す画面接続が要る"
     },
     {
       "feature": 7,
@@ -1182,13 +1238,6 @@
       "name": "23-1-C EC連携のつなぎ先",
       "gap": "api",
       "gapNote": "つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記"
-    },
-    {
-      "feature": 25,
-      "node": "WjYAC",
-      "name": "25-1-C 見本から作る",
-      "gap": "api",
-      "gapNote": "見本の一覧自体は固定データで作れるが、選択後は公開ではなく下書きを作る必要がある。現行 `POST /api/automations` は `isActive`／下書き状態を受け取らず、`automations.is_active DEFAULT 1` で即時稼働するため、その口へ見本を接続してはいけない。下書き作成API、または版付きV6作成APIへ接続してから実装する。見本は実データIDを持たず、タグ・シナリオ・テンプレートを利用者が選び直す"
     },
     {
       "feature": 4,

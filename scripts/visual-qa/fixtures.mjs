@@ -4229,3 +4229,79 @@ export function bookingAvailability(date, staffId) {
     }],
   }
 }
+
+/*
+  保存した対象条件（`SavedSegmentPreset`）。
+
+  **「保存した検索」とは別の型。** あちらは受信箱の絞り込み
+  （`SavedSearch`、`{ all, any, visibility }`）で、こちらは配信の対象条件
+  （`conditionFormat: 'segment_v1'`、`conditions.condition`）。同じ口
+  （`/api/saved-searches`）を `format=segment_v1` で切り替えて使う。
+  **混ぜると、受信箱の条件で配信を送ることになる。**
+
+  `usedIn` は実データのある画面だけが使う。ここでは1本目に
+  「いま予約中の配信から呼ばれている」形を入れ、
+  **呼ばれている条件は消せない**（`canDelete: false`）ことを見る。
+*/
+export const SEGMENT_PRESETS = [
+  {
+    id: 'sp-1', name: '直近30日で反応した友だち', scope: 'friends',
+    conditionFormat: 'segment_v1',
+    conditions: {
+      version: 1,
+      /*
+        **形は `SegmentCondition`**（`apps/web/src/lib/segment-condition.ts:29`）。
+        `{ operator, rules }` であって `{ all: [...] }` ではない。
+        別名で書くと「この条件を使う」で画面が落ちる（実際に落とした）。
+      */
+      condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-0' }] },
+    },
+    createdBy: 'staff-1', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 1, createdAt: '2026-08-12T02:00:00.000Z',
+    usedIn: [{ kind: 'broadcast', id: 'broadcast-0', name: '8月キャンペーンのお知らせ', mode: 'live', lastUsedAt: '2026-08-22T01:00:00.000Z' }],
+    canDelete: false,
+  },
+  {
+    /* 自分だけのもの。**共有していない**ことが見えること。 */
+    id: 'sp-2', name: '定期便を止めた人', scope: 'friends',
+    conditionFormat: 'segment_v1',
+    conditions: {
+      version: 1,
+      condition: { operator: 'AND', rules: [{ type: 'tag_not_exists', value: 'tag-1' }] },
+    },
+    createdBy: 'staff-1', lineAccountId: 'visual-qa-account', isShared: false,
+    displayOrder: 2, createdAt: '2026-07-30T05:40:00.000Z',
+    usedIn: [], canDelete: true,
+  },
+]
+
+/*
+  オートメーションの見本（`AutomationTemplateSummary`）。
+
+  **見本は実データのIDを持たない。** タグやシナリオは、選んだ人が
+  自分の環境のものを選び直す。だからここに `tag-0` のような id は書かない。
+  `triggerLabel` `actionLabel` は**そのまま画面に出る言葉**。
+*/
+export const AUTOMATION_TEMPLATES = [
+  {
+    key: 'welcome-tag',
+    name: '友だち追加であいさつを送る',
+    description: '追加された人へ1通送り、あとから絞り込めるようタグを付けます。',
+    triggerLabel: '友だちが追加されたとき',
+    actionLabel: 'メッセージを送る → タグを付ける',
+  },
+  {
+    key: 'form-followup',
+    name: '回答フォームの答えでシナリオを始める',
+    description: 'フォームに答えた人を、その内容に合うシナリオへ入れます。',
+    triggerLabel: 'フォームに回答されたとき',
+    actionLabel: 'シナリオを開始する',
+  },
+  {
+    key: 'booking-thanks',
+    name: '予約が入ったらお礼を送る',
+    description: '予約が確定した人へお礼を送り、来店前の案内につなげます。',
+    triggerLabel: '予約が確定したとき',
+    actionLabel: 'メッセージを送る',
+  },
+]

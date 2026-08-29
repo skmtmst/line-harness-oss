@@ -282,8 +282,8 @@ export const SCREENS = [
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
     steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
-    verdict: 'needs_fix', verdictNote: 'P1 「保存する条件」が読むだけで変えられない（設計は対応マーク・期限・受信経路・担当者の4つを選び直せる）。期限の行が無い。P2 「よく使うに追加」の切替と「件数は自動更新される」注記が無い',
-    verdictSource: 'inbox-v6/ANgda-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: 'P1 「保存する条件」が読むだけで変えられない（設計は対応マーク・期限・受信経路・担当者の4つを選び直せる。実装は 対応マーク／担当者／受信経路 の3行が値を表示するだけ）。期限の行が無い。P2 「よく使うに追加」の切替と「件数は自動更新される」注記が無い。**#555 `e873eeb9` で撮り直したが、この窓の作りは変わっていない**（#555 は未入力エラーの出し方だけを直した。そちらは `AuSDY` を見る）',
+    verdictSource: 'inbox-v6/ANgda-1440.png', verdictHead: 'e873eeb9',
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -291,8 +291,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: '**P0は #513 で解決した。** 保存に失敗したとき、窓は「保存しました」へ進まず、窓の中に「保存できませんでした。時間を置いてもう一度お試しください。」を出して開いたまま残る。API の番号（405）も素通ししていない。ただし**設計のこのNodeは「保存完了」の画面**で、画面確認では書き込みを常に405で止める決めごとのため、完了の絵そのものは撮れない。窓の作りの残る差は ANgda と同じ（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い）',
-    verdictSource: 'inbox-v6/tBlkL-1920.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: '60b39036',
+    verdict: 'needs_fix', verdictNote: '**P0は #513 で解決した。** 保存に失敗したとき、窓は「保存しました」へ進まず、窓の中に文を出して開いたまま残る。APIの番号（405）も素通ししていない。**#555 `e873eeb9` で撮り直した**——失敗の文が赤い帯（`Notice tone="error"`）に替わり、`AuSDY` `LHjwD` と同じ見え方でそろった。ただし**設計のこのNodeは「保存完了」の画面**で、画面確認では書き込みを常に405で止める決めごとのため、完了の絵そのものは撮れない。窓の作りの残る差は `ANgda` と同じ（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い）',
+    verdictSource: 'inbox-v6/tBlkL-1440.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: 'e873eeb9',
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
@@ -300,8 +300,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P2 設計は赤い帯の注意書きと、押せない保存ボタン。実装は入力欄の下の赤い文だけで、保存ボタンは押せるまま',
-    verdictSource: 'inbox-v6/AuSDY-1920.png', verdictHead: '60b39036',
+    verdict: 'needs_fix', verdictNote: '**#555 `e873eeb9` で、記録していたP2が両方直った。** 未入力のとき **赤い帯**（`Notice tone="error"`、×印つき）で「検索名を入力してください」と出し、**保存ボタンは押せなくなる**（`disabled={saving || nameMissing}`）。入力欄も赤枠になり `aria-invalid`／`aria-describedby` が付くので、読み上げでも同じことが伝わる。設計の「赤い帯の注意書きと、押せない保存ボタン」とそろった。1440・1920とも横スクロール0。P2 残るのは `ANgda` と同じ窓の作り（保存する条件を窓の中で変えられない・期限の行が無い）',
+    verdictSource: 'inbox-v6/AuSDY-1440.png', verdictHead: 'e873eeb9',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -309,8 +309,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P2 文言が設計と違う（設計「同じ名前の保存した検索があります。別の名前を入力してください。」／実装「同じ名前の検索がすでにあります。別の名前にしてください」）。設計は赤い帯、実装は入力欄の下の文',
-    verdictSource: 'inbox-v6/LHjwD-1920.png', verdictHead: '60b39036',
+    verdict: 'needs_fix', verdictNote: '**#555 `e873eeb9` で、重複エラーも入力欄の下の文から赤い帯へ変わった**（同じ `Notice` を使うため）。設計の「赤い帯」とそろった。保存ボタンは押せたままだが、これは正しい——名前を変えれば保存できるので、押せなくする理由がない（未入力とは違う）。1440・1920とも横スクロール0。P2 文言はまだ設計と違う（設計「同じ名前の保存した検索があります。別の名前を入力してください。」／実装「同じ名前の検索がすでにあります。別の名前にしてください」）',
+    verdictSource: 'inbox-v6/LHjwD-1440.png', verdictHead: 'e873eeb9',
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
@@ -450,8 +450,8 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: 'この通を削除する' }],
-    verdict: 'needs_fix', verdictNote: 'P1 通の削除の確認が、ブラウザ標準の confirm（scenario-detail-client.tsx:731「このステップを削除してもよいですか？」）。どの通を消すのか、配信対象と送信後アクションも一緒に消えること、到達済みの履歴は監査記録として残ることを言わない。設計は画面内の確認窓で3つとも書いてある。撮った絵に窓が写っていないのは、標準の窓が画像に入らないため',
-    verdictSource: 'scenarios-v6/dqFft-1920.png + apps/web/src/app/scenarios/detail/scenario-detail-client.tsx:731', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#553 `2fdded68` でブラウザ標準の `confirm` が画面内の確認窓（`ConfirmDialog`）に替わった。** 撮った絵に、設計の3つがそのまま入っている：**どの通か**（「1通目を削除しますか？」）、**何が一緒に消えるか**（「1通目と、その配信対象・送信後アクションが削除されます。」）、**何が残るか**（「到達済みの履歴は監査記録として残ります。」）。加えて「この操作は取り消せません。」。ボタンは「キャンセル」と赤い「この通を削除」で、`Y0Sn3` `Gy9OK` と同じ部品・同じ形。失敗時の文も「この通を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉になった。1440・1920とも横スクロール0。**P1 ただし同じファイルの「シナリオごと削除」はまだブラウザ標準の `confirm`**（`scenario-detail-client.tsx:470`）。購読中の人数は本文に入るが、窓の見た目は揃っていない。束5に残す',
+    verdictSource: 'scenarios-v6/dqFft-1440.png', verdictHead: '2fdded68',
   },
   {
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
@@ -524,8 +524,8 @@ export const SCREENS = [
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信', route: '/broadcasts',
-    verdict: 'needs_fix', verdictNote: 'P2 帯の4枚が設計（予約中・下書き・今月の配信・平均開封率）と違い、今月の配信・到達・平均開封率・失敗になっている。列の並びも違い、開封（率）の未取得が「-」で「—」でない。フォルダごとの「…」（名前を変える・消す）が無い。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖。以前ここに出ていた「予約中 undefined」は /api/broadcasts/stats の固定データを用意していなかったこちらの落ちで、足して消えた。ただし broadcast-kpis.tsx:40 は欠けた項目をそのまま文へ繋ぐので、守りは足りないまま',
-    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpis.tsx:40', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#557 `697cee2c` で帯の未取得が直った。返事を差し替えて実際に確かめた。** 集計が**失敗**したときは4つとも **`—`**（`undefined` も `0` も出ない）、**一部だけ欠けた**ときは揃っている分だけ実値で欠けた分だけ `—`（今月の配信 12件・到達 1,842通 に対し 予約中 `—`・失敗 `—`）、**実値0**のときは `0件` `0通` `0%`。以前の「開封（率）の未取得が `-` で `—` でない」と「`broadcast-kpis.tsx:40` が欠けた項目をそのまま文へ繋ぐ」は、`buildBroadcastKpiCards()` が `?? null` で受けて `BroadcastKpiValue` が `null` を `—` に描く形になり、両方とも解けた。1440・1920とも横スクロール0。P2 帯の4枚が設計（予約中・下書き・今月の配信・平均開封率）と違い、今月の配信・到達・平均開封率・失敗になっている。列の並びも違う。フォルダごとの「…」（名前を変える・消す）が無い。日付欄が `mm/dd/yyyy` になるのは撮影側のブラウザの癖',
+    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpi-values.tsx', verdictHead: '697cee2c',
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC,
     verdict: 'needs_fix', verdictNote: 'P1 節の番号が画面の並びと合っていない（上から 1.送る相手 → 3.送る内容 → 2.送る時間）。設計の5段の進み表示（基本設定・対象者・メッセージ・送信設定・確認）が無く、1枚の長い画面になっている。配信方法（新しいメッセージを作成／テンプレートを選択／過去の配信を複製）と「最近の配信」からの複製が無い。社内メモが無い。P2 右の設定内容（配信対象・配信日時・送信数・配信後）が無く、配信名の字数（14 / 60文字）も出ない。送信対象の未取得が「−」で「—」でない',
@@ -533,10 +533,17 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
-    gap: 'api',
-    gapNote: '#510で共通ConditionBuilder・人数確認・実送信は同じSegmentConditionへ統一済み。#542 Draftで旧検索と混ぜない `segment_v1` の保存・検証APIを追加済み。取り込み順は #421 → #542。画面接続は別PRのため、まだ未実装扱い',
-    status: 'unimplemented',
-    why: '**#510 head `ab1841bc` と #542 head `57941197` を確認しました（2026-08-29）。** API契約はDraftで用意できましたが、「保存した条件から選ぶ」はまだ `disabled` のままです。#421 → #542 の取り込み後に、同じSegmentConditionのまま画面へ接続します',
+    /*
+      **「詳細条件で絞り込んで配信する」を選ばないと保存の口が開かない。**
+      条件がひとつも無いうちは「この条件を保存」が押せない（押せない理由も
+      吹き出しに書いてある）。設計の見どころは**保存と呼び出しの2つの口**
+      なので、そこまで進めてから撮る。
+    */
+    steps: [{ click: '詳細条件で絞り込んで配信する', role: 'text', after: 700 }],
+    verdict: 'needs_fix',
+    verdictNote: '**#550 `f7c5a99e` で「保存した条件から選ぶ」がつながり、未実装ではなくなった。** 「詳細条件で絞り込んで配信する」を選ぶと、条件の下に **「この条件を保存」「保存した条件から選ぶ」** の2つが出る。**押せないときは理由を吹き出しで言う**（アカウント未選択なら「先にLINEアカウントを選んでください」、条件が空なら「詳細条件を1つ以上入力してください」）。空の条件は `pruneCondition` で落ちるので、**誰にも届かない条件を保存できない**。`w72a2` と同じ、正直な押せなさ。読み込む口は `/api/saved-searches?format=segment_v1` で、受信箱の「保存した検索」とは**同じ道でも別の型**（混ぜると受信箱の条件で配信することになる）。1440・1920とも横スクロール0。P2 送信対象の未取得が `-人` で、`—` でそろっていない。P2 設計の対象条件の面（保存済み条件の一覧をその場に出す、条件ごとの見込み人数）はまだ窓の中',
+    verdictSource: 'broadcasts-v6/cPk8A-1440.png',
+    verdictHead: 'f7c5a99e',
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC,
     verdict: 'needs_fix', verdictNote: 'P1 本文の上限が設計と違う。設計は1通あたり5,000文字・合計22,500文字・最大5通で、4,500文字を超えると自動分割。実装は0/500・吹き出しは最大3。ボタン（最大4つ、ラベルと押したときの動作）の編集が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなくセレクト',
@@ -642,15 +649,35 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
-    verdict: 'needs_fix', verdictNote: 'P1 配信の削除の確認が、ブラウザ標準の confirm（broadcasts/page.tsx:139「この配信を削除してもよいですか？」）。どの配信か、予約中か送信済みかを言わない。設計は画面内の確認窓',
-    verdictSource: 'broadcasts-v6/EGMb1-1920.png + apps/web/src/app/broadcasts/page.tsx:139', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#554 `875a9ed3` でブラウザ標準の `confirm` が画面内の確認窓（`ConfirmDialog`）に替わった。** **どの配信かを名前で言う**：「「8月キャンペーンのお知らせ」を削除しますか？」。本文は「削除すると配信設定と確認画面から消えます。**予約中の配信は中止され**、この操作は取り消せません。」で、消えるもの・止まるもの・戻せないことの3つが揃う。ボタンは「キャンセル」と赤い「削除する」。失敗の文も「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉になり、削除の口は `if (!result.success) throw` で成否を見る（`tBlkL` のP0と同じ取りこぼしをしていない）。削除の口は下書きと予約中の行にしか出ないので、送信済みを消せる道は無い。1440・1920とも横スクロール0。P2 帯の下の日付欄が `mm/dd/yyyy` と英語書式で出るのは**撮影側のブラウザの癖**で、実装の不具合ではない',
+    verdictSource: 'broadcasts-v6/EGMb1-1440.png', verdictHead: '875a9ed3',
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
-    gap: 'api',
-    gapNote: 'cPk8Aと同じ。#542 Draftで共通SegmentConditionの保存APIは用意済み。#421 → #542 の取り込み後に、下書き・人数確認・実送信へ同じ形のまま渡す画面接続が要る',
-    status: 'unimplemented',
-    why: '**#510 head `ab1841bc` と #542 head `57941197` を確認しました（2026-08-29）。** 条件は編集でき、保存APIもDraftで用意できましたが、「この条件を保存」は `disabled` のままです。旧SearchConditionsへの部分変換は採用しません',
+    /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
+    mode: 'viewport', height: 1080,
+    steps: [
+      { click: '詳細条件で絞り込んで配信する', role: 'text', after: 700 },
+      { click: '保存した条件から選ぶ', after: 900 },
+    ],
+    variants: [{
+      suffix: '-save', mode: 'viewport',
+      steps: [
+        { click: '詳細条件で絞り込んで配信する', role: 'text', after: 700 },
+        /*
+          **条件が揃うまで「この条件を保存」は押せない。**
+          空の欄を足しただけでは `pruneCondition` で落ちる。保存済みを
+          いったん読み込んで、**呼び出して保存し直す**道を通す。
+        */
+        { click: '保存した条件から選ぶ', after: 900 },
+        { click: 'この条件を使う', after: 900 },
+        { click: 'この条件を保存', after: 900 },
+      ],
+    }],
+    verdict: 'needs_fix',
+    verdictNote: '**#550 `f7c5a99e` で保存と呼び出しの2つの窓が入り、未実装ではなくなった。実際に押して撮った。** 呼び出す窓は「保存した対象条件から選ぶ／選ぶと、この画面の詳細条件へ読み込みます。」で、行ごとに名前と**共有の別**（「運用者と共有」／「自分だけ」）と「この条件を使う」。押すと詳細条件へ入り、「「直近30日で反応した友だち」の条件を読み込みました。」と出る。保存する窓は「この対象条件を保存／次の一斉配信でも同じ条件を呼び出せます。」で、名前欄（例文つき、80字まで）と「同じLINEアカウントを扱う運用者と共有する／外すと、自分だけが呼び出せます。」。読込中・失敗も `ListState` で分かれる。1440・1920とも横スクロール0。P2 設計の「使われている場所」（`usedIn`）と、呼ばれている条件を消せないこと（`canDelete`）が窓に出ていない。型は返ってきているので、出す場所だけの話',
+    verdictSource: 'broadcasts-v6/sqFXf-1440.png + broadcasts-v6/sqFXf-save-1440.png',
+    verdictHead: 'f7c5a99e',
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
@@ -1146,8 +1173,8 @@ export const SCREENS = [
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときも帯の「フォーム 0件」「公開中 0件」が出る（form-submissions/page.tsx:312-327 が loadError を見ずに forms.length を描く。未取得なので—にすべき）。**P0は #436 で解決した。** 失敗は⚠と「回答フォームを読み込めませんでした／通信状態を確認して、もう一度読み込んでください。」＋再読み込みボタンになり、空の文も「フォームを作る」の誘いも出なくなった。読込・空・失敗が data-list-state でも名前で分かれている',
-    verdictSource: 'forms-v6/ZOPyc-error-1920.png + apps/web/src/app/form-submissions/page.tsx:354', verdictHead: '950073ab',
+    verdict: 'needs_fix', verdictNote: '**P0-2（読み込み失敗を空として出す）は #436 で解決し、#556 `6037aeef` で帯まで直った。** 失敗のとき帯は**4つとも `—`**、本文は「回答フォームを読み込めませんでした／通信状態を確認して、もう一度読み込んでください。」＋「回答フォームを再読み込み」で、**作成の誘いは出ない**（押すと同じものをもう1つ作ってしまうため）。空のときは フォーム **0件**・公開中 **0件**（数えて0）に対し、今月の回答 **—**「月ごとの集計は未対応」、回答率 **—**「配った人数を持っていません」と、**未取得はその理由まで書く**。読込は `loading`。3状態とも `data-list-state` で名前が分かれる。**束1と束4の完了条件を満たし、`dC0yg` `TmHjF` と並ぶ手本になった。** 1440・1920とも横スクロール0。P2 残るのは設計の一覧の作り（フォームごとの回答数の推移、公開/停止の切替）',
+    verdictSource: 'forms-v6/ZOPyc-error.txt + forms-v6/ZOPyc-empty.txt', verdictHead: '6037aeef',
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
@@ -1575,8 +1602,8 @@ export const SCREENS = [
     見本12／共通アクション14）で、オートメーションと共通アクションが
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
-  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: 'P1 帯4つ（動いているもの14本／この30日に動いた8,420回／失敗した6回／減らせた手作業およそ70時間）が無い。とくに「減らせた手作業」は、この機能を使い続ける理由を数で出すもの。P1 見本から作る導線が無い（grep 見本 が /automations 配下で0件）。空の作成画面から始めるのと、動く形を1つ手元に置いてから直すのとでは使い始めるまでの距離が違う', verdictSource: 'automations-v6/design-qa.md' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: 'P1 つくる面が設計とそろわない。見本から始める道が無い', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: '**#552 `6ce43563` でタブ帯5本が設計どおりになった**（動いているもの／止めているもの／動いた記録／見本／共通アクション）。以前の「実装は `/automations` と `/common-actions` の別ページ」は解消し、**見本から作る導線も入った**（前のP1）。帯は **未取得を `—` で出す**：ルール4件・稼働中3は実値、今月の実行・失敗・手動実行は `—` と「実行の記録がありません」。**読めていない数を0と言わない。** 1440・1920とも横スクロール0。P1 設計の帯4つ（動いているもの14本／この30日に動いた8,420回／失敗した6回／**減らせた手作業およそ70時間**）のうち、実行回数・失敗・削減時間がまだ `—`。とくに「減らせた手作業」は、この機能を使い続ける理由を数で出すもので、集計の口が要る', verdictSource: 'automations-v6/gief7.txt', verdictHead: '6ce43563' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: '**#552 `6ce43563` の時点で、つくる面は節番号つきの3段になっている**（1. どのルールか／2. 何が起きたら動かすか／3. 何をするか）。きっかけ5つ（メッセージを受け取ったとき・友だちになったとき・タグが付いたとき・フォームに答えたとき・リンクを踏んだとき）と、それぞれの補足（「空欄なら、どんなメッセージでも動きます。」）が出る。**見本から始める道は `gief7` のタブ帯側に入った**ので、前のP1「見本から始める道が無い」はこの画面の外で解けている。1440・1920とも横スクロール0。P2 設計の作る面との差（条件の組み合わせ、失敗したときの決めごと、下書きのまま置く段）はまだ', verdictSource: 'automations-v6/Rv8Jv.txt', verdictHead: '6ce43563' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -1597,17 +1624,23 @@ export const SCREENS = [
   },
   {
     ...AUTOMATION, node: 'WjYAC', name: '25-1-C 見本から作る',
-    gap: 'api',
-    gapNote: '見本の一覧自体は固定データで作れるが、選択後は公開ではなく下書きを作る必要がある。現行 `POST /api/automations` は `isActive`／下書き状態を受け取らず、`automations.is_active DEFAULT 1` で即時稼働するため、その口へ見本を接続してはいけない。下書き作成API、または版付きV6作成APIへ接続してから実装する。見本は実データIDを持たず、タグ・シナリオ・テンプレートを利用者が選び直す',
-    status: 'unimplemented',
-    why: '見本（よく使う組み合わせ）が無い。画面だけ追加して現行createを呼ぶと、要件の「公開ではなく下書きを作る」に反して即時稼働する。`api.automations.create` の入力に `isActive`／statusは無く、DBの既定値は有効。下書き契約ができるまでは見本を選べる画面を出さない',
+    /*
+      **#552 でタブ帯へ「見本」が入った。** `?tab=templates` で開く。
+      見本は実データのIDを持たないので、固定データにも `tag-0` のような
+      id は入れない（選んだ人が自分の環境のものを選び直す）。
+    */
+    route: '/automations?tab=templates', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#552 `6ce43563` で見本が入り、未実装ではなくなった。** タブ帯の「見本」（`?tab=templates`）に3件並び、それぞれ 名前・説明・**きっかけ**・**すること**・「これで作る」。**この節を止めていた条件が満たされている**——画面の先頭に「見本を選ぶと、**公開されていない下書きを作ります**。タグやシナリオは、次の画面でこのアカウントのものを選び直してください。」と書いてあり、口も `POST /api/automation-templates/:key/drafts` で下書きを作る。以前は現行 `POST /api/automations` が `is_active DEFAULT 1` で**即時稼働**するため接続してはいけなかった。見本は実データのIDを持たず、タグ・シナリオは選び直す形も守られている。1440・1920とも横スクロール0。P2 設計は見本12件。実装は3件で、絞り込み（きっかけ別）も無い',
+    verdictSource: 'automations-v6/WjYAC.txt',
+    verdictHead: '6ce43563',
   },
   {
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
     route: '/automations',
     states: { apis: ['**/api/automations*', '**/api/automations/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「オートメーションがありません。「新規ルール」から作成してください。」を出し、作成を誘う。押せば同じルールをもう1つ作る。ルールの数も0件と出る（未取得なので—にすべき）。P2 誘い文の「新規ルール」と実際のボタン名「ルールを作成」が違う。**#516 で直す差分が出ている（未取り込み）**',
-    verdictSource: 'automations-v6/Vdbv5-error-1920.png', verdictHead: '75b010fc',
+    verdict: 'needs_fix', verdictNote: '**#516 → #552 `6ce43563` で、失敗と空が分かれたまま保たれている。** 失敗は「オートメーションを表示できませんでした／**登録したルールは消えていません。**再読み込みしても直らない場合はエラー報告へ。」で、**帯も全部 `—`**（ルール —・稼働中 —・今月の実行 —・失敗 —）。空は「動いているオートメーションはありません。」で帯は **0件**。読込は `loading`。**束1と束4の完了条件を満たしている。** 1440・1920とも横スクロール0。P2 空だけ `data-list-state` が付かない（タブごとの文に替わったため）。読込・失敗には付いているので、撮影側から状態を確かめられるよう空にも付けてほしい',
+    verdictSource: 'automations-v6/Vdbv5-error.txt', verdictHead: '6ce43563',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: 'P2 実装は設計にかなり近い。版（v4）と呼び出し元、古い版のまま呼んでいる先まである。差は、設計がオートメーションと共通アクションを同じタブ帯（5本）にしているのに実装は別ページ（/automations と /common-actions）であること、帯（共通アクション14／呼び出し元38・5機能から／今月2,847回・失敗6／古い版のまま要確認2）が無いこと', verdictSource: 'automations-v6/design-qa.md' },
   { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: 'P2 共通アクションをつくる面は設計に近い。差は「複製して作る」の扱いと、上のタブ帯の位置', verdictSource: 'automations-v6/design-qa.md' },
@@ -2028,11 +2061,16 @@ export const CAPTURED_AT = {
   14: [{ pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' }],
   26: [{ pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' }],
   15: [
-    { pr: 560, head: '7c1acd0f', on: '2026-08-29', screens: ['g89Tc'], note: '寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている' },
     { pr: 559, head: '7922c002', on: '2026-08-29', screens: ['g89Tc'], note: '未取得を一括削除で選べないようにした。**#559 は #438 を含む**' },
+    { pr: 560, head: '7c1acd0f', on: '2026-08-29', screens: ['g89Tc'], note: '寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている' },
   ],
   16: [{ pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' }],
-  6: [{ pr: 561, head: '51827fe1', on: '2026-08-29', screens: ['bPF0s'], note: '予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける' }],
+  6: [
+    { pr: 561, head: '51827fe1', on: '2026-08-29', screens: ['bPF0s'], note: '予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける' },
+    { pr: 557, head: '697cee2c', on: '2026-08-29', screens: ['q76C35'], note: '帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た' },
+    { pr: 554, head: '875a9ed3', on: '2026-08-29', screens: ['EGMb1'], note: '配信の削除を画面内の確認窓へ' },
+    { pr: 550, head: 'f7c5a99e', on: '2026-08-29', screens: ['cPk8A', 'sqFXf'], note: '対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした' },
+  ],
   27: [{ pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' }],
   24: [{ pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' }],
   17: [
@@ -2050,7 +2088,8 @@ export const CAPTURED_AT = {
   8: [
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
-  5: [
+  5: [{ pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
+    
     { pr: 521, head: '7d5d74fd', on: '2026-08-29', screens: ['RUxNf'], note: '開始・停止の確認窓。窓は一覧の行に出る' },
     { pr: 522, head: '3c88b8bd', on: '2026-08-29', screens: ['NrBkW'], note: '開始完了の知らせ。`?started=1` で開ける。#521 の上に積んである' },
     { pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['M2b2B'], note: '新しい口は足さず既存の統計を読む' },
@@ -2059,9 +2098,18 @@ export const CAPTURED_AT = {
       note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
     },
   ],
-  2: [{ pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' }],
-  13: [{ pr: 436, head: '950073ab', on: '2026-08-29', screens: ['ZOPyc'], note: '読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る' }],
-  25: [{ pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' }],
+  2: [
+    { pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' },
+    { pr: 555, head: 'e873eeb9', on: '2026-08-29', screens: ['ANgda', 'tBlkL', 'AuSDY', 'LHjwD'], note: '保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した' },
+  ],
+  13: [
+    { pr: 436, head: '950073ab', on: '2026-08-29', screens: ['ZOPyc'], note: '読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る' },
+    { pr: 556, head: '6037aeef', on: '2026-08-29', screens: ['ZOPyc'], note: '回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない' },
+  ],
+  25: [
+    { pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' },
+    { pr: 552, head: '6ce43563', on: '2026-08-29', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5'], note: 'タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）' },
+  ],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
