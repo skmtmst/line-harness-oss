@@ -883,10 +883,10 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    gap: 'api',
-    gapNote: '既存 `webinar_registrations`・5分前cron・Harness Proxy・冪等キーを再利用する。足りないのは、申込直後/前日/1時間前/開始時/未視聴/視聴完了の設定、通知job、再予約時の旧job取消、結果表示',
+    gap: 'pending',
+    gapNote: '#546 head `de0848b9` で既存申込・5分cron・Harness Proxyを再利用し、申込直後/前日/開始前/開始時/未視聴/視聴完了、再予約時の旧予定取消、冪等キー、最大5回再送、テスト送信を実装済み。1440/1920と各状態の画像確認待ち',
     status: 'unimplemented',
-    why: '管理画面と複数時点の設定は無い。ただし実行基盤はゼロではなく、予約直後の確認送信と開始5分前のcron送信が既に動く。既存資産を広げるのが正しい',
+    why: '#546で管理画面・設定API・通知job・取消・再送を実装済み。未統合なので判定は動かさず、Node単位の画像確認を待つ',
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
