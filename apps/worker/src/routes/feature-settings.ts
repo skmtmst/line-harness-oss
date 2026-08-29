@@ -4,7 +4,9 @@ import {
   getAccountSetting,
   getVersionedAccountSetting,
   saveVersionedAccountSetting,
+  setAccountSetting,
 } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -136,7 +138,7 @@ function settingIsEnabled(raw: string | null): boolean {
   }
 }
 
-function specializedCatalog(raw: string | null): string[] {
+export function specializedCatalog(raw: string | null): string[] {
   if (!raw) return [...NEN_SPECIALIZED_FEATURES];
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -264,8 +266,53 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       sidebarOrder?: unknown;
       sidebarItemOrder?: unknown;
       expectedVersion?: unknown;
+      catalog?: unknown;
     }>();
 
+    const hasBundleUpdate = body.features !== undefined
+      || body.sidebarOrder !== undefined
+      || body.sidebarItemOrder !== undefined;
+    const hasCatalogUpdate = body.catalog !== undefined;
+
+    // 専門機能目録と画面の設定一式は保存先も権限も異なる。
+    // 同じ要求で受けると、片方だけ成功した状態を作り得るため混在させない。
+    if (hasCatalogUpdate && hasBundleUpdate) {
+      return c.json({
+        success: false,
+        error: '専門機能目録と機能設定は分けて保存してください',
+      }, 400);
+    }
+
+    if (hasCatalogUpdate) {
+      const staff = c.get('staff');
+      // TODO(OPS-b): 運営フラグが追加されたら、既定統括による暫定判定を見直す。
+      if (staff?.role !== 'owner' || staff.readOnly
+        || (staff.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
+        return c.json({ success: false, error: 'この操作には運営権限が必要です' }, 403);
+      }
+      if (!Array.isArray(body.catalog)) {
+        return c.json({ success: false, error: 'catalog は配列で指定してください' }, 400);
+      }
+      if (body.catalog.some((key) => typeof key !== 'string'
+        || !NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature))) {
+        return c.json({ success: false, error: 'catalog に知らない専用機能が含まれています' }, 400);
+      }
+      const catalog = body.catalog.filter(
+        (key): key is ToggleableFeature => typeof key === 'string'
+          && NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature),
+      );
+      await setAccountSetting(
+        c.env.DB,
+        accountId,
+        SPECIALIZED_CATALOG_KEY,
+        JSON.stringify(catalog),
+      );
+      return c.json({ success: true, data: null });
+    }
+
+    if (!hasBundleUpdate) {
+      return c.json({ success: false, error: '保存する設定を指定してください' }, 400);
+    }
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
       return c.json({ success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400);
     }

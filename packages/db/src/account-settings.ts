@@ -233,3 +233,44 @@ export async function setTrackedLinkBaseUrl(
 ): Promise<void> {
   return setUrlSetting(db, accountId, TRACKED_LINK_BASE_URL_KEY, value);
 }
+
+// ── Mileage manual adjustment policy ────────────────────────────────────────
+
+const MILEAGE_MANUAL_ADJUSTMENT_POLICY_KEY = 'mileage_manual_adjustment_policy';
+
+export interface MileageManualAdjustmentPolicy {
+  /** Absolute amount at or above which a second owner must approve. */
+  approvalThreshold: number;
+}
+
+export async function getMileageManualAdjustmentPolicy(
+  db: D1Database,
+  accountId: string,
+): Promise<MileageManualAdjustmentPolicy | null> {
+  const raw = await getAccountSetting(db, accountId, MILEAGE_MANUAL_ADJUSTMENT_POLICY_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<MileageManualAdjustmentPolicy>;
+    return Number.isInteger(parsed.approvalThreshold) && Number(parsed.approvalThreshold) > 0
+      ? { approvalThreshold: Number(parsed.approvalThreshold) }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setMileageManualAdjustmentPolicy(
+  db: D1Database,
+  accountId: string,
+  policy: MileageManualAdjustmentPolicy,
+): Promise<void> {
+  if (!Number.isInteger(policy.approvalThreshold) || policy.approvalThreshold <= 0) {
+    throw new Error('Mileage approval threshold must be a positive integer');
+  }
+  await setAccountSetting(
+    db,
+    accountId,
+    MILEAGE_MANUAL_ADJUSTMENT_POLICY_KEY,
+    JSON.stringify({ approvalThreshold: policy.approvalThreshold }),
+  );
+}
