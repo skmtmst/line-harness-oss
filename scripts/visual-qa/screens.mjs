@@ -1545,10 +1545,11 @@ export const SCREENS = [
       持つので、道も鍵も送った中身も、画面にも画像にも出さない。
     */
     ...WEBHOOK, node: 'KNG00', name: '26-1-B やり取りの記録',
-    gap: 'api',
-    gapNote: '外部連携のやり取りを残す記録と、やり直しの口が要る',
+    route: '/webhooks?tab=interactions',
     status: 'unimplemented',
-    why: '送った・受け取ったやり取りの記録が無い。**失敗したものをやり直す場所も無い**（`grep 記録|やり直す|deliveries` が `/webhooks` 配下で0件）',
+    why: '#547 で実装済み。Claude が 1440px・1920px で比較するまでは未実装扱いを維持する',
+    gap: 'pending',
+    gapNote: '#547 head `48715569` に送受信記録・安全な再送・通常/読込/空/失敗を実装済み。1440px・1920pxで設計と比較する',
   },
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
