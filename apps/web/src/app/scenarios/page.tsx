@@ -10,6 +10,8 @@ import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import Button from '@/components/shared/button'
 import ScenarioList from '@/components/scenarios/scenario-list'
 
 type ScenarioWithCount = Scenario & { stepCount?: number }
@@ -17,17 +19,15 @@ type ScenarioWithCount = Scenario & { stepCount?: number }
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
-/** フォルダの色。タグ側と同じ8色にそろえる。 */
-const FOLDER_COLORS = [
-  '#3B82F6',
-  '#10B981',
-  '#F59E0B',
-  '#EF4444',
-  '#8B5CF6',
-  '#EC4899',
-  '#06B6D4',
-  '#6B7280',
-]
+/** 作成日時が、運用画面の基準である日本時間の今月か。 */
+function isCreatedThisMonth(createdAt: string, now = new Date()): boolean {
+  const month = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+  })
+  return month.format(new Date(createdAt)) === month.format(now)
+}
 
 export default function ScenariosPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -37,15 +37,13 @@ export default function ScenariosPage() {
   const [nameQuery, setNameQuery] = useState('')
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」だけ。 */
   const [stoppedOnly, setStoppedOnly] = useState(false)
+  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [folderName, setFolderName] = useState('')
-  const [folderColor, setFolderColor] = useState(FOLDER_COLORS[0])
-  const [addingFolder, setAddingFolder] = useState(false)
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('scenario')
@@ -55,23 +53,6 @@ export default function ScenariosPage() {
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
-
-  const handleAddFolder = async () => {
-    const name = folderName.trim()
-    if (!name || addingFolder) return
-    setAddingFolder(true)
-    setError('')
-    const res = await api.folders.create({ kind: 'scenario', name, color: folderColor })
-    setAddingFolder(false)
-    if (!res.success) {
-      setError(res.error)
-      return
-    }
-    setFolderName('')
-    setFolderColor(FOLDER_COLORS[0])
-    setFolderDialogOpen(false)
-    void loadFolders()
-  }
 
   const loadScenarios = useCallback(async () => {
     setLoading(true)
@@ -181,6 +162,18 @@ export default function ScenariosPage() {
     }
   }
 
+  /** 一覧からフォルダを付け替える。作ったフォルダへ中身を入れる操作。 */
+  const handleMoveFolder = async (id: string, folderId: string) => {
+    setError('')
+    try {
+      const res = await api.scenarios.update(id, { folderId: folderId || null })
+      if (!res.success) throw new Error(res.error)
+      void loadScenarios()
+    } catch {
+      setError('フォルダの変更に失敗しました')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     try {
       await api.scenarios.delete(id)
@@ -198,19 +191,18 @@ export default function ScenariosPage() {
         description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
+              title="表の左端の ⠿ を掴むと並べ替えられます"
+            >
+              ⇅ 並び替えは ⠿ を掴む
+            </span>
             <button
               disabled
-              title="準備中です"
+              title="マニュアルは準備中です"
               className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
             >
               マニュアル
-            </button>
-            <button
-              disabled
-              title="準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              並び替え
             </button>
           </div>
         }
@@ -243,71 +235,13 @@ export default function ScenariosPage() {
       </div>
 
       {folderDialogOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setFolderDialogOpen(false)}
-        >
-          <div
-            className="bg-canvas rounded-card w-full max-w-sm p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
-            <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-              ここで決めた色が、このフォルダに入れたシナリオの印に出ます。
-            </p>
-            <label className="mt-4 block">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                フォルダ名 <span className="text-danger">*</span>
-              </span>
-              <input
-                type="text"
-                autoFocus
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && folderName.trim()) void handleAddFolder()
-                }}
-                placeholder="例: 01_新規フォロー"
-                className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              />
-            </label>
-            <div className="mt-3">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
-              <div className="flex flex-wrap gap-2">
-                {FOLDER_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setFolderColor(c)}
-                    aria-label={`色 ${c}`}
-                    aria-pressed={folderColor === c}
-                    style={{ backgroundColor: c }}
-                    className={`rounded-pill h-7 w-7 ${
-                      folderColor === c ? 'ring-accent ring-2 ring-offset-2' : ''
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setFolderDialogOpen(false)}
-                className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
-              >
-                やめる
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleAddFolder()}
-                disabled={addingFolder || !folderName.trim()}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
-              >
-                {addingFolder ? '追加中…' : '追加する'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <FolderAddDialog
+          kind="scenario"
+          note="シナリオを分けてしまう箱です。消しても、入っていたシナリオは未分類として残ります。"
+          placeholder="例: 01_新規フォロー"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
       )}
 
       {/* 一覧本体（設計 `Body`）。 */}
@@ -318,13 +252,9 @@ export default function ScenariosPage() {
         絵と位置が違っていた。
       */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          disabled
-          title="準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-        >
+        <Button onClick={() => setFolderDialogOpen(true)}>
           フォルダを追加
-        </button>
+        </Button>
         <button
           onClick={() => void handleCreate()}
           disabled={creating}
@@ -388,14 +318,37 @@ export default function ScenariosPage() {
         >
           停止中のみ
         </button>
-        {['離脱が大きい', '今月作成'].map((label) => (
+        {[
+          {
+            label: '離脱が大きい',
+            disabled: true,
+            active: false,
+            title: '離脱率の比較基準が決まっていないため、まだ数えられません',
+            onClick: undefined,
+          },
+          {
+            label: '今月作成',
+            disabled: false,
+            active: createdThisMonthOnly,
+            title: undefined,
+            onClick: () => setCreatedThisMonthOnly((current) => !current),
+          },
+        ].map((filter) => (
           <button
-            key={label}
-            disabled
-            title="この絞り込みはまだ数えられません"
-            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+            key={filter.label}
+            disabled={filter.disabled}
+            title={filter.title}
+            onClick={filter.onClick}
+            aria-pressed={filter.disabled ? undefined : filter.active}
+            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+              filter.disabled
+                ? 'border-hairline text-ink-faint opacity-50'
+                : filter.active
+                  ? 'border-accent-soft bg-accent-soft text-accent'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+            }`}
           >
-            {label}
+            {filter.label}
           </button>
         ))}
       </div>
@@ -429,6 +382,7 @@ export default function ScenariosPage() {
                 : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
             )
             .filter((sc) => (stoppedOnly ? !sc.isActive : true))
+            .filter((sc) => (createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true))
             .filter((sc) =>
               folderFilter === ''
                 ? true
@@ -437,6 +391,8 @@ export default function ScenariosPage() {
                   : sc.folderId === folderFilter,
             )}
           onReorder={handleReorder}
+          folders={folders}
+          onMoveFolder={handleMoveFolder}
           onToggleActive={handleToggleActive}
           onDelete={handleDelete}
           loading={loading}

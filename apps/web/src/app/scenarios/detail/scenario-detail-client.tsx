@@ -1127,9 +1127,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 一括プレビュー
               </button>
               <button
-                disabled
-                title="一括テスト送信は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
+                disabled={sortedSteps.length === 0}
+                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
                 一括テスト送信
               </button>
@@ -1456,13 +1457,6 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
               分岐を追加
-            </button>
-            <button
-              onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
-              disabled={sortedSteps.length === 0}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-            >
-              一括テスト送信
             </button>
           </div>
         </div>
@@ -1815,6 +1809,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       {testSend && (
         <TestSendDialog
           scenarioId={id}
+          lineAccountId={scenario?.lineAccountId ?? null}
           stepId={testSend.stepId}
           stepLabel={testSend.label}
           onClose={() => setTestSend(null)}
