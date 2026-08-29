@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+
+function scenarioCompletionDetail(active: number, completed: number): string {
+  const enrolled = active + completed
+  if (enrolled === 0) return '—'
+  const rate = Math.round((completed / enrolled) * 100)
+  return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
+}
 import type { Folder } from '@line-crm/shared'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
@@ -239,15 +246,15 @@ export default function ScenariosPage() {
         titles={['シナリオ', '購読中', '読了済', '今週の配信']}
         build={(s) => [
             { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
-            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '重複を含む' },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
             {
               title: '読了済',
               value: s.scenarios.completed,
               unit: '人',
-              detail:
-                s.scenarios.subscribers + s.scenarios.completed > 0
-                  ? `完了率 ${Math.round((s.scenarios.completed / (s.scenarios.subscribers + s.scenarios.completed)) * 100)}%`
-                  : '—',
+              detail: scenarioCompletionDetail(
+                s.scenarios.subscribers,
+                s.scenarios.completed,
+              ),
             },
             // 設計の4枚目。source='scenario'（028）で数えられる。
             { title: '今週の配信', value: s.scenarios.sentThisWeek, unit: '通', detail: '過去7日' },
