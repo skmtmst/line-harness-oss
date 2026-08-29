@@ -7,14 +7,24 @@ import {
   applyMileageRulesForEvent,
   processPendingMileageEvents,
   enqueueFollowingMileageMilestones,
+  getMileageConnectedAccountsForFriend,
+  getMileageAdminHistory,
   getMileageAdminOverview,
   getMileageEarningOpportunitiesForFriend,
   getMileageSelfInsights,
+  getMileageHistoryForFriend,
   getMileageSummaryForFriend,
+  MileageAdjustmentError,
+  postMileageAdjustment,
+  postMileageEntry,
   updateMileageRule,
 } from '../src/mileage.js';
 import { addTagToFriend, enqueueHistoricTagMileage } from '../src/tags.js';
 import { updateFriendFollowStatus } from '../src/friends.js';
+import {
+  getMileageManualAdjustmentPolicy,
+  setMileageManualAdjustmentPolicy,
+} from '../src/account-settings.js';
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BENIGN = /duplicate column name|already exists/i;
@@ -144,6 +154,14 @@ describe('configurable mileage rules', () => {
       bookingCount: 1,
     });
     expect(member?.accountNames).toEqual(expect.arrayContaining(['公式A', '公式B']));
+
+    const accountOverview = await getMileageAdminOverview(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1', 'account-2'],
+    });
+    expect(accountOverview.members).toHaveLength(1);
+    expect(accountOverview.members[0]).toMatchObject({
+      primaryFriendId: 'friend-1', available: 26, actionCount: 2, accountCount: 1,
+    });
 
     const selfInsights = await getMileageSelfInsights(db, 'friend-1');
     expect(selfInsights).toMatchObject({
@@ -489,5 +507,186 @@ describe('configurable mileage rules', () => {
     });
     await processPendingMileageEvents(db, { now: '2026-08-10T10:00:00.000+09:00' });
     expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(20);
+  });
+
+  it('scopes admin history to the selected account without splitting a verified wallet', async () => {
+    sqlite.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, user_id, line_account_id)
+       VALUES ('friend-unlinked', 'U3', '別の人', NULL, 'account-2')`,
+    ).run();
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', status: 'available', amount: 10,
+      reason: '公式Aで付与', source: 'booking', sourceEventId: 'booking-a',
+      mileageRuleId: 'builtin-booking-created',
+      idempotencyKey: 'history-booking-a', occurredAt: '2026-08-08T10:00:00.000+09:00',
+    });
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-2', entryType: 'grant', status: 'pending', amount: 20,
+      reason: '公式Bで付与', source: 'form', sourceEventId: 'form-b',
+      idempotencyKey: 'history-form-b', occurredAt: '2026-08-09T10:00:00.000+09:00',
+    });
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-unlinked', entryType: 'grant', status: 'available', amount: 30,
+      reason: '別の人へ付与', source: 'booking', sourceEventId: 'booking-other',
+      idempotencyKey: 'history-booking-other', occurredAt: '2026-08-10T10:00:00.000+09:00',
+    });
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'adjustment', status: 'available', amount: -5,
+      reason: '問い合わせ調整', source: 'manual',
+      idempotencyKey: 'history-manual', occurredAt: '2026-08-10T11:00:00.000+09:00',
+    });
+
+    const selectedOnly = await getMileageAdminHistory(db, { accountId: 'account-1' });
+    expect(selectedOnly.pagination.total).toBe(2);
+    expect(selectedOnly.items.some((item) => item.reason === '公式Bで付与')).toBe(false);
+
+    const accountA = await getMileageAdminHistory(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1', 'account-2'],
+    });
+    expect(accountA.pagination.total).toBe(3);
+    expect(accountA.items.map((item) => item.reason)).toEqual([
+      '問い合わせ調整', '公式Bで付与', '公式Aで付与',
+    ]);
+    expect(accountA.items.every((item) => item.primaryFriendId === 'friend-1')).toBe(true);
+    expect(accountA.items[0]).toMatchObject({ mode: 'manual', hasSourceEvent: false });
+    expect(accountA.items[1]).toMatchObject({ mode: 'automatic', hasSourceEvent: true });
+    expect(accountA.items[2]).toMatchObject({ ruleName: '予約' });
+
+    const accountB = await getMileageAdminHistory(db, {
+      accountId: 'account-2', entryType: 'grant', status: 'available', search: '別の人',
+    });
+    expect(accountB.pagination.total).toBe(1);
+    expect(accountB.items[0]).toMatchObject({
+      primaryFriendId: 'friend-unlinked', displayName: '別の人', amount: 30,
+    });
+
+    expect(await getMileageConnectedAccountsForFriend(db, 'friend-1', ['account-1'])).toEqual([
+      { accountId: 'account-1', accountName: '公式A', friendId: 'friend-1' },
+    ]);
+    expect(await getMileageConnectedAccountsForFriend(db, 'friend-1', ['account-1', 'account-2']))
+      .toEqual([
+        { accountId: 'account-1', accountName: '公式A', friendId: 'friend-1' },
+        { accountId: 'account-2', accountName: '公式B', friendId: 'friend-2' },
+      ]);
+
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', status: 'available', amount: 1,
+      reason: '日本時間では9月1日', source: 'booking', sourceEventId: 'booking-september-jst',
+      idempotencyKey: 'history-september-jst', occurredAt: '2026-08-31T15:30:00.000Z',
+    });
+    const august = await getMileageAdminHistory(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1'], to: '2026-08-31',
+    });
+    expect(august.items.some((item) => item.reason === '日本時間では9月1日')).toBe(false);
+    const september = await getMileageAdminHistory(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1'], from: '2026-09-01', to: '2026-09-01',
+    });
+    expect(september.items.map((item) => item.reason)).toEqual(['日本時間では9月1日']);
+  });
+
+  it('appends a manual adjustment once and returns the original before/after values on retry', async () => {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', amount: 100,
+      reason: '初期付与', source: 'booking', idempotencyKey: 'manual-seed',
+    });
+    const input = {
+      friendId: 'friend-2', amount: -30, reason: '注文の取消分',
+      reasonCategory: 'order_correction', sourceReferenceId: 'ORDER-100',
+      idempotencyKey: 'manual-adjustment-1', executedByStaffId: 'owner-1',
+      executedByStaffName: '山本', lineAccountId: 'account-2',
+    } as const;
+
+    const first = await postMileageAdjustment(db, input);
+    expect(first).toMatchObject({ balanceBefore: 100, balanceAfter: 70, replayed: false });
+    expect(first.entry).toMatchObject({
+      beneficiary_user_id: 'user-1', beneficiary_friend_id: 'friend-2',
+      entry_type: 'adjustment', amount: -30, reason: '注文の取消分', source: 'admin_adjustment',
+      source_event_id: null,
+    });
+    expect((await getMileageHistoryForFriend(db, 'friend-1')).find((item) => item.mode === 'manual')).toMatchObject({
+      mode: 'manual', sourceReferenceId: 'ORDER-100', executedByStaffName: '山本',
+    });
+    expect((await getMileageAdminHistory(db, { accountId: 'account-2' })).items.find((item) => item.mode === 'manual')).toMatchObject({
+      mode: 'manual', hasSourceEvent: false, sourceReferenceId: 'ORDER-100',
+      executedByStaffName: '山本',
+    });
+
+    const retry = await postMileageAdjustment(db, input);
+    expect(retry).toMatchObject({
+      balanceBefore: 100, balanceAfter: 70, replayed: true,
+      entry: { id: first.entry.id },
+    });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(70);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'adjustment'`).get())
+      .toEqual({ count: 1 });
+  });
+
+  it('stores the high-value approval threshold per LINE account without a migration', async () => {
+    expect(await getMileageManualAdjustmentPolicy(db, 'account-1')).toBeNull();
+    await setMileageManualAdjustmentPolicy(db, 'account-1', { approvalThreshold: 5_000 });
+    expect(await getMileageManualAdjustmentPolicy(db, 'account-1')).toEqual({ approvalThreshold: 5_000 });
+    expect(await getMileageManualAdjustmentPolicy(db, 'account-2')).toBeNull();
+    await expect(setMileageManualAdjustmentPolicy(db, 'account-1', { approvalThreshold: 0 }))
+      .rejects.toThrow('positive integer');
+  });
+
+  it('fails closed when a decrement would make the shared wallet negative', async () => {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', amount: 50,
+      reason: '初期付与', source: 'booking', idempotencyKey: 'insufficient-seed',
+    });
+
+    await expect(postMileageAdjustment(db, {
+      friendId: 'friend-2', amount: -51, reason: '誤付与の取消',
+      reasonCategory: 'grant_correction', idempotencyKey: 'manual-too-large',
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-2',
+    })).rejects.toMatchObject<MileageAdjustmentError>({ code: 'insufficient_balance' });
+
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(50);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'adjustment'`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('refuses a friend outside the selected LINE account even when called directly', async () => {
+    await expect(postMileageAdjustment(db, {
+      friendId: 'friend-1', amount: 10, reason: '別アカウントからの操作',
+      reasonCategory: 'other', idempotencyKey: 'manual-cross-account',
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-2',
+    })).rejects.toMatchObject<MileageAdjustmentError>({ code: 'friend_not_found' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'adjustment'`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('rejects reusing an idempotency key for a different adjustment', async () => {
+    const base = {
+      friendId: 'friend-1', amount: 20, reason: '電話対応のお礼',
+      reasonCategory: 'customer_support', idempotencyKey: 'manual-conflict',
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-1',
+    } as const;
+    await postMileageAdjustment(db, base);
+
+    await expect(postMileageAdjustment(db, { ...base, amount: 21 }))
+      .rejects.toMatchObject<MileageAdjustmentError>({ code: 'idempotency_conflict' });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(20);
+  });
+
+  it('lets only one of two racing deductions consume the remaining balance', async () => {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', amount: 100,
+      reason: '初期付与', source: 'booking', idempotencyKey: 'race-seed',
+    });
+    const make = (idempotencyKey: string) => postMileageAdjustment(db, {
+      friendId: 'friend-1', amount: -80, reason: '同時調整',
+      reasonCategory: 'grant_correction', idempotencyKey,
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-1',
+    });
+    const results = await Promise.allSettled([make('race-a'), make('race-b')]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect((results.find((result) => result.status === 'rejected') as PromiseRejectedResult).reason)
+      .toMatchObject({ code: 'insufficient_balance' });
+    expect((await getMileageSummaryForFriend(db, 'friend-2')).available).toBe(20);
   });
 });
