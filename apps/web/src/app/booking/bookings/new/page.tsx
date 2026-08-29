@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import {
   api,
+  ApiError,
   bookingApi,
   type BookingAvailabilitySlot,
   type BookingMenu,
@@ -195,12 +196,14 @@ export default function NewProxyBookingPage() {
       setResult(created)
       setStep('done')
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause)
-      if (message.includes('slot_conflict') || message.includes('slot_not_available')) {
+      if (
+        cause instanceof ApiError
+        && (cause.code === 'slot_conflict' || cause.code === 'slot_not_available')
+      ) {
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
       } else {
-        setError(message || '予約を登録できませんでした')
+        setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
     } finally {
       setLoading(false)
