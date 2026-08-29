@@ -15,6 +15,8 @@ import {
   getMileageConnectedAccountsForFriend,
   jstNow,
   getTagAddedScenarioIds,
+  getSavedSearchById,
+  validateSearchConditions,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -29,6 +31,7 @@ import {
   isValidIdempotencyKey,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
+import { compileSavedSearch } from '../services/saved-search-filter.js';
 
 const friends = new Hono<Env>();
 
@@ -174,6 +177,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       c.req.query('handled') === 'unhandled' ? 'unhandled' : null;
     const operatorId = c.req.query('operatorId');
     const scenarioId = c.req.query('scenarioId');
+    const savedSearchId = c.req.query('savedSearchId');
 
     const db = c.env.DB;
 
@@ -185,12 +189,44 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       binds.push(tagId);
     }
     if (lineAccountId) {
+      const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!visibleScope.allowedAccountIds.includes(lineAccountId)) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
       conditions.push('f.line_account_id = ?');
       binds.push(lineAccountId);
     } else {
       const { scope, where } = await adminAccountScope(c, 'f.');
       conditions.push(where);
       binds.push(...scope.allowedAccountIds);
+    }
+    if (savedSearchId) {
+      if (!lineAccountId) {
+        return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+      }
+      const row = await getSavedSearchById(db, savedSearchId, lineAccountId);
+      const staff = c.get('staff');
+      if (!row
+          || row.scope !== 'friends'
+          || (!row.is_shared && row.created_by !== staff.id && staff.role !== 'owner' && staff.role !== 'admin')) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      let rawConditions: unknown;
+      try {
+        rawConditions = JSON.parse(row.conditions_json);
+      } catch {
+        return c.json({ success: false, error: '保存した検索の条件が壊れています' }, 422);
+      }
+      const validated = validateSearchConditions(rawConditions);
+      if (!validated.ok) {
+        return c.json({ success: false, error: validated.error }, 422);
+      }
+      const compiled = compileSavedSearch(validated.value);
+      if (!compiled.ok) {
+        return c.json({ success: false, error: compiled.error }, 422);
+      }
+      conditions.push(compiled.value.sql);
+      binds.push(...compiled.value.binds);
     }
     if (search) {
       conditions.push('f.display_name LIKE ?');
