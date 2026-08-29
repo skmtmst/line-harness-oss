@@ -66,7 +66,8 @@ nenCampaigns.get('/api/nen-campaigns/overview', requireRole('owner', 'admin', 's
       .bind(...columnScope.scope.allowedAccountIds).first<{ count: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE 1 = 1 ${where}`)
       .bind(...scope.allowedAccountIds).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_coupon_issues`).first<{ count: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_coupon_issues ci JOIN friends f ON f.id = ci.friend_id WHERE 1 = 1 ${where}`)
+      .bind(...scope.allowedAccountIds).first<{ count: number }>(),
   ]);
   return c.json({ success: true, data: {
     activeCampaigns: settings?.count ?? 0,

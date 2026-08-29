@@ -17,6 +17,7 @@ type Friend = { id: string; line_account_id: string; display_name: string; line_
 type Pet = { id: string; friend_id: string; customer_id: string | null; name: string; animal_type: string; gender: string; birthday: string | null };
 type Job = { id: string; friend_id: string; campaign_key: string; status: string };
 type Column = { id: string; title: string; line_account_id: string | null; intro_text: string };
+type Coupon = { id: string; friend_id: string };
 
 const friends: Friend[] = [
   { id: 'friend-a', line_account_id: 'account-a', display_name: 'Owner A', line_user_id: 'line-a' },
@@ -26,6 +27,7 @@ const friends: Friend[] = [
 let pets: Pet[];
 let jobs: Job[];
 let columns: Column[];
+let coupons: Coupon[];
 
 function database(): D1Database {
   return {
@@ -59,7 +61,7 @@ function database(): D1Database {
           if (sql.includes('COUNT(*) AS count FROM nen_columns c')) return { count: columns.filter((column) => binds.map(String).includes(String(column.line_account_id))).length };
           if (sql.includes('COUNT(*) AS count FROM nen_pet_profiles p')) return { count: pets.filter((pet) => binds.map(String).includes(friends.find((f) => f.id === pet.friend_id)!.line_account_id)).length };
           if (sql.includes('COUNT(*) AS count FROM nen_campaign_settings')) return { count: 1 };
-          if (sql.includes('COUNT(*) AS count FROM nen_coupon_issues')) return { count: 1 };
+          if (sql.includes('COUNT(*) AS count FROM nen_coupon_issues ci')) return { count: coupons.filter((coupon) => binds.map(String).includes(friends.find((f) => f.id === coupon.friend_id)!.line_account_id)).length };
           if (sql.includes('SELECT line_account_id FROM nen_columns WHERE id = ?')) return columns.find((column) => column.id === binds[0]) ?? null;
           if (sql.includes('FROM friends WHERE id = ?')) return friends.find((f) => f.id === binds[0]) ?? null;
           if (sql.includes('FROM nen_pet_profiles p JOIN friends f')) {
@@ -120,6 +122,10 @@ beforeEach(() => {
     { id: 'column-a', title: 'Column A', line_account_id: 'account-a', intro_text: 'Intro A' },
     { id: 'column-b', title: 'Column B', line_account_id: 'account-b', intro_text: 'Intro B' },
   ];
+  coupons = [
+    { id: 'coupon-a', friend_id: 'friend-a' },
+    { id: 'coupon-b', friend_id: 'friend-b' },
+  ];
   const allowed = (staff: { id: string }) => staff.id === 'tenant-b' ? ['account-b'] : staff.id === 'no-access' ? [] : ['account-a'];
   access.getScope.mockImplementation(async (_db, staff) => ({ allowedAccountIds: allowed(staff), canSeeUnassigned: false }));
   access.canAccess.mockImplementation(async (_db, staff, ids) => ids.every((id: string) => allowed(staff).includes(id)));
@@ -132,10 +138,10 @@ describe('A-10 NEN campaign account scope', () => {
     expect(data.data.map((job) => job.id)).toEqual(['job-a']);
   });
 
-  test('overview counts jobs, columns, and pets only in the visible account', async () => {
+  test('overview counts jobs, columns, pets, and coupons only in the visible account', async () => {
     const response = await app().request('/api/nen-campaigns/overview', request(), { DB: database() });
-    const { data } = await response.json<{ data: { jobs: { total: number }; columns: number; pets: number } }>();
-    expect(data).toMatchObject({ jobs: { total: 1 }, columns: 1, pets: 1 });
+    const { data } = await response.json<{ data: { jobs: { total: number }; columns: number; pets: number; coupons: number } }>();
+    expect(data).toMatchObject({ jobs: { total: 1 }, columns: 1, pets: 1, coupons: 1 });
   });
 
   test('columns return only rows in the visible account', async () => {
@@ -158,8 +164,8 @@ describe('A-10 NEN campaign account scope', () => {
       expect((await response.json<{ data: unknown[] }>()).data).toHaveLength(0);
     }
     const overview = await instance.request('/api/nen-campaigns/overview', request('GET', undefined, 'no-access'), env);
-    expect((await overview.json<{ data: { jobs: { total: number }; columns: number; pets: number } }>()).data)
-      .toMatchObject({ jobs: { total: 0 }, columns: 0, pets: 0 });
+    expect((await overview.json<{ data: { jobs: { total: number }; columns: number; pets: number; coupons: number } }>()).data)
+      .toMatchObject({ jobs: { total: 0 }, columns: 0, pets: 0, coupons: 0 });
     const update = await instance.request('/api/nen-campaigns/columns/column-a/message', request('PUT', { introText: 'Blocked' }, 'no-access'), env);
     expect(update.status).toBe(404);
   });
