@@ -480,7 +480,17 @@
       "needsFix": 4,
       "unjudged": 0,
       "remaining": 5,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 559,
+          "head": "888e80f9",
+          "on": "2026-08-29",
+          "screens": [
+            "g89Tc"
+          ],
+          "note": "使用先の3つの出し分けと「使っていない」の絞り込み。**#559 は #438 を含む**"
+        }
+      ]
     },
     {
       "feature": 16,
@@ -496,7 +506,19 @@
       "needsFix": 6,
       "unjudged": 0,
       "remaining": 9,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 558,
+          "head": "ef7b5773",
+          "on": "2026-08-29",
+          "screens": [
+            "PouPn",
+            "xqT1Z",
+            "jwrbf"
+          ],
+          "note": "案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える"
+        }
+      ]
     },
     {
       "feature": 17,

@@ -1181,11 +1181,12 @@ export const SCREENS = [
   },
 
   // ── 機能15 登録メディア ─────────────────────────────────
-  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア', verdict: 'needs_fix', verdictNote: 'P1 使っている先が一覧で見えない。設計は札に「3か所で使用中」「どこでも使っていない」を出すが、実装は「使用箇所」のボタンを1つずつ押して開く形で、**消してよいファイルを探すのに6件あれば6回押す**。絞り込み札「使っていない」も無い', verdictSource: 'media-v6/design-qa.md' },
+  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア', verdict: 'needs_fix', verdictNote: '**#438 → #559 で使用先の3つの出し分けが入った。** 1か所以上は「Nか所で使用中」、数えて0は「どこでも使っていない」、まだ数えていないものは「使用先を確認できません」。**「使っていない」の絞り込みも入り、`usageCount === 0` だけを残す**ので、未取得は絞り込みに混ざらない（固定データで3状態を作って確かめた。絞ると6件→2件で、未取得の1件は出てこない）。選択したカードは緑の枠とチェックで目で分かる。1440・1920とも横スクロール0。**P1 ただし一括削除の選択では未取得を未使用へ混ぜている。** チェックボックスが `disabled={(item.usageCount ?? 0) > 0}`（`contents/page.tsx:433`）なので `undefined` は `0` に潰れて選べてしまい、`removable` も `item.usageCount === undefined || item.usageCount === 0`（`:244`）で拾う。実際「全てのメディアを選択」で **3件**（本当に未使用の2件＋未取得の1件）が選ばれた。**使用先を確認できていないものを、使っていないものと同じ扱いで消させない**でほしい', verdictSource: 'media-v6/g89Tc-1440.png + apps/web/src/app/contents/page.tsx:244,433' },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
     verdict: 'needs_fix', verdictNote: 'P1 差し替えができない（grep 差し替え が /contents 配下で0件）。設計の詳細は「差し替える」が主役で、名前とURLは変わらず、使っている3か所すべてが新しい画像に変わり、予約中の配信にも効く。実装で同じことをするには消して入れ直すことになるが、**URLが変わるので使っている先が全部切れる**。商品写真を1枚だけ新しくするのは日常の作業。P1 使用中でも消せる（409が返ると「それでも削除しますか？」で消せる。page.tsx:183）。設計は「使われているあいだは削除できません。先にこの3か所から外してください。」。どちらが正しいかは決めごとだが、**いまは消したあとに何が壊れたかを知る場所が無い**', verdictSource: 'media-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: '夏の定番セット.jpgの使用箇所' }],
+    verdictHead: '888e80f9',
   },
   {
     /*
@@ -1215,7 +1216,7 @@ export const SCREENS = [
     実装は5本で、**「支払い」が無く**、代わりに「成果地点（CV）」と
     「レポート」がある。支払いの2枚（`njLGA` `GqFTV`）は行き先が無い。
   */
-  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: 'P1 帯4つ（今月の成果42件／承認待ち8件 合計¥96,000／確定した報酬¥312,000 8/31締め9/30払い／ほか）が無い。P1 「支払い」のタブが無い（grep 振込|締め が0件）。まだ払っていない額・次の締め・次の支払日・振込先が未登録の人を、画面から知る方法が無い。**成果を認めるところまではできて、そこから先が無い**', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: '**#558 で「決まった額で払う人がずっと ¥0 に見える」が直った。** 率が0%の合同会社ノースが **¥144,000**（承認ずみ16件×¥9,000）と出る。`calculateAffiliateReward`（`affiliates/affiliate-reward.ts`）が、率が0のときだけ確定した定額へ切り替える。**割合方式は後退していない**：田中 明 ¥860,000×10%＝¥86,000、木村 亮 ¥620,000×15%＝¥93,000、成果0の旧パートナーAは¥0。1440・1920とも横スクロール0。P1 帯4つ（今月の成果42件／承認待ち8件 合計¥96,000／確定した報酬¥312,000 8/31締め9/30払い／ほか）が無い。P1 「支払い」のタブが無い。まだ払っていない額・次の締め・次の支払日・振込先が未登録の人を、画面から知る方法が無い', verdictSource: 'affiliates-v6/PouPn.txt + apps/web/src/app/affiliates/affiliate-reward.ts' },
   { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: 'P1 案件の面が設計とそろわない。報酬の決め方が「案件ごとの決まった額」を主にできない', verdictSource: 'affiliates-v6/design-qa.md' },
   { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: 'P1 成果承認の面が設計とそろわない。承認したあと支払いへつなぐ先が無い', verdictSource: 'affiliates-v6/design-qa.md' },
   {
@@ -1224,14 +1225,16 @@ export const SCREENS = [
     gapNote: '締め日・支払日・振込先・未払い残高の表が要る',
     status: 'unimplemented',
     why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
+    verdictHead: 'ef7b5773',
   },
-  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: 'P1 報酬が「売上 × 率」でしか出ない（tabs.tsx:193）。設計の払い方は「案件ごとの決まった額」が基本で、AffiliateOffer.rewardAmount は持っているのに一覧の報酬だけが見ていない。**決まった額で払う人は一覧でずっと ¥0 に見える**（固定データの合同会社ノースは18件の成果で¥0）', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**#558 で「報酬が売上×率でしか出ない」が直った。** どう支払うかを **成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。1440・1920とも横スクロール0。P2 設計との細かな差（連絡先・支払い条件の並び）は未確認', verdictSource: 'affiliates-v6/xqT1Z.txt' },
   {
     ...AFFILIATE, node: 'jwrbf', name: '16-1-E アフィリエイターの成果内訳',
-    verdict: 'needs_fix', verdictNote: 'P1 成果内訳の面が設計とそろわない。報酬が率でしか出ないので内訳も合わない', verdictSource: 'affiliates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#558 で案件別の内訳が入り、承認待ちを確定報酬へ入れないことが絵で分かるようになった。** 表は「案件／報酬単価／承認済み／審査中／確定報酬」で、無料体験の申込は **承認済み7×¥3,000＝¥21,000**、審査中2件は入らない。定期便は2×¥8,000＝¥16,000、友だち追加だけは1×¥300＝¥300。1440・1920とも横スクロール0。P1 帯の見出しに **「クリック (ref_tracking)」** とDBのテーブル名が出ている（束3）。P2 「確定までの保留」の意味が本文で説明されていない', verdictSource: 'affiliates-v6/jwrbf.txt',
     route: '/conversions?tab=affiliates', mode: 'viewport', height: 1136,
     /* 表の行は `onClick` だけで、押せる役を持っていない。文字で探す。 */
     steps: [{ click: '田中 明', role: 'text' }],
+    verdictHead: 'ef7b5773',
   },
   { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: 'P1 案件をつくる面で、報酬の決め方（案件ごとの決まった額）を主にできない', verdictSource: 'affiliates-v6/design-qa.md' },
   {
@@ -1981,6 +1984,8 @@ export const CAPTURED_AT = {
   12: [{ pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' }],
   14: [{ pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' }],
   26: [{ pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' }],
+  15: [{ pr: 559, head: '888e80f9', on: '2026-08-29', screens: ['g89Tc'], note: '使用先の3つの出し分けと「使っていない」の絞り込み。**#559 は #438 を含む**' }],
+  16: [{ pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' }],
   17: [
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },

@@ -628,6 +628,21 @@ async function captureImpl(feature) {
         }
 
         await runSteps(page, s.steps, s.node)
+        /*
+          **操作したあとに、もう一度落ちていないか見る。**
+
+          開いた直後の検査だけでは、**押してから落ちた画面**を捕まえられない。
+          `Ho8z4`（通知タブ）と `jwrbf`（成果内訳）で実際に素通りし、
+          「画面を表示できませんでした」の絵を撮っていた。
+        */
+        const afterSteps = await page.locator('body').innerText()
+        const retryAfter = await page
+          .getByRole('button', { name: 'もう一度試す' })
+          .count()
+          .catch(() => 0)
+        if (retryAfter > 0 && afterSteps.includes('画面を表示できませんでした')) {
+          throw new Error('操作したあとに画面が落ちている（もう一度試す が出ている）')
+        }
         await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
 
         const overflow = await page.evaluate(

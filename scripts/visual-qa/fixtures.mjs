@@ -1734,12 +1734,15 @@ export const MEDIA_ITEMS = [
     mimeType: 'image/jpeg', sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
     url: 'https://example.co.jp/media/summer-set.jpg', uploadedBy: '川野 健太',
     createdAt: '2026-08-18T00:00:00.000Z',
+    /* 使用中。**「3か所で使用中」と出る。** */
+    usageCount: 3,
   },
   {
     id: 'media-2', folderId: 'mf-banner', kind: 'image', filename: '会員証バナー.png',
     mimeType: 'image/png', sizeBytes: 839680, width: 2500, height: 1686, durationMs: null,
     url: 'https://example.co.jp/media/member-banner.png', uploadedBy: '川野 健太',
     createdAt: '2026-08-14T00:00:00.000Z',
+    usageCount: 1,
   },
   {
     /* 動画。**184MB。** 上限に近いものが混ざっていることが要る。 */
@@ -1747,12 +1750,15 @@ export const MEDIA_ITEMS = [
     mimeType: 'video/mp4', sizeBytes: 192937984, width: 1920, height: 1080, durationMs: 80000,
     url: 'https://example.co.jp/media/shop.mp4', uploadedBy: '菅野 亮',
     createdAt: '2026-08-10T00:00:00.000Z',
+    /* 数えて0。**「どこでも使っていない」。未取得とは別。** */
+    usageCount: 0,
   },
   {
     id: 'media-4', folderId: 'mf-banner', kind: 'image', filename: '誕生月クーポン.png',
     mimeType: 'image/png', sizeBytes: 215040, width: 1029, height: 1029, durationMs: null,
     url: 'https://example.co.jp/media/birthday-coupon.png', uploadedBy: '川野 健太',
     createdAt: '2026-08-05T00:00:00.000Z',
+    usageCount: 2,
   },
   {
     /* どこでも使っていないファイル。**消してよいものが分かることが要る。** */
@@ -1760,12 +1766,18 @@ export const MEDIA_ITEMS = [
     mimeType: 'application/pdf', sizeBytes: 1258291, width: null, height: null, durationMs: null,
     url: 'https://example.co.jp/media/menu.pdf', uploadedBy: '菅野 亮',
     createdAt: '2026-07-28T00:00:00.000Z',
+    usageCount: 0,
   },
   {
     id: 'media-6', folderId: 'mf-product', kind: 'image', filename: '定期便パンフ.jpg',
     mimeType: 'image/jpeg', sizeBytes: 491520, width: 1024, height: 678, durationMs: null,
     url: 'https://example.co.jp/media/subscription.jpg', uploadedBy: '川野 健太',
     createdAt: '2026-07-20T00:00:00.000Z',
+    /*
+      **`usageCount` を持たせない＝まだ数えていない。**
+      これが「どこでも使っていない」と同じ扱いにならないかを見る。
+      0件へ絞ったときに出てこないこと、まとめて消す側に入らないことが要る。
+    */
   },
 ]
 
@@ -1890,26 +1902,106 @@ export const CONVERSION_APPROVALS = [
 ]
 
 /** 設計 `PouPn` の流れ（クリック4,820 → 友だち追加612 → 成果42 → 認めた34）。 */
+/**
+ * 紹介者1人ぶんの内訳（`GET /api/affiliates/:id/report`、設計 `jwrbf`）。
+ *
+ * **用意しないと一覧の既定が返り、`report.clicks` で画面ごと落ちます。**
+ * 型は `apps/web/src/app/affiliates/tabs.tsx` の `ReportV2`。
+ *
+ * **承認待ちを確定報酬へ入れないことを、ここで確かめられる形にしてあります。**
+ * 案件ごとの内訳は 承認ずみ16件 × ¥9,000 = ¥144,000 で、
+ * 承認待ち2件（¥18,000ぶん）は `confirmedReward` に入っていません。
+ */
+export const AFFILIATE_REPORT_V2 = {
+  affiliateId: 'aff-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0,
+  clicks: 2180, linkClicks: 2180, friendAdds: 312,
+  conversions: 18, conversionsPending: 2, conversionsApproved: 16, conversionsRejected: 0,
+  conversionsByPoint: [
+    { conversionPointId: 'cp-1', name: '体験申込フォームの送信', count: 11, value: 880_000 },
+    { conversionPointId: 'cp-2', name: '定期便の申込', count: 7, value: 560_000 },
+  ],
+  revenue: 1_440_000,
+  estimatedCommission: 0,
+  confirmedReward: 144_000,
+  byOffer: [
+    {
+      offerId: 'ao-1', offerName: '定期便の申込', rewardAmount: 9_000,
+      conversionsApproved: 16, conversionsPending: 2, confirmedReward: 144_000,
+    },
+  ],
+  duplicateFlags: [],
+}
+
+/**
+ * 帰属ジャーニー（`GET /api/affiliates/:id/journeys`、内訳の面の下）。
+ *
+ * **返事は配列。** 一覧の既定（`{items,total,…}`）を返すと
+ * `journeys.map is not a function` で内訳の面ごと落ちます。
+ */
+export const AFFILIATE_JOURNEYS = [
+  {
+    friendId: 'friend-1', displayName: '高橋 直人', addedAt: '2026-08-20T01:00:00.000Z',
+    refCode: 'north', touchCount: 4, formCount: 1, conversionCount: 1,
+    lastEventAt: '2026-08-24T05:00:00.000Z',
+  },
+  {
+    friendId: 'friend-11', displayName: null, addedAt: '2026-08-18T02:00:00.000Z',
+    refCode: 'north', touchCount: 2, formCount: 0, conversionCount: 0,
+    lastEventAt: '2026-08-18T02:30:00.000Z',
+  },
+]
+
+/**
+ * 紹介者の計測リンク（`GET /api/affiliates/:id/links`）。
+ *
+ * **列の名前はDBのまま**（`ref_code` `click_count` `offer_id` …）。
+ * 型（`api.ts` の `affiliates.links`）がそう決めているので、
+ * 固定データも合わせる。**別名で書くと画面が数を読めない。**
+ */
+export const AFFILIATE_LINKS = [
+  {
+    id: 'al-1', affiliate_id: 'aff-2', ref_code: 'north',
+    label: '定期便のご案内', line_account_id: 'visual-qa-account',
+    is_active: 1, created_at: '2026-06-01T00:00:00.000Z',
+    click_count: 1480, offer_id: 'ao-1', offer_name: '定期便の申込',
+  },
+  {
+    id: 'al-2', affiliate_id: 'aff-2', ref_code: 'north-trial',
+    label: '体験申込', line_account_id: 'visual-qa-account',
+    is_active: 1, created_at: '2026-06-20T00:00:00.000Z',
+    click_count: 700, offer_id: null, offer_name: null,
+  },
+]
+
 export const AFFILIATES_REPORT = [
   {
     affiliateId: 'aff-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10,
     totalClicks: 1240, totalConversions: 12, totalRevenue: 860000,
+    /* 率で払う人。**確定した定額分は持っていても使われない**（率が勝つ）。 */
+    confirmedReward: 0,
     linkCount: 3, friendAdds: 86,
   },
   {
     affiliateId: 'aff-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0,
     totalClicks: 2180, totalConversions: 18, totalRevenue: 1440000,
+    /*
+      **案件ごとの決まった額で払う人。** 率は0%なので、ここが0だと
+      一覧でずっと ¥0 に見える。18件のうち**承認ずみ16件 × ¥9,000 = ¥144,000**。
+      **承認待ちの2件は入れない。**
+    */
+    confirmedReward: 144000,
     linkCount: 5, friendAdds: 312,
   },
   {
     affiliateId: 'aff-3', affiliateName: '木村 亮', code: 'kimura', commissionRate: 15,
     totalClicks: 1400, totalConversions: 12, totalRevenue: 620000,
+    confirmedReward: 0,
     linkCount: 2, friendAdds: 214,
   },
   {
     /* 止めている人。**クリックも成果も0。** 0で崩れないことが要る。 */
     affiliateId: 'aff-4', affiliateName: '旧パートナーA', code: 'legacy-a', commissionRate: 5,
-    totalClicks: 0, totalConversions: 0, totalRevenue: 0, linkCount: 1, friendAdds: 0,
+    totalClicks: 0, totalConversions: 0, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 0,
   },
 ]
 
