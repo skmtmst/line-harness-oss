@@ -28,6 +28,7 @@ describe('共通部品の影響範囲', () => {
       'app/hq/settings/page.tsx',
       'app/inflow-links/page.tsx',
       'app/page.tsx',
+      'app/reminders/new/page.tsx',
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'app/templates/page.tsx',
