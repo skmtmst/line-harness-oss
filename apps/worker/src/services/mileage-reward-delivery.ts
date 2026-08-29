@@ -204,7 +204,7 @@ export async function deliverMileageReward(
 /** Cronから、再試行時刻を過ぎた交換だけを処理する。claimはdeliver側で行う。 */
 export async function processDueMileageRewardDeliveries(
   db: D1Database,
-  options: MileageRewardDeliveryOptions & { now: string; limit?: number },
+  options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
   const due = await db.prepare(
