@@ -51,6 +51,14 @@ describe('V6 32 運用状態の契約', () => {
     expect(source).not.toContain('api.automations.update')
   })
 
+  it('停止前の実測人数を一覧と最終確認で共通表示し、確認直前に読み直す', () => {
+    expect(source).toContain('setImpact(response.data.impact)')
+    expect(source).toContain('const latest = await loadPreview()')
+    expect(source).toContain('operationImpactText(key, impact)')
+    expect(source.match(/operationImpactText\(key, impact\)/g)).toHaveLength(2)
+    expect(source).toContain('別の端末で緊急停止されました')
+  })
+
   it('専用権限をサーバーから読み、認証アプリの6桁コードで操作直前に再確認する', () => {
     expect(source).toContain('response.data.permissions.canControl')
     expect(source).toContain('api.auth.stepUp({ code: totpCode')
@@ -69,10 +77,12 @@ describe('V6 32 運用状態の契約', () => {
     expect(source).toContain('api.operations.history()')
   })
 
-  it('既定停止は一斉・シナリオ・リマインダだけで、自動処理は明示選択にする', () => {
+  it('既定停止は一斉・シナリオ・リマインダだけで、自動処理と自動応答は明示選択にする', () => {
     expect(source).toContain('broadcast_dispatch: true')
     expect(source).toContain('scenario_dispatch: true')
     expect(source).toContain('reminder_dispatch: true')
     expect(source).toContain('automation_actions: false')
+    expect(source).toContain('auto_reply_dispatch: false')
+    expect(source).toContain("auto_reply_dispatch: { label: '自動応答'")
   })
 })

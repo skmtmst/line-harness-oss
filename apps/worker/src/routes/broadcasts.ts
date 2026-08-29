@@ -27,6 +27,7 @@ import {
   buildWarnings,
   hasRecentSimilarBroadcast,
 } from '../services/broadcast-preflight.js';
+import { getBroadcastAudiencePreview } from '../services/broadcast-audience-preview.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 
@@ -214,76 +215,11 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
-    const raw = broadcast as unknown as Record<string, unknown>;
-    let count = 0;
-    let perAccount: Array<{ accountId: string; sendCount: number }> | undefined;
-
-    if (broadcast.target_type === 'multi-account-dedup') {
-      const accountIds = parseJsonArray(raw.account_ids) ?? [];
-      const dedupPriority = parseJsonArray(raw.dedup_priority) ?? [];
-      const preview = await computeDedupBroadcastPreview(
-        c.env.DB,
-        accountIds,
-        dedupPriority,
-        broadcast.target_tag_id ?? null,
-      );
-      // /send パスと同じく inactive/missing アカウントを除外して、実送信数の見積りを返す。
-      // 同時に per-account breakdown も返して confirm modal に表示できるようにする。
-      const { getLineAccountById } = await import('@line-crm/db');
-      let active = 0;
-      const breakdown: Array<{ accountId: string; sendCount: number }> = [];
-      for (const a of preview.perAccount) {
-        const account = await getLineAccountById(c.env.DB, a.accountId);
-        if (account && account.is_active) {
-          active += a.recipients.length;
-          breakdown.push({ accountId: a.accountId, sendCount: a.recipients.length });
-        }
-      }
-      count = active;
-      perAccount = breakdown;
-    } else if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
-      // 注: ここは inline send パス (broadcast.ts:61 getFriendsByTag) が
-      // line_account_id でフィルタしないので、preview もアカウント横断で数える。
-      // 実際の送信先と modal 表示を一致させるための整合性。
-      const row = await c.env.DB.prepare(
-        `SELECT COUNT(*) AS cnt FROM friends f
-           INNER JOIN friend_tags ft ON ft.friend_id = f.id
-           WHERE ft.tag_id = ? AND f.is_following = 1`,
-      ).bind(broadcast.target_tag_id).first<{ cnt: number }>();
-      count = row?.cnt ?? 0;
-    } else if (broadcast.target_type === 'segment') {
-      // 絞り込み配信。条件は下書きに入っている。作った条件と、送る前に出す
-      // 人数がずれないよう、送信と同じ組み立てを使う。
-      const rawConditions = raw.segment_conditions as string | null;
-      try {
-        const conditions = rawConditions ? JSON.parse(rawConditions) : null;
-        if (conditions && Array.isArray(conditions.rules)) {
-          const { buildSegmentQuery } = await import('../services/segment-query.js');
-          const { sql, bindings } = buildSegmentQuery(conditions);
-          const accountId = (raw.line_account_id as string | null) || null;
-          const countSql = accountId
-            ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-            : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
-          const binds = accountId ? [accountId, ...bindings] : bindings;
-          const row = await c.env.DB.prepare(countSql).bind(...binds).first<{ cnt: number }>();
-          count = row?.cnt ?? 0;
-        }
-      } catch (segmentError) {
-        // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
-        // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
-        console.error('preview-count: invalid segment_conditions', segmentError);
-      }
-    } else if (broadcast.target_type === 'all') {
-      const accountId = (raw.line_account_id as string | null) || null;
-      const sql = accountId
-        ? `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1 AND line_account_id = ?`
-        : `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1`;
-      const binds: unknown[] = accountId ? [accountId] : [];
-      const row = await c.env.DB.prepare(sql).bind(...binds).first<{ cnt: number }>();
-      count = row?.cnt ?? 0;
+    const preview = await getBroadcastAudiencePreview(c.env.DB, broadcast);
+    if (preview.count === null) {
+      return c.json({ success: false, error: '配信対象を確認できませんでした' }, 422);
     }
-
-    return c.json({ success: true, data: { count, perAccount } });
+    return c.json({ success: true, data: preview });
   } catch (err) {
     console.error('GET /api/broadcasts/:id/preview-count error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

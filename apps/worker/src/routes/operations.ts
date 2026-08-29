@@ -38,6 +38,7 @@ import {
   isOperationDefinitionSnapshot,
   operationRestorePreviewHash,
 } from '../services/operation-definition-snapshot.js';
+import { getOperationImpactPreview } from '../services/operation-impact-preview.js';
 
 const operations = new Hono<Env>();
 
@@ -67,20 +68,6 @@ function parseCapabilities(raw: unknown): OperationCapability[] | null {
     typeof value === 'string' && OPERATION_CAPABILITIES.includes(value as OperationCapability));
   if (values.length !== raw.length || new Set(values).size !== values.length) return null;
   return values;
-}
-
-async function countActive(
-  db: D1Database,
-  table: 'broadcasts' | 'scenarios' | 'reminders' | 'automations',
-  activeSql: string,
-  accountId: string | null,
-): Promise<number> {
-  const accountClause = accountId ? ' AND line_account_id = ?' : '';
-  const statement = db.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE ${activeSql}${accountClause}`);
-  const row = accountId
-    ? await statement.bind(accountId).first<{ count: number }>()
-    : await statement.first<{ count: number }>();
-  return Number(row?.count ?? 0);
 }
 
 type RestoreBlockers = Partial<Record<OperationCapability, number>>;
@@ -282,23 +269,22 @@ operations.post(
 operations.get('/api/operations/control/preview', async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));
   if (!await canUseScope(c, accountId)) return c.json({ success: false, error: 'Forbidden' }, 403);
-  const [control, broadcasts, scenarios, reminders, automations] = await Promise.all([
+  const [control, impact] = await Promise.all([
     getOperationControlSet(c.env.DB, accountId),
-    countActive(c.env.DB, 'broadcasts', "status IN ('scheduled', 'sending')", accountId),
-    countActive(c.env.DB, 'scenarios', 'is_active = 1', accountId),
-    countActive(c.env.DB, 'reminders', 'is_active = 1', accountId),
-    countActive(c.env.DB, 'automations', 'is_active = 1', accountId),
+    getOperationImpactPreview(c.env.DB, accountId),
   ]);
   return c.json({
     success: true,
     data: {
       control,
       counts: {
-        broadcast_dispatch: broadcasts,
-        scenario_dispatch: scenarios,
-        reminder_dispatch: reminders,
-        automation_actions: automations,
+        broadcast_dispatch: impact.broadcast_dispatch.itemCount,
+        scenario_dispatch: impact.scenario_dispatch.itemCount,
+        reminder_dispatch: impact.reminder_dispatch.itemCount,
+        automation_actions: impact.automation_actions.itemCount,
+        auto_reply_dispatch: impact.auto_reply_dispatch.itemCount,
       },
+      impact,
       permissions: {
         canControl: canControlEmergency(c.get('staff')?.role, c.get('staff')?.permissionKeys),
       },

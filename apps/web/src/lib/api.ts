@@ -105,6 +105,23 @@ export type OperationCapability =
   | 'webhook_outgoing'
   | 'ad_postback'
 
+export type OperationImpactMetric = {
+  itemCount: number
+  friendCount: number | null
+  pendingCount?: number
+  nearestScheduledAt?: string | null
+}
+
+export type OperationImpactPreview = Record<
+  Extract<OperationCapability,
+    | 'broadcast_dispatch'
+    | 'scenario_dispatch'
+    | 'reminder_dispatch'
+    | 'automation_actions'
+    | 'auto_reply_dispatch'>,
+  OperationImpactMetric
+>
+
 export type OperationControl = {
   scopeKey: string
   lineAccountId: string | null
@@ -3341,6 +3358,7 @@ export const api = {
       return fetchApi<ApiResponse<{
         control: OperationControl
         counts: Partial<Record<OperationCapability, number>>
+        impact: OperationImpactPreview
         permissions: { canControl: boolean }
         calculatedAt: string
       }>>(`/api/operations/control/preview${query}`)

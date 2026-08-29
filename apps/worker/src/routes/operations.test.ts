@@ -181,6 +181,14 @@ describe('運用状態API', () => {
           scenario_dispatch: 0,
           reminder_dispatch: 0,
           automation_actions: 0,
+          auto_reply_dispatch: 0,
+        },
+        impact: {
+          broadcast_dispatch: { itemCount: 0, friendCount: 0, nearestScheduledAt: null },
+          scenario_dispatch: { itemCount: 0, friendCount: 0 },
+          reminder_dispatch: { itemCount: 0, friendCount: 0 },
+          automation_actions: { itemCount: 0, friendCount: 0, pendingCount: 0 },
+          auto_reply_dispatch: { itemCount: 0, friendCount: null },
         },
       },
     })
