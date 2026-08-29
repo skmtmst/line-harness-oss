@@ -55,6 +55,16 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(API).not.toContain("`/api/media/${id}${opts?.force ? '?force=1' : ''}`")
   })
 
+  it('使用先を取得できないメディアを未使用として選択・削除しない', () => {
+    expect(PAGE).toContain('function isKnownUnused(item: MediaItem)')
+    expect(PAGE).toContain('return item.usageCount === 0')
+    expect(PAGE).toContain('const removable = filtered.filter(isKnownUnused)')
+    expect(PAGE).toContain('disabled={!isKnownUnused(item)}')
+    expect(PAGE).toContain('使用先を確認できないため選べません')
+    expect(PAGE).toContain('removableSelected.length !== selected.size')
+    expect(PAGE).not.toContain('item.usageCount === undefined || item.usageCount === 0')
+  })
+
   it('選択中のLINEアカウントを一覧・登録・変更・使用先・削除へ渡す', () => {
     expect(PAGE).toContain('api.media.list(accountAtRequest)')
     expect(PAGE).toContain('latestAccountRef.current')
