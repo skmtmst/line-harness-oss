@@ -2024,6 +2024,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    /** 予約中の配信だけを、内容を残した下書きへ安全に戻す。 */
+    cancelReservation: (id: string) =>
+      fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
+        method: 'POST',
+      }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/broadcasts/${id}`, { method: 'DELETE' }),
     // 本送信は取り消せないため、サーバー側が確認ヘッダを要求する。

@@ -9,6 +9,7 @@ const dbMocks = {
   deleteBroadcast: vi.fn(),
   getLineAccountById: vi.fn(),
 };
+const d1Prepare = vi.fn();
 vi.mock('@line-crm/db', () => dbMocks);
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
@@ -56,14 +57,15 @@ const row = {
   alt_text: null,
 };
 
-function setupApp() {
+function setupApp({ changes = 1 }: { changes?: number } = {}) {
+  d1Prepare.mockImplementation(() => ({
+    bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
+  }));
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   app.use('*', async (c, next) => {
     c.env = {
       DB: {
-        prepare: vi.fn(() => ({
-          bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })) })),
-        })),
+        prepare: d1Prepare,
       } as unknown as D1Database,
     };
     // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
@@ -77,6 +79,7 @@ function setupApp() {
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  d1Prepare.mockReset();
 });
 describe('POST /api/broadcasts idempotency', () => {
   test('creates with the idempotency key as the stable broadcast id', async () => {
@@ -186,5 +189,47 @@ describe('PUT /api/broadcasts/:id', () => {
 
     expect(response.status).toBe(400);
     expect(dbMocks.updateBroadcast).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/broadcasts/:id/cancel', () => {
+  test('atomically returns a scheduled broadcast to draft without deleting it', async () => {
+    dbMocks.getBroadcastById
+      .mockResolvedValueOnce(row)
+      .mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(200);
+    expect(d1Prepare).toHaveBeenCalledWith(expect.stringContaining(
+      "WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL",
+    ));
+    expect(dbMocks.deleteBroadcast).not.toHaveBeenCalled();
+    expect((await response.json() as { data: { status: string; scheduledAt: string | null } }).data)
+      .toMatchObject({ status: 'draft', scheduledAt: null });
+  });
+
+  test('does not overwrite a broadcast after the scheduler has started it', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+
+    const response = await setupApp({ changes: 0 }).request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(409);
+    expect(dbMocks.deleteBroadcast).not.toHaveBeenCalled();
+  });
+
+  test('rejects a broadcast that is no longer scheduled', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(409);
+    expect(dbMocks.deleteBroadcast).not.toHaveBeenCalled();
   });
 });

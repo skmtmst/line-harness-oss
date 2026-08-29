@@ -28,15 +28,14 @@ describe('V6 一斉配信の予約完了', () => {
 
   it('予約人数を保存値や固定値で作らず現在の見込みとして表示する', () => {
     expect(PAGE).toContain('api.broadcasts.preflight')
-    expect(PAGE).toContain('estimate?.audienceCount ?? null')
-    expect(PAGE).toContain('現在の配信見込み')
+    expect(PAGE).toContain("estimate.audienceCount.toLocaleString('ja-JP')")
+    expect(PAGE).toContain('現在の見込みから増減することがあります')
     expect(PAGE).not.toContain('totalCount')
   })
 
   it('未取得と実値0を分ける', () => {
-    expect(PAGE).toContain('estimate?.hiddenExcluded ?? null')
-    expect(PAGE).toContain('現在の人数を確認できませんでした')
-    expect(PAGE).toContain('現在の除外人数を確認できませんでした')
+    expect(PAGE).toContain('人数は未取得')
+    expect(PAGE).toContain('人数を送信前に再集計して')
     expect(PAGE).toContain('人数だけ取れないときに予約そのものまで')
   })
 
@@ -48,5 +47,18 @@ describe('V6 一斉配信の予約完了', () => {
   it('送信時に再集計することを明記する', () => {
     expect(PAGE).toContain('送信を始める直前に同じ条件でもう一度数えます')
     expect(PAGE).toContain('現在の見込み')
+  })
+
+  it('5段階の完了と予約状態を実値で読み合わせる', () => {
+    expect(PAGE).toContain("['基本設定', '対象者', 'メッセージ', '送信設定', '確認']")
+    expect(PAGE).toContain("['状態', '予約中']")
+    expect(PAGE).toContain('data-design-node="bPF0s"')
+  })
+
+  it('予約取消は確認後に専用の競合防止APIへ渡す', () => {
+    expect(PAGE).toContain('この配信の予約を取り消しますか？')
+    expect(PAGE).toContain('配信内容は下書きとして残します')
+    expect(PAGE).toContain('api.broadcasts.cancelReservation(broadcast.id)')
+    expect(PAGE).not.toContain('api.broadcasts.delete(broadcast.id)')
   })
 })
