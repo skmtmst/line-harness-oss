@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
+import FormKpiValue from './form-kpi-value'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -266,6 +267,7 @@ export default function FormSubmissionsPage() {
   }
 
   const sortedForms = useMemo(() => sortFormsByLatestAnswer(forms), [forms])
+  const formCountsAvailable = !accountLoading && Boolean(selectedAccountId) && !loading && !loadError
   const answeredCount = useMemo(
     () => forms.filter((form) => form.lastSubmittedAt !== null).length,
     [forms],
@@ -311,18 +313,12 @@ export default function FormSubmissionsPage() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">フォーム</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {forms.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
+          <FormKpiValue value={formCountsAvailable ? forms.length : null} />
           <p className="text-ink-faint mt-0.5 text-xs">作成済み</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">公開中</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {forms.filter((form) => form.isActive).length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
+          <FormKpiValue value={formCountsAvailable ? forms.filter((form) => form.isActive).length : null} />
           <p className="text-ink-faint mt-0.5 text-xs">回答を受け付けています</p>
         </div>
         {/* 月ごとの集計と、回答率（配ったうち何人が答えたか）を出す経路が無い。 */}
