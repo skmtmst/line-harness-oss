@@ -31,8 +31,8 @@ function database(): D1Database {
         bind(...values: unknown[]) { binds = values; return statement; },
         async all() {
           if (!sql.includes('FROM nen_pet_profiles p JOIN friends f')) return { results: [] };
-          const allowed = binds.slice(3).map(String);
-          return { results: pets.filter((pet) => allowed.includes(friends.find((f) => f.id === pet.friend_id)!.line_account_id)).map((pet) => {
+          const selectedAccountId = String(binds[0]);
+          return { results: pets.filter((pet) => selectedAccountId === friends.find((f) => f.id === pet.friend_id)!.line_account_id).map((pet) => {
             const friend = friends.find((f) => f.id === pet.friend_id)!;
             return { ...pet, display_name: friend.display_name, line_user_id: friend.line_user_id };
           }) };
@@ -92,7 +92,7 @@ beforeEach(() => {
 
 describe('A-10 NEN pet account scope', () => {
   test('lists only pets in the tenant and never leaks another tenant line user ID', async () => {
-    const response = await app().request('/api/nen-campaigns/pets', request('GET', undefined, 'tenant-a'), { DB: database() });
+    const response = await app().request('/api/nen-campaigns/pets?lineAccountId=account-a', request('GET', undefined, 'tenant-a'), { DB: database() });
     expect(response.status).toBe(200);
     const text = await response.text();
     expect(text).toContain('line-a');
@@ -101,20 +101,20 @@ describe('A-10 NEN pet account scope', () => {
   });
 
   test('account-scoped staff cannot list pets outside the assigned account', async () => {
-    const response = await app().request('/api/nen-campaigns/pets', request('GET', undefined, 'scoped'), { DB: database() });
+    const response = await app().request('/api/nen-campaigns/pets?lineAccountId=account-a', request('GET', undefined, 'scoped'), { DB: database() });
     const data = await response.json<{ data: Array<{ id: string }> }>();
     expect(data.data.map((pet) => pet.id)).toEqual(['pet-a']);
   });
 
   test.each([['PUT', { name: 'Changed' }], ['DELETE', undefined]] as const)('%s hides and preserves another tenant pet', async (method, body) => {
-    const response = await app().request('/api/nen-campaigns/pets/pet-b', request(method, body, 'tenant-a'), { DB: database() });
+    const response = await app().request('/api/nen-campaigns/pets/pet-b?lineAccountId=account-a', request(method, body, 'tenant-a'), { DB: database() });
     expect(response.status).toBe(404);
     expect(pets.find((pet) => pet.id === 'pet-b')?.name).toBe('Pet B');
   });
 
   test('POST hides another tenant friend and creates no row', async () => {
     const before = pets.length;
-    const response = await app().request('/api/nen-campaigns/pets', request('POST', { friendId: 'friend-b', name: 'Blocked' }), { DB: database() });
+    const response = await app().request('/api/nen-campaigns/pets?lineAccountId=account-a', request('POST', { friendId: 'friend-b', name: 'Blocked' }), { DB: database() });
     expect(response.status).toBe(404);
     expect(pets).toHaveLength(before);
   });
@@ -122,13 +122,13 @@ describe('A-10 NEN pet account scope', () => {
   test('list, create, update, and delete continue to work inside the visible account', async () => {
     const instance = app();
     const env = { DB: database() };
-    expect((await instance.request('/api/nen-campaigns/pets', request(), env)).status).toBe(200);
-    const created = await instance.request('/api/nen-campaigns/pets', request('POST', { friendId: 'friend-a', name: 'New Pet' }), env);
+    expect((await instance.request('/api/nen-campaigns/pets?lineAccountId=account-a', request(), env)).status).toBe(200);
+    const created = await instance.request('/api/nen-campaigns/pets?lineAccountId=account-a', request('POST', { friendId: 'friend-a', name: 'New Pet' }), env);
     expect(created.status).toBe(201);
     const { data } = await created.json<{ data: { id: string } }>();
-    expect((await instance.request(`/api/nen-campaigns/pets/${data.id}`, request('PUT', { name: 'Updated Pet' }), env)).status).toBe(200);
+    expect((await instance.request(`/api/nen-campaigns/pets/${data.id}?lineAccountId=account-a`, request('PUT', { name: 'Updated Pet' }), env)).status).toBe(200);
     expect(pets.find((pet) => pet.id === data.id)?.name).toBe('Updated Pet');
-    expect((await instance.request(`/api/nen-campaigns/pets/${data.id}`, request('DELETE'), env)).status).toBe(200);
+    expect((await instance.request(`/api/nen-campaigns/pets/${data.id}?lineAccountId=account-a`, request('DELETE'), env)).status).toBe(200);
     expect(pets.some((pet) => pet.id === data.id)).toBe(false);
   });
 });
