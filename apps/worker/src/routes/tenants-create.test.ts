@@ -53,7 +53,6 @@ async function patchStatus(id: string, status: unknown, staff = operator()) {
 
 beforeEach(() => {
   testDb = createTestD1();
-  testDb.raw.exec("ALTER TABLE tenants ADD COLUMN feature_packs TEXT NOT NULL DEFAULT '[]'");
 
   // D1 batch is atomic. The shared SQLite adapter predates batch users and
   // executes sequentially, so make its test behavior match D1's contract.
