@@ -756,11 +756,12 @@ export const SCREENS = [
     設計は5段のウィザード（基本設定→どんなときに動くか→何を返すか→優先順位→確認）。
     実装は一覧の上に出る**1枚の窓**で、段も右の「設定内容」も無い。
   */
-  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: 'P1 「条件が重なっている」を知らせる帯が無い（設計の4つめは「要確認（条件重複）」、実装は「未ヒット」）。上から順に最初に当てはまった1つだけが動く仕組みなので、重なりに気づく場所が要る', verdictSource: 'auto-replies-v6/design-qa.md' },
+  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: 'P1 内部の言葉とDBの列名が一覧の本体に出ている。青い箱に「√アカ名 返信あり (inline)／√アカ名 automation 経由」「⚠アカ名 silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)」「アカ名 適用外 (line_account_id が別アカに固定)」。表の「送る内容」列にも `text` `(inline)` がそのまま出る。**#544 の head でも残っている。** P1 「条件が重なっている」を知らせる帯が無い（設計の4つめは「要確認（条件重複）」、実装は「未ヒット」）。上から順に最初に当てはまった1つだけが動く仕組みなので、重なりに気づく場所が要る', verdictSource: 'auto-replies-v6/Gy9OK-1920.png' },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'needs_fix', verdictNote: 'P1 ルール編集の段が無い。設計の A・B・C（ルール編集／反応条件／応答とアクション）が、実装では一覧の上に出る1枚の窓に全部入っている。右の「設定内容」も無い', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
+    verdictHead: '6053c271',
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
@@ -817,11 +818,17 @@ export const SCREENS = [
     },
   },
   {
+    /*
+      **窓は一覧の行の「削除」から開く**（`auto-replies/page.tsx:610-618`）。
+      #544 は #491 を含むので、積み順を守って #544 の head で撮る。
+    */
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
-    gap: 'pending',
-    gapNote: '#544 head `6053c271` で既存 `ConfirmDialog` を接続済み。ルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴が残ることを表示する。取り込み順は #491 → #544。最新headを画像・操作確認してから未実装を外す',
-    status: 'unimplemented',
-    why: '#544でブラウザの `confirm()` を共通確認窓へ置き換え、削除失敗・二重実行も止めた。DB試験でルール削除後も `auto_reply_hits` が残ることを確認済み。#491 → #544 のheadで1440/1920の比較と削除失敗状態を確認するまで未実装扱いを維持する',
+    mode: 'viewport', height: 1080,
+    steps: [{ click: '削除' }],
+    verdict: 'needs_fix',
+    verdictNote: '**#491 → #544 で削除確認が入り、未実装ではなくなった。** 「自動応答「営業時間外の自動返信」を削除しますか？／新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。」。**何が止まり、何が残り、戻せないことの3つを言う**という Y0Sn3 と同じ形で、束5の手本になる。P2 設計との差は絵記号（⚠とごみ箱）',
+    verdictSource: 'auto-replies-v6/Gy9OK-1920.png',
+    verdictHead: '6053c271',
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
@@ -880,10 +887,12 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
-    gap: 'pending',
-    gapNote: '#506 head `5dc99107` で既存 `/api/friend-add-routing/events` を読む `/friend-add-settings/runs` を実装済み。最新headを1440/1920で比較してから未実装を外す',
-    status: 'unimplemented',
-    why: '#506で実行結果画面と契約試験が入った。未統合なので判定は動かさず、Node単位の画像確認を待つ',
+    route: '/friend-add-settings/runs', mode: 'page',
+    states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'needs_fix',
+    verdictNote: '**#506 で実行結果の画面が入り、未実装ではなくなった。** 未取得の扱いが設計より丁寧で、上の案内に「LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。**取得できない記録は0件にせず「経路は取得できません」と表示します。**」と書き、実際に行でもそう出る。処理できなかった行の処理日時は「—」。P1 設計の右側3枚（稼働状況＝状態・二重送信防止・最終配信・平均送信0.8秒／要テスト＝未送信3件とテストの導線／担当者シナリオ開始＝テスト待ち8・対応中21・完了7）が無い。「流入経路別の内訳」（予約128回59.8%／Webサイト54回25.2%／紹介キャンペーン32回15.0%）も無い。実行結果をCSVで書き出す、配信を一時停止 の導線も無い。P2 帯4つの中身が設計と違う（設計は 直近28日の追加214人／累計配信1,842通／シナリオ開始198件／エラー3件）',
+    verdictSource: 'friend-add-v6/P2J0Te-normal-1920.png',
+    verdictHead: '5dc99107',
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
@@ -1927,7 +1936,9 @@ export const CAPTURED_AT = {
   7: [
     { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**' },
     { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
-  8: [{ pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
+  8: [
+    { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
+    { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
   5: [
     { pr: 521, head: '7d5d74fd', on: '2026-08-29', screens: ['RUxNf'], note: '開始・停止の確認窓。窓は一覧の行に出る' },
     { pr: 522, head: '3c88b8bd', on: '2026-08-29', screens: ['NrBkW'], note: '開始完了の知らせ。`?started=1` で開ける。#521 の上に積んである' },
@@ -1940,6 +1951,7 @@ export const CAPTURED_AT = {
   2: [{ pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' }],
   13: [{ pr: 436, head: '950073ab', on: '2026-08-29', screens: ['ZOPyc'], note: '読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る' }],
   25: [{ pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' }],
+  9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
   20: [{ pr: 445, head: '787a4b46', on: '2026-08-28' }],

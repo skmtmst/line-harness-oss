@@ -313,6 +313,12 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    友だち追加時の実行結果。**一覧の既定（配列）を返すと落ちる。**
+    画面は `data.items.length` を読むので、`items` の無い返事だと
+    「もう一度試す」の画面になる。型は `FriendAddEventList`。
+  */
+  [/\/api\/friend-add-routing\/events/, { items: [], nextCursor: null }],
+  /*
     帯の口。**一覧の既定を返すと `summary.inUse` が無く、
     「使用中 undefined件」と撮れる。** 型は `FriendFieldListSummary`。
     `formLinks` は空でも `null`（未取得）ではなく **0（実値）** を返す。
