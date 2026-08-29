@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作32個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,8 +45,10 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(29)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
+    // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
+    // 未実装のCSV・定期レポート操作は数へ入れない。
+    expect(openings).toHaveLength(32)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -89,15 +91,20 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-08-26: 4-1（友だち属性）のヘッダー操作を共通Buttonへ替え、
     // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
     // 減ったら必ずここも締める。
-    expect(debt['direct-primary-button']).toBe(137)
+    // 2026-08-27: シナリオのフォルダ追加を共通ダイアログへ寄せ、
+    // 画面内に重複していた主要操作1つが減って136。
+    expect(debt['direct-primary-button']).toBe(136)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
     //
     // 2026-08-27: ダッシュボードの受信カードが自前の「前へ／次へ」をやめて
     // 共通ページ送りへ寄せた。副次2つ減って280。**減ったので締め直す。**
     // 2026-08-28: マイル正本をV6へ移し、動かないマニュアル・CSV・再読込の
-    // 自前ボタン3つを除いたため277へ減った。
-    expect(debt['direct-secondary-button']).toBe(277)
+    // 自前ボタン3つを除いた。回答フォームの再読込も共通Buttonへ寄せたため、
+    // 合計で4つ減った。さらに分析の死んだ旧UIを削除し、共通Buttonへ寄せたため、
+    // 265まで減った。写真審査の操作3つも共通Button/Dialogへ寄せ、262まで減った。
+    // シナリオでも重複送信・フォルダ追加・使えない並び替えの3つを除き、259まで減った。
+    expect(debt['direct-secondary-button']).toBe(259)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -105,9 +112,13 @@ describe('標準ボタンの第1段階移行', () => {
       **増やしたぶんはここに記録して止める。** 減ったら締め直す。
     */
     // 友だち一覧はV6トークンへ移し、任意値を127か所削除した。
+    // 2026-08-29: 統合ユーザー一覧をV6トークンと7列の業務表へ移し、
+    // 旧画面の任意値を36か所減らした。
     // 2026-08-27: 「今月の配信」から重複していた送信枠の帯を外し、
-    // マイル概要をV6トークンへ寄せたため、実測値がさらに1つ減って1283。
-    expect(debt['arbitrary-value']).toBe(1283)
+    // 「友だちの状態」を設計の3行＋内訳に組み直した。保存検索の保存ダイアログと
+    // マイル概要もV6トークンへ寄せ、分析画面の旧UIも削除した。
+    // 両方を合わせて1243へ締め直す。
+    expect(debt['arbitrary-value']).toBe(1243)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
