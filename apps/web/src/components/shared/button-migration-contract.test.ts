@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作30個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,8 +45,10 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(29)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
+    // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
+    // 未実装のCSV・定期レポート操作は数へ入れない。
+    expect(openings).toHaveLength(30)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -97,8 +99,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 共通ページ送りへ寄せた。副次2つ減って280。**減ったので締め直す。**
     // 2026-08-28: マイル正本をV6へ移し、動かないマニュアル・CSV・再読込の
     // 自前ボタン3つを除いた。回答フォームの再読込も共通Buttonへ寄せたため、
-    // 合計で4つ減って276へ締め直した。
-    expect(debt['direct-secondary-button']).toBe(276)
+    // 合計で4つ減った。さらに分析の死んだ旧UIを削除し、共通Buttonへ寄せたため、
+    // 265まで減った。写真審査の操作3つも共通Button/Dialogへ寄せ、262まで減った。
+    expect(debt['direct-secondary-button']).toBe(262)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -107,8 +110,9 @@ describe('標準ボタンの第1段階移行', () => {
     */
     // 友だち一覧はV6トークンへ移し、任意値を127か所削除した。
     // 2026-08-27: 「今月の配信」から重複していた送信枠の帯を外し、
-    // マイル概要をV6トークンへ寄せたため、実測値がさらに1つ減って1283。
-    expect(debt['arbitrary-value']).toBe(1283)
+    // 「友だちの状態」を設計の3行＋内訳に組み直した。保存検索の保存ダイアログと
+    // マイル概要もV6トークンへ寄せ、分析画面の旧UIも削除したため、1279まで減った。
+    expect(debt['arbitrary-value']).toBe(1279)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
