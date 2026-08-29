@@ -57,6 +57,25 @@ describe('シナリオ購読で絞る', () => {
 });
 
 describe('詳細条件で絞る', () => {
+  it('行動スコアの範囲を配信確定時の現在値で絞る', () => {
+    const { sql, bindings } = buildSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'score_range', value: { min: 30, max: 69 } }],
+    });
+    expect(sql).toContain('f.score >= ?');
+    expect(sql).toContain('f.score <= ?');
+    expect(bindings).toEqual([30, 69]);
+  });
+
+  it('空または逆転した行動スコア範囲を拒否する', () => {
+    expect(() => buildSegmentQuery({
+      operator: 'AND', rules: [{ type: 'score_range', value: { min: null, max: null } }],
+    })).toThrow(/score_range/);
+    expect(() => buildSegmentQuery({
+      operator: 'AND', rules: [{ type: 'score_range', value: { min: 70, max: 30 } }],
+    })).toThrow(/min <= max/);
+  });
+
   it('友だち情報欄の一致を条件にできる', () => {
     const { sql, bindings } = buildSegmentQuery({
       operator: 'AND',

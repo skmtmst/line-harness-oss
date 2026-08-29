@@ -703,6 +703,9 @@ export type FriendListParams = {
   chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
   /** 表示設定。未指定は全部。 */
   visibility?: 'following' | 'blocked'
+  /** 行動スコアの現在値。片方だけでも指定できる。 */
+  scoreMin?: number
+  scoreMax?: number
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -863,6 +866,31 @@ export type MileageAdminHistoryItem = {
 }
 export type MileageAdminHistory = {
   items: MileageAdminHistoryItem[]
+  pagination: { total: number; limit: number; offset: number }
+}
+export type ActionScoreBand = 'high' | 'normal' | 'low'
+export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
+export type ActionScoreSort = 'score_desc' | 'score_asc' | 'change_desc' | 'change_asc' | 'recent_desc'
+export type ActionScoreOverview = {
+  summary: {
+    scoredFriends: number
+    high: number
+    normal: number
+    low: number
+    decreased30d: number
+    highMin: number
+    normalMin: number
+  }
+  items: Array<{
+    friendId: string
+    displayName: string
+    pictureUrl: string | null
+    currentScore: number
+    band: ActionScoreBand
+    change30d: number
+    lastReason: string | null
+    lastChangedAt: string | null
+  }>
   pagination: { total: number; limit: number; offset: number }
 }
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
@@ -1390,6 +1418,8 @@ export const api = {
       if (params?.createdTo) query.createdTo = params.createdTo
       if (params?.chatStatus) query.chatStatus = params.chatStatus
       if (params?.visibility) query.visibility = params.visibility
+      if (params?.scoreMin !== undefined) query.scoreMin = String(params.scoreMin)
+      if (params?.scoreMax !== undefined) query.scoreMax = String(params.scoreMax)
       for (const [k, v] of Object.entries(params?.metadata ?? {})) {
         if (k && v) query[`metadata.${k}`] = v
       }
@@ -3660,6 +3690,24 @@ export const api = {
     }),
     deleteRule: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/mileage/rules/${id}`, { method: 'DELETE' }),
+  },
+  actionScores: {
+    friends: (params: {
+      accountId: string
+      search?: string
+      filter?: ActionScoreFilter
+      sort?: ActionScoreSort
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.filter) query.set('filter', params.filter)
+      if (params.sort) query.set('sort', params.sort)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<ActionScoreOverview>>(`/api/action-scores/friends?${query.toString()}`)
+    },
   },
   webhooks: {
     incoming: {
