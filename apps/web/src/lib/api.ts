@@ -3675,26 +3675,33 @@ export const api = {
         }),
     },
     rules: {
-      list: () =>
-        fetchApi<ApiResponse<NotificationRule[]>>('/api/notifications/rules'),
-      get: (id: string) =>
-        fetchApi<ApiResponse<NotificationRule>>(`/api/notifications/rules/${id}`),
-      create: (data: { name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule[]>>(
+          `/api/notifications/rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      get: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/notifications/rules/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
         fetchApi<ApiResponse<NotificationRule>>('/api/notifications/rules', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: Partial<Pick<NotificationRule, 'name' | 'eventType' | 'conditions' | 'channels' | 'isActive'>>) =>
+      update: (id: string, lineAccountId: string, data: Partial<Pick<NotificationRule, 'name' | 'eventType' | 'conditions' | 'channels' | 'isActive'>>) =>
         fetchApi<ApiResponse<NotificationRule>>(`/api/notifications/rules/${id}`, {
           method: 'PUT',
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, lineAccountId }),
         }),
-      delete: (id: string) =>
-        fetchApi<ApiResponse<null>>(`/api/notifications/rules/${id}`, { method: 'DELETE' }),
+      delete: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<null>>(
+          `/api/notifications/rules/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'DELETE' },
+        ),
     },
-    list: (params?: { status?: string; limit?: string }) =>
+    list: (lineAccountId: string, params?: { status?: string; limit?: string }) =>
       fetchApi<ApiResponse<Notification[]>>(
-        '/api/notifications?' + new URLSearchParams(params as Record<string, string>),
+        '/api/notifications?' + new URLSearchParams({ lineAccountId, ...params }),
       ),
   },
   health: {
