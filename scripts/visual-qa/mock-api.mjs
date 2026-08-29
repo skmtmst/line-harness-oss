@@ -846,7 +846,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/forms') return { success: true, data: FORMS }
   const formSubs = /^\/api\/forms\/([^/]+)\/submissions$/.exec(pathname)
   if (formSubs) {
-    return { success: true, data: FORM_SUBMISSIONS.filter((item) => item.formId === formSubs[1]) }
+    /*
+      **返す形が2つある。** ページを指定しなければ**配列のまま**返す
+      （既存SDKとの互換。`apps/worker/src/routes/forms.ts:452`）。
+      `page` か `limit` が付いたときだけ `{items,total,page,limit}`（`:457`）。
+      片方だけ真似ると、SDKを壊していないことを確かめられない。
+
+      **数の丸めもDBと同じにする**（`packages/db/src/forms.ts:395`）。
+      `page` は1以上、`limit` は1〜50。**丸めた後の値を返す**ので、
+      画面に出る番号はDBが実際に使った値になる。
+    */
+    const rows = FORM_SUBMISSIONS.filter((item) => item.formId === formSubs[1])
+    if (!query.has('page') && !query.has('limit')) return { success: true, data: rows }
+    const page = Math.max(1, Math.floor(Number(query.get('page') ?? '1')))
+    const limit = Math.max(1, Math.min(Math.floor(Number(query.get('limit') ?? '20')), 50))
+    const offset = (page - 1) * limit
+    return { success: true, data: { items: rows.slice(offset, offset + limit), total: rows.length, page, limit } }
   }
   const formOne = /^\/api\/forms\/([^/]+)$/.exec(pathname)
   if (formOne) {
