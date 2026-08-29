@@ -20,7 +20,7 @@ import {
   listRestaurantIntakeAddresses,
   RestaurantIntakeConfigurationError,
 } from '../services/restaurant-email-intake.js';
-import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
+import { configureWebhookEndpoint, fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import {
   issueLineAccessToken,
   LineTokenIssueError,
@@ -609,6 +609,8 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
       tenantId: organization.tenant_id ?? DEFAULT_TENANT_ID,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     createdLineAccountId = lineAccount.id;
+    const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const webhook = await configureWebhookEndpoint(token.access_token, `${base}/webhook`);
     const storeId = crypto.randomUUID();
     await dbFor(c.env, storeId).prepare(`INSERT INTO rt_stores
       (id, organization_id, name, code, capacity, timezone, line_account_id)
@@ -621,7 +623,13 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
       ).run();
     return c.json({
       success: true,
-      data: { store: { id: storeId, name }, lineAccountName: profile.displayName.trim() },
+      data: {
+        store: { id: storeId, name },
+        lineAccountName: profile.displayName.trim(),
+        basicId: profile.basicId?.trim() || null,
+        friendCount: null,
+        webhook,
+      },
     }, 201);
   } catch (error) {
     if (createdLineAccountId) {

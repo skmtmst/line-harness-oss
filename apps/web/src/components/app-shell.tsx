@@ -20,6 +20,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
+  if (pathname.startsWith('/stores/new')) {
+    return <AuthGuard><AccountProvider>{children}</AccountProvider></AuthGuard>
+  }
+
   // 参照画像との比較専用。開発中だけ表示し、実データの取得・保存は行わない。
   // 本番ビルドでは通常の認証ガードを必ず通る。
   if (process.env.NODE_ENV === 'development' && pathname.startsWith('/visual-qa/')) {
