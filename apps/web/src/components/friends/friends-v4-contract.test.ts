@@ -16,6 +16,7 @@ const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', '
 const DUPLICATES = readFileSync(join(HERE, '..', '..', 'app', 'duplicates', 'page.tsx'), 'utf8')
 const USERS_TABLE = readFileSync(join(HERE, '..', 'users', 'users-table.tsx'), 'utf8')
 const USER_ROW = readFileSync(join(HERE, '..', 'users', 'user-row.tsx'), 'utf8')
+const USERS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'users', 'page.tsx'), 'utf8')
 const STRUCTURE = readFileSync(join(HERE, '..', '..', 'lib', 'design-structure.json'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
@@ -125,11 +126,12 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).not.toContain('className="min-w-[160px] flex-1"')
   })
 
-  it('重複・統合ユーザー・統合詳細もV4の表密度と色へそろえる', () => {
+  it('重複画面の密度を保ち、統合ユーザーはV6の実Nodeへ結び付ける', () => {
     expect(DUPLICATES).toContain('rounded-[14px]')
     expect(DUPLICATES).toContain('#DADDE2')
-    expect(USERS_TABLE).toContain('rounded-[14px]')
-    expect(USER_ROW).toContain('#EAEBED')
+    expect(USERS_PAGE).toContain('data-design-node="r7eSi"')
+    expect(USERS_TABLE).toContain('rounded-v6-card')
+    expect(USER_ROW).toContain('border-v6-divider')
     expect(USER_ROW).toContain('登録アカウント詳細')
   })
 
