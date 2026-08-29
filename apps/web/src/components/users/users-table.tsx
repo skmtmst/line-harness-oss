@@ -1,6 +1,9 @@
 'use client'
 
 import UserRow, { type UserRowData } from './user-row'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 const fmt = new Intl.NumberFormat('ja-JP')
 
@@ -19,6 +22,7 @@ interface Props {
   page: number
   pageSize: number
   loading: boolean
+  error: boolean
   onPageChange: (page: number) => void
 }
 
@@ -28,6 +32,7 @@ export default function UsersTable({
   page,
   pageSize,
   loading,
+  error,
   onPageChange,
 }: Props) {
   const accountColorMap = new Map<string, string>()
@@ -45,33 +50,50 @@ export default function UsersTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1
   const end = Math.min(total, page * pageSize)
+  const countAvailable = !loading && !error
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+    <div className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
       <table className="w-full table-fixed">
         <colgroup>
-          <col className="w-[13%]" />
-          <col className="w-[17%]" />
-          <col className="w-[23%]" />
-          <col className="w-[12%]" />
+          <col className="w-[18%]" />
+          <col className="w-[18%]" />
           <col className="w-[20%]" />
-          <col className="w-[15%]" />
+          <col className="w-[14%]" />
+          <col className="w-[11%]" />
+          <col className="w-[10%]" />
+          <col className="w-[9%]" />
         </colgroup>
-        <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
-          <tr>
-            <th className="px-4 py-3">識別子</th>
-            <th className="px-4 py-3">表示名</th>
-            <th className="px-4 py-3">登録アカウント</th>
-            <th className="px-4 py-3">X</th>
-            <th className="px-4 py-3">メール</th>
-            <th className="px-4 py-3">電話</th>
-          </tr>
+        <thead className="border-b border-hairline bg-v6-surface-strong text-left text-micro font-semibold text-v6-ink-secondary">
+          <TableHeadRow>
+            <Th>統合ユーザー</Th>
+            <Th>連絡先</Th>
+            <Th>紐付くアカウント</Th>
+            <Th>UID</Th>
+            <Th>最終接触</Th>
+            <Th>重複配信</Th>
+            <Th align="right">操作</Th>
+          </TableHeadRow>
         </thead>
         <tbody>
-          {rows.length === 0 && !loading ? (
+          {rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#8B938D]">
-                該当ユーザーがいません
+              <td colSpan={7} className="p-4">
+                {loading ? (
+                  <ListState kind="loading" />
+                ) : error ? (
+                  <ListState
+                    kind="error"
+                    title="統合ユーザーを表示できませんでした"
+                    description="再計算するか、時間をおいてもう一度お試しください。"
+                  />
+                ) : (
+                  <ListState
+                    kind="empty"
+                    title="条件に合う統合ユーザーがいません"
+                    description="検索条件を変えてお試しください。"
+                  />
+                )}
               </td>
             </tr>
           ) : (
@@ -81,31 +103,19 @@ export default function UsersTable({
           )}
         </tbody>
       </table>
-      <div className="flex items-center justify-between border-t border-[#EAEBED] px-4 py-3 text-sm text-[#565F59]">
+      <div className="flex items-center justify-between border-t border-v6-divider px-4 py-3 text-sm text-v6-ink-secondary">
         <span>
-          {fmt.format(total)} 件中 {fmt.format(start)}–{fmt.format(end)} 件
+          {countAvailable
+            ? `${fmt.format(total)}人中 ${fmt.format(start)}〜${fmt.format(end)}人`
+            : '—人'}
         </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page <= 1 || loading}
-            className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#0067D9] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]"
-          >
-            前へ
-          </button>
-          <span className="tabular-nums text-xs text-[#8B938D]">
-            {page} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page >= totalPages || loading}
-            className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#0067D9] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]"
-          >
-            次へ
-          </button>
-        </div>
+        <Pagination
+          page={page}
+          pageCount={totalPages}
+          onPageChange={onPageChange}
+          disabled={loading || error}
+          ariaLabel="統合ユーザーのページ送り"
+        />
       </div>
     </div>
   )

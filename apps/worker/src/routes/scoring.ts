@@ -20,8 +20,15 @@ import {
   setMileageManualAdjustmentPolicy,
   postMileageAdjustment,
   MileageAdjustmentError,
+  getActionScoreOverview,
 } from '@line-crm/db';
-import type { MileageEntryStatus, MileageEntryType, MileageRuleRow } from '@line-crm/db';
+import type {
+  ActionScoreFilter,
+  ActionScoreSort,
+  MileageEntryStatus,
+  MileageEntryType,
+  MileageRuleRow,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
@@ -439,6 +446,46 @@ scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/mileage/rules/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ========== 行動スコア（V6 17-2） ==========
+
+const ACTION_SCORE_FILTERS = new Set<ActionScoreFilter>(['all', 'high', 'normal', 'low', 'decreased']);
+const ACTION_SCORE_SORTS = new Set<ActionScoreSort>([
+  'score_desc', 'score_asc', 'change_desc', 'change_asc', 'recent_desc',
+]);
+
+scoring.get('/api/action-scores/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const filterValue = c.req.query('filter') ?? 'all';
+    const sortValue = c.req.query('sort') ?? 'score_desc';
+    if (!ACTION_SCORE_FILTERS.has(filterValue as ActionScoreFilter)) {
+      return c.json({ success: false, error: 'filter is invalid' }, 400);
+    }
+    if (!ACTION_SCORE_SORTS.has(sortValue as ActionScoreSort)) {
+      return c.json({ success: false, error: 'sort is invalid' }, 400);
+    }
+    const requestedLimit = Number(c.req.query('limit') || 20);
+    const requestedOffset = Number(c.req.query('offset') || 0);
+    const data = await getActionScoreOverview(c.env.DB, {
+      accountId,
+      search: c.req.query('search') || '',
+      filter: filterValue as ActionScoreFilter,
+      sort: sortValue as ActionScoreSort,
+      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
+      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+    });
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /api/action-scores/friends error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
