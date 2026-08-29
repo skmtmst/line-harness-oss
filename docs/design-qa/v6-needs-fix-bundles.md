@@ -278,14 +278,28 @@
 |---|---|---|---|---|
 | #550 | `f7c5a99e` | `components/broadcasts/segment-preset*` `broadcast-form.tsx` | `cPk8A` `sqFXf` | 束7（設計の面が無い） |
 | #551 | `44692a37` | `components/reminders/reminder-publish-flow.tsx` `app/reminders/new`・`edit` | `s7T2dz` `JCz6J` `W98zZQ` `s6Vvp` `PSmHo` | 束7 |
-| #552 | `6ce43563` | `components/automations/automation-template-gallery.tsx` `automation-draft-editor.tsx` | `WjYAC`（`gief7` `Rv8Jv` の「見本から始める道が無い」も動く） | 束10（導線が無い） |
+| #552 | `6ce43563` | `components/automations/automation-template-gallery.tsx` `automation-draft-editor.tsx` `app/automations/page.tsx`（タブ帯5本と権限） `new/page.tsx` | `WjYAC`（印あり）＋ `gief7` `Rv8Jv` `Vdbv5`（同じページを描き替えるため） | 束10（導線が無い） |
 | #553 | `2fdded68` | `app/scenarios/detail/scenario-detail-client.tsx` | `dqFft` | **束5** |
 | #554 | `875a9ed3` | `app/broadcasts/page.tsx` | `EGMb1` | **束5** |
-| #555 | `e873eeb9` | `components/chats/saved-view-dialog.tsx` | `tBlkL` | P0-1 の続き |
+| #555 | `e873eeb9` | `components/chats/saved-view-dialog.tsx` | `ANgda`（未入力の赤帯が出るのはこの画面）＋ `tBlkL`（同じ部品） | P0-1 の続き |
 | #556 | `6037aeef` | `app/form-submissions/form-kpi-value.tsx` `page.tsx` | `ZOPyc` | **束4** |
 | #557 | `697cee2c` | `components/broadcasts/broadcast-kpi-values.tsx` | `q76C35` | **束4** |
 | #558 | `ef7b5773` | `app/affiliates/affiliate-reward.ts` `tabs.tsx` | `PouPn` `xqT1Z` `jwrbf` | 束6（数が合わない）— **画像確認済み。4項目とも通った** |
 | #559 | `888e80f9` | `app/contents/page.tsx` `components/shared/filter-chip.tsx` | `g89Tc` | **束4** — **画像確認済み。7項目のうち6つ通り、P1が1つ残る** |
+
+**Node の決め方。** まず差分の `data-design-node` を数え、印が無いPRは
+**変えたファイルを描いている画面**を `screens.mjs` の道から引きました。
+
+| PR | 印（`data-design-node`）の数 | 印が無いときの引き方 |
+|---|---|---|
+| #550 | `sqFXf`×3 `cPk8A`×2 | — |
+| #551 | `s7T2dz` `JCz6J` `W98zZQ` `s6Vvp` `PSmHo` 各1 | — |
+| #552 | `WjYAC`×2 | `app/automations/page.tsx` を描く `gief7` `Vdbv5`、`new/page.tsx` を描く `Rv8Jv` |
+| #553 | 印なし | `scenario-detail-client.tsx` の標準 `confirm` を持つ `dqFft` |
+| #554 | 印なし | `broadcasts/page.tsx` の標準 `confirm` を持つ `EGMb1` |
+| #555 | 印なし | `saved-view-dialog.tsx` を開く `ANgda`（名前を入れる）と `tBlkL`（保存完了） |
+| #556 | 印なし | `form-submissions/page.tsx` の帯を持つ `ZOPyc` |
+| #557 | 印なし | `broadcast-kpi-values.tsx` を描く `q76C35` |
 
 **#550〜#557 は、まだ画像で確かめていません。** どれも head が
 動いていないので、取り込まれた順に `--only` で変わった Node だけ
