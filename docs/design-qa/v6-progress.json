@@ -1028,7 +1028,18 @@
       "needsFix": 4,
       "unjudged": 0,
       "remaining": 4,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 482,
+          "head": "b346d467",
+          "on": "2026-08-29",
+          "screens": [
+            "b3HfZ",
+            "U0BwS"
+          ],
+          "note": "緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）"
+        }
+      ]
     }
   ],
   "gaps": [

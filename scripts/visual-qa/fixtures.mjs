@@ -4376,3 +4376,50 @@ export const REMINDER_PUBLISHED = {
   publishedAt: '2026-08-29T02:30:00.000Z',
   audience: 124, plannedDeliveries: 38, nextScheduledAt: '2026-09-02T10:00:00.000Z',
 }
+
+/*
+  緊急停止の下見（`GET /api/operations/control/preview`）。
+
+  **形は `OperationControlSet`**（`packages/db/src/operations.ts:15`）。
+  `states` は**7つ全部**を持つ（画面が選べるのは4つだけだが、型は7つ）。
+
+  `counts` は**件数だけ**。Workerが数えているのは
+  `broadcasts` `scenarios` `reminders` `automations` の行数で、
+  **友だちの人数は数えていない**（`operations.ts:283`）。ここで人数を
+  作ってしまうと、実装に無いものを在るように見せることになる。
+*/
+const OPERATION_STATES_RUNNING = {
+  broadcast_dispatch: 'running', scenario_dispatch: 'running',
+  reminder_dispatch: 'running', automation_actions: 'running',
+  auto_reply_dispatch: 'running', webhook_outgoing: 'running',
+  ad_postback: 'running',
+}
+
+export const OPERATION_CONTROL_PREVIEW = {
+  control: {
+    scopeKey: 'all', lineAccountId: null, version: 3,
+    states: OPERATION_STATES_RUNNING,
+    activeIncidentId: null, reason: null, actorId: null,
+    stoppedAt: null, updatedAt: '2026-08-28T11:00:00.000Z',
+  },
+  counts: {
+    broadcast_dispatch: 1,
+    scenario_dispatch: 4,
+    reminder_dispatch: 10,
+    automation_actions: 3,
+  },
+  permissions: { canControl: true },
+  calculatedAt: '2026-08-29T02:30:00.000Z',
+}
+
+/* 1アカウントに絞ったとき。**「すべて」と数が変わることを見る。** */
+export const OPERATION_CONTROL_PREVIEW_ONE = {
+  ...OPERATION_CONTROL_PREVIEW,
+  control: { ...OPERATION_CONTROL_PREVIEW.control, scopeKey: 'visual-qa-account', lineAccountId: 'visual-qa-account' },
+  counts: {
+    broadcast_dispatch: 1,
+    scenario_dispatch: 2,
+    reminder_dispatch: 6,
+    automation_actions: 1,
+  },
+}

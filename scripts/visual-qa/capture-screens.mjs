@@ -708,6 +708,16 @@ async function captureImpl(feature) {
         if (retryAfter > 0 && afterSteps.includes('画面を表示できませんでした')) {
           throw new Error('操作したあとに画面が落ちている（もう一度試す が出ている）')
         }
+        /*
+          **真っ白な絵を通さない。** 落ちた画面は文字で見分けてきたが、
+          読み込み自体が失敗すると本文が**空**になり、どの文言にも
+          当たらないまま「撮影OK」で通る。実際に `b3HfZ` で、
+          生成物（`@/generated/release-log.json`）が無くて500になった
+          画面を、3状態とも真っ白なまま撮っていた。
+        */
+        if (afterSteps.trim().length === 0) {
+          throw new Error('本文が空（画面が描かれていない）。サーバの記録を確かめてください')
+        }
         await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
 
         const overflow = await page.evaluate(
