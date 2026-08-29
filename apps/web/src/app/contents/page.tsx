@@ -68,6 +68,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+/** 使用先を取得でき、かつ0件と確定したメディアだけを削除候補にする。 */
+function isKnownUnused(item: MediaItem): boolean {
+  return item.usageCount === 0
+}
+
 export default function MediaLibraryPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -202,10 +207,18 @@ export default function MediaLibraryPage() {
   /** 選んだ札をまとめて消す。使用中はAPIでも必ず止める。 */
   const removeSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
+    const removableSelected = [...selected].filter((id) =>
+      items.some((item) => item.id === id && isKnownUnused(item)),
+    )
+    if (removableSelected.length !== selected.size) {
+      setSelected(new Set(removableSelected))
+      setError('使用先を確認できないメディアは削除できません。状態を読み直して確認してください。')
+      return
+    }
     const accountAtRequest = selectedAccountId
-    if (!confirm(`${selected.size}件のメディアを削除しますか？`)) return
+    if (!confirm(`${removableSelected.length}件のメディアを削除しますか？`)) return
     setError('')
-    for (const id of selected) {
+    for (const id of removableSelected) {
       try {
         await api.media.delete(id, accountAtRequest)
         if (accountAtRequest !== latestAccountRef.current) return
@@ -242,9 +255,7 @@ export default function MediaLibraryPage() {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
-  const removable = filtered.filter(
-    (item) => item.usageCount === undefined || item.usageCount === 0,
-  )
+  const removable = filtered.filter(isKnownUnused)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
 
   return (
@@ -430,7 +441,7 @@ export default function MediaLibraryPage() {
                       <input
                         type="checkbox"
                         checked={selected.has(item.id)}
-                        disabled={(item.usageCount ?? 0) > 0}
+                        disabled={!isKnownUnused(item)}
                         onChange={() =>
                           setSelected((prev) => {
                             const next = new Set(prev)
@@ -440,7 +451,13 @@ export default function MediaLibraryPage() {
                           })
                         }
                         aria-label={`${item.filename}を選ぶ`}
-                        title={(item.usageCount ?? 0) > 0 ? '使用先から外すまで削除できません' : undefined}
+                        title={
+                          item.usageCount == null
+                            ? '使用先を確認できないため選べません'
+                            : item.usageCount > 0
+                              ? '使用先から外すまで削除できません'
+                              : undefined
+                        }
                         className="accent-green-500 mt-0.5"
                       />
                       <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
