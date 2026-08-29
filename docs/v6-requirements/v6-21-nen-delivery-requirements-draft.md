@@ -249,3 +249,22 @@ test送信は同じaccountの検証済みtest recipientだけ。実注文番号�
 6. column audience batchとmetrics
 7. pet consent/archiveとcontent review
 8. V6画面、migration、E2E、画像比較
+
+## 17. 実装照合の進捗（2026-08-28）
+
+今回、既存の配信job・キャンペーン設定・LINEアカウントを作り直さず、次のP0安全要件を先に接続した。
+
+- 新しく予約するjobは、その時点の配信見出し・本文・ボタン・画像をsnapshotとして保持する
+- 既存の未送信jobは、移行時点の設定を初回snapshotとして固定する
+- 送信時は現在の設定本文を使わず、予約時snapshotを使う
+- job・友だち・LINEアカウントが同じaccountであることを再確認する
+- 対象accountの送信tokenが無い場合は、既定tokenへ逃がさず送信を止める
+- snapshotが欠ける・壊れる・別campaignのものである場合は送信を止め、理由を履歴へ残す
+- 既存の`account_settings`を再利用し、配信文・配信ON/OFF・誕生日coupon設定をLINEアカウント別に保存する
+- 概要、設定、配信履歴、column、pet、couponの管理APIは選択中LINEアカウントを必須にし、別アカウントを混ぜない
+- account未確定のcolumnは一覧と配信対象へ出さず、EC同期時にaccountが指定されたものだけを扱う
+- アカウント切替中に前の読み込み結果が戻っても、新しい画面へ上書きしない
+- 配信履歴の`sent`、`pending`、`failed`等は運用者向けの日本語で表示する
+- 誕生日couponは誕生日の3日前10:00 JSTに予約し、年またぎを試験した。2月29日は非うるう年に推測で送らない
+
+まだ完了ではない。公開版、到着予測、2月29日の選択可能な方針、coupon照合、column本文作成、比較指標、恒久失敗の再試行、V6 7画面、最新headの画像比較は後続実装とする。本変更では本番DB更新・配備を行わない。
