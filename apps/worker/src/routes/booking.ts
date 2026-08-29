@@ -11,7 +11,11 @@
 // scheduled_at / decided_at / expires_at) are written from the Worker.
 
 import { Hono, type Context } from 'hono';
-import { getLineAccounts, resolveLineCredential } from '@line-crm/db';
+import {
+  cancelReminderEnrollmentsForSource,
+  getLineAccounts,
+  resolveLineCredential,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { enrollByTrigger } from '../services/reminder-trigger.js';
@@ -488,6 +492,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
       triggerType: 'booking',
       friendId,
       startsAtIso: startsAt.toISOString(),
+      sourceId: bookingId,
+      sourceEventId: `booking:${bookingId}`,
     }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
   );
 
@@ -1014,6 +1020,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       triggerType: 'booking',
       friendId: body.friend_id,
       startsAtIso: startsAt.toISOString(),
+      sourceId: bookingId,
+      sourceEventId: `booking:${bookingId}`,
     }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
   );
   let calendarSync: 'not_configured' | 'synced' | 'failed' = 'not_configured';
@@ -1602,12 +1610,21 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
-    await c.env.DB
-      .prepare(
-        `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status = 'pending'`,
-      )
-      .bind(id)
-      .run();
+    await Promise.all([
+      c.env.DB
+        .prepare(
+          `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status = 'pending'`,
+        )
+        .bind(id)
+        .run(),
+      cancelReminderEnrollmentsForSource(c.env.DB, {
+        sourceKind: 'booking',
+        sourceId: id,
+        reason: next === 'expired'
+          ? '予約の確認期限が切れたため、残りの配信を止めました。'
+          : '予約が取り消されたため、残りの配信を止めました。',
+      }),
+    ]);
     c.executionCtx.waitUntil(
       removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id).catch((error) =>
         console.error('Google Calendar delete failed:', error),

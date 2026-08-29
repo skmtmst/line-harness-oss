@@ -63,6 +63,9 @@ describe('processFriendFieldReminders', () => {
         reminderId: 'rem-1',
         // 年ごと比べると一度も当たらない。月日だけを見る。
         targetDate: '2026-05-03T00:00:00+09:00',
+        sourceKind: 'friend_field',
+        sourceId: 'field-birthday',
+        sourceEventId: 'friend-field:field-birthday:f-1:2026-05-03',
       });
     });
 

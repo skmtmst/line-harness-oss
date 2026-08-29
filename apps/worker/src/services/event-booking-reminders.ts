@@ -9,7 +9,7 @@ import type {
   EventBookingNotificationSender,
   EventNotificationKind,
 } from './event-booking-notifier.js';
-import { resolveLineCredential } from '@line-crm/db';
+import { cancelReminderEnrollmentsForSource, resolveLineCredential } from '@line-crm/db';
 
 export interface ComputedReminder {
   kind: EventReminderKind;
@@ -85,14 +85,21 @@ export async function cancelPendingRemindersFor(
   db: D1Database,
   booking_id: string,
 ): Promise<void> {
-  await db
-    .prepare(
-      `UPDATE event_booking_reminders
-          SET status = 'cancelled'
-        WHERE booking_id = ? AND status IN ('pending','failed')`,
-    )
-    .bind(booking_id)
-    .run();
+  await Promise.all([
+    db
+      .prepare(
+        `UPDATE event_booking_reminders
+            SET status = 'cancelled'
+          WHERE booking_id = ? AND status IN ('pending','failed')`,
+      )
+      .bind(booking_id)
+      .run(),
+    cancelReminderEnrollmentsForSource(db, {
+      sourceKind: 'event',
+      sourceId: booking_id,
+      reason: 'イベント予約が取り消されたため、残りの配信を止めました。',
+    }),
+  ]);
 }
 
 interface DueEventReminderRow {

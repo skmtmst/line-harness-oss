@@ -3,7 +3,7 @@
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
-import { resolveLineCredential } from '@line-crm/db';
+import { cancelReminderEnrollmentsForSource, resolveLineCredential } from '@line-crm/db';
 
 interface StaleRow {
   id: string;
@@ -69,6 +69,11 @@ export async function runExpirer(
       )
       .bind(row.id)
       .run();
+    await cancelReminderEnrollmentsForSource(db, {
+      sourceKind: 'booking',
+      sourceId: row.id,
+      reason: '予約の確認期限が切れたため、残りの配信を止めました。',
+    });
     try {
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,

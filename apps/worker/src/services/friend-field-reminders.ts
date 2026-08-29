@@ -72,6 +72,9 @@ export async function processFriendFieldReminders(
           friendId: friend.friend_id,
           reminderId: reminder.id,
           targetDate: targetDateTime,
+          sourceKind: 'friend_field',
+          sourceId: reminder.trigger_field_id,
+          sourceEventId: `friend-field:${reminder.trigger_field_id}:${friend.friend_id}:${targetDate}`,
         });
         enrolled++;
       }

@@ -205,7 +205,8 @@
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
     "199_reminder_soft_delete.sql",
-    "200_reminder_delivery_runs.sql"
+    "200_reminder_delivery_runs.sql",
+    "251_reminder_versions.sql"
   ],
-  "migrationCount": 206
+  "migrationCount": 207
 }

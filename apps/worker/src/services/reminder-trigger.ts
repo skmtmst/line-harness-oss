@@ -17,6 +17,7 @@ export interface ReminderTriggerRow {
   trigger_offset_minutes: number | null;
   send_at_time: string | null;
   target_tag_id: string | null;
+  current_published_version_id: string | null;
 }
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -66,13 +67,18 @@ export async function enrollByTrigger(
     triggerType: Exclude<ReminderTriggerType, 'manual'>;
     friendId: string;
     startsAtIso: string;
+    sourceId?: string | null;
+    sourceEventId?: string | null;
   },
 ): Promise<number> {
   const rules = await db
     .prepare(
-      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id
+      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
+              current_published_version_id
          FROM reminders
-        WHERE is_active = 1 AND deleted_at IS NULL AND trigger_type = ?`,
+        WHERE is_active = 1 AND lifecycle_status = 'published'
+          AND current_published_version_id IS NOT NULL
+          AND deleted_at IS NULL AND trigger_type = ?`,
     )
     .bind(input.triggerType)
     .all<ReminderTriggerRow>();
@@ -104,10 +110,15 @@ export async function enrollByTrigger(
     const now = new Date().toISOString();
     await db
       .prepare(
-        `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO friend_reminders
+           (id, friend_id, reminder_id, reminder_version_id, target_date,
+            source_kind, source_id, source_event_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(crypto.randomUUID(), input.friendId, rule.id, anchor, now, now)
+      .bind(
+        crypto.randomUUID(), input.friendId, rule.id, rule.current_published_version_id,
+        anchor, input.triggerType, input.sourceId ?? null, input.sourceEventId ?? null, now, now,
+      )
       .run();
     enrolled++;
   }

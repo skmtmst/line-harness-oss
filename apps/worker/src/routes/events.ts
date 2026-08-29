@@ -1268,6 +1268,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       triggerType: 'event',
       friendId: friend.id,
       startsAtIso: slot.starts_at as string,
+      sourceId: id,
+      sourceEventId: `event-booking:${id}`,
     }).catch((err) => console.error('reminder enroll (event) failed:', err));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {

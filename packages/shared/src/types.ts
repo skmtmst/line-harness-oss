@@ -992,6 +992,9 @@ export interface Reminder {
   name: string;
   description: string | null;
   isActive: boolean;
+  lifecycleStatus?: ReminderLifecycleStatus;
+  currentDraftVersionId?: string | null;
+  currentPublishedVersionId?: string | null;
   /** きっかけ。manual は従来どおり手で登録する */
   triggerType?: ReminderTriggerType;
   /** 起点を何分ずらすか。null ならずらさない。負の値も使える */
@@ -1033,6 +1036,92 @@ export interface FriendReminder {
   status: "active" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;
+}
+
+export type ReminderLifecycleStatus = "draft" | "published" | "stopped";
+
+export interface ReminderStopConditions {
+  bookingCancelled: boolean;
+  supportMarkCompleted: boolean;
+  daysAfterTarget: number | null;
+  friendBlocked: boolean;
+}
+
+export interface ReminderDraftStep {
+  stableStepId: string;
+  offsetMinutes: number;
+  messageType: MessageType;
+  messageContent: string;
+  offsetDays?: number | null;
+  sendAtTime?: string | null;
+  templateId?: string | null;
+  targetCondition?: Record<string, unknown>;
+  action?: Record<string, unknown>;
+}
+
+export interface ReminderDraftSettings {
+  name: string;
+  description?: string | null;
+  lineAccountId: string;
+  triggerType: ReminderTriggerType;
+  deliveryMode: "time" | "countdown";
+  triggerFieldId?: string | null;
+  repeatYearly?: boolean;
+  triggerOffsetMinutes?: number | null;
+  sendAtTime?: string | null;
+  targetTagId?: string | null;
+  folderId?: string | null;
+  stopConditions: ReminderStopConditions;
+  steps: ReminderDraftStep[];
+}
+
+export interface ReminderDraftVersion {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "superseded";
+  settings: ReminderDraftSettings;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export interface ReminderValidationResult {
+  valid: boolean;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: "passed" | "failed" | "warning";
+    message: string;
+  }>;
+  audience: { matched: number | null; excluded: number | null };
+}
+
+export interface ReminderPreviewResult {
+  targetDate: string;
+  items: Array<{
+    stableStepId: string;
+    stepNumber: number;
+    scheduledAt: string;
+    label: string;
+    state: "scheduled" | "past" | "duplicate";
+  }>;
+  summary: {
+    audience: number | null;
+    next7Days: number | null;
+    next30Days: number | null;
+    duplicateCount: number;
+  };
+}
+
+export interface ReminderPublishResult {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  audience: number | null;
+  plannedDeliveries: number | null;
+  nextScheduledAt: string | null;
 }
 
 /** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */

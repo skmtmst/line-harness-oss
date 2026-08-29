@@ -28,6 +28,12 @@ export interface ReminderRow {
   display_order: number;
   /** 199: 削除後も送信履歴を残す。値がある行は通常画面・実行対象から外す。 */
   deleted_at: string | null;
+  /** 251: 下書き／公開中／停止中を is_active だけに潰さない。 */
+  lifecycle_status: 'draft' | 'published' | 'stopped';
+  /** 251: 後編集する版。公開版とは別行に固定する。 */
+  current_draft_version_id: string | null;
+  /** 251: 新規登録へ割り当てる公開版。 */
+  current_published_version_id: string | null;
 }
 
 export interface ReminderStepRow {
@@ -51,6 +57,62 @@ export interface FriendReminderRow {
   reminder_id: string;
   target_date: string;
   status: string;
+  created_at: string;
+  updated_at: string;
+  reminder_version_id: string | null;
+  source_kind: string;
+  source_id: string | null;
+  source_event_id: string | null;
+  timezone: string;
+  cancel_reason: string | null;
+  completed_at: string | null;
+  lock_version: number;
+}
+
+export interface ReminderDraftStepInput {
+  stableStepId: string;
+  offsetMinutes: number;
+  messageType: string;
+  messageContent: string;
+  offsetDays?: number | null;
+  sendAtTime?: string | null;
+  templateId?: string | null;
+  targetCondition?: Record<string, unknown>;
+  action?: Record<string, unknown>;
+}
+
+export interface ReminderDraftSettings {
+  name: string;
+  description?: string | null;
+  lineAccountId: string;
+  triggerType: 'manual' | 'booking' | 'event' | 'friend_field';
+  deliveryMode: 'time' | 'countdown';
+  triggerFieldId?: string | null;
+  repeatYearly?: boolean;
+  triggerOffsetMinutes?: number | null;
+  sendAtTime?: string | null;
+  targetTagId?: string | null;
+  folderId?: string | null;
+  stopConditions: {
+    bookingCancelled: boolean;
+    supportMarkCompleted: boolean;
+    daysAfterTarget: number | null;
+    friendBlocked: boolean;
+  };
+  steps: ReminderDraftStepInput[];
+}
+
+export interface ReminderVersionRow {
+  id: string;
+  reminder_id: string;
+  version_number: number;
+  status: 'draft' | 'published' | 'superseded';
+  settings_snapshot: string;
+  last_test_status: 'succeeded' | 'failed' | null;
+  last_tested_at: string | null;
+  last_tested_by_staff_id: string | null;
+  published_at: string | null;
+  published_by_staff_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,7 +240,12 @@ export async function updateReminder(
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.description !== undefined) { sets.push('description = ?'); values.push(updates.description); }
-  if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
+  if (updates.isActive !== undefined) {
+    sets.push('is_active = ?');
+    values.push(updates.isActive ? 1 : 0);
+    sets.push(`lifecycle_status = ?`);
+    values.push(updates.isActive ? 'published' : 'stopped');
+  }
   if (updates.triggerType !== undefined) { sets.push('trigger_type = ?'); values.push(updates.triggerType); }
   if (updates.triggerFieldId !== undefined) { sets.push('trigger_field_id = ?'); values.push(updates.triggerFieldId); }
   if (updates.repeatYearly !== undefined) { sets.push('repeat_yearly = ?'); values.push(updates.repeatYearly ? 1 : 0); }
@@ -202,7 +269,7 @@ export async function deleteReminder(db: D1Database, id: string): Promise<void> 
   await db.batch([
     db.prepare(
       `UPDATE reminders
-          SET is_active = 0, deleted_at = ?, updated_at = ?
+          SET is_active = 0, lifecycle_status = 'stopped', deleted_at = ?, updated_at = ?
         WHERE id = ? AND deleted_at IS NULL`,
     ).bind(now, now, id),
     db.prepare(
@@ -220,9 +287,402 @@ export async function deleteReminder(db: D1Database, id: string): Promise<void> 
   ]);
 }
 
+/** 予約取消・期限超過など、登録元のできごとが無効になったときに残りの通を止める。 */
+export async function cancelReminderEnrollmentsForSource(
+  db: D1Database,
+  input: { sourceKind: string; sourceId: string; reason: string },
+): Promise<void> {
+  const now = jstNow();
+  // 先に登録を止める。2本目が失敗してもcronの取得条件から外れるため、
+  // 取消後に送ってしまう半端な状態にはならない。
+  await db.prepare(
+      `UPDATE friend_reminders
+          SET status = 'cancelled', cancel_reason = ?, lock_version = lock_version + 1,
+              updated_at = ?
+        WHERE source_kind = ? AND source_id = ? AND status = 'active'
+          AND (
+            reminder_version_id IS NULL
+            OR EXISTS (
+              SELECT 1
+                FROM reminder_versions rv
+               WHERE rv.id = friend_reminders.reminder_version_id
+                 AND COALESCE(
+                   json_extract(rv.settings_snapshot, '$.stopConditions.bookingCancelled'),
+                   1
+                 ) = 1
+            )
+          )`,
+    ).bind(input.reason, now, input.sourceKind, input.sourceId).run();
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET status = 'cancelled', next_retry_at = NULL, lease_expires_at = NULL,
+            completed_at = COALESCE(completed_at, ?), updated_at = ?
+      WHERE friend_reminder_id IN (
+        SELECT id FROM friend_reminders
+         WHERE source_kind = ? AND source_id = ? AND status = 'cancelled'
+           AND (
+             reminder_version_id IS NULL
+             OR EXISTS (
+               SELECT 1
+                 FROM reminder_versions rv
+                WHERE rv.id = friend_reminders.reminder_version_id
+                  AND COALESCE(
+                    json_extract(rv.settings_snapshot, '$.stopConditions.bookingCancelled'),
+                    1
+                  ) = 1
+             )
+           )
+      )
+        AND status IN ('planned', 'claimed', 'retry_wait')`,
+  ).bind(now, now, input.sourceKind, input.sourceId).run();
+}
+
+/** 1人の登録を止める。ブロック・期限超過など送信直前の停止条件に使う。 */
+export async function cancelReminderEnrollment(
+  db: D1Database,
+  input: { friendReminderId: string; reason: string; now?: string },
+): Promise<void> {
+  const now = input.now ?? jstNow();
+  await db.prepare(
+      `UPDATE friend_reminders
+          SET status = 'cancelled', cancel_reason = ?, lock_version = lock_version + 1,
+              updated_at = ?
+        WHERE id = ? AND status = 'active'`,
+    ).bind(input.reason, now, input.friendReminderId).run();
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET status = 'cancelled', next_retry_at = NULL, lease_expires_at = NULL,
+            completed_at = COALESCE(completed_at, ?), updated_at = ?
+      WHERE friend_reminder_id = ?
+        AND status IN ('planned', 'claimed', 'retry_wait')`,
+  ).bind(now, now, input.friendReminderId).run();
+}
+
+// =============================================================================
+// V6 公開版・下書き（251）
+// =============================================================================
+
+export function parseReminderVersionSettings(row: ReminderVersionRow): ReminderDraftSettings {
+  return JSON.parse(row.settings_snapshot) as ReminderDraftSettings;
+}
+
+export async function getReminderVersionById(
+  db: D1Database,
+  versionId: string,
+): Promise<ReminderVersionRow | null> {
+  return db.prepare(`SELECT * FROM reminder_versions WHERE id = ?`)
+    .bind(versionId)
+    .first<ReminderVersionRow>();
+}
+
+export async function getReminderDraftVersion(
+  db: D1Database,
+  reminderId: string,
+): Promise<ReminderVersionRow | null> {
+  return db.prepare(
+    `SELECT rv.*
+       FROM reminders r
+       JOIN reminder_versions rv ON rv.id = r.current_draft_version_id
+      WHERE r.id = ? AND r.deleted_at IS NULL AND rv.status = 'draft'`,
+  ).bind(reminderId).first<ReminderVersionRow>();
+}
+
+export async function getReminderPublishedVersion(
+  db: D1Database,
+  reminderId: string,
+): Promise<ReminderVersionRow | null> {
+  return db.prepare(
+    `SELECT rv.*
+       FROM reminders r
+       JOIN reminder_versions rv ON rv.id = r.current_published_version_id
+      WHERE r.id = ? AND r.deleted_at IS NULL AND rv.status = 'published'`,
+  ).bind(reminderId).first<ReminderVersionRow>();
+}
+
+/** 定義と版を1回のD1 batchで作り、版だけ／親だけが残る半端な下書きを作らない。 */
+export async function createReminderWithDraftVersion(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+): Promise<{ reminder: ReminderRow; version: ReminderVersionRow }> {
+  const reminderId = crypto.randomUUID();
+  const versionId = crypto.randomUUID();
+  const now = jstNow();
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
+      `INSERT INTO reminders
+         (id, name, description, is_active, line_account_id, trigger_type,
+          trigger_offset_minutes, send_at_time, target_tag_id, folder_id,
+          delivery_mode, trigger_field_id, repeat_yearly, lifecycle_status,
+          current_draft_version_id, created_at, updated_at)
+       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+    ).bind(
+      reminderId,
+      settings.name,
+      settings.description ?? null,
+      settings.lineAccountId,
+      settings.triggerType,
+      settings.triggerOffsetMinutes ?? null,
+      settings.sendAtTime ?? null,
+      settings.targetTagId ?? null,
+      settings.folderId ?? null,
+      settings.deliveryMode,
+      settings.triggerFieldId ?? null,
+      settings.repeatYearly ? 1 : 0,
+      versionId,
+      now,
+      now,
+    ),
+    db.prepare(
+      `INSERT INTO reminder_versions
+         (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+       VALUES (?, ?, 1, 'draft', ?, ?, ?)`,
+    ).bind(versionId, reminderId, JSON.stringify(settings), now, now),
+  ];
+  settings.steps.forEach((step, position) => {
+    statements.push(
+      db.prepare(
+        `INSERT INTO reminder_version_steps
+           (id, reminder_version_id, stable_step_id, position, offset_minutes,
+            message_type, message_content, offset_days, send_at_time, template_id,
+            target_condition_json, action_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), versionId, step.stableStepId, position,
+        step.offsetMinutes, step.messageType, step.messageContent,
+        step.offsetDays ?? null, step.sendAtTime ?? null, step.templateId ?? null,
+        JSON.stringify(step.targetCondition ?? {}), JSON.stringify(step.action ?? {}), now,
+      ),
+    );
+  });
+  await db.batch(statements);
+  const reminder = await getReminderById(db, reminderId);
+  const version = await getReminderVersionById(db, versionId);
+  if (!reminder || !version) throw new Error('REMINDER_DRAFT_NOT_CREATED');
+  return { reminder, version };
+}
+
+async function replaceReminderVersionSteps(
+  db: D1Database,
+  versionId: string,
+  steps: ReminderDraftStepInput[],
+  now: string,
+): Promise<void> {
+  const statements: D1PreparedStatement[] = [
+    db.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = ?`).bind(versionId),
+  ];
+  steps.forEach((step, position) => {
+    statements.push(
+      db.prepare(
+        `INSERT INTO reminder_version_steps
+           (id, reminder_version_id, stable_step_id, position, offset_minutes,
+            message_type, message_content, offset_days, send_at_time, template_id,
+            target_condition_json, action_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        versionId,
+        step.stableStepId,
+        position,
+        step.offsetMinutes,
+        step.messageType,
+        step.messageContent,
+        step.offsetDays ?? null,
+        step.sendAtTime ?? null,
+        step.templateId ?? null,
+        JSON.stringify(step.targetCondition ?? {}),
+        JSON.stringify(step.action ?? {}),
+        now,
+      ),
+    );
+  });
+  await db.batch(statements);
+}
+
+/**
+ * 公開版は触らず、編集用の版だけを作る／更新する。
+ * 公開済みしか無い場合は次の版番号で下書きを作る。
+ */
+export async function saveReminderDraftVersion(
+  db: D1Database,
+  reminderId: string,
+  settings: ReminderDraftSettings,
+): Promise<ReminderVersionRow> {
+  const reminder = await getReminderById(db, reminderId);
+  if (!reminder) throw new Error('REMINDER_NOT_FOUND');
+  const now = jstNow();
+  let draft = await getReminderDraftVersion(db, reminderId);
+
+  if (!draft) {
+    const next = await db.prepare(
+      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+         FROM reminder_versions WHERE reminder_id = ?`,
+    ).bind(reminderId).first<{ version_number: number }>();
+    const versionId = crypto.randomUUID();
+    await db.batch([
+      db.prepare(
+        `INSERT INTO reminder_versions
+           (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+         VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
+      ).bind(
+        versionId,
+        reminderId,
+        Number(next?.version_number ?? 1),
+        JSON.stringify(settings),
+        now,
+        now,
+      ),
+      db.prepare(
+        `UPDATE reminders
+            SET current_draft_version_id = ?, lifecycle_status = CASE
+                  WHEN current_published_version_id IS NULL THEN 'draft'
+                  ELSE lifecycle_status
+                END,
+                updated_at = ?
+          WHERE id = ? AND deleted_at IS NULL`,
+      ).bind(versionId, now, reminderId),
+    ]);
+    draft = await getReminderVersionById(db, versionId);
+  } else {
+    await db.prepare(
+      `UPDATE reminder_versions
+          SET settings_snapshot = ?, last_test_status = NULL, last_tested_at = NULL,
+              last_tested_by_staff_id = NULL, updated_at = ?
+        WHERE id = ? AND status = 'draft'`,
+    ).bind(JSON.stringify(settings), now, draft.id).run();
+  }
+  if (!draft) throw new Error('REMINDER_DRAFT_NOT_SAVED');
+  await replaceReminderVersionSteps(db, draft.id, settings.steps, now);
+  return (await getReminderVersionById(db, draft.id))!;
+}
+
+export async function recordReminderDraftTest(
+  db: D1Database,
+  versionId: string,
+  input: { succeeded: boolean; staffId: string | null },
+): Promise<void> {
+  const now = jstNow();
+  await db.prepare(
+    `UPDATE reminder_versions
+        SET last_test_status = ?, last_tested_at = ?, last_tested_by_staff_id = ?, updated_at = ?
+      WHERE id = ? AND status = 'draft'`,
+  ).bind(input.succeeded ? 'succeeded' : 'failed', now, input.staffId, now, versionId).run();
+}
+
+/** 公開版を固定し、既存の登録は以前の reminder_version_id のまま残す。 */
+export async function publishReminderDraftVersion(
+  db: D1Database,
+  reminderId: string,
+  staffId: string | null,
+): Promise<ReminderVersionRow> {
+  const draft = await getReminderDraftVersion(db, reminderId);
+  if (!draft) throw new Error('REMINDER_DRAFT_NOT_FOUND');
+  const settings = parseReminderVersionSettings(draft);
+  const now = jstNow();
+  const versionSteps = await db.prepare(
+    `SELECT * FROM reminder_version_steps
+      WHERE reminder_version_id = ? ORDER BY position, stable_step_id`,
+  ).bind(draft.id).all<{
+    stable_step_id: string;
+    offset_minutes: number;
+    message_type: string;
+    message_content: string;
+    offset_days: number | null;
+    send_at_time: string | null;
+    template_id: string | null;
+  }>();
+
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
+      `UPDATE reminder_versions SET status = 'superseded', updated_at = ?
+        WHERE reminder_id = ? AND status = 'published'`,
+    ).bind(now, reminderId),
+    db.prepare(
+      `UPDATE reminder_versions
+          SET status = 'published', published_at = ?, published_by_staff_id = ?, updated_at = ?
+        WHERE id = ? AND status = 'draft'`,
+    ).bind(now, staffId, now, draft.id),
+    db.prepare(
+      `UPDATE reminders
+          SET name = ?, description = ?, line_account_id = ?, trigger_type = ?,
+              delivery_mode = ?, trigger_field_id = ?, repeat_yearly = ?,
+              trigger_offset_minutes = ?, send_at_time = ?, target_tag_id = ?, folder_id = ?,
+              is_active = 1, lifecycle_status = 'published',
+              current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL`,
+    ).bind(
+      settings.name,
+      settings.description ?? null,
+      settings.lineAccountId,
+      settings.triggerType,
+      settings.deliveryMode,
+      settings.triggerFieldId ?? null,
+      settings.repeatYearly ? 1 : 0,
+      settings.triggerOffsetMinutes ?? null,
+      settings.sendAtTime ?? null,
+      settings.targetTagId ?? null,
+      settings.folderId ?? null,
+      draft.id,
+      now,
+      reminderId,
+    ),
+  ];
+
+  // 互換表は削除しない。過去の配信履歴が参照するstable stepを残したまま、
+  // 新しい公開版の内容だけをupsertする。
+  for (const step of versionSteps.results) {
+    statements.push(
+      db.prepare(
+        `INSERT INTO reminder_steps
+           (id, reminder_id, offset_minutes, message_type, message_content,
+            offset_days, send_at_time, template_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           offset_minutes = excluded.offset_minutes,
+           message_type = excluded.message_type,
+           message_content = excluded.message_content,
+           offset_days = excluded.offset_days,
+           send_at_time = excluded.send_at_time,
+           template_id = excluded.template_id`,
+      ).bind(
+        step.stable_step_id,
+        reminderId,
+        step.offset_minutes,
+        step.message_type,
+        step.message_content,
+        step.offset_days,
+        step.send_at_time,
+        step.template_id,
+        now,
+      ),
+    );
+  }
+  await db.batch(statements);
+  return (await getReminderVersionById(db, draft.id))!;
+}
+
+export async function getReminderVersionSteps(
+  db: D1Database,
+  versionId: string,
+): Promise<ReminderStepRow[]> {
+  const result = await db.prepare(
+    `SELECT stable_step_id AS id, rv.reminder_id, rvs.offset_minutes,
+            rvs.message_type, rvs.message_content, rvs.created_at,
+            rvs.offset_days, rvs.send_at_time, rvs.template_id
+       FROM reminder_version_steps rvs
+       JOIN reminder_versions rv ON rv.id = rvs.reminder_version_id
+      WHERE rvs.reminder_version_id = ?
+      ORDER BY rvs.position, rvs.stable_step_id`,
+  ).bind(versionId).all<ReminderStepRow>();
+  return result.results;
+}
+
 // --- リマインダステップ ---
 
 export async function getReminderSteps(db: D1Database, reminderId: string): Promise<ReminderStepRow[]> {
+  const reminder = await getReminderById(db, reminderId);
+  if (reminder?.current_published_version_id) {
+    return getReminderVersionSteps(db, reminder.current_published_version_id);
+  }
   const result = await db.prepare(`SELECT * FROM reminder_steps WHERE reminder_id = ? ORDER BY offset_minutes ASC`)
     .bind(reminderId).all<ReminderStepRow>();
   return result.results;
@@ -275,12 +735,40 @@ export async function deleteReminderStep(db: D1Database, id: string): Promise<vo
 
 export async function enrollFriendInReminder(
   db: D1Database,
-  input: { friendId: string; reminderId: string; targetDate: string },
+  input: {
+    friendId: string;
+    reminderId: string;
+    targetDate: string;
+    sourceKind?: string;
+    sourceId?: string | null;
+    sourceEventId?: string | null;
+    timezone?: string;
+  },
 ): Promise<FriendReminderRow> {
+  const reminder = await getReminderById(db, input.reminderId);
+  if (!reminder || reminder.lifecycle_status !== 'published') {
+    throw new Error('REMINDER_NOT_PUBLISHED');
+  }
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.friendId, input.reminderId, input.targetDate, now, now).run();
+  await db.prepare(
+    `INSERT INTO friend_reminders
+       (id, friend_id, reminder_id, reminder_version_id, target_date,
+        source_kind, source_id, source_event_id, timezone, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id,
+    input.friendId,
+    input.reminderId,
+    reminder.current_published_version_id ?? null,
+    input.targetDate,
+    input.sourceKind ?? 'manual',
+    input.sourceId ?? null,
+    input.sourceEventId ?? null,
+    input.timezone ?? 'Asia/Tokyo',
+    now,
+    now,
+  ).run();
   return (await db.prepare(`SELECT * FROM friend_reminders WHERE id = ?`).bind(id).first<FriendReminderRow>())!;
 }
 
@@ -308,21 +796,39 @@ export async function cancelFriendReminder(db: D1Database, id: string): Promise<
  */
 export async function getPendingReminderDeliveries(
   db: D1Database,
-): Promise<Array<FriendReminderRow & { delivery_mode: string; line_account_id: string | null; steps: ReminderStepRow[] }>> {
+): Promise<Array<FriendReminderRow & {
+  delivery_mode: string;
+  line_account_id: string | null;
+  version_settings_snapshot: string | null;
+  steps: ReminderStepRow[];
+}>> {
   // activeなリマインダ登録を取得
   // 配信方式（153）も一緒に引く。通ごとに引き直すと、通の数だけ問い合わせが増える。
   const activeReminders = await db
-    .prepare(`SELECT fr.*, r.delivery_mode AS delivery_mode, r.line_account_id AS line_account_id
+    .prepare(`SELECT fr.*, r.delivery_mode AS delivery_mode, r.line_account_id AS line_account_id,
+                     rv.settings_snapshot AS version_settings_snapshot
                 FROM friend_reminders fr
                 INNER JOIN reminders r ON r.id = fr.reminder_id
+                LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
                WHERE fr.status = 'active' AND r.is_active = 1 AND r.deleted_at IS NULL`)
-    .all<FriendReminderRow & { delivery_mode: string; line_account_id: string | null }>();
+    .all<FriendReminderRow & {
+      delivery_mode: string;
+      line_account_id: string | null;
+      version_settings_snapshot: string | null;
+    }>();
 
   const results: Array<
-    FriendReminderRow & { delivery_mode: string; line_account_id: string | null; steps: ReminderStepRow[] }
+    FriendReminderRow & {
+      delivery_mode: string;
+      line_account_id: string | null;
+      version_settings_snapshot: string | null;
+      steps: ReminderStepRow[];
+    }
   > = [];
   for (const fr of activeReminders.results) {
-    const steps = await getReminderSteps(db, fr.reminder_id);
+    const steps = fr.reminder_version_id
+      ? await getReminderVersionSteps(db, fr.reminder_version_id)
+      : await getReminderSteps(db, fr.reminder_id);
     // 配信済みステップを取得
     const delivered = await db
       .prepare(`SELECT reminder_step_id FROM friend_reminder_deliveries WHERE friend_reminder_id = ?`)
@@ -348,8 +854,14 @@ export async function markReminderStepDelivered(db: D1Database, friendReminderId
 
 /** 全ステップ配信済みならcompletedにする */
 export async function completeReminderIfDone(db: D1Database, friendReminderId: string, reminderId: string): Promise<void> {
-  const totalSteps = await db.prepare(`SELECT COUNT(*) as count FROM reminder_steps WHERE reminder_id = ?`)
-    .bind(reminderId).first<{ count: number }>();
+  const enrollment = await db.prepare(
+    `SELECT reminder_version_id FROM friend_reminders WHERE id = ? AND reminder_id = ?`,
+  ).bind(friendReminderId, reminderId).first<{ reminder_version_id: string | null }>();
+  const totalSteps = enrollment?.reminder_version_id
+    ? await db.prepare(`SELECT COUNT(*) as count FROM reminder_version_steps WHERE reminder_version_id = ?`)
+        .bind(enrollment.reminder_version_id).first<{ count: number }>()
+    : await db.prepare(`SELECT COUNT(*) as count FROM reminder_steps WHERE reminder_id = ?`)
+        .bind(reminderId).first<{ count: number }>();
   const deliveredSteps = await db.prepare(
     `SELECT COUNT(DISTINCT reminder_step_id) AS count
        FROM (
@@ -365,8 +877,10 @@ export async function completeReminderIfDone(db: D1Database, friendReminderId: s
   ).bind(friendReminderId, friendReminderId).first<{ count: number }>();
 
   if (totalSteps && deliveredSteps && deliveredSteps.count >= totalSteps.count) {
-    await db.prepare(`UPDATE friend_reminders SET status = 'completed', updated_at = ? WHERE id = ?`)
-      .bind(jstNow(), friendReminderId).run();
+    const now = jstNow();
+    await db.prepare(
+      `UPDATE friend_reminders SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?`,
+    ).bind(now, now, friendReminderId).run();
   }
 }
 

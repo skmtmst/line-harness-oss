@@ -7,6 +7,7 @@ const RULE: ReminderTriggerRow = {
   trigger_offset_minutes: null,
   send_at_time: null,
   target_tag_id: null,
+  current_published_version_id: 'rv-1',
 };
 
 describe('起点の時刻', () => {

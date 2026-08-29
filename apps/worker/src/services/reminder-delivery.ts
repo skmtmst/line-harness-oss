@@ -10,6 +10,7 @@
 
 import {
   claimReminderDeliveryRun,
+  cancelReminderEnrollment,
   completeReminderDeliveryRunStatement,
   getPendingReminderDeliveries,
   completeReminderIfDone,
@@ -25,6 +26,8 @@ import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
+import type { ReminderStepRow } from '@line-crm/db';
+import type { Message } from '@line-crm/line-sdk';
 
 const LEASE_MINUTES = 5;
 // 初回送信 + 自動再試行5回。無限に回さず、6回目の失敗で手動確認へ渡す。
@@ -47,6 +50,79 @@ export interface ReminderDeliveryResult {
 }
 
 type SafeDeliveryError = { code: string; message: string; retryable: boolean };
+
+interface ReminderStopConditions {
+  friendBlocked: boolean;
+  supportMarkCompleted: boolean;
+  daysAfterTarget: number | null;
+}
+
+function readStopConditions(snapshot: string | null): ReminderStopConditions {
+  if (!snapshot) return { friendBlocked: false, supportMarkCompleted: false, daysAfterTarget: null };
+  try {
+    const parsed = JSON.parse(snapshot) as {
+      stopConditions?: {
+        friendBlocked?: unknown;
+        supportMarkCompleted?: unknown;
+        daysAfterTarget?: unknown;
+      };
+    };
+    const days = parsed.stopConditions?.daysAfterTarget;
+    return {
+      friendBlocked: parsed.stopConditions?.friendBlocked === true,
+      supportMarkCompleted: parsed.stopConditions?.supportMarkCompleted === true,
+      daysAfterTarget: typeof days === 'number' && Number.isFinite(days) && days >= 0
+        ? days
+        : null,
+    };
+  } catch {
+    // 壊れた設定を「停止条件なし」と推測して全登録を消さない。従来どおり通ごとの
+    // 安全判定を続け、管理画面の検証で設定の修正へ誘導する。
+    return { friendBlocked: false, supportMarkCompleted: false, daysAfterTarget: null };
+  }
+}
+
+/**
+ * 本番とテスト送信が同じ本文・テンプレート・差し込み処理を通るための共通口。
+ * テスト専用の簡易本文を作ると、本番だけ変数が欠ける事故を見逃す。
+ */
+export async function buildReminderStepMessage(
+  db: D1Database,
+  step: ReminderStepRow,
+  friend: Awaited<ReturnType<typeof getFriendById>> & {},
+  deliveredAt: Date,
+): Promise<{
+  message: Message;
+  messageType: string;
+  messageContent: string;
+  templateId: string | null;
+}> {
+  let messageType = step.message_type;
+  let messageContent = step.message_content;
+  if (step.template_id) {
+    const template = await getTemplateById(db, step.template_id);
+    if (template) {
+      messageType = template.message_type;
+      messageContent = template.message_content;
+    }
+  }
+
+  const resolvedMeta = await resolveMetadata(db, friend);
+  const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
+  const expanded = expandVariables(
+    messageContent,
+    { ...friend, metadata: resolvedMeta },
+    undefined,
+    messageType,
+    { ...extra, deliveredAt },
+  );
+  return {
+    message: buildMessage(messageType, expanded),
+    messageType,
+    messageContent: expanded,
+    templateId: step.template_id,
+  };
+}
 
 /** Provider本文や秘密値を管理画面へ出さず、運用者が次の行動を選べる言葉へ直す。 */
 export function classifyReminderDeliveryError(error: unknown): SafeDeliveryError {
@@ -112,10 +188,25 @@ export async function processReminderDeliveries(
   // 未来の通もplannedとして先に台帳へ置く。実行結果画面の「配信予定」と
   // 「次の配信」を、送信時刻になる前から実値で確認できるようにする。
   // claim側の scheduled_at <= now 条件が、時刻前の外部送信を止める。
-  for (let i = 0; i < pending.length; i++) {
+  enrollmentLoop: for (let i = 0; i < pending.length; i++) {
     const enrollment = pending[i];
     if (i > 0) {
       await (options.pause ?? sleep)(addJitter(50, 200));
+    }
+
+    const stopConditions = readStopConditions(enrollment.version_settings_snapshot);
+    if (stopConditions.daysAfterTarget != null) {
+      const stopAt = new Date(enrollment.target_date).getTime()
+        + stopConditions.daysAfterTarget * 86_400_000;
+      if (Number.isFinite(stopAt) && now.getTime() > stopAt) {
+        await cancelReminderEnrollment(db, {
+          friendReminderId: enrollment.id,
+          reason: `基準日から${stopConditions.daysAfterTarget}日を過ぎたため、残りの配信を止めました。`,
+          now: nowIso,
+        });
+        result.skipped++;
+        continue;
+      }
     }
 
     const friend = await getFriendById(db, enrollment.friend_id);
@@ -123,6 +214,24 @@ export async function processReminderDeliveries(
       ? (friend as unknown as Record<string, string | null>).line_account_id ?? null
       : null;
     const accountId = enrollment.line_account_id ?? friendAccountId;
+
+    if (friend && stopConditions.supportMarkCompleted) {
+      const supportMarkId = (friend as unknown as { support_mark_id?: string | null }).support_mark_id ?? null;
+      const completedMark = supportMarkId
+        ? await db.prepare(`SELECT name FROM support_marks WHERE id = ?`)
+            .bind(supportMarkId)
+            .first<{ name: string }>()
+        : null;
+      if (supportMarkId === 'mark_done' || ['完了', '解決済', '対応済み'].includes(completedMark?.name ?? '')) {
+        await cancelReminderEnrollment(db, {
+          friendReminderId: enrollment.id,
+          reason: '対応マークが完了になったため、残りの配信を止めました。',
+          now: nowIso,
+        });
+        result.skipped++;
+        continue;
+      }
+    }
 
     for (const step of enrollment.steps) {
       const sendAt = resolveReminderSendAt(
@@ -158,6 +267,15 @@ export async function processReminderDeliveries(
         continue;
       }
       if (!friend.is_following) {
+        if (stopConditions.friendBlocked) {
+          await cancelReminderEnrollment(db, {
+            friendReminderId: enrollment.id,
+            reason: 'ブロックまたは友だち解除のため、残りの配信を止めました。',
+            now: nowIso,
+          });
+          result.skipped++;
+          continue enrollmentLoop;
+        }
         await skipReminderDeliveryRun(db, {
           id: run.id,
           code: 'friend_not_following',
@@ -172,29 +290,10 @@ export async function processReminderDeliveries(
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
-        let messageType = step.message_type;
-        let messageContent = step.message_content;
-        if (step.template_id) {
-          const template = await getTemplateById(db, step.template_id);
-          if (template) {
-            messageType = template.message_type;
-            messageContent = template.message_content;
-          }
-        }
-
-        const resolvedMeta = await resolveMetadata(db, friend);
-        const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
-        const expanded = expandVariables(
-          messageContent,
-          { ...friend, metadata: resolvedMeta },
-          undefined,
-          messageType,
-          { ...extra, deliveredAt: sendAt },
-        );
-        const message = buildMessage(messageType, expanded);
+        const built = await buildReminderStepMessage(db, step, friend, sendAt);
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
-          [message],
+          [built.message],
           run.line_retry_key,
         );
 
@@ -214,9 +313,9 @@ export async function processReminderDeliveries(
           ).bind(
             logId,
             friend.id,
-            messageType,
-            expanded,
-            step.template_id,
+            built.messageType,
+            built.messageContent,
+            built.templateId,
             accountId,
             nowIso,
           ),

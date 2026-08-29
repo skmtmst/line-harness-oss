@@ -1052,7 +1052,7 @@ CREATE TABLE friend_reminders (
   status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE "friend_scenarios" (
   id                 TEXT PRIMARY KEY,
@@ -1765,6 +1765,40 @@ CREATE TABLE "reminder_steps" (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE reminder_version_steps (
+  id                    TEXT PRIMARY KEY,
+  reminder_version_id   TEXT NOT NULL REFERENCES reminder_versions(id) ON DELETE CASCADE,
+  stable_step_id        TEXT NOT NULL,
+  position              INTEGER NOT NULL DEFAULT 0,
+  offset_minutes        INTEGER NOT NULL,
+  message_type          TEXT NOT NULL,
+  message_content       TEXT NOT NULL,
+  offset_days           INTEGER,
+  send_at_time          TEXT,
+  template_id           TEXT,
+  target_condition_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(target_condition_json)),
+  action_json           TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(action_json)),
+  created_at            TEXT NOT NULL,
+  UNIQUE (reminder_version_id, stable_step_id)
+);
+
+CREATE TABLE reminder_versions (
+  id                    TEXT PRIMARY KEY,
+  reminder_id           TEXT NOT NULL REFERENCES reminders(id) ON DELETE CASCADE,
+  version_number        INTEGER NOT NULL CHECK (version_number > 0),
+  status                TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'published', 'superseded')),
+  settings_snapshot     TEXT NOT NULL CHECK (json_valid(settings_snapshot)),
+  last_test_status      TEXT CHECK (last_test_status IN ('succeeded', 'failed')),
+  last_tested_at        TEXT,
+  last_tested_by_staff_id TEXT,
+  published_at          TEXT,
+  published_by_staff_id TEXT,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
+  UNIQUE (reminder_id, version_number)
+);
+
 CREATE TABLE "reminders" (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
@@ -1783,7 +1817,8 @@ CREATE TABLE "reminders" (
   repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, display_order INTEGER NOT NULL DEFAULT 0, deleted_at TEXT);
+, display_order INTEGER NOT NULL DEFAULT 0, deleted_at TEXT, lifecycle_status TEXT NOT NULL DEFAULT 'published'
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT);
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
@@ -2898,6 +2933,10 @@ CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
 
 CREATE INDEX idx_friend_reminders_friend ON friend_reminders (friend_id);
 
+CREATE UNIQUE INDEX idx_friend_reminders_source_event
+  ON friend_reminders (reminder_id, friend_id, source_event_id)
+  WHERE source_event_id IS NOT NULL;
+
 CREATE INDEX idx_friend_reminders_status ON friend_reminders (status);
 
 CREATE INDEX idx_friend_scenarios_friend_id ON friend_scenarios (friend_id);
@@ -3103,6 +3142,12 @@ CREATE INDEX idx_reminder_delivery_runs_reminder
   ON reminder_delivery_runs (line_account_id, reminder_id, scheduled_at DESC);
 
 CREATE INDEX idx_reminder_steps_by_reminder ON reminder_steps (reminder_id);
+
+CREATE INDEX idx_reminder_version_steps_order
+  ON reminder_version_steps (reminder_version_id, position, stable_step_id);
+
+CREATE INDEX idx_reminder_versions_status
+  ON reminder_versions (reminder_id, status, version_number DESC);
 
 CREATE INDEX idx_reminders_display_order ON reminders(display_order, created_at);
 
@@ -3396,6 +3441,44 @@ BEGIN
     ),
     'pending', 0, NEW.created_at, NEW.created_at, NEW.created_at
   ); END;
+
+CREATE TRIGGER trg_reminder_version_steps_immutable_delete
+BEFORE DELETE ON reminder_version_steps
+WHEN COALESCE((
+  SELECT status FROM reminder_versions WHERE id = OLD.reminder_version_id
+), '') <> 'draft'
+BEGIN SELECT RAISE(ABORT, 'published reminder version steps are immutable'); END;
+
+CREATE TRIGGER trg_reminder_version_steps_immutable_insert
+BEFORE INSERT ON reminder_version_steps
+WHEN COALESCE((
+  SELECT status FROM reminder_versions WHERE id = NEW.reminder_version_id
+), '') <> 'draft'
+BEGIN SELECT RAISE(ABORT, 'published reminder version steps are immutable'); END;
+
+CREATE TRIGGER trg_reminder_version_steps_immutable_update
+BEFORE UPDATE ON reminder_version_steps
+WHEN COALESCE((
+  SELECT status FROM reminder_versions WHERE id = OLD.reminder_version_id
+), '') <> 'draft'
+BEGIN SELECT RAISE(ABORT, 'published reminder version steps are immutable'); END;
+
+CREATE TRIGGER trg_reminder_versions_immutable_delete
+BEFORE DELETE ON reminder_versions
+WHEN OLD.status IN ('published', 'superseded')
+BEGIN SELECT RAISE(ABORT, 'published reminder versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_reminder_versions_immutable_update
+BEFORE UPDATE OF reminder_id, version_number, settings_snapshot ON reminder_versions
+WHEN OLD.status IN ('published', 'superseded')
+BEGIN SELECT RAISE(ABORT, 'published reminder versions are immutable'); END;
+
+CREATE TRIGGER trg_reminder_versions_status_transition
+BEFORE UPDATE OF status ON reminder_versions
+WHEN OLD.status IN ('published', 'superseded')
+ AND NEW.status <> OLD.status
+ AND NOT (OLD.status = 'published' AND NEW.status = 'superseded')
+BEGIN SELECT RAISE(ABORT, 'published reminder version status cannot move backwards'); END;
 
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES
