@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 194,
-  "unimplemented": 64,
+  "compared": 196,
+  "unimplemented": 62,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 171,
+  "needsFix": 173,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -115,17 +115,35 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 12,
-      "unimplemented": 2,
+      "compared": 14,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "needsFix": 13,
       "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 521,
+          "head": "7d5d74fd",
+          "on": "2026-08-29",
+          "screens": [
+            "RUxNf"
+          ],
+          "note": "開始・停止の確認窓。窓は一覧の行に出る"
+        },
+        {
+          "pr": 522,
+          "head": "3c88b8bd",
+          "on": "2026-08-29",
+          "screens": [
+            "NrBkW"
+          ],
+          "note": "開始完了の知らせ。`?started=1` で開ける。#521 の上に積んである"
+        },
         {
           "pr": 503,
           "head": "6db5ad7f",
@@ -791,20 +809,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 5,
-      "node": "RUxNf",
-      "name": "5-1-I シナリオ・配信開始確認",
-      "gap": "pending",
-      "gapNote": "#521 head `7d5d74fd` で開始・停止の確認窓を実装済み。最新headを1440/1920で比較してから未実装を外す"
-    },
-    {
-      "feature": 5,
-      "node": "NrBkW",
-      "name": "5-1-J シナリオ・配信開始完了",
-      "gap": "pending",
-      "gapNote": "#522 head `3c88b8bd` で開始完了と実績確認への導線を実装済み。取り込み順は #521 → #522"
     },
     {
       "feature": 6,

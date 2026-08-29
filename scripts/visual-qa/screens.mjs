@@ -460,17 +460,32 @@ export const SCREENS = [
     verdictSource: 'scenarios-v6/EvVO5-1920.png', verdictHead: '6db5ad7f',
   },
   {
-    ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認', route: EDIT,
-    gap: 'pending',
-    gapNote: '#521 head `7d5d74fd` で開始・停止の確認窓を実装済み。最新headを1440/1920で比較してから未実装を外す',
-    status: 'unimplemented',
-    why: 'developmentには開始前確認が無いが、#521に `data-design-node="RUxNf"` の確認フローがある。#519 → #521の積み順を保ち、headの画像確認待ち',
+    /*
+      **窓は編集画面ではなく一覧に出る。** 行の「停止」「再開」を押すと
+      `ConfirmDialog` が開く（`scenarios/page.tsx:267` の
+      `data-design-node="RUxNf"`）。設計は編集画面からの開始を描いているが、
+      実装は一覧から状態を変える形なので、そこは差として残る。
+    */
+    ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認',
+    route: '/scenarios', mode: 'viewport', height: 1080,
+    steps: [{ click: '再開' }],
+    verdict: 'needs_fix',
+    verdictNote: '**#521 で確認窓が入り、未実装ではなくなった。** 「「休眠ユーザー復帰」を開始しますか？／現在の購読中は0人です。配信内容は3通です。現在届く人はいません。開始後に登録された友だちから配信対象になります。」と、いま届く人がいないことまで言う。P1 設計の中身が入っていない。開始対象の人数・開始タイミング・配信ステップ数・終了後の一覧が無い。配信前チェック4項目（開始条件が設定されています／すべてに配信タイミングがあります／テスト送信が完了しています／LINE公式の送信枠を超えていません）が無い。「開始後に起きること」（条件に一致した人が購読を開始／停止するまで次のステップへ進む／開始・停止・編集は監査履歴とSlackへ記録）が無い。確認のチェックも無い。P2 設計は編集画面から開始するが、実装は一覧の行から状態を変える',
+    verdictSource: 'scenarios-v6/RUxNf-1920.png', verdictHead: '7d5d74fd',
   },
   {
-    ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了', route: EDIT,
-    gap: 'pending',
-    gapNote: '#522 head `3c88b8bd` で開始完了と実績確認への導線を実装済み。取り込み順は #521 → #522',
-    status: 'unimplemented', why: '#522で実装済み。#521の開始確認を土台にしているため、積み順を守った最新headの画像確認待ち',
+    /*
+      **`?started=1` で開く。** 一覧の確認窓で開始が成功したときだけ
+      `router.push(...&started=1)`（`scenarios/page.tsx:170-175`。
+      `if (!response.success) throw` の後ろにある）。URLで開けるので、
+      書き込みを405で止めたままでも完了の面を撮れる。
+    */
+    ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了',
+    route: '/scenarios/detail?id=scenario-0&started=1', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#522 で完了の知らせが入り、未実装ではなくなった。** 「配信を開始しました。条件を満たした友だちから順に配信します。」＋「開始後の結果を見る」。**設計の「新規開始予定116人へ」を出さないのは正しい判断**で、契約試験も `not.toContain(\'開始予定116人\')` で見張っている（その時点で取れない数を作らない）。P2 リンク名が設計の「開始履歴を確認」でなく「開始後の結果を見る」。設計は状態カードが「配信中／2026/08/23 15:20 開始」へ変わり、開始条件に「新規開始予定116人」が出るが、実装の状態カードは「配信可」のまま。**ただしこれは `?started=1` でURLから開いた撮り方の都合**で、実際に開始すれば固定データ側も変わる',
+    verdictSource: 'scenarios-v6/NrBkW-1920.png',
+    verdictHead: '3c88b8bd',
   },
   {
     ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
@@ -1898,6 +1913,8 @@ export const CAPTURED_AT = {
   7: [{ pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   8: [{ pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
   5: [
+    { pr: 521, head: '7d5d74fd', on: '2026-08-29', screens: ['RUxNf'], note: '開始・停止の確認窓。窓は一覧の行に出る' },
+    { pr: 522, head: '3c88b8bd', on: '2026-08-29', screens: ['NrBkW'], note: '開始完了の知らせ。`?started=1` で開ける。#521 の上に積んである' },
     { pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['M2b2B'], note: '新しい口は足さず既存の統計を読む' },
     {
       pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['xfYLn', 'hz9ti'],
