@@ -10,7 +10,7 @@ describe('V6 友だち追加時配信の契約', () => {
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('title="友だち追加時の配信"')
     expect(PAGE).not.toContain('マニュアル')
-    expect(PAGE).toContain('data-design="Actions"')
+    expect(PAGE).toContain('data-design="Head"')
     expect(PAGE).toContain('<TestRunButton accountId={accountId} scenarioName={scenarioName} />')
     expect(PAGE).toContain("{saving ? '保存中…' : '保存'}")
   })

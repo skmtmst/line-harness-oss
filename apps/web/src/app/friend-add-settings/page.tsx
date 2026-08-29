@@ -221,7 +221,7 @@ export default function FriendAddSettingsPage() {
 
   return (
     <div>
-      <div data-design="Actions" className="mb-4 flex flex-wrap items-center justify-end gap-2">
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <TestRunButton accountId={accountId} scenarioName={scenarioName} />
         <button
           type="button"
