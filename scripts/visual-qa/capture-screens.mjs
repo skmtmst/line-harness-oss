@@ -606,6 +606,15 @@ async function captureImpl(feature) {
     const shots = s.states
       ? s.states.kinds.map((kind) => ({ kind, suffix: `-${kind}` }))
       : [{ kind: null, suffix: '' }]
+    /*
+      **同じ画面の、押した先も撮る。** 取り消しの確認窓のように、
+      口の差し替え（`states`）では作れず、押して初めて出るものがある。
+      別の行を足すと設計の枚数（262）が動いてしまうので、
+      **1つの行に枝を生やす**形にする。
+    */
+    if (s.variants) {
+      for (const v of s.variants) shots.push({ kind: null, suffix: v.suffix, steps: v.steps, mode: v.mode })
+    }
     for (const width of WIDTHS) {
      for (const shotSpec of shots) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
@@ -667,7 +676,7 @@ async function captureImpl(feature) {
           }
         }
 
-        await runSteps(page, s.steps, s.node)
+        await runSteps(page, shotSpec.steps ?? s.steps, s.node)
         /*
           **操作したあとに、もう一度落ちていないか見る。**
 
@@ -690,7 +699,11 @@ async function captureImpl(feature) {
         )
         await page.screenshot({
           path: join(out, `${s.node}${shotSpec.suffix}-${width}.png`),
-          fullPage: s.mode === 'page',
+          /*
+            **窓は画面いっぱいでは撮らない。** `fixed` の窓を `fullPage` で
+            撮ると、長い本文の下端へ押し出されて、実際の見え方と違う絵になる。
+          */
+          fullPage: (shotSpec.mode ?? s.mode) === 'page',
         })
         /*
           **絵の隣に、写っている文字も置く。**

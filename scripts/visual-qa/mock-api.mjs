@@ -1213,6 +1213,39 @@ const server = createServer((req, res) => {
     return
   }
 
+  /*
+    一斉配信の予約取り消し。**ここも 405 に落とさない。**
+
+    405 のままだと確認窓の先が一度も描かれず、「取り消せたのか」も
+    「重なったときに何と出るのか」も未確認のまま残る。
+
+    **固定の答えは返さない。** Worker（`broadcasts.ts:800`）と同じく
+    **いまの状態を見て**分ける。`scheduled` でなければ 409。
+    予約でないものを取り消そうとしたときに、画面が何と出すかを見る。
+
+    **書き換えはしない。** 取り消した先の下書きは Worker の仕事で、
+    こちらは返事の形だけをそろえる。
+  */
+  const cancelPath = /^\/api\/broadcasts\/([^/]+)\/cancel$/.exec(url.pathname)
+  if (method === 'POST' && cancelPath) {
+    const found = BROADCASTS.find((b) => b.id === cancelPath[1])
+    if (!found) {
+      res.writeHead(404).end(JSON.stringify({ success: false, error: 'Broadcast not found' }))
+      return
+    }
+    if (found.status !== 'scheduled' || !found.scheduledAt) {
+      res.writeHead(409).end(
+        JSON.stringify({ success: false, error: 'Only scheduled broadcasts can be cancelled' }),
+      )
+      return
+    }
+    res.writeHead(200).end(JSON.stringify({
+      success: true,
+      data: { ...found, status: 'draft', scheduledAt: null },
+    }))
+    return
+  }
+
   if (method !== 'GET') {
     if (READ_ONLY_POSTS.has(url.pathname) && method === 'POST') {
       const body = bodyFor(url.pathname, url.searchParams)
