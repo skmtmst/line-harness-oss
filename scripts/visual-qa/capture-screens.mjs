@@ -760,7 +760,13 @@ async function captureImpl(feature) {
           /* 左のメニューと上の帯は毎回同じなので落とす。本文だけ残す。 */
           const text = await page.locator('main').first().innerText()
             .catch(() => page.locator('body').innerText())
-          writeFileSync(join(out, `${s.node}${shotSpec.suffix}.txt`), text, 'utf-8')
+          /*
+          **行末の空白を落とす。** 表の innerText は列の区切りの
+          タブがそのまま行末に残る。中身は変わらないが、
+          取り込みの門（`git diff --check`）が空白として弾く。
+        */
+        const trimmed = text.split('\n').map((line) => line.replace(/[ \t]+$/, '')).join('\n')
+        writeFileSync(join(out, `${s.node}${shotSpec.suffix}.txt`), trimmed, 'utf-8')
         }
         /*
           **どの状態が出ているかを名前で言えるか**も一緒に記録する。

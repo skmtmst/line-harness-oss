@@ -7,18 +7,18 @@ Webhook
 Webhookを追加
 こちらで受け取る
 こちらから送る
-名前	URL	イベントタイプ	シークレット	ステータス	送信状況	作成日	
-Slack ／ #注文チャンネル	https://hooks.slack.com/services/T0XXXXX/B0XXXXX/xxxxxxxx	
+名前	URL	イベントタイプ	シークレット	ステータス	送信状況	作成日
+Slack ／ #注文チャンネル	https://hooks.slack.com/services/T0XXXXX/B0XXXXX/xxxxxxxx
 ec.order.confirmed
 	設定済	有効	—
 
 送り直し 3 回
 
 	2026/3/1	シークレット更新削除
-Slack ／ #対応チーム	https://hooks.slack.com/services/T0YYYYY/B0YYYYY/yyyyyyyy	
+Slack ／ #対応チーム	https://hooks.slack.com/services/T0YYYYY/B0YYYYY/yyyyyyyy
 friend_add
 message_received
-	設定済	有効	
+	設定済	有効
 6回連続で失敗
 
 最終 2026/8/24 18:00:00
@@ -26,7 +26,7 @@ message_received
 送り直し 3 回
 
 	2026/4/12	シークレット更新削除
-在庫システム	https://stock.example.co.jp/hook	
+在庫システム	https://stock.example.co.jp/hook
 ec.order.confirmed
 ec.order.shipped
 	設定済	有効	—
@@ -34,7 +34,7 @@ ec.order.shipped
 送り直し 5 回
 
 	2026/2/20	シークレット更新削除
-旧CRM（停止中）	https://old-crm.example.co.jp/hook	
+旧CRM（停止中）	https://old-crm.example.co.jp/hook
 friend_add
 	未設定	無効	—
 
