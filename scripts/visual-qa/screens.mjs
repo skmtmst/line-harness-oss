@@ -410,8 +410,8 @@ export const SCREENS = [
 
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
-    verdict: 'needs_fix', verdictNote: '**#529 `4cb2b0d9` で束6の完了条件を満たした。** 読了済 728人 に **「登録合計 1,756人のうち 41%」** と**母数を明記**するようになった（728÷1,756＝41%で合う）。以前は 購読中 1,028人 の隣に 41% だけを置いていたため、読む人には 728÷1,028＝71% との食い違いに見えていた。購読中にも「現在配信中・重複を含む」と断りが付く。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（シナリオごとの離脱地点、フォルダの色）はこの直しの外',
-    verdictSource: 'scenarios-v6/TC1b1.txt', verdictHead: '4cb2b0d9',
+    verdict: 'needs_fix', verdictNote: '**P1 #427 `5f09837c` 単体では束6が未解決。母数の明記は #529 の担当。** #427 で撮ると 購読中 1,028人・読了済 728人 の隣が **41% だけ**で、「登録合計 1,756人のうち」が**出ない**（数えて0件）。読む人には 728÷1,028＝71% との食い違いに見える。**#529 `4cb2b0d9` で撮ると「登録合計 1,756人のうち 41%」と母数が付く。** #427 が `codex/development` 直結へ張り替えられたため、#529 の直りは #427 には入っていない。**#436→#556 と同じ二段構成**なので、#427 だけで解決扱いにしない。内部語・壊れ値は0件、1440・1920とも横スクロール0',
+    verdictSource: 'scenarios-v6/TC1b1.txt', verdictHead: '5f09837c',
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: 'needs_fix', verdictNote: 'P2 設計の3段の進み表示（STEP1 シナリオ情報／STEP2 配信方式／STEP3 1通目を設定）が無い。フォルダをこの画面で選べない（設計はシナリオ情報のカードで選ぶ）。2つのカードの本文・例・チップは設計どおり',
@@ -422,8 +422,8 @@ export const SCREENS = [
     verdictSource: 'scenarios-v6/kk8dz-1920.png', verdictHead: '6db5ad7f',
   },
   { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT,
-    verdict: 'needs_fix', verdictNote: '**#534 `0158ba8e` で `NaN%` が消えた。** 到達率は 100% / 89% / 73% / 18% と実値で出て、取れないところは `—`（本文に `NaN` は0件）。以前は `Math.round(stat.reachRate*100)` が未取得のとき `NaN%` になっていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 一覧に配信対象の列が無く、配信後がどの行も `—`。設計の注意帯（作成しただけでは配信されません…）が無い',
-    verdictSource: 'scenarios-v6/bV5Vs-1440.png', verdictHead: '0158ba8e',
+    verdict: 'needs_fix', verdictNote: '**#427 `5f09837c` で撮り直した。`NaN%` は0件**（到達率の直し自体は #534 `0158ba8e`。#427 でも壊れていない）。内部語・`undefined`・`Invalid Date` も0件。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 一覧に配信対象の列が無く、配信後がどの行も `—`。設計の注意帯（作成しただけでは配信されません…）が無い',
+    verdictSource: 'scenarios-v6/bV5Vs-1440.png', verdictHead: '5f09837c',
   },
   {
     /*
@@ -499,9 +499,10 @@ export const SCREENS = [
   },
   {
     ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: '一括テスト送信', nth: 1 }],
-    verdict: 'needs_fix', verdictNote: 'P1 テスト送信の意味が設計と違う。設計は自分のLINEへ送る確認で「本番影響：なし」、待機は10秒へ短縮、タグ・情報欄の変更は実行しない、と明記する。実装は友だちを選んで本物のメッセージを実際に送る（画面にもその警告が出る）。開始ステップの指定・所要時間・設定サマリー・メッセージプレビュー・開始前の3項目チェックが無い',
-    verdictSource: 'scenarios-v6/g2UNV-1920.png', verdictHead: '6db5ad7f',
+    mode: 'viewport', height: 1080, /* **#427 で「一括テスト送信」が1つになった**（前は2つあり2番目を押していた）。 */
+    steps: [{ click: '一括テスト送信' }],
+    verdict: 'needs_fix', verdictNote: '**#427 `5f09837c` で一括テスト送信が入り、撮れるようになった。** 以前は同じ名前のボタンが2つあり2番目を押していたが、1つに整理された（撮影の段もあわせて直した）。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計のテスト送信は送信先を選び、結果を1通ずつ確かめる。実装は一括で送るところまで',
+    verdictSource: 'scenarios-v6/g2UNV-1440.png', verdictHead: '5f09837c',
   },
   {
     /*
@@ -791,9 +792,9 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: 'を削除' }],
     verdict: 'needs_fix',
-    verdictNote: '**#498 → #514 で削除確認が入り、未実装ではなくなった。** 本文は設計と一字一句同じ。「削除すると未送信の通知予定はすべて取り消されます。送信済みの履歴は監査記録として残り、この操作は取り消せません。」。ボタンもキャンセル／削除する。**何が取り消され、何が残り、戻せないことの3つを言う**という、束5の手本になる形。P2 残る差は絵記号だけ。設計は見出しの左に⚠、削除ボタンにごみ箱の印がある。実装はどちらも無い',
-    verdictSource: 'reminders-v6/Y0Sn3-1920.png',
-    verdictHead: '9a72dba6',
+    verdictNote: '**#498 `f30890f2`（`codex/development` 直結へ張り替え済み）で、束5の形はできている。実際に押して確かめた。** 窓は `ConfirmDialog` で、ブラウザ標準の窓は**0回**。題に名前が入り（「「予約前日のご案内」を削除しますか？」）、本文に3つが揃う——「削除すると**未送信の通知予定はすべて取り消されます**。**送信済みの履歴は監査記録として残り**、この操作は**取り消せません**。」。**失敗しても窓は閉じない**（削除の口を405にして確認）。**P1 ただし窓の中に出る文が `API error: 405` という内部の言葉。** `reminders/page.tsx:230` の `setDeleteError(caught instanceof Error ? caught.message : \'削除に失敗しました\')` が、APIの文をそのまま窓へ流している（束2）。#554 の `EGMb1` は「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉にしていて、そこだけ揃っていない。**推奨修正**：`caught.message` を使わず、決まった一文を出す。1440・1920とも横スクロール0',
+    verdictSource: 'reminders-v6/Y0Sn3-1440.png',
+    verdictHead: 'f30890f2',
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
@@ -1200,7 +1201,7 @@ export const SCREENS = [
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: '**P0「取得失敗を空として出す」は2本に分かれて直る。** ①**本文** は **#436** の担当で、`loadError` を持ち `ListState kind="error"` へ分け、失敗のとき作成の誘いを出さない（`form-submissions/page.tsx:396`）。②**帯** は **#556** の担当で、`form-kpi-value.tsx` を足して未取得を `—`、実値0を `0件` に描き分ける。**#436 の木に `form-kpi-value.tsx` は無い**ので、#436 だけでは帯が直らない。**この判定は #556 `6037aeef` で撮ったもの**（そこには #436 の旧head `950073ab` が入っている。#436 の旧→新は `apps/web` の差分0件なので、判定は新head `35c613a6` でも変わらない）。失敗のとき帯は4つとも `—`、本文は「回答フォームを読み込めませんでした／通信状態を確認して、もう一度読み込んでください。」＋再読み込み。空のときは フォーム **0件**・公開中 **0件**、今月の回答 **—**「月ごとの集計は未対応」、回答率 **—**「配った人数を持っていません」。3状態とも `data-list-state` で分かれ、1440・1920とも横スクロール0。**束1と束4の完了条件を満たし、`dC0yg` `TmHjF` と並ぶ手本になった。** P2 残るのは設計の一覧の作り（フォームごとの回答数の推移、公開/停止の切替）',
-    verdictSource: 'forms-v6/ZOPyc-error.txt + forms-v6/ZOPyc-empty.txt', verdictHead: '6037aeef',
+    verdictSource: 'forms-v6/ZOPyc-error.txt + forms-v6/ZOPyc-empty.txt', verdictHead: '1c1546cb',
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
@@ -1366,7 +1367,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 手で増やす・減らす操作が無い。**間違って付いたマイルを直せない**', verdictSource: 'mileage-v6/design-qa-score-495.md',
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
-    verdictHead: '7d890d3b',
+    verdictHead: '55301679',
   },
   {
     /*
@@ -1398,7 +1399,7 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: 'needs_fix', verdictNote: 'P1 層の境目が設計と違う（設計 ふつう30〜69点・低い29点以下／実装 ふつう40〜69点・低い39点以下）。同じ点数の人が別の層に入る。P1 「内訳を見る」が無く、なぜその点数かを追えない。帯ごとの「この帯の人を見る」「この帯に配信する」も、文だけでボタンが無い。P2 呼び名が設計の「帯」でなく「層」。注意文から「マイル残高はスコアで増えも減りもしません」が落ちている。「点数が変わった理由は未取得」と正直に出しているのは正しい',
-    verdictSource: 'mileage-v6/z3PB2-normal-1920.png', verdictHead: '7d890d3b',
+    verdictSource: 'mileage-v6/z3PB2-normal-1920.png', verdictHead: '55301679',
   },
   {
     /*
@@ -2153,7 +2154,7 @@ export const CAPTURED_AT = {
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
     { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['HIU5O'], note: '#494 は #441 を含む。**新head `5470ede3` でも撮り直していない**——apps/web の20ファイルすべて blob が同一で、差分は Worker の機能設定だけ' },
-    { pr: 495, head: '7d890d3b', on: '2026-08-28', screens: ['z3PB2', 'vz0Ji'], note: '#495 は #494 を含む' },
+    { pr: 495, head: '55301679', on: '2026-08-30', screens: ['z3PB2', 'vz0Ji'], note: '**`codex/development` 直結へ張り替えられたが撮り直していない**——`mileage/page.tsx` と `action-score-tab.tsx` の blob が `7d890d3b` と同一。**`pRHvc` は `screens.mjs` に無いNode**なので判断待ちで飛ばした' },
     { pr: 496, head: '4dac7986', on: '2026-08-28', screens: ['s6MBc'], note: '#496 は #495 を含む' },
     { pr: 499, head: '961722fc', on: '2026-08-28', screens: ['s6MBc'], note: 'Claudeが作ったDraft。#496 の上に積んである' },
   ],
@@ -2163,7 +2164,8 @@ export const CAPTURED_AT = {
     
     { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**。**#498 単体（`ac288d48`）では撮り直さない**——`reminders/page.tsx` の blob は違うが、それは #514 が #498 の上でさらに直したため。撮った木のほうが新しく（`ac288d48` は `9a72dba6` の祖先）、#498 で撮り直すと #514 の直りを絵から巻き戻すことになる' },
     { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] },
-    { pr: 511, head: '4bc71249', on: '2026-08-29', screens: ['GC4St'], note: '実行結果から内部IDを外す。束3' }],
+    { pr: 511, head: '4bc71249', on: '2026-08-29', screens: ['GC4St'], note: '実行結果から内部IDを外す。束3' },
+    { pr: 498, head: 'f30890f2', on: '2026-08-30', screens: ['Y0Sn3'], note: '`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま' }],
   11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
     
@@ -2183,6 +2185,7 @@ export const CAPTURED_AT = {
       note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
     },
     { pr: 530, head: '2568c474', on: '2026-08-29', screens: ['xfYLn'], note: '通の編集から `cron` を外す。束3' },
+    { pr: 427, head: '5f09837c', on: '2026-08-30', screens: ['TC1b1', 'bV5Vs', 'g2UNV'], note: '`codex/development` 直結へ張り替え。**#529 の母数の直りは入っていない**（#427 単体では 41% だけ）' },
   ],
   2: [
     { pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' },
@@ -2191,7 +2194,7 @@ export const CAPTURED_AT = {
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },
     { pr: 436, head: '950073ab', on: '2026-08-29', screens: ['ZOPyc'], note: '読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る' },
-    { pr: 556, head: '6037aeef', on: '2026-08-29', screens: ['ZOPyc'], note: '回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない' },
+    { pr: 556, head: '1c1546cb', on: '2026-08-30', screens: ['ZOPyc'], note: '回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない。**`codex/development` 直結へ張り替えられたが撮り直していない**——`page.tsx` と `form-kpi-value.tsx` の blob が `6037aeef` と同一' },
   ],
   25: [
     { pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' },
@@ -2210,7 +2213,7 @@ export const CAPTURED_AT = {
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
-  20: [{ pr: 445, head: '787a4b46', on: '2026-08-28' }],
+  20: [{ pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`、head `17b32da7`）。撮り直していない——判定は取り込み前の head のままで、画面のファイルは #445 自身の変更なので中身は同じ' }],
   21: [
     { pr: 446, head: '4307088d', on: '2026-08-28' },
     { pr: 525, head: 'deff5ffb', on: '2026-08-29', screens: ['DEX0k'], note: '状態の内部語を日本語へ。束3' },
