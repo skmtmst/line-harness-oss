@@ -4,9 +4,13 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarSchedule, Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type CommonVarUsageImpact } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
+import SummaryCard from '@/components/shared/summary-card'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /**
  * 共通情報の編集。
@@ -37,6 +41,8 @@ function EditCommonVarInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [impact, setImpact] = useState<CommonVarUsageImpact | null>(null)
+  const [impactLoading, setImpactLoading] = useState(false)
 
   const [name, setName] = useState('')
   const [folderId, setFolderId] = useState('')
@@ -110,12 +116,41 @@ function EditCommonVarInner() {
         setError(res.error)
         return
       }
+      setImpact(null)
       setSaved(true)
       void load()
     } catch {
       setError('保存に失敗しました')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const reviewBeforeSave = async () => {
+    if (!item || saving || impactLoading || !selectedAccountId) return
+    if (!name.trim()) {
+      setError('共通情報名を入力してください')
+      return
+    }
+    if (value === item.value) {
+      await save()
+      return
+    }
+    const accountAtRequest = selectedAccountId
+    setImpactLoading(true)
+    setError('')
+    try {
+      const res = await api.commonVars.impactPreview(item.id, accountAtRequest, value)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (!res.success) {
+        setError(res.error)
+        return
+      }
+      setImpact(res.data)
+    } catch {
+      setError('影響する場所を確認できませんでした。もう一度お試しください。')
+    } finally {
+      setImpactLoading(false)
     }
   }
 
@@ -169,6 +204,136 @@ function EditCommonVarInner() {
     } catch {
       setError('予約の削除に失敗しました')
     }
+  }
+
+  if (item && impact) {
+    const immediateCount = impact.items.filter(
+      (usage) => usage.changesOnSave && !['下書き', '停止中'].includes(usage.status),
+    ).length
+    return (
+      <div data-design-node="uNBlA" data-common-var-impact-state="ready">
+        <Notice
+          tone="validation"
+          message={`「${item.name}」を直すと、使用中の${impact.blockingTotal.toLocaleString('ja-JP')}か所へ反映されます。内容を確認してから保存してください。`}
+          className="mb-4"
+        />
+
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            title="変わる場所"
+            value={impact.blockingTotal}
+            unit="か所"
+            detail="下書き・配信予定・自動処理を含みます"
+            variant="v6"
+          />
+          <SummaryCard
+            title="すぐ効くもの"
+            value={immediateCount}
+            unit="か所"
+            detail="保存後に使われる内容です"
+            variant="v6"
+          />
+          <SummaryCard
+            title="文字数の確認"
+            value={null}
+            unit="件"
+            detail="送信先ごとの上限は未接続です"
+            badge="要確認"
+            badgeTone="danger"
+            variant="v6"
+          />
+          <SummaryCard
+            title="送信済みの文"
+            value={impact.historicalTotal}
+            unit="か所"
+            detail="過去に送った内容は変わりません"
+            variant="v6"
+          />
+        </div>
+
+        <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <div className="border-hairline flex items-center justify-between gap-3 border-b px-5 py-4">
+            <div>
+              <p className="text-ink text-sm font-semibold">変わる内容</p>
+              <p className="text-ink-faint mt-1 text-xs">
+                現在の文と保存後の文を、使われている場所ごとに並べています。
+              </p>
+            </div>
+            <span className="text-ink-secondary text-sm">{impact.total.toLocaleString('ja-JP')}件</span>
+          </div>
+          {impact.unscopedFormTotal > 0 ? (
+            <Notice
+              tone="validation"
+              message={`所属するLINEアカウントを確認できない回答フォームが${impact.unscopedFormTotal.toLocaleString('ja-JP')}件あります。内容を見せず、安全のため影響件数に含めています。`}
+              className="m-4"
+            />
+          ) : null}
+          {impact.items.length === 0 ? (
+            <div className="text-ink-secondary px-5 py-10 text-center text-sm">
+              {impact.unscopedFormTotal > 0
+                ? '表示できる使用先はありません。回答フォームは所属確認後に内容を表示します。'
+                : 'この共通情報を使っている場所はありません。'}
+            </div>
+          ) : (
+            <DataTable>
+              <thead>
+                <TableHeadRow>
+                  <Th className="w-32">使われる場所</Th>
+                  <Th className="w-48">名前</Th>
+                  <Th>現在の文</Th>
+                  <Th>保存後の文</Th>
+                  <Th className="w-36">状態</Th>
+                  <Th className="w-24" align="right">操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody>
+                {impact.items.map((usage) => (
+                  <Tr key={`${usage.kind}:${usage.sourceId}`}>
+                    <Td>{usage.kindLabel}</Td>
+                    <Td>
+                      <span className="block max-w-44 truncate" title={usage.name}>{usage.name}</span>
+                    </Td>
+                    <Td>
+                      <span className="block max-w-72 truncate" title={usage.currentPreview}>
+                        {usage.currentPreview}
+                      </span>
+                    </Td>
+                    <Td>
+                      {usage.nextPreview === null ? (
+                        <span className="text-ink-faint">—</span>
+                      ) : (
+                        <span className="block max-w-72 truncate" title={usage.nextPreview}>
+                          {usage.nextPreview}
+                        </span>
+                      )}
+                    </Td>
+                    <Td>
+                      <span className={usage.changesOnSave ? 'text-ink-secondary' : 'text-ink-faint'}>
+                        {usage.status}
+                      </span>
+                    </Td>
+                    <ActionCell>
+                      <Link href={usage.href} className="text-info whitespace-nowrap hover:underline">
+                        中身を見る
+                      </Link>
+                    </ActionCell>
+                  </Tr>
+                ))}
+              </tbody>
+            </DataTable>
+          )}
+        </section>
+
+        <div className="border-hairline bg-canvas sticky bottom-0 mt-4 flex items-center justify-center gap-3 border-t px-4 py-3">
+          <Button variant="secondary" onClick={() => setImpact(null)} disabled={saving}>
+            編集に戻る
+          </Button>
+          <Button variant="primary" onClick={() => void save()} disabled={saving}>
+            {saving ? '保存中...' : 'この内容で保存する'}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -359,11 +524,11 @@ function EditCommonVarInner() {
               </button>
             </div>
             <button
-              onClick={() => void save()}
-              disabled={saving}
+              onClick={() => void reviewBeforeSave()}
+              disabled={saving || impactLoading}
               className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
-              {saving ? '保存中...' : '保存'}
+              {saving ? '保存中...' : impactLoading ? '影響を確認中...' : '保存'}
             </button>
           </div>
         </>

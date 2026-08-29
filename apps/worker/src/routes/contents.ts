@@ -21,6 +21,8 @@ import {
   type Media,
   type MediaKind,
   type CommonVar,
+  type CommonVarUsageImpact,
+  type CommonVarUsageItem,
   type CommonVarSchedule,
   type CommonVarType,
 } from '@line-crm/db';
@@ -300,6 +302,102 @@ function serializeSchedule(row: CommonVarSchedule) {
   };
 }
 
+const USAGE_KIND_LABELS: Record<CommonVarUsageItem['kind'], string> = {
+  template: 'テンプレート',
+  broadcast: '一斉配信',
+  scenario: 'シナリオ配信',
+  reminder: 'リマインダ',
+  auto_reply: '自動応答',
+  form: '回答フォーム',
+  automation: 'オートメーション',
+};
+
+function collectReadableStrings(value: unknown, token: string, out: string[]): void {
+  if (typeof value === 'string') {
+    if (value.includes(token)) out.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectReadableStrings(item, token, out);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      collectReadableStrings(item, token, out);
+    }
+  }
+}
+
+/** JSONの設定値を画面へそのまま出さず、人が読む文だけを短く取り出す。 */
+function readableUsageText(content: string, token: string): string {
+  let text = content;
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    const strings: string[] = [];
+    collectReadableStrings(parsed, token, strings);
+    if (strings.length > 0) text = strings.join(' ／ ');
+  } catch {
+    // 通常の本文はJSONではない。そのまま使う。
+  }
+  const compact = text.replace(/\s+/g, ' ').trim();
+  if (!compact) return 'この設定の中で使われています';
+  return compact.length > 180 ? `${compact.slice(0, 179)}…` : compact;
+}
+
+function usageHref(item: CommonVarUsageItem): string {
+  const id = encodeURIComponent(item.source_parent_id ?? item.source_id);
+  switch (item.kind) {
+    case 'template': return `/templates/edit?id=${id}`;
+    case 'broadcast': return `/broadcasts/detail?id=${id}`;
+    case 'scenario': return `/scenarios/detail?id=${id}`;
+    case 'reminder': return `/reminders/edit?id=${id}`;
+    case 'auto_reply': return `/auto-replies/edit?id=${id}`;
+    case 'form': return `/form-submissions/edit?id=${id}`;
+    case 'automation': return `/automations`;
+  }
+  return '/contents/vars';
+}
+
+function usageStatus(item: CommonVarUsageItem): string {
+  if (item.is_historical === 1) return '送信済み・変わりません';
+  if (item.source_status === 'scheduled') return '配信予約中';
+  if (item.source_status === 'sending') return '配信中';
+  if (item.source_status === 'draft') return '下書き';
+  if (item.source_status === 'stopped') return '停止中';
+  return '使われています';
+}
+
+function serializeUsageImpact(
+  impact: CommonVarUsageImpact,
+  input: { varKey: string; currentValue: string; nextValue?: string },
+) {
+  const token = `{{var.${input.varKey}}}`;
+  return {
+    total: impact.total,
+    blockingTotal: impact.blockingTotal,
+    historicalTotal: impact.historicalTotal,
+    unscopedFormTotal: impact.unscopedFormTotal,
+    canDelete: impact.blockingTotal === 0,
+    byKind: impact.byKind,
+    items: impact.items.map((item) => {
+      const source = readableUsageText(item.source_content, token);
+      return {
+        kind: item.kind,
+        kindLabel: USAGE_KIND_LABELS[item.kind],
+        sourceId: item.source_id,
+        name: item.source_name,
+        status: usageStatus(item),
+        href: usageHref(item),
+        changesOnSave: item.is_historical !== 1,
+        currentPreview: source.replaceAll(token, input.currentValue),
+        nextPreview: input.nextValue === undefined
+          ? null
+          : source.replaceAll(token, input.nextValue),
+      };
+    }),
+  };
+}
+
 contents.get('/api/common-vars', async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -400,12 +498,49 @@ contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin')
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key);
-    return c.json({ success: true, data: { ...impact, canDelete: impact.total === 0 } });
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    return c.json({
+      success: true,
+      data: serializeUsageImpact(impact, {
+        varKey: existing.var_key,
+        currentValue: existing.value,
+      }),
+    });
   } catch (err) {
     console.error('GET /api/common-vars/:id/delete-impact error:', err);
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
+      503,
+    );
+  }
+});
+
+contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (typeof body.nextValue !== 'string') {
+      return c.json({ success: false, error: '変更後の値を入力してください' }, 400);
+    }
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    return c.json({
+      success: true,
+      data: serializeUsageImpact(impact, {
+        varKey: existing.var_key,
+        currentValue: existing.value,
+        nextValue: body.nextValue,
+      }),
+    });
+  } catch (err) {
+    console.error('POST /api/common-vars/:id/impact-preview error:', err);
+    return c.json(
+      { success: false, error: '影響する場所を確認できませんでした' },
       503,
     );
   }
@@ -420,14 +555,17 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key);
-    if (impact.total > 0) {
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    if (impact.blockingTotal > 0) {
       return c.json(
         {
           success: false,
-          error: `${impact.total}件で使用中のため削除できません`,
+          error: `${impact.blockingTotal}件で使用中のため削除できません`,
           code: 'COMMON_VAR_IN_USE',
-          data: { ...impact, canDelete: false },
+          data: serializeUsageImpact(impact, {
+            varKey: existing.var_key,
+            currentValue: existing.value,
+          }),
         },
         409,
       );

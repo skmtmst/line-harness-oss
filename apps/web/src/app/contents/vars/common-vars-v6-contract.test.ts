@@ -41,6 +41,23 @@ describe('V6共通情報一覧', () => {
     expect(WORKER).toContain('getCommonVarUsageImpact')
   })
 
+  it('値を変えると保存前にuNBlAの影響一覧で変更前後を確認する', () => {
+    expect(API).toContain('impactPreview:')
+    expect(EDIT_PAGE).toContain('api.commonVars.impactPreview(item.id, accountAtRequest, value)')
+    expect(EDIT_PAGE).toContain('data-design-node="uNBlA"')
+    expect(EDIT_PAGE).toContain('currentPreview')
+    expect(EDIT_PAGE).toContain('nextPreview')
+    expect(EDIT_PAGE).toContain('この内容で保存する')
+    expect(EDIT_PAGE).toContain('value === item.value')
+    expect(EDIT_PAGE).toContain('影響する場所を確認できませんでした。もう一度お試しください。')
+  })
+
+  it('所属を確認できない回答フォームは中身を見せず安全側に止める', () => {
+    expect(EDIT_PAGE).toContain('impact.unscopedFormTotal')
+    expect(EDIT_PAGE).toContain('内容を見せず、安全のため影響件数に含めています')
+    expect(WORKER).toContain('unscopedFormTotal: impact.unscopedFormTotal')
+  })
+
   it('選択中のLINEアカウントをすべての共通情報APIへ渡す', () => {
     expect(PAGE).toContain('api.commonVars.list(accountAtRequest)')
     expect(PAGE).toContain('latestAccountRef.current')

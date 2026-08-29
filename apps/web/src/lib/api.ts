@@ -96,6 +96,37 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+export type CommonVarUsageKind =
+  | 'template'
+  | 'broadcast'
+  | 'scenario'
+  | 'reminder'
+  | 'auto_reply'
+  | 'form'
+  | 'automation'
+
+export type CommonVarUsageItem = {
+  kind: CommonVarUsageKind
+  kindLabel: string
+  sourceId: string
+  name: string
+  status: string
+  href: string
+  changesOnSave: boolean
+  currentPreview: string
+  nextPreview: string | null
+}
+
+export type CommonVarUsageImpact = {
+  total: number
+  blockingTotal: number
+  historicalTotal: number
+  unscopedFormTotal: number
+  canDelete: boolean
+  byKind: Record<CommonVarUsageKind, number>
+  items: CommonVarUsageItem[]
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -1616,11 +1647,14 @@ export const api = {
         body: JSON.stringify(data),
       }),
     deleteImpact: (id: string, accountId: string) =>
-      fetchApi<ApiResponse<{
-        total: number
-        canDelete: boolean
-        byKind: Record<string, number>
-      }>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
+      fetchApi<ApiResponse<CommonVarUsageImpact>>(
+        `/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    impactPreview: (id: string, accountId: string, nextValue: string) =>
+      fetchApi<ApiResponse<CommonVarUsageImpact>>(`/api/common-vars/${id}/impact-preview`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, nextValue }),
+      }),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
     schedules: (id: string, accountId: string) =>
