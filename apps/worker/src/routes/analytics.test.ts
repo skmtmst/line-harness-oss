@@ -18,6 +18,7 @@ const mocks = {
   createVersionedFunnel: vi.fn(),
   createFunnelVersion: vi.fn(),
   runChronologicalFunnel: vi.fn(),
+  getLatestFunnelRun: vi.fn(),
   createFunnelResultAudience: vi.fn(),
   createAnalyticsCrossRun: vi.fn(),
   getAnalyticsCrossRun: vi.fn(),
@@ -26,6 +27,9 @@ const mocks = {
   getAnalyticsRoutesOverview: vi.fn(),
   getAnalyticsUrlClicksOverview: vi.fn(),
   getAnalyticsUsageOverview: vi.fn(),
+  createSavedAnalyticsFromResult: vi.fn(),
+  getSavedAnalytics: vi.fn(),
+  getSavedAnalyticsSnapshots: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
@@ -62,10 +66,31 @@ app.use('*', async (c, next) => {
   return next();
 });
 app.route('/', analytics);
+const staffApp = new Hono<Env>();
+staffApp.use('*', async (c, next) => {
+  c.set('staff', {
+    id: 'staff-1', name: '担当者', role: 'staff', readOnly: false,
+    permissionKeys: ['/analytics'], assignedLineAccountId: 'account-a',
+    canAccessDescendantAccounts: false,
+  });
+  return next();
+});
+staffApp.route('/', analytics);
 const env = { DB: {} as D1Database };
 
 function req(path: string, method = 'GET', body?: unknown) {
   return app.fetch(
+    new Request(`https://example.com${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+function reqAsStaff(path: string, method = 'GET', body?: unknown) {
+  return staffApp.fetch(
     new Request(`https://example.com${path}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -110,6 +135,17 @@ beforeEach(() => {
       ],
     }],
   });
+  mocks.getLatestFunnelRun.mockResolvedValue({
+    runId: 'run-1', state: 'available', stateReason: null,
+    dataCutoffAt: '2026-08-26T00:00:00.000Z',
+    groups: [{
+      key: 'all', label: '全体', entrants: 2, completed: 1,
+      steps: [
+        { stepOrder: 1, label: '友だち追加', reached: 2, conversionFromPrevious: 1 },
+        { stepOrder: 2, label: '購入', reached: 1, conversionFromPrevious: 0.5 },
+      ],
+    }],
+  });
   mocks.createFunnelResultAudience.mockResolvedValue({
     id: 'audience-1', memberCount: 1, expiresAt: '2026-08-27T00:00:00.000Z',
   });
@@ -124,6 +160,11 @@ beforeEach(() => {
   mocks.getAnalyticsRoutesOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsUrlClicksOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsUsageOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
+  mocks.createSavedAnalyticsFromResult.mockResolvedValue({
+    id: 'saved-1', versionId: 'saved-version-1', snapshotId: 'snapshot-1',
+  });
+  mocks.getSavedAnalytics.mockResolvedValue([]);
+  mocks.getSavedAnalyticsSnapshots.mockResolvedValue([]);
   mocks.createAnalyticsCrossAudience.mockResolvedValue({
     id: 'audience-cross-1', memberCount: 2, expiresAt: '2026-08-27T00:00:00.000Z',
   });
@@ -302,6 +343,44 @@ describe('V6クロス分析API', () => {
   });
 });
 
+describe('V6保存した分析API', () => {
+  it('選択中アカウントの保存済み分析だけを返す', async () => {
+    const res = await req(`/api/analytics/saved?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(mocks.getSavedAnalytics).toHaveBeenCalledWith(env.DB, 'account-a');
+  });
+
+  it('確定した結果から定義版とスナップショットを同時に作る', async () => {
+    const res = await req(`/api/analytics/saved?${ACCOUNT}`, 'POST', {
+      name: '経路 × タグ', sourceKind: 'cross', sourceResultId: 'cross-1',
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.createSavedAnalyticsFromResult).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        lineAccountId: 'account-a', name: '経路 × タグ', sourceKind: 'cross',
+        sourceResultId: 'cross-1', createdBy: 'u-1', createdByName: 'テスト',
+      }),
+    );
+  });
+
+  it('別アカウントの保存結果は履歴でも見せない', async () => {
+    mocks.getSavedAnalyticsSnapshots.mockResolvedValueOnce(null);
+    const res = await req(`/api/analytics/saved/saved-b/snapshots?${ACCOUNT}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('担当者は集計を読めるが、保存結果と個人一覧を作れない', async () => {
+    expect((await reqAsStaff(`/api/analytics/saved?${ACCOUNT}`)).status).toBe(200);
+    expect((await reqAsStaff(`/api/analytics/saved?${ACCOUNT}`, 'POST', {
+      name: '保存不可', sourceKind: 'cross', sourceResultId: 'cross-1',
+    })).status).toBe(403);
+    expect((await reqAsStaff(`/api/analytics/results/cross-1/audiences?${ACCOUNT}`, 'POST', {
+      sourceKind: 'cross', rowKey: 'route-1', columnKey: 'tag-1',
+    })).status).toBe(403);
+  });
+});
+
 describe('ファネルの作成', () => {
   const validSteps = [
     { label: '友だち追加', kind: 'tag', match: { tagId: 't1' } },
@@ -425,6 +504,12 @@ describe('V6ファネルAPI', () => {
         lineAccountId: 'account-a', funnelId: 'fn-1', timeZone: 'Asia/Tokyo', persist: true,
       }),
     );
+  });
+
+  it('画面表示では再計算せず最後の不変結果を返す', async () => {
+    const res = await req(`/api/analytics/funnels/fn-1/runs/latest?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(mocks.getLatestFunnelRun).toHaveBeenCalledWith(env.DB, 'account-a', 'fn-1');
   });
 
   it('時刻にタイムゾーンがなければ集計しない', async () => {
