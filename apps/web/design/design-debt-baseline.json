@@ -87,9 +87,6 @@
     "direct-th": 8,
     "unresolved-classname": 1
   },
-  "app/broadcasts/reserved/page.tsx": {
-    "arbitrary-value": 5
-  },
   "app/chats/page.tsx": {
     "arbitrary-value": 121,
     "direct-primary-button": 2,

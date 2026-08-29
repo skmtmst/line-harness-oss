@@ -183,13 +183,13 @@ function ReservedBroadcastContent() {
         {steps.map((step, index) => (
           <li key={step} className="flex items-center gap-2 text-xs font-bold text-ink">
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent"><Check size={15} aria-hidden="true" /></span>
-            <span><span className="block text-[10px] text-accent">STEP {index + 1}</span>{step}</span>
+            <span><span className="block text-xs text-accent">STEP {index + 1}</span>{step}</span>
           </li>
         ))}
       </ol>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <section className="min-h-[650px] rounded-card border border-hairline bg-canvas px-6 py-8 text-center shadow-sm">
+      <div className="broadcast-reserved-grid grid items-start gap-5">
+        <section className="broadcast-reserved-success rounded-card border border-hairline bg-canvas px-6 py-8 text-center shadow-sm">
           <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-accent-soft text-accent">
             <CalendarCheck2 size={30} aria-hidden="true" />
           </span>
@@ -198,7 +198,7 @@ function ReservedBroadcastContent() {
             {formatJst(broadcast.scheduledAt)}に、{estimate ? `${estimate.audienceCount.toLocaleString('ja-JP')}人` : '人数を送信前に再集計して'}へ配信します。
           </p>
 
-          <dl className="mx-auto mt-6 max-w-[760px] rounded-card border border-hairline bg-canvas-sunken px-5 text-sm">
+          <dl className="mx-auto mt-6 max-w-3xl rounded-card border border-hairline bg-canvas-sunken px-5 text-sm">
             {[
               ['管理名', broadcast.title],
               ['配信対象', targetSummary],
@@ -212,7 +212,7 @@ function ReservedBroadcastContent() {
             ))}
           </dl>
 
-          <div className="mx-auto mt-5 max-w-[760px] text-left">
+          <div className="mx-auto mt-5 max-w-3xl text-left">
             <NoteBar>
               配信対象は、送信を始める直前に同じ条件でもう一度数えます。現在の見込みから増減することがあります。
             </NoteBar>
@@ -244,6 +244,13 @@ function ReservedBroadcastContent() {
           <p className="mt-4 text-xs leading-5 text-ink-faint">取り消しても配信内容は下書きとして残ります。内容を直して、改めて予約できます。</p>
         </aside>
       </div>
+
+      <style jsx>{`
+        .broadcast-reserved-success { min-height: 650px; }
+        @media (min-width: 1280px) {
+          .broadcast-reserved-grid { grid-template-columns: minmax(0, 1fr) 390px; }
+        }
+      `}</style>
 
       <ConfirmDialog
         open={cancelOpen}
