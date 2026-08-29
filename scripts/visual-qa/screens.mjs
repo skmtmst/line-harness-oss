@@ -422,8 +422,8 @@ export const SCREENS = [
     verdictSource: 'scenarios-v6/kk8dz-1920.png', verdictHead: '6db5ad7f',
   },
   { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT,
-    verdict: 'needs_fix', verdictNote: 'P1 到達率が取れないと NaN% と出る（scenario-detail-client.tsx:1510 の Math.round(stat.reachRate*100)。未取得なら—にすべき）。撮った絵のNaN%自体は当時の固定データが reachedRate という別名だったのが原因で、固定データは直した。実装側の守りは残っている。P2 一覧に配信対象の列が無く、配信後がどの行も—。設計の注意帯（作成しただけでは配信されません…）が無い',
-    verdictSource: 'scenarios-v6/bV5Vs-1920.png + apps/web/src/app/scenarios/detail/scenario-detail-client.tsx:1510', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#534 `0158ba8e` で `NaN%` が消えた。** 到達率は 100% / 89% / 73% / 18% と実値で出て、取れないところは `—`（本文に `NaN` は0件）。以前は `Math.round(stat.reachRate*100)` が未取得のとき `NaN%` になっていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 一覧に配信対象の列が無く、配信後がどの行も `—`。設計の注意帯（作成しただけでは配信されません…）が無い',
+    verdictSource: 'scenarios-v6/bV5Vs-1440.png', verdictHead: '0158ba8e',
   },
   {
     /*
@@ -1031,8 +1031,8 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗の詳しい説明が「API error: 500」とそのまま出る。P1 ウェビナーの件数だけ0と出る（ほかの3枚は—。未取得なので—にそろえる）。一覧の中を赤い枠と「もう一度読み込む」にしているのは正しい',
-    verdictSource: 'webinars-v6/zCQXe-error-1920.png', verdictHead: 'ed2e3633',
+    verdict: 'needs_fix', verdictNote: '**#524 `a6c35ee0` で束4の完了条件を満たした。** 失敗のとき帯は **ウェビナー `—件`／公開中 `—`／申込 `—`** で、ウェビナーだけ `0件` と数えていた差は解消した。読込・空・失敗が分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（回ごとの申込の推移、視聴後のフォロー配信の状態）はこの直しの外',
+    verdictSource: 'webinars-v6/zCQXe-error.txt', verdictHead: 'a6c35ee0',
   },
 
   // ── 機能11 テンプレート ─────────────────────────────────
@@ -1118,8 +1118,8 @@ export const SCREENS = [
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/templates*', '**/api/templates/**', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときもタブの件数とフォルダ件数が0と出る（未取得なので—にすべき）。一覧の中を赤い枠で「テンプレートを読み込めませんでした／もう一度読み込む」にしているのは正しい。P2 区分のチップに「Flex」という作り手の言葉が出る',
-    verdictSource: 'templates-v6/NKyoA-error-1920.png', verdictHead: '62ddaebe',
+    verdict: 'needs_fix', verdictNote: '**#528 `1b95452d` で束4の完了条件を満たした。** 失敗のとき、上のタブ（メッセージ／カルーセル／リッチメッセージ／クーポン／リサーチ）もフォルダ（すべて／よく使う／未分類）も**件数がすべて `—`** になる。以前は0を数えていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計のタブは「質問」を含む6本で、質問は #572 で別に入った。並びと数えかたの突き合わせはそちらの取り込み後',
+    verdictSource: 'templates-v6/NKyoA-error.txt', verdictHead: '1b95452d',
   },
 
   // ── 機能12 リッチメニュー ───────────────────────────────
@@ -1164,8 +1164,8 @@ export const SCREENS = [
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/rich-menu-groups*', '**/api/rich-menu-groups/**', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る（rich-menus/page.tsx:452 が受け取った文字をそのまま描く。ApiErrorの既定文が英語と数字）。P1 失敗のときメニューと出し分けが0件と出る（未取得なので—にすべき。今月のタップと最多タップは—と「集計を取れませんでした」で正しい）。**前に「帯に前の数が残る」と書いたのは誤りだった。** 当てはめが /api/rich-menu-groups/tap-stats に届いていなかっただけで、当てはめを直して撮り直したら—になった',
-    verdictSource: 'rich-menus-v6/RW5Tb-error-1920.png + apps/web/src/app/rich-menus/page.tsx:452', verdictHead: '09dc476b',
+    verdict: 'needs_fix', verdictNote: '**#523 `47e7846e` は束3（内部の言葉）の直しで、束4は半分しか満たしていない。** タップ側は直った——今月のタップ `—`「集計を取れませんでした」、最多タップ `—`「まだ押されていません」。**P1 しかし失敗のとき メニュー `0件`／公開中 `0`／出し分け `0件` と数える。** 原因は帯が `groups` から直に数えているため（`rich-menus/page.tsx:349` の `groups.filter(...).length`）。読み込みに失敗すると `groups` が `[]` になり、**持っているメニューが1つも無いように見える**。`tapStats` だけ `—` の逃げ道を持ち（`:355,368`）、`groups` 側には無い。**推奨修正**：読込状態（`loading|ready|error`）を持ち、`ready` 以外は件数を `—` にする（`q76C35` `q8wSqO` と同じ形）。P2 失敗を知らせる文が本文に出ず、「タグ条件で出し分けているメニューはありません」だけが残る。1440・1920とも横スクロール0',
+    verdictSource: 'rich-menus-v6/RW5Tb-error.txt', verdictHead: '47e7846e',
   },
 
   // ── 機能13 回答フォーム ─────────────────────────────────
@@ -2164,6 +2164,7 @@ export const CAPTURED_AT = {
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
   5: [
+    { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
     { pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
     { pr: 521, head: '7d5d74fd', on: '2026-08-29', screens: ['RUxNf'], note: '開始・停止の確認窓。窓は一覧の行に出る' },
@@ -2193,6 +2194,9 @@ export const CAPTURED_AT = {
     { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
   28: [{ pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' }],
   29: [{ pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' }],
+  10: [{ pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' }],
+  11: [{ pr: 528, head: '1b95452d', on: '2026-08-29', screens: ['NKyoA'], note: 'タブとフォルダの件数を未取得 `—` に。束4' }],
+  12: [{ pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' }],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
