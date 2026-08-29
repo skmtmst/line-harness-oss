@@ -415,8 +415,8 @@ export const SCREENS = [
 
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
-    verdict: 'needs_fix', verdictNote: '**P1 #427 `5f09837c` 単体では束6が未解決。母数の明記は #529 の担当。** #427 で撮ると 購読中 1,028人・読了済 728人 の隣が **41% だけ**で、「登録合計 1,756人のうち」が**出ない**（数えて0件）。読む人には 728÷1,028＝71% との食い違いに見える。**#529 `4cb2b0d9` で撮ると「登録合計 1,756人のうち 41%」と母数が付く。** #427 が `codex/development` 直結へ張り替えられたため、#529 の直りは #427 には入っていない。**#436→#556 と同じ二段構成**なので、#427 だけで解決扱いにしない。内部語・壊れ値は0件、1440・1920とも横スクロール0',
-    verdictSource: 'scenarios-v6/TC1b1.txt', verdictHead: '5f09837c',
+    verdict: 'needs_fix', verdictNote: '**#529 が `codex/development` 直結へ張り替わり、head も `4cb2b0d9` → `a3511980` へ動いた。撮り直していない**——`scenarios/page.tsx` の blob が同一。束6の完了条件を満たす：読了済 728人 に **「登録合計 1,756人のうち 41%」** と母数を明記する（728÷1,756＝41%で合う）。購読中にも「現在配信中・重複を含む」と断りが付く。**#427 単体ではこの直りが入らない**（#427 も直結へ張り替わったため）ので、取り込み順は **#427 → #529**。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（シナリオごとの離脱地点、フォルダの色）はこの直しの外',
+    verdictSource: 'scenarios-v6/TC1b1.txt', verdictHead: 'a3511980',
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: 'needs_fix', verdictNote: '**#569 `92f03199` で配信方式の選択が入った。** 「シナリオ「新規登録7日間フォロー」を作成しました。続けて配信方式を選んでください。」と、**いま何が済んで次に何をするか**を書く。段の表示（✓シナリオ情報 → 2 配信方式 → 3 1通目）があり、「あとから変更できますが、**設定済みのステップは作り直しになります**」と、戻れないわけではないが手戻りが出ることを先に断る。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は配信方式ごとの見本（何日後・何時・くり返し）をその場で見せる。実装は選ぶところまで',
@@ -1444,9 +1444,9 @@ export const SCREENS = [
     設計のタブは4本（流入経路24／サイトスクリプト／広告連携3／広告とのつなぎ5）。
     実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
   */
-  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: 'P1 タブに件数が付かない（設計は流入経路24／広告連携3）。帯4つの作りが違う（設計は流入元24本／今月312人・経路が分かる289人／クリック8,420回／平均の追加率6.4%）。左のフォルダの縦帯が無い（ジャンルはあるが別の作り）。「まとめて操作」「CSVで書き出す」が無い', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と1つずつ突き合わせた。** P1 帯が設計と違う。設計は 流入元24本／今月312人（経路が分かる289人）／クリック8,420回／平均の追加率6.4% の4つ。実装は 流入元1件・今月の追加 **`—人`「前月比は出せません」**・クリック3,480回・平均の追加率4% で、**「経路が分かる何人か」が出ない**（設計はそこを分けて出す）。未取得を `—人` にして理由を書くのは正しい。P2 **タブに件数が付かない**（設計は「流入経路 24 / 広告連携 3」）。P2 **「まとめて操作」「CSVで書き出す」が無い**（本文を数えて0件）。P2 左のフォルダの縦帯が、設計はフォルダ、実装はジャンルで別の作り。1440・1920とも横スクロール0、壊れ値・内部語0件', verdictSource: 'inflow-v6/Q4bkTg.txt + inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: 'P1 サイトスクリプトの面が設計とそろわない。18-1 全体の差（タブに件数が付かない・帯4つの作りが違う・左のフォルダの縦帯が無い・まとめて操作/CSVが無い）がここにも効く', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「Yahoo!広告 つないでいません」から実際につなげない。押すと「接続を作る画面は準備中です」で止まる。設計はそこから接続を作らせる', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 「Meta広告とつながっています／成果の送信 有効・成果が起きたその場で送ります」と、いまの状態を先に書く。**送っている中身も明記**（「お客様の名前やメールアドレスは送っていません。クリックIDと成果の名前だけを送ります」）。P2 設計の「Yahoo!広告 つないでいません」から**つなげる**導線が無い（本文に「つなげる」0件）。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/v0HaI.txt + inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: 'P1 流入リンクをつくる面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: 'P1 流入元の詳細の面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
@@ -1468,8 +1468,8 @@ export const SCREENS = [
     だけで、**中身は「広告連携」タブに入っている。** 返した記録も、
     クリックの種類（fbclid）も、失敗の理由も出る。
   */
-  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「成果地点と、広告に返す名前の対応」が無い。対応が付いていない成果地点は広告へ返せないのに、**返せていないことに気づく場所がどこにも無い**。P1 「失敗したものをまとめてやり直す」が無い（試行・次の再試行は—のまま）。P2 帯が「広告側へ返した成果 1件」だけ（設計は 送った866／待っている12／断られた7／やり直して成功23）', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 18-2-A 送信履歴が独立した画面として無く、18-2 の1枚の中に混ざっている', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の3点を1つずつ数えた。** **P1 ①「成果地点と、広告に返す名前の対応」が無い**（本文に「対応が付いて」0件）。設計は**対応が付いていない成果地点を見つけられる**ようにしている。対応が無ければ返せないのに、**返せていないことに気づく場所が無い**。**P1 ②「失敗したものをまとめてやり直す」が無い**（「まとめてやり直」0件、「試行」「次の再試行」も本文に出ない）。失敗（「クリックの目印が結びつきませんでした」）は表に出るが、やり直す操作が無い。P2 ③帯が設計と違う（設計は 送った866／待っている12／断られた7／**やり直して成功23** の4つ。実装は「広告側へ返した成果 1件」だけ）。**良いところ**：接続の説明が正直で、「広告費に対して実際にいくら売れたかを見るには、広告側の費用を取り込む必要があり、**そちらはまだできていません**」と、できないことを先に書く。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/BuVDB.txt + inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。`BuVDB` と同じ1枚の中にある**（独立したタブではなく「広告連携」タブの中）。送信履歴の表（日時／成果／クリックの種類／状態／試行／次の再試行）は在り、状態が 送信済み／送信待ち／失敗 で言い分けられる。**P1 やり直す操作が無い**（`BuVDB` の②と同じ）。P2 「試行」「次の再試行」の値が `—` のまま。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/Im2b1.txt + inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
   { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」）', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: 'c275749d' },
@@ -1496,10 +1496,10 @@ export const SCREENS = [
     使われ方・保存した分析が入っている。数は `AnalyticsMetric`
     （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
-  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: 'P1 設計の帯4つと「片づける」が無い。**最終利用が日本時間で出るのと、一度も使っていないものを—にするのは #445 で直って解決している**', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。未取得と実値0の扱いは、この機能がいちばんよくできている。** 本文に `—` が28か所あり、**`0件` は1つも無い**（数えていないものを0で埋めていない）。データ締切も日本時間で出る。構造は設計とそろっており、残るのは実データの接続', verdictSource: 'analytics-v6/Zxezb.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 社内テスト配信の開封・クリックが **`—`** で、帯に「20人未満は取得対象外」と**理由**が付く。**0ではなく取れないことが分かる**形。残るのは実データの接続', verdictSource: 'analytics-v6/J6Inc.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 広告費が `—` のとき**差し引きも `—`** になる。**片方が未取得なら計算結果も未取得**で、0円として引き算していない。残るのは実データの接続', verdictSource: 'analytics-v6/YBGtm.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。** **前のP1（最終利用が生のUTC）は直っている**——`2026/08/24 14:00` と日本時間で出て、一度も使っていないリッチメニューは `—` のまま（**日付で埋めていない**）。**P1 設計の帯4つと「片づける」が無い。** 本文を数えて **「使っている機能」「作ったのに使っていない」「自動で動いた回数」「手作業が減った時間」「気づいたこと」「片づける」「中身を見る」がいずれも0件**。実装は数（作成／利用中／未使用／参照切れ／最終利用）を並べ、「未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。」と添えるところまで。**数は出るが、そこから片づける道が無い。** 設計はこの画面を「作ったまま使っていないものを見つけて片づける」ためのものとしている。1440・1920とも横スクロール0', verdictSource: 'analytics-v6/QQ1SR.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     gap: 'api',
@@ -1507,10 +1507,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
   },
-  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: 'P1 設計の帯5つと絞り込みが無い。**一覧の「集計状態」列（利用可能／一部集計／取得不可／—）は #445 で入って解決している**', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 集計前は帯4つとも `—` で、「たて・よこの軸を選び、『直近30日を集計』を押してください。」と次にすることを書く。**押す前に数字を見せていない。** 残るのは実データの接続', verdictSource: 'analytics-v6/f5HsX.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 1段目の通過率が `—`。**前の段が無いので割合が出せない**のを 0% と書いていない。残るのは実データの接続', verdictSource: 'analytics-v6/C2I7ry.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 同じ列に **`0%`（押されていない）** と **`—`（数えられない）** が並び、**見分けられる**。束4の手本にできる形。残るのは実データの接続', verdictSource: 'analytics-v6/Fh2Qj.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。前のP1（一覧に集計状態が無い）は直っている**——「集計状態」列があり、利用可能／一部集計／取得不可／`—` を言い分ける。P2 設計の保存した分析は、保存時の条件と最後に見た日をその場で開ける。実装は一覧まで。1440・1920とも横スクロール0', verdictSource: 'analytics-v6/dfwD4.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
@@ -2210,7 +2210,6 @@ export const CAPTURED_AT = {
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
     { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' }],
   5: [
-    { pr: 529, head: '4cb2b0d9', on: '2026-08-29', screens: ['TC1b1'], note: '読了済の母数を明記。束6' },
     { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
     { pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
@@ -2224,6 +2223,7 @@ export const CAPTURED_AT = {
     { pr: 530, head: '2568c474', on: '2026-08-29', screens: ['xfYLn'], note: '通の編集から `cron` を外す。束3' },
     { pr: 569, head: '92f03199', on: '2026-08-30', screens: ['cCB7r'], note: '配信方式の選択。段の表示と、作り直しになる断りが入っている' },
     { pr: 427, head: '5f09837c', on: '2026-08-30', screens: ['TC1b1', 'bV5Vs', 'g2UNV'], note: '`codex/development` 直結へ張り替え。**#529 の母数の直りは入っていない**（#427 単体では 41% だけ）' },
+    { pr: 529, head: 'a3511980', on: '2026-08-30', screens: ['TC1b1'], note: '読了済の母数を明記。束6。**development 直結へ張り替わり head も動いたが撮り直していない**——`scenarios/page.tsx` の blob が同一' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' },
   ],
   2: [
