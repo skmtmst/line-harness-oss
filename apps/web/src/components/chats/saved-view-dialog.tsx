@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Notice from '@/components/shared/notice'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -61,6 +62,8 @@ export default function SavedViewDialog({
   }, [open, onClose])
 
   if (!open || typeof document === 'undefined') return null
+
+  const nameMissing = error === '検索名を入力してください'
 
   const submit = async () => {
     const trimmed = name.trim()
@@ -127,9 +130,10 @@ export default function SavedViewDialog({
                 onChange={(event) => { setName(event.target.value); setError('') }}
                 maxLength={NAME_LIMIT}
                 placeholder="例：未対応・期限超過"
+                aria-invalid={nameMissing}
+                aria-describedby={error ? 'saved-view-error' : undefined}
                 className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${error ? 'border-danger' : 'border-hairline'}`}
               />
-              {error ? <p className="text-danger mt-1.5 text-xs" role="alert">{error}</p> : null}
             </div>
 
             <div>
@@ -143,6 +147,10 @@ export default function SavedViewDialog({
                 ))}
               </dl>
             </div>
+
+            {error ? (
+              <Notice id="saved-view-error" tone="error" message={error} data-saved-view-error />
+            ) : null}
           </div>
         )}
 
@@ -159,7 +167,7 @@ export default function SavedViewDialog({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={saving}
+                disabled={saving || nameMissing}
                 className="rounded-control bg-accent text-on-accent px-5 py-2 text-sm font-bold disabled:opacity-40"
               >
                 {saving ? '保存中' : 'この条件を保存'}

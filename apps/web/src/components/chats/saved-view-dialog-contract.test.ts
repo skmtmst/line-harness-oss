@@ -27,4 +27,16 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(PAGE).toContain('return { success: true }')
     expect(PAGE).toContain('return { success: false, error: message }')
   })
+
+  it('検索名が空だと分かったあとは保存ボタンを押せない', () => {
+    expect(DIALOG).toContain("const nameMissing = error === '検索名を入力してください'")
+    expect(DIALOG).toContain('disabled={saving || nameMissing}')
+  })
+
+  it('未入力エラーは共通の赤い案内帯で表示する', () => {
+    expect(DIALOG).toContain("import Notice from '@/components/shared/notice'")
+    expect(DIALOG).toContain('<Notice id="saved-view-error" tone="error" message={error} data-saved-view-error />')
+    expect(DIALOG).toContain('aria-invalid={nameMissing}')
+    expect(DIALOG).toContain("aria-describedby={error ? 'saved-view-error' : undefined}")
+  })
 })
