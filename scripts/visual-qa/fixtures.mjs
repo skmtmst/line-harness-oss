@@ -1512,6 +1512,69 @@ export const COMMON_VAR_SCHEDULES = {
 }
 
 /**
+ * 共通情報「変える前に影響を見る」。#548 の `CommonVarUsageImpact` と同じ形。
+ *
+ * 回答フォームはまだLINEアカウント所属を持たないため、本文や名前を作らず
+ * `unscopedFormTotal` の件数だけにする。送信済み配信も1件入れ、変更される
+ * 文と過去の記録を同じものとして扱う実装を捕まえる。
+ */
+const COMMON_VAR_ACTIVE_PREVIEWS = [
+  ['tpl-1', '来店予約の前日案内', '明日は株式会社NENへお越しください。'],
+  ['tpl-2', '初回のお礼', '株式会社NENをご利用いただきありがとうございます。'],
+  ['tpl-3', '営業時間外の案内', '株式会社NENの営業時間外にお問い合わせを受け付けました。'],
+  ['tpl-4', '予約確定のお知らせ', '株式会社NENでご予約を承りました。'],
+  ['tpl-5', '発送のお知らせ', '株式会社NENから商品を発送しました。'],
+  ['tpl-6', 'イベント参加案内', '株式会社NENのイベント会場をご案内します。'],
+  ['tpl-7', '相談会のご案内', '株式会社NENの個別相談をご予約いただけます。'],
+  ['tpl-8', '資料送付のお知らせ', '株式会社NENの資料をお送りします。'],
+  ['tpl-9', '購入後のご案内', '株式会社NENでのお買い上げありがとうございます。'],
+  ['tpl-10', 'アンケートのお願い', '株式会社NENのアンケートにご協力ください。'],
+  ['tpl-11', '会員登録のご案内', '株式会社NENの会員登録が完了しました。'],
+  ['tpl-12', 'お問い合わせ受付', '株式会社NENがお問い合わせを受け付けました。'],
+]
+
+export const COMMON_VAR_IMPACT = {
+  total: 16,
+  blockingTotal: 15,
+  historicalTotal: 1,
+  unscopedFormTotal: 3,
+  canDelete: false,
+  byKind: {
+    template: 12,
+    broadcast: 1,
+    scenario: 0,
+    reminder: 0,
+    auto_reply: 0,
+    form: 3,
+    automation: 0,
+  },
+  items: [
+    ...COMMON_VAR_ACTIVE_PREVIEWS.map(([sourceId, name, currentPreview]) => ({
+      kind: 'template',
+      kindLabel: 'テンプレート',
+      sourceId,
+      name,
+      status: '使われています',
+      href: `/templates/edit?id=${sourceId}`,
+      changesOnSave: true,
+      currentPreview,
+      nextPreview: currentPreview.replaceAll('株式会社NEN', '株式会社NENグループ'),
+    })),
+    {
+      kind: 'broadcast',
+      kindLabel: '一斉配信',
+      sourceId: 'broadcast-sent-1',
+      name: '8月のお知らせ',
+      status: '送信済み・変わりません',
+      href: '/broadcasts/broadcast-sent-1',
+      changesOnSave: false,
+      currentPreview: '株式会社NENから8月のお知らせです。',
+      nextPreview: '株式会社NENグループから8月のお知らせです。',
+    },
+  ],
+}
+
+/**
  * 機能15 登録メディア。設計 `g89Tc` の一覧。
  *
  * **`MediaItem` の型どおり。** `kind` は `'image'|'video'|'audio'|'file'` の4つ。

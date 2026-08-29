@@ -870,8 +870,8 @@
       "feature": 8,
       "node": "Gy9OK",
       "name": "8-1-I 削除確認",
-      "gap": "parts",
-      "gapNote": "既存 `ConfirmDialog` にルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴は残ることを表示する。`auto_reply_hits` は外部キーを持たず削除後も残るため新規DBは不要"
+      "gap": "pending",
+      "gapNote": "#544 head `6053c271` で既存 `ConfirmDialog` を接続済み。ルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴が残ることを表示する。取り込み順は #491 → #544。最新headを画像・操作確認してから未実装を外す"
     },
     {
       "feature": 9,
@@ -926,8 +926,8 @@
       "feature": 10,
       "node": "Ho8z4",
       "name": "10-1-D 通知・リマインド",
-      "gap": "api",
-      "gapNote": "前日・1時間前・開始時に走らせる仕掛けが要る"
+      "gap": "pending",
+      "gapNote": "#546 head `de0848b9` で既存申込・5分cron・Harness Proxyを再利用し、申込直後/前日/開始前/開始時/未視聴/視聴完了、再予約時の旧予定取消、冪等キー、最大5回再送、テスト送信を実装済み。1440/1920と各状態の画像確認待ち"
     },
     {
       "feature": 10,
@@ -1003,8 +1003,8 @@
       "feature": 14,
       "node": "uNBlA",
       "name": "14-1-B 変える前に影響を見る",
-      "gap": "api",
-      "gapNote": "共通情報の差し込み先を1件ずつ引く口が要る"
+      "gap": "pending",
+      "gapNote": "#548 head `d4a85ad4` で影響確認APIと画面を実装済み。文字数上限は未接続のため `—` と理由を出す。1440/1920で通常・未取得・所属不明フォーム・送信済みの扱いを比較してから未実装を外す"
     },
     {
       "feature": 14,
@@ -1115,29 +1115,29 @@
       "feature": 24,
       "node": "X8JCA5",
       "name": "24-1-B 送れなかったもの",
-      "gap": "api",
-      "gapNote": "届かなかったお知らせを残す記録が要る"
+      "gap": "pending",
+      "gapNote": "#545 head `03022681` は土台の#504を含み、`/line-notifications?tab=failures` を実装済み。失敗理由・未取得と0件・安全な再試行導線を画像と操作で確認する"
     },
     {
       "feature": 24,
       "node": "Se65i",
       "name": "24-1-C お知らせの記録",
-      "gap": "api",
-      "gapNote": "いつ・だれに・どのお知らせを送ったかの記録が要る。読む元は ec_events と messages_log(source=ec_transactional)。**開封は作らない**"
+      "gap": "pending",
+      "gapNote": "#545 head `03022681` は土台の#504を含み、既存 `ec_events` と `messages_log(source=ec_transactional)` を読む記録を実装済み。**開封は作らない**。通常・空・失敗を確認する"
     },
     {
       "feature": 24,
       "node": "DpxOK",
       "name": "24-2 運用者へのお知らせ",
-      "gap": "api",
-      "gapNote": "運用者へ知らせる仕掛けそのものが要る"
+      "gap": "pending",
+      "gapNote": "#545 head `03022681` に既存の通知ルールDB・アカウント別APIを再利用した一覧を実装済み。通常・読込・空・失敗・権限不足と、未取得 `—` / 実値0を1440/1920で比較する"
     },
     {
       "feature": 24,
       "node": "N2gAza",
       "name": "24-2-A 運用者へのお知らせをつくる",
-      "gap": "api",
-      "gapNote": "同上（作る画面）"
+      "gap": "pending",
+      "gapNote": "#545 head `03022681` に下書き作成画面を実装済み。下書き保存・API直叩きの公開拒否・本文タイトル重複なし・横スクロール0を確認する"
     },
     {
       "feature": 25,
@@ -1150,8 +1150,8 @@
       "feature": 26,
       "node": "KNG00",
       "name": "26-1-B やり取りの記録",
-      "gap": "api",
-      "gapNote": "外部連携のやり取りを残す記録と、やり直しの口が要る"
+      "gap": "pending",
+      "gapNote": "#547 head `48715569` に送受信記録・安全な再送・通常/読込/空/失敗を実装済み。1440px・1920pxで設計と比較する"
     },
     {
       "feature": 27,
