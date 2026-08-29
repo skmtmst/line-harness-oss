@@ -11,8 +11,51 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateCarousel } from '../services/carousel-validation.js';
+import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
 
 const templates = new Hono<Env>();
+
+const QUESTION_BEHAVIORS = new Set([
+  'none',
+  'url',
+  'tel',
+  'add_friend',
+  'mail',
+  'form',
+  'scenario',
+]);
+
+function readQuestionPayload(body: Record<string, unknown>):
+  | { ok: true; question: ScenarioQuestion | null; questionJson?: string | null }
+  | { ok: false; error: string } {
+  if (!('question' in body)) return { ok: true, question: null };
+  if (body.question === null) return { ok: true, question: null, questionJson: null };
+  if (!body.question || typeof body.question !== 'object' || Array.isArray(body.question)) {
+    return { ok: false, error: '質問の内容を読み取れません' };
+  }
+  const raw = JSON.stringify(body.question);
+  const question = parseQuestion(raw);
+  if (!question) return { ok: false, error: '質問文と選択肢を入力してください' };
+  if (question.text.length > 160) return { ok: false, error: '質問文は160文字以内で入力してください' };
+  if (question.choices.length > 13) return { ok: false, error: '選択肢は13件以内で入力してください' };
+  if (question.choices.some((choice) => !choice || typeof choice !== 'object' || typeof choice.label !== 'string')) {
+    return { ok: false, error: 'すべての選択肢に文字を入力してください' };
+  }
+  if (question.choices.some((choice) => !choice.label.trim())) {
+    return { ok: false, error: 'すべての選択肢に文字を入力してください' };
+  }
+  if (question.choices.some((choice) => choice.label.length > 20)) {
+    return { ok: false, error: '選択肢の文字は20文字以内で入力してください' };
+  }
+  if (question.choices.some((choice) => typeof choice.behavior !== 'string' || !QUESTION_BEHAVIORS.has(choice.behavior))) {
+    return { ok: false, error: '選択後の動きを確認してください' };
+  }
+  return { ok: true, question, questionJson: raw };
+}
+
+function questionValue(raw: string | null): ScenarioQuestion | null {
+  return parseQuestion(raw);
+}
 
 /**
  * カルーセルなら中身を確かめる。
@@ -64,6 +107,8 @@ templates.get('/api/templates', async (c) => {
         category: t.category,
         messageType: t.message_type,
         messageContent: t.message_content,
+        question: questionValue(t.question_json),
+        questionStatus: t.question_status,
         folderId: t.folder_id ?? null,
         usageCount: t.usage_count,
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
@@ -92,6 +137,8 @@ templates.get('/api/templates/:id', async (c) => {
         category: item.category,
         messageType: item.message_type,
         messageContent: item.message_content,
+        question: questionValue(item.question_json),
+        questionStatus: item.question_status,
         carouselActions: item.carousel_actions_json
           ? JSON.parse(item.carousel_actions_json)
           : null,
@@ -205,7 +252,7 @@ function readCarouselOptions(body: Record<string, unknown>):
 
 templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; category?: string; messageType: string; messageContent: string }>();
+    const body = await c.req.json<{ name: string; category?: string; messageType: string; messageContent: string; question?: unknown; questionStatus?: 'draft' | 'published' }>();
     if (!body.name || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
@@ -213,8 +260,20 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
-    const item = await createTemplate(c.env.DB, { ...body, ...options.value });
-    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, createdAt: item.created_at } }, 201);
+    const question = readQuestionPayload(body as unknown as Record<string, unknown>);
+    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
+      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+    }
+    const item = await createTemplate(c.env.DB, {
+      ...body,
+      ...options.value,
+      questionJson: question.questionJson,
+      questionStatus: body.questionStatus,
+      // 質問を扱わない利用先で選ばれても、壊れたFlexを送らず質問文を送る。
+      ...(question.question ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text } : {}),
+    });
+    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, question: questionValue(item.question_json), questionStatus: item.question_status, createdAt: item.created_at } }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -224,7 +283,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
 templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json<{ messageType?: string; messageContent?: string }>();
+    const body = await c.req.json<{ messageType?: string; messageContent?: string; question?: unknown; questionStatus?: 'draft' | 'published' }>();
     // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
     const existing = await getTemplateById(c.env.DB, id);
     const carousel = checkCarousel(
@@ -234,7 +293,18 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
-    await updateTemplate(c.env.DB, id, { ...body, ...options.value });
+    const question = readQuestionPayload(body as unknown as Record<string, unknown>);
+    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
+      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+    }
+    await updateTemplate(c.env.DB, id, {
+      ...body,
+      ...options.value,
+      questionJson: question.questionJson,
+      questionStatus: body.questionStatus,
+      ...(question.question ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text } : {}),
+    });
     const updated = await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -245,6 +315,8 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
         category: updated.category,
         messageType: updated.message_type,
         messageContent: updated.message_content,
+        question: questionValue(updated.question_json),
+        questionStatus: updated.question_status,
         carouselActions: updated.carousel_actions_json
           ? JSON.parse(updated.carousel_actions_json)
           : null,
