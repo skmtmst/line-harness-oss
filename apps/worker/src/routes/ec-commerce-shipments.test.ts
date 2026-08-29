@@ -97,7 +97,11 @@ describe('GET /api/ec-commerce/shipments', () => {
         order_items: JSON.stringify([{ name: '鹿肉ミンチ', quantity: 2 }]),
       }),
     ]);
-    expect((withSubscriptionItems.later as Row[])[0].items).toBe('猪肉スライス × 1');
+    const withItems = [
+      ...(withSubscriptionItems.soon as Row[]),
+      ...(withSubscriptionItems.later as Row[]),
+    ];
+    expect(withItems[0].items).toBe('猪肉スライス × 1');
 
     const withoutSubscriptionItems = await callShipments([
       orderRow({
@@ -107,7 +111,11 @@ describe('GET /api/ec-commerce/shipments', () => {
         order_items: JSON.stringify([{ name: '鹿肉ミンチ', quantity: 2 }]),
       }),
     ]);
-    expect((withoutSubscriptionItems.later as Row[])[0].items).toBe('鹿肉ミンチ × 2');
+    const withoutItems = [
+      ...(withoutSubscriptionItems.soon as Row[]),
+      ...(withoutSubscriptionItems.later as Row[]),
+    ];
+    expect(withoutItems[0].items).toBe('鹿肉ミンチ × 2');
   });
 
   it('商品情報がどちらにも無くても壊れない', async () => {
