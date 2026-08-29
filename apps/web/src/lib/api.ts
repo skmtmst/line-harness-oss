@@ -4316,6 +4316,17 @@ export interface BookingStaff {
   is_active: number;
 }
 
+export interface BookingMenuStaff {
+  id: string;
+  display_name: string;
+  role: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+  is_designation_optional: number;
+  price: number;
+  duration_minutes: number;
+}
+
 export interface BookingShift {
   id: string;
   work_date: string;
@@ -4368,6 +4379,27 @@ export interface BookingGoogleCalendarConnection {
   last_error: string | null;
 }
 
+export interface BookingAvailabilitySlot {
+  date: string;
+  start: string;
+  end: string;
+}
+
+export interface BookingAvailabilityResponse {
+  by_staff: Array<{
+    staff_id: string;
+    display_name: string;
+    slots: BookingAvailabilitySlot[];
+  }>;
+}
+
+export interface ProxyBookingResult {
+  booking_id: string;
+  status: string;
+  calendar_sync: 'not_configured' | 'synced' | 'failed' | 'pending';
+  replayed?: boolean;
+}
+
 function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
@@ -4376,6 +4408,39 @@ export const bookingApi = {
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
+  listMenuStaff: (accountId: string, menuId: string) =>
+    fetchApi<{ staff: BookingMenuStaff[] }>(
+      withAccount(`/api/booking/admin/menus/${menuId}/staff`, accountId),
+    ),
+  getAvailability: (
+    accountId: string,
+    params: { menuId: string; staffId?: string; from: string; to: string },
+  ) => {
+    const query = new URLSearchParams({
+      account_id: accountId,
+      menu_id: params.menuId,
+      from: params.from,
+      to: params.to,
+    });
+    if (params.staffId) query.set('staff_id', params.staffId);
+    return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
+  },
+  createProxyBooking: (
+    accountId: string,
+    body: {
+      friend_id: string;
+      menu_id: string;
+      staff_id: string;
+      starts_at: string;
+      customer_note?: string;
+    },
+    idempotencyKey: string,
+  ) =>
+    fetchApi<ProxyBookingResult>(withAccount('/api/booking/admin/bookings', accountId), {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(body),
+    }),
   createMenu: (accountId: string, body: Partial<BookingMenu>) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/menus', accountId), {
       method: 'POST',
