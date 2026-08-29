@@ -42,6 +42,7 @@ interface BroadcastFormProps {
   openTemplatePickerInitially?: boolean
   initialTemplateId?: string | null
   initialContentTemplateId?: string | null
+  initialCondition?: SegmentCondition | null
 }
 
 /*
@@ -259,6 +260,7 @@ export default function BroadcastForm({
   openTemplatePickerInitially = false,
   initialTemplateId = null,
   initialContentTemplateId = null,
+  initialCondition = null,
 }: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
   const createIdempotencyKey = useRef(crypto.randomUUID())
@@ -268,13 +270,13 @@ export default function BroadcastForm({
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [targetMode, setTargetMode] = useState<TargetMode>('scenario')
+  const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [tagId, setTagId] = useState('')
   /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
-  const [condition, setCondition] = useState<SegmentCondition | null>(null)
+  const [condition, setCondition] = useState<SegmentCondition | null>(initialCondition)
   /*
    * 本文のURLを短くしてクリックを数えるか。
    *
