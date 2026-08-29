@@ -45,6 +45,7 @@ describe('共通部品の影響範囲', () => {
       'app/tags/page.tsx',
       'app/tags/searches/edit/page.tsx',
       'app/templates/page.tsx',
+      'app/templates/questions/new/page.tsx',
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
       'components/friend-fields/saved-search-list.tsx',
@@ -63,7 +64,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする13ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする14ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
@@ -80,6 +81,7 @@ describe('共通部品の影響範囲', () => {
       'components/friends/friend-list-table.tsx',
       'components/line-notifications/notification-run-list.tsx',
       'components/support/pending-inbox-card.tsx',
+      'components/users/users-table.tsx',
     ])
   })
 
