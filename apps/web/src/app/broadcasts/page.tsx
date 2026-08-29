@@ -12,6 +12,7 @@ import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
 import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -79,6 +80,9 @@ function BroadcastList() {
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
+  const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadInsight = async (id: string) => {
     try {
@@ -135,13 +139,19 @@ function BroadcastList() {
     broadcasts.filter(b => b.status === 'sent').forEach(b => loadInsight(b.id))
   }, [broadcasts])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この配信を削除してもよいですか？')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeletingId(deleteTarget.id)
+    setDeleteError('')
     try {
-      await api.broadcasts.delete(id)
-      load()
+      const result = await api.broadcasts.delete(deleteTarget.id)
+      if (!result.success) throw new Error(result.error)
+      setDeleteTarget(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -568,7 +578,10 @@ function BroadcastList() {
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
-                            onClick={() => handleDelete(broadcast.id)}
+                            onClick={() => {
+                              setDeleteError('')
+                              setDeleteTarget(broadcast)
+                            }}
                             className="px-3 py-1 min-h-[44px] text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
                           >
                             削除
@@ -587,6 +600,21 @@ function BroadcastList() {
             </div>
           </div>
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
+        description="削除すると配信設定と確認画面から消えます。予約中の配信は中止され、この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deletingId !== null}
+        error={deleteError}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (deletingId !== null) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }
