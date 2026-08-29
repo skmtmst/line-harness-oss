@@ -152,6 +152,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     const offset = Number(c.req.query('offset') ?? '0');
     const tagId = c.req.query('tagId');
     const lineAccountId = c.req.query('lineAccountId');
+    const audienceId = c.req.query('audienceId')?.trim();
     const search = c.req.query('search');
     // ?includeTags=false skips per-row tag enrichment (N+1 of getFriendTags
     // → ~50 extra D1 reads on a wide list query). The list view needs tags
@@ -180,6 +181,28 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     const savedSearchId = c.req.query('savedSearchId');
 
     const db = c.env.DB;
+    const staff = c.get('staff');
+
+    if (lineAccountId && !await canAccessAllLineAccounts(db, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+
+    if (audienceId) {
+      if (staff.role !== 'owner' && staff.role !== 'admin') {
+        return c.json({ success: false, error: '対象者の個人一覧を表示する権限がありません' }, 403);
+      }
+      if (!lineAccountId) {
+        return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+      }
+      const audience = await db.prepare(
+        `SELECT id, expires_at FROM analytics_result_audiences
+          WHERE id = ? AND line_account_id = ?`,
+      ).bind(audienceId, lineAccountId).first<{ id: string; expires_at: string }>();
+      if (!audience) return c.json({ success: false, error: 'Not found' }, 404);
+      if (audience.expires_at <= new Date().toISOString()) {
+        return c.json({ success: false, error: 'この分析結果の対象者は24時間を過ぎました。もう一度集計してください' }, 410);
+      }
+    }
 
     // Build WHERE conditions
     const conditions: string[] = [];
@@ -187,6 +210,15 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     if (tagId) {
       conditions.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
       binds.push(tagId);
+    }
+    if (audienceId) {
+      conditions.push(
+        `EXISTS (
+          SELECT 1 FROM analytics_result_audience_members arm
+          WHERE arm.audience_id = ? AND arm.friend_id = f.id
+        )`,
+      );
+      binds.push(audienceId);
     }
     if (lineAccountId) {
       const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));

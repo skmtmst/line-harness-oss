@@ -181,6 +181,246 @@ export type CommonActionSummary = {
   updatedAt: string;
 };
 
+export type AnalyticsMetricState =
+  | 'available'
+  | 'pending'
+  | 'unavailable'
+  | 'insufficient'
+  | 'partial'
+  | 'failed'
+
+export type AnalyticsMetric<T> = {
+  value: T | null
+  state: AnalyticsMetricState
+  reason: string | null
+}
+
+export type AnalyticsEnvelope<T> = {
+  lineAccountId: string
+  timeZone: string
+  period: { from: string; to: string }
+  dataCutoffAt: string
+  data: T
+}
+
+export type AnalyticsFriendsOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  metrics: {
+    added: AnalyticsMetric<number>
+    removed: AnalyticsMetric<number>
+    net: AnalyticsMetric<number>
+    currentFriends: AnalyticsMetric<number>
+    firstTime: AnalyticsMetric<number>
+    returning: AnalyticsMetric<number>
+  }
+  days: Array<{ date: string; added: number; removed: number; net: number }>
+  campaigns: Array<{
+    id: string
+    name: string
+    kind: 'broadcast' | 'scenario'
+    occurredAt: string
+    date: string
+  }>
+  historyAvailableFrom: string | null
+}>
+
+export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
+  metrics: {
+    sent: AnalyticsMetric<number>
+    delivered: AnalyticsMetric<number>
+    opened: AnalyticsMetric<number>
+    lineClicked: AnalyticsMetric<number>
+    trackedClicks: AnalyticsMetric<number>
+    unavailableCampaigns: AnalyticsMetric<number>
+  }
+  campaigns: Array<{
+    id: string
+    name: string
+    kind: 'broadcast' | 'scenario'
+    sentAt: string
+    targetPeople: AnalyticsMetric<number>
+    delivered: AnalyticsMetric<number>
+    opened: AnalyticsMetric<number>
+    lineClicked: AnalyticsMetric<number>
+    outcomes: AnalyticsMetric<number>
+    fetchedAt: string | null
+  }>
+  trackedClickHours: Array<{ hour: number; clicks: number }>
+  clickDefinition: string
+}>
+
+export type AnalyticsRoutesOverview = AnalyticsEnvelope<{
+  attributionModel: 'first_touch'
+  attributionLabel: string
+  routes: Array<{
+    id: string
+    refCode: string | null
+    name: string
+    clicks: AnalyticsMetric<number>
+    friendAdds: AnalyticsMetric<number>
+    currentFriends: AnalyticsMetric<number>
+    reactionPeople: AnalyticsMetric<number>
+    conversions: {
+      approved: AnalyticsMetric<number>
+      pending: AnalyticsMetric<number>
+      rejected: AnalyticsMetric<number>
+      revenue: AnalyticsMetric<number>
+    }
+    adCost: AnalyticsMetric<number>
+    costPerFriend: AnalyticsMetric<number>
+    costPerConversion: AnalyticsMetric<number>
+    profitAfterAdCost: AnalyticsMetric<number>
+  }>
+  searchConsoleHref: string
+}>
+
+export type AnalyticsUsageOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  checkedAt: string
+  automaticDeletion: false
+  categories: Array<{
+    key: string
+    label: string
+    href: string
+    created: AnalyticsMetric<number>
+    inUse: AnalyticsMetric<number>
+    unused: AnalyticsMetric<number>
+    brokenReferences: AnalyticsMetric<number>
+    lastUsedAt: AnalyticsMetric<string>
+  }>
+}>
+
+export type AnalyticsUrlClicksOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  exposureAvailableFrom: string | null
+  hasMore: boolean
+  clickRateDefinition: string
+  links: Array<{
+    trackedLinkId: string
+    name: string
+    originalUrl: string
+    shortCode: string | null
+    isActive: boolean
+    actions: { tagName: string | null; scenarioName: string | null }
+    clicks: AnalyticsMetric<number>
+    knownClickPeople: AnalyticsMetric<number>
+    deliveredPeople: AnalyticsMetric<number>
+    clickRate: AnalyticsMetric<number>
+    firstClickedAt: AnalyticsMetric<string>
+    lastClickedAt: AnalyticsMetric<string>
+    usageLocations: string[]
+  }>
+}>
+
+export type AnalyticsCrossAxis =
+  | { kind: 'route' }
+  | { kind: 'tag' }
+  | { kind: 'field_choice'; fieldId: string }
+  | { kind: 'score_band' }
+  | { kind: 'conversion_point' }
+  | { kind: 'booking_status' }
+  | { kind: 'purchase_status' }
+
+export type AnalyticsCrossResult = {
+  lineAccountId: string
+  timeZone: string
+  rowValues: Array<{ key: string; label: string }>
+  columnValues: Array<{ key: string; label: string }>
+  cells: Array<{
+    rowKey: string
+    rowLabel: string
+    columnKey: string
+    columnLabel: string
+    value: number
+    uniqueFriends: number
+    totalRatio: number | null
+    previousValue: number
+    difference: number
+  }>
+  totalValue: number
+  totalFriends: number
+  previousTotalValue: number
+  periodFrom: string
+  periodTo: string
+  previousPeriodFrom: string
+  previousPeriodTo: string
+  dataCutoffAt: string
+  state: 'available' | 'partial' | 'unavailable'
+  stateReason: string | null
+}
+
+export type AnalyticsFunnelStepResult = {
+  stepOrder: number
+  label: string
+  reached: number
+  conversionFromPrevious: number | null
+  droppedAfter: number
+  inProgressAfter: number
+  averageSecondsFromPrevious: number | null
+  medianSecondsFromPrevious: number | null
+}
+
+export type AnalyticsFunnelRunResult = {
+  runId: string | null
+  funnelId: string
+  versionId: string | null
+  versionNumber: number | null
+  lineAccountId: string
+  cohortFrom: string
+  cohortTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'available' | 'unavailable' | 'partial' | 'failed'
+  stateReason: string | null
+  groups: Array<{
+    key: string
+    label: string
+    entrants: number
+    completed: number
+    steps: AnalyticsFunnelStepResult[]
+  }>
+}
+
+export type SavedAnalyticsSummary = {
+  id: string
+  name: string
+  kind: 'cross' | 'funnel'
+  status: 'active' | 'archived'
+  currentVersionNumber: number
+  createdBy: string | null
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  snapshotCount: number
+  latestSnapshot: {
+    id: string
+    state: 'available' | 'partial' | 'unavailable' | 'failed'
+    periodFrom: string
+    periodTo: string
+    dataCutoffAt: string
+    createdAt: string
+  } | null
+}
+
+export type SavedAnalyticsSnapshot = {
+  id: string
+  savedAnalysisId: string
+  analysisVersionId: string
+  sourceKind: 'cross' | 'funnel'
+  sourceResultId: string
+  periodFrom: string
+  periodTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'available' | 'partial' | 'unavailable' | 'failed'
+  result: unknown
+  createdBy: string | null
+  createdAt: string
+}
+
 export type CommonActionVersion = {
   id: string;
   versionNumber: number;
@@ -391,6 +631,8 @@ export type FriendListParams = {
   limit?: string | number
   tagId?: string
   accountId?: string
+  /** 分析結果から作った24時間の対象者。友だちIDをURLへ並べない。 */
+  audienceId?: string
   search?: string
   /**
    * `false` でタグ enrich をスキップ。autocomplete 等で displayName/picture
@@ -1071,6 +1313,7 @@ export const api = {
       if (params?.limit) query.limit = String(params.limit)
       if (params?.tagId) query.tagId = params.tagId
       if (params?.accountId) query.lineAccountId = params.accountId
+      if (params?.audienceId) query.audienceId = params.audienceId
       if (params?.search) query.search = params.search
       if (params?.includeTags === false) query.includeTags = 'false'
       if (params?.includeChatStatus) query.includeChatStatus = 'true'
@@ -1398,6 +1641,35 @@ export const api = {
    * 外部APIを叩かないので、ここが外の障害で落ちることはない。
    */
   analytics: {
+    friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsFriendsOverview>>(
+        `/api/analytics/friends${rangeQuery({ ...params, accountId })}`,
+      ),
+    reactionsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsReactionsOverview>>(
+        `/api/analytics/reactions${rangeQuery({ ...params, accountId })}`,
+      ),
+    routesOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsRoutesOverview>>(
+        `/api/analytics/routes${rangeQuery({ ...params, accountId })}`,
+      ),
+    usageOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsUsageOverview>>(
+        `/api/analytics/usage${rangeQuery({ ...params, accountId })}`,
+      ),
+    urlClicksOverview: (
+      accountId: string,
+      params?: { from?: string; to?: string; limit?: number },
+    ) => {
+      const query = new URLSearchParams()
+      query.set('account_id', accountId)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
+      if (params?.limit) query.set('limit', String(params.limit))
+      return fetchApi<ApiResponse<AnalyticsUrlClicksOverview>>(
+        `/api/analytics/url-clicks?${query.toString()}`,
+      )
+    },
     messages: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
@@ -1456,6 +1728,80 @@ export const api = {
       fetchApi<ApiResponse<Array<{ row: string; col: string; count: number }>>>(
         `/api/analytics/cross?account_id=${encodeURIComponent(accountId)}&fieldId=${encodeURIComponent(fieldId)}`,
       ),
+    runCross: (accountId: string, data: {
+      rowAxis: AnalyticsCrossAxis
+      columnAxis: AnalyticsCrossAxis
+      measure: { kind: 'unique_friends' }
+      filters: []
+      periodFrom: string
+      periodTo: string
+    }) => fetchApi<ApiResponse<{ id: string; state: 'pending' }>>(
+      `/api/analytics/cross/query?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    crossResult: (accountId: string, id: string) =>
+      fetchApi<ApiResponse<{
+        id: string
+        state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'
+        errorCode: string | null
+        result: AnalyticsCrossResult | null
+        createdAt: string
+      }>>(`/api/analytics/cross/results/${id}?account_id=${encodeURIComponent(accountId)}`),
+    createResultAudience: (accountId: string, resultId: string, data: {
+      sourceKind: 'cross' | 'funnel'
+      rowKey?: string
+      columnKey?: string
+      groupKey?: string
+      stepOrder?: number
+      selection?: 'reached' | 'stopped' | 'in_progress'
+    }) => fetchApi<ApiResponse<{ id: string; memberCount: number; expiresAt: string }>>(
+      `/api/analytics/results/${resultId}/audiences?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    v6Funnels: {
+      list: (accountId: string) => fetchApi<ApiResponse<Array<{
+        id: string
+        name: string
+        windowDays: number
+        createdAt: string
+        currentVersion: { id: string; versionNumber: number; createdAt: string } | null
+        migrationState: 'ready' | 'needs_migration'
+      }>>>(`/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`),
+      create: (accountId: string, data: {
+        name: string
+        windowDays: number
+        steps: Array<{ label: string; kind: string; match: Record<string, string> }>
+      }) => fetchApi<ApiResponse<{ funnelId: string; version: { id: string; versionNumber: number } }>>(
+        `/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      latestRun: (accountId: string, funnelId: string) =>
+        fetchApi<ApiResponse<AnalyticsFunnelRunResult>>(
+          `/api/analytics/funnels/${funnelId}/runs/latest?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      run: (accountId: string, funnelId: string, data: { cohortFrom: string; cohortTo: string }) =>
+        fetchApi<ApiResponse<AnalyticsFunnelRunResult>>(
+          `/api/analytics/funnels/${funnelId}/run?account_id=${encodeURIComponent(accountId)}`,
+          { method: 'POST', body: JSON.stringify(data) },
+        ),
+    },
+    saved: {
+      list: (accountId: string) => fetchApi<ApiResponse<SavedAnalyticsSummary[]>>(
+        `/api/analytics/saved?account_id=${encodeURIComponent(accountId)}`,
+      ),
+      create: (accountId: string, data: {
+        name: string
+        sourceKind: 'cross' | 'funnel'
+        sourceResultId: string
+      }) => fetchApi<ApiResponse<{ id: string; versionId: string; snapshotId: string }>>(
+        `/api/analytics/saved?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      snapshots: (accountId: string, id: string) =>
+        fetchApi<ApiResponse<SavedAnalyticsSnapshot[]>>(
+          `/api/analytics/saved/${id}/snapshots?account_id=${encodeURIComponent(accountId)}`,
+        ),
+    },
   },
   /**
    * ログイン履歴。オーナーと管理者だけが見られる。

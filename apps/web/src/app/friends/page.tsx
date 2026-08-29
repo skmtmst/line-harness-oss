@@ -40,6 +40,7 @@ function FriendsPageInner({
 }) {
   const { selectedAccountId } = useAccount()
   const searchParams = useSearchParams()
+  const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
@@ -99,6 +100,7 @@ function FriendsPageInner({
         limit: pageSize,
         tagId: selectedTagId || undefined,
         accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
         search: searchSubmitted || undefined,
         includeChatStatus: true,
         sort: sortMode,
@@ -119,7 +121,7 @@ function FriendsPageInner({
     } finally {
       setLoading(false)
     }
-  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])

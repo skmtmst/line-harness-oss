@@ -15,9 +15,9 @@
   },
   "app/analytics/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 9,
-    "direct-th": 18,
-    "direct-secondary-button": 13
+    "arbitrary-value": 8,
+    "direct-th": 3,
+    "direct-secondary-button": 2
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,
