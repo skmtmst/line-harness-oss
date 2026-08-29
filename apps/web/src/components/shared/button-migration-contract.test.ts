@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作30個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作32個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -47,7 +47,7 @@ describe('標準ボタンの第1段階移行', () => {
 
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
-    expect(openings).toHaveLength(30)
+    expect(openings).toHaveLength(32)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
   })
 
@@ -112,10 +112,13 @@ describe('標準ボタンの第1段階移行', () => {
       **増やしたぶんはここに記録して止める。** 減ったら締め直す。
     */
     // 友だち一覧はV6トークンへ移し、任意値を127か所削除した。
+    // 2026-08-29: 統合ユーザー一覧をV6トークンと7列の業務表へ移し、
+    // 旧画面の任意値を36か所減らした。
     // 2026-08-27: 「今月の配信」から重複していた送信枠の帯を外し、
     // 「友だちの状態」を設計の3行＋内訳に組み直した。保存検索の保存ダイアログと
-    // マイル概要もV6トークンへ寄せ、分析画面の旧UIも削除したため、1279まで減った。
-    expect(debt['arbitrary-value']).toBe(1279)
+    // マイル概要もV6トークンへ寄せ、分析画面の旧UIも削除した。
+    // 両方を合わせて1243へ締め直す。
+    expect(debt['arbitrary-value']).toBe(1243)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

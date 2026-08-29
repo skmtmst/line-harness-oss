@@ -2481,6 +2481,9 @@ CREATE TABLE templates (
   carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
   -- 162: 制限を超えたときに返すテキスト。空なら何も返さない。
   carousel_tap_limit_text TEXT,
+  -- 質問テンプレート。scenario_steps.question_json と同じ形。
+  question_json TEXT CHECK (question_json IS NULL OR json_valid(question_json)),
+  question_status TEXT NOT NULL DEFAULT 'published' CHECK (question_status IN ('draft', 'published')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id));
