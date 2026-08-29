@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
@@ -82,6 +83,7 @@ export default function MediaLibraryPage() {
     () => new Set(KINDS.map((k) => k.key)),
   )
   const [query, setQuery] = useState('')
+  const [showUnusedOnly, setShowUnusedOnly] = useState(false)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -224,9 +226,11 @@ export default function MediaLibraryPage() {
     const needle = query.trim().toLowerCase()
     return items.filter(
       (item) =>
-        kinds.has(item.kind) && (!needle || item.filename.toLowerCase().includes(needle)),
+        kinds.has(item.kind) &&
+        (!showUnusedOnly || item.usageCount === 0) &&
+        (!needle || item.filename.toLowerCase().includes(needle)),
     )
-  }, [items, kinds, query])
+  }, [items, kinds, query, showUnusedOnly])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
   const current = useMemo(
@@ -330,6 +334,15 @@ export default function MediaLibraryPage() {
             {kind.label}
           </label>
         ))}
+        <FilterChip
+          selected={showUnusedOnly}
+          onChange={(selectedValue) => {
+            setShowUnusedOnly(selectedValue)
+            setPage(1)
+          }}
+        >
+          使っていない
+        </FilterChip>
         <input
           type="search"
           value={query}
@@ -440,8 +453,21 @@ export default function MediaLibraryPage() {
                     <p className="text-ink-faint text-[11px] tabular-nums">
                       登録：{formatStamp(item.createdAt)}・{formatSize(item.sizeBytes)}
                     </p>
-                    <p className="text-ink-faint text-xs tabular-nums">
-                      使用先：{item.usageCount === undefined ? '—' : `${item.usageCount}件`}
+                    <p
+                      className={`text-xs font-medium tabular-nums ${
+                        item.usageCount === undefined
+                          ? 'text-ink-faint'
+                          : item.usageCount === 0
+                            ? 'text-ink-faint'
+                            : 'text-success'
+                      }`}
+                    >
+                      <span className="sr-only">使用先：</span>
+                      {item.usageCount === undefined
+                        ? '使用先を確認できません'
+                        : item.usageCount === 0
+                          ? 'どこでも使っていない'
+                          : `${item.usageCount}か所で使用中`}
                     </p>
                   </>
                 )}

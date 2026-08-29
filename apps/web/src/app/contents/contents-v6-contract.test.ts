@@ -19,7 +19,17 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('未取得の使用数を0件に見せない', () => {
-    expect(PAGE).toContain("item.usageCount === undefined ? '—'")
+    expect(PAGE).toContain("? '使用先を確認できません'")
+    expect(PAGE).toContain("item.usageCount === 0")
+    expect(PAGE).toContain("? 'どこでも使っていない'")
+    expect(PAGE).toContain('`${item.usageCount}か所で使用中`')
+  })
+
+  it('使っていないメディアだけを一覧で絞り込める', () => {
+    expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
+    expect(PAGE).toContain('selected={showUnusedOnly}')
+    expect(PAGE).toContain('!showUnusedOnly || item.usageCount === 0')
+    expect(PAGE).toContain('使っていない')
   })
 
   it('使用中メディアの強制削除口を持たない', () => {
