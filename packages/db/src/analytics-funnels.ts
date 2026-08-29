@@ -952,6 +952,32 @@ export async function runChronologicalFunnel(
   return { runId, ...resultBase };
 }
 
+/**
+ * 一覧を開いただけで新しい結果を作らないため、最後に確定した実行結果を読む。
+ * 結果JSONは実行時点で固定済みで、現在の定義から再計算しない。
+ */
+export async function getLatestFunnelRun(
+  db: D1Database,
+  lineAccountId: string,
+  funnelId: string,
+): Promise<FunnelRunResult | null> {
+  const row = await db.prepare(
+    `SELECT id, result_json
+       FROM analytics_funnel_runs
+      WHERE line_account_id = ? AND funnel_id = ?
+        AND state IN ('available', 'partial', 'unavailable', 'failed')
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1`,
+  ).bind(lineAccountId, funnelId).first<{ id: string; result_json: string }>();
+  if (!row) return null;
+  try {
+    const result = JSON.parse(row.result_json) as Omit<FunnelRunResult, 'runId'>;
+    return { runId: row.id, ...result };
+  } catch {
+    throw new Error('analytics_funnel_run_result_invalid');
+  }
+}
+
 export async function createFunnelResultAudience(
   db: D1Database,
   input: {

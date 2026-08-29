@@ -219,6 +219,7 @@ export async function purgeExpiredAnalyticsReadData(
   reconciliationRuns: number;
   funnelRuns: number;
   crossRuns: number;
+  savedSnapshots: number;
   audiences: number;
   urlExposures: number;
   urlExposureQueue: number;
@@ -232,6 +233,7 @@ export async function purgeExpiredAnalyticsReadData(
     db.prepare(`DELETE FROM analytics_result_audiences WHERE expires_at <= ?`).bind(now.toISOString()),
     db.prepare(`DELETE FROM analytics_funnel_runs WHERE created_at < ?`).bind(eventCutoff),
     db.prepare(`DELETE FROM analytics_cross_runs WHERE created_at < ?`).bind(eventCutoff),
+    db.prepare(`DELETE FROM analytics_saved_analysis_snapshots WHERE created_at < ?`).bind(eventCutoff),
     db.prepare(`DELETE FROM analytics_url_exposures WHERE sent_at < ?`).bind(eventCutoff),
     db.prepare(
       `DELETE FROM analytics_url_exposure_queue
@@ -245,7 +247,8 @@ export async function purgeExpiredAnalyticsReadData(
     audiences: Number(results[3]?.meta?.changes ?? 0),
     funnelRuns: Number(results[4]?.meta?.changes ?? 0),
     crossRuns: Number(results[5]?.meta?.changes ?? 0),
-    urlExposures: Number(results[6]?.meta?.changes ?? 0),
-    urlExposureQueue: Number(results[7]?.meta?.changes ?? 0),
+    savedSnapshots: Number(results[6]?.meta?.changes ?? 0),
+    urlExposures: Number(results[7]?.meta?.changes ?? 0),
+    urlExposureQueue: Number(results[8]?.meta?.changes ?? 0),
   };
 }
