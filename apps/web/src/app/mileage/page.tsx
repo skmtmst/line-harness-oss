@@ -11,11 +11,13 @@ import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
 import { formatMileageDate } from './mileage-display'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
+import MileageRewardsTab from './mileage-rewards-tab'
 
 const PAGE_SIZE = 50
 const TABS = [
   { key: 'balances', label: '友だちの残高' },
   { key: 'earning-rules', label: 'たまる決めごと' },
+  { key: 'rewards', label: '使い道' },
   { key: 'history', label: '履歴' },
   { key: 'score', label: '行動スコア' },
 ] as const
@@ -207,7 +209,7 @@ function MileagePageInner() {
   }, [accounts, selectedAccountId])
 
   return (
-    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
+    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
       <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
@@ -218,6 +220,8 @@ function MileagePageInner() {
             ? <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
             : tab === 'earning-rules'
               ? <Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>
+              : tab === 'rewards'
+                ? <Button href="/mileage/rewards/new" variant="primary">使い道をつくる</Button>
               : undefined}
         />
       </div>
@@ -357,6 +361,8 @@ function MileagePageInner() {
       </section>}
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
+
+      {tab === 'rewards' && selectedAccountId ? <MileageRewardsTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
       {tab === 'score' && selectedAccountId ? <ActionScoreTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 

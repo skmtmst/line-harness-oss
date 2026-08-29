@@ -575,6 +575,65 @@ export type MileageAdminOverview = {
   members: MileageAdminMember[]
   pagination: { total: number; limit: number; offset: number }
 }
+export type MileageRewardKind = 'coupon' | 'tag' | 'scenario' | 'template' | 'early_access' | 'rank'
+export type MileageRewardStatus = 'draft' | 'published' | 'stopped' | 'archived'
+export type MileageRewardDraft = {
+  name: string
+  description?: string | null
+  imageUrl?: string | null
+  rewardKind: MileageRewardKind
+  requiredMiles: number
+  stockLimit?: number | null
+  perFriendLimit?: number | null
+  startsAt?: string | null
+  endsAt?: string | null
+  benefitExpiresDays?: number | null
+  commonActionVersionId?: string | null
+  failurePolicy?: 'retry' | 'refund' | 'manual'
+  customerMessage?: string
+}
+export type MileageReward = {
+  id: string
+  lineAccountId: string
+  programId: string
+  name: string
+  description: string | null
+  imageUrl: string | null
+  rewardKind: MileageRewardKind
+  status: MileageRewardStatus
+  sortOrder: number
+  currentDraftVersionId: string | null
+  currentPublishedVersionId: string | null
+  currentVersion: null | {
+    id: string
+    versionNumber: number
+    status: 'draft' | 'published'
+    requiredMiles: number
+    stockLimit: number | null
+    perFriendLimit: number | null
+    startsAt: string | null
+    endsAt: string | null
+    benefitExpiresDays: number | null
+    commonActionVersionId: string | null
+    failurePolicy: 'retry' | 'refund' | 'manual'
+    customerMessage: string
+    publishedAt: string | null
+  }
+  exchangedThisMonth: number
+  availableCodeCount: number | null
+  createdAt: string
+  updatedAt: string
+}
+export type MileageRewardOverview = {
+  rewards: MileageReward[]
+  summary: {
+    publishedCount: number
+    redeemedMilesThisMonth: number
+    neverRedeemedFriendCount: number | null
+    mostRedeemedRewardName: string | null
+    mostRedeemedRewardCount: number | null
+  }
+}
 export type MileageAdminHistoryItem = {
   id: string
   primaryFriendId: string
@@ -3282,6 +3341,45 @@ export const api = {
     }),
     deleteRule: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/mileage/rules/${id}`, { method: 'DELETE' }),
+    rewardOverview: (accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardOverview>>(
+        `/api/mileage/rewards?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    reward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageReward>>(
+        `/api/mileage/rewards/${id}?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    createReward: (accountId: string, draft: MileageRewardDraft) =>
+      fetchApi<ApiResponse<MileageReward>>('/api/mileage/rewards', {
+        method: 'POST', body: JSON.stringify({ accountId, draft }),
+      }),
+    updateRewardDraft: (
+      id: string, accountId: string, expectedVersionId: string, draft: MileageRewardDraft,
+    ) => fetchApi<ApiResponse<MileageReward>>(`/api/mileage/rewards/${id}/draft`, {
+      method: 'PUT', body: JSON.stringify({ accountId, expectedVersionId, draft }),
+    }),
+    createRewardDraft: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageReward>>(`/api/mileage/rewards/${id}/draft`, {
+        method: 'POST', body: JSON.stringify({ accountId }),
+      }),
+    publishReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageReward>>(`/api/mileage/rewards/${id}/publish`, {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'mileage-reward-publish' },
+        body: JSON.stringify({ accountId }),
+      }),
+    setRewardStatus: (id: string, accountId: string, status: 'published' | 'stopped' | 'archived') =>
+      fetchApi<ApiResponse<MileageReward>>(`/api/mileage/rewards/${id}/status`, {
+        method: 'POST', body: JSON.stringify({ accountId, status }),
+      }),
+    reorderRewards: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<null>>('/api/mileage/rewards-order', {
+        method: 'PUT', body: JSON.stringify({ accountId, ids }),
+      }),
+    importRewardCodes: (id: string, accountId: string, codes: string[]) =>
+      fetchApi<ApiResponse<{ inserted: number }>>(`/api/mileage/rewards/${id}/codes`, {
+        method: 'POST', body: JSON.stringify({ accountId, codes }),
+      }),
   },
   actionScores: {
     friends: (params: {
