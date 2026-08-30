@@ -23,7 +23,9 @@ describe('V6 リマインダ削除確認の契約', () => {
     expect(PAGE).toContain('requestDelete([r])')
     expect(PAGE).toContain('requestDelete(reminders.filter')
     expect(PAGE).toContain('for (const reminder of pendingDelete)')
-    expect(PAGE).toContain('setDeleteError(caught instanceof Error')
+    expect(PAGE).toContain('setPendingDelete((previous) => previous.filter')
+    expect(PAGE).toContain('状態を読み直してから、もう一度お試しください')
+    expect(PAGE).not.toContain("setDeleteError(caught instanceof Error ? caught.message")
     expect(PAGE).toContain('error={deleteError}')
   })
 
