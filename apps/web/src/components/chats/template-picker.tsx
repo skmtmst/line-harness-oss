@@ -1,6 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import {
+  filterFavorites,
+  readFavorites,
+  toggleFavorite,
+  updatedLabel,
+  writeFavorites,
+} from './template-favorites'
 import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -35,6 +42,17 @@ export default function TemplatePicker({
   const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [category, setCategory] = useState<'all' | 'frequent' | 'reservation' | 'ec'>('all')
+  /*
+    ★は自分で登録するもの（設計 `NWbuF`）。**前は「先頭5件」を
+    「よく使う」と呼んでいた**ので、使っていないひな形にも札が出ていた。
+  */
+  const [favorites, setFavorites] = useState<string[]>([])
+  useEffect(() => setFavorites(readFavorites()), [])
+  const star = (id: string) => {
+    const next = toggleFavorite(favorites, id)
+    setFavorites(next)
+    writeFavorites(next)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -71,11 +89,11 @@ export default function TemplatePicker({
       if (!q) return true
       return t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
     })
-    if (category === 'frequent') return filtered.slice(0, 5)
+    if (category === 'frequent') return filterFavorites(filtered, favorites)
     if (category === 'reservation') return filtered.filter((template) => /予約|来店|前日|日程/.test(`${template.name} ${template.messageContent}`))
     if (category === 'ec') return filtered.filter((template) => /EC|注文|発送|配送|商品/.test(`${template.name} ${template.messageContent}`))
     return filtered
-  }, [category, textTemplates, search, folderId])
+  }, [category, textTemplates, search, folderId, favorites])
 
   if (!open) return null
 
@@ -169,12 +187,16 @@ export default function TemplatePicker({
             </div>
             {shown.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-[#98A2B3]">
-                {templates.length === 0 ? '文字のテンプレートがまだありません。' : '見つかりませんでした。'}
+                {templates.length === 0
+                  ? '文字のテンプレートがまだありません。'
+                  : category === 'frequent'
+                    ? 'よく使うに登録したひな形はまだありません。☆を押すと登録できます。'
+                    : '見つかりませんでした。'}
               </p>
             ) : (
               <ul className="space-y-2">
                 {shown.map((template) => (
-                  <li key={template.id}>
+                  <li key={template.id} className="relative">
                     <button
                       type="button"
                       onClick={() => setSelectedId(template.id)}
@@ -184,6 +206,15 @@ export default function TemplatePicker({
                       <p className="truncate text-sm font-semibold text-[#1F2937]">{template.name}</p>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#667085]">{template.messageContent}</p>
                     </button>
+                      <button
+                        type="button"
+                        onClick={() => star(template.id)}
+                        aria-pressed={favorites.includes(template.id)}
+                        aria-label={`「${template.name}」を${favorites.includes(template.id) ? 'よく使うから外す' : 'よく使うに登録する'}`}
+                        className={`absolute top-3 right-3 text-sm ${favorites.includes(template.id) ? 'text-[#B45309]' : 'text-[#C4C9D4] hover:text-[#B45309]'}`}
+                      >
+                        {favorites.includes(template.id) ? '★' : '☆'}
+                      </button>
                   </li>
                 ))}
               </ul>
@@ -195,7 +226,8 @@ export default function TemplatePicker({
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-base font-bold text-[#1F2937]">{selected.name}</h3>
-                  {category === 'frequent' && <span className="rounded-lg border border-[#F6D68A] bg-[#FFF8E7] px-2.5 py-1.5 text-xs font-semibold text-[#B45309]">☆ よく使う</span>}
+                  {/* 札は**そのひな形が登録されているとき**だけ。絞り込みの状態では出さない。 */}
+                  {favorites.includes(selected.id) && <span className="rounded-lg border border-[#F6D68A] bg-[#FFF8E7] px-2.5 py-1.5 text-xs font-semibold text-[#B45309]">★ よく使うに登録済み</span>}
                 </div>
                 <p className="mt-5 text-xs font-semibold text-[#667085]">送信内容のプレビュー</p>
                 <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
@@ -204,7 +236,7 @@ export default function TemplatePicker({
                 </div>
                 <div className="mt-3 rounded-lg bg-[#F7F8F6] px-4 py-3 text-xs leading-6 text-[#667085]">
                   この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
-                  種類：テキスト
+                  種類：テキスト　・　更新：{updatedLabel(selected.updatedAt)}
                 </div>
               </div>
             ) : (

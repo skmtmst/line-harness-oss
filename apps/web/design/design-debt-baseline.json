@@ -508,7 +508,7 @@
     "direct-secondary-button": 1
   },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 61
+    "arbitrary-value": 64
   },
   "components/dashboard/dashboard-editor.tsx": {
     "arbitrary-value": 17,
