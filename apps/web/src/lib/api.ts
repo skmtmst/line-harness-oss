@@ -703,6 +703,9 @@ export type FriendListParams = {
   chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
   /** 表示設定。未指定は全部。 */
   visibility?: 'following' | 'blocked'
+  /** 行動スコアの現在値。片方だけでも指定できる。 */
+  scoreMin?: number
+  scoreMax?: number
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -865,6 +868,31 @@ export type MileageAdminHistory = {
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
 }
+export type ActionScoreBand = 'high' | 'normal' | 'low'
+export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
+export type ActionScoreSort = 'score_desc' | 'score_asc' | 'change_desc' | 'change_asc' | 'recent_desc'
+export type ActionScoreOverview = {
+  summary: {
+    scoredFriends: number
+    high: number
+    normal: number
+    low: number
+    decreased30d: number
+    highMin: number
+    normalMin: number
+  }
+  items: Array<{
+    friendId: string
+    displayName: string
+    pictureUrl: string | null
+    currentScore: number
+    band: ActionScoreBand
+    change30d: number
+    lastReason: string | null
+    lastChangedAt: string | null
+  }>
+  pagination: { total: number; limit: number; offset: number }
+}
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
@@ -904,6 +932,30 @@ export type ListStats = {
     sentThisWeek: number
   }
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+}
+
+/** 質問テンプレート。シナリオの質問と同じ契約を使う。 */
+export type TemplateQuestion = {
+  intro?: string
+  text: string
+  altText?: string
+  tapMode: 'single' | 'multiple'
+  choices: Array<{
+    label: string
+    behavior: 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
+    url?: string
+    tel?: string
+    email?: string
+    formId?: string
+    scenario?: { op: 'start' | 'stop'; scenarioId?: string | null; restart?: 'from_start' | 'from_read'; rememberPrevious?: boolean }
+    userMessage?: string
+    hideUserMessage?: boolean
+    reply?: string
+    repeatReply?: string
+    addTagIds?: string[]
+    removeTagIds?: string[]
+    field?: { fieldId: string; value: string }
+  }>
 }
 
 /* ---- リッチメニューのボタン（147） ---- */
@@ -1390,6 +1442,8 @@ export const api = {
       if (params?.createdTo) query.createdTo = params.createdTo
       if (params?.chatStatus) query.chatStatus = params.chatStatus
       if (params?.visibility) query.visibility = params.visibility
+      if (params?.scoreMin !== undefined) query.scoreMin = String(params.scoreMin)
+      if (params?.scoreMax !== undefined) query.scoreMax = String(params.scoreMax)
       for (const [k, v] of Object.entries(params?.metadata ?? {})) {
         if (k && v) query[`metadata.${k}`] = v
       }
@@ -2863,6 +2917,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
@@ -2878,6 +2934,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2898,6 +2956,8 @@ export const api = {
       category: string
       messageType: string
       messageContent: string
+      question?: TemplateQuestion | null
+      questionStatus?: 'draft' | 'published'
       /** 162: 選択肢を押したときの動き。 */
       carouselActions?: unknown | null
       /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2911,7 +2971,7 @@ export const api = {
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -3660,6 +3720,24 @@ export const api = {
     }),
     deleteRule: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/mileage/rules/${id}`, { method: 'DELETE' }),
+  },
+  actionScores: {
+    friends: (params: {
+      accountId: string
+      search?: string
+      filter?: ActionScoreFilter
+      sort?: ActionScoreSort
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.filter) query.set('filter', params.filter)
+      if (params.sort) query.set('sort', params.sort)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<ActionScoreOverview>>(`/api/action-scores/friends?${query.toString()}`)
+    },
   },
   webhooks: {
     incoming: {

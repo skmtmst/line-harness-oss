@@ -153,6 +153,29 @@ describe('A-8 friends tenant scope', () => {
     expect(prepared.length).toBeLessThan(10);
   });
 
+  test('an explicit hidden LINE account cannot bypass the visible-account scope', async () => {
+    const response = await createApp([]).request('/api/friends?lineAccountId=other&includeTags=false');
+    expect(response.status).toBe(404);
+    expect(mocks.canAccess).toHaveBeenCalled();
+  });
+
+  test('score range is applied before count and pagination', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      '/api/friends?lineAccountId=own&scoreMin=30&scoreMax=69&includeTags=false',
+    );
+    expect(response.status).toBe(200);
+    expect(prepared.some(({ sql, binds }) =>
+      sql.includes('f.score >= ?') && sql.includes('f.score <= ?')
+      && binds.includes(30) && binds.includes(69))).toBe(true);
+  });
+
+  test('rejects malformed or reversed score ranges', async () => {
+    expect((await createApp([]).request('/api/friends?scoreMin=abc')).status).toBe(400);
+    expect((await createApp([]).request('/api/friends?scoreMin=70&scoreMax=30')).status).toBe(400);
+  });
+
   test('分析対象者はアカウント指定がなければ検索しない', async () => {
     const response = await createApp([]).request('/api/friends?audienceId=audience-a');
     expect(response.status).toBe(400);
