@@ -30,7 +30,8 @@ describe('V6 イベント・申込者一覧の状態', () => {
   })
 
   it('申込者一覧は未取得のKPIを0件にせずCSVも止める', () => {
-    expect(BOOKINGS).toContain("value={dataReady ? String(confirmed + pending) : '—'}")
+    expect(BOOKINGS).toContain('const applied = confirmed + pending')
+    expect(BOOKINGS).toContain("value={dataReady ? String(applied) : '—'}")
     expect(BOOKINGS).toContain("value={dataReady ? String(waitlist.length) : '—'}")
     expect(BOOKINGS).toContain('disabled={!dataReady}')
     expect(BOOKINGS).toContain("const [capacityLoadStatus, setCapacityLoadStatus] = useState<LoadStatus>('loading')")
@@ -47,7 +48,8 @@ describe('V6 イベント・申込者一覧の状態', () => {
   it('操作失敗は内部エラーでなく、一覧を残したまま日本語で案内する', () => {
     expect(BOOKINGS).not.toContain("setError(e instanceof Error ? e.message : String(e))")
     expect(BOOKINGS).toContain('const [actionError, setActionError]')
-    expect(BOOKINGS).toContain('予約を確定・拒否できませんでした。')
+    expect(BOOKINGS).toContain('予約を確定できませんでした。')
+    expect(BOOKINGS).toContain('予約を拒否できませんでした。')
     expect(BOOKINGS).toContain('{actionError}')
   })
 })

@@ -11,8 +11,11 @@ import {
   type EventWaitlistItem,
 } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { describeBookingCapacity } from '../event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -62,6 +65,11 @@ function BookingsInner() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<EventBookingItem | null>(null)
+  const [cancelError, setCancelError] = useState('')
+  const [rejectTarget, setRejectTarget] = useState<EventBookingItem | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectError, setRejectError] = useState('')
   const loadRequestRef = useRef(0)
 
   const refresh = useCallback(async () => {
@@ -135,34 +143,38 @@ function BookingsInner() {
     return <div className="p-4 text-red-700">id クエリが必要です</div>
   }
 
-  async function decide(id: string, action: 'confirm' | 'reject') {
-    if (!selectedAccountId || !eventId) return
-    let reason: string | undefined
-    if (action === 'reject') {
-      const r = window.prompt('拒否理由（任意・admin内部メモ。友だちには固定文面）')
-      if (r === null) return
-      reason = r || undefined
-    }
+  async function decide(id: string, action: 'confirm' | 'reject', reason?: string) {
+    if (!selectedAccountId || !eventId || busy) return
     setBusy(true)
     try {
       await eventsApi.decideBooking(selectedAccountId, eventId, id, action, reason)
+      if (action === 'reject') {
+        setRejectTarget(null)
+        setRejectReason('')
+        setRejectError('')
+      }
       await refresh()
     } catch {
-      setActionError('予約を確定・拒否できませんでした。状態を読み直してから、もう一度お試しください。')
+      if (action === 'reject') {
+        setRejectError('予約を拒否できませんでした。状態を読み直してから、もう一度お試しください。')
+      } else {
+        setActionError('予約を確定できませんでした。状態を読み直してから、もう一度お試しください。')
+      }
     } finally {
       setBusy(false)
     }
   }
 
-  async function adminCancel(id: string) {
-    if (!selectedAccountId || !eventId) return
-    if (!confirm('運営側でキャンセルしますか？友だちにLINE通知が送られます。')) return
+  async function adminCancel() {
+    if (!selectedAccountId || !eventId || !cancelTarget || busy) return
     setBusy(true)
+    setCancelError('')
     try {
-      await eventsApi.adminCancelBooking(selectedAccountId, eventId, id)
+      await eventsApi.adminCancelBooking(selectedAccountId, eventId, cancelTarget.id)
+      setCancelTarget(null)
       await refresh()
     } catch {
-      setActionError('予約をキャンセルできませんでした。状態を読み直してから、もう一度お試しください。')
+      setCancelError('予約をキャンセルできませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -184,6 +196,7 @@ function BookingsInner() {
   const confirmed = items.filter((b) => b.status === 'confirmed').length
   const pending = items.filter((b) => b.status === 'requested').length
   const cancelled = items.filter((b) => b.status === 'cancelled').length
+  const applied = confirmed + pending
   // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
   const capacity = totalCapacity ?? 0
   const shownItems = tab === 'all' ? items : items.filter((item) => item.status === tab)
@@ -201,7 +214,7 @@ function BookingsInner() {
           ['順番', '友だち', '予約枠', '状態', '受付日時'],
           ...waitlist.map((item, index) => [
             index + 1,
-            item.friend_name ?? item.friend_id.slice(0, 8),
+            item.friend_name ?? '友だちは未取得',
             formatJp(item.slot_starts_at),
             item.status === 'invited' ? '案内済み' : '待機中',
             formatJp(item.created_at),
@@ -210,8 +223,8 @@ function BookingsInner() {
       : [
           ['友だち', '経由アカウント', '予約枠', '状態', '受付日時'],
           ...shownItems.map((item) => [
-            item.friend_display_name ?? item.friend_id.slice(0, 8),
-            accounts.find((account) => account.id === item.line_account_id)?.name ?? '',
+            item.friend_display_name ?? '友だちは未取得',
+            accounts.find((account) => account.id === item.line_account_id)?.name ?? 'アカウントは未取得',
             formatJp(item.slot_starts_at),
             STATUS_TABS.find((status) => status.key === item.status)?.label ?? item.status,
             formatJp(item.requested_at),
@@ -255,7 +268,7 @@ function BookingsInner() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="申込"
-          value={dataReady ? String(confirmed + pending) : '—'}
+          value={dataReady ? String(applied) : '—'}
           unit={dataReady ? '人' : ''}
           detail={dataReady
             ? capacityLoadStatus === 'loading'
@@ -263,18 +276,44 @@ function BookingsInner() {
               : capacityLoadStatus === 'error'
                 ? '定員は取得できませんでした'
                 : capacity > 0
-                  ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}`
+                  ? describeBookingCapacity(applied, capacity)
                   : '定員なし'
             : '取得できませんでした'}
         />
-        <EventKpi title="承認待ち" value={dataReady ? String(pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '対応が必要' : '取得できませんでした'} />
+        <EventKpi
+          title="承認待ち"
+          value={dataReady ? String(pending) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={dataReady
+            ? pending > 0
+              ? `${pending}件を確認してください`
+              : '確認待ちはありません'
+            : '取得できませんでした'}
+        />
         <EventKpi
           title="キャンセル待ち"
           value={dataReady ? String(waitlist.length) : '—'}
           unit={dataReady ? '人' : ''}
-          detail={dataReady ? (event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です') : '取得できませんでした'}
+          detail={dataReady
+            ? waitlist.length === 0
+              ? event?.waitlist_enabled
+                ? '空き待ちはありません'
+                : '受け付けない設定です'
+              : event?.waitlist_enabled
+                ? '空きが出たら順に案内します'
+                : '受付設定を確認してください'
+            : '取得できませんでした'}
         />
-        <EventKpi title="キャンセル" value={dataReady ? String(cancelled) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? 'この一覧のうち' : '取得できませんでした'} />
+        <EventKpi
+          title="キャンセル"
+          value={dataReady ? String(cancelled) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={dataReady
+            ? cancelled > 0
+              ? '空いた枠を確認してください'
+              : 'キャンセルはありません'
+            : '取得できませんでした'}
+        />
       </div>
 
       {actionError ? (
@@ -323,7 +362,7 @@ function BookingsInner() {
                     {waitlist.map((item, index) => (
                       <tr key={item.id} className="border-t border-gray-100">
                         <td className="px-4 py-3 tabular-nums">{index + 1}</td>
-                        <td className="px-4 py-3">{item.friend_name ?? item.friend_id.slice(0, 8)}</td>
+                        <td className="px-4 py-3">{item.friend_name ?? '友だちは未取得'}</td>
                         <td className="px-4 py-3">{formatJp(item.slot_starts_at)}</td>
                         <td className="px-4 py-3">{item.status === 'invited' ? '案内済み' : '待機中'}</td>
                         <td className="px-4 py-3 text-xs text-gray-500">{formatJp(item.created_at)}</td>
@@ -353,11 +392,11 @@ function BookingsInner() {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`
-                      : (b.line_account_id ?? '').slice(0, 8)
+                      : 'アカウントは未取得'
                     return (
                     <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-800">
-                        {b.friend_display_name ?? b.friend_id.slice(0, 8)}
+                        {b.friend_display_name ?? '友だちは未取得'}
                       </td>
                       <td className="px-4 py-3 text-gray-700 text-xs">{accountLabel}</td>
                       <td className="px-4 py-3 text-gray-700">{formatJp(b.slot_starts_at)}</td>
@@ -378,7 +417,12 @@ function BookingsInner() {
                               承認
                             </button>
                             <button
-                              onClick={() => decide(b.id, 'reject')}
+                              data-qa-open="i5SN2j-reject"
+                              onClick={() => {
+                                setRejectTarget(b)
+                                setRejectReason('')
+                                setRejectError('')
+                              }}
                               disabled={busy}
                               className="px-3 py-1 bg-gray-500 text-white rounded-lg text-xs font-medium hover:bg-gray-600 disabled:opacity-50"
                             >
@@ -403,7 +447,11 @@ function BookingsInner() {
                               無断
                             </button>
                             <button
-                              onClick={() => adminCancel(b.id)}
+                              data-qa-open="i5SN2j-cancel"
+                              onClick={() => {
+                                setCancelError('')
+                                setCancelTarget(b)
+                              }}
                               disabled={busy}
                               className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium hover:bg-white disabled:opacity-50"
                             >
@@ -420,6 +468,59 @@ function BookingsInner() {
             </div>
           )}
         </div>
+
+        <ConfirmDialog
+          open={cancelTarget !== null}
+          title={`${cancelTarget?.friend_display_name ?? 'この友だち'}さんの予約をキャンセルしますか？`}
+          description={cancelTarget
+            ? `予約枠 ${formatJp(cancelTarget.slot_starts_at)} を運営側でキャンセルし、友だちへLINEで通知します。申込と操作の履歴は残ります。この操作は取り消せません。`
+            : ''}
+          confirmLabel="予約をキャンセル"
+          destructive
+          busy={busy}
+          error={cancelError}
+          onConfirm={() => void adminCancel()}
+          onCancel={() => {
+            if (busy) return
+            setCancelTarget(null)
+            setCancelError('')
+          }}
+        />
+
+        <Dialog
+          open={rejectTarget !== null}
+          title={`${rejectTarget?.friend_display_name ?? 'この友だち'}さんの予約を拒否しますか？`}
+          description={rejectTarget
+            ? `予約枠 ${formatJp(rejectTarget.slot_starts_at)} の申込を拒否し、友だちへ固定の案内をLINEで送ります。`
+            : ''}
+          confirmLabel="予約を拒否"
+          busy={busy}
+          error={rejectError}
+          onConfirm={() => {
+            if (!rejectTarget) return
+            void decide(rejectTarget.id, 'reject', rejectReason.trim() || undefined)
+          }}
+          onCancel={() => {
+            if (busy) return
+            setRejectTarget(null)
+            setRejectReason('')
+            setRejectError('')
+          }}
+        >
+          <label className="block text-sm font-medium text-gray-700" htmlFor="event-booking-reject-reason">
+            運用メモ（任意）
+          </label>
+          <textarea
+            id="event-booking-reject-reason"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            disabled={busy}
+            rows={3}
+            className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+            placeholder="例：日程の調整が必要なため"
+          />
+          <p className="mt-2 text-xs text-gray-500">このメモは友だちへ送られません。</p>
+        </Dialog>
     </div>
   )
 }
