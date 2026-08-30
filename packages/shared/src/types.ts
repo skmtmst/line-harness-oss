@@ -299,6 +299,50 @@ export interface CommonVarSchedule {
   appliedAt: string | null;
 }
 
+/** 共通情報を差し込んでいる設定の種類。 */
+export type CommonVarUsageKind =
+  | "template"
+  | "broadcast"
+  | "scenario"
+  | "reminder"
+  | "auto_reply"
+  | "form"
+  | "automation";
+
+/** 共通情報を削除する前に、運用者へ見せる使用先。内部IDは専用項目で返さない。 */
+export interface CommonVarDeleteImpactItem {
+  kind: CommonVarUsageKind;
+  kindLabel: string;
+  name: string;
+  status: string;
+  href: string;
+  blocksDeletion: boolean;
+  currentPreview: string;
+}
+
+/** 所属を確定できず、名前や本文を安全に見せられない使用先。 */
+export interface CommonVarDeleteImpactUnavailableReference {
+  kind: CommonVarUsageKind;
+  kindLabel: string;
+  count: number;
+  reason: string;
+}
+
+/** 共通情報の削除前確認（GET /api/common-vars/:id/delete-impact）。 */
+export interface CommonVarDeleteImpact {
+  variable: { id: string; name: string; varKey: string };
+  total: number;
+  blockingTotal: number;
+  historicalTotal: number;
+  unscopedFormTotal: number;
+  canDelete: boolean;
+  byKind: Record<CommonVarUsageKind, number>;
+  items: CommonVarDeleteImpactItem[];
+  unavailableReferences: CommonVarDeleteImpactUnavailableReference[];
+  checkedAt: string;
+  recommendedAction: "delete" | "review_references";
+}
+
 export type SavedSearchConditionKind =
   | "name"
   | "tag"

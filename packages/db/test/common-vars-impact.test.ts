@@ -6,40 +6,57 @@ import { getCommonVarMap, getCommonVarUsageImpact } from '../src/common-vars';
 import { asD1 } from './d1-test-helper';
 
 describe('common variable usage impact', () => {
-  it('counts the exact legacy token across every supported usage kind', async () => {
-    const totals = [2, 1, 3, 0, 1, 2, 0];
-    const binds: unknown[][] = [];
-    const db = {
-      prepare: vi.fn((_sql: string) => ({
-        bind: (...values: unknown[]) => {
-          binds.push(values);
-          return { first: async () => ({ total: totals.shift() ?? 0 }) };
-        },
-      })),
-    } as unknown as D1Database;
+  it('returns selected-account details while keeping legacy forms safe', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('a1','c1','A1','t','s'), ('a2','c2','A2','t','s');
+      INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+      VALUES ('t1','A1テンプレート','text','営業時間は{{var.shop_hours}}','a1'),
+             ('t2','A2テンプレート','text','営業時間は{{var.shop_hours}}','a2');
+      INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id, account_ids)
+      VALUES ('b1','予約中','text','{{var.shop_hours}}です','all','scheduled','a1',NULL),
+             ('b2','送信済み','text','{{var.shop_hours}}でした','all','sent','a1',NULL),
+             ('b3','複数アカウント','text','{{var.shop_hours}}です','multi-account-dedup','draft','a2','["a2","a1"]');
+      INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+      VALUES ('s1','来店後','manual','a1'), ('s2','別アカウント','manual','a2');
+      INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content)
+      VALUES ('ss1','s1',1,0,'text','次は{{var.shop_hours}}'),
+             ('ss2','s2',1,0,'text','次は{{var.shop_hours}}');
+      INSERT INTO forms (id, name, fields, on_submit_message_content, layout)
+      VALUES ('f1','所属未設定フォーム','[]','受付は{{var.shop_hours}}','{}'),
+             ('f2','A1フォーム','[]','受付は{{var.shop_hours}}','{}'),
+             ('f3','A2フォーム','[]','受付は{{var.shop_hours}}','{}');
+      INSERT INTO form_accounts (form_id, line_account_id)
+      VALUES ('f2','a1'), ('f3','a2');
+    `);
 
-    const impact = await getCommonVarUsageImpact(db, 'shop_hours');
+    const impact = await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a1');
 
-    expect(impact.total).toBe(9);
-    expect(impact.byKind).toMatchObject({
-      template: 2,
-      broadcast: 1,
-      scenario: 3,
-      auto_reply: 1,
-      form: 2,
+    expect(impact).toMatchObject({
+      total: 7,
+      blockingTotal: 6,
+      historicalTotal: 1,
+      unscopedFormTotal: 1,
+      byKind: { template: 1, broadcast: 3, scenario: 1, form: 2 },
     });
-    expect(binds.flat()).toHaveLength(12);
-    expect(binds.flat().every((value) => value === '{{var.shop_hours}}')).toBe(true);
+    expect(impact.items.map((item) => item.source_id)).toEqual([
+      't1', 'b1', 'b2', 'b3', 'ss1', 'f2',
+    ]);
+    expect(impact.items.some((item) => item.source_name.includes('A2'))).toBe(false);
+    expect(impact.items.some((item) => item.source_name.includes('所属未設定'))).toBe(false);
+    raw.close();
   });
 
   it('does not hide a failed scan as zero usages', async () => {
     const db = {
       prepare: vi.fn(() => ({
-        bind: () => ({ first: async () => { throw new Error('table unavailable'); } }),
+        bind: () => ({ all: async () => { throw new Error('table unavailable'); } }),
       })),
     } as unknown as D1Database;
 
-    await expect(getCommonVarUsageImpact(db, 'shop_hours')).rejects.toThrow('table unavailable');
+    await expect(getCommonVarUsageImpact(db, 'shop_hours', 'a1')).rejects.toThrow('table unavailable');
   });
 });
 

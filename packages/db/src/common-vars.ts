@@ -38,21 +38,117 @@ export type CommonVarUsageKind =
 
 export interface CommonVarUsageImpact {
   total: number;
+  /** 過去に送り終わった配信を除き、削除すると現在の設定が壊れる件数。 */
+  blockingTotal: number;
+  /** 送信済みで、共通情報を削除しても過去の配信内容が変わらない件数。 */
+  historicalTotal: number;
+  /** LINEアカウントへの所属が無く、名前や本文を安全に返せない古いフォーム。 */
+  unscopedFormTotal: number;
   byKind: Record<CommonVarUsageKind, number>;
+  items: CommonVarUsageItem[];
 }
 
-const COMMON_VAR_USAGE_SOURCES: Array<{
+export interface CommonVarUsageItem {
   kind: CommonVarUsageKind;
-  table: string;
-  columns: string[];
+  source_id: string;
+  source_parent_id: string | null;
+  source_name: string;
+  source_status: string | null;
+  source_content: string;
+  is_historical: number;
+}
+
+const COMMON_VAR_USAGE_QUERIES: Array<{
+  kind: CommonVarUsageKind;
+  sql: string;
+  values: (token: string, lineAccountId: string) => string[];
 }> = [
-  { kind: 'template', table: 'templates', columns: ['message_content'] },
-  { kind: 'broadcast', table: 'broadcasts', columns: ['message_content'] },
-  { kind: 'scenario', table: 'scenario_steps', columns: ['message_content', 'message_bubbles_json'] },
-  { kind: 'reminder', table: 'reminder_steps', columns: ['message_content'] },
-  { kind: 'auto_reply', table: 'auto_replies', columns: ['response_content', 'actions_json'] },
-  { kind: 'form', table: 'forms', columns: ['fields', 'layout', 'on_submit_message_content'] },
-  { kind: 'automation', table: 'automations', columns: ['conditions', 'actions'] },
+  {
+    kind: 'template',
+    sql: `SELECT t.id AS source_id, NULL AS source_parent_id, t.name AS source_name,
+                 'active' AS source_status, t.message_content AS source_content, 0 AS is_historical
+            FROM templates t
+           WHERE t.line_account_id = ? AND instr(coalesce(t.message_content, ''), ?) > 0`,
+    values: (token, account) => [account, token],
+  },
+  {
+    kind: 'broadcast',
+    sql: `SELECT b.id AS source_id, NULL AS source_parent_id, b.title AS source_name,
+                 b.status AS source_status, b.message_content AS source_content,
+                 CASE WHEN b.status = 'sent' THEN 1 ELSE 0 END AS is_historical
+            FROM broadcasts b
+           WHERE (b.line_account_id = ? OR EXISTS (
+                   SELECT 1 FROM json_each(coalesce(b.account_ids, '[]')) WHERE value = ?
+                 ))
+             AND instr(coalesce(b.message_content, ''), ?) > 0`,
+    values: (token, account) => [account, account, token],
+  },
+  {
+    kind: 'scenario',
+    sql: `SELECT ss.id AS source_id, s.id AS source_parent_id,
+                 s.name || '・' || CAST(ss.step_order AS TEXT) || '通目' AS source_name,
+                 CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(ss.message_content, ''), ?) > 0
+                      THEN ss.message_content ELSE coalesce(ss.message_bubbles_json, '') END AS source_content,
+                 0 AS is_historical
+            FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id
+           WHERE s.line_account_id = ?
+             AND (instr(coalesce(ss.message_content, ''), ?) > 0
+               OR instr(coalesce(ss.message_bubbles_json, ''), ?) > 0)`,
+    values: (token, account) => [token, account, token, token],
+  },
+  {
+    kind: 'reminder',
+    sql: `SELECT rs.id AS source_id, r.id AS source_parent_id, r.name AS source_name,
+                 CASE WHEN r.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 rs.message_content AS source_content, 0 AS is_historical
+            FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
+           WHERE r.line_account_id = ? AND instr(coalesce(rs.message_content, ''), ?) > 0`,
+    values: (token, account) => [account, token],
+  },
+  {
+    kind: 'auto_reply',
+    sql: `SELECT ar.id AS source_id, NULL AS source_parent_id,
+                 coalesce(nullif(ar.name, ''), ar.keyword) AS source_name,
+                 CASE WHEN ar.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(ar.response_content, ''), ?) > 0
+                      THEN ar.response_content ELSE coalesce(ar.actions_json, '') END AS source_content,
+                 0 AS is_historical
+            FROM auto_replies ar
+           WHERE ar.line_account_id = ?
+             AND (instr(coalesce(ar.response_content, ''), ?) > 0
+               OR instr(coalesce(ar.actions_json, ''), ?) > 0)`,
+    values: (token, account) => [token, account, token, token],
+  },
+  {
+    kind: 'form',
+    sql: `SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
+                 CASE WHEN f.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+                      THEN f.on_submit_message_content
+                      WHEN instr(coalesce(f.fields, ''), ?) > 0 THEN f.fields
+                      ELSE coalesce(f.layout, '') END AS source_content,
+                 0 AS is_historical
+            FROM forms f JOIN form_accounts fa ON fa.form_id = f.id
+           WHERE fa.line_account_id = ?
+             AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+               OR instr(coalesce(f.fields, ''), ?) > 0
+               OR instr(coalesce(f.layout, ''), ?) > 0)`,
+    values: (token, account) => [token, token, account, token, token, token],
+  },
+  {
+    kind: 'automation',
+    sql: `SELECT a.id AS source_id, NULL AS source_parent_id, a.name AS source_name,
+                 CASE WHEN a.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(a.conditions, ''), ?) > 0
+                      THEN a.conditions ELSE coalesce(a.actions, '') END AS source_content,
+                 0 AS is_historical
+            FROM automations a
+           WHERE a.line_account_id = ?
+             AND (instr(coalesce(a.conditions, ''), ?) > 0
+               OR instr(coalesce(a.actions, ''), ?) > 0)`,
+    values: (token, account) => [token, account, token, token],
+  },
 ];
 
 export interface CommonVarSchedule {
@@ -98,24 +194,48 @@ export async function getCommonVars(
 export async function getCommonVarUsageImpact(
   db: D1Database,
   varKey: string,
+  lineAccountId: string,
 ): Promise<CommonVarUsageImpact> {
   const token = `{{var.${varKey}}}`;
   const byKind = Object.fromEntries(
-    COMMON_VAR_USAGE_SOURCES.map((source) => [source.kind, 0]),
+    COMMON_VAR_USAGE_QUERIES.map((source) => [source.kind, 0]),
   ) as Record<CommonVarUsageKind, number>;
+  const items: CommonVarUsageItem[] = [];
 
-  for (const source of COMMON_VAR_USAGE_SOURCES) {
-    const predicate = source.columns
-      .map((column) => `instr(coalesce(${column}, ''), ?) > 0`)
-      .join(' OR ');
-    const row = await db
-      .prepare(`SELECT COUNT(*) AS total FROM ${source.table} WHERE ${predicate}`)
-      .bind(...source.columns.map(() => token))
-      .first<{ total: number }>();
-    byKind[source.kind] = Number(row?.total ?? 0);
+  for (const source of COMMON_VAR_USAGE_QUERIES) {
+    const result = await db.prepare(source.sql)
+      .bind(...source.values(token, lineAccountId))
+      .all<Omit<CommonVarUsageItem, 'kind'>>();
+    const found = result.results.map((item) => ({ ...item, kind: source.kind }));
+    items.push(...found);
+    byKind[source.kind] = found.length;
   }
 
-  return { total: Object.values(byKind).reduce((sum, count) => sum + count, 0), byKind };
+  // form_accounts が1件も無い古いフォームだけは、どのアカウントのものか
+  // 確定できない。名前や本文は返さず、件数だけ残して削除を安全側に止める。
+  const unscopedForms = await db.prepare(
+    `SELECT COUNT(*) AS count FROM forms f
+      WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
+        AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+          OR instr(coalesce(f.fields, ''), ?) > 0
+          OR instr(coalesce(f.layout, ''), ?) > 0)`,
+  ).bind(token, token, token).first<{ count: number }>();
+  const unscopedFormTotal = Number(unscopedForms?.count ?? 0);
+  byKind.form += unscopedFormTotal;
+
+  const historicalTotal = items.reduce(
+    (sum, item) => sum + (item.is_historical === 1 ? 1 : 0),
+    0,
+  );
+  const total = items.length + unscopedFormTotal;
+  return {
+    total,
+    blockingTotal: total - historicalTotal,
+    historicalTotal,
+    unscopedFormTotal,
+    byKind,
+    items,
+  };
 }
 
 export async function getCommonVarById(
