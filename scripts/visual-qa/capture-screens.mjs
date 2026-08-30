@@ -270,6 +270,17 @@ async function runSteps(page, steps = [], node = '') {
         選ぶときは画面に出ている言葉で書く。値のほうは `bs-1` のような
         内部の id で、人の言葉ではない。
       */
+      /*
+        **素の `<select>` もある。** 同じ「選ぶ」でも、共通部品の
+        ほうはボタンと一覧で作ってあり、受信箱の担当者などは
+        素の `<select>` のまま。先に素のほうを試す。
+      */
+      const native = page.locator(`select[aria-label="${step.select}"]`).first()
+      if (await native.count()) {
+        await native.selectOption({ label: step.label })
+        await page.waitForTimeout(step.after ?? 500)
+        continue
+      }
       await page.getByRole('button', { name: step.select }).first().click({ timeout: 15_000 })
       await page.waitForTimeout(200)
       await page.getByRole('option', { name: step.label, exact: true }).first()

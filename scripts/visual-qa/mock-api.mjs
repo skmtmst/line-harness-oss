@@ -1115,6 +1115,27 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   /*
+    受信箱の右にある顧客情報（`components/chats/friend-info-sidebar.tsx:6`）。
+    **`tags` と `formSubmissions` を必ず配列で返す。** どちらかが
+    無いと `.length` で**受信箱ごと落ちる**。
+  */
+  const friendDetail = /^\/api\/friends\/([^/]+)$/.exec(pathname)
+  if (friendDetail) {
+    const f = FRIENDS.find((x) => x.id === friendDetail[1])
+    return { success: true, data: {
+      id: friendDetail[1],
+      displayName: f?.displayName ?? null,
+      pictureUrl: null, isFollowing: true, metadata: {},
+      realName: null, systemDisplayName: null, refCode: null,
+      createdAt: f?.createdAt ?? '2026-08-13T00:00:00.000Z',
+      tags: (f?.tags ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color ?? '#8B938D' })),
+      formSubmissions: [],
+    } }
+  }
+  /* 友だちにいま出ているリッチメニュー。**出していないときは `id: null`。** */
+  const friendRichMenu = /^\/api\/friends\/([^/]+)\/rich-menu$/.exec(pathname)
+  if (friendRichMenu) return { success: true, data: { id: null, name: null, isDefault: false } }
+  /*
     やり取り1件。**`friendName` を必ず返す**（型は `ChatDetail`、
     `app/chats/page.tsx:54`。`Chat` を継ぎ、`friendName: string`）。
 

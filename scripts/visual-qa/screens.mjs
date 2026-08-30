@@ -230,14 +230,14 @@ export const SCREENS = [
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
-    verdict: 'needs_fix', verdictNote: 'P2 フォルダ一覧に「未分類」が出ない。すべて20件のうち3件（未分類）だけ選べない',
-    verdictSource: 'inbox-v6/NWbuF-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P2 テンプレート選択のフォルダ分けが無い。** ルート `/chats`（トーク→「▧ テンプレートを選択」）。設計はフォルダで絞ってから選ぶ。実装は「フォルダ」の押し口が本文に無い（撮影の段が「フォルダ」を押せず0件）。**撮影の段が古い**ので、開いたあとの面はまだ撮れていない——段を直してから詰める。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
     steps: [...OPEN_CHAT, { click: '内部メモ' }],
-    verdict: 'needs_fix', verdictNote: 'P2 設計は入力欄の上に出る「内部メモを追加」パネル（スタッフのみの札・記入例・社内限定の注記）、実装は中央のダイアログで札と注記が無い',
-    verdictSource: 'inbox-v6/B7CER8-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P2 内部メモの面が設計とそろわない。** ルート `/chats`（トークを開いて「内部メモ」）。設計はメモに**書いた人と時刻**が残り、あとから誰が書いたか分かる。取得元：`inbox-v6/B7CER8.txt`。1440・1920とも横スクロール0。**この行の撮影は、いまトークを開く前で止まっている**（開いたあとの面を撮るには段の直しが要る）',
+    verdictSource: 'inbox-v6/B7CER8.txt', verdictHead: 'c275749d',
   },
   /*
     2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。素のセレクトのままだと
@@ -247,15 +247,16 @@ export const SCREENS = [
   */
   {
     ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
-    steps: [{ click: '担当者で絞り込む' }],
-    verdict: 'needs_fix', verdictNote: 'P2 選択肢に人のアイコンが無い。「未割当」が「未割り当て」で並びも先頭',
-    verdictSource: 'inbox-v6/YZaDK-1920.png', verdictHead: 'a4239357',
+    /* **「担当者で絞り込む」は選ぶ口**（ボタンではない）。 */
+    steps: [{ select: '担当者で絞り込む', label: 'Kenta' }],
+    verdict: 'needs_fix', verdictNote: '**P2 担当者の絞り込みが素の `<select>` のまま。** ルート `/chats`。選択肢は すべて／未割り当て／Masato／Kenta。設計は担当ごとの未読数を添えた専用の選び口（「Kenta 3」のように、選ぶ前に**どこに何件たまっているか**が分かる形）。実装は名前だけで数が出ない。帯は 要返信1件（最長1時間12分待ち）／自分が担当0件／今日の受信0件／メール0件／期限超過1件 と**数えて0を `0件` で出す**のは正しい。取得元：`inbox-v6/YZaDK.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/YZaDK.txt', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
     steps: [...OPEN_CHAT, { click: '担当者を変える' }],
-    verdict: 'needs_fix', verdictNote: 'P1 担当を変える窓に絞り込み用の「すべて」が混ざっている（担当者を「すべて」にはできない）。P2 顔写真の丸が無い',
-    verdictSource: 'inbox-v6/L35UOV-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P2 担当者の変更が、設計の専用の選び口になっていない。** ルート `/chats`。**#492 の前の記録では「担当者を変える」ボタンがあったが、いまは無い**（撮影の段が0件）。担当の変更は右上の選び口へ移ったとみられる。段を直してから詰める。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
@@ -268,16 +269,16 @@ export const SCREENS = [
     // 「予約」だけだと**分類のチップ**に当たる。フォルダの行は
     // `role="option"` で「フォルダ 予約」という名前なので、そちらを指す。
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: 'フォルダ 予約', role: 'option' }],
-    verdict: 'needs_fix', verdictNote: 'P2 フォルダを予約にしても上の区分チップが「すべて」のまま。「★ 予約内のよく使う」の見出しが無い。1件ごとの★が無い',
-    verdictSource: 'inbox-v6/TUveA-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P2 `NWbuF` と同じ面の続き。** ルート `/chats`。**撮影の段が古く**「フォルダ」を押せない（0件）。段を直してから詰める。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }],
-    verdict: 'needs_fix', verdictNote: 'P2 設計は420pxの浮くパネル、実装は右端の全高ドロワー。未読だけ表示がスイッチでなくチェック。期限とメッセージ種別は「まだ絞り込めません」で押せない（口が無いことを正直に出したもの。設計は押せる）',
-    verdictSource: 'inbox-v6/w72a2-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P2 絞り込みの面。** ルート `/chats`。**撮影の段が古く**「絞り込み」を押せない（0件）。本文には「絞り込み」の語があるので、押せる形が変わったとみられる。段を直してから詰める。**この画面は束3の手本**（押せないときに理由を書く形）として記録してある。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
   },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }],
-    verdict: 'needs_fix', verdictNote: 'P1 保存した検索の中身（対応マーク・期限などの条件）と件数が出ず、名前だけ並ぶ。P2 よく使うの★と「…」が無く、削除が赤字で直に並ぶ',
-    verdictSource: 'inbox-v6/ASsb3-1920.png', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P1 保存した検索の中身と件数が出ず、名前だけ並ぶ。** ルート `/chats`（「保存した検索」）。設計は名前の下に**条件（対応マーク・期限など）と、いま何件あたるか**を出す。**中身が見えないと、どれを押せばよいか名前から推測することになる。** P2 よく使うの★と「…」（名前を変える・消す）が無く、削除が赤字で直に並ぶ——**押し間違いが起きやすい並び**。取得元：`inbox-v6/ASsb3.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/ASsb3.txt', verdictHead: 'c275749d',
   },
   /*
     2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
