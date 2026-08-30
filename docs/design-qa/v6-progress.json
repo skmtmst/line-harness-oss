@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 29,
+  "match": 32,
   "structureMatchDataPending": 18,
-  "needsFix": 181,
+  "needsFix": 178,
   "unjudged": 0,
-  "remaining": 229,
+  "remaining": 226,
   "features": [
     {
       "feature": 1,
@@ -1437,11 +1437,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 3,
       "structureMatchDataPending": 0,
-      "needsFix": 7,
+      "needsFix": 4,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 459,
@@ -1473,6 +1473,17 @@
             "SbuUI"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 587,
+          "head": "425a6b1a",
+          "on": "2026-08-30",
+          "screens": [
+            "GFDqW",
+            "GfceK",
+            "Lg8ff"
+          ],
+          "note": "確認直前の空き再取得、完了画面のリマインダ時刻と台帳の事実。撮影データの slots[].date を要件どおりに直した"
         }
       ]
     },

@@ -4357,13 +4357,22 @@ export const BOOKING_MENU_STAFF = [
   登録の直前にもう一度空きを見て `slot_conflict` を返す。
 */
 export const BOOKING_TAKEN_SLOT = '14:00'
-export function bookingAvailability(date, staffId) {
+export function bookingAvailability(date, staffId, { empty = false } = {}) {
   const person = BOOKING_MENU_STAFF.find((item) => item.id === staffId) ?? BOOKING_MENU_STAFF[0]
+  /*
+    **`date` は必ず入れる。**#587 の確認画面は
+    `slot.date === date && slot.start === time` で空きを見直す
+    （`bookings/new/page.tsx:194`）。空文字のまま返すと**どの枠も一致せず、
+    常に「埋まりました」になる**。実装の不具合に見えるが、固定データの穴。
+
+    `empty: true` は**枠が消えた状態**（`Lg8ff` の競合回復を撮るため）。
+    器は同じで `slots` だけ空にする。
+  */
   return {
     by_staff: [{
       staff_id: person.id,
       display_name: person.display_name,
-      slots: [
+      slots: empty ? [] : [
         { date, start: '10:00', end: '11:45' },
         { date, start: BOOKING_TAKEN_SLOT, end: '15:45' },
       ],

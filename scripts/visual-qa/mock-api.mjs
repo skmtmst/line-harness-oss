@@ -581,7 +581,10 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   const menuStaff = /^\/api\/booking\/admin\/menus\/([^/]+)\/staff$/.exec(pathname)
   if (menuStaff) return { staff: BOOKING_MENU_STAFF }
   if (pathname === '/api/booking/admin/availability') {
-    return bookingAvailability(query.get('from') ?? '', query.get('staff_id') ?? '')
+    /* `?empty=1` で枠が消えた状態を返す（`Lg8ff` の競合回復を撮るため）。 */
+    return bookingAvailability(query.get('from') ?? '', query.get('staff_id') ?? '', {
+      empty: query.get('empty') === '1',
+    })
   }
   if (pathname === '/api/booking/admin/pending-count') {
     return { count: BOOKING_REQUESTS.filter((b) => b.status === 'requested').length }
