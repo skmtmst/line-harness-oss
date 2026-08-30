@@ -133,6 +133,12 @@ describe('identity candidate contract', () => {
     await expect(upsertIdentityCandidate(db, rawPhone)).rejects.toMatchObject({
       code: 'UNMASKED_IDENTITY_VALUE', status: 422,
     });
+
+    const rawPhoneInDetail = ecDraft();
+    rawPhoneInDetail.left.detail = '連絡先 090-1234-5678';
+    await expect(upsertIdentityCandidate(db, rawPhoneInDetail)).rejects.toMatchObject({
+      code: 'UNMASKED_IDENTITY_VALUE', status: 422,
+    });
   });
 
   it('keeps a different decision and does not put it back in the pending queue', async () => {

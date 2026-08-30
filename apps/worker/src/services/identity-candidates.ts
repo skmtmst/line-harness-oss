@@ -118,11 +118,13 @@ function canonicalDraft(draft: IdentityCandidateDraft): IdentityCandidateDraft {
 
 const MASK_MARKER = /[*\u2022\u25cf\u2026]/;
 const RAW_EMAIL = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i;
+const RAW_PHONE = /(?:\+?\d[\s().-]*){10,15}/;
 const SENSITIVE_LABEL = /(e-?mail|mail|\u30e1\u30fc\u30eb|phone|tel|\u96fb\u8a71)/i;
 
 function containsRawSensitiveValue(label: string, preview: string | null): boolean {
   if (!preview) return false;
   if (RAW_EMAIL.test(preview) && !MASK_MARKER.test(preview)) return true;
+  if (RAW_PHONE.test(preview) && !MASK_MARKER.test(preview)) return true;
   if (!SENSITIVE_LABEL.test(label)) return false;
   const digits = preview.replace(/\D/g, '');
   return digits.length >= 7 && !MASK_MARKER.test(preview);
