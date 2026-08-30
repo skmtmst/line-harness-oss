@@ -690,15 +690,31 @@ export const TEMPLATES = (() => {
  * すでにある名前を打ったときの絵なので、既存が0件だと「保存しました」に
  * なってしまう。実際そうなった。
  */
+/*
+  受信箱の保存した検索。**Workerは `conditions` を保存されたまま返す**
+  （`routes/chats.ts:135` が `JSON.parse(...) as unknown`）。
+  保存した検索の仕組みは受信箱より前からあるので、**古い行は
+  `{ all: [], any: [] }` の形で入っている**。3件目をその形のままにして、
+  古い保存を開いても落ちないことを撮影で確かめられるようにする。
+*/
 export const INBOX_SAVED_VIEWS = [
-  ['VIPかつ未契約', true],
-  ['未対応・担当なし', true],
-  ['自分の未対応', false],
-].map(([name, isShared], index) => ({
+  ['VIPかつ未契約', true, {
+    version: 1, query: '', channels: ['line'], statuses: ['unread', 'on_hold'],
+    assignees: [], unread: 'all', messageTypes: [], receivedFrom: null, receivedTo: null,
+    sort: 'newest',
+  }],
+  ['未対応・担当なし', true, {
+    version: 1, query: '', channels: [], statuses: ['unread'],
+    assignees: ['unassigned'], unread: 'all', messageTypes: [], receivedFrom: null,
+    receivedTo: null, sort: 'waiting_desc',
+  }],
+  // 受信箱より前に作られた保存。画面が決めつけて読むと、ここで落ちる。
+  ['自分の未対応', false, { all: [], any: [] }],
+].map(([name, isShared, conditions], index) => ({
   id: `inbox-view-${index}`,
   name: String(name),
   scope: 'chats',
-  conditions: { all: [], any: [] },
+  conditions,
   createdBy: 'Kenta',
   lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
