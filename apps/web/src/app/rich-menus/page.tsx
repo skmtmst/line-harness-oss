@@ -314,6 +314,20 @@ export default function RichMenusListPage() {
   const topArea = tapStats?.byArea[0] ?? null
   const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
   const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
+  const groupKpiState = !selectedAccount?.id
+    ? 'unselected'
+    : loading
+      ? 'loading'
+      : error
+        ? 'error'
+        : 'ready'
+  const groupKpiReady = groupKpiState === 'ready'
+  const groupKpiUnavailableText =
+    groupKpiState === 'unselected'
+      ? 'LINEアカウントを選ぶと表示します'
+      : groupKpiState === 'loading'
+        ? '読み込んでいます'
+        : '一覧を取得できませんでした'
 
   const q = query.trim()
   const byQuery = q
@@ -357,15 +371,21 @@ export default function RichMenusListPage() {
 
   return (
     <main data-design-node="GO8RQ" className="p-6 max-w-7xl mx-auto">
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        data-design="KPIs"
+        data-group-kpi-state={groupKpiState}
+        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">メニュー</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {groups.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
+            {groupKpiReady ? groups.length : '—'}
+            {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {groups.filter((g) => g.status === 'published').length}
+            {groupKpiReady
+              ? `公開中 ${groups.filter((g) => g.status === 'published').length}`
+              : `公開中 —・${groupKpiUnavailableText}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -394,14 +414,16 @@ export default function RichMenusListPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">出し分け</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {targetingCount}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
+            {groupKpiReady ? targetingCount : '—'}
+            {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {targetingCount > 0
-              ? 'タグ条件で自動的に切り替わります'
-              : 'タグ条件で出し分けているメニューはありません'}
+            {groupKpiReady
+              ? targetingCount > 0
+                ? 'タグ条件で自動的に切り替わります'
+                : 'タグ条件で出し分けているメニューはありません'
+              : groupKpiUnavailableText}
           </p>
         </div>
       </div>
