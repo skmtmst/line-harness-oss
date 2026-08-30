@@ -57,6 +57,12 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  IdentityCandidateDetail,
+  IdentityCandidateKind,
+  IdentityCandidateList,
+  IdentityCandidateStatus,
+  DecideIdentityCandidateRequest,
+  UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
 /**
@@ -4336,6 +4342,41 @@ export const api = {
       fetchApi<{ success: boolean; data?: { id: string; approvalStatus: string }; error?: string }>(
         `/api/conversions/events/${eventId}/approval`,
         { method: 'PATCH', body: JSON.stringify({ status: 'rejected' }) },
+      ),
+  },
+  /**
+   * 本人照合の候補。3-2-A（友だち同士）と 23-1-A（ECの会員）が同じ口を読む。
+   *
+   * 判定と取り消しは、画面が読み込んだ版（`expectedVersion`）を必ず送る。
+   * 先に別の人が判定していれば Worker が 409 `STALE_CANDIDATE` を返すので、
+   * 画面は上書きせず読み直しを促す。
+   */
+  identityCandidates: {
+    list: (params: {
+      kind: IdentityCandidateKind
+      status?: IdentityCandidateStatus
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ kind: params.kind })
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
+    },
+    get: (id: string) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}`,
+      ),
+    decide: (id: string, body: DecideIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/decide`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    undo: (id: string, body: UndoIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/undo`,
+        { method: 'POST', body: JSON.stringify(body) },
       ),
   },
   duplicates: {
