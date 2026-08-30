@@ -89,4 +89,12 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(ADJUSTMENT).toContain('送信・失効台帳が接続されるまで実行しません')
     expect(ADJUSTMENT).not.toContain('「マイルが付きました」と届きます')
   })
+
+  it('手動増減の失敗でAPI番号や内部文をそのまま出さない', () => {
+    expect(ADJUSTMENT).toContain('mileageAdjustmentErrorMessage')
+    expect(ADJUSTMENT).toContain("error.status === 405")
+    expect(ADJUSTMENT).toContain('この環境ではマイルを手で変更できません。')
+    expect(ADJUSTMENT).toContain('状態を読み直してから、もう一度お試しください。')
+    expect(ADJUSTMENT).not.toContain("error instanceof ApiError || error instanceof Error ? error.message")
+  })
 })
