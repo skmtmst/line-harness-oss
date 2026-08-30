@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 225,
-  "unimplemented": 33,
+  "compared": 228,
+  "unimplemented": 30,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 7,
-  "structureMatchDataPending": 17,
-  "needsFix": 201,
+  "match": 23,
+  "structureMatchDataPending": 18,
+  "needsFix": 187,
   "unjudged": 0,
-  "remaining": 251,
+  "remaining": 235,
   "features": [
     {
       "feature": 1,
@@ -51,43 +51,32 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 2,
       "structureMatchDataPending": 0,
-      "needsFix": 16,
+      "needsFix": 15,
       "unjudged": 0,
-      "remaining": 16,
+      "remaining": 15,
       "capturedAt": [
-        {
-          "pr": 513,
-          "head": "60b39036",
-          "on": "2026-08-29",
-          "screens": [
-            "tBlkL",
-            "AuSDY",
-            "LHjwD"
-          ],
-          "note": "保存の成否を窓へ返す直し。**P0は解決**"
-        },
-        {
-          "pr": 555,
-          "head": "e873eeb9",
-          "on": "2026-08-29",
-          "screens": [
-            "ANgda",
-            "tBlkL",
-            "AuSDY",
-            "LHjwD"
-          ],
-          "note": "保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した"
-        },
         {
           "pr": 0,
           "head": "c275749d",
           "on": "2026-08-30",
           "screens": [
-            "xGLVe"
+            "f0zn6"
           ],
-          "note": "development そのもので撮った"
+          "note": "本文が取れていなかったので撮った。development そのもの"
+        },
+        {
+          "pr": 555,
+          "head": "9eee9655",
+          "on": "2026-08-30",
+          "screens": [
+            "tBlkL",
+            "ANgda",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "重複エラーの文言を設計へ。変更はこの1行だけ"
         }
       ]
     },
@@ -107,22 +96,16 @@
       "remaining": 10,
       "capturedAt": [
         {
-          "pr": 520,
-          "head": "4848a8f3",
-          "on": "2026-08-29",
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
           "screens": [
-            "bzDn6"
+            "PhxG6",
+            "Igi72",
+            "I6UAdr",
+            "YzxU1"
           ],
-          "note": "友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**"
-        },
-        {
-          "pr": 565,
-          "head": "ea2e730d",
-          "on": "2026-08-29",
-          "screens": [
-            "r7eSi"
-          ],
-          "note": "統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）"
+          "note": "判定を具体化するため撮った"
         }
       ]
     },
@@ -135,11 +118,11 @@
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
-      "match": 0,
+      "match": 2,
       "structureMatchDataPending": 1,
-      "needsFix": 15,
+      "needsFix": 13,
       "unjudged": 0,
-      "remaining": 17,
+      "remaining": 15,
       "capturedAt": [
         {
           "pr": 0,
@@ -160,6 +143,17 @@
             "zGZMA"
           ],
           "note": "判定を具体化するため撮り直した（本文が無かった）。development そのもの"
+        },
+        {
+          "pr": 420,
+          "head": "f77de350",
+          "on": "2026-08-30",
+          "screens": [
+            "HBTk0",
+            "yKEdO",
+            "KoT6c"
+          ],
+          "note": "入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた"
         }
       ]
     },
@@ -250,6 +244,18 @@
             "xfYLn"
           ],
           "note": "通の編集から `cron` を外す。束3"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "kk8dz",
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5"
+          ],
+          "note": "判定を具体化するため撮った。development そのもの"
         },
         {
           "pr": 569,
@@ -363,11 +369,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "needsFix": 10,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 429,
@@ -428,6 +434,15 @@
           "note": "`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま"
         },
         {
+          "pr": 514,
+          "head": "d064bded",
+          "on": "2026-08-30",
+          "screens": [
+            "Y0Sn3"
+          ],
+          "note": "一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった"
+        },
+        {
           "pr": 0,
           "head": "c275749d",
           "on": "2026-08-30",
@@ -484,6 +499,15 @@
             "cmDfJ"
           ],
           "note": "内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "K7vg2"
+          ],
+          "note": "判定を具体化するため撮った"
         }
       ]
     },
@@ -565,11 +589,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "needsFix": 9,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 0,
@@ -584,6 +608,15 @@
             "J3GxEZ"
           ],
           "note": "同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった"
+        },
+        {
+          "pr": 493,
+          "head": "cdbfe42c",
+          "on": "2026-08-30",
+          "screens": [
+            "W7LBc"
+          ],
+          "note": "縦帯が category ではなく folderId で数えるようになった。通常・読込・0件・失敗と、押した2つ"
         }
       ]
     },
@@ -591,16 +624,16 @@
       "feature": 12,
       "name": "リッチメニュー",
       "total": 9,
-      "compared": 8,
-      "unimplemented": 1,
+      "compared": 9,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 5,
       "structureMatchDataPending": 0,
-      "needsFix": 8,
+      "needsFix": 4,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 0,
@@ -614,6 +647,53 @@
             "TL7tp"
           ],
           "note": "同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**"
+        },
+        {
+          "pr": 583,
+          "head": "0218ef61",
+          "on": "2026-08-30",
+          "screens": [
+            "GO8RQ"
+          ],
+          "note": "出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致"
+        },
+        {
+          "pr": 509,
+          "head": "4cf82bd9",
+          "on": "2026-08-30",
+          "screens": [
+            "DIUbO",
+            "NXdDk"
+          ],
+          "note": "つながりの通常・読込・空・失敗を本文まで取った。空を失敗と混ぜない"
+        },
+        {
+          "pr": 575,
+          "head": "ab5750ec",
+          "on": "2026-08-30",
+          "screens": [
+            "szXsT"
+          ],
+          "note": "削除確認が ConfirmDialog へ。管理画面のものとLINE上のものが別の窓。失敗しても閉じない"
+        },
+        {
+          "pr": 577,
+          "head": "7b8df2f4",
+          "on": "2026-08-30",
+          "screens": [
+            "RW5Tb"
+          ],
+          "note": "失敗のとき帯を — に。実値0と未取得を言い分ける"
+        },
+        {
+          "pr": 583,
+          "head": "bb1e4dfd",
+          "on": "2026-08-30",
+          "screens": [
+            "kQ1bs",
+            "XtfO3"
+          ],
+          "note": "編集画面に「出す順番」。表示は1番始まり、保存は0始まりのまま"
         }
       ]
     },
@@ -627,8 +707,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 5,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
@@ -669,6 +749,15 @@
             "cSqvP"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 586,
+          "head": "7428a314",
+          "on": "2026-08-30",
+          "screens": [
+            "EMBIK"
+          ],
+          "note": "回答の保存先をフォーム定義から数える。重複は Set で除く。固定データにわざと重複を入れて確かめた"
         }
       ]
     },
@@ -757,16 +846,16 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 6,
-      "unimplemented": 3,
+      "compared": 7,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 0,
       "needsFix": 6,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 0,
@@ -780,6 +869,24 @@
             "GPWzq"
           ],
           "note": "同上"
+        },
+        {
+          "pr": 585,
+          "head": "75d6eb9a",
+          "on": "2026-08-30",
+          "screens": [
+            "njLGA"
+          ],
+          "note": "支払いのタブ。承認済みだけを集計し、保留期間内と承認日時未取得を分ける。通常・読込・0件・取得失敗の4状態"
+        },
+        {
+          "pr": 585,
+          "head": "3857365b",
+          "on": "2026-08-30",
+          "screens": [
+            "njLGA"
+          ],
+          "note": "取得失敗のとき帯を — にする直し。0円と見分けがつくようになった"
         }
       ]
     },
@@ -892,16 +999,16 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 8,
-      "unimplemented": 1,
+      "compared": 9,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 0,
       "needsFix": 8,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 443,
@@ -923,6 +1030,17 @@
             "Im2b1"
           ],
           "note": "development そのもので撮った（根元9本のマージ後）"
+        },
+        {
+          "pr": 574,
+          "head": "0906b8fa",
+          "on": "2026-08-30",
+          "screens": [
+            "JupxW",
+            "BMmxU",
+            "UIaM7"
+          ],
+          "note": "refの初期選択、一覧の4状態、削除確認の窓。撮影モックに詳細・ファネル・流入元の口を足した"
         }
       ]
     },
@@ -968,11 +1086,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 6,
-      "needsFix": 2,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 445,
@@ -995,6 +1113,15 @@
             "dfwD4"
           ],
           "note": "development そのもので撮った（根元9本のマージ後）"
+        },
+        {
+          "pr": 584,
+          "head": "d0e62d59",
+          "on": "2026-08-30",
+          "screens": [
+            "QQ1SR"
+          ],
+          "note": "使われ方の4つの帯と片づけの導線。通常・読込・空・失敗の4状態"
         }
       ]
     },
@@ -1007,11 +1134,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 2,
-      "needsFix": 4,
+      "needsFix": 3,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 446,
@@ -1047,6 +1174,16 @@
             "i9sQP"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 526,
+          "head": "1c91a7bc",
+          "on": "2026-08-30",
+          "screens": [
+            "HpKyF",
+            "VLMGH"
+          ],
+          "note": "誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み"
         }
       ]
     },
@@ -1361,11 +1498,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 2,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "needsFix": 2,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 533,
@@ -1386,6 +1523,16 @@
             "ugP5y"
           ],
           "note": "イベント予約の作成・予約者・一覧。キャンセル待ちの口を撮影モックへ足した（無いと `waitlist.length` で落ちる）"
+        },
+        {
+          "pr": 533,
+          "head": "c9d33d95",
+          "on": "2026-08-30",
+          "screens": [
+            "ugP5y",
+            "k5m5Bc"
+          ],
+          "note": "帯が「次に何をするか」になった。あと少しで満席・申し込みが少ない。未取得と実値0も言い分ける"
         }
       ]
     },
@@ -1596,13 +1743,6 @@
       "gapNote": "物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない"
     },
     {
-      "feature": 12,
-      "node": "szXsT",
-      "name": "12-1-F リッチメニューの削除確認",
-      "gap": "api",
-      "gapNote": "確認窓だけでは作れない。現在表示中の人数、次に表示されるメニュー、切替元、自動応答・オートメーション等の参照元を返す影響確認と、LINE取り下げの完了を保証する実行記録が要る。`force=true` は管理画面へ出さない"
-    },
-    {
       "feature": 13,
       "node": "ava2n",
       "name": "13-1-B フォームのデザイン設定",
@@ -1632,13 +1772,6 @@
     },
     {
       "feature": 16,
-      "node": "njLGA",
-      "name": "16-1-C 支払い",
-      "gap": "api",
-      "gapNote": "締め日・支払日・振込先・未払い残高の表が要る"
-    },
-    {
-      "feature": 16,
       "node": "QX70l",
       "name": "16-1-G アフィリエイターを削除する確認",
       "gap": "drop",
@@ -1650,13 +1783,6 @@
       "name": "16-1-H 支払いを確定する",
       "gap": "api",
       "gapNote": "同上（締める操作）"
-    },
-    {
-      "feature": 18,
-      "node": "UIaM7",
-      "name": "18-1-E 流入リンクの削除確認",
-      "gap": "api",
-      "gapNote": "確認窓だけでは作れない。投稿・広告・自動処理・成果対応の使用先、過去流入数、転送先候補を返す影響確認と、停止・アーカイブ・別リンクへの転送を行う契約が要る。履歴がある経路は物理削除しない"
     },
     {
       "feature": 20,

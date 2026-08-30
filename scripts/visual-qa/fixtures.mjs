@@ -1460,6 +1460,39 @@ export const RICH_MENU_GROUP_DETAILS = {
  * `fields` は `{name,label,type}` の配列で、通で返さないと
  * 回答の列見出しが組み立てられない。
  */
+
+/**
+ * フォーム定義（`FormLayout` v2）。**#586 の「回答の保存先」がこれを数える。**
+ *
+ * 形は `packages/shared/src/form-layout.ts:212`。数え方は
+ * `summarizeFormDestinations()`——`Set` に入れるので、**同じ情報欄・タグを
+ * 複数の質問で使っても1つとして数える**。
+ *
+ * 数える先は4通りある。**全部を1枚に入れてある：**
+ * 1. 入力欄の `destinations.friendFieldIds`
+ * 2. `destinations.realName` / `displayName` / `note`（`friends.real_name` 等）
+ * 3. `choiceMode: 'tag'` の選択肢の `tagId`、`choiceMode: 'friendField'` の
+ *    `choiceFriendFieldId`、`choiceMode: 'action'` の中の動作
+ * 4. `options.afterActions` と、フォームの `onSubmitTagId`
+ */
+function formLayout(sections, afterActions = []) {
+  return {
+    version: 2,
+    header: [],
+    sections: sections.map((blocks, index) => ({
+      id: `sec-${index + 1}`,
+      name: `${index + 1}ページ目`,
+      blocks,
+    })),
+    options: { afterActions },
+  }
+}
+
+/** 入力欄1つ。 */
+function input(id, name, label, type, extra = {}) {
+  return { id, kind: 'input', type, name, label, ...extra }
+}
+
 export const FORMS = [
   {
     id: 'form-1', name: '来店アンケート', description: '来店後に感想と次回の希望を聞く',
@@ -1473,6 +1506,29 @@ export const FORMS = [
     isActive: true, submitCount: 1284,
     createdAt: '2026-05-02T00:00:00.000Z', lastSubmittedAt: '2026-08-24T05:22:00.000Z',
     usedByAccounts: [],
+    /*
+      **重複を入れてある。**`次回のご来店予定` と `ご満足度` が同じ
+      `field-birthday` を指し、`よかったところ` の選択肢2つが同じ `tag-0` を
+      指す。数えて **友だち情報欄 3・タグ 2** になるのが正しい
+      （`field-birthday` / `friends.real_name` / `field-plan`、`tag-0` / `tag-1`）。
+      重複を数えると 5・4 になるので、**この1枚で `Set` が効いているか分かる**。
+    */
+    onSubmitTagId: 'tag-1',
+    layout: formLayout([[
+      input('b1', 'name', 'お名前', 'text', { destinations: { realName: true } }),
+      input('b2', 'satisfaction', 'ご満足度', 'radio', {
+        choiceMode: 'friendField', choiceFriendFieldId: 'field-birthday',
+        choices: [{ id: 'c1', label: '満足' }, { id: 'c2', label: 'ふつう' }],
+      }),
+      input('b3', 'good_points', 'よかったところ', 'checkbox', {
+        choiceMode: 'tag',
+        choices: [{ id: 'c3', label: '接客', tagId: 'tag-0' }, { id: 'c4', label: '雰囲気', tagId: 'tag-0' }],
+      }),
+      input('b4', 'comment', 'ご意見・ご要望', 'textarea'),
+      input('b5', 'next_visit', '次回のご来店予定', 'date', {
+        destinations: { friendFieldIds: ['field-birthday', 'field-plan'] },
+      }),
+    ]]),
   },
   {
     id: 'form-2', name: '資料請求', description: '名前と連絡先',
@@ -1486,6 +1542,15 @@ export const FORMS = [
     isActive: true, submitCount: 468,
     createdAt: '2026-04-14T00:00:00.000Z', lastSubmittedAt: '2026-08-23T02:10:00.000Z',
     usedByAccounts: [],
+    /* 送信後の動作から数える例。友だち情報欄 1・タグ 1。 */
+    onSubmitTagId: null,
+    layout: formLayout([[
+      input('b6', 'name', 'お名前', 'text'),
+      input('b7', 'email', 'メールアドレス', 'email'),
+    ]], [
+      { kind: 'friend_field', fieldId: 'field-plan', value: '資料請求' },
+      { kind: 'tag', op: 'add', tagIds: ['tag-2'] },
+    ]),
   },
   {
     id: 'form-3', name: '休止の理由', description: '定期便を止めたい人に聞く',
@@ -1494,6 +1559,12 @@ export const FORMS = [
       { name: 'detail', label: 'くわしく', type: 'textarea' },
     ],
     isActive: true, submitCount: 96,
+    /* **保存先が1つも無いフォーム。**`友だち情報欄 0・タグ 0` と出るべきで、`—` ではない。 */
+    onSubmitTagId: null,
+    layout: formLayout([[
+      input('b8', 'reason', '休止の理由', 'radio', { choices: [{ id: 'c5', label: '価格' }] }),
+      input('b9', 'detail', 'くわしく', 'textarea'),
+    ]]),
     createdAt: '2026-06-20T00:00:00.000Z', lastSubmittedAt: '2026-08-19T08:00:00.000Z',
     usedByAccounts: [],
   },
@@ -1504,6 +1575,23 @@ export const FORMS = [
     isActive: false, submitCount: 0,
     createdAt: '2026-08-18T00:00:00.000Z', lastSubmittedAt: null,
     usedByAccounts: [],
+    /*
+      **定義は必ず付ける。**Worker の `parseLayout()` は `null` を返さず、
+      定義が無ければ `fields` から作り、それも無ければ空の定義を返す
+      （`packages/shared/src/form-layout.ts:447`）。**定義の無いフォームは
+      口から返ってこない**ので、ここで省くと実際には起きない形になる。
+      選択肢に動作を付けた例。友だち情報欄 1・タグ 1。
+    */
+    onSubmitTagId: null,
+    layout: formLayout([[
+      input('b10', 'choice', 'どれが気になりますか', 'radio', {
+        choiceMode: 'action',
+        choices: [
+          { id: 'c6', label: '和風', actions: [{ kind: 'tag', op: 'add', tagIds: ['tag-3'] }] },
+          { id: 'c7', label: '洋風', actions: [{ kind: 'friend_field', fieldId: 'field-plan', value: '洋風' }] },
+        ],
+      }),
+    ]]),
   },
 ]
 
