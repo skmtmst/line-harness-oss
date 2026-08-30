@@ -278,6 +278,47 @@ CREATE TABLE analytics_result_audiences (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE analytics_saved_analyses (
+  id                     TEXT PRIMARY KEY,
+  line_account_id        TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  name                   TEXT NOT NULL,
+  kind                   TEXT NOT NULL CHECK (kind IN ('cross','funnel')),
+  current_version_number INTEGER NOT NULL DEFAULT 1 CHECK (current_version_number >= 1),
+  status                 TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+  created_by             TEXT,
+  created_by_name        TEXT NOT NULL,
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL
+);
+
+CREATE TABLE analytics_saved_analysis_snapshots (
+  id                    TEXT PRIMARY KEY,
+  saved_analysis_id     TEXT NOT NULL REFERENCES analytics_saved_analyses(id) ON DELETE CASCADE,
+  analysis_version_id   TEXT NOT NULL REFERENCES analytics_saved_analysis_versions(id) ON DELETE RESTRICT,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  source_kind           TEXT NOT NULL CHECK (source_kind IN ('cross','funnel')),
+  source_result_id      TEXT NOT NULL,
+  period_from           TEXT NOT NULL,
+  period_to             TEXT NOT NULL,
+  time_zone             TEXT NOT NULL,
+  data_cutoff_at        TEXT NOT NULL,
+  state                 TEXT NOT NULL CHECK (state IN ('available','partial','unavailable','failed')),
+  result_json           TEXT NOT NULL CHECK (json_valid(result_json)),
+  created_by            TEXT,
+  created_at            TEXT NOT NULL
+);
+
+CREATE TABLE analytics_saved_analysis_versions (
+  id                  TEXT PRIMARY KEY,
+  saved_analysis_id   TEXT NOT NULL REFERENCES analytics_saved_analyses(id) ON DELETE CASCADE,
+  line_account_id     TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  version_number      INTEGER NOT NULL CHECK (version_number >= 1),
+  definition_json     TEXT NOT NULL CHECK (json_valid(definition_json)),
+  created_by          TEXT,
+  created_at          TEXT NOT NULL,
+  UNIQUE (saved_analysis_id, version_number)
+);
+
 CREATE TABLE analytics_url_exposure_queue (
   message_id            TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1534,7 +1575,9 @@ CREATE TABLE nen_delivery_jobs (
   last_error TEXT,
   sent_at TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, campaign_snapshot TEXT CHECK (
+  campaign_snapshot IS NULL OR json_valid(campaign_snapshot)
+),
   UNIQUE (campaign_key, friend_id, source_key)
 );
 
@@ -1593,6 +1636,29 @@ CREATE TABLE nen_pet_profiles (
   updated_at TEXT NOT NULL
 , breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT);
 
+CREATE TABLE nen_photo_review_events (
+  id TEXT PRIMARY KEY,
+  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  from_status TEXT NOT NULL CHECK (from_status = 'pending'),
+  to_status TEXT NOT NULL CHECK (to_status IN ('adopted', 'rejected')),
+  reason_code TEXT CHECK (reason_code IS NULL OR reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')),
+  reason_note TEXT,
+  awarded_points INTEGER NOT NULL DEFAULT 0,
+  reviewed_by TEXT NOT NULL,
+  reviewed_by_name TEXT NOT NULL,
+  notification_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (notification_status IN ('pending', 'sent', 'failed')),
+  notification_error TEXT,
+  notification_attempt_count INTEGER NOT NULL DEFAULT 0
+    CHECK (notification_attempt_count >= 0),
+  notification_first_failed_at TEXT,
+  notification_sent_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(photo_id, from_status)
+);
+
 CREATE TABLE nen_photo_submissions (
   id TEXT PRIMARY KEY,
   friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
@@ -1607,7 +1673,10 @@ CREATE TABLE nen_photo_submissions (
   created_at TEXT NOT NULL,
   reviewed_at TEXT,
   updated_at TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id), publication_consent_version TEXT, publication_consent_at TEXT, publication_withdrawn_at TEXT, public_pet_name INTEGER NOT NULL DEFAULT 0
+  CHECK (public_pet_name IN (0, 1)), review_reason_code TEXT
+  CHECK (review_reason_code IS NULL OR review_reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')), review_reason_note TEXT, reviewed_by TEXT, reviewed_by_name TEXT, review_notification_status TEXT NOT NULL DEFAULT 'not_required'
+  CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')));
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -2413,6 +2482,9 @@ CREATE TABLE templates (
   carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
   -- 162: 制限を超えたときに返すテキスト。空なら何も返さない。
   carousel_tap_limit_text TEXT,
+  -- 質問テンプレート。scenario_steps.question_json と同じ形。
+  question_json TEXT CHECK (question_json IS NULL OR json_valid(question_json)),
+  question_status TEXT NOT NULL DEFAULT 'published' CHECK (question_status IN ('draft', 'published')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id));
@@ -2679,6 +2751,15 @@ CREATE INDEX idx_analytics_reconciliation_account_time
 
 CREATE INDEX idx_analytics_result_audiences_expiry
   ON analytics_result_audiences(line_account_id, expires_at);
+
+CREATE INDEX idx_analytics_saved_analyses_account
+  ON analytics_saved_analyses(line_account_id, status, updated_at DESC, id DESC);
+
+CREATE INDEX idx_analytics_saved_snapshots_history
+  ON analytics_saved_analysis_snapshots(line_account_id, saved_analysis_id, created_at DESC, id DESC);
+
+CREATE INDEX idx_analytics_saved_versions_current
+  ON analytics_saved_analysis_versions(line_account_id, saved_analysis_id, version_number DESC);
 
 CREATE INDEX idx_analytics_url_exposure_queue_due
   ON analytics_url_exposure_queue(status, available_at, created_at)
@@ -3049,6 +3130,20 @@ CREATE INDEX idx_nen_pet_profiles_birthday
 CREATE INDEX idx_nen_pet_profiles_customer
   ON nen_pet_profiles(customer_id);
 
+CREATE INDEX idx_nen_photo_review_events_account_created
+  ON nen_photo_review_events(line_account_id, created_at DESC);
+
+CREATE INDEX idx_nen_photo_review_events_notification
+  ON nen_photo_review_events(notification_status, created_at)
+  WHERE notification_status IN ('pending', 'failed');
+
+CREATE INDEX idx_nen_photos_account_status
+  ON nen_photo_submissions(line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_nen_photos_publication
+  ON nen_photo_submissions(line_account_id, publication_consent_at, reviewed_at DESC)
+  WHERE status = 'adopted' AND publication_withdrawn_at IS NULL;
+
 CREATE INDEX idx_nen_photos_status ON nen_photo_submissions(status, created_at DESC);
 
 CREATE INDEX idx_nen_point_ledger_friend_created
@@ -3333,6 +3428,40 @@ WHEN NEW.source_kind = 'funnel'
     WHERE r.id = NEW.source_result_id AND r.line_account_id = NEW.line_account_id
  )
 BEGIN SELECT RAISE(ABORT, 'analytics_result_source_not_found'); END;
+
+CREATE TRIGGER trg_analytics_saved_snapshots_no_update
+BEFORE UPDATE ON analytics_saved_analysis_snapshots
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_snapshot_immutable'); END;
+
+CREATE TRIGGER trg_analytics_saved_snapshots_same_parent
+BEFORE INSERT ON analytics_saved_analysis_snapshots
+WHEN NOT EXISTS (
+  SELECT 1
+    FROM analytics_saved_analyses a
+    JOIN analytics_saved_analysis_versions v
+      ON v.id = NEW.analysis_version_id
+     AND v.saved_analysis_id = a.id
+     AND v.line_account_id = a.line_account_id
+   WHERE a.id = NEW.saved_analysis_id
+     AND a.line_account_id = NEW.line_account_id
+)
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
+
+CREATE TRIGGER trg_analytics_saved_versions_no_delete
+BEFORE DELETE ON analytics_saved_analysis_versions
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_version_immutable'); END;
+
+CREATE TRIGGER trg_analytics_saved_versions_no_update
+BEFORE UPDATE ON analytics_saved_analysis_versions
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_version_immutable'); END;
+
+CREATE TRIGGER trg_analytics_saved_versions_same_account
+BEFORE INSERT ON analytics_saved_analysis_versions
+WHEN NOT EXISTS (
+  SELECT 1 FROM analytics_saved_analyses a
+   WHERE a.id = NEW.saved_analysis_id AND a.line_account_id = NEW.line_account_id
+)
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
 
 CREATE TRIGGER trg_automation_published_version_immutable
 BEFORE UPDATE ON automation_versions

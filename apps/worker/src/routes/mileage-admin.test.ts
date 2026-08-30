@@ -22,6 +22,7 @@ const dbMocks = {
   getMileageManualAdjustmentPolicy: vi.fn(),
   setMileageManualAdjustmentPolicy: vi.fn(),
   postMileageAdjustment: vi.fn(),
+  getActionScoreOverview: vi.fn(),
   MileageAdjustmentError: class MileageAdjustmentError extends Error {
     constructor(public readonly code: string) { super(code); }
   },
@@ -132,6 +133,24 @@ describe('mileage admin API', () => {
       limit: 100,
       offset: 0,
     });
+  });
+
+  it('returns account-scoped action scores with bounded filters', async () => {
+    dbMocks.getActionScoreOverview.mockResolvedValue({
+      summary: { scoredFriends: 2, high: 1, normal: 0, low: 1, decreased30d: 1, highMin: 70, normalMin: 30 },
+      items: [], pagination: { total: 2, limit: 100, offset: 0 },
+    });
+    const response = await call('/api/action-scores/friends?accountId=account-1&filter=decreased&sort=change_asc&limit=999');
+    expect(response.status).toBe(200);
+    expect(dbMocks.getActionScoreOverview).toHaveBeenCalledWith(env.DB, {
+      accountId: 'account-1', search: '', filter: 'decreased', sort: 'change_asc', limit: 100, offset: 0,
+    });
+  });
+
+  it('rejects hidden accounts and unknown action-score filters', async () => {
+    expect((await call('/api/action-scores/friends?accountId=hidden')).status).toBe(404);
+    expect((await call('/api/action-scores/friends?accountId=account-1&filter=vip')).status).toBe(400);
+    expect(dbMocks.getActionScoreOverview).not.toHaveBeenCalled();
   });
 
   it('rejects unknown mileage-history filters', async () => {
