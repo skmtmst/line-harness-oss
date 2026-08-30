@@ -219,8 +219,8 @@ export const SCREENS = [
   {
     ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
     steps: [...OPEN_CHAT, { click: '表示項目' }],
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 右パネルの表示設定が設計とそろわない（項目ごとの出し入れ）。1440・1920とも横スクロール0 **ルート**：`/chats`（「表示項目」）。**取得元**：`inbox-v6/Xi4x9.txt`。**推奨修正**：右パネルの項目を1つずつ出し入れできるようにする。**出す項目の一覧は既に画面が持っている**ので、切替の記憶（この端末）を足すだけ。',
-    verdictSource: 'inbox-v6/Xi4x9.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#604 `8f103587`（#538 `a2788ef5` の上）で撮り直した。前の判定は誤りだったので取り消す。** ルート `/chats`（「表示項目」）。1440・1920とも横スクロール0。 **「項目ごとの出し入れができない」と書いていたが、#513・#538 で既に入っていた。** development `c275749d` で撮った古い絵をもとに書いた判定だった。いまは項目ごとのチェックと「上へ／下へ」の並べ替えがあり、選んだ形は端末に残る。 **全部隠したときに戻す道が無かったので足した**（「初期状態に戻す」）。右パネルが空になり、どれを隠したかも画面から読めなくなるため。いま何件隠しているかも添えた。 P2 設計はスイッチと掴んで動かす形、実装はチェックと「上へ／下へ」。設計にある「完了」は無い（押さなくてもその場で効くため要らない）。出し入れの中身は同じなので、残るのは操作の見た目の差だけ。 取得元：`inbox-v6/Xi4x9-1440.png` ＋ `friend-info-sidebar.tsx:226`',
+    verdictSource: 'inbox-v6/Xi4x9.txt + inbox-v6/design-qa.md', verdictHead: '8f103587',
   },
   // 未読の会話が並んだ状態。開かずにそのまま撮る。
   { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読',
@@ -279,7 +279,7 @@ export const SCREENS = [
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }],
     variants: [{ suffix: '-menu', steps: [{ click: '保存した検索', after: 600 }, { qaOpen: 'ASsb3', after: 600 }] }],
     verdict: 'needs_fix', verdictNote: '**#604 `93065346`（#538 `a2788ef5` の上）で直した。撮っている途中で画面が落ちて、実装の不具合が見つかった。** ルート `/chats`（「保存した検索」）。1440・1920とも横スクロール0。 **① 受信箱より前に作られた保存を開くと、受信箱ごと落ちていた。** Workerは `conditions` を `JSON.parse(row.conditions_json) as unknown` でそのまま返す（`routes/chats.ts:135`）。保存した検索の仕組みは受信箱より前からあり、古い行は `{ all: [], any: [] }` の形で入っている。画面はそれを `InboxSavedViewConditions` と決めつけて `conditions.statuses.length` を読んでいた。`normalizeSavedViewConditions()` で知っている値だけ拾い、分からない形は「何も絞っていない」として扱う。**撮影の固定データが3件とも古い形だったので、この道は一度も通っていなかった。**受信箱が実際に保存する形を2件に入れ、1件だけ古い形のまま残した。 **② 名前の下に条件の要約を出した**（「未対応・保留 ／ LINE」「未対応 ／ 担当 未割り当て」、古い形の1件は「すべての会話」）。担当者のidは名前へ直し、分からないidは「不明な担当者」。 **③ 赤字の「削除」を名前の隣から「…」へ畳んだ**（名前を変える／消す）。選ぶつもりで押し間違える並びだった。消す前に「この保存した検索だけが消えます。会話や絞り込みの条件そのものは残り…この操作は取り消せません。」と言う。 P2 ★（よく使う）と、当たる件数が無い。**件数は数を作らないため入れていない**——いまの読み口では一覧を丸ごと数え直さないと出せない。`QKx8Q` と同じ口が要るので、そちらと同時に。 `undefined`・`NaN`・`Invalid Date`・`API error` は0件。取得元：`inbox-v6/ASsb3.txt:28-36` ＋ `ASsb3-menu-1440.png`',
-    verdictSource: 'inbox-v6/ASsb3.txt', verdictHead: '93065346',
+    verdictSource: 'inbox-v6/ASsb3.txt', verdictHead: '8f103587',
   },
   /*
     2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
@@ -2443,7 +2443,7 @@ export const CAPTURED_AT = {
 
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' },
     { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
-      { pr: 604, head: '93065346', on: '2026-08-31', screens: ['ASsb3'], note: 'Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」も足した' },
+      { pr: 604, head: '8f103587', on: '2026-08-31', screens: ['ASsb3', 'Xi4x9'], note: 'Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した' },
   ],
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },
