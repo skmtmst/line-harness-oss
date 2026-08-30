@@ -342,6 +342,55 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    機能設定。**一覧の既定（配列）だと `visibleFeatureGroups` が落ちる。**
+    `specializedFeatureKeys` を読むので、配列を渡すと `undefined.includes` になる。
+    「空」は**何も出していないアカウント**——`features` が空で、専用機能も無い。
+  */
+  [/\/api\/settings\/features(\?|$)/, {
+    features: {}, sidebarOrder: null, sidebarItemOrder: null,
+    parentChildMode: false, specializedFeatureKeys: [],
+  }],
+  /*
+    分析の「使われ方」（`QQ1SR`・#584）。**一覧の既定（配列）では試したことにならない。**
+    この口は封筒（`{lineAccountId, period, data:{summary, categories}}`）を返すので、
+    配列を返すと `overview.summary` で落ちる。**それは「空」ではなく「壊れた返事」。**
+
+    何も作っていないアカウントで Worker が返す形に合わせる——**分類8つは
+    コードに直書きなので消えず、数だけ0**になる（`analytics-overviews.ts:897`）。
+  */
+  [/\/api\/analytics\/usage(\?|$)/, {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-07-28', to: '2026-08-25' },
+    dataCutoffAt: '2026-08-25T02:00:00.000Z',
+    data: {
+      state: 'available', stateReason: null,
+      checkedAt: '2026-08-25T02:00:00.000Z', automaticDeletion: false,
+      summary: {
+        unusedItems: { value: 0, state: 'available', reason: null },
+        automaticRuns: { value: 0, state: 'partial', reason: '現在はオートメーションの実行記録だけを数えています' },
+        manualSends: { value: 0, state: 'available', reason: null },
+        estimatedHoursSaved: { value: 0, state: 'partial', reason: '現在はオートメーションの実行記録だけを数えています。1回30秒として試算しています' },
+      },
+      categories: [
+        ['templates', 'テンプレート', '/templates'],
+        ['scenarios', 'シナリオ', '/scenarios'],
+        ['forms', '回答フォーム', '/form-submissions'],
+        ['rich_menus', 'リッチメニュー', '/rich-menus'],
+        ['friend_attributes', 'タグ・友だち情報', '/tags'],
+        ['inflow_conversion', '流入リンク・成果地点', '/inflow-links'],
+        ['automations', 'オートメーション・共通アクション', '/automations'],
+        ['media_vars', '登録メディア・共通情報', '/contents'],
+      ].map(([key, label, href]) => ({
+        key, label, href,
+        created: { value: 0, state: 'available', reason: null },
+        inUse: { value: 0, state: 'available', reason: null },
+        unused: { value: 0, state: 'available', reason: null },
+        brokenReferences: { value: null, state: 'partial', reason: 'JSON内の参照切れは次の利用関係台帳で追加します' },
+        lastUsedAt: { value: null, state: 'available', reason: null },
+      })),
+    },
+  }],
+  /*
     友だち一覧。**一覧の既定（配列）を返すと画面ごと落ちる。**
     画面は `data.items` と `data.total` を読むので、`items` の無い返事だと
     「もう一度試す」の絵になる（`SHAPES['/api/friends']` と同じ形で返す）。

@@ -224,7 +224,7 @@ export const SCREENS = [
   },
   // 未読の会話が並んだ状態。開かずにそのまま撮る。
   { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読',
-    verdict: 'needs_fix', verdictNote: '**P2 担当者ごとに束ねる面が無い。** ルート `/chats`。実装は1本の一覧に「担当者：すべて」の絞り込みが付くだけで、**担当ごとに分けて並べる形になっていない**（撮った本文でも行の末尾に `K Kenta` `M Masato` `未 未割り当て` が付くだけ）。設計の 2-5 は担当ごとの束と、その束ごとの未読数。P2 帯は 要返信1件／最長1時間12分待ち／自分が担当0件／今日の受信0件／メール0件／期限超過1件 の6つで、設計の並びと合わせる。**帯の「要返信 1件」と対応ルールのタブ「要返信 3」が食い違うが、これは撮影用の固定データが別々の口から来ているためで、実装の不具合ではない。** 取得元：`inbox-v6/f0zn6.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P2 担当者ごとに束ねる面が無い。** ルート `/chats`。実装は1本の一覧に担当者の絞り込み（すべて／未割り当て／Masato／Kenta）が付くだけで、**担当ごとに分けて並べる形になっていない**（撮った本文でも行の末尾に `K Kenta` `M Masato` `未 未割り当て` が付くだけ）。設計の 2-5 は担当ごとの束と、その束ごとの未読数。P2 帯は 要返信1件／最長1時間12分待ち／自分が担当0件／今日の受信0件／メール0件／期限超過1件 の6つで、設計の並びと合わせる。**帯の「要返信 1件」と対応ルールのタブ「要返信 3」が食い違うが、これは撮影用の固定データが別々の口から来ているためで、実装の不具合ではない。** 取得元：`inbox-v6/f0zn6.txt`。1440・1920とも横スクロール0',
     verdictSource: 'inbox-v6/f0zn6.txt', verdictHead: 'c275749d',
   },
   {
@@ -1500,7 +1500,19 @@ export const SCREENS = [
   { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。未取得と実値0の扱いは、この機能がいちばんよくできている。** 本文に `—` が28か所あり、**`0件` は1つも無い**（数えていないものを0で埋めていない）。データ締切も日本時間で出る。構造は設計とそろっており、残るのは実データの接続', verdictSource: 'analytics-v6/Zxezb.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 社内テスト配信の開封・クリックが **`—`** で、帯に「20人未満は取得対象外」と**理由**が付く。**0ではなく取れないことが分かる**形。残るのは実データの接続', verdictSource: 'analytics-v6/J6Inc.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 広告費が `—` のとき**差し引きも `—`** になる。**片方が未取得なら計算結果も未取得**で、0円として引き算していない。残るのは実データの接続', verdictSource: 'analytics-v6/YBGtm.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。** **前のP1（最終利用が生のUTC）は直っている**——`2026/08/24 14:00` と日本時間で出て、一度も使っていないリッチメニューは `—` のまま（**日付で埋めていない**）。**P1 設計の帯4つと「片づける」が無い。** 本文を数えて **「使っている機能」「作ったのに使っていない」「自動で動いた回数」「手作業が減った時間」「気づいたこと」「片づける」「中身を見る」がいずれも0件**。実装は数（作成／利用中／未使用／参照切れ／最終利用）を並べ、「未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。」と添えるところまで。**数は出るが、そこから片づける道が無い。** 設計はこの画面を「作ったまま使っていないものを見つけて片づける」ためのものとしている。1440・1920とも横スクロール0', verdictSource: 'analytics-v6/QQ1SR.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  {
+    ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage',
+    /*
+      **#584 でこの面が作られたので、4つの状態を撮る。**
+      口は2つある——使われ方そのものと、「使っている機能」を数えるための
+      機能設定。片方だけ差し替えると、もう片方が普通に返って絵が混ざる。
+    */
+    states: {
+      apis: ['**/api/analytics/usage*', '**/api/settings/features*'],
+      kinds: ['loading', 'empty', 'error'],
+    },
+    verdict: 'match', verdictNote: '**#584 `d0e62d59` で撮った。設計 20-1-C の4つの帯と表がそろい、片づけの導線も入った。前のP1（帯4つと「片づける」が無い）は解決。** ルート `/analytics?tab=usage`。通常・読込・空・失敗の4状態を1440・1920で撮った（計6枚、いずれも横スクロール0）。\n\n**帯4つ**：「使っている機能 32 / 32」「作ったのに使っていない 20個」「自動で動いた回数 412回」「手作業が減った時間 3.43時間」。\n\n**未使用が実値0と未取得を混ぜていない。** 表の8分類のうち、シナリオは `0` で「すべて利用中です」、登録メディア・共通情報は `—` で「旧データにLINEアカウント所属がないため、安全に分けられません」。**数えて0と、数えられないが別の言葉になっている。** 合計の20個にも「取得できた分類だけの合計です」と断りが付く（未取得の分類を0として足していない）。\n\n**「片づける」は未使用が確定した項目だけ。** 行の「片づける」は `canTidyUsage()`（`unused.value !== null && > 0`）で守られており、数えて出現数を確かめた——**通常7回／空1回**。空では8分類すべてが `0` になり、行の「片づける」が1つも出ない。\n\n**分析画面から直接消さない。** 行の「中身を見る」も「片づける」も `href={item.href}` で `/templates` `/scenarios` `/rich-menus` などへ**移動するだけ**。この画面に削除の口は無く、下に「未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。」と常に出る。Workerも `automaticDeletion: false` を返す。\n\n**自動回数と削減時間の断りが本文に出ている。** 「現在はオートメーションの実行記録だけを数えています」「1回30秒として試算しています」。どちらも `state: \'partial\'` で返る（`analytics-overviews.ts:919`）。\n\n**状態の出方**：読込＝「分析を読み込んでいます」／失敗＝「分析を表示できませんでした」。**失敗を空や0として出していない。**\n\n**残る差（P2、この画面の合否は変えない）**：帯の「作ったのに使っていない」カードに付く「片づける」だけは**守りが無い**（`page.tsx:1417` の `action={{ label: \'片づける\', href: \'#usage-items\' }}` に条件が付いていない）。未使用が0個でも未取得でも出る。**ただし押しても表へ飛ぶだけ**（`href="#usage-items"`）で何も消えないため、P2。**推奨修正**：`unusedItems.value` が `null` か `0` のときはこのボタンを出さない。\n\n**内部ID・API error・undefined・NaN・Invalid Date は6枚とも0件。** 日時は日本時間（`2026-08-24T05:00:00Z` → `2026/08/24 14:00`）。',
+    verdictSource: 'analytics-v6/QQ1SR.txt + QQ1SR-loading.txt + QQ1SR-empty.txt + QQ1SR-error.txt' , verdictHead: 'd0e62d59' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     gap: 'api',
@@ -2298,6 +2310,7 @@ export const CAPTURED_AT = {
   20: [
     { pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4'], note: 'development そのもので撮った（根元9本のマージ後）' },
+    { pr: 584, head: 'd0e62d59', on: '2026-08-30', screens: ['QQ1SR'], note: '使われ方の4つの帯と片づけの導線。通常・読込・空・失敗の4状態' },
   ],
   21: [
     { pr: 446, head: '4307088d', on: '2026-08-28' },

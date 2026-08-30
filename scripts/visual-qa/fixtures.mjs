@@ -3167,20 +3167,66 @@ export const ANALYTICS_ROUTES = envelope({
 })
 
 /** 設計 `QQ1SR`（使っている18／43・作ったのに使っていない32個）。 */
+/**
+ * 分析の「使われ方」（設計 `QQ1SR`）。**#584 で `summary` と8分類が入った。**
+ *
+ * 形は Worker の `getAnalyticsUsageOverview()`
+ * （`packages/db/src/analytics-overviews.ts:788`）に合わせている。書き写した決めごと：
+ *
+ * - 分類は8つ。`usageCategory()` は `created` か `inUse` が `null` なら
+ *   **`unused` も `null`**（`Math.max(0, created - inUse)` は片方欠けたら出さない）
+ * - `brokenReferences` は**どの分類でも必ず未取得**
+ *   （`metric(null, 'partial', 'JSON内の参照切れは次の利用関係台帳で追加します')`）
+ * - `media_vars` は `state: 'unavailable'`。旧データに所属が無く安全に分けられない
+ * - よって `unusedItems` は**取れた分類だけの合計**で `partial`
+ * - `automaticRuns` は**常に `partial`**。オートメーションの実行記録しか数えていない
+ * - `estimatedHoursSaved` は `automaticRuns * 30 / 3600` を小数2桁に丸めた**試算**
+ *
+ * **未使用が実値0の分類（`scenarios`）と、未取得の分類（`media_vars`）を
+ * 両方入れている。** 画面が2つを混ぜないことを、この1枚で確かめるため。
+ */
+const USAGE_BROKEN = M(null, 'partial', 'JSON内の参照切れは次の利用関係台帳で追加します')
+
+/** `usageCategory()` と同じ計算。`created` か `inUse` が `null` なら `unused` も `null`。 */
+function usageCategory(key, label, href, created, inUse, lastUsedAt, state = 'available', reason = null) {
+  const unused = created == null || inUse == null ? null : Math.max(0, created - inUse)
+  return {
+    key, label, href,
+    created: M(created, state, reason),
+    inUse: M(inUse, state, reason),
+    unused: M(unused, state, reason),
+    brokenReferences: USAGE_BROKEN,
+    lastUsedAt: M(lastUsedAt, state, reason),
+  }
+}
+
 export const ANALYTICS_USAGE = envelope({
-  state: 'available', stateReason: null,
+  state: 'partial',
+  stateReason: '旧データの所属が分からない項目は合計へ混ぜていません',
   checkedAt: '2026-08-25T02:00:00.000Z',
   automaticDeletion: false,
+  summary: {
+    /* 3 + 0 + 3 + 1 + 8 + 3 + 2 = 20。`media_vars` は未取得なので足していない。 */
+    unusedItems: M(20, 'partial', '取得できた分類だけの合計です'),
+    automaticRuns: M(412, 'partial', '現在はオートメーションの実行記録だけを数えています'),
+    manualSends: M(96),
+    /* Math.round((412 * 30 / 3600) * 100) / 100 = 3.43 */
+    estimatedHoursSaved: M(3.43, 'partial', '現在はオートメーションの実行記録だけを数えています。1回30秒として試算しています'),
+  },
   categories: [
-    { key: 'templates', label: 'テンプレート', href: '/templates', created: M(64), inUse: M(50), unused: M(14), brokenReferences: M(0), lastUsedAt: M('2026-08-24T05:00:00.000Z') },
-    { key: 'tags', label: 'タグ', href: '/tags', created: M(101), inUse: M(92), unused: M(9), brokenReferences: M(2), lastUsedAt: M('2026-08-25T01:00:00.000Z') },
-    { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: M(18), inUse: M(14), unused: M(4), brokenReferences: M(0), lastUsedAt: M('2026-08-24T05:22:00.000Z') },
-    {
-      /* 一度も使われていない種類。**最後に使った日は未取得（0ではない）。** */
-      key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus',
-      created: M(4), inUse: M(3), unused: M(1), brokenReferences: M(0),
-      lastUsedAt: M(null, 'unavailable', '使われた記録がありません'),
-    },
+    usageCategory('templates', 'テンプレート', '/templates', 24, 21, '2026-08-24T05:00:00.000Z'),
+    /* **未使用が実値0。** 「すべて利用中です」と出て、「片づける」は出ない。 */
+    usageCategory('scenarios', 'シナリオ', '/scenarios', 12, 12, '2026-08-25T01:00:00.000Z'),
+    usageCategory('forms', '回答フォーム', '/form-submissions', 9, 6, '2026-08-24T05:22:00.000Z',
+      'partial', '回答実績から所属を確認できるフォームのみです'),
+    usageCategory('rich_menus', 'リッチメニュー', '/rich-menus', 5, 4, null),
+    usageCategory('friend_attributes', 'タグ・友だち情報', '/tags', 38, 30, '2026-08-25T00:30:00.000Z',
+      'partial', '旧共通項目はLINEアカウント所属を持たないため、利用実績から判定しています'),
+    usageCategory('inflow_conversion', '流入リンク・成果地点', '/inflow-links', 14, 11, '2026-08-23T09:00:00.000Z'),
+    usageCategory('automations', 'オートメーション・共通アクション', '/automations', 17, 15, '2026-08-25T01:40:00.000Z'),
+    /* **未取得。** `created` が `null` なので `unused` も `null`。「片づける」は出ない。 */
+    usageCategory('media_vars', '登録メディア・共通情報', '/contents', null, null, null,
+      'unavailable', '旧データにLINEアカウント所属がないため、安全に分けられません'),
   ],
 })
 
