@@ -494,7 +494,7 @@
     "arbitrary-value": 1
   },
   "components/chats/inbox-filter-panel.tsx": {
-    "arbitrary-value": 4,
+    "arbitrary-value": 2,
     "unresolved-classname": 9,
     "direct-secondary-button": 1,
     "direct-primary-button": 1

@@ -147,7 +147,14 @@ export default function InboxFilterPanel({
             <select aria-label="期限で絞り込む" className={fieldClass} disabled defaultValue="all">
               <option value="all">すべて</option>
             </select>
-            <p className="text-ink-faint mt-1 text-[11px]">まだ絞り込めません</p>
+            {/*
+              **押せない理由を書く。** 「まだ絞り込めません」だけだと、
+              自分の権限の問題なのか、設定が要るのか、まだ無いのかが
+              分からない。読み口が期限を返すようになれば外せる。
+            */}
+            <p className="text-ink-faint mt-1 text-micro">
+              期限はまだ記録していないため、絞り込めません
+            </p>
           </div>
 
           <div>
@@ -160,7 +167,9 @@ export default function InboxFilterPanel({
                 </label>
               ))}
             </div>
-            <p className="text-ink-faint mt-1 text-[11px]">まだ絞り込めません</p>
+            <p className="text-ink-faint mt-1 text-micro">
+              種別で絞る読み口がまだ無いため、選んでも一覧は変わりません
+            </p>
           </div>
 
           <label className="border-hairline flex h-10 items-center justify-between border-t pt-3 text-sm">
