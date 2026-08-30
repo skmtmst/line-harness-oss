@@ -34,7 +34,9 @@ export type CommonVarUsageKind =
   | 'reminder'
   | 'auto_reply'
   | 'form'
-  | 'automation';
+  | 'automation'
+  | 'friend_add'
+  | 'common_action';
 
 export interface CommonVarUsageImpact {
   total: number;
@@ -61,27 +63,43 @@ export interface CommonVarUsageItem {
 const COMMON_VAR_USAGE_QUERIES: Array<{
   kind: CommonVarUsageKind;
   sql: string;
-  values: (token: string, lineAccountId: string) => string[];
+  values: (varKey: string, token: string, lineAccountId: string) => string[];
 }> = [
   {
     kind: 'template',
     sql: `SELECT t.id AS source_id, NULL AS source_parent_id, t.name AS source_name,
-                 'active' AS source_status, t.message_content AS source_content, 0 AS is_historical
+                 'active' AS source_status,
+                 CASE WHEN instr(coalesce(t.message_content, ''), ?) > 0
+                      THEN t.message_content
+                      WHEN instr(coalesce(t.question_json, ''), ?) > 0
+                      THEN t.question_json ELSE coalesce(t.carousel_actions_json, '') END AS source_content,
+                 0 AS is_historical
             FROM templates t
-           WHERE t.line_account_id = ? AND instr(coalesce(t.message_content, ''), ?) > 0`,
-    values: (token, account) => [account, token],
+           WHERE t.line_account_id = ?
+             AND (instr(coalesce(t.message_content, ''), ?) > 0
+               OR instr(coalesce(t.question_json, ''), ?) > 0
+               OR instr(coalesce(t.carousel_actions_json, ''), ?) > 0
+               OR EXISTS (
+                 SELECT 1 FROM json_tree(CASE WHEN json_valid(t.carousel_actions_json)
+                                              THEN t.carousel_actions_json ELSE 'null' END) j
+                  WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
+               ))`,
+    values: (varKey, token, account) => [token, token, account, token, token, token, varKey],
   },
   {
     kind: 'broadcast',
     sql: `SELECT b.id AS source_id, NULL AS source_parent_id, b.title AS source_name,
-                 b.status AS source_status, b.message_content AS source_content,
+                 b.status AS source_status,
+                 CASE WHEN instr(coalesce(b.message_content, ''), ?) > 0
+                      THEN b.message_content ELSE coalesce(b.message_bubbles_json, '') END AS source_content,
                  CASE WHEN b.status = 'sent' THEN 1 ELSE 0 END AS is_historical
             FROM broadcasts b
            WHERE (b.line_account_id = ? OR EXISTS (
                    SELECT 1 FROM json_each(coalesce(b.account_ids, '[]')) WHERE value = ?
                  ))
-             AND instr(coalesce(b.message_content, ''), ?) > 0`,
-    values: (token, account) => [account, account, token],
+             AND (instr(coalesce(b.message_content, ''), ?) > 0
+               OR instr(coalesce(b.message_bubbles_json, ''), ?) > 0)`,
+    values: (_varKey, token, account) => [token, account, account, token, token],
   },
   {
     kind: 'scenario',
@@ -89,13 +107,27 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                  s.name || '・' || CAST(ss.step_order AS TEXT) || '通目' AS source_name,
                  CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  CASE WHEN instr(coalesce(ss.message_content, ''), ?) > 0
-                      THEN ss.message_content ELSE coalesce(ss.message_bubbles_json, '') END AS source_content,
+                      THEN ss.message_content
+                      WHEN instr(coalesce(ss.message_bubbles_json, ''), ?) > 0
+                      THEN ss.message_bubbles_json ELSE coalesce(ss.question_json, '') END AS source_content,
                  0 AS is_historical
             FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id
            WHERE s.line_account_id = ?
              AND (instr(coalesce(ss.message_content, ''), ?) > 0
-               OR instr(coalesce(ss.message_bubbles_json, ''), ?) > 0)`,
-    values: (token, account) => [token, account, token, token],
+               OR instr(coalesce(ss.message_bubbles_json, ''), ?) > 0
+               OR instr(coalesce(ss.question_json, ''), ?) > 0)
+           UNION ALL
+          SELECT sa.id AS source_id, s.id AS source_parent_id,
+                 s.name || '・共通情報操作' AS source_name,
+                 CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 sa.config_json AS source_content, 0 AS is_historical
+           FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id
+           WHERE s.line_account_id = ? AND sa.action_type = 'common_var'
+             AND json_extract(CASE WHEN json_valid(sa.config_json)
+                                   THEN sa.config_json ELSE 'null' END, '$.varKey') = ?`,
+    values: (varKey, token, account) => [
+      token, token, account, token, token, token, account, varKey,
+    ],
   },
   {
     kind: 'reminder',
@@ -104,7 +136,7 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                  rs.message_content AS source_content, 0 AS is_historical
             FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
            WHERE r.line_account_id = ? AND instr(coalesce(rs.message_content, ''), ?) > 0`,
-    values: (token, account) => [account, token],
+    values: (_varKey, token, account) => [account, token],
   },
   {
     kind: 'auto_reply',
@@ -115,10 +147,15 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                       THEN ar.response_content ELSE coalesce(ar.actions_json, '') END AS source_content,
                  0 AS is_historical
             FROM auto_replies ar
-           WHERE ar.line_account_id = ?
+           WHERE (ar.line_account_id = ? OR ar.line_account_id IS NULL)
              AND (instr(coalesce(ar.response_content, ''), ?) > 0
-               OR instr(coalesce(ar.actions_json, ''), ?) > 0)`,
-    values: (token, account) => [token, account, token, token],
+               OR instr(coalesce(ar.actions_json, ''), ?) > 0
+               OR EXISTS (
+                 SELECT 1 FROM json_tree(CASE WHEN json_valid(ar.actions_json)
+                                              THEN ar.actions_json ELSE 'null' END) j
+                  WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
+               ))`,
+    values: (varKey, token, account) => [token, account, token, token, varKey],
   },
   {
     kind: 'form',
@@ -134,7 +171,7 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
              AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
                OR instr(coalesce(f.fields, ''), ?) > 0
                OR instr(coalesce(f.layout, ''), ?) > 0)`,
-    values: (token, account) => [token, token, account, token, token, token],
+    values: (_varKey, token, account) => [token, token, account, token, token, token],
   },
   {
     kind: 'automation',
@@ -144,10 +181,68 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                       THEN a.conditions ELSE coalesce(a.actions, '') END AS source_content,
                  0 AS is_historical
             FROM automations a
-           WHERE a.line_account_id = ?
+           WHERE (a.line_account_id = ? OR a.line_account_id IS NULL)
              AND (instr(coalesce(a.conditions, ''), ?) > 0
-               OR instr(coalesce(a.actions, ''), ?) > 0)`,
-    values: (token, account) => [token, account, token, token],
+               OR instr(coalesce(a.actions, ''), ?) > 0
+               OR EXISTS (
+                 SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions)
+                                              THEN a.actions ELSE 'null' END) j
+                  WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
+               ))
+           UNION ALL
+          SELECT d.id AS source_id, NULL AS source_parent_id, d.name AS source_name,
+                 d.status AS source_status, '共通情報を使う操作があります' AS source_content,
+                 0 AS is_historical
+            FROM automation_definitions d
+           WHERE d.line_account_id = ? AND EXISTS (
+             SELECT 1 FROM automation_versions v
+              WHERE v.automation_id = d.id
+                AND v.id IN (d.current_draft_version_id, d.current_published_version_id)
+                AND (instr(coalesce(v.trigger_config, ''), ?) > 0
+                  OR instr(coalesce(v.condition_config, ''), ?) > 0
+                  OR instr(coalesce(v.action_config, ''), ?) > 0
+                  OR EXISTS (
+                    SELECT 1 FROM json_tree(CASE WHEN json_valid(v.action_config)
+                                                 THEN v.action_config ELSE 'null' END) j
+                     WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
+                  ))
+           )`,
+    values: (varKey, token, account) => [
+      token, account, token, token, varKey,
+      account, token, token, token, varKey,
+    ],
+  },
+  {
+    kind: 'friend_add',
+    sql: `SELECT s.id AS source_id, NULL AS source_parent_id,
+                 '友だち追加時の設定' AS source_name, 'active' AS source_status,
+                 s.value AS source_content, 0 AS is_historical
+            FROM account_settings s
+           WHERE s.line_account_id = ? AND s.key = 'friend_add_routing'
+             AND (instr(coalesce(s.value, ''), ?) > 0 OR EXISTS (
+               SELECT 1 FROM json_tree(CASE WHEN json_valid(s.value)
+                                            THEN s.value ELSE 'null' END) j
+                WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
+             ))`,
+    values: (varKey, token, account) => [account, token, varKey],
+  },
+  {
+    kind: 'common_action',
+    sql: `SELECT a.id AS source_id, NULL AS source_parent_id, a.name AS source_name,
+                 a.status AS source_status, '共通情報を使う操作があります' AS source_content,
+                 0 AS is_historical
+            FROM common_actions a
+           WHERE a.line_account_id = ? AND EXISTS (
+             SELECT 1 FROM common_action_versions v
+              WHERE v.common_action_id = a.id
+                AND v.id IN (a.current_draft_version_id, a.current_published_version_id)
+                AND (instr(coalesce(v.action_config, ''), ?) > 0 OR EXISTS (
+                  SELECT 1 FROM json_tree(CASE WHEN json_valid(v.action_config)
+                                               THEN v.action_config ELSE 'null' END) j
+                   WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
+                ))
+           )`,
+    values: (varKey, token, account) => [account, token, varKey],
   },
 ];
 
@@ -204,7 +299,7 @@ export async function getCommonVarUsageImpact(
 
   for (const source of COMMON_VAR_USAGE_QUERIES) {
     const result = await db.prepare(source.sql)
-      .bind(...source.values(token, lineAccountId))
+      .bind(...source.values(varKey, token, lineAccountId))
       .all<Omit<CommonVarUsageItem, 'kind'>>();
     const found = result.results.map((item) => ({ ...item, kind: source.kind }));
     items.push(...found);

@@ -307,7 +307,9 @@ export type CommonVarUsageKind =
   | "reminder"
   | "auto_reply"
   | "form"
-  | "automation";
+  | "automation"
+  | "friend_add"
+  | "common_action";
 
 /** 共通情報を削除する前に、運用者へ見せる使用先。内部IDは専用項目で返さない。 */
 export interface CommonVarDeleteImpactItem {

@@ -315,6 +315,35 @@ describe('共通情報', () => {
     );
   });
 
+  it('共通情報を変更する操作は内部JSONを表示しない', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, friend_add: 1 },
+      items: [{
+        kind: 'friend_add',
+        source_id: 'friend-add-setting',
+        source_parent_id: null,
+        source_name: '友だち追加時の設定',
+        source_status: 'active',
+        source_content: '{"actionType":"common_var","config":{"varKey":"shop_hours"}}',
+        is_historical: 0,
+      }],
+    });
+
+    const res = await req('/api/common-vars/cv-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      kindLabel: '友だち追加時の配信',
+      href: '/friend-add-settings',
+      currentPreview: 'この設定の中で使われています',
+    });
+    expect(JSON.stringify(body.data.items[0])).not.toContain('varKey');
+    expect(JSON.stringify(body.data.items[0])).not.toContain('shop_hours');
+  });
+
   it('所属不明の古いフォームは名前を返さず、件数だけで削除を止める', async () => {
     mocks.getCommonVarUsageImpact.mockResolvedValue({
       ...EMPTY_COMMON_VAR_IMPACT,

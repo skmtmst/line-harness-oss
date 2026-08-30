@@ -312,6 +312,8 @@ const COMMON_VAR_USAGE_KIND_LABELS: Record<CommonVarUsageKind, string> = {
   auto_reply: '自動応答',
   form: '回答フォーム',
   automation: 'オートメーション',
+  friend_add: '友だち追加時の配信',
+  common_action: '共通アクション',
 };
 
 function collectReadableStrings(value: unknown, token: string, out: string[]): void {
@@ -336,7 +338,9 @@ function readableCommonVarUsage(content: string, token: string): string {
   try {
     const strings: string[] = [];
     collectReadableStrings(JSON.parse(content) as unknown, token, strings);
-    if (strings.length > 0) text = strings.join(' ／ ');
+    // 共通情報を増減する操作は varKey を内部JSONに持つ。人向けの文が
+    // 無いときはJSONを見せず、下の共通文へ倒す。
+    text = strings.join(' ／ ');
   } catch {
     // 通常の本文はJSONではない。
   }
@@ -355,6 +359,8 @@ function commonVarUsageHref(item: CommonVarUsageItem): string {
     case 'auto_reply': return `/auto-replies/edit?id=${id}`;
     case 'form': return `/form-submissions/edit?id=${id}`;
     case 'automation': return '/automations';
+    case 'friend_add': return '/friend-add-settings';
+    case 'common_action': return `/common-actions/versions?id=${id}`;
   }
 }
 

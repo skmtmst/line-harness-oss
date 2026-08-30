@@ -58,6 +58,102 @@ describe('common variable usage impact', () => {
 
     await expect(getCommonVarUsageImpact(db, 'shop_hours', 'a1')).rejects.toThrow('table unavailable');
   });
+
+  it('counts structured messages, shared legacy rules, and value-changing actions', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`
+      BEGIN;
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('a1','c1','A1','t','s');
+      INSERT INTO templates
+        (id, name, message_type, message_content, question_json, line_account_id)
+      VALUES
+        ('template-q','質問','text','質問です',
+         '{"text":"受付は{{var.shop_hours}}","tapMode":"single","choices":[]}', 'a1');
+      INSERT INTO broadcasts
+        (id, title, message_type, message_content, target_type, status, line_account_id,
+         message_bubbles_json)
+      VALUES
+        ('broadcast-bubbles','複数吹き出し','text','本文','all','draft','a1',
+         '[{"type":"text","text":"{{var.shop_hours}}"}]');
+      INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+      VALUES ('scenario-1','来店後','manual','a1');
+      INSERT INTO scenario_steps
+        (id, scenario_id, step_order, delay_minutes, message_type, message_content, question_json)
+      VALUES
+        ('step-question','scenario-1',1,0,'text','本文',
+         '{"text":"{{var.shop_hours}}","tapMode":"single","choices":[]}');
+      INSERT INTO scenario_actions
+        (id, scenario_id, hook, sort_order, action_type, config_json)
+      VALUES
+        ('scenario-action','scenario-1','scenario_completed',0,'common_var',
+         '{"varKey":"shop_hours","op":"add","value":"1"}');
+      INSERT INTO auto_replies
+        (id, keyword, response_content, line_account_id, name, actions_json)
+      VALUES
+        ('auto-global','受付','本文',NULL,'共通の自動応答',
+         '[{"kind":"row","actionType":"common_var","config":{"varKey":"shop_hours","op":"add","value":"1"}}]');
+      INSERT INTO automations (id, name, event_type, actions, line_account_id)
+      VALUES
+        ('automation-global','共通の旧自動化','friend_add',
+         '[{"type":"common_var","varKey":"shop_hours"}]',NULL);
+      INSERT INTO automation_definitions (id, line_account_id, name)
+      VALUES ('automation-v6','a1','V6自動化');
+      INSERT INTO automation_versions
+        (id, automation_id, version_number, trigger_type, action_config)
+      VALUES
+        ('automation-version','automation-v6',1,'manual',
+         '[{"type":"common_var","varKey":"shop_hours"}]');
+      UPDATE automation_definitions
+         SET current_draft_version_id = 'automation-version'
+       WHERE id = 'automation-v6';
+      INSERT INTO account_settings (id, line_account_id, key, value)
+      VALUES
+        ('friend-add-setting','a1','friend_add_routing',
+         '{"firstTime":{"actions":[{"kind":"row","actionType":"common_var","config":{"varKey":"shop_hours","op":"add","value":"1"}}]}}');
+      INSERT INTO common_actions (id, line_account_id, name)
+      VALUES ('common-action','a1','在庫を増やす');
+      INSERT INTO common_action_versions
+        (id, common_action_id, version_number, action_config)
+      VALUES
+        ('common-action-version','common-action',1,
+         '[{"type":"common_var","varKey":"shop_hours"}]');
+      UPDATE common_actions
+         SET current_draft_version_id = 'common-action-version'
+       WHERE id = 'common-action';
+      COMMIT;
+    `);
+
+    const impact = await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a1');
+
+    expect(impact).toMatchObject({
+      total: 9,
+      blockingTotal: 9,
+      historicalTotal: 0,
+      byKind: {
+        template: 1,
+        broadcast: 1,
+        scenario: 2,
+        auto_reply: 1,
+        automation: 2,
+        friend_add: 1,
+        common_action: 1,
+      },
+    });
+    expect(impact.items.map((item) => item.source_id)).toEqual([
+      'template-q',
+      'broadcast-bubbles',
+      'step-question',
+      'scenario-action',
+      'auto-global',
+      'automation-global',
+      'automation-v6',
+      'friend-add-setting',
+      'common-action',
+    ]);
+    raw.close();
+  });
 });
 
 describe('common variable account scope', () => {
