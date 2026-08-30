@@ -4,6 +4,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import type {
   EntryRoute,
   EntryRouteFunnel,
@@ -49,6 +51,9 @@ function InflowLinkDetailPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // 左のリンク一覧。流入件数を添えるので、集計も一緒に引く。
   useEffect(() => {
@@ -114,6 +119,24 @@ function InflowLinkDetailPageContent() {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       window.prompt('コピーしてください:', url)
+    }
+  }
+
+  async function deleteRoute() {
+    if (!route || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const result = await api.entryRoutes.delete(route.id)
+      if (!result.success) throw new Error(result.error)
+      setDeleteOpen(false)
+      router.replace('/inflow-links')
+    } catch {
+      setDeleteError(
+        '流入リンクを削除できませんでした。状態を読み直してから、もう一度お試しください。',
+      )
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -208,6 +231,15 @@ function InflowLinkDetailPageContent() {
                     >
                       {copied ? 'コピーしました' : 'URLをコピー'}
                     </button>
+                    <Button
+                      aria-label={`${route.name}の削除を確認`}
+                      onClick={() => {
+                        setDeleteError('')
+                        setDeleteOpen(true)
+                      }}
+                    >
+                      削除の確認
+                    </Button>
                     <span
                       className={`rounded-pill px-2 py-0.5 text-xs ${
                         route.isActive
@@ -307,6 +339,22 @@ function InflowLinkDetailPageContent() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteOpen && route !== null}
+        designNode="UIaM7"
+        title={`「${route?.name ?? ''}」を削除しますか？`}
+        description="この流入リンクの設定を削除します。過去のクリック・友だち追加・成果の記録と、すでに友だちへ保存された流入元は残ります。削除した設定は元に戻せません。"
+        confirmLabel="流入リンクを削除"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void deleteRoute()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteOpen(false)
+        }}
+      />
     </div>
   )
 }
