@@ -262,3 +262,88 @@ export const FRIENDS = [
     tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
   }),
 ]
+
+/**
+ * `GET /api/rich-menu-groups/:id/delete-impact` の正本形。
+ *
+ * Claude は szXsT の通常・0件・失敗を撮るとき、この3つをそのまま使う。
+ * 表示中人数は記録する台帳が無いので、設計の人数を固定値で作らない。
+ */
+export const RICH_MENU_DELETE_IMPACT = {
+  group: {
+    id: 'rich-menu-target',
+    accountId: 'visual-qa-account',
+    name: '来店後フォローメニュー',
+    status: 'published',
+  },
+  currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+  nextDisplay: {
+    guaranteedGroupId: null,
+    reason: 'friend_specific_rules',
+    candidates: [
+      {
+        groupId: 'rich-menu-next',
+        name: '通常メニュー',
+        targetingPriority: 20,
+        isTargetingEnabled: false,
+        isDefaultForAll: true,
+      },
+    ],
+  },
+  incomingSwitches: [
+    {
+      sourceGroupId: 'rich-menu-source',
+      sourceGroupName: '会員向けメニュー',
+      sourcePageId: 'rich-menu-source-page',
+      sourcePageName: '特典',
+      areaId: 'rich-menu-source-area',
+      areaLabel: '来店後のご案内',
+      targetPageId: 'rich-menu-target-page',
+      targetPageName: 'フォロー',
+    },
+  ],
+  operationalReferences: [
+    { kind: 'automation', ownerId: 'automation-visual', ownerName: '来店後の自動案内' },
+    { kind: 'common_action', ownerId: 'common-action-visual', ownerName: 'フォローを始める' },
+  ],
+  lineResources: {
+    pageCount: 2,
+    pagesWithLineRichMenuId: 2,
+    isDefaultForAll: false,
+    publishing: false,
+  },
+  blockers: ['published', 'line_resources', 'incoming_switches', 'operational_references'],
+  canDelete: false,
+  recommendedAction: 'unpublish',
+}
+
+export const RICH_MENU_DELETE_IMPACT_EMPTY = {
+  group: {
+    id: 'rich-menu-safe',
+    accountId: 'visual-qa-account',
+    name: '未使用の下書き',
+    status: 'draft',
+  },
+  currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+  nextDisplay: {
+    guaranteedGroupId: null,
+    reason: 'friend_specific_rules',
+    candidates: [],
+  },
+  incomingSwitches: [],
+  operationalReferences: [],
+  lineResources: {
+    pageCount: 1,
+    pagesWithLineRichMenuId: 0,
+    isDefaultForAll: false,
+    publishing: false,
+  },
+  blockers: [],
+  canDelete: true,
+  recommendedAction: 'delete',
+}
+
+export const RICH_MENU_DELETE_IMPACT_ERROR = {
+  success: false,
+  error: '削除したときの影響を確認できませんでした',
+}

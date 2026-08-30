@@ -19,7 +19,17 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIENDS,
+  FRIEND_SCENARIOS,
+  FRIEND_STATS,
+  LIST_STATS,
+  OPERATORS,
+  RICH_MENU_DELETE_IMPACT,
+  RICH_MENU_DELETE_IMPACT_EMPTY,
+  TAGS,
+  TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -399,6 +409,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (richMenuDeleteImpact) {
+    const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT_EMPTY.group.id
+      ? RICH_MENU_DELETE_IMPACT_EMPTY
+      : RICH_MENU_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
