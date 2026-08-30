@@ -117,70 +117,85 @@ export async function createFriendBulkRun(
     now: string;
   },
 ): Promise<{ run: FriendBulkRunSummary; created: boolean }> {
-  const existing = await db.prepare(
-    `SELECT * FROM friend_bulk_runs
-      WHERE tenant_id = ? AND created_by = ? AND idempotency_key = ?`,
-  ).bind(input.tenantId, input.createdBy, input.idempotencyKey).first<RunRow>();
   const selectionJson = JSON.stringify(input.selection);
   const operationJson = JSON.stringify(input.operation);
-  if (existing && (existing.selection_json !== selectionJson || existing.operation_json !== operationJson)) {
+  const executionPlanJson = input.executionPlan === undefined ? null : JSON.stringify(input.executionPlan);
+  const scheduledAt = input.scheduledAt ?? null;
+  const undoOfRunId = input.undoOfRunId ?? null;
+
+  const matchesRequest = (row: RunRow & { undo_of_run_id?: string | null }): boolean => (
+    row.selection_json === selectionJson
+    && row.operation_json === operationJson
+    && row.execution_plan_json === executionPlanJson
+    && row.scheduled_at === scheduledAt
+    && (row.undo_of_run_id ?? null) === undoOfRunId
+  );
+  const findExisting = () => db.prepare(
+    `SELECT * FROM friend_bulk_runs
+      WHERE tenant_id = ? AND created_by = ? AND idempotency_key = ?`,
+  ).bind(input.tenantId, input.createdBy, input.idempotencyKey).first<RunRow & { undo_of_run_id: string | null }>();
+  const existing = await findExisting();
+  if (existing && !matchesRequest(existing)) {
     throw new FriendBulkIdempotencyConflictError();
   }
-  if (existing && existing.status !== 'preparing') return { run: serializeRun(existing), created: false };
+  if (existing) return { run: serializeRun(existing), created: false };
 
-  const runId = existing?.id ?? crypto.randomUUID();
-  if (!existing) await db.prepare(
-    `INSERT INTO friend_bulk_runs
-       (id, tenant_id, created_by, selection_json, operation_json, execution_plan_json, status,
-        target_count, excluded_count, reversible, idempotency_key, scheduled_at,
-        undo_of_run_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'preparing', 0, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    runId,
-    input.tenantId,
-    input.createdBy,
-    selectionJson,
-    operationJson,
-    input.executionPlan === undefined ? null : JSON.stringify(input.executionPlan),
-    input.excludedCount,
-    input.reversible ? 1 : 0,
-    input.idempotencyKey,
-    input.scheduledAt ?? null,
-    input.undoOfRunId ?? null,
-    input.now,
-    input.now,
-  ).run();
+  const runId = crypto.randomUUID();
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
+      `INSERT INTO friend_bulk_runs
+         (id, tenant_id, created_by, selection_json, operation_json, execution_plan_json, status,
+          target_count, excluded_count, reversible, idempotency_key, scheduled_at,
+          undo_of_run_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'preparing', 0, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      runId,
+      input.tenantId,
+      input.createdBy,
+      selectionJson,
+      operationJson,
+      executionPlanJson,
+      input.excludedCount,
+      input.reversible ? 1 : 0,
+      input.idempotencyKey,
+      scheduledAt,
+      undoOfRunId,
+      input.now,
+      input.now,
+    ),
+  ];
+  for (let offset = 0; offset < input.targets.length; offset += 50) {
+    const chunk = input.targets.slice(offset, offset + 50);
+    const values: unknown[] = [];
+    const rows = chunk.map((target, index) => {
+      const ordinal = offset + index;
+      values.push(
+        crypto.randomUUID(), runId, target.friendId, target.lineAccountId, ordinal,
+        `${runId}:${target.friendId}`, input.now,
+      );
+      return `(?, ?, ?, ?, ?, 'queued', ?, ?)`;
+    });
+    statements.push(db.prepare(
+      `INSERT INTO friend_bulk_run_items
+         (id, run_id, friend_id, line_account_id, ordinal, status, idempotency_key, updated_at)
+       VALUES ${rows.join(',')}`,
+    ).bind(...values));
+  }
+  statements.push(db.prepare(
+    `UPDATE friend_bulk_runs SET status = 'queued', target_count = ?, updated_at = ?
+      WHERE id = ? AND status = 'preparing'`,
+  ).bind(input.targets.length, input.now, runId));
   try {
-    for (let offset = 0; offset < input.targets.length; offset += 50) {
-      const chunk = input.targets.slice(offset, offset + 50);
-      const values: unknown[] = [];
-      const rows = chunk.map((target, index) => {
-        const ordinal = offset + index;
-        values.push(
-          crypto.randomUUID(), runId, target.friendId, target.lineAccountId, ordinal,
-          `${runId}:${target.friendId}`, input.now,
-        );
-        return `(?, ?, ?, ?, ?, 'queued', ?, ?)`;
-      });
-      await db.prepare(
-        `INSERT OR IGNORE INTO friend_bulk_run_items
-           (id, run_id, friend_id, line_account_id, ordinal, status, idempotency_key, updated_at)
-         VALUES ${rows.join(',')}`,
-      ).bind(...values).run();
-    }
-    const count = await db.prepare(
-      `SELECT COUNT(*) AS count FROM friend_bulk_run_items WHERE run_id = ?`,
-    ).bind(runId).first<{ count: number }>();
-    if (Number(count?.count ?? 0) !== input.targets.length) {
-      throw new Error('一括操作の対象をすべて固定できませんでした');
-    }
-    await db.prepare(
-      `UPDATE friend_bulk_runs SET status = 'queued', target_count = ?, updated_at = ?
-        WHERE id = ? AND status = 'preparing'`,
-    ).bind(input.targets.length, input.now, runId).run();
+    // D1 の batch は全体が1トランザクションになる。実行台帳だけ、または対象の
+    // 一部だけが残る中間状態を外から観測させない。
+    await db.batch(statements);
   } catch (error) {
-    await db.prepare(`DELETE FROM friend_bulk_run_items WHERE run_id = ?`).bind(runId).run();
-    await db.prepare(`DELETE FROM friend_bulk_runs WHERE id = ? AND status = 'preparing'`).bind(runId).run();
+    // 同じキーが同時に来た競合は、先に確定した実行を返して冪等にする。
+    const winner = await findExisting();
+    if (winner) {
+      if (!matchesRequest(winner)) throw new FriendBulkIdempotencyConflictError();
+      return { run: serializeRun(winner), created: false };
+    }
     throw error;
   }
   const created = await getFriendBulkRun(db, runId, input.tenantId);

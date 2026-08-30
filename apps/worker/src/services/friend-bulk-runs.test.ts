@@ -1,12 +1,13 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getFriendBulkRunDetail } from '@line-crm/db';
+import { createFriendBulkRun, getFriendBulkRunDetail } from '@line-crm/db';
 import { AutomationActionError, type AutomationActionExecutor } from './automation-engine';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import {
   createFriendBulkUndoRun,
   previewFriendBulkRun,
   processFriendBulkRun,
+  requireFriendBulkRunAccess,
   retryFriendBulkRun,
   startFriendBulkRun,
 } from './friend-bulk-runs';
@@ -132,7 +133,7 @@ describe('V6 友だち一括操作', () => {
     expect(testDb.raw.prepare(`SELECT status FROM friend_bulk_run_items`).get())
       .toEqual({ status: 'temporary_failure' });
 
-    expect(await retryFriendBulkRun(testDb.db, created.run.id, 'default', LATER)).toBe(1);
+    expect(await retryFriendBulkRun(testDb.db, created.run.id, staff, LATER)).toBe(1);
     expect(await processFriendBulkRun(testDb.db, created.run.id, {
       now: LATER, executors: { send_message: send },
     })).toMatchObject({ status: 'success' });
@@ -202,5 +203,108 @@ describe('V6 友だち一括操作', () => {
     const undo = await createFriendBulkUndoRun(testDb.db, staff, created.run.id, crypto.randomUUID(), LATER);
     await processFriendBulkRun(testDb.db, undo.run.id, { now: LATER });
     expect(testDb.raw.prepare(`SELECT is_hidden FROM friends WHERE id = 'friend-1'`).get()).toEqual({ is_hidden: 0 });
+  });
+
+  it('同じ冪等キーでも実行予定日時が違えば別の依頼として拒否する', async () => {
+    testDb.raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`).run();
+    const key = crypto.randomUUID();
+    await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'add_tag', tagId: 'tag-1' },
+      scheduledAt: NOW,
+      idempotencyKey: key,
+      now: NOW,
+    });
+
+    await expect(startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'add_tag', tagId: 'tag-1' },
+      scheduledAt: LATER,
+      idempotencyKey: key,
+      now: NOW,
+    })).rejects.toMatchObject({ code: 'idempotency_conflict', status: 409 });
+  });
+
+  it('対象の固定に失敗しても途中の実行台帳を残さない', async () => {
+    await expect(createFriendBulkRun(testDb.db, {
+      tenantId: 'default',
+      createdBy: staff.id,
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_visibility', hidden: true },
+      targets: [
+        { friendId: 'friend-1', lineAccountId: 'account-1' },
+        { friendId: 'friend-1', lineAccountId: 'account-1' },
+      ],
+      excludedCount: 0,
+      reversible: true,
+      idempotencyKey: crypto.randomUUID(),
+      now: NOW,
+    })).rejects.toBeTruthy();
+
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_runs`).get())
+      .toEqual({ count: 0 });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_bulk_run_items`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('EC側を正とする友だち情報は一括操作でも書き換えさせない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO friend_fields (id, name, field_key, type, ec_is_master)
+       VALUES ('field-ec', '会員ランク', 'member_rank', 'text', 1)`,
+    ).run();
+
+    await expect(previewFriendBulkRun(testDb.db, staff, {
+      kind: 'explicit', friendIds: ['friend-1'],
+    }, {
+      kind: 'set_friend_fields', values: { 'field-ec': 'ゴールド' },
+    })).rejects.toMatchObject({ code: 'friend_field_ec_master', status: 409 });
+  });
+
+  it('担当外アカウントを含む実行はIDを知っていても読ませない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO staff_members
+         (id, name, role, api_key, tenant_id, account_scope)
+       VALUES ('scoped-owner', '担当者', 'owner', 'key-scoped', 'default', 'accounts')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+       VALUES ('scoped-owner', 'account-1', ?)`,
+    ).run(NOW);
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-3'] },
+      operation: { kind: 'set_visibility', hidden: true },
+      idempotencyKey: crypto.randomUUID(),
+      now: NOW,
+    });
+    const scopedStaff = { ...staff, id: 'scoped-owner' };
+
+    await expect(requireFriendBulkRunAccess(testDb.db, scopedStaff, created.run.id))
+      .rejects.toMatchObject({ code: 'run_not_found', status: 404 });
+    await expect(createFriendBulkUndoRun(
+      testDb.db, scopedStaff, created.run.id, crypto.randomUUID(), LATER,
+    )).rejects.toMatchObject({ code: 'run_not_found', status: 404 });
+  });
+
+  it('一括操作のあとに人が変更した値は取り消しで上書きしない', async () => {
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'set_visibility', hidden: true },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    await processFriendBulkRun(testDb.db, created.run.id, { now: NOW });
+    testDb.raw.prepare(`UPDATE friends SET is_hidden = 0 WHERE id = 'friend-1'`).run();
+
+    const undo = await createFriendBulkUndoRun(testDb.db, staff, created.run.id, crypto.randomUUID(), LATER);
+    await processFriendBulkRun(testDb.db, undo.run.id, { now: LATER });
+
+    expect(testDb.raw.prepare(`SELECT is_hidden FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ is_hidden: 0 });
+    expect(testDb.raw.prepare(
+      `SELECT status, error_code, error_message FROM friend_bulk_run_items WHERE run_id = ?`,
+    ).get(undo.run.id)).toEqual({
+      status: 'permanent_failure',
+      error_code: 'undo_conflict',
+      error_message: '一括操作のあとに内容が変更されているため、この対象は取り消しませんでした',
+    });
   });
 });

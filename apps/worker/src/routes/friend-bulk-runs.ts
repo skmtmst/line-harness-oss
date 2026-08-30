@@ -9,6 +9,7 @@ import {
   FriendBulkRunError,
   previewFriendBulkRun,
   processFriendBulkRun,
+  requireFriendBulkRunAccess,
   retryFriendBulkRun,
   startFriendBulkRun,
 } from '../services/friend-bulk-runs.js';
@@ -42,9 +43,21 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   }
 }
 
-friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin', 'staff'), async (c) => {
+async function parseJsonBody<T>(c: Context<Env>): Promise<T> {
+  const text = await c.req.text();
+  if (new TextEncoder().encode(text).byteLength > 1024 * 1024) {
+    throw new FriendBulkRunError('request_too_large', '一括操作の指定が大きすぎます', 413);
+  }
   try {
-    const body = await c.req.json<{ selection?: unknown; operation?: unknown }>();
+    return JSON.parse(text) as T;
+  } catch {
+    throw new FriendBulkRunError('invalid_json', '一括操作の指定を読み取れません', 400);
+  }
+}
+
+friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await parseJsonBody<{ selection?: unknown; operation?: unknown }>(c);
     const result = await previewFriendBulkRun(c.env.DB, c.get('staff')!, body.selection, body.operation);
     return c.json({ success: true, data: result.preview });
   } catch (error) {
@@ -52,9 +65,9 @@ friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admi
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ selection?: unknown; operation?: unknown; scheduledAt?: unknown }>();
+    const body = await parseJsonBody<{ selection?: unknown; operation?: unknown; scheduledAt?: unknown }>(c);
     const result = await startFriendBulkRun(c.env.DB, c.get('staff')!, {
       selection: body.selection,
       operation: body.operation,
@@ -73,9 +86,10 @@ friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin', 'sta
   }
 });
 
-friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const staff = c.get('staff')!;
+    await requireFriendBulkRunAccess(c.env.DB, staff, c.req.param('id'));
     const detail = await getFriendBulkRunDetail(
       c.env.DB,
       c.req.param('id'),
@@ -92,13 +106,13 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin', '
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), async (c) => {
   try {
     const staff = c.get('staff')!;
     const count = await retryFriendBulkRun(
       c.env.DB,
       c.req.param('id'),
-      staff.tenantId ?? DEFAULT_TENANT_ID,
+      staff,
     );
     keepRunning(c, processFriendBulkRun(c.env.DB, c.req.param('id'), {
       executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
@@ -109,7 +123,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'ad
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), async (c) => {
   try {
     const result = await createFriendBulkUndoRun(
       c.env.DB,

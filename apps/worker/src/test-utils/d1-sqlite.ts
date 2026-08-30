@@ -5,8 +5,7 @@
  * 「SQL が正しいか」を確かめられない。条件ビルダーやアクションのように
  * **SQL そのものが仕様**のものは、本物の SQLite に当てないと意味がない。
  *
- * 実装しているのは実際に使っている口だけ（prepare / bind / first / all / run）。
- * batch や exec は使っていないので置いていない。
+ * 実装しているのは実際に使っている口だけ（prepare / bind / first / all / run / batch）。
  */
 import Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
@@ -31,6 +30,10 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
     if (typeof a === 'boolean') return a ? 1 : 0
     return a as never
   })
+  const runSync = () => {
+    const info = raw.prepare(sql).run(...normalized)
+    return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } }
+  }
   return {
     first: async <T = unknown>(): Promise<T | null> => {
       const row = raw.prepare(sql).get(...normalized)
@@ -40,10 +43,9 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
       const rows = raw.prepare(sql).all(...normalized)
       return { results: rows as T[] }
     },
-    run: async () => {
-      const info = raw.prepare(sql).run(...normalized)
-      return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } }
-    },
+    run: async () => runSync(),
+    /** createTestD1.batch が同期トランザクション内で使うテスト専用口。 */
+    __runSync: runSync,
   }
 }
 
@@ -60,11 +62,11 @@ export function createTestD1(): SqliteD1 {
       bind: (...args: unknown[]) => wrap(raw, sql, args),
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),
-    batch: async (statements: D1PreparedStatement[]) => {
-      const results = []
-      for (const statement of statements) results.push(await statement.run())
-      return results
-    },
+    batch: async (statements: D1PreparedStatement[]) => raw.transaction(() => (
+      statements.map((statement) => (
+        statement as unknown as { __runSync: () => unknown }
+      ).__runSync())
+    ))(),
   } as unknown as D1Database
 
   return { db, raw }

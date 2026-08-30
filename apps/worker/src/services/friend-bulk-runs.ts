@@ -23,7 +23,11 @@ import {
   type SavedSearchConditions,
 } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
-import { getVisibleLineAccountScope, type VisibleLineAccountScope } from './account-access.js';
+import {
+  canAccessAllLineAccounts,
+  getVisibleLineAccountScope,
+  type VisibleLineAccountScope,
+} from './account-access.js';
 import { createAutomationActionExecutors, type AutomationActionExecutorDependencies } from './automation-action-executors.js';
 import { AutomationActionError, type ActionDefinition, type AutomationActionExecutor } from './automation-engine.js';
 import { compileSavedSearch } from './saved-search-filter.js';
@@ -396,9 +400,16 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
     case 'set_friend_fields': {
       const ids = Object.keys(operation.values);
       const rows = await db.prepare(
-        `SELECT id FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(...ids).all<{ id: string }>();
+        `SELECT id, ec_is_master FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ).bind(...ids).all<{ id: string; ec_is_master: number }>();
       if (rows.results.length !== ids.length) throw new FriendBulkRunError('friend_field_not_found', '友だち情報の項目が見つかりません', 404);
+      if (rows.results.some((row) => row.ec_is_master === 1)) {
+        throw new FriendBulkRunError(
+          'friend_field_ec_master',
+          'EC側を正としている友だち情報は管理画面から変更できません',
+          409,
+        );
+      }
       return { operation, resourceAccountId: undefined, reversible: true };
     }
     case 'set_visibility':
@@ -755,9 +766,20 @@ async function executeUndo(
   if (!source) return { status: 'skipped', before: null, after: null };
   const before = source.before_json ? JSON.parse(source.before_json) as Record<string, unknown> : null;
   const after = source.after_json ? JSON.parse(source.after_json) as Record<string, unknown> : null;
+  const conflict = (): never => {
+    throw new ItemExecutionError(
+      'undo_conflict',
+      '一括操作のあとに内容が変更されているため、この対象は取り消しませんでした',
+      false,
+    );
+  };
   switch (operation.kind) {
     case 'add_tag':
     case 'remove_tag': {
+      const currentAssigned = Boolean(await db.prepare(
+        `SELECT 1 AS ok FROM friend_tags WHERE friend_id = ? AND tag_id = ?`,
+      ).bind(item.friend_id, operation.tagId).first<{ ok: number }>());
+      if (currentAssigned !== Boolean(after && after.assigned)) conflict();
       const assigned = Boolean(before && before.assigned);
       if (assigned) await attachTagAndFireSideEffects(db, item.friend_id, operation.tagId);
       else await detachTagAndFireSideEffects(db, item.friend_id, operation.tagId);
@@ -765,6 +787,11 @@ async function executeUndo(
     }
     case 'start_scenario':
     case 'stop_scenario': {
+      const expectedId = after && typeof after.id === 'string' ? after.id : null;
+      const current = expectedId ? await db.prepare(
+        `SELECT id, status FROM friend_scenarios WHERE id = ?`,
+      ).bind(expectedId).first<{ id: string; status: string }>() : null;
+      if (!expectedId || !current || current.status !== after?.status) conflict();
       if (before && typeof before.id === 'string') {
         await db.prepare(`UPDATE friend_scenarios SET status = ?, updated_at = ? WHERE id = ?`)
           .bind(before.status, now, before.id).run();
@@ -775,11 +802,16 @@ async function executeUndo(
     }
     case 'assign_operator': {
       const chat = await getChatByFriendId(db, item.friend_id);
+      if ((chat?.operator_id ?? null) !== (after?.operatorId ?? null)) conflict();
       if (chat) await updateChat(db, chat.id, { operatorId: before?.operatorId as string | null });
       break;
     }
     case 'set_support': {
       const chat = await getChatByFriendId(db, item.friend_id);
+      const friend = await db.prepare(`SELECT support_mark_id FROM friends WHERE id = ?`)
+        .bind(item.friend_id).first<{ support_mark_id: string | null }>();
+      if ((chat?.status ?? null) !== (after?.status ?? null)
+        || (friend?.support_mark_id ?? null) !== (after?.markId ?? null)) conflict();
       if (chat && typeof before?.status === 'string') await updateChat(db, chat.id, { status: before.status });
       if (item.line_account_id) await setFriendSupportMark(
         db,
@@ -792,12 +824,23 @@ async function executeUndo(
     }
     case 'set_reminder': {
       const ids = after && Array.isArray(after.ids) ? after.ids.filter((id): id is string => typeof id === 'string') : [];
+      if (!ids.length) conflict();
+      const rows = await db.prepare(
+        `SELECT id, status FROM friend_reminders WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ).bind(...ids).all<{ id: string; status: string }>();
+      if (rows.results.length !== ids.length || rows.results.some((row) => row.status !== 'active')) conflict();
       if (ids.length) await db.prepare(`UPDATE friend_reminders SET status = 'cancelled', updated_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`)
         .bind(now, ...ids).run();
       break;
     }
     case 'cancel_reminder': {
       const rows = Array.isArray(before) ? before : [];
+      const ids = rows.filter(isRecord).map((row) => row.id).filter((id): id is string => typeof id === 'string');
+      const current = ids.length ? await db.prepare(
+        `SELECT id, status FROM friend_reminders WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ).bind(...ids).all<{ id: string; status: string }>() : { results: [] };
+      if (!ids.length || current.results.length !== ids.length
+        || current.results.some((row) => row.status !== 'cancelled')) conflict();
       for (const row of rows) if (isRecord(row) && typeof row.id === 'string') {
         await db.prepare(`UPDATE friend_reminders SET status = 'active', updated_at = ? WHERE id = ?`).bind(now, row.id).run();
       }
@@ -805,6 +848,18 @@ async function executeUndo(
     }
     case 'set_friend_fields': {
       if (!isRecord(before)) break;
+      if (!isRecord(after)) return conflict();
+      const afterValues = after;
+      const ids = Object.keys(afterValues);
+      const currentRows = await db.prepare(
+        `SELECT field_id, value FROM friend_field_values
+          WHERE friend_id = ? AND field_id IN (${ids.map(() => '?').join(',')})`,
+      ).bind(item.friend_id, ...ids).all<{ field_id: string; value: string | null }>();
+      const current = Object.fromEntries(ids.map((id) => [
+        id,
+        currentRows.results.find((row) => row.field_id === id)?.value ?? null,
+      ]));
+      if (JSON.stringify(current) !== JSON.stringify(afterValues)) conflict();
       for (const [fieldId, value] of Object.entries(before)) {
         if (value === null) await db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(item.friend_id, fieldId).run();
         else await db.prepare(
@@ -815,13 +870,23 @@ async function executeUndo(
       }
       break;
     }
-    case 'set_visibility':
+    case 'set_visibility': {
+      const current = await db.prepare(`SELECT is_hidden FROM friends WHERE id = ?`)
+        .bind(item.friend_id).first<{ is_hidden: number }>();
+      if (!current || (current.is_hidden === 1) !== (after?.hidden === true)) conflict();
       await db.prepare(`UPDATE friends SET is_hidden = ?, updated_at = ? WHERE id = ?`)
         .bind(before?.hidden === true ? 1 : 0, now, item.friend_id).run();
       break;
-    case 'add_conversion':
-      if (after && typeof after.id === 'string') await db.prepare(`DELETE FROM conversion_events WHERE id = ?`).bind(after.id).run();
+    }
+    case 'add_conversion': {
+      const conversionId = after && typeof after.id === 'string' ? after.id : null;
+      if (!conversionId) return conflict();
+      const current = await db.prepare(`SELECT id FROM conversion_events WHERE id = ?`)
+        .bind(conversionId).first<{ id: string }>();
+      if (!current) conflict();
+      await db.prepare(`DELETE FROM conversion_events WHERE id = ?`).bind(conversionId).run();
       break;
+    }
     default:
       throw new ItemExecutionError('undo_not_supported', 'この操作は取り消せません', false);
   }
@@ -904,9 +969,11 @@ export async function processDueFriendBulkRuns(
 export async function retryFriendBulkRun(
   db: D1Database,
   runId: string,
-  tenantId: string,
+  staff: AuthenticatedStaff,
   now = new Date().toISOString(),
 ): Promise<number> {
+  const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+  await requireFriendBulkRunAccess(db, staff, runId);
   const reset = await resetFriendBulkRunFailures(db, runId, tenantId, now);
   if (reset < 0) throw new FriendBulkRunError('run_not_found', '一括操作が見つかりません', 404);
   if (reset === 0) throw new FriendBulkRunError('nothing_to_retry', '再試行する失敗はありません', 409);
@@ -921,8 +988,7 @@ export async function createFriendBulkUndoRun(
   now = new Date().toISOString(),
 ) {
   const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
-  const source = await getFriendBulkRunRow(db, sourceRunId) as RunRow | null;
-  if (!source || source.tenant_id !== tenantId) throw new FriendBulkRunError('run_not_found', '一括操作が見つかりません', 404);
+  await requireFriendBulkRunAccess(db, staff, sourceRunId);
   const summary = await db.prepare(`SELECT reversible, operation_json, selection_json FROM friend_bulk_runs WHERE id = ?`)
     .bind(sourceRunId).first<{ reversible: number; operation_json: string; selection_json: string }>();
   if (!summary || summary.reversible !== 1) throw new FriendBulkRunError('undo_not_supported', 'この操作は取り消せません', 409);
@@ -943,6 +1009,34 @@ export async function createFriendBulkUndoRun(
     undoOfRunId: sourceRunId,
     now,
   });
+}
+
+/**
+ * 実行IDを知っていても、現在の担当範囲外の友だち名や操作結果は見せない。
+ * 作成後に担当範囲が狭まった場合も、全対象を見られる人だけが再試行・取消できる。
+ */
+export async function requireFriendBulkRunAccess(
+  db: D1Database,
+  staff: AuthenticatedStaff,
+  runId: string,
+): Promise<RunRow> {
+  const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+  const run = await getFriendBulkRunRow(db, runId) as RunRow | null;
+  if (!run || run.tenant_id !== tenantId) {
+    throw new FriendBulkRunError('run_not_found', '一括操作が見つかりません', 404);
+  }
+  const rows = await db.prepare(
+    `SELECT DISTINCT line_account_id FROM friend_bulk_run_items WHERE run_id = ?`,
+  ).bind(runId).all<{ line_account_id: string | null }>();
+  if (!await canAccessAllLineAccounts(
+    db,
+    staff,
+    rows.results.map((row) => row.line_account_id),
+  )) {
+    // 存在自体を明かさない。
+    throw new FriendBulkRunError('run_not_found', '一括操作が見つかりません', 404);
+  }
+  return run;
 }
 
 export { parseOperation, parseSelection };
