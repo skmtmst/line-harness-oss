@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { type ReactNode } from 'react'
 import Dialog from './dialog'
 
 interface ConfirmDialogProps {
@@ -12,7 +12,19 @@ interface ConfirmDialogProps {
   destructive?: boolean
   busy?: boolean
   error?: string
-  onConfirm: () => void
+  /**
+   * 押す前に読み合わせる中身。
+   *
+   * **確認は「はい／いいえ」だけでは足りないことがある。** 一斉配信の
+   * 最終確認は、対象人数・配信日時・送る中身を並べてから決める
+   * （設計 `FpgxH`）。`Dialog` はもともと受け取れるので、素通しにする。
+   */
+  children?: ReactNode
+  /**
+   * `undefined` を渡すと**確認のボタンそのものが出ない**（`Dialog` の作り）。
+   * 数えられていない人数のまま送らせない、といった止め方に使う。
+   */
+  onConfirm?: () => void
   onCancel: () => void
 }
 
@@ -26,6 +38,7 @@ export default function ConfirmDialog({
   destructive = false,
   busy = false,
   error,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -41,6 +54,8 @@ export default function ConfirmDialog({
       error={error}
       onConfirm={onConfirm}
       onCancel={onCancel}
-    />
+    >
+      {children}
+    </Dialog>
   )
 }

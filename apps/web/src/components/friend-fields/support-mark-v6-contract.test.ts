@@ -23,6 +23,21 @@ describe('V6 対応マーク', () => {
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
     expect(EDITOR).toContain('api.supportMarks.list(selectedAccountId)')
+    for (const label of ['マーク名', '色', '並び順', '新着時の初期値にする']) expect(EDITOR).toContain(label)
+  })
+
+  it('未接続の自動変更ルールを作ったように見せず、既存の受信時設定だけを残す', () => {
+    expect(EDITOR).not.toContain('>自動変更ルール</h2>')
+    expect(EDITOR).toContain('メッセージ受信時にこのマークへ変更')
+    expect(EDITOR).toContain('現在接続済みの受信時設定だけを変更します')
+    expect(EDITOR).not.toContain('担当者割当・期限超過')
+  })
+
+  it('保存と削除の失敗で内部のAPI文言をそのまま表示しない', () => {
+    expect(EDITOR).toContain('対応マークを保存できませんでした。状態を読み直してから、もう一度お試しください。')
+    expect(LIST).toContain('対応マークを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    expect(EDITOR).not.toContain('reason instanceof ApiError ? reason.message')
+    expect(LIST).not.toContain("reason instanceof ApiError ? reason.message : '削除できませんでした'")
   })
 
   it('タブ行から追加画面へ進める', () => {

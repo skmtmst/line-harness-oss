@@ -113,8 +113,8 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
       const res = await api.supportMarks.delete(mark.id, accountId, { force: mark.friendCount > 0 })
       if (!res.success) throw new Error(res.error)
       await load()
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '削除できませんでした')
+    } catch {
+      setError('対応マークを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 

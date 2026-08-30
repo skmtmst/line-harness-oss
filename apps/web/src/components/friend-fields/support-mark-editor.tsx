@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Circle } from 'lucide-react'
 import type { SupportMark } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Card from '@/components/shared/card'
@@ -86,8 +86,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         : await api.supportMarks.create(selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '対応マークを保存できませんでした')
+    } catch {
+      setError('対応マークを保存できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -104,7 +104,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card padding="default">
           <h2 className="mb-4 text-sm font-bold text-ink">基本情報</h2>
           <label className="mb-4 block">
@@ -125,19 +125,13 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             <span>新着時の初期値にする<small className="mt-1 block font-normal text-ink-faint">初期値は1つだけ選べます</small></span>
             <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-5 w-5 accent-accent" />
           </label>
-        </Card>
-
-        <Card padding="default">
-          <h2 className="mb-2 text-sm font-bold text-ink">自動変更ルール</h2>
-          <p className="mb-4 text-xs leading-relaxed text-ink-faint">現在接続済みの「メッセージを受信したとき」を設定します。</p>
-          {autoOnInbound ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink">メッセージを受信したとき</span>
-              <span className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink">このマークに変更</span>
-              <button type="button" onClick={() => setAutoOnInbound(false)} className="text-xs font-semibold text-danger hover:underline">ルールを外す</button>
-            </div>
-          ) : <Button type="button" onClick={() => setAutoOnInbound(true)}>＋ 受信時ルールを追加</Button>}
-          <p className="mt-4 text-xs leading-relaxed text-ink-faint">担当者割当・期限超過などは、機能25の共通オートメーションから追加します。</p>
+          <label className="mt-4 flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm font-semibold text-ink">
+            <span>
+              メッセージ受信時にこのマークへ変更
+              <small className="mt-1 block font-normal text-ink-faint">現在接続済みの受信時設定だけを変更します</small>
+            </span>
+            <input type="checkbox" checked={autoOnInbound} onChange={(event) => setAutoOnInbound(event.target.checked)} className="h-5 w-5 accent-accent" />
+          </label>
         </Card>
 
         <Card padding="default">

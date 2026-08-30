@@ -16,6 +16,7 @@ import {
   updateSavedSearch,
   deleteSavedSearch,
   countSavedSearches,
+  getSavedSearchReferences,
   validateSearchConditions,
   SAVED_SEARCH_LIMIT,
   getLoginAudit,
@@ -33,12 +34,17 @@ import {
   type SupportMarkScope,
   type SavedSearch,
   type SavedSearchAccess,
+  type SavedSearchReference,
   type Folder,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  getSavedSearchMatchInsights,
+  type SavedSearchMatchInsight,
+} from '../services/saved-search-insights.js';
 
 /**
  * 対応マーク・保存した検索・汎用フォルダ。
@@ -78,7 +84,11 @@ async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Re
   return { tenantId: staff.tenantId, lineAccountId };
 }
 
-function serializeSearch(row: SavedSearch) {
+function serializeSearch(
+  row: SavedSearch,
+  insight: SavedSearchMatchInsight = { matchCount: null, matchCountError: null },
+  references: SavedSearchReference[] = [],
+) {
   return {
     id: row.id,
     name: row.name,
@@ -89,6 +99,16 @@ function serializeSearch(row: SavedSearch) {
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
     createdAt: row.created_at,
+    matchCount: insight.matchCount,
+    matchCountError: insight.matchCountError,
+    usedIn: references.map((reference) => ({
+      kind: reference.reference_kind,
+      id: reference.reference_id,
+      name: reference.reference_name,
+      mode: reference.reference_mode,
+      lastUsedAt: reference.last_used_at,
+    })),
+    canDelete: references.length === 0,
   };
 }
 
@@ -374,7 +394,24 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
       && (row.line_account_id === access.lineAccountId
         ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
         : row.line_account_id === null && row.created_by === access.staffId));
-    return c.json({ success: true, data: visible.map(serializeSearch) });
+    const [insights, references] = await Promise.all([
+      getSavedSearchMatchInsights(c.env.DB, visible, access.lineAccountId),
+      getSavedSearchReferences(c.env.DB, visible.map((row) => row.id), access.lineAccountId),
+    ]);
+    const referencesBySearch = new Map<string, SavedSearchReference[]>();
+    for (const reference of references) {
+      const current = referencesBySearch.get(reference.saved_search_id) ?? [];
+      current.push(reference);
+      referencesBySearch.set(reference.saved_search_id, current);
+    }
+    return c.json({
+      success: true,
+      data: visible.map((row) => serializeSearch(
+        row,
+        insights.get(row.id),
+        referencesBySearch.get(row.id),
+      )),
+    });
   } catch (err) {
     console.error('GET /api/saved-searches error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -425,7 +462,11 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
       isShared: body.isShared === true,
       displayOrder: Number(body.displayOrder ?? 0),
     });
-    return c.json({ success: true, data: serializeSearch(saved) }, 201);
+    const insights = await getSavedSearchMatchInsights(c.env.DB, [saved], access.lineAccountId);
+    return c.json({
+      success: true,
+      data: serializeSearch(saved, insights.get(saved.id), []),
+    }, 201);
   } catch (err) {
     console.error('POST /api/saved-searches error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -468,7 +509,14 @@ friendAttributes.patch(
 
       const saved = await updateSavedSearch(c.env.DB, id, access, patch);
       if (!saved) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
-      return c.json({ success: true, data: serializeSearch(saved!) });
+      const [insights, references] = await Promise.all([
+        getSavedSearchMatchInsights(c.env.DB, [saved], access.lineAccountId),
+        getSavedSearchReferences(c.env.DB, [saved.id], access.lineAccountId),
+      ]);
+      return c.json({
+        success: true,
+        data: serializeSearch(saved, insights.get(saved.id), references),
+      });
     } catch (err) {
       console.error('PATCH /api/saved-searches/:id error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -489,10 +537,21 @@ friendAttributes.delete(
           || (existing.created_by !== access.staffId && !access.canManageAll)) {
         return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
       }
+      const references = await getSavedSearchReferences(c.env.DB, [id], access.lineAccountId);
+      if (references.length > 0) {
+        return c.json({
+          success: false,
+          error: `この検索は${references.length}件で使用中です。使用先を外してから削除してください。`,
+          data: { usedIn: serializeSearch(existing, undefined, references).usedIn },
+        }, 409);
+      }
       const deleted = await deleteSavedSearch(c.env.DB, id, access);
       if (!deleted) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
       return c.json({ success: true, data: null });
     } catch (err) {
+      if (err instanceof Error && /foreign key constraint/i.test(err.message)) {
+        return c.json({ success: false, error: 'この検索は使用中のため削除できません' }, 409);
+      }
       console.error('DELETE /api/saved-searches/:id error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }

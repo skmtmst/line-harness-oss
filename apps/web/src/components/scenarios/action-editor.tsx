@@ -103,7 +103,7 @@ export default function ActionEditor({
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes, varRes] = await Promise.all([
         api.tags.list(),
-        api.friendFields.list(),
+        api.friendFields.list(selectedAccountId),
         api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
         api.commonVars.list(),
