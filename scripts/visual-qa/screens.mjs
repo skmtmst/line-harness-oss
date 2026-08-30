@@ -207,20 +207,20 @@ export const SCREENS = [
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 テンプレート選択の面が設計とそろわない（絞り込みと、選んだあとの差し込みの見え方）。1440・1920とも横スクロール0 **ルート**：`/chats`（トーク→「▧ テンプレートを選択」）。**取得元**：`inbox-v6/NfgOs.txt`。**推奨修正**：`NWbuF` `TUveA` と同じ束。**まず撮影の段を直す**（「フォルダ」を押せていない）。押せたあとに絞り込みと差し込みの見え方を詰める。',
-    verdictSource: 'inbox-v6/NfgOs.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#604 `6011cfeb` で解けた。前の判定は development `c275749d` の古い絵をもとにした「確かめられていない」状態だった。** ルート `/chats`（トーク→「テンプレートを選択」）。1440・1920とも横スクロール0。 絞り込みは フォルダの選び口（件数つき：すべて22／未分類5／お問い合わせ8／予約5／EC4）・札（すべて／よく使う／予約／EC）・名前と本文の検索 の3通り。 差し込みの見え方は 「今日」の帯つきプレビュー・「この操作ではまだ送信されません。入力欄へ内容を挿入します。」・「種類：テキスト ・ 更新：2026/01/13」・「入力欄へ挿入」。**送信ではなく挿入だと押す前に分かる。** 取得元：`inbox-v6/NfgOs-1440.png` ＋ `template-picker.tsx`',
+    verdictSource: 'inbox-v6/NfgOs.txt + inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   {
     ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
     steps: [...OPEN_CHAT, { click: '顧客情報を閉じる' }],
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 顧客情報パネルを閉じた形は出る。P2 設計との差は、閉じたときのトーク幅の広がり方。1440・1920とも横スクロール0 **ルート**：`/chats`（顧客情報パネルを閉じた形）。**取得元**：`inbox-v6/H3lAOB.txt`。**推奨修正**：閉じたときにトーク欄が設計どおり広がるようにする。**CSSの幅の割り当てだけ**で、口は変わらない。',
-    verdictSource: 'inbox-v6/H3lAOB.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#604 `6011cfeb` で撮り直した。** ルート `/chats`（顧客情報パネルを閉じた形）。1440・1920とも横スクロール0。 P2 閉じたときのトーク欄の広がり方が設計と違う。CSSの幅の割り当てだけで、口は変わらない。 取得元：`inbox-v6/H3lAOB.txt`',
+    verdictSource: 'inbox-v6/H3lAOB.txt + inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   {
     ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
     steps: [...OPEN_CHAT, { click: '表示項目' }],
     verdict: 'needs_fix', verdictNote: '**#604 `8f103587`（#538 `a2788ef5` の上）で撮り直した。前の判定は誤りだったので取り消す。** ルート `/chats`（「表示項目」）。1440・1920とも横スクロール0。 **「項目ごとの出し入れができない」と書いていたが、#513・#538 で既に入っていた。** development `c275749d` で撮った古い絵をもとに書いた判定だった。いまは項目ごとのチェックと「上へ／下へ」の並べ替えがあり、選んだ形は端末に残る。 **全部隠したときに戻す道が無かったので足した**（「初期状態に戻す」）。右パネルが空になり、どれを隠したかも画面から読めなくなるため。いま何件隠しているかも添えた。 P2 設計はスイッチと掴んで動かす形、実装はチェックと「上へ／下へ」。設計にある「完了」は無い（押さなくてもその場で効くため要らない）。出し入れの中身は同じなので、残るのは操作の見た目の差だけ。 取得元：`inbox-v6/Xi4x9-1440.png` ＋ `friend-info-sidebar.tsx:226`',
-    verdictSource: 'inbox-v6/Xi4x9.txt + inbox-v6/design-qa.md', verdictHead: '8f103587',
+    verdictSource: 'inbox-v6/Xi4x9.txt + inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   // 未読の会話が並んだ状態。開かずにそのまま撮る。
   { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読',
@@ -230,14 +230,14 @@ export const SCREENS = [
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
-    verdict: 'needs_fix', verdictNote: '**P2 テンプレート選択のフォルダ分けが無い。** ルート `/chats`（トーク→「▧ テンプレートを選択」）。設計はフォルダで絞ってから選ぶ。実装は「フォルダ」の押し口が本文に無い（撮影の段が「フォルダ」を押せず0件）。**撮影の段が古い**ので、開いたあとの面はまだ撮れていない——段を直してから詰める。1440・1920とも横スクロール0 **取得元**：`inbox-v6/design-qa.md`（撮影の段が「フォルダ」を押せず、開いたあとの本文は取れていない）。**推奨修正**：**先に撮影の段を直す**。押せる形が変わっているので、いまの判定は「フォルダ分けが無い」ではなく「確かめられていない」が正しい。段を直してから差を書く。',
-    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#604 `6011cfeb` で解けた。「テンプレート選択のフォルダ分けが無い」は誤りで、#536・#426 で既に入っていた。取り消す。** ルート `/chats`。1440・1920とも横スクロール0。 フォルダの選び口を開くと、すべてのフォルダ 22／未分類 5／お問い合わせ 8／予約 5／EC 4 が件数つきで並ぶ。**取得できた0件も0のまま出る。** フォルダ名での検索も付いている。 取得元：`inbox-v6/NWbuF-1440.png`',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   {
     ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
     steps: [...OPEN_CHAT, { click: '内部メモ' }],
-    verdict: 'needs_fix', verdictNote: '**P2 内部メモの面が設計とそろわない。** ルート `/chats`（トークを開いて「内部メモ」）。設計はメモに**書いた人と時刻**が残り、あとから誰が書いたか分かる。取得元：`inbox-v6/B7CER8.txt`。1440・1920とも横スクロール0。**この行の撮影は、いまトークを開く前で止まっている**（開いたあとの面を撮るには段の直しが要る） **推奨修正**：メモに書いた人と時刻を残す。**受信箱は担当者を既に持っている**ので、書いた人は取れる。**残作業**：トークを開いたあとの面を撮れるよう段を直す。',
-    verdictSource: 'inbox-v6/B7CER8.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#604 `6011cfeb` で撮り直した。前の「段の直しが要る」は解消し、トークを開いた形まで撮れている。** ルート `/chats`（トークを開いて「内部メモ」）。1440・1920とも横スクロール0。 P2 **メモに書いた人と時刻が残らない。** 設計はあとから誰が書いたか分かる形。受信箱は担当者を既に持っているので書いた人は取れるが、メモ自体に書き手と時刻を持たせる口が要る。 取得元：`inbox-v6/B7CER8.txt:119`。推奨修正：メモへ書き手と時刻を持たせる（Codex側・P2）',
+    verdictSource: 'inbox-v6/B7CER8.txt', verdictHead: '6011cfeb',
   },
   /*
     2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。素のセレクトのままだと
@@ -249,14 +249,14 @@ export const SCREENS = [
     ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
     /* **「担当者で絞り込む」は選ぶ口**（ボタンではない）。 */
     steps: [{ select: '担当者で絞り込む', label: 'Kenta' }],
-    verdict: 'needs_fix', verdictNote: '**P2 担当者の絞り込みが素の `<select>` のまま。** ルート `/chats`。選択肢は すべて／未割り当て／Masato／Kenta。設計は担当ごとの未読数を添えた専用の選び口（「Kenta 3」のように、選ぶ前に**どこに何件たまっているか**が分かる形）。実装は名前だけで数が出ない。帯は 要返信1件（最長1時間12分待ち）／自分が担当0件／今日の受信0件／メール0件／期限超過1件 と**数えて0を `0件` で出す**のは正しい。取得元：`inbox-v6/YZaDK.txt`。1440・1920とも横スクロール0 **推奨修正**：担当ごとの未読数を選び口に添える（「Kenta 3」）。**数は `f0zn6` の一覧が既に持っている**ので、同じ値を選び口へ渡すだけ。素の `<select>` を専用の部品へ替えるのはそのあと。',
-    verdictSource: 'inbox-v6/YZaDK.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#604 `6011cfeb` で撮り直した。** ルート `/chats`。1440・1920とも横スクロール0。 選択肢は すべて／未割り当て／Masato／Kenta。 P2 設計は担当ごとの未読数を添えた選び口（「Kenta 3」）。**数を作らないため添えていない。** 前の判定で「`f0zn6` の一覧が既に持っている」と書いたのは誤りで、取り消す。`InboxStats` は waiting・mine・todayInbound しか返さず、**担当ごとの内訳が無い**。一覧から数えることもできるが、一覧は20件ずつのページなので数え落とす。 取得元：`inbox-v6/YZaDK.txt:28` ＋ `lib/api.ts:732`。推奨修正：`/api/chats/stats` に担当ごとの未読を足す（Codex側・P2）',
+    verdictSource: 'inbox-v6/YZaDK.txt', verdictHead: '6011cfeb',
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
     steps: [...OPEN_CHAT, { click: '担当者を変える' }],
-    verdict: 'needs_fix', verdictNote: '**P2 担当者の変更が、設計の専用の選び口になっていない。** ルート `/chats`。**#492 の前の記録では「担当者を変える」ボタンがあったが、いまは無い**（撮影の段が0件）。担当の変更は右上の選び口へ移ったとみられる。段を直してから詰める。1440・1920とも横スクロール0 **取得元**：`inbox-v6/design-qa.md`（「担当者を変える」の押し口が本文に0件で、開いたあとの面は取れていない）。**推奨修正**：**先に撮影の段を直す**。押し口が右上の選び口へ移ったとみられるので、いまの判定は「専用の選び口になっていない」ではなく「確かめられていない」が正しい。',
-    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#604 `6011cfeb` で撮り直した。前の「段が0件で確かめられていない」は解消している。** ルート `/chats`。1440・1920とも横スクロール0。 担当の変更はトークの見出しの「担当： Kenta」の選び口へ移っていた（設計の「担当者を変える」ボタンは無い）。押すとその場で変えられる。 P2 設計は名前と顔を並べた専用の選び口。実装は素の選び口で、誰に渡すのかを名前だけで選ぶ。 取得元：`inbox-v6/L35UOV.txt:106`',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
@@ -269,17 +269,17 @@ export const SCREENS = [
     // 「予約」だけだと**分類のチップ**に当たる。フォルダの行は
     // `role="option"` で「フォルダ 予約」という名前なので、そちらを指す。
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: 'フォルダ 予約', role: 'option' }],
-    verdict: 'needs_fix', verdictNote: '**P2 `NWbuF` と同じ面の続き。** ルート `/chats`。**撮影の段が古く**「フォルダ」を押せない（0件）。段を直してから詰める。1440・1920とも横スクロール0 **取得元**：`inbox-v6/design-qa.md`（撮影の段が「フォルダ」を押せず0件）。**推奨修正**：`NWbuF` と同じ束。**段を直してからまとめて詰める。**',
-    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#604 `6011cfeb` で解けた。`NWbuF` と同じ面。前の「段が古く押せない」は解消している。** ルート `/chats`。1440・1920とも横スクロール0。予約フォルダを選ぶと、そのフォルダのひな形だけに絞られる。 取得元：`inbox-v6/TUveA-1440.png`',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }],
-    verdict: 'needs_fix', verdictNote: '**P2 絞り込みの面。** ルート `/chats`。**撮影の段が古く**「絞り込み」を押せない（0件）。本文には「絞り込み」の語があるので、押せる形が変わったとみられる。段を直してから詰める。**この画面は束3の手本**（押せないときに理由を書く形）として記録してある。1440・1920とも横スクロール0 **取得元**：`inbox-v6/design-qa.md`（撮影の段が「絞り込み」を押せず0件）。**推奨修正**：**先に撮影の段を直す**。本文には「絞り込み」の語があるので押せる形が変わっただけで、無いわけではない。**この画面の「押せないときに理由を書く」形は束3の手本なので残す。**',
-    verdictSource: 'inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#604 `6011cfeb` で解けた。前の「段が古く押せない（0件）」は解消している。** ルート `/chats`（「絞り込み」）。1440・1920とも横スクロール0。 設計の6項目がすべて在る：対応マーク・担当者・受信経路・期限・表示するメッセージ種別・未読だけ表示。「リセット」と「この条件で絞り込む」も在る。 **押せない2項目に理由を書いた。** 前は「まだ絞り込めません」だけで、自分の権限の問題なのか、設定が要るのか、まだ無いのかが分からなかった。いまは「期限はまだ記録していないため、絞り込めません」「種別で絞る読み口がまだ無いため、選んでも一覧は変わりません」。**この形が束3の手本。** 取得元：`inbox-v6/w72a2.txt:28-56` ＋ `inbox-filter-panel.tsx`',
+    verdictSource: 'inbox-v6/design-qa.md', verdictHead: '6011cfeb',
   },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }],
     variants: [{ suffix: '-menu', steps: [{ click: '保存した検索', after: 600 }, { qaOpen: 'ASsb3', after: 600 }] }],
     verdict: 'needs_fix', verdictNote: '**#604 `93065346`（#538 `a2788ef5` の上）で直した。撮っている途中で画面が落ちて、実装の不具合が見つかった。** ルート `/chats`（「保存した検索」）。1440・1920とも横スクロール0。 **① 受信箱より前に作られた保存を開くと、受信箱ごと落ちていた。** Workerは `conditions` を `JSON.parse(row.conditions_json) as unknown` でそのまま返す（`routes/chats.ts:135`）。保存した検索の仕組みは受信箱より前からあり、古い行は `{ all: [], any: [] }` の形で入っている。画面はそれを `InboxSavedViewConditions` と決めつけて `conditions.statuses.length` を読んでいた。`normalizeSavedViewConditions()` で知っている値だけ拾い、分からない形は「何も絞っていない」として扱う。**撮影の固定データが3件とも古い形だったので、この道は一度も通っていなかった。**受信箱が実際に保存する形を2件に入れ、1件だけ古い形のまま残した。 **② 名前の下に条件の要約を出した**（「未対応・保留 ／ LINE」「未対応 ／ 担当 未割り当て」、古い形の1件は「すべての会話」）。担当者のidは名前へ直し、分からないidは「不明な担当者」。 **③ 赤字の「削除」を名前の隣から「…」へ畳んだ**（名前を変える／消す）。選ぶつもりで押し間違える並びだった。消す前に「この保存した検索だけが消えます。会話や絞り込みの条件そのものは残り…この操作は取り消せません。」と言う。 P2 ★（よく使う）と、当たる件数が無い。**件数は数を作らないため入れていない**——いまの読み口では一覧を丸ごと数え直さないと出せない。`QKx8Q` と同じ口が要るので、そちらと同時に。 `undefined`・`NaN`・`Invalid Date`・`API error` は0件。取得元：`inbox-v6/ASsb3.txt:28-36` ＋ `ASsb3-menu-1440.png`',
-    verdictSource: 'inbox-v6/ASsb3.txt', verdictHead: '8f103587',
+    verdictSource: 'inbox-v6/ASsb3.txt', verdictHead: '6011cfeb',
   },
   /*
     2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
@@ -2443,7 +2443,7 @@ export const CAPTURED_AT = {
 
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' },
     { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
-      { pr: 604, head: '8f103587', on: '2026-08-31', screens: ['ASsb3', 'Xi4x9'], note: 'Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した' },
+      { pr: 604, head: '6011cfeb', on: '2026-08-31', screens: ['ASsb3', 'Xi4x9', 'NfgOs', 'NWbuF', 'TUveA', 'w72a2', 'B7CER8', 'YZaDK', 'L35UOV', 'H3lAOB'], note: 'Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した' },
   ],
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },

@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 47,
+  "match": 51,
   "structureMatchDataPending": 18,
-  "needsFix": 170,
+  "needsFix": 166,
   "unjudged": 0,
-  "remaining": 211,
+  "remaining": 207,
   "features": [
     {
       "feature": 1,
@@ -51,11 +51,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 6,
       "structureMatchDataPending": 0,
-      "needsFix": 15,
+      "needsFix": 11,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 11,
       "capturedAt": [
         {
           "pr": 513,
@@ -121,11 +121,19 @@
         },
         {
           "pr": 604,
-          "head": "8f103587",
+          "head": "6011cfeb",
           "on": "2026-08-31",
           "screens": [
             "ASsb3",
-            "Xi4x9"
+            "Xi4x9",
+            "NfgOs",
+            "NWbuF",
+            "TUveA",
+            "w72a2",
+            "B7CER8",
+            "YZaDK",
+            "L35UOV",
+            "H3lAOB"
           ],
           "note": "Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した"
         }
