@@ -288,8 +288,8 @@ export const SCREENS = [
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
     steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
-    verdict: 'needs_fix', verdictNote: 'P1 「保存する条件」が読むだけで変えられない（設計は対応マーク・期限・受信経路・担当者の4つを選び直せる。実装は 対応マーク／担当者／受信経路 の3行が値を表示するだけ）。期限の行が無い。P2 「よく使うに追加」の切替と「件数は自動更新される」注記が無い。**#555 `e873eeb9` で撮り直したが、この窓の作りは変わっていない**（#555 は未入力エラーの出し方だけを直した。そちらは `AuSDY` を見る） **ルート**：`/chats`（「この条件を保存」）。**取得元**：`inbox-v6/ANgda.txt`。**推奨修正**：窓の中で条件を選び直せるようにする。**選び口の部品は一覧側の絞り込みが既に持っている**ので、同じものを窓へ入れる。期限の行と「よく使うに追加」も同時に。',
-    verdictSource: 'inbox-v6/ANgda-1440.png', verdictHead: 'e873eeb9',
+    verdict: 'needs_fix', verdictNote: ' **#555 の新head `9eee9655` でも撮った。変更は重複エラーの文言1行だけで、窓の作りは変わっていない。** 判定は据え置く（**P1** 保存する条件を窓の中で変えられない・期限の行が無い。**P2** よく使うに追加が無い）。',
+    verdictSource: 'inbox-v6/ANgda-1440.png', verdictHead: '9eee9655',
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -297,8 +297,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: '**P0は #513 で解決した。** 保存に失敗したとき、窓は「保存しました」へ進まず、窓の中に文を出して開いたまま残る。APIの番号（405）も素通ししていない。**#555 `e873eeb9` で撮り直した**——失敗の文が赤い帯（`Notice tone="error"`）に替わり、`AuSDY` `LHjwD` と同じ見え方でそろった。ただし**設計のこのNodeは「保存完了」の画面**で、画面確認では書き込みを常に405で止める決めごとのため、完了の絵そのものは撮れない。窓の作りの残る差は `ANgda` と同じ（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い） **ルート**：`/chats`（保存の窓）。**取得元**：`inbox-v6/tBlkL.txt`。**推奨修正**：残る差は `ANgda` と同じ束なので一緒に直す。**保存完了の絵は撮れない**——画面確認では書き込みを常に405で止める決めごとのため。**この制約は撮影側のもので、実装の不具合ではない。**',
-    verdictSource: 'inbox-v6/tBlkL-1440.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: 'e873eeb9',
+    verdict: 'needs_fix', verdictNote: ' **#555 の新head `9eee9655` でも撮った。この head の変更は重複エラーの文言1行だけ**（`saved-view-dialog.tsx:79`）で、**この Node の見え方は変わっていない**。判定は据え置く（**P2** 残る差は `ANgda` と同じ窓の作り）。',
+    verdictSource: 'inbox-v6/tBlkL-1440.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: '9eee9655',
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
@@ -306,8 +306,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: '**#555 `e873eeb9` で、記録していたP2が両方直った。** 未入力のとき **赤い帯**（`Notice tone="error"`、×印つき）で「検索名を入力してください」と出し、**保存ボタンは押せなくなる**（`disabled={saving || nameMissing}`）。入力欄も赤枠になり `aria-invalid`／`aria-describedby` が付くので、読み上げでも同じことが伝わる。設計の「赤い帯の注意書きと、押せない保存ボタン」とそろった。1440・1920とも横スクロール0。P2 残るのは `ANgda` と同じ窓の作り（保存する条件を窓の中で変えられない・期限の行が無い） **ルート**：`/chats`（保存の窓・未入力）。**取得元**：`inbox-v6/AuSDY.txt`。**推奨修正**：**この赤い帯＋押せない保存ボタンの形を、ほかの窓へ写す**。`aria-invalid` / `aria-describedby` まで付けているので、読み上げでも同じことが伝わる。残る差は `ANgda` と同じ束。',
-    verdictSource: 'inbox-v6/AuSDY-1440.png', verdictHead: 'e873eeb9',
+    verdict: 'needs_fix', verdictNote: ' **#555 の新head `9eee9655` でも撮った。変更は重複エラーの文言1行だけで、未入力のときの見え方は変わっていない。** 判定は据え置く（**P2** 残る差は `ANgda` と同じ窓の作り）。',
+    verdictSource: 'inbox-v6/AuSDY-1440.png', verdictHead: '9eee9655',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -315,8 +315,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: '**#555 `e873eeb9` で、重複エラーも入力欄の下の文から赤い帯へ変わった**（同じ `Notice` を使うため）。設計の「赤い帯」とそろった。保存ボタンは押せたままだが、これは正しい——名前を変えれば保存できるので、押せなくする理由がない（未入力とは違う）。1440・1920とも横スクロール0。P2 文言はまだ設計と違う（設計「同じ名前の保存した検索があります。別の名前を入力してください。」／実装「同じ名前の検索がすでにあります。別の名前にしてください」） **ルート**：`/chats`（保存の窓・重複）。**取得元**：`inbox-v6/LHjwD.txt`。**推奨修正**：文言を設計へそろえる（「同じ名前の保存した検索があります。別の名前を入力してください。」）。**保存ボタンを押せたままにしている判断は正しい**——名前を変えれば保存できるので、未入力と違って押せなくする理由がない。',
-    verdictSource: 'inbox-v6/LHjwD-1440.png', verdictHead: 'e873eeb9',
+    verdict: 'match', verdictNote: '**#555 `9eee9655` で、前に挙げたP2（重複エラーの文言が設計と違う）が解消した。** ルート `/chats`（保存の窓・重複）。1440・1920とも横スクロール0。 **文言が設計どおりになった**：「**同じ名前の保存した検索があります。別の名前を入力してください。**」（前は「同じ名前の検索がすでにあります。別の名前にしてください」）。`saved-view-dialog.tsx:79` の1行の差し替えで、**この head の変更はこれだけ**（ほかは契約試験の追加5行）。 **赤い帯（`Notice tone="error"`）で出る**のは前から。`AuSDY`（未入力）と同じ見え方でそろっている。 **保存ボタンは押せたまま。これは正しい**——名前を変えれば保存できるので、未入力と違って押せなくする理由がない。 **窓の作りの残る差は `ANgda` の担当**（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い）。**この Node の差は無くなった。** 取得元：`inbox-v6/LHjwD-1440.png` ＋ `saved-view-dialog.tsx:79`',
+    verdictSource: 'inbox-v6/LHjwD-1440.png + saved-view-dialog.tsx:79', verdictHead: '9eee9655',
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
@@ -797,10 +797,12 @@ export const SCREENS = [
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認', route: '/reminders',
     mode: 'viewport', height: 1080,
     steps: [{ click: 'を削除' }],
-    verdict: 'needs_fix',
-    verdictNote: '**#498 `f30890f2`（`codex/development` 直結へ張り替え済み）で、束5の形はできている。実際に押して確かめた。** 窓は `ConfirmDialog` で、ブラウザ標準の窓は**0回**。題に名前が入り（「「予約前日のご案内」を削除しますか？」）、本文に3つが揃う——「削除すると**未送信の通知予定はすべて取り消されます**。**送信済みの履歴は監査記録として残り**、この操作は**取り消せません**。」。**失敗しても窓は閉じない**（削除の口を405にして確認）。**P1 ただし窓の中に出る文が `API error: 405` という内部の言葉。** `reminders/page.tsx:230` の `setDeleteError(caught instanceof Error ? caught.message : \'削除に失敗しました\')` が、APIの文をそのまま窓へ流している（束2）。#554 の `EGMb1` は「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉にしていて、そこだけ揃っていない。**推奨修正**：`caught.message` を使わず、決まった一文を出す。1440・1920とも横スクロール0 **ルート**：`/reminders`（削除の窓）。**取得元**：`reminders-v6/Y0Sn3.txt`（削除の口を405にして確かめた）。**推奨修正**：**窓に出る `API error: 405` を画面の言葉に替える**（`reminders/page.tsx:230`）。`EGMb1` `dqFft` は同じ場面で「…できませんでした。状態を読み直してから、もう一度お試しください。」と出せているので、その文を使う。',
-    verdictSource: 'reminders-v6/Y0Sn3-1440.png',
-    verdictHead: 'f30890f2',
+    /* 失敗しても窓が閉じないか、文が画面の言葉かを見る。撮影用の口は405。 */
+    variants: [{ suffix: '-fail', steps: [{ click: 'を削除' }, { click: '削除する' }, { wait: 1200 }] }],
+    verdict: 'match',
+    verdictNote: '**#514 `d064bded` で、前に挙げたP1（窓の中に `API error: 405` という内部の言葉が出る）が解消した。実際に押して確かめた。** ルート `/reminders`（削除の窓）。1440・1920とも横スクロール0。 **直り方**：削除を1件ずつ回して結果を残す形になり（`reminders/page.tsx:221`「1件ずつ結果を残す。途中で失敗しても、成功した削除まで失敗扱いにしない。」）、失敗の文は口の返事を素通しせず **`${失敗件数}件を削除できませんでした。状態を読み直してから、もう一度お試しください。`** を組み立てる（`:251`）。 **撮影用の口を405にして押すと、窓は開いたまま「1件を削除できませんでした。状態を読み直してから、もう一度お試しください。」**。内部の番号も英語も出ない。 **束5の形は前から満たしている**：題に名前（「「予約前日のご案内」を削除しますか？」）、本文に3つ——「削除すると**未送信の通知予定はすべて取り消されます**。**送信済みの履歴は監査記録として残り**、この操作は**取り消せません**。」。ボタンは「キャンセル」と赤い「削除する」。ブラウザ標準の窓は0回。 **一部だけ失敗したときも、成功した分は消える**——`succeededIds` で成功した行だけ一覧から外す。**「全部やり直し」にならないので、同じ操作を2回して二重に消す事故が起きない。** **P2 残る差（この判定は変えない）**：設計との細かな差（絵記号）は `Gy9OK` と同じ束。 取得元：`reminders-v6/Y0Sn3-fail-1440.png` ＋ `reminders/page.tsx:221,251`',
+    verdictSource: 'reminders-v6/Y0Sn3-fail-1440.png + reminders/page.tsx:251',
+    verdictHead: 'd064bded',
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
@@ -2075,15 +2077,15 @@ export const SCREENS = [
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**P1 設計の列が2つのうち1つしか無い。** ルート `/tags?tab=fields`。実装の列は **友だち情報欄名／種別／既定値／入力済み／表示**。設計は 順番／項目名／種類／使用中／**回答フォーム**／**表示先**／操作 で、**「回答フォーム」は本文にあるが「表示先」が0件**。設計は「愛犬のお名前 テキスト 187人 **回答フォーム3個** **友だち詳細・テンプレート差し込み**」と、**どこに出るか**まで見せる。**P1 帯4つが無い**（設計は 項目数12件（使用中9件）／登録済み友だち187人／フォーム連携6件／今月の更新3件）。**P1 「入力済み」が未取得なのに `0人` と出る**（束4。`?withUsage=1` を付けて読む必要がある）。取得元：`friend-attributes-v6/HBTk0.txt`。1440・1920とも横スクロール0 **推奨修正**：**「入力済み」が未取得なのに `0人` と出るのを先に直す**（束4）。`?withUsage=1` を付けて読み、取れないときは `—` にする。**数えて0と、数えられないを混ぜているのはこの画面だけ**（`hqrOv` は正しく出せている）。「表示先」の列と帯4つはそのあと。',
-    verdictSource: 'friend-attributes-v6/HBTk0.txt', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#420 `f77de350` で、前に挙げたP1が3つとも解消した。** ルート `/tags?tab=fields`。1440・1920とも横スクロール0。 **① 「入力済み」が未取得なのに `0人` と出る、が直った。** 一覧は `api.friendFields.list(accountId, { withUsage: true })` で読むようになり（`field-list.tsx:55`）、値は `field.usageCount ?? \'—\'` で出す（`:139`）。**取れていれば実値（187人・164人・141人・72人）、取れなければ `—`。0で埋めない。** **② 帯4つが入った**：項目数 4件（使用中4件）／登録済み友だち 187人（1項目以上を登録）／フォーム連携 **`—`（未取得）**／今月の更新 3件（追加・編集）。**フォーム連携だけ口が無いので `—` と未取得の札**で、**取れているものと取れていないものが同じ帯の中で見分けられる**。 **③ 「表示先」が出るようになった**（前は本文を数えて0件）。 **④ 使用中の項目には「移行」、使っていない項目には削除のごみ箱**（`:143,144`）。使用中の削除は押せなくして `title` に「値が入っているため、先に項目を移行してください」と理由を書く。**共通項目には鍵の印**（「共通項目は直接削除できません」）。**押せなくして理由を書く形は `g89Tc`（メディアの一括削除）と同じ手本。** **`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は0件。** 取得元：`friend-attributes-v6/HBTk0.txt` ＋ `field-list.tsx:55,139`',
+    verdictSource: 'friend-attributes-v6/HBTk0.txt + field-list.tsx:139', verdictHead: 'f77de350',
   },
   {
     node: 'yKEdO', feature: 4, name: '4-2-C 一覧の状態（空・読込・エラー）',
     dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
     states: { apis: ['**/api/friend-fields*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**P0（失敗を空として出す）は #420 `87c150ad` で解決済み。P1 が残る。** ルート `/tags?tab=fields`。失敗のときに空状態と「項目を追加」の誘いを同時に出していたのが直った。**残るP1は帯の数**（`HBTk0` と同じ。未取得を `0人` と出す）。取得元：`friend-attributes-v6/yKEdO-error.txt`。1440・1920とも横スクロール0 **推奨修正**：残るP1は `HBTk0` と同じ（未取得を `0人` と出す）。**`?withUsage=1` を付けて読み、取れないときは `—` にする**。この2枚は同じ直しで一緒に解ける。',
-    verdictSource: 'friend-attributes-v6/yKEdO.txt', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#420 `f77de350` で、残っていたP1（帯が未取得を `0人` と出す）が解消した。読込・空・失敗を撮って確かめた。** ルート `/tags?tab=fields`（空・読込・失敗）。1440・1920とも横スクロール0。 **取得失敗のとき帯は4つとも `—`**：項目数 `—件`／登録済み友だち `—人`（1項目以上を登録）／フォーム連携 `—件`（回答の登録先）／今月の更新 `—件`（追加・編集）。**通常のとき（`HBTk0`）は 4件・187人・3件 と実値**なので、**未取得と実値が見分けられる**。 **前のP0（失敗を空として出し、「項目を追加」の誘いを同時に出す）は解決済み**で、この head でも保たれている。 **`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は0件。** 取得元：`friend-attributes-v6/yKEdO-error.txt` ＋ `HBTk0.txt`',
+    verdictSource: 'friend-attributes-v6/yKEdO-error.txt', verdictHead: 'f77de350',
   },
   { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
     verdict: 'needs_fix', verdictNote: '**P1 人数が「人」だけで数字が出ない。** ルート `/tags?tab=marks`。撮った本文の「いまの人数」列は **未対応・対応中・保留・対応済・気にかける の5行とも「人」だけ**で、数字が入っていない（`[0-9]+人` を数えて0件）。原因は `mark-list.tsx:176` が `{mark.friendCount}人` を出すのに、**`SupportMark` の型に `friendCount` が無い**こと。どの口も返さないので常に空になる。設計は 未対応23人／対応中19人／対応済186人／保留3人 を出す。**推奨修正**：数を返す口ができるまでは **`—人`** と出す（空にしない）。空欄は「0人」とも「取れていない」とも読めない。**P1 帯4つが無い**（設計は マークの種類4件（使用中4件）／未対応23人（全体の10.0%）／対応中19人／過去7日の変更74回）。同じ画面の4タブのうち**タグ（`hqrOv`）だけが帯を持ち**、作りが揃っていない。取得元：`friend-attributes-v6/rIhbN.txt`。1440・1920とも横スクロール0',
@@ -2146,7 +2148,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    verdict: 'needs_fix', verdictNote: '**訂正：前の判定（「設計との差は並びと文言」）は 404 の絵から書かれていた。取り消す。** ルート `/tags/fields/migrate?id=field-birthday`。**development `c275749d` にこの道は無く、撮った本文は「404 This page could not be found.」だけだった。** `apps/web/src/app/tags/fields/` の下に `migrate` が無く、`field-list.tsx` にも「移行」の押し口が無い（数えて0件）。**この画面は #537 の枝にだけある**（`b296cb04:apps/web/src/app/tags/fields/migrate/page.tsx`）。#537 は open のまま。**P1 development では項目移行ができない。** 使用中の項目は消せないので、移行の道が無いと**行き止まりになる**。**残作業**：#537 の head で `--only KoT6c` を撮り、そこから設計との差を詰める。**development の絵で判定しない**（無い画面を「並びが違う」とは書けない）。取得元：`friend-attributes-v6/KoT6c.txt`（404の記録） **推奨修正**：**#537 の head で `--only KoT6c` を撮ってから差を詰める。** development には画面が無いので、ここで見た絵（404）から設計との差は書けない。', verdictSource: 'friend-attributes-v6/KoT6c.txt（404の記録）', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#420 `f77de350` で本文が取れた。前の判定（404の絵から書かれていた）を置き換える。** ルート `/tags/fields/migrate?id=field-birthday`。1440・1920とも横スクロール0。**development には無い画面で、#420 の枝にある。** **先に事前確認だけを行う形**：「**まず事前確認だけを行います。友だちの値や既存の項目は変更しません。**確認が必要な値を直してから、移行を実行してください。」——**押しても何も動かないことを先に書く**ので、確かめてから進める。 **いま使っている項目と、新しく作る項目を左右に並べる**：「誕生日 `{{field.birthday}}` 日付 → 新しく作る項目（項目名・種類）」。差し込み名も出るので、**テンプレートのどこが影響するか**が分かる。 **種類は10種類**（1行テキスト・複数行テキスト・数値・日付・単一選択・複数選択・真偽・URL・電話番号・メール）で、**それぞれに例が付く**（「日付 — 誕生日など」「数値 — 体重など」）。**P1 設計の12種類のうち 日時・画像・PDF が無く、真偽が増えている**（`A1ZYeP` と同じ差。移行先の選択肢もそこに引きずられる）。**日時が無いので、予約時刻のような値は移行先を作れない。** **P2 事前確認の結果（何件が移り、何件が直しを要るか）は、押してからでないと出ない。** 設計は移行の前に件数を見せる。**推奨修正**：種類の不足は `A1ZYeP` と同じ直しで一緒に解ける。件数は `uNBlA`（変える前に影響を見る）と同じ形にできる。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friend-attributes-v6/KoT6c.txt`', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: 'f77de350',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
   },
   {
@@ -2302,6 +2304,7 @@ export const CAPTURED_AT = {
     { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] },
     { pr: 511, head: '4bc71249', on: '2026-08-29', screens: ['GC4St'], note: '実行結果から内部IDを外す。束3' },
     { pr: 498, head: 'f30890f2', on: '2026-08-30', screens: ['Y0Sn3'], note: '`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま' },
+    { pr: 514, head: 'd064bded', on: '2026-08-30', screens: ['Y0Sn3'], note: '一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' }],
   11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
@@ -2393,8 +2396,14 @@ export const CAPTURED_AT = {
     { pr: 585, head: '3857365b', on: '2026-08-30', screens: ['njLGA'], note: '取得失敗のとき帯を — にする直し。0円と見分けがつくようになった' },
   ],
   23: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' }],
-  4: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' }],
-  2: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' }],
+  4: [
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' },
+    { pr: 420, head: 'f77de350', on: '2026-08-30', screens: ['HBTk0', 'yKEdO', 'KoT6c'], note: '入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた' },
+  ],
+  2: [
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' },
+    { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
+  ],
   3: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'YzxU1'], note: '判定を具体化するため撮った' }],
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
