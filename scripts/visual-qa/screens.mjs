@@ -1148,7 +1148,7 @@ export const SCREENS = [
     段は無いが**中身は同じ画面に全部ある**ので、同じ絵を3つの設計と
     突き合わせる形にする。
   */
-  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。P1 どれが出るかを決める『順番』が画面に出ない。** リッチメニューは**同じ友だちが複数に当てはまったとき、いちばん上の1つだけ**が出る。つまり順番がそのまま「お客さまに何が見えるか」。設計は3つで支える——見出しの「出す順番を変える」／「上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、いちばん上の1つだけが出ます。」の断り／並び順の既定を「出す順番（自分で決めた順）」にする。**実装はどれも無い**（本文を数えて「評価順」「順番」「上から順」「優先」すべて0件）。並び順の既定は「タップ数が多い順」（`page.tsx:93`）なので、**画面に出ている並びは実際に出る順番と関係が無い**。上から2番目に見えるメニューが最後に判定されることがある。`targetingPriority` はデータとして持っているのに、画面が一度も出していない。P2 設計は表、実装は札の格子。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/GO8RQ.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'match', verdictNote: '**#583 `0218ef61` で撮った。前のP1（どれが出るかを決める順番が画面に出ない）は解決。** ルート `/rich-menus`。**最新headは既存の判定head `c275749d` と違い、`rich-menus/page.tsx` の blob も変わっていたので撮り直した**（`5b5f3baa` → `437fa88e`）。1440・1920とも横スクロール0。 **設計が求めた3つがそろった。** ①並び順の選択肢の先頭に「出す順番（自分で決めた順）」が入り、**既定になった**（`page.tsx:136` の `useState<SortKey>(\'priority\')`。前は「タップ数が多い順」）②「出す順番を変える」の口が出る ③断りが常に出る——「出す順番：上にあるメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、いちばん上の1つだけが表示されます。」 **一覧の順番が、実際に出る順番と一致することをコードで確かめた。** 画面は `compareTargetingGroups()`（`targeting-order.ts:8`）で `targetingPriority` 昇順→`createdAt` 昇順に並べる。Workerが友だちへ出すメニューを選ぶ問い合わせは `ORDER BY g.targeting_priority ASC, g.created_at ASC`（`packages/db/src/rich-menus.ts:932`）。**同率のときの決め方まで同じ。** 試験も同率を見張っている（`targeting-order.test.ts` に `targetingPriority: 0` が2件あり、`createdAt` の早いほうが先に来ることを確かめている）。 **並べ替えると古い同順位が残らない。** `moveTargetingGroup()` は動かしたあと全件を `0,1,2…` へそろえ直す。範囲外へ動かそうとしたときは `null` を返して**書き込みを起こさない**。 **未取得と0件を分けている。** 帯の「出し分け」は取れていないとき `—`（件の字も出さない）、取れて0件のときは「タグ条件で出し分けているメニューはありません」、1件以上で「タグ条件で自動的に切り替わります」（`page.tsx:429-438`）。撮った絵は2件なので3つ目の文が出ている。 **内部ID・undefined・NaN・Invalid Date は0件。** 管理画面外の表に出る `richmenu-line-1` はLINE側のメニューの目印で、**LINE公式マネージャーの画面と突き合わせるために要る値**（名前の無いメニューを見分ける手がかり）。秘密値ではない。 **残る差（P2）**：設計は表、実装は札の格子。この判定は変えない。', verdictSource: 'rich-menus-v6/GO8RQ.txt + targeting-order.ts + packages/db/src/rich-menus.ts:932' , verdictHead: '0218ef61' },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: '**P2 形とボタンが1枚に同居している。** ルート `/rich-menus/new`。撮った本文は「リッチメニューを作る／名前と土台のレイアウトを決め…」で、`kQ1bs`（誰に出すか）`UMiJ9`（公開のしかた）と**同じ1枚**。設計は段で分ける。**`GO8RQ` のP1（出る順番が見えない）と同じ根で、ここでも優先の説明が無い。** 取得元：`rich-menus-v6/XtfO3.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/XtfO3.txt' , verdictHead: 'c275749d' },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**P1 出し分けの条件を決める画面なのに、当てはまったときにどれが優先されるかが出ない。** ルート `/rich-menus/edit?id=rmg-1`。`XtfO3` `UMiJ9` と同じ1枚の中にある。**`targetingPriority` は持っているのに画面が出さない**（`GO8RQ` と同じ根）。**推奨修正**：この節に「上にあるものが優先されます」の断りと、いまの順番を出す。取得元：`rich-menus-v6/kQ1bs.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/kQ1bs.txt' , verdictHead: 'c275749d' },
   {
@@ -1306,6 +1306,7 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
     verdictHead: 'ef7b5773',
+    verdictNote: '**判断済み（2026-08-30）：「未払い残高」ではなく「承認済み報酬の合計」と書く。振込先は 銀行・支店・種別・末尾4桁だけ。** ルート `/conversions?tab=payment`（想定）、読み口 `/api/affiliate-payments`（想定）。**Codexが実装中。PR番号とheadが届くまで、こちらは固定データと撮影手順の準備だけを行う。** **確かめた土台**：`conversion_events` が `affiliate_id` `approval_status`（pending/approved/rejected）`approved_at` を持ち、`affiliates` が `hold_days`（返品・キャンセルを見る保留日数）と `payout_cycle`（**覚書。計算には使わないと `095_affiliate_settlement.sql` に明記**）を持つ。報酬額は `affiliate_offers` 側（#558 で 定額／割合／なし の3通り）。**承認済みの合計はいまある表から出せる。** **払った記録がまだ無いので「未払い」とは書かない。** 振込先は `affiliates` に列が無く、**銀行名・支店名・口座種別・末尾4桁だけ**を持つ（口座番号の全桁と名義は画面に出さない）。**この画面はまだ未実装のまま。headを見るまで判定を変えない。**',
   },
   { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**#558 で「報酬が売上×率でしか出ない」が直った。** どう支払うかを **成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。1440・1920とも横スクロール0。P2 設計との細かな差（連絡先・支払い条件の並び）は未確認', verdictSource: 'affiliates-v6/xqT1Z.txt' , verdictHead: 'c275749d' },
   {
@@ -1329,6 +1330,7 @@ export const SCREENS = [
     gap: 'api',
     gapNote: '同上（締める操作）',
     status: 'unimplemented', why: '16-1-C（支払い）が無いので、締める操作も無い',
+    verdictNote: '**判断済み（2026-08-30）：締め済み期間は変更しない。返品は次の未締め期間へマイナス調整として入れる。** ルート `/affiliates?tab=payment`（想定）。**この決めごとにより、締めた期間の行は書き換え不要になり、台帳は追記だけで済む。** **必要なもの**：支払い期間の台帳（期間の始め・終わり・確定日・対象の成果・金額・状態）と、締める操作。調整はマイナスの明細として**次の未締め期間に足す**ので、`amount` は負の値を許す列にする。**先に決まっていること**：締めたあとの金額は動かさない。区分：新規API・DB。P1。**着手前に `njLGA`（支払いタブ）が要る。**',
   },
 
   // ── 機能17 マイル・行動スコア ───────────────────────────
@@ -1527,15 +1529,30 @@ export const SCREENS = [
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
-  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。P0が4つとも直っている**（失敗の隣に失敗が1件／「発送完了から-3日後」／配信履歴の生UTC／読み込み失敗を0件と言う）。一覧は「誕生日の3日前 10:00」と正しく出る。**P1 編集画面の「何日後に送るか」が誕生日配信では効かない。** 誕生日の3日前は `delay_days` ではなく `birthdayDeliveryTarget`（`nen-engagement.ts:414`）が決めており、編集画面の欄は無関係。**効かない欄を出しているので、直したつもりで直らない。** 欄を隠すか「誕生日配信ではこの欄は使いません」と書くのが要る。P1-1（コラムの状態が英語）とP1-2（きっかけが `ec.order.delivered`）は **#525・#526 で直っているのを確認済み**。1440・1920とも横スクロール0', verdictSource: 'nen-v6/VLMGH.txt + nen-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', /*
+      **配信履歴のタブも撮る。** UTCの日時を日本時間で出しているかは、
+      ここでしか目に見えない（`formatNenJobDateTime` を使うのはこのタブだけ）。
+    */
+    variants: [{ suffix: '-history', steps: [{ click: '配信履歴' }] }],
+    /* 失敗を空として出していないかを見る。読込・空・失敗の3つ。 */
+    states: {
+      apis: ['**/api/nen-campaigns/**', '**/api/nen-campaigns'],
+      kinds: ['loading', 'empty', 'error'],
+    },
+    verdict: 'needs_fix', verdictNote: '**#526 `1c91a7bc` で撮った（`campaign-display.ts` が変わったのでここも撮り直した）。読込・空・失敗の3状態も撮った。** ルート `/nen-campaigns`。1440・1920とも横スクロール0。 **失敗を空や0件として出していない。** 口を落とすと画面ごと **「表示できませんでした／フォロー配信の情報を読み込めませんでした。／フォロー配信を再読み込み」** に替わり、**帯も一覧も出さない**（`page.tsx:180`）。空のときは 配信ジョブ0件・待機中0件・失敗0件で、失敗の帯だけ文が **「失敗した配信を確認してください」→「失敗の記録はありません」** と変わる。**0件と失敗が別の言葉になっている。** **未取得は `—`。** 「今月の配信」は `—` に「この画面では集計していません」と理由が付く（0を作っていない）。待機中・失敗も `overview?.jobs.pending ?? \'—\'` で受ける。 **日時は日本時間。** 配信履歴の「予定：2026/08/24 10:00」は口の `2026-08-24T01:00:00.000Z` から出ている。 **残る差**：P1 設計 21-1 は配信ごとの送信数・開封数を一覧に出すが、実装は **「配信ごとの送信数・開封数を数える経路がまだありません」** と書いて出せない（口が無い。**穴を隠さず書いている**点は良い）。P2 設計はフォルダの縦帯を左に置くが、実装は上の「フォルダを追加」だけ。', verdictSource: 'nen-v6/VLMGH.txt + VLMGH-history.txt + VLMGH-empty.txt + VLMGH-error.txt' , verdictHead: '1c91a7bc' },
   { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: '**#525 `deff5ffb` で束3の完了条件を満たした。** 状態が `scheduled` `sent` `draft` のまま出ていたのが、数えて**すべて0件**になった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（回ごとの配信結果への導線）はこの直しの外', verdictSource: 'nen-v6/DEX0k.txt' , verdictHead: 'deff5ffb' },
   { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 ペット・記念日の作りが設計とそろわない。1440・1920とも横スクロール0', verdictSource: 'nen-v6/q4lajm.txt + nen-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }], verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 配信履歴の日時は日本時間で出る（P0解決済み）。構造は設計とそろっており、残るのは実データの接続', verdictSource: 'nen-v6/WeXbL.txt + nen-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
-    verdict: 'needs_fix', verdictNote: '**#526 `dfcc9a53` で束3の完了条件を満たした。** きっかけが `ec.order.delivered` `pet.birthday` のような内部の名前で出ていたのが、数えて**すべて0件**になった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の編集の作り（配信条件の組み立て）はこの直しの外', verdictSource: 'nen-v6/HpKyF.txt',
+    /*
+      **誕生日配信も同じ編集画面で撮る。** `?key=` で中身が変わり、
+      #526 はここで「何日後」を出さないようにした。行は増やさない。
+    */
+    variants: [{ suffix: '-birthday', route: '/nen-campaigns/edit?key=birthday_coupon' }],
+    verdict: 'match', verdictNote: '**#526 `1c91a7bc` で撮った。誕生日配信の「何日後」は消え、画面の文言が実際の送信処理と一致した。** ルート `/nen-campaigns/edit?key=review_request`（誕生日は `?key=birthday_coupon` を変種 `-birthday` として同じ行から撮った）。1440・1920とも横スクロール0。 **① 効かない「何日後」の欄が残っていない。** 誕生日クーポンの編集では入力欄が消え、代わりに **「送る日 誕生日の3日前」「時刻 10:00（固定）」** が読み取り専用で出る（`campaign-editor.tsx:319`）。発送後の配信（`review_request`）では「何日後に送るか」が今までどおり出るので、**効く画面からは消していない**。 **② 画面の文言と実際の予約日時が一致する。** 画面は「ペットの誕生日の3日前、10:00に届きます。この日時は誕生日配信の実行処理で固定されています。」と書く。Workerの `birthdayDeliveryTarget()`（`apps/worker/src/services/nen-engagement.ts:414`）を読んで突き合わせた——対象は **日本時間の今日＋3日** が誕生日のペット（`monthDay` の作り方）、予約時刻は **`Date.UTC(…, 1, 0, 0)` ＝ UTC 01:00 ＝ 日本時間 10:00**。**3日前も10:00も、画面の言葉のとおり。** **③ UTCを日本時間で出している。** 撮った配信履歴で、口が返した `2026-08-24T01:00:00.000Z` が **「予定：2026/08/24 10:00」** と出た（`formatNenJobDateTime` が `timeZone: \'Asia/Tokyo\'`）。**生のUTCも `Invalid Date` も0件。** 日時が壊れているときは日付を作らず「日時を確認できません」と書く。 **④ 内部の言葉が出ない。** `ec.order.delivered` `pet.birthday` のような口の名前は0件で、「商品を発送したとき」「ペットの誕生日」と日本語で出る。 **残る差（P2、この画面の合否は変えない）**：設計の編集は配信条件を組み立てられるが、実装は「タグでさらに絞り込む設定は、まだ保存する場所がありません。」と**できないことを書いて断っている**。**穴を隠していない**ので、この画面の判定は下げない。', verdictSource: 'nen-v6/HpKyF.txt + HpKyF-birthday.txt + nen-engagement.ts:414',
     route: '/nen-campaigns/edit?key=review_request',
-    verdictHead: 'dfcc9a53',
+    verdictHead: '1c91a7bc',
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
@@ -1543,6 +1560,7 @@ export const SCREENS = [
     gapNote: 'コラムの正本はEC側。管理画面で書くなら保存先が要る',
     status: 'unimplemented',
     why: 'コラムを新しく書く画面が無い。実装は**外から取り込んだコラムの「配信文」だけ**を直せる（`page.tsx:414`「配信文を編集」）。題名・本文・写真・分類はこちらで作れない',
+    verdictNote: '**判断済み（2026-08-30）：V6は外部記事リンク方式。本文をDBに持たない。** ルート `/nen-campaigns`。**この決めごとにより、表の作り替えは不要になった**——`nen_columns` の `article_url TEXT NOT NULL` と `external_id` はそのままで正しい。**残る作業は管理画面から作る口だけ。** いまコラムを入れられるのは EC-CUBE からの署名付きWebhookだけで（`apps/worker/src/routes/nen-campaigns.ts:300` の `verifyEccubeSignature`）、管理画面から作れるのは `intro_text`（配信文）だけ（`page.tsx:414`「配信文を編集」）。**必要なもの**：管理画面向けの作成・更新API（題名・分類・抜粋・記事URL・画像URL・公開日）。本文の列は足さない。区分：新規API（DBの変更は不要）。P1。',
   },
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
@@ -1602,6 +1620,7 @@ export const SCREENS = [
     gapNote: 'Stripe定期便本体の接続。実装に「接続後に有効化します」と明記',
     status: 'unimplemented',
     why: '定期便のタブが無い。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）',
+    verdictNote: '**判断済み（2026-08-30）：Stripe接続待ちとして今回のV6対象外候補。仮画面は作らない。** ルート `/ec-commerce`。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）。**受け口はできていて、外の接続だけが残っている。** **仮画面を作らない**——中身の無いタブを足すと、使える機能があるように見える。**この状態のまま据え置く。** 接続が済んだら、`ec_events` の定期便イベントを読む一覧として作る。',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
@@ -2246,6 +2265,7 @@ export const CAPTURED_AT = {
     { pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' },
     { pr: 555, head: 'e873eeb9', on: '2026-08-29', screens: ['ANgda', 'tBlkL', 'AuSDY', 'LHjwD'], note: '保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['xGLVe'], note: 'development そのもので撮った' },
+    { pr: 583, head: '0218ef61', on: '2026-08-30', screens: ['GO8RQ'], note: '出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致' },
   ],
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },
@@ -2287,7 +2307,10 @@ export const CAPTURED_AT = {
     `RW5Tb`（#523）を巻き戻した。git から戻した。**
   */
   1: [{ pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' }],
-  12: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['GO8RQ', 'XtfO3', 'kQ1bs', 'UMiJ9', 'TL7tp'], note: '同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**' }],
+  12: [
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['GO8RQ', 'XtfO3', 'kQ1bs', 'UMiJ9', 'TL7tp'], note: '同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**' },
+    { pr: 583, head: '0218ef61', on: '2026-08-30', screens: ['GO8RQ'], note: '出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致' },
+  ],
   10: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZC13r', 'lvaY5', 'PV1Vh', 'd3rFGD', 'Xjk8q', 'Q8sHa', 'yxyzQ'], note: 'development そのもので撮った' }],
   11: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['W7LBc', 'GFlD7', 'FRkls', 'j9ixI', 'hsBtl', 'J3GxEZ'], note: '同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった' }],
   16: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' }],
@@ -2317,6 +2340,7 @@ export const CAPTURED_AT = {
     { pr: 525, head: 'deff5ffb', on: '2026-08-29', screens: ['DEX0k'], note: '状態の内部語を日本語へ。束3' },
     { pr: 526, head: 'dfcc9a53', on: '2026-08-29', screens: ['HpKyF'], note: 'きっかけの内部名を日本語へ。束3' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['VLMGH', 'q4lajm', 'WeXbL', 'i9sQP'], note: 'development そのもので撮った' },
+    { pr: 526, head: '1c91a7bc', on: '2026-08-30', screens: ['HpKyF', 'VLMGH'], note: '誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み' },
   ],
   22: [
     { pr: 447, head: '65adbc59', on: '2026-08-28' },

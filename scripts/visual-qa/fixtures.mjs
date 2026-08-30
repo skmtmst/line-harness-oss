@@ -4563,3 +4563,59 @@ export const NOTIFICATION_CENTER = {
   counts: { all: 3, error: 2, update: 1, unread: 2 },
   unreadCount: 2,
 }
+
+/**
+ * 支払い（設計 `njLGA` 16-1-C）。**Codexが実装中。まだ絵は撮らない。**
+ *
+ * **ルートも口も「想定」で、正本ではない**——ルート `/conversions?tab=payment`、
+ * 読み口 `/api/affiliate-payments`。**PRのheadが届いたら、実装のコードで
+ * 確かめてから使う。推測したAPIパスを正本にしない。**
+ *
+ * 値の作り方は、いまある表から出せる範囲に合わせている：
+ * - `conversion_events` の `approval_status`（pending/approved/rejected）と
+ *   `approved_at`、`affiliate_id`
+ * - `affiliates` の `hold_days`（返品・キャンセルを見る保留日数）と
+ *   `payout_cycle`（**覚書。計算には使わないと `095_affiliate_settlement.sql` に明記**）
+ * - 報酬額は `affiliate_offers` 側（#558 で 定額／割合／なし の3通り）
+ *
+ * **決まったこと（2026-08-30）を守っている：**
+ * - **「未払い残高」と書かない。**払った記録を持つ表がまだ無いので、
+ *   出せるのは `approvedTotal`＝**承認済み報酬の合計**まで
+ * - **振込先は 銀行・支店・種別・末尾4桁だけ。**口座番号の全桁と名義は持たない
+ * - 締めは `GqFTV` の担当。ここには**締めた記録が無い**ので、
+ *   `closedThrough` は `null`（＝まだ一度も締めていない）
+ *
+ * 未取得と実値0を分けるため、**支払いサイクルが未設定の人**（`payoutCycle: null`）と、
+ * **承認済みが0件の人**（`approvedCount: 0`）を両方入れている。
+ */
+export const AFFILIATE_PAYMENTS = {
+  /** まだ一度も締めていない。`GqFTV` が入るまで `null` のまま。 */
+  closedThrough: null,
+  items: [
+    {
+      affiliateId: 'aff-1', name: '田中 紹介', code: 'tanaka',
+      approvedCount: 24, approvedTotal: 72000,
+      holdingCount: 3, holdingTotal: 9000,
+      holdDays: 30, payoutCycle: '毎月末締め・翌月末払い',
+      bank: { name: 'みずほ銀行', branch: '渋谷支店', kind: '普通', last4: '4821' },
+      lastApprovedAt: '2026-08-24T05:00:00.000Z',
+    },
+    {
+      affiliateId: 'aff-2', name: '北の店ネットワーク', code: 'north',
+      approvedCount: 8, approvedTotal: 24000,
+      holdingCount: 0, holdingTotal: 0,
+      holdDays: 30, payoutCycle: '毎月末締め・翌月末払い',
+      bank: { name: '北洋銀行', branch: '札幌中央支店', kind: '当座', last4: '0137' },
+      lastApprovedAt: '2026-08-20T02:30:00.000Z',
+    },
+    {
+      /* **承認済みが実値0の人。**「—」ではなく「0件」と出る側。 */
+      affiliateId: 'aff-3', name: '佐藤 個人', code: 'sato',
+      approvedCount: 0, approvedTotal: 0,
+      holdingCount: 2, holdingTotal: 6000,
+      holdDays: null, payoutCycle: null,
+      bank: null,
+      lastApprovedAt: null,
+    },
+  ],
+}

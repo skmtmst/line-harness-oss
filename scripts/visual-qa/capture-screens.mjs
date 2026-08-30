@@ -703,7 +703,12 @@ async function captureImpl(feature) {
       **1つの行に枝を生やす**形にする。
     */
     if (s.variants) {
-      for (const v of s.variants) shots.push({ kind: null, suffix: v.suffix, steps: v.steps, mode: v.mode })
+      /*
+        **同じ画面の別の入り口も、行を増やさずに撮る。** 262枚は動かさない。
+        `route` を書くと、その変種だけ別のURLで開く（誕生日配信のように、
+        同じ編集画面でも `?key=` で中身が変わるもの）。
+      */
+      for (const v of s.variants) shots.push({ kind: null, suffix: v.suffix, steps: v.steps, mode: v.mode, route: v.route })
     }
     for (const width of WIDTHS) {
      for (const shotSpec of shots) {
@@ -716,7 +721,7 @@ async function captureImpl(feature) {
         if (shotSpec.kind && shotSpec.kind !== 'normal') {
           await applyState(page, s.states.apis, shotSpec.kind)
         }
-        await page.goto(`${BASE}${s.route}`, {
+        await page.goto(`${BASE}${shotSpec.route ?? s.route}`, {
           /* 読み込み中は返事が来ないので `networkidle` を待てない。 */
           waitUntil: shotSpec.kind === 'loading' ? 'domcontentloaded' : 'networkidle',
           timeout: 120_000,
@@ -726,7 +731,8 @@ async function captureImpl(feature) {
         // 行き先を必ず見る。**クエリまで見る**（タブは `?tab=` でしか区別できない）。
         const url = new URL(page.url())
         const landed = url.pathname + url.search
-        if (landed !== s.route) throw new Error(`${s.route} から ${landed} へ飛ばされた`)
+        const want = shotSpec.route ?? s.route
+        if (landed !== want) throw new Error(`${want} から ${landed} へ飛ばされた`)
         const body = await page.locator('body').innerText()
         /*
           **文字だけで見分けない。** 「LINEでログイン」は説明文にも出る
