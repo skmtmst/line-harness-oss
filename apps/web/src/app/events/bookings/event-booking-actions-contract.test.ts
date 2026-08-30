@@ -6,6 +6,7 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 describe('V6 i5SN2j イベント申込者の次行動と安全なキャンセル', () => {
   it('4枚の帯を数だけで終わらせず次にすることへつなぐ', () => {
     expect(PAGE).toContain('describeBookingCapacity(applied, capacity)')
+    expect(PAGE).toContain('対応が必要：')
     expect(PAGE).toContain('件を確認してください')
     expect(PAGE).toContain('確認待ちはありません')
     expect(PAGE).toContain('空きが出たら順に案内します')

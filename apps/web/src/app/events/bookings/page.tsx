@@ -286,7 +286,7 @@ function BookingsInner() {
           unit={dataReady ? '件' : ''}
           detail={dataReady
             ? pending > 0
-              ? `${pending}件を確認してください`
+              ? `対応が必要：${pending}件を確認してください`
               : '確認待ちはありません'
             : '取得できませんでした'}
         />
@@ -507,7 +507,7 @@ function BookingsInner() {
             setRejectError('')
           }}
         >
-          <label className="block text-sm font-medium text-gray-700" htmlFor="event-booking-reject-reason">
+          <label className="text-ink block text-sm font-medium" htmlFor="event-booking-reject-reason">
             運用メモ（任意）
           </label>
           <textarea
@@ -516,10 +516,10 @@ function BookingsInner() {
             onChange={(event) => setRejectReason(event.target.value)}
             disabled={busy}
             rows={3}
-            className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+            className="border-hairline text-ink disabled:bg-canvas-sunken mt-2 w-full rounded-lg border px-3 py-2 text-sm"
             placeholder="例：日程の調整が必要なため"
           />
-          <p className="mt-2 text-xs text-gray-500">このメモは友だちへ送られません。</p>
+          <p className="text-ink-faint mt-2 text-xs">このメモは友だちへ送られません。</p>
         </Dialog>
     </div>
   )
