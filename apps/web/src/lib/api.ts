@@ -57,6 +57,11 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  FriendBulkSelection,
+  FriendBulkOperation,
+  FriendBulkPreview,
+  FriendBulkRunSummary,
+  FriendBulkRunDetail,
 } from '@line-crm/shared'
 
 /**
@@ -1487,6 +1492,40 @@ export const api = {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
     },
+    bulkPreview: (selection: FriendBulkSelection, operation: FriendBulkOperation) =>
+      fetchApi<ApiResponse<FriendBulkPreview>>('/api/friends/bulk-runs/preview', {
+        method: 'POST',
+        body: JSON.stringify({ selection, operation }),
+      }),
+    bulkCreate: (
+      selection: FriendBulkSelection,
+      operation: FriendBulkOperation,
+      options: { idempotencyKey: string; scheduledAt?: string; confirmIrreversible?: boolean },
+    ) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>('/api/friends/bulk-runs', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': options.idempotencyKey,
+          ...(options.confirmIrreversible ? { 'X-Confirm-Irreversible': 'friend-bulk-run' } : {}),
+        },
+        body: JSON.stringify({ selection, operation, scheduledAt: options.scheduledAt }),
+      }),
+    bulkGet: (id: string, options?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (options?.page) query.set('page', String(options.page))
+      if (options?.limit) query.set('limit', String(options.limit))
+      const tail = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<FriendBulkRunDetail>>(`/api/friends/bulk-runs/${id}${tail}`)
+    },
+    bulkRetry: (id: string) =>
+      fetchApi<ApiResponse<{ retriedCount: number }>>(`/api/friends/bulk-runs/${id}/retry`, {
+        method: 'POST',
+      }),
+    bulkUndo: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>(`/api/friends/bulk-runs/${id}/undo`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }),
     /**
      * 友だち情報（metadata）を書き換える。
      * 渡した項目だけ変わる。null を渡すとその項目を削除する。

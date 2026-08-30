@@ -211,7 +211,8 @@
     "203_saved_search_references.sql",
     "204_analytics_saved_results.sql",
     "205_tenant_feature_packs.sql",
-    "252_template_questions.sql"
+    "252_template_questions.sql",
+    "253_friend_bulk_runs.sql"
   ],
-  "migrationCount": 212
+  "migrationCount": 213
 }

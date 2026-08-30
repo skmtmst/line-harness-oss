@@ -27,6 +27,7 @@ import { runExpirer } from './services/booking-expirer.js';
 import { processDueEventReminders } from './services/event-booking-reminders.js';
 import { processDueMeetConsultationReminders } from './services/meet-consultation-reminders.js';
 import { processDueAutomationRuns } from './services/automation-engine.js';
+import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
 import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
@@ -39,6 +40,7 @@ import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
+import { friendBulkRuns } from './routes/friend-bulk-runs.js';
 import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
@@ -289,6 +291,7 @@ app.use('*', tenantScopeMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', friendBulkRuns);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
@@ -1142,6 +1145,18 @@ async function scheduled(
     }
   } catch (e) {
     console.error('automation-v6 cron error:', e);
+  }
+
+  // 友だち一括操作は対象IDを固定したサーバ側ジョブ。待機中の共通アクションと、
+  // Worker終了でleaseが切れた対象だけを再開する。失敗分は利用者が再試行するまで触らない。
+  try {
+    const result = await processDueFriendBulkRuns(env.DB, {
+      now: new Date(event.scheduledTime).toISOString(),
+      executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+    });
+    if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
+  } catch (e) {
+    console.error('friend bulk runs cron error:', e);
   }
 
   // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
