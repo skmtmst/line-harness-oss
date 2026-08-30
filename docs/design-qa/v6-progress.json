@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 34,
+  "match": 35,
   "structureMatchDataPending": 18,
-  "needsFix": 176,
+  "needsFix": 175,
   "unjudged": 0,
-  "remaining": 224,
+  "remaining": 223,
   "features": [
     {
       "feature": 1,
@@ -1341,11 +1341,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
+      "match": 4,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
+      "needsFix": 4,
       "unjudged": 0,
-      "remaining": 5,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 502,
@@ -1389,6 +1389,15 @@
             "syWp4"
           ],
           "note": "development そのもので撮り直した。帯4つと複製は既に入っていた"
+        },
+        {
+          "pr": 594,
+          "head": "a389b70a",
+          "on": "2026-08-30",
+          "screens": [
+            "syWp4"
+          ],
+          "note": "Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している"
         }
       ]
     },
