@@ -9,6 +9,7 @@ import FolderPanel from '@/components/shared/folder-panel'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
 
@@ -42,6 +43,9 @@ function VarsPageInner() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   /** 選んでいるフォルダ。URLに出して、戻るとブックマークを壊さない。 */
   const folderFilter = params.get('folder') ?? ''
@@ -128,9 +132,10 @@ function VarsPageInner() {
     }
   }
 
-  const removeSelected = async () => {
+  const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     setError('')
+    setDeleteError('')
     try {
       const impacts = await Promise.all(
         [...selected].map(async (id) => {
@@ -149,18 +154,47 @@ function VarsPageInner() {
       setError('使用先を確認できないため削除できません。もう一度お試しください。')
       return
     }
-    if (
-      !confirm(
-        `${selected.size}件の未使用の共通情報を削除しますか？\nこの操作は取り消せません。`,
-      )
-    )
+
+    const targets = items.filter((item) => selected.has(item.id))
+    if (targets.length !== selected.size) {
+      setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
       return
+    }
+    setDeleteTargets(targets)
+  }
+
+  const removeSelected = async () => {
+    if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    const failed: CommonVar[] = []
+    for (const target of deleteTargets) {
+      try {
+        const result = await api.commonVars.delete(target.id, selectedAccountId)
+        if (!result.success) throw new Error(result.error)
+      } catch {
+        failed.push(target)
+      }
+    }
+
     try {
-      for (const id of selected) await api.commonVars.delete(id, selectedAccountId)
+      if (failed.length > 0) {
+        setDeleteTargets(failed)
+        setSelected(new Set(failed.map((item) => item.id)))
+        setDeleteError(
+          failed.length === deleteTargets.length
+            ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
+            : `${failed.length}件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
+        )
+        await load()
+        return
+      }
+
+      setDeleteTargets([])
       setSelected(new Set())
-      void load()
-    } catch {
-      setError('削除に失敗しました')
+      await load()
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -400,7 +434,7 @@ function VarsPageInner() {
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
             <button
-              onClick={() => void removeSelected()}
+              onClick={() => void prepareRemoveSelected()}
               disabled={selected.size === 0}
               className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
             >
@@ -410,6 +444,24 @@ function VarsPageInner() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTargets.length > 0}
+        title={deleteTargets.length === 1
+          ? `「${deleteTargets[0]?.name ?? ''}」を削除しますか？`
+          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1}件を削除しますか？`}
+        description={`選択した${deleteTargets.length}件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void removeSelected()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteTargets([])
+        }}
+      />
     </div>
   )
 }
