@@ -1384,10 +1384,10 @@ export const SCREENS = [
       窓は `position: fixed` なので `page`（全面）では撮れない。
     */
     ...MILEAGE, node: 'vz0Ji', name: '17-1-F マイルを手で増やす・減らす',
-    verdict: 'needs_fix', verdictNote: 'P1 手で増やす・減らす操作が無い。**間違って付いたマイルを直せない**', verdictSource: 'mileage-v6/design-qa-score-495.md',
+    verdict: 'needs_fix', verdictNote: '**#582 `78e2f065` で、手で調整したときの失敗が日本語になった。実際に押して確かめた。** 撮影用モックは書き込みを405で返すので、そのまま失敗させると窓の中に **「この環境ではマイルを手で変更できません。」** と出る（内部語・番号は0件）。**窓は2段になっている**——①だれの・増やすか減らすか・マイル数・理由 →②**「この変更で起きること」で 変更前 2,450 mile / 変更量 +100 mile / 変更後 2,550 mile を見せてから**「この内容で増やす」。押し間違いでは動かない形。上に「記録に残ります。あとから理由をたどれるようにしてください。」と書くのも良い。**#582 は状態ごとに文を分ける**（403 権限／405 この環境／409 ほかの操作と重なった／**428 確認手順が完了していません**／通信）。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の友だち別明細は、増減の理由ごとの内訳と、取り消した記録の跡をその場で開く。実装は一覧と調整まで', verdictSource: 'mileage-v6/vz0Ji-1440.png',
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
-    verdictHead: '55301679',
+    verdictHead: '78e2f065',
   },
   {
     /*
@@ -1933,15 +1933,15 @@ export const SCREENS = [
     `capture.spec.mjs` が撮っている（`tags-csv-*`）。
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    verdict: 'needs_fix', verdictNote: 'P2 フォルダの但し書きが設計の「中の項目」でなく「中のタグ」。帯・フォルダ・行・列・よく使うは数値まで設計どおり',
-    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**P2 文言だけ。** ルート `/tags`。**この画面の4タブのうち、帯4つを持つのはここだけ**（撮った本文で 101件／186人／26件／101件／20件 と実値が出る）。`rIhbN` `HBTk0` `QKx8Q` には帯が無く、**同じ画面なのに作りが揃っていない**。取得元：`friend-attributes-v6/hqrOv.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/hqrOv.txt', verdictHead: 'c275749d',
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
     steps: [{ click: '削除', scope: 'main' }],
-    verdict: 'needs_fix', verdictNote: 'P2 注意文が設計と違う（設計「アフィリエイトのオファーで使用中のタグは削除できません」／実装「使用中のため、このタグは削除できません（4件から参照されています）」）。窓の作りは5行＋赤い注意＋名前の打ち直し＋2つのボタンまで一致。実装の文のほうが正しいので、Pencil側を直す候補',
-    verdictSource: 'friend-attributes-v6/dKlkz-1920.png + design-qa-remaining10.md', verdictHead: '87c150ad',
+    verdict: 'structure_match_data_pending', verdictNote: '**構造は設計とそろっている。** ルート `/tags`（タグ削除の確認）。残るのは実データの接続——**消す前に「何人に付いているか」を出す口**が要る（`zGZMA` と同じ根、束11）。取得元：`friend-attributes-v6/dKlkz.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/dKlkz.txt', verdictHead: 'c275749d',
   },
   {
     node: 'H374MR', feature: 4, name: '4-1-H タグCSV一括登録',
@@ -1956,8 +1956,8 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-preview',
     why: '同上。`tags-csv-preview` が撮っている',
-    verdict: 'needs_fix', verdictNote: 'P1 CSV確認に「行」の列が無い。設計は12/13/14/15/16とCSVの行番号を出す。P2 扱いの言葉が設計と違う（設計「飛ばす／エラー」実装「重複で見送り／入力確認」。実装のほうが正確なのでPencil側を直す候補）',
-    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**P1 CSV取り込みの確認が設計と別の仕掛け。** ルート `/tags?tab=fields`（取り込み）。設計は取り込む前に**何行が新規で何行が更新か、はじかれた行とその理由**を見せてから進む。実装は別の作りで、行ごとの内訳を出さない。取得元：`friend-attributes-v6/sfTEW.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/sfTEW.txt', verdictHead: 'c275749d',
   },
   {
     node: 'op1rh', feature: 4, name: '4-1-H-B CSV取り込み・完了',
@@ -1976,19 +1976,19 @@ export const SCREENS = [
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
-    verdict: 'needs_fix', verdictNote: 'P1 「回答フォーム」「表示先」の列が無い。「入力済み」が未取得なのに0人と出る（withUsage=1を付けずに読んでいる）。帯4つが無い',
-    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**P1 設計の列が2つのうち1つしか無い。** ルート `/tags?tab=fields`。実装の列は **友だち情報欄名／種別／既定値／入力済み／表示**。設計は 順番／項目名／種類／使用中／**回答フォーム**／**表示先**／操作 で、**「回答フォーム」は本文にあるが「表示先」が0件**。設計は「愛犬のお名前 テキスト 187人 **回答フォーム3個** **友だち詳細・テンプレート差し込み**」と、**どこに出るか**まで見せる。**P1 帯4つが無い**（設計は 項目数12件（使用中9件）／登録済み友だち187人／フォーム連携6件／今月の更新3件）。**P1 「入力済み」が未取得なのに `0人` と出る**（束4。`?withUsage=1` を付けて読む必要がある）。取得元：`friend-attributes-v6/HBTk0.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/HBTk0.txt', verdictHead: 'c275749d',
   },
   {
     node: 'yKEdO', feature: 4, name: '4-2-C 一覧の状態（空・読込・エラー）',
     dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
     states: { apis: ['**/api/friend-fields*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 読込・空・失敗の文が設計と違う（設計「読み込んでいます／データがありません／表示できませんでした」）。P0（失敗時に空の文と「項目を追加」の誘いが出る）は #420 で直った',
-    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**P0（失敗を空として出す）は #420 `87c150ad` で解決済み。P1 が残る。** ルート `/tags?tab=fields`。失敗のときに空状態と「項目を追加」の誘いを同時に出していたのが直った。**残るP1は帯の数**（`HBTk0` と同じ。未取得を `0人` と出す）。取得元：`friend-attributes-v6/yKEdO-error.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/yKEdO.txt', verdictHead: 'c275749d',
   },
   { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
-    verdict: 'needs_fix', verdictNote: 'P1 マークごとの人数が「人」だけで数字が出ない（SupportMarkの型にfriendCountが無く、どの口も返さない）。未取得なら—と出すべきところが空。帯4つが無い',
-    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**P1 人数が「人」だけで数字が出ない。** ルート `/tags?tab=marks`。撮った本文の「いまの人数」列は **未対応・対応中・保留・対応済・気にかける の5行とも「人」だけ**で、数字が入っていない（`[0-9]+人` を数えて0件）。原因は `mark-list.tsx:176` が `{mark.friendCount}人` を出すのに、**`SupportMark` の型に `friendCount` が無い**こと。どの口も返さないので常に空になる。設計は 未対応23人／対応中19人／対応済186人／保留3人 を出す。**推奨修正**：数を返す口ができるまでは **`—人`** と出す（空にしない）。空欄は「0人」とも「取れていない」とも読めない。**P1 帯4つが無い**（設計は マークの種類4件（使用中4件）／未対応23人（全体の10.0%）／対応中19人／過去7日の変更74回）。同じ画面の4タブのうち**タグ（`hqrOv`）だけが帯を持ち**、作りが揃っていない。取得元：`friend-attributes-v6/rIhbN.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/rIhbN.txt', verdictHead: 'c275749d',
   },
   { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした。** 保存した検索の一覧に内部の識別子（`ss-`）や `support_mark` `scenario_id` といった列名が出なくなった（数えて0件）。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（条件の要約、使用先の表示）はこの直しの外', verdictSource: 'tags-v6/QKx8Q.txt' , verdictHead: 'e929f22a' },
 
@@ -2005,15 +2005,15 @@ export const SCREENS = [
     node: 'tP0RW', feature: 4, name: '4-1-B タグを作る・連動ON',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'page',
     steps: [{ click: 'タグ連動', role: 'switch' }],
-    verdict: 'needs_fix', verdictNote: 'P2 「ONの間だけ動きます。OFFに戻すと、以降にタグが付いても連動は実行されません（過去の付与は取り消されません）。」の注記が無い。「マイル タグが付いた瞬間に積みます」の見出しが無い。a〜eの番号と設計の言い回し（このタグが初めて付いた本人に／その人を紹介した人に ほか）が違う',
-    verdictSource: 'friend-attributes-v6/tP0RW-1920.png', verdictHead: 'baeb644b',
+    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/tP0RW.txt`。1440・1920とも横スクロール0。**具体的な差は、設計画像が用意できてから詰める**（この機能は `design-qa-remaining10.md` に画像が無く、文章の記述だけで見ている）',
+    verdictSource: 'friend-attributes-v6/tP0RW.txt', verdictHead: 'c275749d',
   },
   {
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'viewport', height: 1320,
     steps: [{ click: 'タグ連動', role: 'switch' }, { click: '＋ アクションを追加' }],
-    verdict: 'needs_fix', verdictNote: 'P2 見出しの副題にタグ名が入らない（設計は「「NEN会員（定期）」が付いたときに実行する処理を選びます。」）。節の名前が違う（処理の種類→アクションの種類、実行タイミング→実行するタイミング、実行順の位置→追加する位置）。位置に「4番目（いちばん最後）」の順番が出ない。13種類の処理と待機の注記は一致',
-    verdictSource: 'friend-attributes-v6/LfrQs-1920.png', verdictHead: 'baeb644b',
+    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/LfrQs.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める',
+    verdictSource: 'friend-attributes-v6/LfrQs.txt', verdictHead: 'c275749d',
   },
   {
     node: 'ee0sk', feature: 4, name: '4-1-D タグを編集・既存設定あり',
@@ -2025,14 +2025,14 @@ export const SCREENS = [
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'viewport', height: 1590,
     steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }, { click: '保存する' }],
-    verdict: 'needs_fix', verdictNote: 'P2 副題にタグ名が入らない。取り消し方の案内（マイル画面から手動で調整）が無い。「新規作成のときはこのダイアログは出ません」の注記が無い。表に見出し行を足したのは実装のほうが読みやすい',
-    verdictSource: 'friend-attributes-v6/VjXGX-1920.png', verdictHead: 'baeb644b',
+    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/VjXGX.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める',
+    verdictSource: 'friend-attributes-v6/VjXGX.txt', verdictHead: 'c275749d',
   },
   {
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
     dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
-    verdict: 'needs_fix', verdictNote: 'P2 設計は一覧に重なる小窓（フォルダを編集）、実装は別ページ。「一覧での表示」の見え方見本が無い。色の並びが設計と違う。「作成する場所（タグ／友だち情報欄）」は実装だけにある足し前',
-    verdictSource: 'friend-attributes-v6/byqIW-1920.png', verdictHead: 'baeb644b',
+    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/byqIW.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める',
+    verdictSource: 'friend-attributes-v6/byqIW.txt', verdictHead: 'c275749d',
   },
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
@@ -2047,7 +2047,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    verdict: 'needs_fix', verdictNote: 'P1（「dry-run」が画面に出ている）', verdictSource: 'v6-recheck-496-and-classification.md', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/KoT6c.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: 'c275749d',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
   },
   {
@@ -2061,8 +2061,8 @@ export const SCREENS = [
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'viewport', height: 1080,
     steps: [{ click: '削除', nth: 1, scope: 'main' }],
-    verdict: 'needs_fix', verdictNote: 'P1 何人に付いているか、どのマークへ置き換わるかを言わずに消せる。設計は「この対応マークを使用している3人は、削除後に「未対応」へ変更されます。元に戻せません。」',
-    verdictSource: 'friend-attributes-v6/zGZMA-1920.png', verdictHead: 'baeb644b',
+    verdict: 'needs_fix', verdictNote: '**P1 対応マークを消すとき、何人に付いているかも移り先も言わない。** ルート `/tags?tab=marks`。撮った本文の行は「マーク名／新規の初期値／いまの人数／自動で変わるとき」と「削除」で、**人数が空**（`rIhbN` と同じ根）。消す前に**何人から外れるのか**が分からない。設計は消す前に人数と移り先を出す。**新しい口が要る**（束11）ので、段1（`ConfirmDialog` 化）だけ先にはできない——**人数を出せないまま窓だけ作ると、空欄の窓になる**。取得元：`friend-attributes-v6/zGZMA.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friend-attributes-v6/zGZMA.txt', verdictHead: 'c275749d',
   },
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
@@ -2193,6 +2193,7 @@ export const CAPTURED_AT = {
     { pr: 496, head: '4dac7986', on: '2026-08-28', screens: ['s6MBc'], note: '#496 は #495 を含む' },
     { pr: 499, head: '642b8222', on: '2026-08-30', screens: ['s6MBc'], note: 'Claudeが作ったDraft。#496 の上に積んである。**head は動いたが撮り直していない**——`apps/web` の差分0件' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['s98Vfw', 'N46cQ', 'BmoGY', 'k8VCU'], note: 'development そのもので撮った' },
+    { pr: 582, head: '78e2f065', on: '2026-08-30', screens: ['vz0Ji'], note: '手で調整したときの失敗を日本語に。405を実際に起こして確かめた' },
   ],
   7: [
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
@@ -2276,6 +2277,7 @@ export const CAPTURED_AT = {
   11: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['W7LBc', 'GFlD7', 'FRkls', 'j9ixI', 'hsBtl', 'J3GxEZ'], note: '同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった' }],
   16: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' }],
   23: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' }],
+  4: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' }],
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },

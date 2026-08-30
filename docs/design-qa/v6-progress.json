@@ -7,8 +7,8 @@
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
-  "structureMatchDataPending": 16,
-  "needsFix": 202,
+  "structureMatchDataPending": 17,
+  "needsFix": 201,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -136,20 +136,30 @@
       "elsewhere": 4,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 16,
+      "structureMatchDataPending": 1,
+      "needsFix": 15,
       "unjudged": 0,
       "remaining": 17,
       "capturedAt": [
         {
-          "pr": 541,
-          "head": "e929f22a",
-          "on": "2026-08-29",
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
           "screens": [
-            "QKx8Q",
-            "XBkiQ"
+            "hqrOv",
+            "dKlkz",
+            "sfTEW",
+            "HBTk0",
+            "yKEdO",
+            "rIhbN",
+            "tP0RW",
+            "LfrQs",
+            "VjXGX",
+            "byqIW",
+            "KoT6c",
+            "zGZMA"
           ],
-          "note": "保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3"
+          "note": "判定を具体化するため撮り直した（本文が無かった）。development そのもの"
         }
       ]
     },
@@ -866,6 +876,15 @@
             "k8VCU"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 582,
+          "head": "78e2f065",
+          "on": "2026-08-30",
+          "screens": [
+            "vz0Ji"
+          ],
+          "note": "手で調整したときの失敗を日本語に。405を実際に起こして確かめた"
         }
       ]
     },
