@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error 画面確認用の固定データは素のJSで管理する。
-import {
-  FRIEND_ADD_LIFECYCLE_DRAFT,
-  FRIEND_ADD_LIFECYCLE_EMPTY,
-  FRIEND_ADD_LIFECYCLE_ERROR,
-  FRIEND_ADD_LIFECYCLE_PUBLISHED,
-  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
-  FRIEND_ADD_LIFECYCLE_VALIDATION,
-} from './fixtures.mjs';
+import { FRIEND_ADD_LIFECYCLE_DRAFT, FRIEND_ADD_LIFECYCLE_EMPTY, FRIEND_ADD_LIFECYCLE_ERROR, FRIEND_ADD_LIFECYCLE_PUBLISHED, FRIEND_ADD_LIFECYCLE_TEST_RESULT, FRIEND_ADD_LIFECYCLE_VALIDATION } from './fixtures.mjs';
 
 describe('友だち追加時配信の画面確認データ', () => {
   it('本物の下書き・確認・試験・公開契約と同じ項目を持つ', () => {
