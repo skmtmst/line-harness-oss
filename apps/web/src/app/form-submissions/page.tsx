@@ -530,7 +530,7 @@ export default function FormSubmissionsPage() {
                     <button
                       type="button"
                       onClick={() => openDelete(form)}
-                      className="rounded-md p-1 text-gray-300 opacity-60 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                      className="text-ink-faint hover:bg-danger-bg hover:text-danger rounded-md p-1 opacity-60 transition group-hover:opacity-100"
                       aria-label={`${normalizedName}を削除`}
                       title="回答フォームを削除"
                     >
