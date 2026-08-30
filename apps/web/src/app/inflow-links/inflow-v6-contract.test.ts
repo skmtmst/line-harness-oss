@@ -34,4 +34,13 @@ describe('V6 流入と計測', () => {
     expect(ads).toContain('}, [selectedAccountId])');
     expect(ads).toContain('LINEアカウントを選んでください');
   });
+
+  it('refコード付きの詳細URLから対象リンクを初期選択する', () => {
+    expect(detail).toContain("const requestedRefCode = searchParams.get('ref') ?? ''");
+    expect(detail).toContain('entryRoute.refCode === requestedRefCode');
+    expect(detail).toContain('api.entryRoutes.get(selectedId)');
+    expect(detail).toContain('api.entryRoutes.funnel(selectedId)');
+    expect(detail).toContain('api.entryRoutes.sources(selectedId)');
+    expect(detail).toContain('r.id === selectedId');
+  });
 });

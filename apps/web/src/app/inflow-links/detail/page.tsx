@@ -39,6 +39,7 @@ function InflowLinkDetailPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
+  const requestedRefCode = searchParams.get('ref') ?? ''
 
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [stats, setStats] = useState<Map<string, RefRouteStats>>(new Map())
@@ -54,6 +55,8 @@ function InflowLinkDetailPageContent() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const selectedId =
+    id || routes.find((entryRoute) => entryRoute.refCode === requestedRefCode)?.id || ''
 
   // 左のリンク一覧。流入件数を添えるので、集計も一緒に引く。
   useEffect(() => {
@@ -84,7 +87,7 @@ function InflowLinkDetailPageContent() {
 
   // 右の内訳。リンクを選び直すたびに引き直す。
   useEffect(() => {
-    if (!id) {
+    if (!selectedId) {
       setRoute(null)
       setFunnel(null)
       setSources([])
@@ -93,9 +96,9 @@ function InflowLinkDetailPageContent() {
     let cancelled = false
     setError('')
     void Promise.allSettled([
-      api.entryRoutes.get(id),
-      api.entryRoutes.funnel(id),
-      api.entryRoutes.sources(id),
+      api.entryRoutes.get(selectedId),
+      api.entryRoutes.funnel(selectedId),
+      api.entryRoutes.sources(selectedId),
     ]).then(([r, f, s]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoute(r.value.data)
@@ -106,7 +109,7 @@ function InflowLinkDetailPageContent() {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [selectedId])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const url = route ? `${workerBase}/r/${route.refCode}` : null
@@ -184,7 +187,7 @@ function InflowLinkDetailPageContent() {
           ) : (
             <ul className="space-y-1">
               {routes.map((r) => {
-                const active = r.id === id
+                const active = r.id === selectedId
                 const count = stats.get(r.refCode)?.friendCount ?? 0
                 return (
                   <li key={r.id}>
