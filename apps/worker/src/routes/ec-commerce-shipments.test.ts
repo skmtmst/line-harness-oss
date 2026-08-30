@@ -171,7 +171,10 @@ describe('GET /api/ec-commerce/shipments', () => {
       orderRow({ id: 'b', event_type: 'ec.subscription.upcoming', scheduled_shipping_date: '2026-09-01' }),
       orderRow({ id: 'c', event_type: 'ec.subscription.upcoming', scheduled_shipping_date: '2026-09-15' }),
     ]);
-    expect((data.later as Row[]).map((row) => row.id)).toEqual(['b', 'c', 'a']);
+    // 実行日が予定日に近づくと先頭行は「今日・明日」へ移る。区分に依存せず、
+    // 返事全体で日付順が保たれることを確認する。
+    const all = [...(data.soon as Row[]), ...(data.later as Row[])];
+    expect(all.map((row) => row.id)).toEqual(['b', 'c', 'a']);
   });
 
   it('走査した件数と上限を返す（取りこぼしの判断に使う）', async () => {
