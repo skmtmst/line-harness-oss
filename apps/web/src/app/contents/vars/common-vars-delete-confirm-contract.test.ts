@@ -11,6 +11,7 @@ describe('共通情報の削除確認', () => {
   it('ブラウザ標準の確認ではなく共通ダイアログを使う', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).not.toContain('confirm(')
+    expect(PAGE).toContain('data-qa-open="yPkWe"')
   })
 
   it('使用先を確認できた未使用の共通情報だけを確認画面へ進める', () => {
