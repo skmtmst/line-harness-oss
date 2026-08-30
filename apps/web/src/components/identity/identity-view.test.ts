@@ -72,6 +72,16 @@ describe('失敗の言い換え', () => {
     expect(failureOf({ status: 409, code: 'CANDIDATE_ALREADY_DECIDED' }).kind).toBe('stale')
   })
 
+  it('機械コードが取れなくても、409を「先を越された」として扱う', () => {
+    /*
+     * `extractApiErrorCode` はWorkerの `code`（大文字）を拾わないので、
+     * 画面へ届く `ApiError.code` は `undefined` になる。コードで見分ける
+     * 書き方だと、ここが黙って「表示できませんでした」に落ちる。
+     */
+    expect(failureOf({ status: 409, code: undefined }).kind).toBe('stale')
+    expect(failureOf({ status: 409 }).title).toBe('先に別の判定が入っています')
+  })
+
   it('内部の記号をそのまま画面へ出さない', () => {
     for (const input of [
       { status: 500, code: 'INTERNAL_ERROR' },

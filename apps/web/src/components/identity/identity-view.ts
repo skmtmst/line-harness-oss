@@ -146,10 +146,21 @@ export function failureOf(input: FailureInput): IdentityFailure {
       description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。',
     }
   }
-  if (input?.status === 409 && (input.code === 'STALE_CANDIDATE' || input.code === 'CANDIDATE_ALREADY_DECIDED')) {
+  /*
+   * **`code` では見分けられない。** `extractApiErrorCode` は本文の `error` が
+   * 英小文字のsnake_caseのときだけコードとして拾う。Workerは `error` に
+   * 日本語の文、`code` に `STALE_CANDIDATE` などを入れるので、画面へ届く
+   * `ApiError.code` は常に `undefined` になる。コードで見分ける書き方だと、
+   * ここが黙って「表示できませんでした」に落ちる。
+   *
+   * この読み口の409は種類がいくつかある（先を越された／すでに判定済み／
+   * 別の結び付けが先にある）が、**運用する人がすることは同じ**——
+   * 最新を読み直して見直す。だから状態番号だけで1つに寄せる。
+   */
+  if (input?.status === 409) {
     return {
       kind: 'stale',
-      title: '別の人が先に判定しました',
+      title: '先に別の判定が入っています',
       description: '最新の状態を読み直してから、もう一度判断してください。',
     }
   }
