@@ -4655,3 +4655,87 @@ export const AFFILIATE_PAYMENTS_EMPTY = {
   data: [],
   limitations: { payoutHistory: false, bankDestination: false, settlementSchedule: false },
 }
+
+/**
+ * 支払いを確定する（設計 `GqFTV` 16-1-H）。**Codexが実装する前の下ごしらえ。**
+ *
+ * **口もルートも「想定」で、正本ではない。** PRのheadが届いたら、まず実装の
+ * コードでルートと口と型を確かめてから使う。**推測したAPIパスを正本にしない。**
+ * - 想定ルート：`/conversions?tab=payment`（`njLGA` と同じ面の中の操作）
+ * - 想定の口：`GET /api/affiliate-payment-periods`
+ *
+ * **決まっていること（2026-08-30）を形にしてある：**
+ * - **締め済みの期間は変更しない。**`status: 'closed'` の行は金額が動かない
+ * - **返品は次の未締め期間へマイナス調整として入れる。**`adjustments` に
+ *   負の `amount` を持たせ、**どの締め済み期間の返品か**を `originPeriodId` で指す
+ * - `njLGA` と同じく **「未払い残高」とは書かない**。締める前は
+ *   `approvedReward`（承認済み報酬の合計）、締めたあとは `closedAmount`
+ *
+ * **実在する表から出せる範囲**：`conversion_events`（`approval_status`
+ * `approved_at` `affiliate_id`）、`affiliates`（`hold_days` `payout_cycle`）、
+ * `affiliate_offers`（`reward_amount`）。**期間の台帳そのものは新しく要る。**
+ *
+ * 入れてある場合分け：**締め済み1・未締め1・調整あり1・調整なし1**。
+ */
+export const AFFILIATE_PAYMENT_PERIODS = {
+  success: true,
+  data: [
+    {
+      periodId: 'ap-2026-07', from: '2026-07-01', to: '2026-07-31',
+      /* **締め済み。**金額は動かさない。 */
+      status: 'closed', closedAt: '2026-08-01T01:00:00.000Z', closedBy: '川野 健太',
+      closedAmount: 96000, closedConversions: 32,
+      adjustments: [],
+    },
+    {
+      periodId: 'ap-2026-08', from: '2026-08-01', to: '2026-08-31',
+      /* **まだ締めていない。**締めるまで金額は動く。 */
+      status: 'open', closedAt: null, closedBy: null,
+      closedAmount: null, closedConversions: null,
+      approvedReward: 111000, approvedConversions: 37,
+      adjustments: [
+        {
+          /* **7月分の返品。**締め済みの7月は直さず、8月へマイナスで入れる。 */
+          adjustmentId: 'adj-1', reason: '返品',
+          amount: -9000, conversions: -3,
+          originPeriodId: 'ap-2026-07', recordedAt: '2026-08-12T03:00:00.000Z',
+        },
+      ],
+    },
+  ],
+  /* `njLGA` と同じ穴。締めが入っても振込先はまだ無い。 */
+  limitations: { payoutHistory: false, bankDestination: false },
+}
+
+/** 締めの「0件」。**期間の台帳がまだ1本も無い状態。** */
+export const AFFILIATE_PAYMENT_PERIODS_EMPTY = {
+  success: true, data: [],
+  limitations: { payoutHistory: false, bankDestination: false },
+}
+
+/**
+ * コラム（設計 `ymXJK` 21-1-E）。**Codexが実装する前の下ごしらえ。**
+ *
+ * **列は推測ではない**——`nen_columns`（`bootstrap.sql:1458`）そのまま。
+ * **想定なのは管理画面から作る口だけ**（`POST /api/nen-campaigns/columns` と想定）。
+ * PRのheadが届いたら実装で確かめる。
+ *
+ * **決まっていること（2026-08-30）：V6は外部記事リンク方式。本文をDBに持たない。**
+ * よって `article_url` は必ず埋まり、本文の列は増やさない。いまの取り込み口
+ * （EC-CUBEからの署名付きWebhook）と同じ形で、管理画面からも作れるようにするだけ。
+ *
+ * 入れてある場合分け：**公開済み・下書き・画像なし・公開日未取得**。
+ */
+export const NEN_COLUMN_DRAFT = {
+  id: 'col-new', externalId: null, slug: 'summer-care-2026',
+  title: '夏のケアで気をつけたいこと',
+  category: 'お手入れ',
+  excerpt: '暑い時期に増えるご相談を、3つにまとめました。',
+  introText: '暑くなってきましたね。今月は夏のケアについてお届けします。',
+  articleUrl: 'https://example.co.jp/columns/summer-care-2026',
+  imageUrl: 'https://example.co.jp/img/summer-care.jpg',
+  /* **公開日が未取得。**`—` と出るべきで、今日の日付で埋めない。 */
+  publishedAt: null,
+  deliveryStatus: 'draft', deliveryAt: null,
+  createdAt: '2026-08-30T01:00:00.000Z', updatedAt: '2026-08-30T01:00:00.000Z',
+}
