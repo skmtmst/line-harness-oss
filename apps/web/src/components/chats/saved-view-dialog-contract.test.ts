@@ -39,4 +39,9 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(DIALOG).toContain('aria-invalid={nameMissing}')
     expect(DIALOG).toContain("aria-describedby={error ? 'saved-view-error' : undefined}")
   })
+
+  it('重複時は何が重なり、次に何を入力するかを案内する', () => {
+    expect(DIALOG).toContain('同じ名前の保存した検索があります。別の名前を入力してください。')
+    expect(DIALOG).not.toContain('同じ名前の検索がすでにあります。別の名前にしてください')
+  })
 })

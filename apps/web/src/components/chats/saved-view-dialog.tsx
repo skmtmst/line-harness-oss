@@ -76,7 +76,7 @@ export default function SavedViewDialog({
       return
     }
     if (existingNames.some((existing) => existing.trim() === trimmed)) {
-      setError('同じ名前の検索がすでにあります。別の名前にしてください')
+      setError('同じ名前の保存した検索があります。別の名前を入力してください。')
       return
     }
     setError('')
