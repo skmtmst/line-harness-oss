@@ -11,6 +11,7 @@ import {
   createFunnelVersion,
   createVersionedFunnel,
   evaluateChronologicalFunnel,
+  getLatestFunnelRun,
   getCurrentFunnelVersion,
   runChronologicalFunnel,
   validateFunnelComparisonGroups,
@@ -259,6 +260,12 @@ describe('V6ファネルの版・結果・一時対象者', () => {
     });
     expect(run).toMatchObject({ state: 'available', versionNumber: 2 });
     expect(run.groups[0].steps.map((step) => step.reached)).toEqual([1, 1]);
+    expect(await getLatestFunnelRun(db, 'account-a', created.funnelId)).toMatchObject({
+      runId: run.runId,
+      state: 'available',
+      versionNumber: 2,
+    });
+    expect(await getLatestFunnelRun(db, 'account-b', created.funnelId)).toBeNull();
     expect(sqlite.prepare(
       `SELECT friend_id FROM analytics_funnel_run_members WHERE run_id = ?`,
     ).all(run.runId)).toEqual([{ friend_id: 'friend-a' }]);
