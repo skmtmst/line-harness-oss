@@ -71,23 +71,31 @@ export default function AffiliatePaymentTab() {
     })
   }, [filter, items, query])
 
+  const summaryUnavailable = error && !loading
+
   return (
     <div className="space-y-4" data-payment-ledger="not-connected">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="承認済み報酬の合計"
-          value={summary.approvedReward}
+          value={summaryUnavailable ? null : summary.approvedReward}
           unit="円"
-          detail={`${summary.approvedPeople.toLocaleString('ja-JP')}人分・支払済みかは未取得`}
+          detail={summaryUnavailable
+            ? '読み込めませんでした'
+            : `${summary.approvedPeople.toLocaleString('ja-JP')}人分・支払済みかは未取得`}
           loading={loading}
         />
         <KpiCard
           title="保留期間内"
-          value={summary.heldReward}
+          value={summaryUnavailable ? null : summary.heldReward}
           unit="円"
-          detail={summary.unknownHold > 0 ? `確認できた分・${summary.unknownHold}件は承認日時未取得` : '承認日時と保留日数から集計'}
-          badge={summary.unknownHold > 0 ? '一部未取得' : undefined}
-          badgeTone={summary.unknownHold > 0 ? 'neutral' : undefined}
+          detail={summaryUnavailable
+            ? '読み込めませんでした'
+            : summary.unknownHold > 0
+              ? `確認できた分・${summary.unknownHold}件は承認日時未取得`
+              : '承認日時と保留日数から集計'}
+          badge={!summaryUnavailable && summary.unknownHold > 0 ? '一部未取得' : undefined}
+          badgeTone={!summaryUnavailable && summary.unknownHold > 0 ? 'neutral' : undefined}
           loading={loading}
         />
         <KpiCard
@@ -99,9 +107,9 @@ export default function AffiliatePaymentTab() {
         />
         <KpiCard
           title="支払い条件の覚書"
-          value={summary.cycleConfigured}
+          value={summaryUnavailable ? null : summary.cycleConfigured}
           unit="人"
-          detail="計算には使わないメモ"
+          detail={summaryUnavailable ? '読み込めませんでした' : '計算には使わないメモ'}
           loading={loading}
         />
       </div>
