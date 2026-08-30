@@ -2,7 +2,7 @@
 
 対象Nodeは `YfTfJ`、画面は `/contents` です。この枝は確認窓を作らず、
 Claudeが画面を実装するための読み口と安全な削除条件だけを追加します。
-固定baseは #560 head `7c1acd0f` です。
+契約PRは #610、固定baseは #560 head `7c1acd0f` です。
 
 ## 読む口
 
