@@ -119,6 +119,23 @@ describe('tenant creation and feature packs', () => {
     expect((await request('/api/tenants', { name: '拒否対象' }, staff)).status).toBe(403);
   });
 
+  it.each([
+    operator({ tenantId: 'another-tenant' }),
+    operator({ role: 'admin' }),
+    operator({ readOnly: true }),
+  ])('管理権限のない利用者による機能パック変更を403にする', async (staff) => {
+    const response = await app(staff).request(
+      `/api/tenants/${DEFAULT_TENANT_ID}/feature-packs`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ featurePacks: ['restaurant'] }),
+      },
+      environment(),
+    );
+    expect(response.status).toBe(403);
+  });
+
   it('機能パックを許可リストの値だけに変更する', async () => {
     const created = await request('/api/tenants', { name: 'パック変更対象' });
     const { data } = await created.json<{ data: { id: string } }>();
@@ -130,6 +147,16 @@ describe('tenant creation and feature packs', () => {
     expect(response.status).toBe(200);
     expect(testDb.raw.prepare('SELECT feature_packs FROM tenants WHERE id = ?').get(data.id))
       .toEqual({ feature_packs: '["restaurant"]' });
+  });
+
+  it.each([
+    { prefecture: '東京都' },
+    { representativeName: '代表者' },
+  ])('未対応の作成項目を400で拒否する', async (unsupportedField) => {
+    expect((await request('/api/tenants', {
+      name: '未対応項目を含む統括',
+      ...unsupportedField,
+    })).status).toBe(400);
   });
 });
 
@@ -145,6 +172,10 @@ describe('tenant status', () => {
     expect((await patchStatus(DEFAULT_TENANT_ID, status)).status).toBe(400);
   });
 
+  it('存在しない統括の状態変更を404にする', async () => {
+    expect((await patchStatus('missing-tenant', 'active')).status).toBe(404);
+  });
+
   it.each([
     operator({ tenantId: 'another-tenant' }),
     operator({ role: 'admin' }),
@@ -155,6 +186,15 @@ describe('tenant status', () => {
 });
 
 describe('tenant list', () => {
+  it.each([
+    operator({ tenantId: 'another-tenant' }),
+    operator({ role: 'admin' }),
+    operator({ readOnly: true }),
+  ])('管理権限のない利用者を403にする', async (staff) => {
+    const response = await app(staff).request('/api/tenants', {}, environment());
+    expect(response.status).toBe(403);
+  });
+
   it('archivedを通常は除外し、include_archived=1なら含める', async () => {
     testDb.raw.prepare(
       "INSERT INTO tenants (id, name, status) VALUES ('archived-tenant', '保管済み', 'archived')",
