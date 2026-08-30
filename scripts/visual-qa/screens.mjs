@@ -224,8 +224,8 @@ export const SCREENS = [
   },
   // 未読の会話が並んだ状態。開かずにそのまま撮る。
   { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読',
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 新着・担当者別未読の面が設計とそろわない（担当ごとの束ね方）。1440・1920とも横スクロール0',
-    verdictSource: 'inbox-v6/f0zn6.txt + inbox-v6/design-qa.md', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**P2 担当者ごとに束ねる面が無い。** ルート `/chats`。実装は1本の一覧に「担当者：すべて」の絞り込みが付くだけで、**担当ごとに分けて並べる形になっていない**（撮った本文でも行の末尾に `K Kenta` `M Masato` `未 未割り当て` が付くだけ）。設計の 2-5 は担当ごとの束と、その束ごとの未読数。P2 帯は 要返信1件／最長1時間12分待ち／自分が担当0件／今日の受信0件／メール0件／期限超過1件 の6つで、設計の並びと合わせる。**帯の「要返信 1件」と対応ルールのタブ「要返信 3」が食い違うが、これは撮影用の固定データが別々の口から来ているためで、実装の不具合ではない。** 取得元：`inbox-v6/f0zn6.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'inbox-v6/f0zn6.txt', verdictHead: 'c275749d',
   },
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
@@ -727,7 +727,7 @@ export const SCREENS = [
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: '**画面全体は要修正のまま。** P1 作成の段の構造が無い。設計は段ごとに 対象の絞り込み・停止条件・配信予定の下見・テスト送信・最終確認へ進むが、実装にあるのは1段目の入力だけ（段の実装は #551 が別に進めている。`s7T2dz` ほか5枚を見る）。**画面全体の一致判定は行っていない。** ／ **#429 の受入条件だけは確認済み**（新head `0f612926`。**撮り直していない**——`reminders/new/page.tsx` `edit/page.tsx` `lib/api.ts` の blob が旧head `838116b4` と同一で、差分は Worker の `feature-settings.ts` と試験と反映履歴だけ）。①既存フォルダを選べる（`api.folders.list(\'reminder\')` の結果を `<option>` に並べる）②選んだ `folderId` が保存の口へ渡る（`api.reminders.create({ folderId: folderId || null })`）③再読み込みが動く（`foldersReloadToken` を増やして読み直す。失敗のときだけ「フォルダを再読み込み」が出る）④**取得できて0件と、取得失敗を混ぜない**——`foldersLoadState` が `loading|ready|error` の3つで、失敗のときは選べなくして「フォルダを読み込めませんでした。未取得と0件を区別するため、選択を止めています。」と書く。0件のときは「未分類」だけが選べる ⑤**別アカウントのフォルダは混ざりようがない**——`folders` 表に `line_account_id` が無く（`bootstrap.sql:899`）、`getFolders` も `WHERE kind = ?` だけ。**アカウント別フォルダという概念が設計に無い**ので、混ぜる余地が無い（「正しく絞れている」ではない）', verdictSource: 'reminders-v6/design-qa.md + #429 head 0f612926 のコード' , verdictHead: '0f612926' },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
-    verdict: 'needs_fix', verdictNote: 'P1 通知ステップ編集の面が設計とそろわない', verdictSource: 'reminders-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P1 通知ステップ編集の面が設計とそろわない。** ルート `/reminders/edit?id=reminder-3`。設計 7-1-B は、起点からの相対時刻（○日前／○時間前）を段で並べ、各段に本文と差し込み（`{{name}}` `{{meet_url}}`）を持たせる。**判定は #? の head `9a72dba6` で撮った絵に基づくもので、本文の書き出しは残っていない**（この画面の `.txt` は取れていない）。**このNodeは development で撮り直していない**——`9a72dba6` に含まれる直しを古い head で巻き戻さないため。**残作業**：`9a72dba6` を含む枝で `--only J64xI` を撮り、本文から具体的な差を詰める。取得元：`reminders-v6/design-qa.md` ＋ `reminders-v6/J64xI-1920.png`', verdictSource: 'reminders-v6/design-qa.md + reminders-v6/J64xI-1920.png',
     route: '/reminders/edit?id=reminder-3',
     verdictHead: '9a72dba6',
   },
@@ -928,7 +928,7 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
   },
-  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差（配信内容の下見、条件の重なり）は `uLQQc` と同じ', verdictSource: 'friend-add-v6/txMO9.txt' , verdictHead: '2ab18c88' },
+  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: '**P2 友だち追加時の配信。作りは設計に近い。** ルート `/friend-add`。段は 1 はじめて友だち追加した人／2 以前からの友だち・ブロックを解除した人 に分かれ、それぞれ 配信するシナリオ・開始のタイミング（すぐに配信／シナリオの設定どおり）・あわせて実行すること を持つ。**良い点**：「決めていない（有効なシナリオを全部流す）」という**既定の挙動を選択肢の文言に書いている**。「流入元の記録は友だち追加のたびに必ず走るので、ここで指定する必要はありません」と、**やらなくていいことまで書いている**。**P2 残る差**：`uLQQc` と同じで、配信内容の下見（実際に届く文面）と、1・2の条件が重なったときどちらが効くかが出ない。取得元：`friend-add-v6/txMO9.txt`（#431 `2ab18c88` で撮った本文）。1440・1920とも横スクロール0', verdictSource: 'friend-add-v6/txMO9.txt' , verdictHead: '2ab18c88' },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
     verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差は `uLQQc` と同じ', verdictSource: 'friend-add-v6/U3SI5.txt',
@@ -1195,7 +1195,7 @@ export const SCREENS = [
     （見た目をアプリにそろえる方針にしたため、と画面に書いてある）。
   */
   { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム', verdict: 'needs_fix', verdictNote: '**画面全体は要修正のまま。** P1 一覧の列に「回答の保存先」（友だち情報欄3・タグ2）が無い。このフォームに答えると友だちの何が書き換わるかを一覧で読めない。**どこへ書いているかは、消す前・変える前にいちばん要る情報**。実装の札は名前・回答数・最終回答だけで、保存先を知るには1つずつ編集画面を開くことになる。P2 帯の4枚のうち「今月の回答」「回答率」は `page.tsx:331,335` で **`—` を直に書いている**（集計の経路が無いことを画面のコメントでも断っている）。断り方は正しいが、数は出ない ／ **#436 の受入条件は確認済み**（head `35c613a6`）。1440・1920とも横スクロール0。`undefined` / `Invalid Date` / `NaN` / 内部ID（`form-1` `sub-1` `friend-4`）はいずれも0件', verdictSource: 'forms-v6/EMBIK-1440.png' , verdictHead: '35c613a6' },
-  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 フォームを作る面が設計とそろわない', verdictSource: 'forms-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT, verdict: 'needs_fix', verdictNote: '**P1 タグの選び口が、フォルダ分けのない1本の長い並び。** ルート `/forms/edit?id=form-1`。撮った本文で「EC顧客連携済み…VIPタグ1〜13／ペットタグ1〜12／会員タグ1〜9…」が**平らに全部**出る。友だち一覧のタグはフォルダで束ねているのに、ここだけ束ねない。**P1 ブロックの種類が設計より少ない**——実装は テキスト／ラジオボタン／チェックボックス／プルダウン／ファイル／日付／都道府県。設計の 数値・メール・電話・画像・住所自動入力 が無い。**良い点**：日付ブロックが「回答の登録先」で友だち情報欄を選べ、さらに「この日付からリマインダを起動する」でリマインダをつなげられる（設計どおり）。「回答データの見出し：next_visit」も出る。取得元：`forms-v6/vCqUj.txt`。1440・1920とも横スクロール0', verdictSource: 'forms-v6/vCqUj.txt' , verdictHead: 'c275749d' },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
     gap: 'drop',
@@ -1225,7 +1225,7 @@ export const SCREENS = [
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
-  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: 'P1 一覧に「使われている場所」の数が出ない。共通情報は1か所直すと差し込んでいる全部の文が同時に変わるので、どこで使われているかが要る', verdictSource: 'common-vars-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: '**P1 一覧に「使われている場所」の列が無い。** ルート `/contents/vars`。列は 共通情報名／種別／値／スケジュール の4つだけ（撮った本文どおり）。共通情報は1か所直すと差し込んでいる全部の文が同時に変わるので、**消す前・変える前に「何か所で使っているか」が一覧で見えないと危ない**。設計は「使用箇所」列を持つ。**良い点**：差し込み名（`{{var.会社名}}`）を名前の下に出す、値が空のものは「（空）」と書く、予約された変更を「2026/09/30(水) 15:00 から → （空）」と出す、フォルダを消したときの行き先を注記で断る——いずれも設計どおり。**推奨修正**：一覧に使用箇所数の列を足す（`uNBlA` の影響確認と同じ口を使える）。取得元：`common-vars-v6/WuKzU.txt`。1440・1920とも横スクロール0', verdictSource: 'common-vars-v6/WuKzU.txt' , verdictHead: 'c275749d' },
   { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: 'P1 編集画面そのものには、どこで使われているかが1つも出ない（名前・フォルダ・差し込み名・値・更新スケジュールだけ）。**ただし #548 で「保存」を押すと影響確認の面（`uNBlA`）へ進むようになった**ので、「どこが変わるか見えないまま保存する」状態ではなくなった。P2 設計は値の下に「保存すると、下の15か所すべてが すぐに変わります」と常に出す。実装は押してから出る', verdictSource: 'common-vars-v6/uNBlA-1920.png' , verdictHead: 'c275749d' },
   {
     /*
@@ -1273,7 +1273,7 @@ export const SCREENS = [
       常に出ている**ので、同じ絵で突き合わせる。
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
-    verdict: 'needs_fix', verdictNote: 'P1 ファイルを入れる面が独立しておらず、一覧と同じ画面にある', verdictSource: 'media-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 ファイルを入れる面が一覧と同じ画面にある。** ルート `/media`。設計は入れる面を独立させるが、実装は一覧の頭にドロップ欄を置く。**実務上は困らない**ので P1 から P2 へ下げる。**良い点**：入れる前に上限を全部出す（画像10MB・音声30MB・動画90MB・PDF20MB）、「中身の形式とファイル名の拡張子が食い違うものは保存できません」と断る、「公開リンクが作られるため、個人情報の取り扱いに注意してください」を出す、行ごとに「使用箇所」を持つ。**P1 上限を超えたファイルが一覧に残っている**——「店内のようす.mp4 184.0 MB」は動画90MBの上限を超える。撮影用の固定データが上限を無視して作られているためで、実装の不具合ではないが、**上限を超えた行をどう見せるかは決まっていない**。取得元：`media-v6/eXAJP.txt`。1440・1920とも横スクロール0', verdictSource: 'media-v6/eXAJP.txt',
     verdictHead: 'c275749d',
   },
   {
@@ -1446,10 +1446,10 @@ export const SCREENS = [
     実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
   */
   { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と1つずつ突き合わせた。** P1 帯が設計と違う。設計は 流入元24本／今月312人（経路が分かる289人）／クリック8,420回／平均の追加率6.4% の4つ。実装は 流入元1件・今月の追加 **`—人`「前月比は出せません」**・クリック3,480回・平均の追加率4% で、**「経路が分かる何人か」が出ない**（設計はそこを分けて出す）。未取得を `—人` にして理由を書くのは正しい。P2 **タブに件数が付かない**（設計は「流入経路 24 / 広告連携 3」）。P2 **「まとめて操作」「CSVで書き出す」が無い**（本文を数えて0件）。P2 左のフォルダの縦帯が、設計はフォルダ、実装はジャンルで別の作り。1440・1920とも横スクロール0、壊れ値・内部語0件', verdictSource: 'inflow-v6/Q4bkTg.txt + inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: 'P1 サイトスクリプトの面が設計とそろわない。18-1 全体の差（タブに件数が付かない・帯4つの作りが違う・左のフォルダの縦帯が無い・まとめて操作/CSVが無い）がここにも効く', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: '**P2 サイトスクリプトの面。前のP1（帯が数を偽る）は解決している。** ルート `/inflow-links?tab=script`。**取れていない値を `—件`、数えて0のものを `0` と言い分けている**（「今日の計測 —件／ページ閲覧 0」「友だちと結びついた —件」「設置ページ —種類／計測イベント 0」）。「まだ記録が届いていません／コードを貼ってから数分で届きはじめます。」も、空を失敗と混ぜずに次の行動を出していて良い。**P2 残る差**：18-1 全体の差（タブに件数が付かない・帯4つの作りが違う・左のフォルダの縦帯が無い・まとめて操作／CSVが無い）がここにも効く。**P2 貼るコードのURLが撮影環境のもの**（`http://127.0.0.1:8788/...`）——本番では自ドメインになるはずで、画像に出た値は環境由来。取得元：`inflow-v6/IhSBB.txt`。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/IhSBB.txt' , verdictHead: 'c275749d' },
   { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 「Meta広告とつながっています／成果の送信 有効・成果が起きたその場で送ります」と、いまの状態を先に書く。**送っている中身も明記**（「お客様の名前やメールアドレスは送っていません。クリックIDと成果の名前だけを送ります」）。P2 設計の「Yahoo!広告 つないでいません」から**つなげる**導線が無い（本文に「つなげる」0件）。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/v0HaI.txt + inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: 'P1 流入リンクをつくる面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: 'P1 流入元の詳細の面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: '**P2 リンクを発行する面。作りは設計に近い。** ルート `/inflow-links/new`。段は 1 どのリンクか（フォルダ・リンク名・refコード）／2 このリンクから友だちになったとき（タグを自動で付ける）。**良い点**：refコードに「半角英小文字・数字・ハイフンで2〜64文字」「あとから変えられません。配ったURLが使えなくなるためです。」と、**なぜ変えられないかまで書いている**。**P1 タグの選び口がフォルダ分けのない1本の長い並び**（`vCqUj` と同じ。VIPタグ1〜13・ペットタグ1〜12…が平らに出る）。**P2 設計との差**：友だち追加後に流すシナリオの指定と、発行後のQR/短縮URLの出し方がこの面に無い。取得元：`inflow-v6/TEVk8.txt`。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/TEVk8.txt' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: '**P1 リンクを選ぶまで中身が何も出ない。** ルート `/inflow-links/detail?ref=summer-ig`。**`ref=summer-ig` を付けて開いても「左からリンクを選んでください。」のまま**で、URLで指したリンクが選ばれない。設計はそのリンクの内訳（流入→友だち追加→クリック→CV）を最初から出す。**P2 一覧側は良い**——「夏のInstagram投稿 SNS ・ 86件の流入」のように、フォルダと流入数を並べて出す。「春のキャンペーン 未分類 ・ 0件の流入」も、**0を `—` と混ぜずに `0件`** と書けている。**推奨修正**：`ref` の値を初期選択に反映する。取得元：`inflow-v6/JupxW.txt`。1440・1920とも横スクロール0', verdictSource: 'inflow-v6/JupxW.txt' , verdictHead: 'c275749d' },
   {
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     gap: 'api',
@@ -1474,7 +1474,7 @@ export const SCREENS = [
 
   // ── 機能19 コンバージョン ───────────────────────────────
   { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」）', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: 'P1 レポートの面が設計とそろわない。詳しくは conversions-v6/design-qa.md の「GUxsj レポート — P1」', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: '**P1 レポートのタブを開くと、成果地点（CV）の表がそのまま出る。** ルート `/conversions?tab=report`。撮った本文はタブ5本と「成果地点（CV）名／種別／CV数／金額」の表で、**「成果地点（CV）」タブ（`sZLDm`）と同じ中身**。設計のレポートは期間で区切って アフィリエイター別／案件別／時系列 を出す面で、CV一覧ではない。**良い点**：金額が無いものを `—`、CV数0のものを `0` と言い分けている（「資料ダウンロード 58 —」「旧キャンペーンの申込 0 —」）。合計 ¥1,284,000 も出る。**推奨修正**：レポートのタブに期間の選び口と集計軸の切り替えを置く。取得元：`conversions-v6/GUxsj.txt`。1440・1920とも横スクロール0', verdictSource: 'conversions-v6/GUxsj.txt' , verdictHead: 'c275749d' },
   { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     /*
@@ -1540,7 +1540,7 @@ export const SCREENS = [
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
-  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'needs_fix', verdictNote: 'P0 写真審査の一覧が設計とそろわない（元の判定を引き継いでいる。中身は photos-v6/design-qa.md を見る）', verdictSource: 'photos-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'needs_fix', verdictNote: '**P2 写真審査の一覧。作りは設計に近い。P0から下げる。** ルート `/photos`。帯4つ（未審査3件／承認済1件／見送り1件／投稿の合計5件）に**それぞれ説明が付き**、タブも「審査待ち（3）採用済み（1）見送り（1）すべて（5）」と件数を持つ。行は 投稿者・日時・状態・本文・「見送る」「採用して5pt付与」。**良い点**：本文が無い投稿を「コメントなし」と書き、空欄にしていない。付与するマイル数をボタンの文言に出している。**P2 残る差**：設計は審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。実装は「審査ルールを設定」への導線まで。**写真そのものは撮影用の固定データで、実在の投稿ではない。** 取得元：`photos-v6/Qu6Vk.txt`。1440・1920とも横スクロール0', verdictSource: 'photos-v6/Qu6Vk.txt' , verdictHead: 'c275749d' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
     gap: 'api',
@@ -1714,7 +1714,7 @@ export const SCREENS = [
     steps: [{ click: 'こちらから送る' }],
     verdictHead: 'c6fd4388',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: 'P1 こちらで受け取る面が設計とそろわない。見本から作る道が無い', verdictSource: 'webhooks-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**P1 見本から作る道が無い。** ルート `/webhooks`。受信Webhookの追加は名前とソースタイプを自分で決める形で、**設計の「予約サービス」「アンケートツール」といった見本を選んで作る道が無い**。**P2 タブの言葉に内部の語が残る**——「受信 (Incoming)」「送信 (Outgoing)」。同じ言い回しは #545 で `k3WxrO` が「こちらから送る」へ直っているので、**ここだけ直っていない**。**良い点**：シークレットを「設定済」「未設定」とだけ書き、**値そのものを画面に出していない**（秘密値を出さない決めごとを守れている）。**P2 エンドポイントURLが撮影環境のもの**（`http://localhost:3180/...`）——環境由来で実装の不具合ではない。取得元：`webhooks-v6/M0Gb7.txt`。1440・1920とも横スクロール0', verdictSource: 'webhooks-v6/M0Gb7.txt' , verdictHead: 'c275749d' },
   {
     /*
       **#547 で「やり取りの記録」タブが入った。**
@@ -1857,7 +1857,7 @@ export const SCREENS = [
   */
   { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'needs_fix', verdictNote: 'P1 タブの分けかたが違う。設計は「メニュー8／受付枠／休業日／予約のルール」を1つの帯に並べるが、実装はメニューと担当スタッフの2タブで、**受付枠と休業日は /booking/staff/shifts の別ルート**。予約管理の画面からは飛べるが、予約設定の画面のタブには出てこない。「予約のルール」（先の予約が取れる範囲・締め切り・キャンセル期限）は BookingMenu が持っている（booking_window_days / cutoff_hours_before / cancel_deadline_hours_before）のに、**メニューごとに散っていてまとめて見る場所が無い**。P2 帯が設計と違う（設計は 出しているメニュー6つ／いちばん選ばれた トリミング小型犬142件／受け付けている時間9:00〜19:00／先の予約が取れる範囲60日先まで）。枠の稼働率が—なのは、受付時間の総枠数を数える仕組みが無いためで、正直な出し方', verdictSource: 'booking-settings-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: '**#517 `43d3d20e` で撮った。** 「スタッフごとの受付時間を決めます。**Googleカレンダーをつなぐと、そちらの予定が入っている時間は自動で受付を止めます。**」と、外の予定との関係を先に書く。「特別休業日を設定」「変更を保存」があり、編集する人を選ぶまでは何も出さない。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の受付時間は曜日×時間の格子で、休業日と重ねて見せる。実装は人ごとの一覧まで', verdictSource: 'booking-settings-v6/tksPc.txt' , verdictHead: '43d3d20e' },
-  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: 'P1 予約メニューをつくる面が設計とそろわない。予約のルールをメニューの中だけで決める形になっている', verdictSource: 'booking-settings-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: '**P2 予約のルールをメニューの中だけで決める形。設計より作りは細かい。** ルート `/booking/menus/new`。段は 1 お客様に見える情報（名前・所要時間・料金・分類・説明）／2 予約の受け方（同時に受けられる件数・受付期間・締め切り・キャンセル期限・後の空き時間）／3 このメニューを担当できる人。**良い点**：どの欄にも**何を入れる欄か**が添えてある（「同じ時間帯に何組まで受けるかです。」「片づけや移動の時間です。次の予約はこのぶん後ろから入ります。」「空欄なら制限なし。」）。**P2 設計との差**：設計は受付期間・締め切りを**予約設定側の共通ルール**に置き、メニューでは上書きだけを許す。実装はメニューごとに全部決める形なので、**メニューが増えるとルールがばらける**。取得元：`booking-settings-v6/GhOb3.txt`。1440・1920とも横スクロール0', verdictSource: 'booking-settings-v6/GhOb3.txt' , verdictHead: 'c275749d' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
@@ -1905,7 +1905,7 @@ export const SCREENS = [
 
   // ── 機能32 運用状態 ─────────────────────────────────────
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
-  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health', verdict: 'needs_fix', verdictNote: 'P1 健全性の6項目（LINE接続・月間配信数ほか）を、項目ごとに「確認する内容／結果／いまの数字／目安／最後の確認／中身を見る」で常に並べる形になっていない。「5分ごとに自動確認」「次は11:50に自動で確かめます」も無い', verdictSource: 'operations-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health', verdict: 'needs_fix', verdictNote: '**前のP1（6項目が常に並ばない）は解決している。** ルート `/emergency?tab=health`。撮った本文に「チェック結果／6項目を常に表示し、確認内容と最新結果を示します／5分ごと」とあり、**LINE接続・月間配信数・API・外部連携・Webhook・配信処理・友だち変化 の6項目が結果ごと並ぶ**。数字も添う（「残り197通 / 上限200通（残り98%）」「24時間以内の受信148件」「予約1件・送信中0件」「追加0人・ブロック0人」）。**P2 残る差**：項目ごとの **目安（しきい値）／最後の確認／中身を見る** の3列が無く（本文に「目安」は0件）、設計の「次は11:50に自動で確かめます」のような**次回時刻**も出ない（「5分ごとに自動確認」までで、次がいつかは書かない）。**推奨修正**：項目の行を6列（確認する内容／結果／いまの数字／目安／最後の確認／中身を見る）に広げ、帯に次回時刻を足す。取得元：`operations-v6/UgonK.txt`。1440・1920とも横スクロール0', verdictSource: 'operations-v6/UgonK.txt' , verdictHead: 'c275749d' },
   {
     /* 通常・読込・失敗を見る。**下見が取れないと停止を押せないはず**。 */
     ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control',
@@ -2281,6 +2281,7 @@ export const CAPTURED_AT = {
   16: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' }],
   23: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' }],
   4: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' }],
+  2: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' }],
   3: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'YzxU1'], note: '判定を具体化するため撮った' }],
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
