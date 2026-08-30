@@ -342,6 +342,35 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    タップの集計（`RW5Tb` の帯）。**一覧の既定（配列）だと落ちる**——
+    `RichMenuTapStats` は `{ from, to, byArea, byGroup, total }` の1件。
+    「空」は**押された記録が1つも無い**状態で、`total` は数えて0。
+  */
+  [/\/api\/rich-menu-groups\/tap-stats(\?|$)/, {
+    from: '2026-08-01', to: '2026-08-31', byArea: [], byGroup: [], total: 0,
+  }],
+  /*
+    LINE上のメニュー一覧（`RW5Tb` の「LINE 公式アカウントの現状」）。
+    **一覧の既定（配列）だと落ちる**——画面は `currentDefault` と `lineMenus`
+    を読む。「空」は**LINE側にメニューが1つも無い**状態。
+  */
+  [/\/api\/rich-menu-groups\/external(\?|$)/, { currentDefault: null, lineMenus: [] }],
+  /*
+    切替のつながり（`DIUbO` `NXdDk`・#509）。**一覧の既定（配列）だと落ちる**——
+    画面は `api.richMenuGroups.get(groupId)` の返り値を**1件の中身**として読む
+    （`connections/page.tsx:41`）ので、配列を渡すと `.pages` で落ちる。
+    「空」は**メニューは在るが、切替のページを1枚も持っていない**状態。
+  */
+  [/\/api\/rich-menu-groups\/(?!external|tap-stats)[^/?]+(\?|$)/, {
+    id: 'rmg-2', accountId: 'visual-qa-account', name: '夏キャンペーン',
+    chatBarText: 'キャンペーン', size: 'large', defaultPageId: null,
+    isDefaultForAll: false, status: 'draft', publishingAt: null,
+    targetingCondition: null, targetingPriority: 1, targetingEnabled: false,
+    folderId: null, displayOrder: 2, thumbnailR2Key: null,
+    updatedAt: '2026-08-22T00:00:00.000Z', createdAt: '2026-08-22T00:00:00.000Z',
+    pages: [],
+  }],
+  /*
     機能設定。**一覧の既定（配列）だと `visibleFeatureGroups` が落ちる。**
     `specializedFeatureKeys` を読むので、配列を渡すと `undefined.includes` になる。
     「空」は**何も出していないアカウント**——`features` が空で、専用機能も無い。
