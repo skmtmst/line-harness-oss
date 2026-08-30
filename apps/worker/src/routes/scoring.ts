@@ -14,12 +14,19 @@ import {
   updateMileageRule,
   deleteMileageRule,
   getMileageAdminOverview,
+  getMileageAdminHistory,
   applyMileageRulesForEvent,
+  getMileageManualAdjustmentPolicy,
+  setMileageManualAdjustmentPolicy,
+  postMileageAdjustment,
+  MileageAdjustmentError,
 } from '@line-crm/db';
-import type { MileageRuleRow } from '@line-crm/db';
+import type { MileageEntryStatus, MileageEntryType, MileageRuleRow } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 
 const scoring = new Hono<Env>();
 
@@ -46,12 +53,21 @@ function serializeMileageRule(rule: MileageRuleRow) {
 
 // ========== マイル管理 ==========
 
-scoring.get('/api/mileage/overview', requireRole('owner', 'admin'), async (c) => {
+scoring.get('/api/mileage/overview', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!accountScope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') || 50)));
     const offset = Math.max(0, Number(c.req.query('offset') || 0));
     const overview = await getMileageAdminOverview(c.env.DB, {
-      accountId: c.req.query('accountId') || null,
+      accountId,
+      visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
       limit: Number.isFinite(limit) ? limit : 50,
       offset: Number.isFinite(offset) ? offset : 0,
@@ -62,6 +78,225 @@ scoring.get('/api/mileage/overview', requireRole('owner', 'admin'), async (c) =>
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+const MILEAGE_ENTRY_TYPES = new Set<MileageEntryType>([
+  'grant', 'reversal', 'spend', 'expiration', 'adjustment',
+]);
+const MILEAGE_ENTRY_STATUSES = new Set<MileageEntryStatus>(['pending', 'available', 'void']);
+const MILEAGE_MODES = new Set(['automatic', 'manual'] as const);
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!accountScope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const entryTypeValue = c.req.query('entryType');
+    const statusValue = c.req.query('status');
+    const modeValue = c.req.query('mode');
+    const fromValue = c.req.query('from')?.trim();
+    const toValue = c.req.query('to')?.trim();
+    if (entryTypeValue && !MILEAGE_ENTRY_TYPES.has(entryTypeValue as MileageEntryType)) {
+      return c.json({ success: false, error: 'entryType is invalid' }, 400);
+    }
+    if (statusValue && !MILEAGE_ENTRY_STATUSES.has(statusValue as MileageEntryStatus)) {
+      return c.json({ success: false, error: 'status is invalid' }, 400);
+    }
+    if (modeValue && !MILEAGE_MODES.has(modeValue as 'automatic' | 'manual')) {
+      return c.json({ success: false, error: 'mode is invalid' }, 400);
+    }
+    if ((fromValue && !DATE_ONLY.test(fromValue)) || (toValue && !DATE_ONLY.test(toValue))) {
+      return c.json({ success: false, error: 'from and to must be YYYY-MM-DD' }, 400);
+    }
+    if (fromValue && toValue && fromValue > toValue) {
+      return c.json({ success: false, error: 'from must not be after to' }, 400);
+    }
+    const requestedLimit = Number(c.req.query('limit') || 50);
+    const requestedOffset = Number(c.req.query('offset') || 0);
+    const history = await getMileageAdminHistory(c.env.DB, {
+      accountId,
+      visibleAccountIds: accountScope.allowedAccountIds,
+      search: c.req.query('search') || '',
+      entryType: entryTypeValue as MileageEntryType | undefined,
+      status: statusValue as MileageEntryStatus | undefined,
+      mode: modeValue as 'automatic' | 'manual' | undefined,
+      from: fromValue || undefined,
+      to: toValue || undefined,
+      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50,
+      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+    });
+    return c.json({ success: true, data: history });
+  } catch (err) {
+    console.error('GET /api/mileage/history error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+const MILEAGE_ADJUSTMENT_REASON_CATEGORIES = new Set([
+  'customer_support',
+  'order_correction',
+  'grant_correction',
+  'campaign',
+  'other',
+]);
+
+scoring.get('/api/mileage/adjustment-policy', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
+    return c.json({
+      success: true,
+      data: policy
+        ? { configured: true as const, approvalThreshold: policy.approvalThreshold }
+        : { configured: false as const, approvalThreshold: null },
+    });
+  } catch (err) {
+    console.error('GET /api/mileage/adjustment-policy error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+scoring.put('/api/mileage/adjustment-policy', requireRole('owner'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; approvalThreshold?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    const approvalThreshold = Number(body.approvalThreshold);
+    if (!accountId || !Number.isInteger(approvalThreshold) || approvalThreshold <= 0) {
+      return c.json({ success: false, error: 'accountId and a positive integer approvalThreshold are required' }, 400);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    await setMileageManualAdjustmentPolicy(c.env.DB, accountId, { approvalThreshold });
+    auditLog(c, 'mileage.adjustment.policy.update', { kind: 'line_account', id: accountId });
+    return c.json({ success: true, data: { configured: true, approvalThreshold } });
+  } catch (err) {
+    console.error('PUT /api/mileage/adjustment-policy error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+scoring.post(
+  '/api/mileage/adjustments',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('mileage-adjustment'),
+  async (c) => {
+    try {
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+      if (!isValidIdempotencyKey(idempotencyKey)) {
+        return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      }
+      const body = await c.req.json<{
+        accountId?: unknown;
+        friendId?: unknown;
+        direction?: unknown;
+        amount?: unknown;
+        reasonCategory?: unknown;
+        reason?: unknown;
+        sourceReferenceId?: unknown;
+      }>();
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      const friendId = typeof body.friendId === 'string' ? body.friendId.trim() : '';
+      const direction = body.direction === 'increase' || body.direction === 'decrease'
+        ? body.direction
+        : null;
+      const amount = Number(body.amount);
+      const reasonCategory = typeof body.reasonCategory === 'string' ? body.reasonCategory.trim() : '';
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      const sourceReferenceId = typeof body.sourceReferenceId === 'string'
+        ? body.sourceReferenceId.trim()
+        : '';
+      if (!accountId || !friendId || !direction || !Number.isInteger(amount) || amount <= 0) {
+        return c.json({ success: false, error: 'accountId, friendId, direction and a positive integer amount are required' }, 400);
+      }
+      if (amount > 1_000_000_000) {
+        return c.json({ success: false, error: 'amount is too large' }, 400);
+      }
+      if (!MILEAGE_ADJUSTMENT_REASON_CATEGORIES.has(reasonCategory)) {
+        return c.json({ success: false, error: 'reasonCategory is invalid' }, 400);
+      }
+      if (!reason || reason.length > 500 || sourceReferenceId.length > 128) {
+        return c.json({ success: false, error: 'reason is required and one or more fields are too long' }, 400);
+      }
+
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.allowedAccountIds.includes(accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      const friend = await c.env.DB.prepare(
+        `SELECT id FROM friends WHERE id = ? AND line_account_id = ?`,
+      ).bind(friendId, accountId).first<{ id: string }>();
+      if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+
+      const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
+      if (!policy) {
+        return c.json({
+          success: false,
+          error: '高額調整の承認境界が未設定です。オーナーが先に設定してください。',
+          code: 'ADJUSTMENT_POLICY_REQUIRED',
+        }, 400);
+      }
+      if (amount >= policy.approvalThreshold) {
+        return c.json({
+          success: false,
+          error: `${policy.approvalThreshold.toLocaleString('ja-JP')} mile以上は別のオーナー承認が必要です。`,
+          code: 'OWNER_APPROVAL_REQUIRED',
+          data: { approvalThreshold: policy.approvalThreshold },
+        }, 400);
+      }
+
+      const staff = c.get('staff');
+      const signedAmount = direction === 'decrease' ? -amount : amount;
+      const result = await postMileageAdjustment(c.env.DB, {
+        friendId,
+        amount: signedAmount,
+        reason,
+        reasonCategory,
+        sourceReferenceId: sourceReferenceId || null,
+        idempotencyKey,
+        executedByStaffId: staff.id,
+        executedByStaffName: staff.name,
+        lineAccountId: accountId,
+      });
+      auditLog(c, 'mileage.adjustment.create', { kind: 'mileage_ledger', id: result.entry.id });
+      return c.json({
+        success: true,
+        data: {
+          entryId: result.entry.id,
+          balanceBefore: result.balanceBefore,
+          amount: result.entry.amount,
+          balanceAfter: result.balanceAfter,
+          replayed: result.replayed,
+        },
+      }, result.replayed ? 200 : 201);
+    } catch (err) {
+      if (err instanceof MileageAdjustmentError) {
+        if (err.code === 'insufficient_balance') {
+          return c.json({ success: false, error: '利用可能な残高を超えて減らすことはできません', code: err.code }, 400);
+        }
+        if (err.code === 'idempotency_conflict') {
+          return c.json({ success: false, error: '同じIdempotency-Keyが別の内容で使われています', code: err.code }, 409);
+        }
+        if (err.code === 'friend_not_found') {
+          return c.json({ success: false, error: 'Friend not found', code: err.code }, 404);
+        }
+      }
+      console.error('POST /api/mileage/adjustments error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 scoring.get('/api/mileage/rules', async (c) => {
   try {

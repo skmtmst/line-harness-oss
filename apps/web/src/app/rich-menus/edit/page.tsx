@@ -189,7 +189,9 @@ function Editor({
       const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
         api.tags.list(),
         api.templates.list(),
-        api.forms.list(),
+        group?.accountId
+          ? api.forms.list(group.accountId)
+          : Promise.resolve({ success: true as const, data: [] }),
         api.trackedLinks.list(),
         api.folders.list('rich_menu'),
       ])
@@ -213,7 +215,7 @@ function Editor({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [group?.accountId])
 
   const activePage = pages.find((p) => p.id === activePageId) ?? pages[0] ?? null
   const selectedArea =
