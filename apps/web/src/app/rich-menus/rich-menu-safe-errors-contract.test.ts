@@ -20,9 +20,13 @@ describe('V6 リッチメニューのエラー表示', () => {
   })
 
   it('一覧・並び替え・削除・LINEからの削除・取り込みを別の文にする', () => {
-    for (const action of ['load', 'reorder', 'delete', 'externalDelete', 'import']) {
+    for (const action of ['load', 'reorder', 'import']) {
       expect(PAGE).toContain(`richMenuError(e, '${action}')`)
     }
+    expect(PAGE).toContain(
+      "deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'",
+    )
+    expect(PAGE).toContain('setDeleteError(richMenuError(e, action))')
     expect(PAGE).toContain('リッチメニューを読み込めませんでした。')
     expect(PAGE).toContain('LINE上のリッチメニューを取り込めませんでした。')
   })

@@ -10,6 +10,7 @@ import type { Folder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Pagination from '@/components/shared/pagination'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -103,6 +104,10 @@ type LineMenu = {
   } | null
 }
 
+type DeleteTarget =
+  | { kind: 'managed'; group: RichMenuGroupListItem }
+  | { kind: 'external'; menu: LineMenu }
+
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
@@ -126,6 +131,9 @@ export default function RichMenusListPage() {
   const [page, setPage] = useState(1)
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
@@ -135,6 +143,9 @@ export default function RichMenusListPage() {
     setError(null)
     setExternalError(null)
     setApplyTo(null)
+    setDeleteTarget(null)
+    setDeleteBusy(false)
+    setDeleteError(null)
     setPage(1)
     if (!selectedAccount?.id) setLoading(false)
   }, [selectedAccount?.id])
@@ -234,7 +245,7 @@ export default function RichMenusListPage() {
     }
   }
 
-  async function handleDelete(group: RichMenuGroupListItem) {
+  function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
       alert(
         `「${group.name}」は LINE に登録されています。\n\n` +
@@ -242,31 +253,39 @@ export default function RichMenusListPage() {
       )
       return
     }
-    if (!confirm(`「${group.name}」を削除します。元には戻せません。`)) return
-    try {
-      const res = await api.richMenuGroups.delete(group.id)
-      if (!res.success) throw new Error('delete_failed')
-      await reload()
-    } catch (e) {
-      alert(richMenuError(e, 'delete'))
-    }
+    setDeleteError(null)
+    setDeleteTarget({ kind: 'managed', group })
   }
 
-  async function handleDeleteExternal(menu: LineMenu) {
+  function handleDeleteExternal(menu: LineMenu) {
     if (!selectedAccount?.id) return
-    if (
-      !confirm(
-        `LINE 上のリッチメニュー「${menu.name}」(richMenuId: ${menu.richMenuId.slice(0, 14)}...) を削除します。\n\n` +
-          'この管理画面外で作成されたメニューを LINE 公式アカウントから消します。元に戻せません。\n\n続行しますか？',
-      )
-    )
-      return
+    setDeleteError(null)
+    setDeleteTarget({ kind: 'external', menu })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deleteBusy) return
+    const action: RichMenuAction = deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'
+    setDeleteBusy(true)
+    setDeleteError(null)
     try {
-      const res = await api.richMenuGroups.deleteExternal(menu.richMenuId, selectedAccount.id)
-      if (!res.success) throw new Error('delete_failed')
+      if (deleteTarget.kind === 'managed') {
+        const res = await api.richMenuGroups.delete(deleteTarget.group.id)
+        if (!res.success) throw new Error('delete_failed')
+      } else {
+        if (!selectedAccount?.id) throw new Error('account_missing')
+        const res = await api.richMenuGroups.deleteExternal(
+          deleteTarget.menu.richMenuId,
+          selectedAccount.id,
+        )
+        if (!res.success) throw new Error('delete_failed')
+      }
+      setDeleteTarget(null)
       await reload()
     } catch (e) {
-      alert(richMenuError(e, 'externalDelete'))
+      setDeleteError(richMenuError(e, action))
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -707,6 +726,61 @@ export default function RichMenusListPage() {
           onClose={() => setApplyTo(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        designNode="szXsT"
+        title={
+          deleteTarget
+            ? `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
+            : 'リッチメニューを削除しますか？'
+        }
+        description={
+          deleteTarget?.kind === 'managed'
+            ? '管理画面に保存したこのリッチメニューを削除します。LINEに登録中のメニューは、先に取り下げない限り削除できません。'
+            : 'この管理画面外で作成されたリッチメニューを、LINE公式アカウントから削除します。'
+        }
+        confirmLabel={deleteTarget?.kind === 'external' ? 'LINEから削除' : '削除する'}
+        destructive
+        busy={deleteBusy}
+        error={deleteError ?? undefined}
+        onCancel={() => {
+          if (deleteBusy) return
+          setDeleteTarget(null)
+          setDeleteError(null)
+        }}
+        onConfirm={() => void confirmDelete()}
+      >
+        {deleteTarget?.kind === 'managed' ? (
+          <ul className="space-y-2 text-sm text-ink-secondary">
+            <li>
+              <strong className="text-ink">消えるもの：</strong>
+              このリッチメニューの設定と画像
+            </li>
+            <li>
+              <strong className="text-ink">残るもの：</strong>
+              同じフォルダのほかのメニューと、これまでのタップ記録
+            </li>
+            <li>
+              <strong className="text-danger">元に戻せません。</strong>
+            </li>
+          </ul>
+        ) : (
+          <ul className="space-y-2 text-sm text-ink-secondary">
+            <li>
+              <strong className="text-ink">消えるもの：</strong>
+              LINE公式アカウント上のこのリッチメニュー
+            </li>
+            <li>
+              <strong className="text-ink">残るもの：</strong>
+              管理画面で作成・編集しているほかのリッチメニュー
+            </li>
+            <li>
+              <strong className="text-danger">元に戻せません。</strong>
+            </li>
+          </ul>
+        )}
+      </ConfirmDialog>
     </main>
   )
 }
