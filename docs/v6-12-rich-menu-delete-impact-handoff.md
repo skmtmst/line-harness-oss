@@ -19,6 +19,7 @@ Claudeが確認窓を実装するための読み口と安全な削除条件だ�
   - `candidates` は実際の判定順と同じ候補順。先頭を「必ず次」と断定しない
 - `incomingSwitches` は、別のリッチメニューからこのメニューへ入る切替
 - `operationalReferences` は、現在版の自動処理と共通アクションからの参照
+  - 旧自動処理の `line_account_id = null` は全アカウントで動くため、参照があればここに含む
 - `lineResources` は、ページ数・LINE上の実体・全員の既定・公開処理中か
 - `blockers` が空のときだけ `canDelete=true`
 

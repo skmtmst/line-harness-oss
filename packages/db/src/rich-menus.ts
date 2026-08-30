@@ -426,7 +426,7 @@ export async function getRichMenuDeleteImpact(
            UNION
            SELECT 'automation', legacy.id, legacy.name
              FROM automations legacy
-            WHERE legacy.line_account_id = ?
+            WHERE (legacy.line_account_id = ? OR legacy.line_account_id IS NULL)
               AND legacy.is_active = 1
               AND EXISTS (
                 SELECT 1

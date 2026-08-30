@@ -250,4 +250,25 @@ describe('getRichMenuDeleteImpact', () => {
     expect(impact?.canDelete).toBe(false);
     expect(impact?.recommendedAction).toBe('review_references');
   });
+
+  test('全アカウントで動く旧自動処理の参照も削除影響に含める', async () => {
+    insertGroup(sqlite, { id: 'target', name: '消したいメニュー' });
+    insertPage(sqlite, 'target', 'target-page', 'line-target');
+    sqlite.prepare(
+      `INSERT INTO automations
+         (id, name, event_type, conditions, actions, is_active, priority, created_at, updated_at,
+          line_account_id)
+       VALUES ('global-automation', '全店共通の自動処理', 'friend_add', '{}', ?, 1, 0,
+               '2026-08-31T10:00:00.000', '2026-08-31T10:00:00.000', NULL)`,
+    ).run(JSON.stringify([{ type: 'switch_rich_menu', params: { richMenuId: 'line-target' } }]));
+    db = asD1(sqlite);
+
+    const impact = await getRichMenuDeleteImpact(db, 'target');
+
+    expect(impact?.operationalReferences).toEqual([
+      { kind: 'automation', ownerId: 'global-automation', ownerName: '全店共通の自動処理' },
+    ]);
+    expect(impact?.blockers).toContain('operational_references');
+    expect(impact?.canDelete).toBe(false);
+  });
 });
