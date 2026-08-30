@@ -743,6 +743,33 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: { audienceId: 'aud-1', friendCount: 42, state: 'available', stateReason: null } }
   }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  /*
+    流入リンクの詳細（`JupxW` `UIaM7`・#574）。**1件・ファネル・流入元の3つ。**
+    無いと一覧の既定（配列）が返り、画面が `route.refCode` で落ちる。
+
+    型は実装に合わせた——1件は `EntryRoute`、ファネルは `EntryRouteFunnel`
+    （`packages/shared/src/types.ts:838` の**スネークケース4つ**）、流入元は
+    `{ label, count }` の並び（`api.ts:4201`）。
+  */
+  {
+    const one = pathname.match(/^\/api\/entry-routes\/([^/]+)$/)
+    if (one) {
+      const row = ENTRY_ROUTES.find((r) => r.id === one[1])
+      return row ? { success: true, data: row } : { status: 404, body: { success: false, error: 'not found' } }
+    }
+    const funnel = pathname.match(/^\/api\/entry-routes\/([^/]+)\/funnel$/)
+    if (funnel) {
+      return { success: true, data: { click_count: 486, friend_add_count: 86, form_submission_count: 24, cv_count: 11 } }
+    }
+    const sources = pathname.match(/^\/api\/entry-routes\/([^/]+)\/sources$/)
+    if (sources) {
+      return { success: true, data: [
+        { label: 'instagram', count: 312 },
+        { label: 'lin.ee', count: 96 },
+        { label: '直接アクセス', count: 78 },
+      ] }
+    }
+  }
   if (pathname === '/api/entry-route-genres') return { success: true, data: ENTRY_ROUTE_GENRES }
   if (pathname === '/api/analytics/ref-summary') return { success: true, data: REF_SUMMARY }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
