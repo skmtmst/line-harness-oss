@@ -208,6 +208,45 @@ describe('V6分析の概要4画面', () => {
     expect(result.data).toMatchObject({ state: 'partial', automaticDeletion: false });
   });
 
+  it('使われ方の自動実行と手動送信は選択中アカウント・期間・テストを分ける', async () => {
+    sqlite.prepare(
+      `INSERT INTO automation_definitions (id, line_account_id, name, status)
+       VALUES ('automation-a','account-a','A','active'), ('automation-x','account-b','X','active')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO automation_versions (
+         id, automation_id, version_number, status, trigger_type
+       ) VALUES ('version-a','automation-a',1,'published','message'),
+                ('version-x','automation-x',1,'published','message')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO automation_runs (
+         id, line_account_id, automation_id, automation_version_id,
+         source_event_id, idempotency_key, status, is_test, started_at
+       ) VALUES ('run-a','account-a','automation-a','version-a','event-a','key-a','success',0,'2026-08-10'),
+                ('run-test','account-a','automation-a','version-a','event-t','key-t','success',1,'2026-08-11'),
+                ('run-old','account-a','automation-a','version-a','event-o','key-o','success',0,'2026-07-01'),
+                ('run-x','account-b','automation-x','version-x','event-x','key-x','success',0,'2026-08-10')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO messages_log (
+         id, friend_id, direction, message_type, content, source,
+         delivery_type, line_account_id, created_at
+       ) VALUES ('manual-a','friend-a','outgoing','text','a','manual','push','account-a','2026-08-12'),
+                ('test-a','friend-a','outgoing','text','a','manual','test','account-a','2026-08-12'),
+                ('manual-x','friend-x','outgoing','text','x','manual','push','account-b','2026-08-12')`,
+    ).run();
+
+    const result = await getAnalyticsUsageOverview(db, CONTEXT);
+    expect(result.data.summary).toMatchObject({
+      automaticRuns: { value: 1, state: 'partial' },
+      manualSends: { value: 1, state: 'available' },
+      estimatedHoursSaved: { value: 0.01, state: 'partial' },
+    });
+    expect(result.data.summary.automaticRuns.reason).toContain('オートメーションの実行記録だけ');
+    expect(result.data.summary.unusedItems.state).toBe('partial');
+  });
+
   it('URLクリックは取得開始前の到達人数を0件と断定しない', async () => {
     sqlite.prepare(
       `INSERT INTO tracked_links (id, name, original_url, line_account_id, short_code)
