@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 51,
+  "match": 52,
   "structureMatchDataPending": 18,
-  "needsFix": 166,
+  "needsFix": 165,
   "unjudged": 0,
-  "remaining": 207,
+  "remaining": 206,
   "features": [
     {
       "feature": 1,
@@ -213,11 +213,11 @@
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
-      "match": 2,
+      "match": 3,
       "structureMatchDataPending": 1,
-      "needsFix": 13,
+      "needsFix": 12,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 14,
       "capturedAt": [
         {
           "pr": 420,
@@ -281,6 +281,16 @@
             "KoT6c"
           ],
           "note": "入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた"
+        },
+        {
+          "pr": 605,
+          "head": "3b5098a3",
+          "on": "2026-08-31",
+          "screens": [
+            "l25rlp",
+            "ee0sk"
+          ],
+          "note": "Claudeが直した。連動OFF時の説明・★の切り替え方・OFFに戻したときの断り。#422 の上"
         }
       ]
     },
