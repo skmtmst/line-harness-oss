@@ -9,6 +9,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { daysUntilEvent, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -36,6 +37,15 @@ function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string
   if (status === 'loading') return '読み込み中'
   if (status === 'error') return '取得できませんでした'
   return readyDetail
+}
+
+function formatShortJpDate(iso: string | null): string {
+  if (!iso) return '日時未設定'
+  return new Date(iso).toLocaleDateString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Tokyo',
+  })
 }
 
 export default function EventsListPage() {
@@ -85,20 +95,9 @@ export default function EventsListPage() {
     return e.total_capacity != null && e.total_active >= e.total_capacity
   }
 
-  const kpi = useMemo(() => {
-    const open = items.filter((e) => e.is_published === 1)
-    const applied = items.reduce((sum, e) => sum + e.total_active, 0)
-    const capacity = open.reduce((sum, e) => sum + (e.total_capacity ?? 0), 0)
-    const filled = open.reduce((sum, e) => sum + e.total_active, 0)
-    return {
-      open: open.length,
-      applied,
-      // 受付中のイベントで、定員のうちどれだけ埋まったか。
-      // 定員なしのイベントは分母に入れられないので、混ぜずに省く。
-      rate: capacity > 0 ? Math.round((filled / capacity) * 100) : null,
-      pending: items.reduce((sum, e) => sum + e.pending_count, 0),
-    }
-  }, [items])
+  const attention = useMemo(() => summarizeEventAttention(items), [items])
+  const nearest = attention.upcoming[0]
+  const nearestLow = attention.lowApplications[0]
 
   const filtered = useMemo(() => {
     const q = query.trim()
@@ -121,7 +120,7 @@ export default function EventsListPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
-  const dataReady = loadStatus === 'ready'
+  const dataReady = Boolean(selectedAccountId) && loadStatus === 'ready'
 
   return (
     <div data-design-node="ugP5y">
@@ -133,28 +132,48 @@ export default function EventsListPage() {
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
-          title="イベント"
-          value={dataReady ? String(items.length) : '—'}
-          unit={dataReady ? '件' : ''}
-          detail={loadDetail(Boolean(selectedAccountId), loadStatus, `受付中 ${kpi.open}`)}
+          title="これからの回"
+          value={dataReady ? String(attention.upcoming.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            nearest ? `いちばん近いのは ${formatShortJpDate(nearest.next_slot_starts_at)}` : '予定されている回はありません',
+          )}
         />
         <Kpi
           title="申込"
-          value={dataReady ? String(kpi.applied) : '—'}
+          value={dataReady ? String(attention.applied) : '—'}
           unit={dataReady ? '人' : ''}
-          detail={loadDetail(Boolean(selectedAccountId), loadStatus, '累計')}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            attention.fillRate === null
+              ? '定員を確認できません'
+              : `定員${attention.capacity}人に対して ${attention.fillRate}%`,
+          )}
         />
         <Kpi
-          title="定員の充足"
-          value={dataReady && kpi.rate !== null ? String(kpi.rate) : '—'}
-          unit={dataReady && kpi.rate !== null ? '%' : ''}
-          detail={loadDetail(Boolean(selectedAccountId), loadStatus, '受付中のもの')}
+          title="あと少しで満席"
+          value={dataReady ? String(attention.nearlyFull.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            attention.nearlyFull.length > 0 ? '声をかけると埋まります' : '該当する回はありません',
+          )}
         />
         <Kpi
-          title="承認待ち"
-          value={dataReady ? String(kpi.pending) : '—'}
-          unit={dataReady ? '件' : ''}
-          detail={loadDetail(Boolean(selectedAccountId), loadStatus, '要対応')}
+          title="申し込みが少ない"
+          value={dataReady ? String(attention.lowApplications.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            nearestLow
+              ? `${formatShortJpDate(nearestLow.next_slot_starts_at)}の回。あと${daysUntilEvent(nearestLow) ?? '—'}日です`
+              : '該当する回はありません',
+          )}
         />
       </div>
 

@@ -20,4 +20,13 @@ describe('V6 イベント予約の件数状態', () => {
     expect(PAGE).toContain("filtered.length === 0")
     expect(PAGE).toContain("? '0件'")
   })
+
+  it('全体平均でなく、次に声をかける回を帯へ出す', () => {
+    expect(PAGE).toContain("title=\"これからの回\"")
+    expect(PAGE).toContain("title=\"あと少しで満席\"")
+    expect(PAGE).toContain('声をかけると埋まります')
+    expect(PAGE).toContain("title=\"申し込みが少ない\"")
+    expect(PAGE).toContain('daysUntilEvent(nearestLow)')
+    expect(PAGE).not.toContain('title="定員の充足"')
+  })
 })

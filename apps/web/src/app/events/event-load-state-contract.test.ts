@@ -24,8 +24,8 @@ describe('V6 イベント・申込者一覧の状態', () => {
   }
 
   it('イベント一覧は未取得のKPIを0件にしない', () => {
-    expect(EVENTS).toContain("value={dataReady ? String(items.length) : '—'}")
-    expect(EVENTS).toContain("value={dataReady ? String(kpi.applied) : '—'}")
+    expect(EVENTS).toContain("value={dataReady ? String(attention.upcoming.length) : '—'}")
+    expect(EVENTS).toContain("value={dataReady ? String(attention.applied) : '—'}")
     expect(EVENTS).toContain('登録したイベントは消えていません。')
   })
 
