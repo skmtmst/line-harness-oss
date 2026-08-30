@@ -116,6 +116,36 @@ function canonicalDraft(draft: IdentityCandidateDraft): IdentityCandidateDraft {
   };
 }
 
+const MASK_MARKER = /[*\u2022\u25cf\u2026]/;
+const RAW_EMAIL = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i;
+const SENSITIVE_LABEL = /(e-?mail|mail|\u30e1\u30fc\u30eb|phone|tel|\u96fb\u8a71)/i;
+
+function containsRawSensitiveValue(label: string, preview: string | null): boolean {
+  if (!preview) return false;
+  if (RAW_EMAIL.test(preview) && !MASK_MARKER.test(preview)) return true;
+  if (!SENSITIVE_LABEL.test(label)) return false;
+  const digits = preview.replace(/\D/g, '');
+  return digits.length >= 7 && !MASK_MARKER.test(preview);
+}
+
+function assertMaskedDraft(draft: IdentityCandidateDraft): void {
+  for (const subject of [draft.left, draft.right]) {
+    if (containsRawSensitiveValue('detail', subject.detail)) {
+      throw new IdentityCandidateError(422, 'UNMASKED_IDENTITY_VALUE', '\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9\u3084\u96fb\u8a71\u756a\u53f7\u306f\u30de\u30b9\u30af\u3057\u3066\u304f\u3060\u3055\u3044');
+    }
+    for (const attribute of subject.attributes) {
+      if (containsRawSensitiveValue(attribute.label, attribute.valuePreview)) {
+        throw new IdentityCandidateError(422, 'UNMASKED_IDENTITY_VALUE', '\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9\u3084\u96fb\u8a71\u756a\u53f7\u306f\u30de\u30b9\u30af\u3057\u3066\u304f\u3060\u3055\u3044');
+      }
+    }
+  }
+  for (const evidence of draft.evidence) {
+    if (containsRawSensitiveValue(`${evidence.key} ${evidence.label}`, evidence.valuePreview)) {
+      throw new IdentityCandidateError(422, 'UNMASKED_IDENTITY_VALUE', '\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9\u3084\u96fb\u8a71\u756a\u53f7\u306f\u30de\u30b9\u30af\u3057\u3066\u304f\u3060\u3055\u3044');
+    }
+  }
+}
+
 async function assertLineAccountTenant(
   db: D1Database,
   tenantId: string,
@@ -166,6 +196,7 @@ export async function upsertIdentityCandidate(
   if (draft.evidence.length === 0) {
     throw new IdentityCandidateError(422, 'EVIDENCE_REQUIRED', '根拠の無い候補は作れません');
   }
+  assertMaskedDraft(draft);
   await assertLineAccountTenant(db, draft.tenantId, draft.left.lineAccountId);
   await assertLineAccountTenant(db, draft.tenantId, draft.right.lineAccountId);
   await assertFriendScope(db, draft.tenantId, draft.right.id, draft.right.lineAccountId);
@@ -182,9 +213,19 @@ export async function upsertIdentityCandidate(
       throw new IdentityCandidateError(422, 'EC_ACCOUNT_MISMATCH', '別のLINEアカウントへ自動で結び付けられません');
     }
     const event = await db.prepare(
-      'SELECT id, source, customer_id FROM ec_events WHERE id = ?',
-    ).bind(draft.left.id).first<{ id: string; source: string; customer_id: string | null }>();
-    if (!event || event.source !== draft.sourceKey || event.customer_id !== draft.externalCustomerId) {
+      'SELECT id, source, customer_id, line_account_id FROM ec_events WHERE id = ?',
+    ).bind(draft.left.id).first<{
+      id: string;
+      source: string;
+      customer_id: string | null;
+      line_account_id: string | null;
+    }>();
+    if (
+      !event
+      || event.source !== draft.sourceKey
+      || event.customer_id !== draft.externalCustomerId
+      || event.line_account_id !== draft.left.lineAccountId
+    ) {
       throw new IdentityCandidateError(422, 'EC_EVENT_MISMATCH', 'ECのできごとと会員情報が一致しません');
     }
   }
@@ -354,8 +395,15 @@ export async function getIdentityCandidate(
       ORDER BY candidate_version DESC`,
   ).bind(id).all<DecisionRow>();
   const activeLink = await hasActiveLink(db, row);
+  const summary = listItem(row);
   return {
-    ...listItem(row),
+    id: summary.id,
+    kind: summary.kind,
+    status: summary.status,
+    version: summary.version,
+    confidence: summary.confidence,
+    left: summary.left,
+    right: summary.right,
     evidence: parseJson<IdentityCandidateEvidence[]>(row.evidence_json, []),
     impact: parseJson<IdentityCandidateImpactMetric[]>(row.impact_json, []),
     history: historyRows.results.map((item) => ({
@@ -369,6 +417,8 @@ export async function getIdentityCandidate(
         item.reprocess_scope_json ?? 'null', null,
       )?.mode ?? null,
     })),
+    detectedAt: summary.detectedAt,
+    reviewedAt: summary.reviewedAt,
     canDecide: DECIDABLE.has(row.status) && !activeLink,
     canUndo: activeLink || row.status === 'different' || row.status === 'deferred',
     undoNote: activeLink

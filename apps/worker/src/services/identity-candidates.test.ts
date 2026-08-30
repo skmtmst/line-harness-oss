@@ -28,9 +28,9 @@ function seed() {
   insertFriend(testDb.raw, 'friend-c', { line_account_id: 'account-a', display_name: '田中 花子' });
   testDb.raw.prepare(`
     INSERT INTO ec_events (
-      id, source, external_event_id, event_type, customer_id, line_user_id,
+      id, source, external_event_id, event_type, line_account_id, customer_id, line_user_id,
       payload, status, received_at, updated_at
-    ) VALUES ('event-a', 'eccube', 'external-a', 'ec.order.confirmed', 'customer-a',
+    ) VALUES ('event-a', 'eccube', 'external-a', 'ec.order.confirmed', 'account-a', 'customer-a',
       'U00000000000000000000000000000000', '{}', 'skipped', '2026-08-30', '2026-08-30')
   `).run();
   return testDb;
@@ -116,7 +116,23 @@ describe('identity candidate contract', () => {
     expect(ec).toMatchObject({ kind: 'ec_member', status: 'pending', version: 1 });
     expect(friend.impact[1].value).toBeNull();
     expect(ec.impact[1].value).toBe(0);
+    expect(friend).not.toHaveProperty('evidenceSummary');
     expect(JSON.stringify([friend, ec])).not.toContain('tanaka@example.jp');
+  });
+
+  it('rejects raw email addresses and phone numbers before saving a candidate', async () => {
+    const { db } = seed();
+    const rawEmail = friendDraft();
+    rawEmail.left.attributes[0].valuePreview = 'tanaka@example.jp';
+    await expect(upsertIdentityCandidate(db, rawEmail)).rejects.toMatchObject({
+      code: 'UNMASKED_IDENTITY_VALUE', status: 422,
+    });
+
+    const rawPhone = ecDraft();
+    rawPhone.left.attributes[0].valuePreview = '090-1234-5678';
+    await expect(upsertIdentityCandidate(db, rawPhone)).rejects.toMatchObject({
+      code: 'UNMASKED_IDENTITY_VALUE', status: 422,
+    });
   });
 
   it('keeps a different decision and does not put it back in the pending queue', async () => {
