@@ -15,9 +15,9 @@
   },
   "app/analytics/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 9,
-    "direct-th": 18,
-    "direct-secondary-button": 13
+    "arbitrary-value": 8,
+    "direct-th": 3,
+    "direct-secondary-button": 2
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,
@@ -245,7 +245,6 @@
     "direct-secondary-button": 1
   },
   "app/nen-members/page.tsx": {
-    "direct-secondary-button": 3,
     "arbitrary-value": 1
   },
   "app/page.tsx": {
@@ -302,7 +301,7 @@
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 6,
-    "direct-secondary-button": 10,
+    "direct-secondary-button": 9,
     "direct-primary-button": 3,
     "direct-th": 7
   },
@@ -317,9 +316,12 @@
     "direct-primary-button": 1
   },
   "app/scenarios/page.tsx": {
-    "direct-secondary-button": 5,
-    "direct-primary-button": 2,
+    "direct-secondary-button": 3,
+    "direct-primary-button": 1,
     "arbitrary-value": 1
+  },
+  "app/scenarios/results/page.tsx": {
+    "unresolved-classname": 23
   },
   "app/search-console/page.tsx": {
     "arbitrary-value": 11,
@@ -670,8 +672,7 @@
     "direct-primary-button": 3
   },
   "components/scenarios/scenario-list.tsx": {
-    "arbitrary-value": 3,
-    "direct-th": 9
+    "arbitrary-value": 3
   },
   "components/scenarios/schedule-input.tsx": {
     "unresolved-classname": 5
@@ -769,15 +770,14 @@
     "arbitrary-value": 9
   },
   "components/users/user-row.tsx": {
-    "arbitrary-value": 17,
-    "unresolved-classname": 1
+    "unresolved-classname": 1,
+    "arbitrary-value": 1
   },
   "components/users/users-filters.tsx": {
     "arbitrary-value": 11
   },
   "components/users/users-table.tsx": {
-    "arbitrary-value": 27,
-    "direct-th": 6
+    "arbitrary-value": 7
   },
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 16,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildDefaultColumnIntro, buildNenDeliveryMessages, buildNenFlexMessage } from './nen-engagement.js';
+import {
+  birthdayDeliveryTarget,
+  buildDefaultColumnIntro,
+  buildNenDeliveryMessages,
+  buildNenFlexMessage,
+  readNenCampaignSnapshot,
+} from './nen-engagement.js';
 
 const campaign = {
   campaign_key: 'shipping_confirmed',
@@ -16,6 +22,31 @@ const campaign = {
 };
 
 describe('buildNenFlexMessage', () => {
+  it('schedules birthday delivery at 10:00 JST three days before, including year boundaries', () => {
+    expect(birthdayDeliveryTarget(new Date('2026-08-27T15:00:00.000Z'))).toMatchObject({
+      issueYear: 2026, monthDay: '08-31', deliveryAt: new Date('2026-08-28T01:00:00.000Z'),
+    });
+    expect(birthdayDeliveryTarget(new Date('2026-12-28T15:00:00.000Z'))).toMatchObject({
+      issueYear: 2027, monthDay: '01-01', deliveryAt: new Date('2026-12-29T01:00:00.000Z'),
+    });
+  });
+
+  it('uses the copy fixed when the job was queued', () => {
+    const snapshot = JSON.stringify({ ...campaign, title: '予約時の見出し' });
+    const fixed = readNenCampaignSnapshot(snapshot, campaign.campaign_key);
+    expect(fixed?.title).toBe('予約時の見出し');
+
+    const changedCurrentSetting = { ...campaign, title: '後から編集した見出し' };
+    expect(buildNenDeliveryMessages(fixed!, {})).not.toEqual(
+      buildNenDeliveryMessages(changedCurrentSetting, {}),
+    );
+  });
+
+  it('rejects a snapshot belonging to another campaign', () => {
+    expect(readNenCampaignSnapshot(JSON.stringify(campaign), 'review_request')).toBeNull();
+    expect(readNenCampaignSnapshot(null, campaign.campaign_key)).toBeNull();
+  });
+
   it('keeps mandatory order facts while using editable campaign copy', () => {
     const message = buildNenFlexMessage(campaign, {
       event: {

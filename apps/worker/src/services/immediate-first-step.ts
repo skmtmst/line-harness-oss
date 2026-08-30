@@ -13,7 +13,7 @@ import {
   jstNow,
   toJstString,
 } from '@line-crm/db';
-import { LineClient } from '@line-crm/line-sdk';
+import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   buildMessage,
   expandVariables,
@@ -22,6 +22,7 @@ import {
 } from './step-delivery.js';
 import { decorateForFriendPush } from './auto-track.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
+import { buildQuestionMessages, parseQuestion } from './scenario-question.js';
 
 export interface ImmediatePushContext {
   defaultAccessToken: string;
@@ -291,10 +292,11 @@ export async function pushImmediateFirstStep(
       resolveStepContent(db, firstStep),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
+    const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
     const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
     const expanded = expandVariables(
       resolved.messageContent,
-      { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1],
+      friendWithMeta,
       ctx.workerUrl,
       resolved.messageType,
       extra,
@@ -304,18 +306,33 @@ export async function pushImmediateFirstStep(
     // caller-resolved channel — LIFF/OAuth entry points run BEFORE the follow
     // webhook wires friend.line_account_id, and an owner-less link would send
     // that account's friends through the global LIFF consent screen.
-    const decorated = await decorateForFriendPush(
-      db,
-      resolved.messageType,
-      expanded,
-      ctx.workerUrl,
-      { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId },
-    );
-    const sentMessage = buildMessage(decorated.messageType, decorated.content);
+    const question = parseQuestion(resolved.questionJson);
+    let messages: Message[];
+    if (question) {
+      messages = buildQuestionMessages(
+        {
+          ...question,
+          intro: question.intro
+            ? expandVariables(question.intro, friendWithMeta, ctx.workerUrl, 'text', extra)
+            : question.intro,
+          text: expandVariables(question.text, friendWithMeta, ctx.workerUrl, 'text', extra),
+        },
+        firstStep.id,
+      );
+    } else {
+      const decorated = await decorateForFriendPush(
+        db,
+        resolved.messageType,
+        expanded,
+        ctx.workerUrl,
+        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId },
+      );
+      messages = [buildMessage(decorated.messageType, decorated.content)];
+    }
 
     try {
       if (options?.reply) {
-        await options.reply.client.replyMessage(options.reply.replyToken, [sentMessage]);
+        await options.reply.client.replyMessage(options.reply.replyToken, messages);
       } else {
         const pushTarget = options?.targetLineUserId ?? friend.line_user_id;
         if (!pushTarget) {
@@ -332,7 +349,7 @@ export async function pushImmediateFirstStep(
           if (acct?.channel_access_token) accessToken = acct.channel_access_token;
         }
         const lineClient = new LineClient(accessToken);
-        await lineClient.pushMessage(pushTarget, [sentMessage]);
+        await lineClient.pushMessage(pushTarget, messages);
       }
     } catch (err) {
       // The message never left LINE's API — release so the cron retries on
@@ -353,23 +370,25 @@ export async function pushImmediateFirstStep(
     // Log what was actually delivered (post buildMessage normalization) so
     // the cooldown above sees it on subsequent calls and the dashboard chat
     // view mirrors LINE 1:1. delivery_type mirrors the send channel.
-    const logPayload = messageToLogPayload(sentMessage);
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?)`,
-      )
-      .bind(
-        crypto.randomUUID(),
-        friendId,
-        logPayload.messageType,
-        logPayload.content,
-        firstStep.id,
-        options?.reply ? 'reply' : null,
-        resolved.templateIdAtSend,
-        jstNow(),
-      )
-      .run();
+    for (const sentMessage of messages) {
+      const logPayload = messageToLogPayload(sentMessage);
+      await db
+        .prepare(
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at)
+           VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          friendId,
+          logPayload.messageType,
+          logPayload.content,
+          firstStep.id,
+          options?.reply ? 'reply' : null,
+          resolved.templateIdAtSend,
+          jstNow(),
+        )
+        .run();
+    }
 
     await settleAfterSend();
     settleAfterSend = null;
