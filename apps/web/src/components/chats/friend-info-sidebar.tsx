@@ -262,6 +262,28 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 )
               })}
             </div>
+            {/*
+              **戻す道が無いと、全部消したときに直せない。**
+              項目を全部隠すと右パネルが空になり、どれを隠したかも
+              画面から読めなくなる（設計 `Xi4x9` の「初期状態に戻す」）。
+            */}
+            <div className="border-hairline mt-2 flex items-center justify-between border-t pt-2">
+              <p className="text-ink-faint text-nano">
+                {hiddenSections.length === 0
+                  ? 'すべて表示しています'
+                  : `${hiddenSections.length}件を隠しています`}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSectionOrder(DETAIL_SECTIONS.map((item) => item.key))
+                  setHiddenSections([])
+                }}
+                className="text-accent text-nano font-bold"
+              >
+                初期状態に戻す
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -358,7 +380,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                         {mileage.summary.available.toLocaleString('ja-JP')}
                         <span className="text-ink-faint ml-1 text-[11px] font-semibold">mile</span>
                       </p>
-                      <p className="text-ink-faint text-[10px]">利用可能</p>
+                      <p className="text-ink-faint text-nano">利用可能</p>
                     </div>
                     {mileage.summary.pending > 0 && (
                       <span className="bg-canvas-sunken text-ink-secondary rounded-full px-2 py-1 text-[10px] font-medium">

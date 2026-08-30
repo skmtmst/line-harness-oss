@@ -14,7 +14,8 @@ const MENU = readFileSync(
 describe('保存した検索の行', () => {
   it('名前の下に条件を出す', () => {
     // 名前だけ並んでいると、どれを押せばよいか名前から推測することになる。
-    expect(PAGE).toContain('savedViewSummary(view.conditions, operators)')
+    // **決めつけて読まない**——古い形の保存でも落ちないよう、必ず通す。
+    expect(PAGE).toContain('savedViewSummary(normalizeSavedViewConditions(view.conditions), operators)')
   })
 
   it('消すを名前の隣に直に並べない', () => {
