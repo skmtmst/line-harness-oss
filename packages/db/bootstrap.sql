@@ -2590,7 +2590,7 @@ CREATE TABLE tenants (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, feature_packs TEXT NOT NULL DEFAULT '[]');
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
