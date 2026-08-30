@@ -212,7 +212,8 @@
     "203_saved_search_references.sql",
     "204_analytics_saved_results.sql",
     "252_template_questions.sql",
-    "257_identity_candidates.sql"
+    "257_identity_candidates.sql",
+    "258_merged_people_detail.sql"
   ],
-  "migrationCount": 213
+  "migrationCount": 214
 }

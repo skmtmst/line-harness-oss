@@ -23,6 +23,7 @@ import {
   FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
+  MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
 } from './fixtures.mjs'
 
@@ -370,6 +371,14 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? IDENTITY_CANDIDATE_EC
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
+  }
+  const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
+  if (mergedPerson) {
+    if (query.get('visualState') === 'error') return MERGED_PERSON_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: MERGED_PERSON_EMPTY }
+    }
+    return { success: true, data: MERGED_PERSON_DETAIL }
   }
   if (pathname === '/api/dashboard/preferences') {
     /*
