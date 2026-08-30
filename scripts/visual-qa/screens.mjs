@@ -1300,13 +1300,21 @@ export const SCREENS = [
   { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: '**P2 案件の一覧。作りは設計に近い。** ルート `/affiliates?tab=offers`。帯4つは 公開中の案件4件／今月の成果8件「確定した件数」／**支払い予定 29,800円「確定した報酬の合計」**／付与予定マイル 4,000mile「報酬をマイルで払う分」。**良い点**：「『何をしたら成果になり、いくら払うか』の組み合わせです。」と**案件が何かを一文で**書く。帯の副題が全部「何を数えたか」になっている。**P2 残る差**：設計 16-1-A は案件ごとに 成果数と支払い予定 を行に出すが、実装は帯の合計まで（列は 案件名／説明／報酬／マイル／対象）。**「支払い予定」の言葉は `njLGA` の決めごと（2026-08-30）と食い違う**——払った記録を持つ表がまだ無いので、正しくは**「確定した報酬の合計」**（副題のほうが正確）。**推奨修正**：帯の見出しを「確定した報酬の合計」にそろえる。取得元：`affiliates-v6/GH8VL.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/GH8VL.txt' , verdictHead: 'c275749d' },
   { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: '**P2 成果承認。行ごとの判定はできている。** ルート `/affiliates?tab=approvals`。札は 承認待ち／承認済み／却下済み。列は 日時／友だち／アフィリエイター／案件／CVポイント／金額／**フラグ**／操作（承認・却下）。**良い点**：**注意の要る行に `⚠` が付き、要らない行は `—`**（空欄にしていない）。友だちは表示名と `friend-4…` を並べ、**同名の別人を取り違えないようにしている**。**P1 却下の理由を残す場所が無い。** 押すとすぐ却下になり、あとから「なぜ落としたか」が分からない。**P2 まとめて承認する導線が無い**（1件ずつ）。**推奨修正**：却下に理由の入力を足す。まとめ承認は `hold_days` を超えた行だけに絞ると安全。取得元：`affiliates-v6/n5VVTb.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/n5VVTb.txt' , verdictHead: 'c275749d' },
   {
-    ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
-    gap: 'api',
-    gapNote: '締め日・支払日・振込先・未払い残高の表が要る',
-    status: 'unimplemented',
-    why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
-    verdictHead: 'ef7b5773',
-    verdictNote: '**判断済み（2026-08-30）：「未払い残高」ではなく「承認済み報酬の合計」と書く。振込先は 銀行・支店・種別・末尾4桁だけ。** ルート `/conversions?tab=payment`（想定）、読み口 `/api/affiliate-payments`（想定）。**Codexが実装中。PR番号とheadが届くまで、こちらは固定データと撮影手順の準備だけを行う。** **確かめた土台**：`conversion_events` が `affiliate_id` `approval_status`（pending/approved/rejected）`approved_at` を持ち、`affiliates` が `hold_days`（返品・キャンセルを見る保留日数）と `payout_cycle`（**覚書。計算には使わないと `095_affiliate_settlement.sql` に明記**）を持つ。報酬額は `affiliate_offers` 側（#558 で 定額／割合／なし の3通り）。**承認済みの合計はいまある表から出せる。** **払った記録がまだ無いので「未払い」とは書かない。** 振込先は `affiliates` に列が無く、**銀行名・支店名・口座種別・末尾4桁だけ**を持つ（口座番号の全桁と名義は画面に出さない）。**この画面はまだ未実装のまま。headを見るまで判定を変えない。**',
+    /*
+      **#585 で「支払い」のタブが入った。**正本は `/conversions?tab=payment` で、
+      旧ルート `/affiliates?tab=payment` は `router.replace` で正本へ送られる
+      （`affiliates/page.tsx:20`）。**比較が終わるまで `unimplemented` を外さない**
+      という指示に従い、撮り終えてから外した。
+    */
+    ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い', route: '/conversions?tab=payment',
+    /*
+      口は1つだけ（`/api/affiliate-payments`）。読込・0件・取得失敗を別々に撮る。
+      **保留日時の未取得は通常の絵で見る**——固定データの佐藤 個人が
+      `holdStatusUnknown: 2` を持ち、帯に「一部未取得」の札が出る。
+    */
+    states: { apis: ['**/api/affiliate-payments*'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: '**#585 `75d6eb9a` で「支払い」のタブが入った。撮り終えたので `unimplemented` を外した。** ルート `/conversions?tab=payment`（正本）。旧ルート `/affiliates?tab=payment` は `router.replace(\'/conversions?tab=payment\')` で正本へ送られる（`affiliates/page.tsx:20`）。通常・読込・0件・取得失敗の4状態を1440・1920で撮った（計8枚、**すべて横スクロール0**）。 **P0 取得に失敗したとき、帯が「0円」と出る。** 同じ画面の下では「承認済み報酬を0円とは扱っていません。状態を読み直してください。」と書いているのに、**すぐ上の帯は「承認済み報酬の合計 0円」「保留期間内 0円」「支払い条件の覚書 0人」**。**画面の中で言っていることが食い違う。** 0件のときの帯と**見分けがつかない**（両方とも 0円／0円／—／0人）。原因は `catch { setItems([]); setError(true) }` のあと、帯が `error` を見ずに `summary`（空配列の合計＝0）から描かれるため（`payment-tab.tsx:33-45` と `:76-108`）。**金額の画面でこれが起きると、払うものが無いと読み違える。** **推奨修正**：`error` のときは帯の `value` を `null` にして `—` を出し、`detail` を「読み込めませんでした」にする。表と同じ守りを帯にも付ける。 **満たしている条件（確かめ方つき）** ①**承認済みだけを数え、pending / rejected を含めない**——Workerの問い合わせが `LEFT JOIN conversion_events ... AND COALESCE(ce.approval_status,\'pending\') = \'approved\'`（`packages/db/src/affiliate-payments.ts`）。試験も見張っている（`pending` と `rejected` を入れたうえで `approvedConversions: 1` を要求）。**3件とも通ることを実際に走らせて確かめた。** ②**割合方式は成果金額×率、定額方式は案件の固定額**——`a.commission_rate > 0` なら `cp.value * rate / 100`、そうでなければ `off.reward_amount`。試験で 割合 ¥1,000／定額 ¥3,000 を確かめている。 ③**実値0は `0円`**——山あい商店が「¥0／承認済み 0件」と出る（`—` にしていない）。0件の状態でも帯は `0円` で正しい。 ④**保留期間内と承認日時未取得を混ぜない**——佐藤 個人の行が「¥3,000・1件／14日保留・**2件は承認日時を確認できません**」。帯にも**「一部未取得」の札**が付き、「確認できた分・2件は承認日時未取得」と書く。Worker側も `heldConversions`（`approved_at` あり・窓の中）と `holdStatusUnknown`（`approved_at` 無し）を別の列で返す。 ⑤**「未払い残高」「支払済み」「今年払った合計」を値として出していない**——出てくるのは「支払済みの記録がまだ無いため、ここでは『未払い残高』や『今年払った合計』を表示しません。」という**出さない理由の文**だけ。 ⑥**次の締め・振込先は作っていない**——「次の締め `—`／締め日を計算する設定は未接続」、表の振込先は全行「`—`／未接続」。 ⑦**支払い確定・振込CSVの操作が無い**——数えて0件。「振込先と締め処理は未接続です。この画面から支払いの確定や振込用CSVの作成はできません。」と断る。 ⑧**`undefined` `NaN` `Invalid Date` 内部ID `API error` `Failed to fetch` は4状態とも0件**（`affiliateId` の `aff-1` は画面に出ず、出るのは運用者が使う「コード tanaka」だけ）。 **P2 「現在の紹介者データは、すべてのLINEアカウントで共通です。」** と断っている。`affiliates` 表に `line_account_id` が無いためで、**穴を隠していない**のは良いが、店舗ごとに紹介者を分ける段になると作り直しが要る。 取得元：`affiliates-v6/njLGA-normal.txt` ＋ `-loading` `-empty` `-error` ＋ `packages/db/src/affiliate-payments.ts` ＋ `packages/db/test/affiliate-payments.test.ts`（実行して3件とも通過）',
+    verdictSource: 'affiliates-v6/njLGA-normal.txt + njLGA-error.txt + packages/db/src/affiliate-payments.ts', verdictHead: '75d6eb9a',
   },
   { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**P2 アフィリエイターを追加する。#558 で報酬の決め方が直り、作りは設計に近い。** ルート `/affiliates/new`。段は 1 どなたを登録するか（名前・屋号／連絡先メール／紹介コード）→ 報酬の決め方。**#558 で「報酬が売上×率でしか出ない」が直った**——**成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。**良い点**：紹介コードに「空欄にすると、推測されにくいコードを自動で作ります（そのほうが、他の人にコードを当てられにくくなります）」と**なぜ自動が良いか**まで書く。連絡先メールに「報酬の確定連絡に使います。」と用途を書く。**P2 残る差**：設計 16-1-D は 支払い条件（締め日・支払サイクル・振込先）もこの段で決めるが、実装は名前・連絡先・コード・報酬まで。**振込先は `njLGA` の決めごと（銀行・支店・種別・末尾4桁だけ）に沿って足す。** 取得元：`affiliates-v6/xqT1Z.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/xqT1Z.txt' , verdictHead: 'c275749d' },
   {
@@ -2313,7 +2321,10 @@ export const CAPTURED_AT = {
   ],
   10: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZC13r', 'lvaY5', 'PV1Vh', 'd3rFGD', 'Xjk8q', 'Q8sHa', 'yxyzQ'], note: 'development そのもので撮った' }],
   11: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['W7LBc', 'GFlD7', 'FRkls', 'j9ixI', 'hsBtl', 'J3GxEZ'], note: '同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった' }],
-  16: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' }],
+  16: [
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' },
+    { pr: 585, head: '75d6eb9a', on: '2026-08-30', screens: ['njLGA'], note: '支払いのタブ。承認済みだけを集計し、保留期間内と承認日時未取得を分ける。通常・読込・0件・取得失敗の4状態' },
+  ],
   23: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' }],
   4: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' }],
   2: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' }],

@@ -556,6 +556,18 @@ const EMPTY_BODIES = [
  */
 const BARE_EMPTY = [
   /*
+    支払い（`njLGA`・#585）。**返事は `{ success, data, limitations }` で
+    `ApiResponse` の入れ子ではない**（`api.ts:2391`）ので、包まずに返す。
+    包むと `response.data` が undefined になり、**0件のはずが失敗の面になる。**
+    「0件」は**取得はできて、相手が1人もいない**状態。`limitations` は
+    実装が返す3つの穴で、どれも `false` の直値。
+  */
+  [/\/api\/affiliate-payments(\?|$)/, {
+    success: true,
+    data: [],
+    limitations: { payoutHistory: false, bankDestination: false, settlementSchedule: false },
+  }],
+  /*
     顧客へのお知らせの記録。**`pagination` は `data` の外にある**
     （型は `ApiResponse<EcNotificationRunList> & { pagination }`）ので、
     包まずにそのまま返す。包むと `response.pagination.total` で落ちて
