@@ -15,7 +15,8 @@ describe('V6 シナリオ開始完了', () => {
 
   it('完了画面は作り物の対象人数を出さず、開始後の結果へ進める', () => {
     expect(DETAIL).toContain('配信を開始しました。条件を満たした友だちから順に配信します。')
-    expect(DETAIL).toContain('開始後の結果を見る')
+    expect(DETAIL).toContain('開始履歴を確認')
+    expect(DETAIL).not.toContain('開始後の結果を見る')
     expect(DETAIL).toContain('/scenarios/results?id=')
     expect(DETAIL).not.toContain('開始予定116人')
   })
