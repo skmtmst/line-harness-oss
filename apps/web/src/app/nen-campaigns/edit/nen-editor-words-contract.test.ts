@@ -14,9 +14,11 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
     expect(EDITOR).not.toContain("{setting.triggerEvent ?? '手動で送る'}")
   })
 
-  it('誕生日配信で使われない日数欄を見せない', () => {
+  it('誕生日配信で使われない日数・時刻入力を見せず、実際の固定日時を案内する', () => {
     expect(EDITOR).toContain("setting.campaignKey === 'birthday_coupon'")
     expect(EDITOR).toContain('誕生日の3日前')
+    expect(EDITOR).toContain('10:00（固定）')
+    expect(EDITOR).toContain('この日時は誕生日配信の実行処理で固定されています。')
     expect(EDITOR).toContain('{formatCampaignTiming(merged)}')
   })
 

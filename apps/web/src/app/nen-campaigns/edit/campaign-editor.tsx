@@ -307,7 +307,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
             </h2>
             <p className="text-ink-faint text-xs leading-relaxed">
               {setting.campaignKey === 'birthday_coupon'
-                ? 'ペットの誕生日の3日前、指定した時刻に届きます。'
+                ? 'ペットの誕生日の3日前、10:00に届きます。この日時は誕生日配信の実行処理で固定されています。'
                 : 'この配信は「きっかけが起きたあと、指定した日数が経った日の指定時刻」に届きます。毎週きまった曜日・毎月きまった日で送る形は、まだ保存する場所がありません。'}
             </p>
             <Field label="きっかけ">
@@ -317,32 +317,41 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               {setting.campaignKey === 'birthday_coupon' ? (
-                <Field label="送る日">
-                  <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
-                    誕生日の3日前
-                  </p>
-                </Field>
+                <>
+                  <Field label="送る日">
+                    <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
+                      誕生日の3日前
+                    </p>
+                  </Field>
+                  <Field label="時刻">
+                    <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
+                      10:00（固定）
+                    </p>
+                  </Field>
+                </>
               ) : (
-                <Field label="何日後に送るか" htmlFor="nc-delay" note="0 なら当日です。">
-                  <input
-                    id="nc-delay"
-                    type="number"
-                    min={0}
-                    value={merged.delayDays ?? 0}
-                    onChange={(e) => setDraft((p) => ({ ...p, delayDays: Number(e.target.value) }))}
-                    className={`${inputClass} w-32 tabular-nums`}
-                  />
-                </Field>
+                <>
+                  <Field label="何日後に送るか" htmlFor="nc-delay" note="0 なら当日です。">
+                    <input
+                      id="nc-delay"
+                      type="number"
+                      min={0}
+                      value={merged.delayDays ?? 0}
+                      onChange={(e) => setDraft((p) => ({ ...p, delayDays: Number(e.target.value) }))}
+                      className={`${inputClass} w-32 tabular-nums`}
+                    />
+                  </Field>
+                  <Field label="時刻" htmlFor="nc-time">
+                    <input
+                      id="nc-time"
+                      type="time"
+                      value={(merged.deliveryTime ?? '10:00').slice(0, 5)}
+                      onChange={(e) => setDraft((p) => ({ ...p, deliveryTime: e.target.value }))}
+                      className={`${inputClass} w-40`}
+                    />
+                  </Field>
+                </>
               )}
-              <Field label="時刻" htmlFor="nc-time">
-                <input
-                  id="nc-time"
-                  type="time"
-                  value={(merged.deliveryTime ?? '10:00').slice(0, 5)}
-                  onChange={(e) => setDraft((p) => ({ ...p, deliveryTime: e.target.value }))}
-                  className={`${inputClass} w-40`}
-                />
-              </Field>
             </div>
           </section>
 
