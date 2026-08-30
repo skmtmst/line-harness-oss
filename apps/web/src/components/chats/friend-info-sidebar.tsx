@@ -53,7 +53,8 @@ const DETAIL_SECTIONS = [
 type DetailSectionKey = (typeof DETAIL_SECTIONS)[number]['key']
 
 function formatDate(iso: string | null): string {
-  if (!iso) return '-'
+  // 未取得は全角の「—」。半角の `-` はマイナスや区切りに見える。
+  if (!iso) return '—'
   const d = new Date(iso)
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
@@ -67,8 +68,8 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
 
 /** Render a metadata value safely as text. Objects/arrays → JSON, primitives → as-is. */
 function renderValue(value: unknown): string {
-  if (value === null || value === undefined) return '-'
-  if (typeof value === 'string') return value || '-'
+  if (value === null || value === undefined) return '—'
+  if (typeof value === 'string') return value || '—'
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   try {
     return JSON.stringify(value)

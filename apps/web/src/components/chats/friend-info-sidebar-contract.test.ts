@@ -30,3 +30,12 @@ describe('右パネルの表示項目', () => {
     expect(SIDEBAR).toContain('件を隠しています')
   })
 })
+
+describe('未取得の書き方', () => {
+  it('半角ハイフンで書かない', () => {
+    // 半角の `-` は「値が入っていない」ではなく、マイナスや区切りに見える。
+    expect(SIDEBAR).not.toMatch(/return '-'/)
+    expect(SIDEBAR).not.toMatch(/\|\| '-'/)
+    expect(SIDEBAR).toContain("return '—'")
+  })
+})

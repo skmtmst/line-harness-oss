@@ -153,7 +153,8 @@ function StickerMessageImage({ content }: { content: string }) {
 }
 
 function formatDatetime(iso: string | null): string {
-  if (!iso) return '-'
+  // 未取得は全角の「—」。半角の `-` はマイナスや区切りに見える。
+  if (!iso) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
