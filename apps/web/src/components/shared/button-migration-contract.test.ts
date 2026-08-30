@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作30個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -47,7 +47,8 @@ describe('標準ボタンの第1段階移行', () => {
 
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
-    expect(openings).toHaveLength(29)
+    // 2026-08-30: 流入リンク一覧の取得失敗へ、共通Buttonの再読込を1つ追加。
+    expect(openings).toHaveLength(30)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
   })
 
@@ -79,6 +80,7 @@ describe('標準ボタンの第1段階移行', () => {
       'onClick={exportCsv}',
       'onClick={handleCreate}',
       "onClick={() => setEditingGenre('new')}",
+      'onClick={() => void load()}',
       'onClick={save}',
       'onClick={onCancel}',
     ]) {
