@@ -4985,3 +4985,95 @@ export const AUTO_REPLY_PUBLISHED = {
   publishedAt: '2026-08-30T02:30:00.000Z',
   acknowledgedConflictIds: ['ar-1', 'ar-5'],
 }
+
+/**
+ * 友だち追加時の配信の、公開までの契約（設計 `ec9vg` `quhg6`）。
+ *
+ * **Codexが作る前の下ごしらえ。API head が届くまで使わない。**
+ * `screens.mjs` の `ec9vg` `quhg6` は `unimplemented` のままにしてある。
+ *
+ * **口もルートも「想定」で正本ではない。** head が届いたら実装のコードで
+ * 確かめてから使う。**推測したAPIパスを正本にしない。**
+ * - 想定ルート：`/friend-add-settings/publish`
+ * - 想定の口：`/api/friend-add-rules/:id/{draft,validate,conflicts,test,publish}`
+ *
+ * **形は機能8（#595 の自動応答）に合わせてある。** 同じ「下書き → 確認 →
+ * 試験 → 公開」なので、**別々の形にすると画面も試験も二重に持つことになる。**
+ * 設定の中身だけ `FriendAddRouting`（`packages/shared/src/types.ts:1719`）。
+ *
+ * 機能9にだけある確認：
+ * - **二重経路**（同じ人が2つの入口から入って2回配信されないか）
+ * - **流入条件**（どの流入リンクから来た人か）
+ * - **初回案内**（はじめての人へ最初に送るもの）
+ */
+export const FRIEND_ADD_DRAFT = {
+  ruleId: 'far-1', versionId: 'farv-3', versionNumber: 3, status: 'draft',
+  settings: {
+    firstTime: { scenarioId: 'scenario-0', timing: 'immediate', actions: [{ kind: 'tag', op: 'add', tagIds: ['tag-0'] }] },
+    returning: { scenarioId: null, mode: 'same', startPosition: 'resume', actions: [] },
+    criteria: { firstTime: 'never_added' },
+  },
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-08-30T02:10:00.000Z',
+  publishedAt: null,
+}
+
+/** まだ試していない下書き。**公開前チェックが通らない状態を撮るため。** */
+export const FRIEND_ADD_DRAFT_UNTESTED = {
+  ...FRIEND_ADD_DRAFT, lastTestStatus: null, lastTestedAt: null,
+}
+
+/**
+ * 二重経路の確認（`ec9vg`）。**同じ人が2回配信される組み合わせを出す。**
+ * 機能8の「競合」に当たるが、こちらは**入口が2つある**という別の重なり方。
+ */
+export const FRIEND_ADD_CONFLICTS = [
+  {
+    ruleId: 'entry-summer-ig', name: '夏のInstagram投稿（流入リンク）', certainty: 'certain',
+    winnerRuleId: 'entry-summer-ig',
+    reason: 'この流入リンクにもシナリオが設定されています。同じ人に2回届きます',
+  },
+  {
+    ruleId: 'ar-3', name: '友だち追加の自動応答', certainty: 'possible',
+    winnerRuleId: 'far-1',
+    reason: '追加直後のメッセージと重なることがあります。相手が先に送ってきた場合だけです',
+  },
+]
+
+/** 公開前チェック（`ec9vg`）。**通らない理由を全部返す。** */
+export const FRIEND_ADD_VALIDATION = {
+  valid: false,
+  errors: [],
+  warnings: ['はじめての人のシナリオが「決めていない」ままです'],
+  conflicts: FRIEND_ADD_CONFLICTS,
+  lastTestStatus: 'succeeded',
+  /* **対象見込み。**取得元が無い項目は `null` で返し、画面は `—（未取得）` にする。 */
+  estimatedTargets: { firstTime: 116, returning: null },
+}
+
+export const FRIEND_ADD_VALIDATION_OK = {
+  valid: true, errors: [], warnings: [], conflicts: [], lastTestStatus: 'succeeded',
+  estimatedTargets: { firstTime: 116, returning: 8 },
+}
+
+/**
+ * 試験（`ec9vg` の手前）。**送信も状態更新もしない**（`stateChanged: false`）。
+ * 機能8と同じ形にしてある。
+ */
+export const FRIEND_ADD_DRY_RUN = {
+  matched: true,
+  branchTaken: 'firstTime',
+  scenario: { id: 'scenario-0', name: '新規登録7日間フォロー' },
+  actions: [{ kind: 'tag', op: 'add', tagIds: ['tag-0'] }],
+  duplicateRoutes: [{ ruleId: 'entry-summer-ig', name: '夏のInstagram投稿（流入リンク）' }],
+  stateChanged: false,
+}
+
+/** 公開の結果（`quhg6`）。 */
+export const FRIEND_ADD_PUBLISHED = {
+  ruleId: 'far-1', versionId: 'farv-3', versionNumber: 3,
+  publishedAt: '2026-08-30T02:30:00.000Z',
+  acknowledgedConflictIds: ['entry-summer-ig', 'ar-3'],
+  /* **監視先。**取得元が無ければ `null` にして、画面は `—（未取得）`。 */
+  monitoring: { runsPath: '/friend-add-settings/runs', slackChannel: null },
+}
