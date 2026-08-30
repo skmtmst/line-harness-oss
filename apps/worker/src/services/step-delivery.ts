@@ -475,7 +475,7 @@ async function processSingleDelivery(
    * 前文があるぶん複数通になるので、以降は配列で扱う。差し込みは前文にも
    * 効かせたいので、質問の組み立ては差し込みのあとに置いている。
    */
-  const question = parseQuestion(currentStep.question_json);
+  const question = parseQuestion(resolved.questionJson);
   const messages: Message[] = question
     ? buildQuestionMessages(
         {
