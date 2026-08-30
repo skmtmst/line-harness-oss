@@ -97,7 +97,13 @@ describe('GET /api/ec-commerce/shipments', () => {
         order_items: JSON.stringify([{ name: '鹿肉ミンチ', quantity: 2 }]),
       }),
     ]);
-    expect((withSubscriptionItems.later as Row[])[0].items).toBe('猪肉スライス × 1');
+    // 8月30日に実行すると8月31日は「近日」、それ以前なら「今後」に入る。
+    // ここで見たいのは商品の優先順位なので、日付で変わる区分には依存しない。
+    const withSubscriptionRows = [
+      ...(withSubscriptionItems.soon as Row[]),
+      ...(withSubscriptionItems.later as Row[]),
+    ];
+    expect(withSubscriptionRows[0].items).toBe('猪肉スライス × 1');
 
     const withoutSubscriptionItems = await callShipments([
       orderRow({
@@ -107,7 +113,11 @@ describe('GET /api/ec-commerce/shipments', () => {
         order_items: JSON.stringify([{ name: '鹿肉ミンチ', quantity: 2 }]),
       }),
     ]);
-    expect((withoutSubscriptionItems.later as Row[])[0].items).toBe('鹿肉ミンチ × 2');
+    const withoutSubscriptionRows = [
+      ...(withoutSubscriptionItems.soon as Row[]),
+      ...(withoutSubscriptionItems.later as Row[]),
+    ];
+    expect(withoutSubscriptionRows[0].items).toBe('鹿肉ミンチ × 2');
   });
 
   it('商品情報がどちらにも無くても壊れない', async () => {
