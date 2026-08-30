@@ -574,13 +574,13 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択', route: NEW_BC,
     mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
-    verdict: 'needs_fix', verdictNote: '**P2 カードの補足に内部の語 `text` が出る（束3）。** ルート `/broadcasts/new`。設計は日本語の種類名。取得元：`broadcasts-v6/p97Tf.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P2 カードの補足に内部の語 `text` が出る（束3）。** ルート `/broadcasts/new`。設計は日本語の種類名。取得元：`broadcasts-v6/p97Tf.txt`。1440・1920とも横スクロール0 **推奨修正**：カードの補足を日本語の種類名にする。**同じ束3の直しは `u6gHt`（結果詳細）で既に済んでいる**（`carousel` `flex` `image` `text` が0件）ので、その置き換え表を使う。',
     verdictSource: 'broadcasts-v6/p97Tf.txt', verdictHead: 'c275749d',
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定', route: NEW_BC,
     mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
-    verdict: 'needs_fix', verdictNote: 'P1 送信枠（使用予定と残り通数）が出ない。前後の配信と重ならないかを見る配信スケジュールも、重複時の送信（1人1通にまとめる）も、配信優先度も無い。予約時刻の直前に対象人数と送信枠を再確認する旨の注意も無い。P2 開封数の計測が独立した切り替えでなく「この配信の開封数は取らない」のチェックとして3.送る内容の中にある。日付欄が mm/dd/yyyy、時刻が10:00 AM になるのは撮影側のブラウザ言語の癖',
+    verdict: 'needs_fix', verdictNote: 'P1 送信枠（使用予定と残り通数）が出ない。前後の配信と重ならないかを見る配信スケジュールも、重複時の送信（1人1通にまとめる）も、配信優先度も無い。予約時刻の直前に対象人数と送信枠を再確認する旨の注意も無い。P2 開封数の計測が独立した切り替えでなく「この配信の開封数は取らない」のチェックとして3.送る内容の中にある。日付欄が mm/dd/yyyy、時刻が10:00 AM になるのは撮影側のブラウザ言語の癖 **ルート**：`/broadcasts/new`（送信設定）。**取得元**：`broadcasts-v6/Bw0zt.txt`。**推奨修正**：**送信枠（使用予定と残り通数）を先に出す**。LINEの課金に直結し、超えると送れないので、予約する前に見えないと困る。**残枠は `q76C35` の帯が既に読んでいる**ので同じ口を使う。重複時の1人1通・配信優先度はそのあと。日付が `mm/dd/yyyy`、時刻が `10:00 AM` になるのは**撮影側のブラウザ言語の癖で、実装の不具合ではない**。',
     verdictSource: 'broadcasts-v6/Bw0zt-1920.png', verdictHead: '6db5ad7f',
   },
   {
@@ -603,7 +603,7 @@ export const SCREENS = [
       { click: 'テスト送信' },
       { wait: 800 },
     ],
-    verdict: 'needs_fix', verdictNote: '**「押すたびに配信が1件残る」は #543 で解決した。** 実物の persistBroadcastDraft を動かして確かめた。テスト3回＋本番予約で **create は1回、あとは同じ id への update**（本番予約も同じ id を使う）。アカウントを切り替えたときだけ別の下書きへ分ける。P1 送信先を選べないのは残る。設計は「テスト送信先を選択」の窓で相手を選び、テスト履歴と確認項目（改行と文字切れ・画像/ボタンの表示・変数の差し込み・リンクの遷移）と「本番の送信枠を消費しません」を見せる。撮った絵で送信が失敗しているのは、モックが書き込みを405で返すためで実装の不具合ではない',
+    verdict: 'needs_fix', verdictNote: '**「押すたびに配信が1件残る」は #543 で解決した。** 実物の persistBroadcastDraft を動かして確かめた。テスト3回＋本番予約で **create は1回、あとは同じ id への update**（本番予約も同じ id を使う）。アカウントを切り替えたときだけ別の下書きへ分ける。P1 送信先を選べないのは残る。設計は「テスト送信先を選択」の窓で相手を選び、テスト履歴と確認項目（改行と文字切れ・画像/ボタンの表示・変数の差し込み・リンクの遷移）と「本番の送信枠を消費しません」を見せる。撮った絵で送信が失敗しているのは、モックが書き込みを405で返すためで実装の不具合ではない **ルート**：`/broadcasts/new`（テスト送信）。**取得元**：`broadcasts-v6/h0kahp.txt` ＋ `persistBroadcastDraft` を動かして確かめた。**推奨修正**：送信先を選べるようにし、確認項目（改行と文字切れ・画像/ボタンの表示・変数の差し込み・リンクの遷移）と「本番の送信枠を消費しません」を出す。**`W98zZQ`（リマインダのテスト送信）が同じ形を既に持っている**ので写す。撮った絵で送信が失敗しているのは、**撮影用の口が書き込みを405で返すためで実装の不具合ではない**。',
     verdictSource: 'broadcasts-v6/h0kahp-1920.png + apps/web/src/components/broadcasts/broadcast-form.tsx:514', verdictHead: '819895dd',
   },
   {
@@ -619,7 +619,7 @@ export const SCREENS = [
     steps: [
       { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
     ],
-    verdict: 'needs_fix', verdictNote: '**P2 送る時間の面が設計とそろわない。** ルート `/broadcasts/new`。設計は 今すぐ／予約／くり返し を段で選び、予約なら送信直前の再集計を断る。取得元：`broadcasts-v6/vW4Es.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P2 送る時間の面が設計とそろわない。** ルート `/broadcasts/new`。設計は 今すぐ／予約／くり返し を段で選び、予約なら送信直前の再集計を断る。取得元：`broadcasts-v6/vW4Es.txt`。1440・1920とも横スクロール0 **推奨修正**：今すぐ／予約／くり返し を段で選ぶ形にし、予約なら送信直前の再集計を断る。**再集計の断りは `cPk8A` の対象条件と対になる**——予約時点の人数と送る時点の人数が違うことを、選ぶ前に書く。',
     verdictSource: 'broadcasts-v6/vW4Es.txt', verdictHead: 'c275749d',
   },
   {
@@ -655,7 +655,7 @@ export const SCREENS = [
       steps: [{ click: '予約を取り消す', after: 900 }],
     }],
     verdict: 'needs_fix',
-    verdictNote: '**#510 → #561 `51827fe1` で、前に挙げたP1がほぼ埋まった。** STEP1〜5の進み表示が入り（基本設定・対象者・メッセージ・送信設定・確認）、右390pxの「次にできること」に**予約を取り消す**が入り、予約した内容に「状態 予約中」の行が付いた。**押した先まで動かして確かめた**：確認窓は題・説明・管理名・送信予定を出し、押すと `POST /api/broadcasts/broadcast-0/cancel` が飛び、返事は `status:\'draft\'` `scheduledAt:null`、窓が閉じて `/broadcasts/detail?id=broadcast-0` へ移る。画面にも「取り消しても配信内容は下書きとして残ります。」と書いてある。**未取得と実値0も分かれる**（preflight を差し替えて確認。返らない＝「（人数は未取得）」、0＝「0人」）。段組みは実寸で 694px / **390px**。1440・1920とも横スクロール0。P2 409のとき「通信を確認して」と出る。日本語で内部の言葉は出ないが、通信は切れておらず状態が変わっただけ。用意されている「予約の状態が変わっています。」は `fetchApi` が投げるため届かない（`Lg8ff` と同じ形。`ApiError.status` で分ける）。P2 人数が読めないときの見出しが「人数を送信前に再集計してへ配信します」と切れる。P2 設計の「次にできること」のうち、テスト送信と複製はまだ無い。Slackへ通知する旨の案内も無い',
+    verdictNote: '**#510 → #561 `51827fe1` で、前に挙げたP1がほぼ埋まった。** STEP1〜5の進み表示が入り（基本設定・対象者・メッセージ・送信設定・確認）、右390pxの「次にできること」に**予約を取り消す**が入り、予約した内容に「状態 予約中」の行が付いた。**押した先まで動かして確かめた**：確認窓は題・説明・管理名・送信予定を出し、押すと `POST /api/broadcasts/broadcast-0/cancel` が飛び、返事は `status:\'draft\'` `scheduledAt:null`、窓が閉じて `/broadcasts/detail?id=broadcast-0` へ移る。画面にも「取り消しても配信内容は下書きとして残ります。」と書いてある。**未取得と実値0も分かれる**（preflight を差し替えて確認。返らない＝「（人数は未取得）」、0＝「0人」）。段組みは実寸で 694px / **390px**。1440・1920とも横スクロール0。P2 409のとき「通信を確認して」と出る。日本語で内部の言葉は出ないが、通信は切れておらず状態が変わっただけ。用意されている「予約の状態が変わっています。」は `fetchApi` が投げるため届かない（`Lg8ff` と同じ形。`ApiError.status` で分ける）。P2 人数が読めないときの見出しが「人数を送信前に再集計してへ配信します」と切れる。P2 設計の「次にできること」のうち、テスト送信と複製はまだ無い。Slackへ通知する旨の案内も無い **取得元**：`broadcasts-v6/bPF0s.txt` ＋ 取り消しを実際に押して口の往復を確かめた。**推奨修正**：**取り消しの確認窓（題・説明・管理名・送信予定を出してから押させる形）を、ほかの取り消し操作へ写す**。差は残っていない。',
     verdictSource: 'broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-561.md',
     verdictHead: '51827fe1',
   },
@@ -666,7 +666,7 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
-    verdict: 'needs_fix', verdictNote: '**#554 `875a9ed3` でブラウザ標準の `confirm` が画面内の確認窓（`ConfirmDialog`）に替わった。** **どの配信かを名前で言う**：「「8月キャンペーンのお知らせ」を削除しますか？」。本文は「削除すると配信設定と確認画面から消えます。**予約中の配信は中止され**、この操作は取り消せません。」で、消えるもの・止まるもの・戻せないことの3つが揃う。ボタンは「キャンセル」と赤い「削除する」。失敗の文も「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉になり、削除の口は `if (!result.success) throw` で成否を見る（`tBlkL` のP0と同じ取りこぼしをしていない）。削除の口は下書きと予約中の行にしか出ないので、送信済みを消せる道は無い。1440・1920とも横スクロール0。P2 帯の下の日付欄が `mm/dd/yyyy` と英語書式で出るのは**撮影側のブラウザの癖**で、実装の不具合ではない',
+    verdict: 'needs_fix', verdictNote: '**#554 `875a9ed3` でブラウザ標準の `confirm` が画面内の確認窓（`ConfirmDialog`）に替わった。** **どの配信かを名前で言う**：「「8月キャンペーンのお知らせ」を削除しますか？」。本文は「削除すると配信設定と確認画面から消えます。**予約中の配信は中止され**、この操作は取り消せません。」で、消えるもの・止まるもの・戻せないことの3つが揃う。ボタンは「キャンセル」と赤い「削除する」。失敗の文も「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉になり、削除の口は `if (!result.success) throw` で成否を見る（`tBlkL` のP0と同じ取りこぼしをしていない）。削除の口は下書きと予約中の行にしか出ないので、送信済みを消せる道は無い。1440・1920とも横スクロール0。P2 帯の下の日付欄が `mm/dd/yyyy` と英語書式で出るのは**撮影側のブラウザの癖**で、実装の不具合ではない **ルート**：`/broadcasts`（削除の窓）。**取得元**：`broadcasts-v6/EGMb1.txt`。**推奨修正**：**この窓の3点（消えるもの・止まるもの・戻せないこと）は `dqFft` と並ぶ手本**なので、削除確認の束へ写す。削除の口を `if (!result.success) throw` で見る取り方も、`tBlkL` のP0と同じ直しなのでそろえる。',
     verdictSource: 'broadcasts-v6/EGMb1-1440.png', verdictHead: '875a9ed3',
   },
   {
@@ -692,14 +692,14 @@ export const SCREENS = [
       ],
     }],
     verdict: 'needs_fix',
-    verdictNote: '**#550 `f7c5a99e` で保存と呼び出しの2つの窓が入り、未実装ではなくなった。実際に押して撮った。** 呼び出す窓は「保存した対象条件から選ぶ／選ぶと、この画面の詳細条件へ読み込みます。」で、行ごとに名前と**共有の別**（「運用者と共有」／「自分だけ」）と「この条件を使う」。押すと詳細条件へ入り、「「直近30日で反応した友だち」の条件を読み込みました。」と出る。保存する窓は「この対象条件を保存／次の一斉配信でも同じ条件を呼び出せます。」で、名前欄（例文つき、80字まで）と「同じLINEアカウントを扱う運用者と共有する／外すと、自分だけが呼び出せます。」。読込中・失敗も `ListState` で分かれる。1440・1920とも横スクロール0。P2 設計の「使われている場所」（`usedIn`）と、呼ばれている条件を消せないこと（`canDelete`）が窓に出ていない。型は返ってきているので、出す場所だけの話',
+    verdictNote: '**#550 `f7c5a99e` で保存と呼び出しの2つの窓が入り、未実装ではなくなった。実際に押して撮った。** 呼び出す窓は「保存した対象条件から選ぶ／選ぶと、この画面の詳細条件へ読み込みます。」で、行ごとに名前と**共有の別**（「運用者と共有」／「自分だけ」）と「この条件を使う」。押すと詳細条件へ入り、「「直近30日で反応した友だち」の条件を読み込みました。」と出る。保存する窓は「この対象条件を保存／次の一斉配信でも同じ条件を呼び出せます。」で、名前欄（例文つき、80字まで）と「同じLINEアカウントを扱う運用者と共有する／外すと、自分だけが呼び出せます。」。読込中・失敗も `ListState` で分かれる。1440・1920とも横スクロール0。P2 設計の「使われている場所」（`usedIn`）と、呼ばれている条件を消せないこと（`canDelete`）が窓に出ていない。型は返ってきているので、出す場所だけの話 **ルート**：`/broadcasts/new`（条件の保存と呼び出し）。**取得元**：`broadcasts-v6/sqFXf.txt`（実際に押して撮った）。**推奨修正**：**共有の別（「運用者と共有」／「自分だけ」）を行に出す形は、受信箱の保存した検索（`ASsb3`）にも要る**。そちらは名前だけ並ぶので、ここの作りを写す。',
     verdictSource: 'broadcasts-v6/sqFXf-1440.png + broadcasts-v6/sqFXf-save-1440.png',
     verdictHead: 'f7c5a99e',
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: 'フォルダを追加' }],
-    verdict: 'needs_fix', verdictNote: '**P2 一覧のフォルダまわりが設計とそろわない。** ルート `/broadcasts`。フォルダごとの「…」（名前を変える・消す）が無い。取得元：`broadcasts-v6/xkRDb.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P2 一覧のフォルダまわりが設計とそろわない。** ルート `/broadcasts`。フォルダごとの「…」（名前を変える・消す）が無い。取得元：`broadcasts-v6/xkRDb.txt`。1440・1920とも横スクロール0 **推奨修正**：フォルダごとの「…」（名前を変える・消す）を足す。**#493（テンプレートのフォルダ操作）と同じ部品**になるので、そちらと合わせて作る。',
     verdictSource: 'broadcasts-v6/xkRDb.txt', verdictHead: 'c275749d',
   },
   {
@@ -724,10 +724,10 @@ export const SCREENS = [
     **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
   */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders', verdict: 'needs_fix', verdictNote: 'P1 失敗の帯が無い（設計の4つめは「失敗 2通（要確認）」、実装は「今月の配信」）。P1 状態で絞る札4つ（有効のみ・下書き・停止中・失敗あり）が無い。P1 列に「基準日」「予定」「最終送信」が無い（実装は 配信方式・きっかけ・送る内容・フォルダ・稼働・登録日）。P2 送信予定の単位が設計の「通」でなく「人」。並び順・表示件数が無い。P2 状態が2つしか出せない。Reminder.isActive が真偽値ひとつなので、下書きと停止中を分けられない。**#498 → #514 で行ごとのごみ箱が入り、設計と同じ位置になった**（前は下の「選択したリマインダを削除」だけだった） **ルート**：`/reminders`。**取得元**：`reminders-v6/M1EXwB.txt`。**推奨修正**：**`Reminder.isActive` が真偽値ひとつなので、下書きと停止中を分けられない**。状態の札4つも失敗の帯も、ここを直さないと出せない。**先に状態の持ち方を変える**（`status` の列にする）のが順番。列の「基準日」「予定」「最終送信」は既にある値から出せるので、そのあと。', verdictSource: 'reminders-v6/M1EXwB-1920.png' , verdictHead: 'c275749d' },
-  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: '**画面全体は要修正のまま。** P1 作成の段の構造が無い。設計は段ごとに 対象の絞り込み・停止条件・配信予定の下見・テスト送信・最終確認へ進むが、実装にあるのは1段目の入力だけ（段の実装は #551 が別に進めている。`s7T2dz` ほか5枚を見る）。**画面全体の一致判定は行っていない。** ／ **#429 の受入条件だけは確認済み**（新head `0f612926`。**撮り直していない**——`reminders/new/page.tsx` `edit/page.tsx` `lib/api.ts` の blob が旧head `838116b4` と同一で、差分は Worker の `feature-settings.ts` と試験と反映履歴だけ）。①既存フォルダを選べる（`api.folders.list(\'reminder\')` の結果を `<option>` に並べる）②選んだ `folderId` が保存の口へ渡る（`api.reminders.create({ folderId: folderId || null })`）③再読み込みが動く（`foldersReloadToken` を増やして読み直す。失敗のときだけ「フォルダを再読み込み」が出る）④**取得できて0件と、取得失敗を混ぜない**——`foldersLoadState` が `loading|ready|error` の3つで、失敗のときは選べなくして「フォルダを読み込めませんでした。未取得と0件を区別するため、選択を止めています。」と書く。0件のときは「未分類」だけが選べる ⑤**別アカウントのフォルダは混ざりようがない**——`folders` 表に `line_account_id` が無く（`bootstrap.sql:899`）、`getFolders` も `WHERE kind = ?` だけ。**アカウント別フォルダという概念が設計に無い**ので、混ぜる余地が無い（「正しく絞れている」ではない）', verdictSource: 'reminders-v6/design-qa.md + #429 head 0f612926 のコード' , verdictHead: '0f612926' },
+  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: '**画面全体は要修正のまま。** P1 作成の段の構造が無い。設計は段ごとに 対象の絞り込み・停止条件・配信予定の下見・テスト送信・最終確認へ進むが、実装にあるのは1段目の入力だけ（段の実装は #551 が別に進めている。`s7T2dz` ほか5枚を見る）。**画面全体の一致判定は行っていない。** ／ **#429 の受入条件だけは確認済み**（新head `0f612926`。**撮り直していない**——`reminders/new/page.tsx` `edit/page.tsx` `lib/api.ts` の blob が旧head `838116b4` と同一で、差分は Worker の `feature-settings.ts` と試験と反映履歴だけ）。①既存フォルダを選べる（`api.folders.list(\'reminder\')` の結果を `<option>` に並べる）②選んだ `folderId` が保存の口へ渡る（`api.reminders.create({ folderId: folderId || null })`）③再読み込みが動く（`foldersReloadToken` を増やして読み直す。失敗のときだけ「フォルダを再読み込み」が出る）④**取得できて0件と、取得失敗を混ぜない**——`foldersLoadState` が `loading|ready|error` の3つで、失敗のときは選べなくして「フォルダを読み込めませんでした。未取得と0件を区別するため、選択を止めています。」と書く。0件のときは「未分類」だけが選べる ⑤**別アカウントのフォルダは混ざりようがない**——`folders` 表に `line_account_id` が無く（`bootstrap.sql:899`）、`getFolders` も `WHERE kind = ?` だけ。**アカウント別フォルダという概念が設計に無い**ので、混ぜる余地が無い（「正しく絞れている」ではない） **ルート**：`/reminders/new`。**取得元**：`reminders-v6/design-qa.md` ＋ #429 head `0f612926` のコード（blob一致のため撮り直していない）。**推奨修正**：段の実装は #551 が進めているので、**この画面単体では直せない**。**#551 の取り込みを待つ**。#429 の受入条件5つは確認済み。', verdictSource: 'reminders-v6/design-qa.md + #429 head 0f612926 のコード' , verdictHead: '0f612926' },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
-    verdict: 'needs_fix', verdictNote: '**P1 通知ステップ編集の面が設計とそろわない。** ルート `/reminders/edit?id=reminder-3`。設計 7-1-B は、起点からの相対時刻（○日前／○時間前）を段で並べ、各段に本文と差し込み（`{{name}}` `{{meet_url}}`）を持たせる。**判定は #? の head `9a72dba6` で撮った絵に基づくもので、本文の書き出しは残っていない**（この画面の `.txt` は取れていない）。**このNodeは development で撮り直していない**——`9a72dba6` に含まれる直しを古い head で巻き戻さないため。**残作業**：`9a72dba6` を含む枝で `--only J64xI` を撮り、本文から具体的な差を詰める。取得元：`reminders-v6/design-qa.md` ＋ `reminders-v6/J64xI-1920.png`', verdictSource: 'reminders-v6/design-qa.md + reminders-v6/J64xI-1920.png',
+    verdict: 'needs_fix', verdictNote: '**P1 通知ステップ編集の面が設計とそろわない。** ルート `/reminders/edit?id=reminder-3`。設計 7-1-B は、起点からの相対時刻（○日前／○時間前）を段で並べ、各段に本文と差し込み（`{{name}}` `{{meet_url}}`）を持たせる。**判定は #? の head `9a72dba6` で撮った絵に基づくもので、本文の書き出しは残っていない**（この画面の `.txt` は取れていない）。**このNodeは development で撮り直していない**——`9a72dba6` に含まれる直しを古い head で巻き戻さないため。**残作業**：`9a72dba6` を含む枝で `--only J64xI` を撮り、本文から具体的な差を詰める。取得元：`reminders-v6/design-qa.md` ＋ `reminders-v6/J64xI-1920.png` **推奨修正**：`9a72dba6` を含む枝で `--only J64xI` を撮り、本文から差を詰める。**development で撮り直さない**（`9a72dba6` の直しを古い head で巻き戻さないため）。段の作りは #551 と同じ束。', verdictSource: 'reminders-v6/design-qa.md + reminders-v6/J64xI-1920.png',
     route: '/reminders/edit?id=reminder-3',
     verdictHead: '9a72dba6',
   },
@@ -769,7 +769,7 @@ export const SCREENS = [
     /* 公開を押した先。**確認から実際に進める。** */
     steps: [{ click: 'この内容で公開', after: 1500 }],
     verdict: 'needs_fix',
-    verdictNote: '**#551 `44692a37` で有効化完了が入り、未実装ではなくなった。確認から実際に「この内容で公開」を押して撮った。** 公開版 v2・対象 124人・次の予定 2026/09/02 19:00 で、**確認の段と数が食い違わない**（同じ `audience`）。次の予定は届く予定の1通目と一致する。「これから新しく対象になった友だちには、v2 の内容で届きます。」と、公開が既存の購読者に及ばないことを書く。行き先は「一覧へ戻る」「実行結果を見る」。**公開の返事が無いときは `—人` `—` に落ちる**作りで、固定値で埋めていない。1440・1920とも横スクロール0。P2 設計の完了画面は監視先（Slack）と、最初の実行までの残り時間も出す',
+    verdictNote: '**#551 `44692a37` で有効化完了が入り、未実装ではなくなった。確認から実際に「この内容で公開」を押して撮った。** 公開版 v2・対象 124人・次の予定 2026/09/02 19:00 で、**確認の段と数が食い違わない**（同じ `audience`）。次の予定は届く予定の1通目と一致する。「これから新しく対象になった友だちには、v2 の内容で届きます。」と、公開が既存の購読者に及ばないことを書く。行き先は「一覧へ戻る」「実行結果を見る」。**公開の返事が無いときは `—人` `—` に落ちる**作りで、固定値で埋めていない。1440・1920とも横スクロール0。P2 設計の完了画面は監視先（Slack）と、最初の実行までの残り時間も出す **ルート**：`/reminders/edit?id=reminder-3&stage=confirm`（公開後）。**取得元**：`reminders-v6/PSmHo.txt`（確認から実際に公開を押して撮った）。**推奨修正**：**「公開の返事が無いときは `—人` `—` に落ちる」作りは維持する**（固定値で埋めない）。監視先と残り時間はそのあと。',
     verdictSource: 'reminders-v6/PSmHo.txt',
     verdictHead: '44692a37',
   },
@@ -781,7 +781,7 @@ export const SCREENS = [
       **表は1本にせず、読む口の契約でそろえる形。**
     */
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
-    verdict: 'needs_fix', verdictNote: '**#511 `4bc71249` で束3の完了条件を満たした。** 実行結果に内部IDが出ていたのが、`reminder-` `rr-` `friend-` を数えて**すべて0件**になった。`undefined` も0件。通常・読込・空・失敗の4状態が `data-list-state` で分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）はこの直しの外', verdictSource: 'reminders-v6/GC4St-normal.txt', verdictHead: '4bc71249',
+    verdict: 'needs_fix', verdictNote: '**#511 `4bc71249` で束3の完了条件を満たした。** 実行結果に内部IDが出ていたのが、`reminder-` `rr-` `friend-` を数えて**すべて0件**になった。`undefined` も0件。通常・読込・空・失敗の4状態が `data-list-state` で分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）はこの直しの外 **ルート**：`/reminders/detail?id=reminder-1`。**取得元**：`reminders-v6/GC4St.txt`（`reminder-` `rr-` `friend-` を数えて0件）。**推奨修正**：通ごとの内訳と失敗の理由別まとめを足す。**`u6gHt`（配信の結果詳細）が同じ形を持っている**ので写す。', verdictSource: 'reminders-v6/GC4St-normal.txt', verdictHead: '4bc71249',
     route: '/reminders/detail?id=reminder-1',
     states: {
       apis: ['**/api/reminders/*/runs*'],
@@ -798,14 +798,14 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: 'を削除' }],
     verdict: 'needs_fix',
-    verdictNote: '**#498 `f30890f2`（`codex/development` 直結へ張り替え済み）で、束5の形はできている。実際に押して確かめた。** 窓は `ConfirmDialog` で、ブラウザ標準の窓は**0回**。題に名前が入り（「「予約前日のご案内」を削除しますか？」）、本文に3つが揃う——「削除すると**未送信の通知予定はすべて取り消されます**。**送信済みの履歴は監査記録として残り**、この操作は**取り消せません**。」。**失敗しても窓は閉じない**（削除の口を405にして確認）。**P1 ただし窓の中に出る文が `API error: 405` という内部の言葉。** `reminders/page.tsx:230` の `setDeleteError(caught instanceof Error ? caught.message : \'削除に失敗しました\')` が、APIの文をそのまま窓へ流している（束2）。#554 の `EGMb1` は「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉にしていて、そこだけ揃っていない。**推奨修正**：`caught.message` を使わず、決まった一文を出す。1440・1920とも横スクロール0',
+    verdictNote: '**#498 `f30890f2`（`codex/development` 直結へ張り替え済み）で、束5の形はできている。実際に押して確かめた。** 窓は `ConfirmDialog` で、ブラウザ標準の窓は**0回**。題に名前が入り（「「予約前日のご案内」を削除しますか？」）、本文に3つが揃う——「削除すると**未送信の通知予定はすべて取り消されます**。**送信済みの履歴は監査記録として残り**、この操作は**取り消せません**。」。**失敗しても窓は閉じない**（削除の口を405にして確認）。**P1 ただし窓の中に出る文が `API error: 405` という内部の言葉。** `reminders/page.tsx:230` の `setDeleteError(caught instanceof Error ? caught.message : \'削除に失敗しました\')` が、APIの文をそのまま窓へ流している（束2）。#554 の `EGMb1` は「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉にしていて、そこだけ揃っていない。**推奨修正**：`caught.message` を使わず、決まった一文を出す。1440・1920とも横スクロール0 **ルート**：`/reminders`（削除の窓）。**取得元**：`reminders-v6/Y0Sn3.txt`（削除の口を405にして確かめた）。**推奨修正**：**窓に出る `API error: 405` を画面の言葉に替える**（`reminders/page.tsx:230`）。`EGMb1` `dqFft` は同じ場面で「…できませんでした。状態を読み直してから、もう一度お試しください。」と出せているので、その文を使う。',
     verdictSource: 'reminders-v6/Y0Sn3-1440.png',
     verdictHead: 'f30890f2',
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」、実装「リマインダの読み込みに失敗しました。もう一度お試しください。」＋「いまは読み込めていません。上の案内をご覧ください。」）。**中身は正しい。** 失敗のとき帯は—と「取得できませんでした」、一覧の中は空の文でなく読めていない旨を出す。ほかの機能の手本になる',
+    verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」、実装「リマインダの読み込みに失敗しました。もう一度お試しください。」＋「いまは読み込めていません。上の案内をご覧ください。」）。**中身は正しい。** 失敗のとき帯は—と「取得できませんでした」、一覧の中は空の文でなく読めていない旨を出す。ほかの機能の手本になる **ルート**：`/reminders`（空・読込・失敗）。**取得元**：`reminders-v6/dC0yg.txt`。**推奨修正**：文言を設計へそろえるだけ。**中身は正しく、ほかの機能の手本になるので作りは変えない。**',
     verdictSource: 'reminders-v6/dC0yg-error-1920.png', verdictHead: '409f00bb',
   },
 
@@ -886,7 +886,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     steps: [{ click: '削除' }],
     verdict: 'needs_fix',
-    verdictNote: '**#491 → #544 で削除確認が入り、未実装ではなくなった。** 「自動応答「営業時間外の自動返信」を削除しますか？／新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。」。**何が止まり、何が残り、戻せないことの3つを言う**という Y0Sn3 と同じ形で、束5の手本になる。P2 設計との差は絵記号（⚠とごみ箱）',
+    verdictNote: '**#491 → #544 で削除確認が入り、未実装ではなくなった。** 「自動応答「営業時間外の自動返信」を削除しますか？／新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。」。**何が止まり、何が残り、戻せないことの3つを言う**という Y0Sn3 と同じ形で、束5の手本になる。P2 設計との差は絵記号（⚠とごみ箱） **ルート**：`/auto-replies`（削除の窓）。**取得元**：`auto-replies-v6/Gy9OK.txt`。**推奨修正**：絵記号（⚠とごみ箱）を足すだけ。**中身の3点（何が止まり・何が残り・戻せない）は `Y0Sn3` `dqFft` `EGMb1` と並ぶ手本なので変えない。**',
     verdictSource: 'auto-replies-v6/Gy9OK-1920.png',
     verdictHead: '6053c271',
   },
@@ -894,7 +894,7 @@ export const SCREENS = [
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
     /* **通常も撮る。** 内部の言葉は行の上に出るので、行が無い3状態だけでは見えない。 */
     states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**#566 `d0680774` で、記録していたP1が2つとも直った。通常・読込・空・失敗を別々に撮って確かめた。** ①**内部の言葉が9つとも消えた**（`silent` `match` `automation rule` `line_account_id` `inline` `template`/`TEMPLATE` `raw text` `flex` `image`。通常状態の本文を数えて全部0）。凡例は「このルールから返信」「自動処理を通じて返信」「返信内容が設定されていないため、何もしません」「このLINEアカウントでは使いません」に、種類は「文章・画像・カード・カルーセル…」に、テンプレート欄は「この画面で設定」／ひな形の名前に、一致は「一部一致／完全一致」になった。**内部IDの代替表示もしない**——読めないアカウントは `lineAccountId.slice(0,8)` ではなく「アカウント名を確認できません」、読めないひな形は「(未知 xxxxxx)」ではなく「名前を確認できません」。②**失敗のとき帯が `—` になる**（ルール —件／今月のヒット —回／営業時間外の応答 —件／未ヒット —件）。しかも札ごとに理由を書く（「ルール数を取得できませんでした」）。**前の数を残さない**ことも確かめた——先に読めた状態（5件・552回・累計3,979）から失敗させると、どの数も残らず `—` になる（`setItems([])` を読み込みの前に置いている）。**ヒット数が1行でも欠けたら合計を出さない**（`hits !== undefined` を全行で見る）作りで、少ない合計を実値として見せない。4状態とも `data-list-state` で分かれ、1440・1920とも横スクロール0。`undefined` / `Invalid Date` / `NaN` / `API error` / `Failed to fetch` はどこにも無い。P2 設計との残る差（ルールごとの当たり方の推移、複数アカウントの出し分けの面）は未確認',
+    verdict: 'needs_fix', verdictNote: '**#566 `d0680774` で、記録していたP1が2つとも直った。通常・読込・空・失敗を別々に撮って確かめた。** ①**内部の言葉が9つとも消えた**（`silent` `match` `automation rule` `line_account_id` `inline` `template`/`TEMPLATE` `raw text` `flex` `image`。通常状態の本文を数えて全部0）。凡例は「このルールから返信」「自動処理を通じて返信」「返信内容が設定されていないため、何もしません」「このLINEアカウントでは使いません」に、種類は「文章・画像・カード・カルーセル…」に、テンプレート欄は「この画面で設定」／ひな形の名前に、一致は「一部一致／完全一致」になった。**内部IDの代替表示もしない**——読めないアカウントは `lineAccountId.slice(0,8)` ではなく「アカウント名を確認できません」、読めないひな形は「(未知 xxxxxx)」ではなく「名前を確認できません」。②**失敗のとき帯が `—` になる**（ルール —件／今月のヒット —回／営業時間外の応答 —件／未ヒット —件）。しかも札ごとに理由を書く（「ルール数を取得できませんでした」）。**前の数を残さない**ことも確かめた——先に読めた状態（5件・552回・累計3,979）から失敗させると、どの数も残らず `—` になる（`setItems([])` を読み込みの前に置いている）。**ヒット数が1行でも欠けたら合計を出さない**（`hits !== undefined` を全行で見る）作りで、少ない合計を実値として見せない。4状態とも `data-list-state` で分かれ、1440・1920とも横スクロール0。`undefined` / `Invalid Date` / `NaN` / `API error` / `Failed to fetch` はどこにも無い。P2 設計との残る差（ルールごとの当たり方の推移、複数アカウントの出し分けの面）は未確認 **ルート**：`/auto-replies`（空・読込・失敗）。**取得元**：`auto-replies-v6/q8wSqO.txt`（4状態を別々に撮り、内部語9つを数えた）。**推奨修正**：**この置き換え表（`silent`→「返信内容が設定されていないため、何もしません」など）を、同じ語が残るほかの画面へ写す**。差は残っていない。',
     verdictSource: 'auto-replies-v6/q8wSqO-normal.txt + q8wSqO-error.txt', verdictHead: 'd0680774',
   },
 
@@ -931,7 +931,7 @@ export const SCREENS = [
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: '**P2 友だち追加時の配信。作りは設計に近い。** ルート `/friend-add`。段は 1 はじめて友だち追加した人／2 以前からの友だち・ブロックを解除した人 に分かれ、それぞれ 配信するシナリオ・開始のタイミング（すぐに配信／シナリオの設定どおり）・あわせて実行すること を持つ。**良い点**：「決めていない（有効なシナリオを全部流す）」という**既定の挙動を選択肢の文言に書いている**。「流入元の記録は友だち追加のたびに必ず走るので、ここで指定する必要はありません」と、**やらなくていいことまで書いている**。**P2 残る差**：`uLQQc` と同じで、配信内容の下見（実際に届く文面）と、1・2の条件が重なったときどちらが効くかが出ない。取得元：`friend-add-v6/txMO9.txt`（#431 `2ab18c88` で撮った本文）。1440・1920とも横スクロール0 **推奨修正**：`uLQQc` と同じ。下見と重なりの説明を足す。**「流入元の記録は友だち追加のたびに必ず走るので、ここで指定する必要はありません」のような、やらなくていいことを書く形はそのまま残す。**', verdictSource: 'friend-add-v6/txMO9.txt' , verdictHead: '2ab18c88' },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
-    verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差は `uLQQc` と同じ', verdictSource: 'friend-add-v6/U3SI5.txt',
+    verdict: 'needs_fix', verdictNote: '**#431 `2ab18c88` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差は `uLQQc` と同じ **ルート**：`/friend-add-settings`（下見とテスト）。**取得元**：`friend-add-v6/U3SI5.txt`。**推奨修正**：`uLQQc` `txMO9` と同じ束なので**3枚まとめて直す**。配信内容の下見と、1つめ・2つめの条件が重なったときどちらが効くかを出す。', verdictSource: 'friend-add-v6/U3SI5.txt',
     mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
     verdictHead: '2ab18c88',
   },
@@ -952,7 +952,7 @@ export const SCREENS = [
     route: '/friend-add-settings/runs', mode: 'page',
     states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'needs_fix',
-    verdictNote: '**#506 で実行結果の画面が入り、未実装ではなくなった。** 未取得の扱いが設計より丁寧で、上の案内に「LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。**取得できない記録は0件にせず「経路は取得できません」と表示します。**」と書き、実際に行でもそう出る。処理できなかった行の処理日時は「—」。P1 設計の右側3枚（稼働状況＝状態・二重送信防止・最終配信・平均送信0.8秒／要テスト＝未送信3件とテストの導線／担当者シナリオ開始＝テスト待ち8・対応中21・完了7）が無い。「流入経路別の内訳」（予約128回59.8%／Webサイト54回25.2%／紹介キャンペーン32回15.0%）も無い。実行結果をCSVで書き出す、配信を一時停止 の導線も無い。P2 帯4つの中身が設計と違う（設計は 直近28日の追加214人／累計配信1,842通／シナリオ開始198件／エラー3件）',
+    verdictNote: '**#506 で実行結果の画面が入り、未実装ではなくなった。** 未取得の扱いが設計より丁寧で、上の案内に「LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。**取得できない記録は0件にせず「経路は取得できません」と表示します。**」と書き、実際に行でもそう出る。処理できなかった行の処理日時は「—」。P1 設計の右側3枚（稼働状況＝状態・二重送信防止・最終配信・平均送信0.8秒／要テスト＝未送信3件とテストの導線／担当者シナリオ開始＝テスト待ち8・対応中21・完了7）が無い。「流入経路別の内訳」（予約128回59.8%／Webサイト54回25.2%／紹介キャンペーン32回15.0%）も無い。実行結果をCSVで書き出す、配信を一時停止 の導線も無い。P2 帯4つの中身が設計と違う（設計は 直近28日の追加214人／累計配信1,842通／シナリオ開始198件／エラー3件） **ルート**：`/friend-add-settings/runs`。**取得元**：`friend-add-v6/P2J0Te.txt`。**推奨修正**：**「取得できない記録は0件にせず『経路は取得できません』と表示します」の断りはそのまま残す**（束4の手本）。右側3枚と流入経路別の内訳は、`Q4bkTg`（流入と計測）の「経路が分かる何人か」と同じ口が要るので、そちらと同時に。',
     verdictSource: 'friend-add-v6/P2J0Te-normal-1920.png',
     verdictHead: '5dc99107',
   },
@@ -973,13 +973,13 @@ export const SCREENS = [
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '**P1 作成の段が無い。** ルート `/webinars/new`。撮った本文の見出しは「ウェビナーを作る／録画と配信枠を設定すると、友だちが『◯』…」の1枚で、設計の 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 という段が無い。**段の終わり（公開前確認 `D6yO7e`・公開完了 `TimXl`）が未実装**なので、作り終えたかどうかを画面が言えない。**推奨修正**：#508 が `D6yO7e` を実装済みなので、#507 → #508 の取り込み後に段を通す。取得元：`webinars-v6/lvaY5.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt' , verdictHead: 'c275749d' },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**P2 動画・公開設定が1枚に同居している。** ルート `/webinars/edit?id=wb-1`。撮った本文は「ウェビナーの編集／動画セミナーの公開設定と、視聴中・視聴後…」で始まり、**`d3rFGD`（CTA・フォーム）`Xjk8q`（視聴後アクション）と同じ1枚**。設計はそれぞれ別の段。**同じ画面を3つのNodeで指しているので、どこを直したか追いにくい。** 取得元：`webinars-v6/PV1Vh.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/PV1Vh.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 動画・公開設定が1枚に同居している。** ルート `/webinars/edit?id=wb-1`。撮った本文は「ウェビナーの編集／動画セミナーの公開設定と、視聴中・視聴後…」で始まり、**`d3rFGD`（CTA・フォーム）`Xjk8q`（視聴後アクション）と同じ1枚**。設計はそれぞれ別の段。**同じ画面を3つのNodeで指しているので、どこを直したか追いにくい。** 取得元：`webinars-v6/PV1Vh.txt`。1440・1920とも横スクロール0 **推奨修正**：`d3rFGD` `Xjk8q` と同じ1枚なので、**3つまとめて段へ分ける**。1枚ずつ直すと同じ画面を3回触ることになり、どこを直したか追えなくなる。', verdictSource: 'webinars-v6/PV1Vh.txt',
     steps: [{ click: 'いつ見られるようにするか' }],
     verdictHead: 'c275749d',
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**P2 CTA・フォームが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/d3rFGD.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/d3rFGD.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 CTA・フォームが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/d3rFGD.txt`。1440・1920とも横スクロール0 **推奨修正**：`PV1Vh` `Xjk8q` と同じ束。**3つまとめて段へ分ける。**', verdictSource: 'webinars-v6/d3rFGD.txt',
     steps: [{ click: '見ている途中に出すもの' }],
     verdictHead: 'c275749d',
   },
@@ -987,13 +987,13 @@ export const SCREENS = [
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド', route: WEBINAR_EDIT,
     steps: [{ click: '通知とリマインド' }],
     verdict: 'needs_fix',
-    verdictNote: '**#546 で通知とリマインドが入り、未実装ではなくなった。** 設計が求めた4つ（申込直後の受付確認／前日20:00／開始1時間前／開始時、および未視聴者へ翌日10:00の見逃し案内）と視聴完了のお礼まで揃い、**設計より細かく編集できる**（設計は畳んだ行、実装は1つずつ切り替えと時刻の欄）。「日程を選び直したときは、前の回の未送信予定を取り消し、新しい回へ作り直します。」も書いてある。P2 STEP1〜5の進み表示が無い。設定サマリーの中身が違う（設計は 対象完了・リマインド・対象184人・タグ「配信済み」を追加、実装は 通知6種類・送信待ち42件・送信済み138件・送れなかったもの2件。実装のほうが運用に効く）。テスト送信と公開ページを見るが押せない（設計は押せる）。下書き保存と「視聴後アクションへ」の導線が無い。時刻が08:00 PM/10:00 AMと英語書式になるのは撮影側のブラウザ言語の癖',
+    verdictNote: '**#546 で通知とリマインドが入り、未実装ではなくなった。** 設計が求めた4つ（申込直後の受付確認／前日20:00／開始1時間前／開始時、および未視聴者へ翌日10:00の見逃し案内）と視聴完了のお礼まで揃い、**設計より細かく編集できる**（設計は畳んだ行、実装は1つずつ切り替えと時刻の欄）。「日程を選び直したときは、前の回の未送信予定を取り消し、新しい回へ作り直します。」も書いてある。P2 STEP1〜5の進み表示が無い。設定サマリーの中身が違う（設計は 対象完了・リマインド・対象184人・タグ「配信済み」を追加、実装は 通知6種類・送信待ち42件・送信済み138件・送れなかったもの2件。実装のほうが運用に効く）。テスト送信と公開ページを見るが押せない（設計は押せる）。下書き保存と「視聴後アクションへ」の導線が無い。時刻が08:00 PM/10:00 AMと英語書式になるのは撮影側のブラウザ言語の癖 **ルート**：`/webinars/edit?id=webinar-1`（通知・リマインド）。**取得元**：`webinars-v6/Ho8z4.txt`。**推奨修正**：STEP1〜5の進み表示を足す（`bPF0s` が同じ進み表示を既に持っている）。**設定サマリーは実装のほう（通知6種類・送信待ち42件・送信済み138件・送れなかったもの2件）が運用に効くので変えない。** 「日程を選び直したときは、前の回の未送信予定を取り消し、新しい回へ作り直します。」の断りも残す。',
     verdictSource: 'webinars-v6/Ho8z4-1920.png',
     verdictHead: 'de0848b9',
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**P2 視聴後アクションが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/Xjk8q.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Xjk8q.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 視聴後アクションが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/Xjk8q.txt`。1440・1920とも横スクロール0 **推奨修正**：`PV1Vh` `d3rFGD` と同じ束。**3つまとめて段へ分ける。**', verdictSource: 'webinars-v6/Xjk8q.txt',
     steps: [{ click: 'いつ見られるようにするか' }],
     verdictHead: 'c275749d',
   },
@@ -1001,7 +1001,7 @@ export const SCREENS = [
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー', route: WEBINAR_EDIT,
     mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
-    verdictNote: '**#507 で公開ページを見る導線が実データへつながった。** ただし撮った head では**押せない**まま（`<Button data-design-node="GB0NR" disabled title={previewUnavailableReason}>`）。LIFF IDが確認できないアカウントでは理由付きで止める作りで、**押せて何も起きないより良い**。P1 押せる状態の絵は、LIFF IDを持つ固定データを用意しないと撮れない。設計は押せる',
+    verdictNote: '**#507 で公開ページを見る導線が実データへつながった。** ただし撮った head では**押せない**まま（`<Button data-design-node="GB0NR" disabled title={previewUnavailableReason}>`）。LIFF IDが確認できないアカウントでは理由付きで止める作りで、**押せて何も起きないより良い**。P1 押せる状態の絵は、LIFF IDを持つ固定データを用意しないと撮れない。設計は押せる **ルート**：`/webinars/edit?id=webinar-1`（公開ページを見る）。**取得元**：`webinars-v6/design-qa.md` ＋ `previewUnavailableReason` の実装。**推奨修正**：**押せない理由を出して止める作りは正しいので変えない**（押せて何も起きないより良い）。**残作業**：LIFF IDを持つ固定データを用意して、押せる状態の絵を撮る。',
     verdictSource: 'webinars-v6/GB0NR-1920.png',
     verdictHead: '61eeb3c7',
   },
@@ -1026,13 +1026,13 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**P2 参加者管理が `yxyzQ`（分析）と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の画面。取得元：`webinars-v6/Q8sHa.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Q8sHa.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 参加者管理が `yxyzQ`（分析）と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の画面。取得元：`webinars-v6/Q8sHa.txt`。1440・1920とも横スクロール0 **推奨修正**：`yxyzQ` と同じ1枚なので**2つまとめて分ける**。設計は別画面。', verdictSource: 'webinars-v6/Q8sHa.txt',
     steps: [{ click: '概要・分析' }],
     verdictHead: 'c275749d',
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**P2 分析が `Q8sHa` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。**一覧側でまとめて数える口が無い**ので `ZC13r` の帯が `—` のままになる（同じ根）。取得元：`webinars-v6/yxyzQ.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/yxyzQ.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 分析が `Q8sHa` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。**一覧側でまとめて数える口が無い**ので `ZC13r` の帯が `—` のままになる（同じ根）。取得元：`webinars-v6/yxyzQ.txt`。1440・1920とも横スクロール0 **推奨修正**：**一覧側でまとめて数える口を足すのが先**——`ZC13r` の帯が `—` のままなのはこれが根。1本ぶんは `WebinarAnalytics` から出せているので、**同じ集計を一覧用にまとめて返す**だけ。', verdictSource: 'webinars-v6/yxyzQ.txt',
     steps: [{ click: '概要・分析' }],
     verdictHead: 'c275749d',
   },
@@ -1046,7 +1046,7 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**#524 `a6c35ee0` で束4の完了条件を満たした。** 失敗のとき帯は **ウェビナー `—件`／公開中 `—`／申込 `—`** で、ウェビナーだけ `0件` と数えていた差は解消した。読込・空・失敗が分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（回ごとの申込の推移、視聴後のフォロー配信の状態）はこの直しの外',
+    verdict: 'needs_fix', verdictNote: '**#524 `a6c35ee0` で束4の完了条件を満たした。** 失敗のとき帯は **ウェビナー `—件`／公開中 `—`／申込 `—`** で、ウェビナーだけ `0件` と数えていた差は解消した。読込・空・失敗が分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（回ごとの申込の推移、視聴後のフォロー配信の状態）はこの直しの外 **ルート**：`/webinars`（空・読込・失敗）。**取得元**：`webinars-v6/zCQXe.txt`。**推奨修正**：一覧の作り（回ごとの申込の推移、視聴後のフォロー配信の状態）は `ZC13r` と同じ束なので一緒に。',
     verdictSource: 'webinars-v6/zCQXe-error.txt', verdictHead: 'a6c35ee0',
   },
 
@@ -1058,13 +1058,13 @@ export const SCREENS = [
   { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '**P1 「フォルダ」の縦帯が、フォルダを読んでいない。** ルート `/templates`。縦帯は `templates.reduce(... template.category ...)`（`templates/page.tsx:180`）で **`category` を数えている**。`templates` 表には `folder_id`（`folders` への外部キー）が別にあり、`/api/folders?kind=template` も お問い合わせ8・予約5・EC4 を返しているのに、**画面はそれを一度も使わない**。撮った絵では22件が「general 20／未分類 2」の2つに潰れ、3つのフォルダがどこにも出ない。**フォルダを作っても一覧で効かない。** 担当は #493。**推奨修正**：縦帯を `/api/folders?kind=template` と `folderId` から作る。**（縦帯に出ていた `text` の字は撮影用の固定データの値で、実装の不具合ではない。DBの既定 `general` に直した。指摘は値に関係なく残る。）** P2 種類の札が 全て／テキスト／Flex／画像／未使用 の5つで、**設計の「質問」が無い**（#572 で `NNDMR` として入ったので、取り込み後に数え直す）。P2 送信数は全行 `—` で未取得（0で埋めていないのは良い）。取得元：`templates-v6/W7LBc.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/W7LBc.txt + templates/page.tsx:180' , verdictHead: 'c275749d' },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
-    verdict: 'needs_fix', verdictNote: '**P2 メッセージを作る面が設計とそろわない。** ルート `/templates`。**タブに件数は付いている**（メッセージ22／カルーセル24／リッチメッセージ10／クーポン6／リサーチ4）。設計との差は本文の上限（1通5,000字・合計22,500字・最大5通・4,500字で自動分割）、ボタンの編集（最大4つ・ラベルと動き）、URLの扱いの表（サイト名・URL・計測）。取得元：`templates-v6/GFlD7.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/GFlD7.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 メッセージを作る面が設計とそろわない。** ルート `/templates`。**タブに件数は付いている**（メッセージ22／カルーセル24／リッチメッセージ10／クーポン6／リサーチ4）。設計との差は本文の上限（1通5,000字・合計22,500字・最大5通・4,500字で自動分割）、ボタンの編集（最大4つ・ラベルと動き）、URLの扱いの表（サイト名・URL・計測）。取得元：`templates-v6/GFlD7.txt`。1440・1920とも横スクロール0 **推奨修正**：**本文の上限を先に直す**（1通5,000字・合計22,500字・最大5通・4,500字で自動分割）。**`XQfMD`（一斉配信の本文編集）と同じ差**なので、2画面まとめて直す。ボタンの編集とURLの扱いの表もそちらと共通。', verdictSource: 'templates-v6/GFlD7.txt',
     steps: [{ click: 'テンプレートを作る' }],
     verdictHead: 'c275749d',
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'needs_fix', verdictNote: '**P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カードセットを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/FRkls.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カードセットを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0 **推奨修正**：カードごとの並べ替えと画像の比率の指定を足す。**カルーセルの中身は `NNDMR`（質問を作る）が選択肢の開閉で似た作りを持っている**ので、並べ替えの部品はそこから写せる。', verdictSource: 'templates-v6/FRkls.txt',
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
     verdictHead: 'c275749d',
   },
@@ -1083,7 +1083,7 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
-    verdict: 'needs_fix', verdictNote: '**P2 リッチメッセージを作る面が設計とそろわない。** ルート `/templates`（リッチメッセージ→作る）。設計との差は領域の分け方の見本を選ぶところ。取得元：`templates-v6/j9ixI.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/j9ixI.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 リッチメッセージを作る面が設計とそろわない。** ルート `/templates`（リッチメッセージ→作る）。設計との差は領域の分け方の見本を選ぶところ。取得元：`templates-v6/j9ixI.txt`。1440・1920とも横スクロール0 **推奨修正**：領域の分け方の見本を選べるようにする。**リッチメニューの編集（`XtfO3`）が既に領域を区切る部品を持っている**ので、見本の形をそこから写す。', verdictSource: 'templates-v6/j9ixI.txt',
     steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
     verdictHead: 'c275749d',
   },
