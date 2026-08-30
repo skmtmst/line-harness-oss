@@ -380,10 +380,13 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
-    route: '/friends?tab=duplicates', gap: 'api',
-    gapNote: '集計口だけでは作れない。候補ID、友だち2件、根拠、確信度、pending/linked/different/deferred/invalidated、判定者・理由・履歴を持つ `identity_candidates` と候補詳細・判定APIが要る',
-    status: 'unimplemented',
-    why: '現行 `/api/duplicates/stats` はアカウント別件数と重複マトリックスだけを返し、候補行・根拠・判定状態を返さない。正式要件 §9・§11・§14 が候補台帳と判定APIを要求しているため、画面の導線追加だけでは完成しない',
+    route: '/friends/identity-candidates',
+    states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    variants: [{ suffix: '-decide', steps: [{ qaOpen: 'InCDe', after: 700 }] }],
+    verdict: 'match',
+    verdictNote: '**#600 `484c0cd8`（#598 `a13be90c` の上）で新規実装。設計 `InCDe` 3-2-A。** ルート `/friends/identity-candidates`。1440・1920とも横スクロール0。 **① 5状態を撮り分けた**：通常・読込・空・失敗・権限不足。**失敗と権限不足では候補を1件も描かない**（`page.tsx` は `review.state === \'ready\'` の中でだけ中身を組む）ので、見てよい人が決まっている名前・マスク値が断片で漏れない。 **② 未取得と実値0を分けている**：影響は 重複配信 `3通` ／ 注文（取得元を接続後に表示） `—（未取得）`。`impact.value === null` を `—（未取得）`、`0` を `0通` にする判断は `identity-view.ts:impactText`。 **③ 根拠に強さと確認済みの札**：確認済みのメールアドレスが同じ〈決め手になる／確認済み〉、表示名が似ている〈参考／未確認〉。「表示名やプロフィール画像だけの一致は、決め手にはしません。」も出る。 **④ 判定窓**（`data-qa-open="InCDe"`）は3つの判定と理由入力を持ち、**理由が空のうちは送りのボタンが押せない**。「別人として記録する」には「根拠が変わるまで候補へ戻しません。」が付く。友だち同士なので再処理の欄は出さない（Workerが422を返すため）。 **⑤ 消えないことと取り消しの効き方**を判定前と判定窓の両方に出す。 設計の「統合プロフィールに採用する値」表は、**項目ごとの採用値を保存する口が契約に無い**ため作っていない（`DecideIdentityCandidateRequest` は `decision` と `reason` だけ）。押しても何も起きない操作を置かなかった。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。平文のメール・電話・内部IDの露出なし。** 取得元：`friends-v6/InCDe-normal.txt`・`InCDe-forbidden.txt` ＋ `identity-view.ts` ＋ `friends/identity-candidates/page.tsx`',
+    verdictSource: 'friends-v6/InCDe-normal.txt + identity-view.ts',
+    verdictHead: '484c0cd8',
   },
   {
     /*
@@ -1701,10 +1704,13 @@ export const SCREENS = [
   { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'needs_fix', verdictNote: 'P1 結びつかなかった注文が、どこにも出てこない。ECの注文にはLINEの友だちが誰なのか書かれておらず、メールか電話で結びつけて、どちらも一致しなかった注文が「会員のつき合わせ」に並ぶ設計。実装にはそれを集めて見る場所が無い。設計は候補（電話番号が同じ／確からしさ とても高い）と「結びつけると増える売上 ¥312,400（この24件ぶん。分析にも入ります）」まで出す。**いま結びつかなかった注文は、買ってくれた事実がLINE側に何も残らないまま**で、購入後の配信も成果地点もマイルも動かない。P1 つなぎ先を画面から変えられない（page.tsx:174「接続先や突合キーを画面から変える口が無い」） **ルート**：`/ec-commerce`。**取得元**：`ec-v6/eI3gs.txt` ＋ `ec-commerce/page.tsx:174`。**推奨修正**：`ELayY`（会員のつき合わせ）の候補台帳が要る。**いま結びつかなかった注文は、買ってくれた事実がLINE側に何も残らない**ので、配信も成果地点もマイルも動かない。つなぎ先を画面から変える（`oHAN4`）ときは、**署名の秘密値を画面へ出さない**——`M0Gb7`（Webhook）の「設定済／未設定」の見せ方を写す。', verdictSource: 'ec-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
-    gap: 'api',
-    gapNote: '`friendId` が空のeventを並べるだけでは足りない。検証済みemail/電話の候補、account/shop境界、linked/rejected/deferred判断、影響確認、過去eventの再処理範囲を持つidentity候補・判断API/DBが要る',
-    status: 'unimplemented',
-    why: '現行 `ec_events` は未照合eventを保持できるが、候補の根拠・確定/否定/保留・再提示抑止・影響確認を保存する口が無い。正式要件 §7・§8・§11 がidentity candidate/link decisionとaccount scopeを要求している',
+    route: '/ec-commerce/identity-candidates',
+    states: { apis: ['**/api/identity-candidates*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    variants: [{ suffix: '-decide', steps: [{ qaOpen: 'ELayY', after: 700 }] }],
+    verdict: 'match',
+    verdictNote: '**#600 `484c0cd8`（#598 `a13be90c` の上）で新規実装。設計 `ELayY` 23-1-A。** ルート `/ec-commerce/identity-candidates`。1440・1920とも横スクロール0。 **① `InCDe` と同じ候補部品・状態部品・判定窓を使う**（`components/identity`）。外枠だけが違う。 **② 5状態を撮り分けた**：通常・読込・空・失敗・権限不足。失敗と権限不足では候補も注意帯も描かない。 **③ 未取得と実値0を分けている**：影響は 結び付く注文 `24件` ／ 過去のLINE送信（再送しません） `0通`。**設計の帯にある「自動で結びついた」「結びつけると増える売上」は読み口が返さないので、数字を作らず `—（未取得）` と書いた。** **④ 判定窓**（`data-qa-open="ELayY"`）はECなので**再処理の範囲**が出る。既定は「今後の注文だけ結び付ける（過去のLINE送信は再送しません）」で、過去へ副作用を出さない。 **⑤ 版競合**は `expectedVersion` を送り、409 `STALE_CANDIDATE` を「別の人が先に判定しました。最新の状態を読み直してください。」に言い換える（内部の記号は出さない）。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。平文のメール・電話・内部IDの露出なし。** 取得元：`ec-v6/ELayY-normal.txt`・`ELayY-forbidden.txt` ＋ `identity-decision-dialog.tsx` ＋ `ec-commerce/identity-candidates/page.tsx`',
+    verdictSource: 'ec-v6/ELayY-normal.txt + identity-decision-dialog.tsx',
+    verdictHead: '484c0cd8',
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
@@ -2269,14 +2275,23 @@ export const CAPTURED_AT = {
   4: [
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
+  { pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' },
+    { pr: 420, head: 'f77de350', on: '2026-08-30', screens: ['HBTk0', 'yKEdO', 'KoT6c'], note: '入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた' },
   ],
   10: [
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
     { pr: 546, head: 'de0848b9', on: '2026-08-29', screens: ['Ho8z4'], note: '通知とリマインド。既存の申込と5分ごとの仕掛けを使う' },
+  { pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZC13r', 'lvaY5', 'PV1Vh', 'd3rFGD', 'Xjk8q', 'Q8sHa', 'yxyzQ'], note: 'development そのもので撮った' },
   ],
   11: [
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
+  { pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' },
+    { pr: 528, head: '1b95452d', on: '2026-08-29', screens: ['NKyoA'], note: 'タブとフォルダの件数を未取得 `—` に。束4' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['W7LBc', 'GFlD7', 'FRkls', 'j9ixI', 'hsBtl', 'J3GxEZ'], note: '同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった' },
+    { pr: 493, head: 'cdbfe42c', on: '2026-08-30', screens: ['W7LBc'], note: '縦帯が category ではなく folderId で数えるようになった。通常・読込・0件・失敗と、押した2つ' },
   ],
   6: [
     { pr: 543, head: '819895dd', on: '2026-08-29', screens: ['h0kahp'], note: 'テスト送信と本番予約で同じ下書きを使う直し。押すたびに配信が増える件は解決' },
@@ -2286,8 +2301,24 @@ export const CAPTURED_AT = {
       screens: ['q76C35', 'zZ9fA', 'XQfMD', 'p97Tf', 'Bw0zt', 'vW4Es', 'u6gHt', 'EGMb1', 'xkRDb', 'TmHjF'],
       note: '固定データ（配信の帯・1件の配信）を足して撮り直した。**`FpgxH` は #497 の絵に戻した。** 機能ごと撮り直すと、別のPRで直った1枚が直る前に戻る',
     },
+
+    { pr: 531, head: '1a943082', on: '2026-08-29', screens: ['u6gHt'], note: '内部語を外し、開封の母数を明記。束3と束6' },
+    { pr: 561, head: '51827fe1', on: '2026-08-29', screens: ['bPF0s'], note: '予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける' },
+    { pr: 557, head: '697cee2c', on: '2026-08-29', screens: ['q76C35'], note: '帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た' },
+    { pr: 554, head: '875a9ed3', on: '2026-08-29', screens: ['EGMb1'], note: '配信の削除を画面内の確認窓へ' },
+    { pr: 550, head: 'f7c5a99e', on: '2026-08-29', screens: ['cPk8A', 'sqFXf'], note: '対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした' },
   ],
-  12: [{ pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' }],
+  12: [
+    { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },
+    { pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['GO8RQ', 'XtfO3', 'kQ1bs', 'UMiJ9', 'TL7tp'], note: '同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**' },
+    { pr: 583, head: '0218ef61', on: '2026-08-30', screens: ['GO8RQ'], note: '出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致' },
+    { pr: 509, head: '4cf82bd9', on: '2026-08-30', screens: ['DIUbO', 'NXdDk'], note: 'つながりの通常・読込・空・失敗を本文まで取った。空を失敗と混ぜない' },
+    { pr: 575, head: 'ab5750ec', on: '2026-08-30', screens: ['szXsT'], note: '削除確認が ConfirmDialog へ。管理画面のものとLINE上のものが別の窓。失敗しても閉じない' },
+    { pr: 577, head: '7b8df2f4', on: '2026-08-30', screens: ['RW5Tb'], note: '失敗のとき帯を — に。実値0と未取得を言い分ける' },
+    { pr: 583, head: 'bb1e4dfd', on: '2026-08-30', screens: ['kQ1bs', 'XtfO3'], note: '編集画面に「出す順番」。表示は1番始まり、保存は0始まりのまま' },
+    { pr: 592, head: '84f35a0b', on: '2026-08-30', screens: ['XtfO3'], note: 'Claudeが直した。3段の進み方。段の見た目は cCB7r と共通の部品へ切り出した。直した本人が比較している' },
+  ],
   14: [
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['WuKzU', 'gBtaK'], note: 'development そのもので撮った' },
@@ -2306,13 +2337,10 @@ export const CAPTURED_AT = {
   16: [
     { pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' },
     { pr: 563, head: '64798425', on: '2026-08-29', screens: ['jwrbf'], note: '帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**' },
-  ],
-  6: [
-    { pr: 531, head: '1a943082', on: '2026-08-29', screens: ['u6gHt'], note: '内部語を外し、開封の母数を明記。束3と束6' },
-    { pr: 561, head: '51827fe1', on: '2026-08-29', screens: ['bPF0s'], note: '予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける' },
-    { pr: 557, head: '697cee2c', on: '2026-08-29', screens: ['q76C35'], note: '帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た' },
-    { pr: 554, head: '875a9ed3', on: '2026-08-29', screens: ['EGMb1'], note: '配信の削除を画面内の確認窓へ' },
-    { pr: 550, head: 'f7c5a99e', on: '2026-08-29', screens: ['cPk8A', 'sqFXf'], note: '対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした' },
+
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' },
+    { pr: 585, head: '75d6eb9a', on: '2026-08-30', screens: ['njLGA'], note: '支払いのタブ。承認済みだけを集計し、保留期間内と承認日時未取得を分ける。通常・読込・0件・取得失敗の4状態' },
+    { pr: 585, head: '3857365b', on: '2026-08-30', screens: ['njLGA'], note: '取得失敗のとき帯を — にする直し。0円と見分けがつくようになった' },
   ],
   27: [
     { pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' },
@@ -2345,8 +2373,8 @@ export const CAPTURED_AT = {
     { pr: 511, head: '4bc71249', on: '2026-08-29', screens: ['GC4St'], note: '実行結果から内部IDを外す。束3' },
     { pr: 498, head: 'f30890f2', on: '2026-08-30', screens: ['Y0Sn3'], note: '`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま' },
     { pr: 514, head: 'd064bded', on: '2026-08-30', screens: ['Y0Sn3'], note: '一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった' },
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' }],
-  11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' },
+  ],
   8: [
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
@@ -2379,6 +2407,9 @@ export const CAPTURED_AT = {
     { pr: 555, head: 'e873eeb9', on: '2026-08-29', screens: ['ANgda', 'tBlkL', 'AuSDY', 'LHjwD'], note: '保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['xGLVe'], note: 'development そのもので撮った' },
     { pr: 583, head: '0218ef61', on: '2026-08-30', screens: ['GO8RQ'], note: '出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致' },
+
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' },
+    { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
   ],
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },
@@ -2400,7 +2431,10 @@ export const CAPTURED_AT = {
   ],
   3: [
     { pr: 520, head: '4848a8f3', on: '2026-08-29', screens: ['bzDn6'], note: '友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**' },
-    { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
+    { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' },
+  { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'YzxU1'], note: '判定を具体化するため撮った' },
+      { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['InCDe'], note: 'Claudeが #598 の読み口の上に実装した2画面のうち友だち同士のほう。5状態＋判定窓で12枚' },
+  ],
   28: [
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
@@ -2412,48 +2446,19 @@ export const CAPTURED_AT = {
     { pr: 533, head: 'c9d33d95', on: '2026-08-30', screens: ['ugP5y', 'k5m5Bc'], note: '帯が「次に何をするか」になった。あと少しで満席・申し込みが少ない。未取得と実値0も言い分ける' },
     { pr: 593, head: 'f9619297', on: '2026-08-30', screens: ['i5SN2j'], note: '帯が次の行動に。拒否は運用メモ、運営キャンセルは3点を示す。撮影モックに申込者の口を足した' },
   ],
-  10: [{ pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' }],
-  11: [{ pr: 528, head: '1b95452d', on: '2026-08-29', screens: ['NKyoA'], note: 'タブとフォルダの件数を未取得 `—` に。束4' }],
-  12: [{ pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' }],
-  4: [{ pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' }],
-  30: [{ pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' }],
-  31: [{ pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' }],
-  /*
-    **`codex/development` そのもので撮った回。** 8/29 に根元PRが9本
-    入り、多くの画面がここで初めて「どのheadで見たか」を持てた。
-    **`--only` を付け忘れて機能まるごと撮り、`DIUbO` `NXdDk`（#509）と
-    `RW5Tb`（#523）を巻き戻した。git から戻した。**
-  */
-  1: [{ pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' }],
-  12: [
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['GO8RQ', 'XtfO3', 'kQ1bs', 'UMiJ9', 'TL7tp'], note: '同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**' },
-    { pr: 583, head: '0218ef61', on: '2026-08-30', screens: ['GO8RQ'], note: '出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致' },
-    { pr: 509, head: '4cf82bd9', on: '2026-08-30', screens: ['DIUbO', 'NXdDk'], note: 'つながりの通常・読込・空・失敗を本文まで取った。空を失敗と混ぜない' },
-    { pr: 575, head: 'ab5750ec', on: '2026-08-30', screens: ['szXsT'], note: '削除確認が ConfirmDialog へ。管理画面のものとLINE上のものが別の窓。失敗しても閉じない' },
-    { pr: 577, head: '7b8df2f4', on: '2026-08-30', screens: ['RW5Tb'], note: '失敗のとき帯を — に。実値0と未取得を言い分ける' },
-    { pr: 583, head: 'bb1e4dfd', on: '2026-08-30', screens: ['kQ1bs', 'XtfO3'], note: '編集画面に「出す順番」。表示は1番始まり、保存は0始まりのまま' },
-    { pr: 592, head: '84f35a0b', on: '2026-08-30', screens: ['XtfO3'], note: 'Claudeが直した。3段の進み方。段の見た目は cCB7r と共通の部品へ切り出した。直した本人が比較している' },
+  30: [
+    { pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' },
   ],
-  10: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZC13r', 'lvaY5', 'PV1Vh', 'd3rFGD', 'Xjk8q', 'Q8sHa', 'yxyzQ'], note: 'development そのもので撮った' }],
-  11: [
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['W7LBc', 'GFlD7', 'FRkls', 'j9ixI', 'hsBtl', 'J3GxEZ'], note: '同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった' },
-    { pr: 493, head: 'cdbfe42c', on: '2026-08-30', screens: ['W7LBc'], note: '縦帯が category ではなく folderId で数えるようになった。通常・読込・0件・失敗と、押した2つ' },
+  31: [
+    { pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' },
   ],
-  16: [
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' },
-    { pr: 585, head: '75d6eb9a', on: '2026-08-30', screens: ['njLGA'], note: '支払いのタブ。承認済みだけを集計し、保留期間内と承認日時未取得を分ける。通常・読込・0件・取得失敗の4状態' },
-    { pr: 585, head: '3857365b', on: '2026-08-30', screens: ['njLGA'], note: '取得失敗のとき帯を — にする直し。0円と見分けがつくようになった' },
+  1: [
+    { pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' },
   ],
-  23: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' }],
-  4: [
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' },
-    { pr: 420, head: 'f77de350', on: '2026-08-30', screens: ['HBTk0', 'yKEdO', 'KoT6c'], note: '入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた' },
+  23: [
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
+    { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
   ],
-  2: [
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' },
-    { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
-  ],
-  3: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'YzxU1'], note: '判定を具体化するため撮った' }],
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },

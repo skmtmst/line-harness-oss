@@ -596,6 +596,11 @@ const EMPTY_BODIES = [
   /* 友だちの一覧はページ送りつき。配列で返すと画面ごと落ちる。 */
   [/\/api\/friends(\?|$)/, { items: [], total: 0, page: 1, limit: 20 }],
   [/\/api\/rich-menu-groups\/(external|tap-stats)/, null],
+  /*
+    本人照合の候補（`InCDe` / `ELayY`）。**一覧の既定（配列）だと落ちる**——
+    画面は `data.items` を読む。「空」は**同じ人の疑いが1件も無い**状態。
+  */
+  [/\/api\/identity-candidates(\?|$)/, { items: [], total: 0, limit: 20, offset: 0 }],
 ]
 
 /**

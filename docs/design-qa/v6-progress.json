@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 232,
-  "unimplemented": 26,
+  "compared": 234,
+  "unimplemented": 24,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 40,
+  "match": 42,
   "structureMatchDataPending": 18,
   "needsFix": 174,
   "unjudged": 0,
-  "remaining": 218,
+  "remaining": 216,
   "features": [
     {
       "feature": 1,
@@ -58,6 +58,47 @@
       "remaining": 15,
       "capturedAt": [
         {
+          "pr": 513,
+          "head": "60b39036",
+          "on": "2026-08-29",
+          "screens": [
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "保存の成否を窓へ返す直し。**P0は解決**"
+        },
+        {
+          "pr": 555,
+          "head": "e873eeb9",
+          "on": "2026-08-29",
+          "screens": [
+            "ANgda",
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "xGLVe"
+          ],
+          "note": "development そのもので撮った"
+        },
+        {
+          "pr": 583,
+          "head": "0218ef61",
+          "on": "2026-08-30",
+          "screens": [
+            "GO8RQ"
+          ],
+          "note": "出す順番を既定にし、断りと並べ替えの口を足した。Workerの選ぶ順と同率の決め方まで一致"
+        },
+        {
           "pr": 0,
           "head": "c275749d",
           "on": "2026-08-30",
@@ -84,17 +125,35 @@
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 7,
-      "unimplemented": 4,
+      "compared": 8,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 2,
       "structureMatchDataPending": 0,
       "needsFix": 6,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 9,
       "capturedAt": [
+        {
+          "pr": 520,
+          "head": "4848a8f3",
+          "on": "2026-08-29",
+          "screens": [
+            "bzDn6"
+          ],
+          "note": "友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**"
+        },
+        {
+          "pr": 565,
+          "head": "ea2e730d",
+          "on": "2026-08-29",
+          "screens": [
+            "r7eSi"
+          ],
+          "note": "統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）"
+        },
         {
           "pr": 0,
           "head": "c275749d",
@@ -106,6 +165,15 @@
             "YzxU1"
           ],
           "note": "判定を具体化するため撮った"
+        },
+        {
+          "pr": 600,
+          "head": "484c0cd8",
+          "on": "2026-08-31",
+          "screens": [
+            "InCDe"
+          ],
+          "note": "Claudeが #598 の読み口の上に実装した2画面のうち友だち同士のほう。5状態＋判定窓で12枚"
         }
       ]
     },
@@ -124,6 +192,38 @@
       "unjudged": 0,
       "remaining": 15,
       "capturedAt": [
+        {
+          "pr": 420,
+          "head": "87c150ad",
+          "on": "2026-08-28",
+          "screens": [
+            "HBTk0",
+            "yKEdO",
+            "KoT6c",
+            "A1ZYeP",
+            "l25rlp",
+            "rIhbN"
+          ]
+        },
+        {
+          "pr": 421,
+          "head": "f7b7974a",
+          "on": "2026-08-28",
+          "screens": [
+            "QKx8Q",
+            "XBkiQ"
+          ]
+        },
+        {
+          "pr": 541,
+          "head": "e929f22a",
+          "on": "2026-08-29",
+          "screens": [
+            "QKx8Q",
+            "XBkiQ"
+          ],
+          "note": "保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3"
+        },
         {
           "pr": 0,
           "head": "c275749d",
@@ -333,6 +433,42 @@
       "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
+        {
+          "pr": 543,
+          "head": "819895dd",
+          "on": "2026-08-29",
+          "screens": [
+            "h0kahp"
+          ],
+          "note": "テスト送信と本番予約で同じ下書きを使う直し。押すたびに配信が増える件は解決"
+        },
+        {
+          "pr": 497,
+          "head": "84e5bab9",
+          "on": "2026-08-28",
+          "screens": [
+            "FpgxH"
+          ],
+          "note": "Claudeが作ったDraft。#495 の上に積んである"
+        },
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "vW4Es",
+            "u6gHt",
+            "EGMb1",
+            "xkRDb",
+            "TmHjF"
+          ],
+          "note": "固定データ（配信の帯・1件の配信）を足して撮り直した。**`FpgxH` は #497 の絵に戻した。** 機能ごと撮り直すと、別のPRで直った1枚が直る前に戻る"
+        },
         {
           "pr": 531,
           "head": "1a943082",
@@ -597,6 +733,34 @@
       "remaining": 13,
       "capturedAt": [
         {
+          "pr": 508,
+          "head": "61eeb3c7",
+          "on": "2026-08-29",
+          "screens": [
+            "TimXl",
+            "GB0NR"
+          ],
+          "note": "公開完了と公開ページの導線。**#508 は #507 を含む**"
+        },
+        {
+          "pr": 546,
+          "head": "de0848b9",
+          "on": "2026-08-29",
+          "screens": [
+            "Ho8z4"
+          ],
+          "note": "通知とリマインド。既存の申込と5分ごとの仕掛けを使う"
+        },
+        {
+          "pr": 524,
+          "head": "a6c35ee0",
+          "on": "2026-08-29",
+          "screens": [
+            "zCQXe"
+          ],
+          "note": "ウェビナーの帯を未取得 `—` に。束4"
+        },
+        {
           "pr": 0,
           "head": "c275749d",
           "on": "2026-08-30",
@@ -628,6 +792,42 @@
       "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
+        {
+          "pr": 433,
+          "head": "51020a97",
+          "on": "2026-08-28",
+          "screens": [
+            "M9cij"
+          ]
+        },
+        {
+          "pr": 493,
+          "head": "62ddaebe",
+          "on": "2026-08-28",
+          "screens": [
+            "CzndJ",
+            "M9cij"
+          ],
+          "note": "#493 は #433 を含む"
+        },
+        {
+          "pr": 572,
+          "head": "e4ab641f",
+          "on": "2026-08-29",
+          "screens": [
+            "NNDMR"
+          ],
+          "note": "質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持"
+        },
+        {
+          "pr": 528,
+          "head": "1b95452d",
+          "on": "2026-08-29",
+          "screens": [
+            "NKyoA"
+          ],
+          "note": "タブとフォルダの件数を未取得 `—` に。束4"
+        },
         {
           "pr": 0,
           "head": "c275749d",
@@ -668,6 +868,25 @@
       "unjudged": 0,
       "remaining": 3,
       "capturedAt": [
+        {
+          "pr": 509,
+          "head": "e148615c",
+          "on": "2026-08-29",
+          "screens": [
+            "DIUbO",
+            "NXdDk"
+          ],
+          "note": "切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した"
+        },
+        {
+          "pr": 523,
+          "head": "47e7846e",
+          "on": "2026-08-29",
+          "screens": [
+            "RW5Tb"
+          ],
+          "note": "内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える"
+        },
         {
           "pr": 0,
           "head": "c275749d",
@@ -899,6 +1118,26 @@
       "unjudged": 0,
       "remaining": 8,
       "capturedAt": [
+        {
+          "pr": 558,
+          "head": "ef7b5773",
+          "on": "2026-08-29",
+          "screens": [
+            "PouPn",
+            "xqT1Z",
+            "jwrbf"
+          ],
+          "note": "案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える"
+        },
+        {
+          "pr": 563,
+          "head": "64798425",
+          "on": "2026-08-29",
+          "screens": [
+            "jwrbf"
+          ],
+          "note": "帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**"
+        },
         {
           "pr": 0,
           "head": "c275749d",
@@ -1274,16 +1513,16 @@
       "feature": 23,
       "name": "EC連携",
       "total": 4,
-      "compared": 1,
-      "unimplemented": 3,
+      "compared": 2,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 0,
       "needsFix": 1,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 0,
@@ -1293,6 +1532,15 @@
             "eI3gs"
           ],
           "note": "同上"
+        },
+        {
+          "pr": 600,
+          "head": "484c0cd8",
+          "on": "2026-08-31",
+          "screens": [
+            "ELayY"
+          ],
+          "note": "同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」"
         }
       ]
     },
@@ -1730,13 +1978,6 @@
     },
     {
       "feature": 3,
-      "node": "InCDe",
-      "name": "3-2-A 重複候補詳細・統合前確認",
-      "gap": "api",
-      "gapNote": "集計口だけでは作れない。候補ID、友だち2件、根拠、確信度、pending/linked/different/deferred/invalidated、判定者・理由・履歴を持つ `identity_candidates` と候補詳細・判定APIが要る"
-    },
-    {
-      "feature": 3,
       "node": "w8W4Eh",
       "name": "3-3-A 統合ユーザー詳細",
       "gap": "api",
@@ -1874,13 +2115,6 @@
       "name": "22-1-C 出しているもの",
       "gap": "api",
       "gapNote": "通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る"
-    },
-    {
-      "feature": 23,
-      "node": "ELayY",
-      "name": "23-1-A 会員のつき合わせ",
-      "gap": "api",
-      "gapNote": "`friendId` が空のeventを並べるだけでは足りない。検証済みemail/電話の候補、account/shop境界、linked/rejected/deferred判断、影響確認、過去eventの再処理範囲を持つidentity候補・判断API/DBが要る"
     },
     {
       "feature": 23,
