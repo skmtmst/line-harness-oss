@@ -14,6 +14,7 @@ import {
   getFriendJourney,
   getAffiliateByFriendId,
   getAffiliateJourneys,
+  getAffiliatePaymentSummaries,
   listAffiliateLinks,
   listAffiliateOffers,
 } from '@line-crm/db';
@@ -111,6 +112,28 @@ affiliates.get('/api/affiliates', async (c) => {
     return c.json({ success: true, data: items.map(serializeAffiliate) });
   } catch (err) {
     console.error('GET /api/affiliates error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/affiliate-payments - approved reward totals for the read-only V6 tab
+//
+// There is no payout ledger yet. This endpoint intentionally does not call the
+// values unpaid/paid and does not fabricate bank details or settlement dates.
+affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const items = await getAffiliatePaymentSummaries(c.env.DB);
+    return c.json({
+      success: true,
+      data: items,
+      limitations: {
+        payoutHistory: false,
+        bankDestination: false,
+        settlementSchedule: false,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/affiliate-payments error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

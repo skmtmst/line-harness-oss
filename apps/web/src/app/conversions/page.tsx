@@ -48,6 +48,7 @@ function within28Days(iso: string): boolean {
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
+import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 
@@ -60,7 +61,7 @@ interface ConversionReportItem {
 }
 
 /**
- * 設計 6-1 は1画面に5タブ。並びは設計のまま、素のURLでは主役の
+ * 成果から支払い条件までを1画面でたどる。素のURLでは主役の
  * 「成果地点（CV）」を開く。
  *
  * これまでは /conversions が2タブ、その中に入れていた /affiliates が
@@ -71,6 +72,7 @@ const MERGED_TABS = [
   { key: 'affiliates', label: 'アフィリエイター' },
   { key: 'offers', label: '案件' },
   { key: 'approvals', label: '成果承認' },
+  { key: 'payment', label: '支払い' },
   { key: 'points', label: '成果地点（CV）' },
   { key: 'report', label: 'レポート' },
 ]
@@ -405,6 +407,7 @@ function ConversionsPageHost() {
     affiliates: 'PouPn',
     offers: 'GH8VL',
     approvals: 'n5VVTb',
+    payment: 'njLGA',
   }
   return (
     <div data-design-node={nodeByTab[tab]}>
@@ -420,6 +423,7 @@ function ConversionsPageHost() {
       {tab === 'affiliates' && <AffiliatorsTab />}
       {tab === 'offers' && <OffersTab />}
       {tab === 'approvals' && <ApprovalQueue />}
+      {tab === 'payment' && <AffiliatePaymentTab />}
       {tab === 'report' && <ReportTab />}
     </div>
   )

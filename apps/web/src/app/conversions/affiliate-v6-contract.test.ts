@@ -7,10 +7,11 @@ const LEGACY_PAGE = readFileSync(new URL('../affiliates/page.tsx', import.meta.u
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 成果・アフィリエイトの契約', () => {
-  it('紹介者・案件・成果承認をV6実Nodeへ結ぶ', () => {
+  it('紹介者・案件・成果承認・支払いをV6実Nodeへ結ぶ', () => {
     expect(PAGE).toContain("affiliates: 'PouPn'")
     expect(PAGE).toContain("offers: 'GH8VL'")
     expect(PAGE).toContain("approvals: 'n5VVTb'")
+    expect(PAGE).toContain("payment: 'njLGA'")
     expect(TABS).toContain('data-design-node="PouPn"')
   })
 
@@ -18,7 +19,8 @@ describe('V6 成果・アフィリエイトの契約', () => {
     expect(PAGE).not.toContain("import Header from")
     expect(PAGE).not.toContain('マニュアルは準備中です')
     expect(LEGACY_PAGE).not.toContain("import Header from")
-    expect(LEGACY_PAGE).toContain("redirect('/conversions?tab=affiliates')")
+    expect(LEGACY_PAGE).toContain("tab === 'payment'")
+    expect(LEGACY_PAGE).toContain('router.replace(`/conversions?tab=${target}`)')
   })
 
   it('紹介者一覧の空・読込・失敗を言い分ける', () => {

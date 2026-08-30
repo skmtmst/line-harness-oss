@@ -26,6 +26,7 @@ const dbMocks = {
   getFriendJourney: vi.fn(),
   getAffiliateByFriendId: vi.fn(),
   getAffiliateJourneys: vi.fn(),
+  getAffiliatePaymentSummaries: vi.fn(),
   listAffiliateLinks: vi.fn(),
   listAffiliateOffers: vi.fn().mockResolvedValue([]),
   // resolveLinkBaseUrl → getLinkBaseUrl
@@ -86,6 +87,38 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getLineAccounts.mockResolvedValue([]);
   dbMocks.getLinkBaseUrl.mockResolvedValue(null); // fall back to WORKER_URL/r
+});
+
+describe('GET /api/affiliate-payments — read-only approved totals', () => {
+  it('returns the DB summary with explicit unavailable capabilities', async () => {
+    dbMocks.getAffiliatePaymentSummaries.mockResolvedValue([
+      {
+        affiliateId: 'aff-1',
+        affiliateName: '紹介パートナー',
+        code: 'partner-1',
+        holdDays: 30,
+        payoutCycle: '月末締め',
+        approvedConversions: 2,
+        approvedReward: 6000,
+        heldConversions: 1,
+        heldReward: 3000,
+        holdStatusUnknown: 0,
+      },
+    ]);
+
+    const res = await get('/api/affiliate-payments');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      data: [expect.objectContaining({ affiliateId: 'aff-1', approvedReward: 6000 })],
+      limitations: {
+        payoutHistory: false,
+        bankDestination: false,
+        settlementSchedule: false,
+      },
+    });
+    expect(dbMocks.getAffiliatePaymentSummaries).toHaveBeenCalledWith(env.DB);
+  });
 });
 
 describe('POST /api/affiliates — random-code create', () => {
