@@ -288,6 +288,25 @@ async function runSteps(page, steps = [], node = '') {
       await page.waitForTimeout(step.after ?? 500)
       continue
     }
+    /*
+      **`data-qa-open` を先に見る。**文言で探すと、言葉を変えたときに
+      撮影が黙って空振りする（`削除` が `LINE から削除` と部分一致した、
+      `aria-label` が見えている文字と違った、を実際にやった）。
+      Node ID の目印があるものは、そちらで押す。
+    */
+    if (step.qaOpen) {
+      const marked = page.locator(`[data-qa-open="${step.qaOpen}"]`)
+      const count = await marked.count()
+      if (!count) {
+        throw new Error(
+          `${node}: data-qa-open="${step.qaOpen}" が見つかりません。`
+          + '画面に目印が付いていないか、その行が描かれていません。',
+        )
+      }
+      await marked.first().click({ timeout: 15_000 })
+      await page.waitForTimeout(step.after ?? 800)
+      continue
+    }
     const root = step.scope === 'main' ? page.locator('main') : page
     /*
       **押せるものが操作の役を持っているとは限らない。** 表の行に

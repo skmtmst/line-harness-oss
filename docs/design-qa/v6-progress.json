@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 32,
+  "match": 33,
   "structureMatchDataPending": 18,
-  "needsFix": 178,
+  "needsFix": 177,
   "unjudged": 0,
-  "remaining": 226,
+  "remaining": 225,
   "features": [
     {
       "feature": 1,
@@ -166,11 +166,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 4,
+      "match": 5,
       "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "needsFix": 9,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 534,
@@ -306,6 +306,15 @@
             "q5G45"
           ],
           "note": "同上。配信方式の見本は設計より丁寧に入っていた"
+        },
+        {
+          "pr": 590,
+          "head": "a133916a",
+          "on": "2026-08-30",
+          "screens": [
+            "RUxNf"
+          ],
+          "note": "Claudeが直した。配信前チェック4項目。確かめられない2つは —（未取得）。直した本人が比較している"
         }
       ]
     },
