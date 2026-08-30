@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const PUBLISHER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'lib', 'rich-menu-publisher.ts'),
   'utf8',
@@ -63,6 +64,15 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('moveTargetingGroup(groups, group.id')
     expect(PAGE).toContain('reordered.map((item) =>')
     expect(PAGE).not.toContain("setSortKey('manual')")
+  })
+
+  it('編集画面も一覧と同じ1番始まりの出す順番を案内する', () => {
+    expect(EDIT_PAGE).toContain('出す順番')
+    expect(EDIT_PAGE).toContain('一覧で上にあるメニューが優先されます。現在は')
+    expect(EDIT_PAGE).toContain('{targetingPriority + 1}番目です。')
+    expect(EDIT_PAGE).toContain('value={targetingPriority + 1}')
+    expect(EDIT_PAGE).toContain("Math.max(0, (parseInt(e.target.value, 10) || 1) - 1)")
+    expect(EDIT_PAGE).not.toContain('数が小さいほうが先に出ます。')
   })
 })
 
