@@ -604,6 +604,32 @@ const EMPTY_BODIES = [
  */
 const BARE_EMPTY = [
   /*
+    イベントの申込者・キャンセル待ち・詳細（`i5SN2j`・#593）。
+    画面は3つを同時に読む（`bookings/page.tsx:90`）。**どれか1つでも
+    一覧の既定（配列）が返ると落ちる**ので、器をそれぞれ合わせる。
+    「空」は**イベントは在るが、申込が1件も無い**状態。
+  */
+  [/\/api\/events\/admin\/events\/[^/?]+\/waitlist(\?|$)/, { waitlist: [] }],
+  [/\/api\/events\/admin\/events\/[^/?]+\/bookings(\?|$)/, { items: [] }],
+  /*
+    詳細は**1件の中身**をそのまま返す。イベント自体は在るので、
+    定員と申込の数だけ0にする。**イベントごと消すと「空」ではなく
+    「見つからない」になり、別の絵になる。**
+  */
+  [/\/api\/events\/admin\/events\/(?!.*\/)[^/?]+(\?|$)/, {
+    id: 'ev-1', name: '秋のしつけ教室（第1回）', venue_name: '店内', venue_url: null,
+    image_url: null, description: '', description_centered: false,
+    max_bookings_per_friend: 1, requires_approval: 1,
+    cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1,
+    reminder_hours_before: 2, is_published: 1, sort_order: 1,
+    created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-01T00:00:00.000Z',
+    next_slot_starts_at: '2026-09-05T05:00:00.000Z',
+    total_capacity: 12, total_active: 0, pending_count: 0,
+    visible_tag_id: null, visible_tag_name: null,
+  }],
+  /* 申込者が1件も無い状態。`{ items }` の器はそのまま。 */
+  [/\/api\/events\/admin\/events\/[^/?]+\/bookings(\?|$)/, { items: [] }],
+  /*
     支払い（`njLGA`・#585）。**返事は `{ success, data, limitations }` で
     `ApiResponse` の入れ子ではない**（`api.ts:2391`）ので、包まずに返す。
     包むと `response.data` が undefined になり、**0件のはずが失敗の面になる。**

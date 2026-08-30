@@ -4836,3 +4836,53 @@ export const NEN_COLUMN_DRAFT = {
   deliveryStatus: 'draft', deliveryAt: null,
   createdAt: '2026-08-30T01:00:00.000Z', updatedAt: '2026-08-30T01:00:00.000Z',
 }
+
+/**
+ * イベントの申込者（設計 `i5SN2j`）。型は `EventBookingItem`（`api.ts:4046`）。
+ *
+ * **画面の押し口は状態で出し分かれる**（`events/bookings/page.tsx:410,432`）——
+ * 「拒否」は `status: 'requested'` の行、「運営キャンセル」は `'confirmed'` の行
+ * にしか出ない。**どちらも入れないと窓を撮れない。**
+ *
+ * **名前が取れない行も1つ入れてある**（`friend_display_name: null`）。
+ * 画面が内部IDで代用せず「友だちは未取得」と書くかを、この1枚で確かめる。
+ */
+export const EVENT_BOOKINGS = [
+  {
+    id: 'eb-1', event_id: 'ev-1', slot_id: 'evs-1', friend_id: 'friend-1',
+    line_account_id: 'visual-qa-account', status: 'requested',
+    customer_note: 'はじめて参加します', internal_note: null,
+    requested_at: '2026-08-28T02:10:00.000Z', decided_at: null,
+    cancelled_at: null, cancelled_by: null,
+    slot_starts_at: '2026-09-05T05:00:00.000Z', slot_ends_at: '2026-09-05T06:00:00.000Z',
+    friend_display_name: '菅野 亮', friend_line_user_id: 'U-visual-3',
+  },
+  {
+    id: 'eb-2', event_id: 'ev-1', slot_id: 'evs-1', friend_id: 'friend-2',
+    line_account_id: 'visual-qa-account', status: 'confirmed',
+    customer_note: null, internal_note: null,
+    requested_at: '2026-08-26T01:00:00.000Z', decided_at: '2026-08-26T02:00:00.000Z',
+    cancelled_at: null, cancelled_by: null,
+    slot_starts_at: '2026-09-05T05:00:00.000Z', slot_ends_at: '2026-09-05T06:00:00.000Z',
+    friend_display_name: 'Kenta Kawano', friend_line_user_id: 'U-visual-1',
+  },
+  {
+    /* **名前が取れない行。**内部IDで代用していないかを見る。 */
+    id: 'eb-3', event_id: 'ev-1', slot_id: 'evs-1', friend_id: 'friend-9',
+    line_account_id: 'visual-qa-account', status: 'confirmed',
+    customer_note: null, internal_note: null,
+    requested_at: '2026-08-25T04:00:00.000Z', decided_at: '2026-08-25T05:00:00.000Z',
+    cancelled_at: null, cancelled_by: null,
+    slot_starts_at: '2026-09-05T05:00:00.000Z', slot_ends_at: '2026-09-05T06:00:00.000Z',
+    friend_display_name: null, friend_line_user_id: null,
+  },
+  {
+    id: 'eb-4', event_id: 'ev-1', slot_id: 'evs-1', friend_id: 'friend-3',
+    line_account_id: 'visual-qa-account', status: 'waiting',
+    customer_note: null, internal_note: null,
+    requested_at: '2026-08-29T03:00:00.000Z', decided_at: null,
+    cancelled_at: null, cancelled_by: null,
+    slot_starts_at: '2026-09-05T05:00:00.000Z', slot_ends_at: '2026-09-05T06:00:00.000Z',
+    friend_display_name: '山田 太郎', friend_line_user_id: 'U-visual-4',
+  },
+]

@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 35,
+  "match": 36,
   "structureMatchDataPending": 18,
-  "needsFix": 175,
+  "needsFix": 174,
   "unjudged": 0,
-  "remaining": 223,
+  "remaining": 222,
   "features": [
     {
       "feature": 1,
@@ -1568,11 +1568,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 3,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 533,
@@ -1603,6 +1603,15 @@
             "k5m5Bc"
           ],
           "note": "帯が「次に何をするか」になった。あと少しで満席・申し込みが少ない。未取得と実値0も言い分ける"
+        },
+        {
+          "pr": 593,
+          "head": "f9619297",
+          "on": "2026-08-30",
+          "screens": [
+            "i5SN2j"
+          ],
+          "note": "帯が次の行動に。拒否は運用メモ、運営キャンセルは3点を示す。撮影モックに申込者の口を足した"
         }
       ]
     },
