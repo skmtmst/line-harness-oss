@@ -375,7 +375,8 @@ CREATE TABLE auto_replies (
   keyword_match_mode     TEXT NOT NULL DEFAULT 'any'
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
-  CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)));
+  CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)), lifecycle_status TEXT NOT NULL DEFAULT 'published'
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT);
 
 CREATE TABLE auto_reply_action_runs (
   id                  TEXT PRIMARY KEY,
@@ -459,7 +460,8 @@ CREATE TABLE auto_reply_versions (
     CHECK (status IN ('draft', 'published', 'retired')),
   published_at          TEXT,
   published_by_staff_id TEXT,
-  created_at            TEXT NOT NULL,
+  created_at            TEXT NOT NULL, last_test_status TEXT
+  CHECK (last_test_status IN ('succeeded', 'failed')), last_tested_at TEXT, last_tested_by_staff_id TEXT, publish_idempotency_key TEXT, updated_at TEXT,
   UNIQUE (auto_reply_id, version_number)
 );
 
@@ -2906,6 +2908,13 @@ CREATE INDEX idx_auto_reply_hits_rule   ON auto_reply_hits(auto_reply_id, hit_at
 CREATE INDEX idx_auto_reply_versions_current
   ON auto_reply_versions (auto_reply_id, version_number DESC);
 
+CREATE UNIQUE INDEX idx_auto_reply_versions_publish_key
+  ON auto_reply_versions (publish_idempotency_key)
+  WHERE publish_idempotency_key IS NOT NULL;
+
+CREATE INDEX idx_auto_reply_versions_status
+  ON auto_reply_versions (auto_reply_id, status, version_number DESC);
+
 CREATE INDEX idx_automation_definitions_account_status
   ON automation_definitions(line_account_id, status, priority DESC);
 
@@ -3604,6 +3613,24 @@ WHEN NOT EXISTS (
    WHERE a.id = NEW.saved_analysis_id AND a.line_account_id = NEW.line_account_id
 )
 BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
+
+CREATE TRIGGER trg_auto_reply_versions_immutable_delete
+BEFORE DELETE ON auto_reply_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published auto reply versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_auto_reply_versions_immutable_update
+BEFORE UPDATE OF auto_reply_id, version_number, line_account_id, definition_snapshot
+ON auto_reply_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published auto reply versions are immutable'); END;
+
+CREATE TRIGGER trg_auto_reply_versions_status_transition
+BEFORE UPDATE OF status ON auto_reply_versions
+WHEN OLD.status IN ('published', 'retired')
+ AND NEW.status <> OLD.status
+ AND NOT (OLD.status = 'published' AND NEW.status = 'retired')
+BEGIN SELECT RAISE(ABORT, 'published auto reply version status cannot move backwards'); END;
 
 CREATE TRIGGER trg_automation_published_version_immutable
 BEFORE UPDATE ON automation_versions

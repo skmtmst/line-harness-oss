@@ -213,7 +213,8 @@
     "204_analytics_saved_results.sql",
     "252_template_questions.sql",
     "253_reminder_delivery_runs.sql",
-    "254_auto_reply_evaluations.sql"
+    "254_auto_reply_evaluations.sql",
+    "255_auto_reply_version_lifecycle.sql"
   ],
-  "migrationCount": 214
+  "migrationCount": 215
 }
