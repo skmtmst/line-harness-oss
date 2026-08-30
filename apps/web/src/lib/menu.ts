@@ -115,7 +115,7 @@ export const MENU_SECTIONS: MenuSection[] = [
     title: '成果と分析',
     items: [
       { href: '/conversions?tab=affiliates', label: '成果とアフィリエイト', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' , id: 'affiliates', note: '紹介者・案件・成果承認を管理します', featureKey: 'affiliates' },
-      { href: '/scoring', label: 'マイル', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' , id: 'mileage', note: '購入・紹介でたまるポイント', featureKey: 'mileage' },
+      { href: '/mileage', label: 'マイル', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' , id: 'mileage', note: '購入・紹介でたまるポイント', featureKey: 'mileage' },
       { href: '/inflow-links', label: '流入と計測', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' , id: 'inflow', note: 'URLごとのクリックと友だち追加の計測', featureKey: 'inflow_tracking' },
       { href: '/conversions', label: 'コンバージョン', icon: 'M9 11l3 3L22 4M21 4h-7M21 4v7M5 3H4a2 2 0 00-2 2v15a2 2 0 002 2h15a2 2 0 002-2v-1' , id: 'conversions', note: '成果地点（CV）と集計レポートを管理します', featureKey: 'affiliates' },
       { href: '/analytics', label: '分析', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' , id: 'analytics', note: '友だちの増減・配信の反応をまとめて見ます', featureKey: 'analytics' },

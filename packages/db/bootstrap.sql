@@ -910,6 +910,13 @@ CREATE TABLE "folders" (
   color         TEXT
 );
 
+CREATE TABLE form_accounts (
+  form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (form_id, line_account_id)
+);
+
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL,
@@ -2849,6 +2856,9 @@ CREATE INDEX idx_events_account_published_sort ON events (line_account_id, is_pu
 CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
 
 CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
+
+CREATE INDEX idx_form_accounts_account
+  ON form_accounts(line_account_id, form_id);
 
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
