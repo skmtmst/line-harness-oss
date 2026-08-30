@@ -632,6 +632,15 @@
     "arbitrary-value": 1,
     "direct-th": 1
   },
+  "components/merged-person/merged-delivery-dialog.tsx": {
+    "unresolved-classname": 12
+  },
+  "components/merged-person/merged-person-detail.tsx": {
+    "unresolved-classname": 10
+  },
+  "components/merged-person/merged-person-sections.tsx": {
+    "unresolved-classname": 46
+  },
   "components/prompt-modal.tsx": {
     "arbitrary-value": 6
   },

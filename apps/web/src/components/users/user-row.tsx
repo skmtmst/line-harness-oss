@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Button from '@/components/shared/button'
+import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
 
 const fmt = new Intl.DateTimeFormat('ja-JP', {
   year: 'numeric',
@@ -48,6 +50,8 @@ export interface UserRowData {
 interface Props {
   row: UserRowData
   accountColorMap: Map<string, string>
+  /** 統合ユーザー詳細（設計 `w8W4Eh`）を開く。開ける行だけに渡る。 */
+  onOpenMergedPerson?: (personId: string) => void
 }
 
 function formatDateTime(value: string): string {
@@ -74,8 +78,14 @@ const UID_STATUS = {
   },
 } as const
 
-export default function UserRow({ row, accountColorMap }: Props) {
+export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Props) {
   const [expanded, setExpanded] = useState(false)
+  /*
+   * 統合ユーザー詳細を開けるのは、UIDを根拠にまとめた行だけ。
+   * 「要確認」（プロフィールが似ているだけ）と「未連携」には、
+   * 開く先の統合ユーザーがまだ無い。
+   */
+  const mergedPersonId = mergedPersonIdOf(row)
   const uidStatus = UID_STATUS[row.identityKeyKind]
   const primaryUid = row.accounts[0]?.lineUserId
   const duplicateCount = row.accounts.length
@@ -145,14 +155,25 @@ export default function UserRow({ row, accountColorMap }: Props) {
           </span>
         </td>
         <td className="px-3 py-3 text-right">
-          <button
-            type="button"
-            className="whitespace-nowrap rounded-v6-control bg-action px-3 py-2 text-xs font-bold text-on-action hover:opacity-90"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? '閉じる' : '詳細を見る'}
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {mergedPersonId && onOpenMergedPerson ? (
+              <Button
+                type="button"
+                data-qa-open="w8W4Eh"
+                onClick={() => onOpenMergedPerson(mergedPersonId)}
+              >
+                統合ユーザーを開く
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              className="whitespace-nowrap rounded-v6-control bg-action px-3 py-2 text-xs font-bold text-on-action hover:opacity-90"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? '閉じる' : '詳細を見る'}
+            </button>
+          </div>
         </td>
       </tr>
       {expanded && (
