@@ -11,6 +11,7 @@ describe('友だち追加時配信の画面確認データ', () => {
     });
     expect(FRIEND_ADD_LIFECYCLE_VALIDATION).toMatchObject({
       canPublish: true,
+      estimatedAudienceCount: 128,
       conflicts: [],
       lastTestStatus: 'succeeded',
     });

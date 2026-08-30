@@ -1489,6 +1489,8 @@ export interface FriendAddRoutingValidationCheck {
 
 export interface FriendAddRoutingValidation {
   canPublish: boolean;
+  /** 公開前に確認できた、選択中LINEアカウントの現在の有効友だち数。 */
+  estimatedAudienceCount: number | null;
   checks: FriendAddRoutingValidationCheck[];
   /** 初回と再追加は同じ判定器の排他的な2分岐なので、重複候補は通常0件。 */
   conflicts: Array<{ code: string; message: string }>;

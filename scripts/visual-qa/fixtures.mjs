@@ -233,6 +233,7 @@ export const FRIEND_ADD_LIFECYCLE_DRAFT = {
 
 export const FRIEND_ADD_LIFECYCLE_VALIDATION = {
   canPublish: true,
+  estimatedAudienceCount: 128,
   checks: [
     {
       key: 'first_time',

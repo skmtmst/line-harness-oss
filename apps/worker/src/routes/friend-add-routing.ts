@@ -66,13 +66,24 @@ function versionResponse(row: FriendAddRoutingVersionRow): FriendAddRoutingVersi
   };
 }
 
+async function getEstimatedAudienceCount(db: D1Database, accountId: string): Promise<number | null> {
+  const audience = await db.prepare(
+    `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND is_following = 1`,
+  ).bind(accountId).first<{ count: number | null }>();
+  const count = audience?.count;
+  return typeof count === 'number' && Number.isFinite(count) ? count : null;
+}
+
 async function validateRoutingDraft(
   db: D1Database,
   accountId: string,
   row: FriendAddRoutingVersionRow,
 ): Promise<FriendAddRoutingValidation> {
   const routing = normalizeRouting(JSON.parse(row.definition_snapshot));
-  const scenarios = await listFriendAddScenarios(db, accountId);
+  const [scenarios, estimatedAudienceCount] = await Promise.all([
+    listFriendAddScenarios(db, accountId),
+    getEstimatedAudienceCount(db, accountId),
+  ]);
   const allowed = new Set(scenarios.map((scenario) => scenario.id));
   const firstInvalid = Boolean(routing.firstTime.scenarioId && !allowed.has(routing.firstTime.scenarioId));
   const returningMissing = routing.returning.mode === 'other' && !routing.returning.scenarioId;
@@ -84,6 +95,7 @@ async function validateRoutingDraft(
 
   return {
     canPublish,
+    estimatedAudienceCount,
     checks: [
       {
         key: 'first_time',
@@ -446,9 +458,7 @@ friendAddRouting.post(
         idempotencyKey,
         staffId: c.get('staff').id,
       });
-      const audience = await c.env.DB.prepare(
-        `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND is_following = 1`,
-      ).bind(accountId).first<{ count: number }>();
+      const estimatedAudienceCount = await getEstimatedAudienceCount(c.env.DB, accountId);
       if (!published.published_at) {
         throw new Error('FRIEND_ADD_ROUTING_PUBLISHED_AT_MISSING');
       }
@@ -459,7 +469,7 @@ friendAddRouting.post(
           versionId: published.id,
           versionNumber: Number(published.version_number),
           publishedAt: published.published_at,
-          estimatedAudienceCount: Number(audience?.count ?? 0),
+          estimatedAudienceCount,
           duplicatePrevention: 'webhook_event' as const,
           monitoringPath: '/friend-add-settings/runs' as const,
         },

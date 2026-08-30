@@ -136,11 +136,32 @@ describe('friend-add routing draft/test/publish contract', () => {
       { method: 'POST' },
       makeEnv(),
     )
-    const body = await response.json() as { data: { canPublish: boolean; checks: Array<{ status: string }> } }
+    const body = await response.json() as {
+      data: { canPublish: boolean; estimatedAudienceCount: number | null; checks: Array<{ status: string }> }
+    }
 
     expect(response.status).toBe(200)
     expect(body.data.canPublish).toBe(false)
+    expect(body.data.estimatedAudienceCount).toBe(12)
     expect(body.data.checks[0].status).toBe('failed')
+  })
+
+  test('公開前の確認で対象見込みを返し、公開後まで人数を隠さない', async () => {
+    const response = await app.request(
+      '/api/friend-add-routing/validate?account_id=account-1',
+      { method: 'POST' },
+      makeEnv(),
+    )
+    const body = await response.json() as {
+      data: { canPublish: boolean; estimatedAudienceCount: number | null }
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.data).toMatchObject({
+      canPublish: true,
+      estimatedAudienceCount: 12,
+    })
+    expect(db.publishFriendAddRoutingDraftVersion).not.toHaveBeenCalled()
   })
 
   test('dry-runは本番と同じ判定器を使うが状態を変えない', async () => {
