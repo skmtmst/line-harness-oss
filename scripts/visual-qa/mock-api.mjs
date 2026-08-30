@@ -70,6 +70,7 @@ import {
   BOOKING_STAFF,
   BOOKING_TAKEN_SLOT,
   BROADCASTS,
+  BROADCAST_FOLDERS,
   BROADCAST_MESSAGE_ASSETS,
   BROADCAST_STATS,
   CHATS,
@@ -658,6 +659,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const found = [...TEMPLATES, QUESTION_TEMPLATE_PUBLISHED, QUESTION_TEMPLATE_DRAFT]
       .find((t) => t.id === oneTemplate[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
+    return { success: true, data: BROADCAST_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }

@@ -575,12 +575,12 @@ export const SCREENS = [
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信', route: '/broadcasts',
-    verdict: 'needs_fix', verdictNote: '**#557 `697cee2c` で帯の未取得が直った。返事を差し替えて実際に確かめた。** 集計が**失敗**したときは4つとも **`—`**（`undefined` も `0` も出ない）、**一部だけ欠けた**ときは揃っている分だけ実値で欠けた分だけ `—`（今月の配信 12件・到達 1,842通 に対し 予約中 `—`・失敗 `—`）、**実値0**のときは `0件` `0通` `0%`。以前の「開封（率）の未取得が `-` で `—` でない」と「`broadcast-kpis.tsx:40` が欠けた項目をそのまま文へ繋ぐ」は、`buildBroadcastKpiCards()` が `?? null` で受けて `BroadcastKpiValue` が `null` を `—` に描く形になり、両方とも解けた。1440・1920とも横スクロール0。P2 帯の4枚が設計（予約中・下書き・今月の配信・平均開封率）と違い、今月の配信・到達・平均開封率・失敗になっている。列の並びも違う。フォルダごとの「…」（名前を変える・消す）が無い。日付欄が `mm/dd/yyyy` になるのは撮影側のブラウザの癖 **ルート**：`/broadcasts`。**取得元**：`broadcasts-v6/q76C35.txt`（口の返事を差し替えて実際に確かめた）。**推奨修正**：#557 を取り込む。development にはまだ入っておらず、同じ画面の `TmHjF` では「予約中 undefined」がいまも出る。',
-    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpi-values.tsx', verdictHead: '697cee2c',
+    verdict: 'needs_fix', verdictNote: '**#602 `d02be6d8` で帯が設計どおりになった。** ルート `/broadcasts`。1440・1920とも横スクロール0。 **帯の4枚を設計の順にした**（予約中 4件・下書き `—`・今月の配信 12件／1,842人へ到達・平均開封率 69.4%）。前は「今月の配信・到達・平均開封率・失敗」で、V2 の 4-2 を写したままだった。 **下書きの件数は作らず `—（未取得）`。** `/api/broadcasts/stats` は返さず、一覧は全件返るので数えられそうに見えるが、**一覧はLINEアカウントで絞れるのに集計は絞らない**（`getBroadcastStats` はテナント全体を数える）。基準の違う数を同じ帯に並べると、足しても合わない4枚になる。「今日の予約」も同じ理由。 **未取得の半角ハイフンを全角の `—` にそろえた**（表の配信日時と開封（率））。 P2 **列の並びが設計と違う**——設計は タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作 の6列、実装は タイトル／配信日時／配信条件／内容／配信数／開封（率）／状態／削除 の8列。表の作り直しになるので別PRにする。 推奨修正：列を設計の6列へまとめる。あわせて `/api/broadcasts/stats` に `draft` と `scheduledToday` を足せば、帯が4枚とも実値になる（Codex側・P2）',
+    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpi-values.tsx', verdictHead: 'd02be6d8',
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC,
-    verdict: 'needs_fix', verdictNote: 'P1 節の番号が画面の並びと合っていない（上から 1.送る相手 → 3.送る内容 → 2.送る時間）。設計の5段の進み表示（基本設定・対象者・メッセージ・送信設定・確認）が無く、1枚の長い画面になっている。配信方法（新しいメッセージを作成／テンプレートを選択／過去の配信を複製）と「最近の配信」からの複製が無い。社内メモが無い。P2 右の設定内容（配信対象・配信日時・送信数・配信後）が無く、配信名の字数（14 / 60文字）も出ない。送信対象の未取得が「−」で「—」でない **ルート**：`/broadcasts/new`。**取得元**：`broadcasts-v6/design-qa.md`。**推奨修正**：まず**節の番号と並びを合わせる**（1.送る相手 → 2.送る時間 → 3.送る内容）。番号が並びと食い違うのは文言だけで直り、いちばん誤解を生む。段の進み表示・複製の道・右の設定内容は、そのあとで足す。未取得の「−」を「—」にそろえるのも文字1つ。',
-    verdictSource: 'broadcasts-v6/zZ9fA-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#603 `c86d7242` でP1の1つが解けた。** ルート `/broadcasts/new`。1440・1920とも横スクロール0。 **節の番号が画面の並びと合っていなかったのを直した。** 前は 1.送る相手 → 3.送る内容 → 2.送る時間 で、飛ばした節があるように読めた。設計の段も 基本設定 → 対象者 → メッセージ → 送信設定 の順なので、**並べ替えではなく番号のほうを直した**（導入の一文も同じ順にそろえた）。 **送信対象の未取得を全角の `—` にそろえた。** P1 設計の5段の進み表示（基本設定・対象者・メッセージ・送信設定・確認）が無く、1枚の長い画面のまま。配信方法の3択（新しいメッセージを作成／テンプレートを選択／過去の配信を複製）と「最近の配信」からの複製が無い。 P2 右の設定内容（配信対象・配信日時・送信数・配信後）が無く、配信名の字数（14 / 60文字）も出ない。社内メモは**保存先が無い**（`broadcasts.create` に項目が無い）ので、口が要る。 推奨修正：5段の進み表示を先に足す。設計の段は画面の節と1対1なので、段の帯を上に置いて節を対応させる',
+    verdictSource: 'broadcasts-v6/zZ9fA-1920.png', verdictHead: 'c86d7242',
   },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
@@ -592,13 +592,13 @@ export const SCREENS = [
     */
     steps: [{ click: '詳細条件で絞り込んで配信する', role: 'text', after: 700 }],
     verdict: 'needs_fix',
-    verdictNote: '**#550 `f7c5a99e` で「保存した条件から選ぶ」がつながり、未実装ではなくなった。** 「詳細条件で絞り込んで配信する」を選ぶと、条件の下に **「この条件を保存」「保存した条件から選ぶ」** の2つが出る。**押せないときは理由を吹き出しで言う**（アカウント未選択なら「先にLINEアカウントを選んでください」、条件が空なら「詳細条件を1つ以上入力してください」）。空の条件は `pruneCondition` で落ちるので、**誰にも届かない条件を保存できない**。`w72a2` と同じ、正直な押せなさ。読み込む口は `/api/saved-searches?format=segment_v1` で、受信箱の「保存した検索」とは**同じ道でも別の型**（混ぜると受信箱の条件で配信することになる）。1440・1920とも横スクロール0。P2 送信対象の未取得が `-人` で、`—` でそろっていない。P2 設計の対象条件の面（保存済み条件の一覧をその場に出す、条件ごとの見込み人数）はまだ窓の中 **取得元**：`broadcasts-v6/cPk8A.txt` ＋ `/api/saved-searches?format=segment_v1` の返事。**推奨修正**：**押せないときに理由を吹き出しで言う形と、空の条件を保存させない `pruneCondition` は維持する**。誰にも届かない条件を保存できないのがこの画面の要。',
+    verdictNote: '**#603 `c86d7242` で送信対象の未取得が `—` になった。** ルート `/broadcasts/new`（対象条件）。1440・1920とも横スクロール0。 P2 設計の対象条件の面（保存済み条件の一覧をその場に出す、条件ごとの見込み人数）はまだ窓の中。 押せないときに理由を吹き出しで言う形と、空の条件を保存させない `pruneCondition` は維持している。誰にも届かない条件を保存できないのがこの画面の要。 推奨修正：保存済み条件を窓の外（面の中）へ出す',
     verdictSource: 'broadcasts-v6/cPk8A-1440.png',
-    verdictHead: 'f7c5a99e',
+    verdictHead: 'c86d7242',
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC,
-    verdict: 'needs_fix', verdictNote: '**P1 本文の上限が設計と違う。** ルート `/broadcasts/new`。設計は1通5,000字・合計22,500字・最大5通で、4,500字を超えると自動分割。実装は 0/500・吹き出しは最大3。**長い本文が書けず、書けても分割されない。** P1 ボタンの編集（最大4つ、ラベルと押したときの動作）が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなく選び口。取得元：`broadcasts-v6/XQfMD.txt`。1440・1920とも横スクロール0 **ルート**：`/broadcasts/new`。**推奨修正**：**本文の上限を先に直す**（1通5,000字・合計22,500字・最大5通、4,500字超は自動分割）。いまの 0/500・最大3通では、設計どおりの配信が**そもそも書けない**。ボタンの編集とURLの扱いの表はそのあと。',
-    verdictSource: 'broadcasts-v6/XQfMD.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#603 `c86d7242` で本文の上限が解けた。** ルート `/broadcasts/new`（メッセージ編集）。1440・1920とも横スクロール0。 **1通500文字から5,000文字にした。** 500文字では設計どおりの配信がそもそも書けなかった。5,000 は LINE のテキストの上限でもある。**数え方も直した**——前は1つ目の吹き出しだけを見ていたので、2通目に長い本文を書いても「分割なし」と出たままだった。いちばん長い通と合計の両方を見る。**4,500文字を超えたら分けるよう促す**（前は「問題ありません」と「超えています」の2つしかなく、送れるが読みにくい長さが伝わらなかった）。 **最大5通と自動分割は入れていない。Workerが `messageBubbles.length > 3` を400で弾く**（`apps/worker/src/routes/broadcasts.ts:494,679`）。画面の上限だけ上げると、書けるのに保存で失敗する。上限は `message-limits.ts` に1か所へ集めたので、Worker側が受けられるようになったら数字を1つ変えるだけで済む。 P1 ボタンの編集（最大4つ、ラベルと押したときの動作）が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなく選び口。 推奨修正：`messageBubbles` の上限を3から5へ（Codex側・P1）',
+    verdictSource: 'broadcasts-v6/XQfMD.txt', verdictHead: 'c86d7242',
   },
   {
     /*
@@ -608,14 +608,14 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択', route: NEW_BC,
     mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
-    verdict: 'needs_fix', verdictNote: '**P2 カードの補足に内部の語 `text` が出る（束3）。** ルート `/broadcasts/new`。設計は日本語の種類名。取得元：`broadcasts-v6/p97Tf.txt`。1440・1920とも横スクロール0 **推奨修正**：カードの補足を日本語の種類名にする。**同じ束3の直しは `u6gHt`（結果詳細）で既に済んでいる**（`carousel` `flex` `image` `text` が0件）ので、その置き換え表を使う。',
-    verdictSource: 'broadcasts-v6/p97Tf.txt', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#603 `c86d7242` で解けた。** ルート `/broadcasts/new`（テンプレート選択）。1440・1920とも横スクロール0。 **カードの補足に内部の語 `text` が出ていたのを直した。** 知らない種類のとき `?? template.messageType` で元の値へ落としていたので、`text` や `carousel` がそのまま出ていた。`typeLabel()` を通し、知らない種類は「その他」にする。撮った絵では札が「テキスト」になっている。',
+    verdictSource: 'broadcasts-v6/p97Tf.txt', verdictHead: 'c86d7242',
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定', route: NEW_BC,
     mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
-    verdict: 'needs_fix', verdictNote: 'P1 送信枠（使用予定と残り通数）が出ない。前後の配信と重ならないかを見る配信スケジュールも、重複時の送信（1人1通にまとめる）も、配信優先度も無い。予約時刻の直前に対象人数と送信枠を再確認する旨の注意も無い。P2 開封数の計測が独立した切り替えでなく「この配信の開封数は取らない」のチェックとして3.送る内容の中にある。日付欄が mm/dd/yyyy、時刻が10:00 AM になるのは撮影側のブラウザ言語の癖 **ルート**：`/broadcasts/new`（送信設定）。**取得元**：`broadcasts-v6/Bw0zt.txt`。**推奨修正**：**送信枠（使用予定と残り通数）を先に出す**。LINEの課金に直結し、超えると送れないので、予約する前に見えないと困る。**残枠は `q76C35` の帯が既に読んでいる**ので同じ口を使う。重複時の1人1通・配信優先度はそのあと。日付が `mm/dd/yyyy`、時刻が `10:00 AM` になるのは**撮影側のブラウザ言語の癖で、実装の不具合ではない**。',
-    verdictSource: 'broadcasts-v6/Bw0zt-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#603 `c86d7242` の時点で残るP1。** ルート `/broadcasts/new`（送信設定）。1440・1920とも横スクロール0。 P1 **送信枠（使用予定と残り通数）が出ない。軽い読み口が無い。** `quotaLimit` / `quotaUsed` は**ダッシュボードの重い集計**（`/api/dashboard/overview`）の中にしかなく、作成画面の読み込みでそれを叩くのは割に合わない。**数を作らないため、この画面には出していない。** 前の判定で「`q76C35` の帯が既に読んでいるので同じ口を使う」と書いたのは誤りで、帯が読んでいるのは今月の配信・予約中・到達・失敗・平均開封率だけ。取り消す。 P1 前後の配信と重ならないかを見る配信スケジュール、重複時の送信（1人1通にまとめる）、配信優先度も無い。予約時刻の直前に対象人数と送信枠を再確認する旨の注意も無い。 P2 開封数の計測が独立した切り替えでなく「この配信の開封数は取らない」のチェックとして送る内容の中にある。日付が `mm/dd/yyyy`、時刻が `10:00 AM` になるのは撮影側のブラウザ言語の癖で、実装の不具合ではない。 推奨修正：`/api/broadcasts/quota`（`quotaLimit` / `quotaUsed` だけ返す軽い口）をCodex側に足してから、この画面へ出す（P1）',
+    verdictSource: 'broadcasts-v6/Bw0zt-1920.png', verdictHead: 'c86d7242',
   },
   {
     /*
@@ -653,8 +653,8 @@ export const SCREENS = [
     steps: [
       { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
     ],
-    verdict: 'needs_fix', verdictNote: '**P2 送る時間の面が設計とそろわない。** ルート `/broadcasts/new`。設計は 今すぐ／予約／くり返し を段で選び、予約なら送信直前の再集計を断る。取得元：`broadcasts-v6/vW4Es.txt`。1440・1920とも横スクロール0 **推奨修正**：今すぐ／予約／くり返し を段で選ぶ形にし、予約なら送信直前の再集計を断る。**再集計の断りは `cPk8A` の対象条件と対になる**——予約時点の人数と送る時点の人数が違うことを、選ぶ前に書く。',
-    verdictSource: 'broadcasts-v6/vW4Es.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#603 `c86d7242` の時点で残るP2。** ルート `/broadcasts/new`（送る時間）。1440・1920とも横スクロール0。 節の番号は 3. 送る時間 になり、画面の並びと合った。 P2 設計は 今すぐ／予約／くり返し を段で選び、予約なら送信直前の再集計を断る。実装は3つの押しボタンで、再集計の断りが無い。 推奨修正：再集計の断りは `cPk8A` の対象条件と対になる——予約時点の人数と送る時点の人数が違うことを、選ぶ前に書く',
+    verdictSource: 'broadcasts-v6/vW4Es.txt', verdictHead: 'c86d7242',
   },
   {
     /*
@@ -700,8 +700,8 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
-    verdict: 'needs_fix', verdictNote: '**#554 `875a9ed3` でブラウザ標準の `confirm` が画面内の確認窓（`ConfirmDialog`）に替わった。** **どの配信かを名前で言う**：「「8月キャンペーンのお知らせ」を削除しますか？」。本文は「削除すると配信設定と確認画面から消えます。**予約中の配信は中止され**、この操作は取り消せません。」で、消えるもの・止まるもの・戻せないことの3つが揃う。ボタンは「キャンセル」と赤い「削除する」。失敗の文も「この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。」と画面の言葉になり、削除の口は `if (!result.success) throw` で成否を見る（`tBlkL` のP0と同じ取りこぼしをしていない）。削除の口は下書きと予約中の行にしか出ないので、送信済みを消せる道は無い。1440・1920とも横スクロール0。P2 帯の下の日付欄が `mm/dd/yyyy` と英語書式で出るのは**撮影側のブラウザの癖**で、実装の不具合ではない **ルート**：`/broadcasts`（削除の窓）。**取得元**：`broadcasts-v6/EGMb1.txt`。**推奨修正**：**この窓の3点（消えるもの・止まるもの・戻せないこと）は `dqFft` と並ぶ手本**なので、削除確認の束へ写す。削除の口を `if (!result.success) throw` で見る取り方も、`tBlkL` のP0と同じ直しなのでそろえる。',
-    verdictSource: 'broadcasts-v6/EGMb1-1440.png', verdictHead: '875a9ed3',
+    verdict: 'match', verdictNote: '**#602 `d02be6d8` で撮り直し、差は無い。** ルート `/broadcasts`（削除の窓）。1440・1920とも横スクロール0。 どの配信かを名前で言う（「「8月キャンペーンのお知らせ」を削除しますか？」）、本文は消えるもの・止まるもの・戻せないことの3つが揃う、ボタンは「キャンセル」と赤い「削除する」。削除の口は `if (!result.success) throw` で成否を見る。 **前に挙げた唯一のP2（日付欄が `mm/dd/yyyy`）は撮影側のブラウザの癖で、実装の不具合ではない。** 実装側に差が無いので一致とする。',
+    verdictSource: 'broadcasts-v6/EGMb1-1440.png', verdictHead: 'd02be6d8',
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
@@ -732,9 +732,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
-    mode: 'viewport', height: 1080, steps: [{ click: 'フォルダを追加' }],
-    verdict: 'needs_fix', verdictNote: '**P2 一覧のフォルダまわりが設計とそろわない。** ルート `/broadcasts`。フォルダごとの「…」（名前を変える・消す）が無い。取得元：`broadcasts-v6/xkRDb.txt`。1440・1920とも横スクロール0 **推奨修正**：フォルダごとの「…」（名前を変える・消す）を足す。**#493（テンプレートのフォルダ操作）と同じ部品**になるので、そちらと合わせて作る。',
-    verdictSource: 'broadcasts-v6/xkRDb.txt', verdictHead: 'c275749d',
+    mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
+    variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
+    verdict: 'match', verdictNote: '**#602 `d02be6d8`（#561 `51827fe1` の上）で解けた。** ルート `/broadcasts`。1440・1920とも横スクロール0。 **フォルダごとの「…」（名前を変える／消す）が入った。** 口（`api.folders.update` / `delete`）は元からあり、出す場所だけの話だった。共通の `FolderPanel` は**カーソルを置いたときだけ出る「編集」**で、撮った絵にも写らず、名前を変えられること自体が伝わっていなかった。設計どおり常に見える「…」にそろえた（7画面が同じ部品を使う）。 **消すときは、消えるもの・残るもの・戻せないことを先に言う**（「入っていた配信は消えず、未分類として残ります。フォルダの分け方だけが失われ、この操作は取り消せません。」）。`EGMb1` と同じ形。 撮影は文言ではなく `data-qa-open="xkRDb"` で押している。取得元：`broadcasts-v6/xkRDb-1440.png`',
+    verdictSource: 'broadcasts-v6/xkRDb.txt', verdictHead: 'd02be6d8',
   },
   {
     ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）', route: '/broadcasts',
@@ -745,10 +746,10 @@ export const SCREENS = [
     */
     states: {
       apis: ['**/api/broadcasts?**', '**/api/broadcasts', '**/api/broadcasts/stats*', '**/api/list-stats*'],
-      kinds: ['loading', 'empty', 'error'],
+      kinds: ['loading', 'empty', 'error', 'forbidden'],
     },
-    verdict: 'needs_fix', verdictNote: '**P1 空・失敗のとき帯の補助行に `undefined` が出る。** ルート `/broadcasts`。口を空で返すと **「今月の配信 — 件／予約中 undefined」「到達 — 通／失敗 undefined」** となる（値そのものは `—` に落ちるが、**補助の行だけ守りが無い**）。**これは #557 `697cee2c` が直すP1で、development にはまだ入っていない**——#557 では `buildBroadcastKpiCards()` が `?? null` で受け、`stats?.scheduled == null ? \'—\'` と分ける。撮影ハーネスは `undefined` を見つけて撮影を止めた（絵として残していない）。**推奨修正**：#557 の取り込み。取得元：口を空にして再現。1440・1920とも横スクロール0',
-    verdictSource: 'broadcasts-v6/TmHjF-normal.txt', verdictHead: 'c275749d',
+    verdict: 'match', verdictNote: '**#602 `d02be6d8` で解けた。** ルート `/broadcasts`。1440・1920とも横スクロール0。 **① 空・失敗のとき帯の補助行に出ていた `undefined` が消えた。** #557 の `buildBroadcastKpiCards()` が `?? null` で受ける形が入った。 **② 権限不足を読み込み失敗から分けた。** 403 は読み直しても直らず、誰かに権限を足してもらうしかない。読込・空・失敗・権限不足を `ListState` の別々の1枚にした（`loading` は設計どおり骨組みのまま）。 撮り分けた4状態：読込／「配信がありません」＋作成の誘い／「配信を読み込めませんでした」／「配信を見る権限がありません」。**空と失敗が別の文になっている。** `undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictSource: 'broadcasts-v6/TmHjF-normal.txt', verdictHead: 'd02be6d8',
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
@@ -2336,6 +2337,8 @@ export const CAPTURED_AT = {
     { pr: 557, head: '697cee2c', on: '2026-08-29', screens: ['q76C35'], note: '帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た' },
     { pr: 554, head: '875a9ed3', on: '2026-08-29', screens: ['EGMb1'], note: '配信の削除を画面内の確認窓へ' },
     { pr: 550, head: 'f7c5a99e', on: '2026-08-29', screens: ['cPk8A', 'sqFXf'], note: '対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした' },
+      { pr: 602, head: 'd02be6d8', on: '2026-08-31', screens: ['q76C35', 'xkRDb', 'EGMb1', 'TmHjF'], note: 'Claudeが一覧を直した。帯の4枚・フォルダの「…」・権限不足の分離' },
+    { pr: 603, head: 'c86d7242', on: '2026-08-31', screens: ['zZ9fA', 'cPk8A', 'XQfMD', 'p97Tf', 'Bw0zt', 'vW4Es'], note: '同じくClaude。節の番号・本文の上限5,000字・内部の語の除去。#602 の上に積む' },
   ],
   12: [
     { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },

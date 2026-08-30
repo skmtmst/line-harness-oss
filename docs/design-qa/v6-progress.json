@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 43,
+  "match": 47,
   "structureMatchDataPending": 18,
-  "needsFix": 174,
+  "needsFix": 170,
   "unjudged": 0,
-  "remaining": 215,
+  "remaining": 211,
   "features": [
     {
       "feature": 1,
@@ -436,11 +436,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 5,
       "structureMatchDataPending": 0,
-      "needsFix": 14,
+      "needsFix": 10,
       "unjudged": 0,
-      "remaining": 14,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 543,
@@ -523,6 +523,32 @@
             "sqFXf"
           ],
           "note": "対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした"
+        },
+        {
+          "pr": 602,
+          "head": "d02be6d8",
+          "on": "2026-08-31",
+          "screens": [
+            "q76C35",
+            "xkRDb",
+            "EGMb1",
+            "TmHjF"
+          ],
+          "note": "Claudeが一覧を直した。帯の4枚・フォルダの「…」・権限不足の分離"
+        },
+        {
+          "pr": 603,
+          "head": "c86d7242",
+          "on": "2026-08-31",
+          "screens": [
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "vW4Es"
+          ],
+          "note": "同じくClaude。節の番号・本文の上限5,000字・内部の語の除去。#602 の上に積む"
         }
       ]
     },

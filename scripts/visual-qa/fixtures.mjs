@@ -593,6 +593,26 @@ export const FRIEND_DETAILS = {
  * テンプレートの置き場。設計 `NWbuF`（2-6 全フォルダ展開）の件数そのまま。
  * 未分類3・お問い合わせ8・予約5・EC4 で計20件。
  */
+/**
+ * 一斉配信のフォルダ。設計 `q76C35` の左パネル（予約配信・キャンペーン・
+ * EC・フォロー）。**フォルダが1つも無いと「…」の操作が描かれず、
+ * 撮影が「目印が見つからない」で止まる。**
+ */
+export const BROADCAST_FOLDERS = [
+  ['bf-scheduled', '予約配信'],
+  ['bf-campaign', 'キャンペーン'],
+  ['bf-ec', 'EC・フォロー'],
+].map(([id, name], index) => ({
+  id: String(id),
+  kind: 'broadcast',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  color: null,
+  createdAt: '2026-01-13T00:00:00.000Z',
+  updatedAt: '2026-01-13T00:00:00.000Z',
+}))
+
 export const TEMPLATE_FOLDERS = [
   ['tf-inquiry', 'お問い合わせ', 8],
   ['tf-booking', '予約', 5],
