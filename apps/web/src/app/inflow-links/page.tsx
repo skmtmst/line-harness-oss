@@ -16,6 +16,7 @@ import AdIntegration from './ad-integration'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 
 interface MessageTemplate {
   id: string
@@ -124,63 +125,68 @@ function InflowLinksPageInner() {
   const load = async () => {
     setLoading(true)
     setError('')
-    // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
-    // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
-    // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
-    const summaryQuery = selectedAccountId ? `?lineAccountId=${selectedAccountId}` : ''
-    const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
-      api.entryRoutes.list(),
-      // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
-      // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
-      api.entryRouteGenres.list().catch(() => ({
-        success: false as const,
-        data: [] as EntryRouteGenre[],
-      })),
-      api.pools.list(),
-      api.scenarios.list(),
-      api.messageTemplates.list(),
-      api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
-      fetchApi<{ success: boolean; data: RefSummaryData }>(
-        `/api/analytics/ref-summary${summaryQuery}`,
-      ).catch(() => ({ success: false, data: null })),
-      api.trackedLinks.list().catch(() => ({ success: false, data: null })),
-    ])
-    if (r.success) setRoutes(r.data)
-    else setError('リファラルリンクの取得に失敗しました')
-    if (genreRes.success) setGenres(genreRes.data)
-    if (p.success) setPools(p.data)
-    if (s.success) setScenarios(s.data)
-    if (t.success) setTemplates(t.data)
-    if (tagRes.success) setTags(tagRes.data)
-    if ('success' in sum && sum.success && sum.data) setSummary(sum.data)
-    if (tl.success && tl.data) {
-      setTrackedLinks(
-        tl.data.map((row) => ({
-          id: row.id,
-          name: row.name,
-          scenarioId: row.scenarioId,
-          isActive: row.isActive,
+    try {
+      // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
+      // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
+      // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
+      const summaryQuery = selectedAccountId ? `?lineAccountId=${selectedAccountId}` : ''
+      const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
+        api.entryRoutes.list(),
+        // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
+        // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
+        api.entryRouteGenres.list().catch(() => ({
+          success: false as const,
+          data: [] as EntryRouteGenre[],
         })),
-      )
-    }
+        api.pools.list(),
+        api.scenarios.list(),
+        api.messageTemplates.list(),
+        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
+        fetchApi<{ success: boolean; data: RefSummaryData }>(
+          `/api/analytics/ref-summary${summaryQuery}`,
+        ).catch(() => ({ success: false, data: null })),
+        api.trackedLinks.list().catch(() => ({ success: false, data: null })),
+      ])
+      if (r.success) setRoutes(r.data)
+      else setError('登録したリンクは消えていません。状態を読み直してください。')
+      if (genreRes.success) setGenres(genreRes.data)
+      if (p.success) setPools(p.data)
+      if (s.success) setScenarios(s.data)
+      if (t.success) setTemplates(t.data)
+      if (tagRes.success) setTags(tagRes.data)
+      if ('success' in sum && sum.success && sum.data) setSummary(sum.data)
+      if (tl.success && tl.data) {
+        setTrackedLinks(
+          tl.data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            scenarioId: row.scenarioId,
+            isActive: row.isActive,
+          })),
+        )
+      }
 
-    // Load pool→accounts mapping after we know the pool list. Done in a 2nd
-    // round-trip so the table can render with summary stats immediately; the
-    // filter just doesn't apply the pool-membership rule until this resolves
-    // (zero-inflow rows still pass through friendCount > 0 path).
-    if (p.success) {
-      const entries = await Promise.all(
-        p.data.map(async (pool) => {
-          const res = await api.pools.accounts.list(pool.id)
-          const ids = res.success
-            ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
-            : new Set<string>()
-          return [pool.id, ids] as const
-        }),
-      )
-      setPoolMembers(Object.fromEntries(entries))
+      // Load pool→accounts mapping after we know the pool list. Done in a 2nd
+      // round-trip so the table can render with summary stats immediately; the
+      // filter just doesn't apply the pool-membership rule until this resolves
+      // (zero-inflow rows still pass through friendCount > 0 path).
+      if (p.success) {
+        const entries = await Promise.all(
+          p.data.map(async (pool) => {
+            const res = await api.pools.accounts.list(pool.id)
+            const ids = res.success
+              ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
+              : new Set<string>()
+            return [pool.id, ids] as const
+          }),
+        )
+        setPoolMembers(Object.fromEntries(entries))
+      }
+    } catch {
+      setError('登録したリンクは消えていません。状態を読み直して、もう一度お試しください。')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -422,35 +428,40 @@ function InflowLinksPageInner() {
   const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
   const addRate = totalClicks > 0 ? Math.round((totalFriends / totalClicks) * 100) : null
+  const dataReady = !loading && !error
 
   return (
     <div>
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
-          value={sortedRows.length}
+          value={dataReady ? sortedRows.length : null}
           unit="件"
-          detail={`稼働中 ${activeRouteCount}`}
+          detail={dataReady ? `稼働中 ${activeRouteCount}` : '取得できませんでした'}
         />
         {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
-        <KpiCard title="今月の追加" value={null} unit="人" detail="前月比は出せません" />
-        <KpiCard title="クリック" value={totalClicks} unit="回" detail="累計" />
+        <KpiCard
+          title="今月の追加"
+          value={null}
+          unit="人"
+          detail={dataReady ? '前月比は出せません' : '取得できませんでした'}
+        />
+        <KpiCard
+          title="クリック"
+          value={dataReady ? totalClicks : null}
+          unit="回"
+          detail={dataReady ? '累計' : '取得できませんでした'}
+        />
         <KpiCard
           title="平均の追加率"
-          value={addRate}
+          value={dataReady ? addRate : null}
           unit="%"
-          detail="クリックのうち"
+          detail={dataReady ? 'クリックのうち' : '取得できませんでした'}
         />
       </div>
 
-      {error && (
-        <div className="p-3 rounded bg-danger-bg border border-danger-bg text-danger text-sm mb-4">
-          {error}
-        </div>
-      )}
-
       <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside>
+        {dataReady ? <aside>
           <button
             onClick={() => setEditingGenre('new')}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
@@ -519,9 +530,9 @@ function InflowLinksPageInner() {
               </div>
             )}
           </div>
-        </aside>
+        </aside> : null}
 
-        <section className="min-w-0">
+        <section className={dataReady ? 'min-w-0' : 'min-w-0 2xl:col-span-2'}>
           <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
@@ -551,15 +562,20 @@ function InflowLinksPageInner() {
           </div>
 
       {loading ? (
-        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
-          読み込み中...
-        </div>
+        <ListState kind="loading" title="流入リンクを読み込んでいます" />
+      ) : error ? (
+        <ListState
+          kind="error"
+          title="流入リンクを表示できませんでした"
+          description={error}
+          action={<Button onClick={() => void load()}>再読み込み</Button>}
+        />
       ) : sortedRows.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
-          {selectedGenre
-            ? `「${selectedGenreLabel}」にはまだリンクがありません。`
-            : '左側の「フォルダを追加」から最初のフォルダを作ってください。'}
-        </div>
+        <ListState
+          kind="empty"
+          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : '流入リンクがまだありません'}
+          description={selectedGenre ? '別のフォルダを選ぶか、新しくURLを発行してください。' : '左側の「フォルダを追加」から最初のフォルダを作ってください。'}
+        />
       ) : (
         <div className="overflow-hidden rounded-lg border border-hairline bg-white">
           <table className="w-full table-fixed text-xs">

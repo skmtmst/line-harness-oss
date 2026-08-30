@@ -43,4 +43,15 @@ describe('V6 流入と計測', () => {
     expect(detail).toContain('api.entryRoutes.sources(selectedId)');
     expect(detail).toContain('r.id === selectedId');
   });
+
+  it('一覧の読込・空・失敗を分け、失敗を0件として表示しない', () => {
+    expect(page).toContain("import ListState from '@/components/shared/list-state'");
+    expect(page).toContain('const dataReady = !loading && !error');
+    expect(page).toContain('<ListState kind="loading" title="流入リンクを読み込んでいます" />');
+    expect(page).toContain('kind="error"');
+    expect(page).toContain('title="流入リンクを表示できませんでした"');
+    expect(page).toContain('action={<Button onClick={() => void load()}>再読み込み</Button>}');
+    expect(page).toContain('kind="empty"');
+    expect(page).not.toContain('{error && (');
+  });
 });
