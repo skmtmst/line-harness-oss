@@ -1,6 +1,6 @@
 # V6 契約・画面の受け渡しキュー
 
-更新: 2026-08-31 07:49 JST
+更新: 2026-08-31 07:56 JST
 
 この文書は、Codexが用意するAPI・DB契約と、Claudeが載せる画面を一対一で追うための正本です。
 同じ契約を重ねて作らず、画面PRを確認してから次の契約へ進みます。
@@ -24,7 +24,7 @@
 | 2 | #608 `c9747e9d` | `szXsT` | 契約済み・CI 3本pass | #597の画面確認後、通常・参照0件・失敗・409再読込を実装する |
 | 3 | #610 `c1b97aff` | `YfTfJ` | 契約済み・CI 3本pass | 通常・使用先0件・失敗・409再読込を実装する |
 | 4 | #611 `18e7d41e` | `yPkWe` | 契約済み・CI 3本pass | 通常・使用先0件・失敗・409再読込を実装する |
-| 5 | #526 `1c91a7bc` | `ymXJK` | 次の軽い契約・仕様確定 | #597の画面確認後、管理画面から外部記事リンクを下書き保存する契約を1本だけ作る |
+| 5 | #526 `1c91a7bc` | `ymXJK` | 実装前監査済み・#597画面待ち | #597の画面確認後、管理画面から外部記事リンクを下書き保存する契約を1本だけ作る |
 | 6 | #581 `256f7a9a` | `gBp2J` | 重い契約・後回し | 物理削除を止めるmigrationと参照先監査を先に設計する。影響確認GETだけは作らない |
 
 ## 既存契約なので作り直さないもの
@@ -44,15 +44,18 @@
 - 既存の署名付きEC連携が使う値の検証と保存値の組み立ては共通化する。ただしEC連携のupsertを管理画面へそのまま持ち込まない。
 - 管理画面で既存のslugに当たったときは409 `column_already_exists` で止め、別アカウントの記事を黙って上書きしない。署名付きEC連携の同期動作は変えない。
 - 保存するのは題名・分類・抜粋・記事URL・画像URL・公開日。**本文は保存しない。**
-- 管理画面のbodyは `{ title, category?, excerpt?, articleUrl, imageUrl?, publishedAt? }`。`slug`、`externalId`、`lineAccountId`、`body` は画面から送らない。
-- 内部slugは記事URLの末尾からWorkerで作り、空のパスなどで作れない場合は400 `article_url_invalid` にする。画面側でslugを推測・表示しない。
-- `articleUrl` は必須かつHTTPS。空・HTTP・不正URLは400 `article_url_invalid`。任意の `imageUrl` もHTTPSだけを許し、違反は400 `image_url_invalid` にする。
-- `title` は空白だけを許さず120文字以内、`excerpt` は500文字以内。違反は400 `title_invalid` / `excerpt_too_long` とし、画面が項目の言葉へ安全に直せるコードを返す。
-- `publishedAt` は省略またはnullならnullのまま保存し、今日の日付で補わない。値がある場合だけ有効な日時か検査し、無効なら400 `published_at_invalid` にする。
+- 管理画面のbodyは `{ title, category?, excerpt?, articleUrl, imageUrl?, publishedAt? }`。`slug`、`externalId`、`lineAccountId`、`body` は受け取らず、含まれていたら400 `request_invalid` で止める。
+- 管理画面のJSONは16KiBを上限にし、超過は413 `payload_too_large`、壊れたJSONは400 `request_invalid`。本文を送られてから項目検査で捨てる形にしない。
+- 内部slugは記事URLのpathの末尾からWorkerで作る。末尾の `/` は除き、percent decode後が空、`.`、`..`、160文字超、制御文字または `/` を含む場合は400 `article_url_invalid`。大文字小文字を勝手に変えず、画面側でslugを推測・表示しない。
+- `articleUrl` は必須かつHTTPSで2048文字以内。空・HTTP・認証情報付き・不正URLは400 `article_url_invalid`。任意の `imageUrl` もHTTPS・2048文字以内・認証情報なしだけを許し、違反は400 `image_url_invalid` にする。
+- `title` は空白だけを許さず120文字以内、`category` は60文字以内、`excerpt` は500文字以内。違反は400 `title_invalid` / `category_too_long` / `excerpt_too_long` とし、画面が項目の言葉へ安全に直せるコードを返す。
+- `publishedAt` は省略またはnullならnullのまま保存し、今日の日付で補わない。値がある場合はタイムゾーン付きISO 8601だけを受け、UTCのISO文字列に正規化する。無効なら400 `published_at_invalid` にする。
 - 管理画面から作った時点は下書き。公開や配信を同時に始めない。
 - `external_id` はnull、`delivery_status` はdraft、`line_account_id` はqueryで確定した値、`intro_text` は既存の `buildDefaultColumnIntro()` で作る。
-- 成功は `{ success: true, data: { id } }`。重複409、入力400、権限403、保存失敗500を内部文言なしで区別できる契約にする。
-- Worker試験は、アカウント未選択・権限外・role不足・正常保存・本文を受け取らない・公開日null・HTTPS検査・重複409・別アカウントを上書きしない、を固定する。
+- 管理画面の作成は必ず新規 `INSERT` とし、署名付きEC連携のupsertへ流さない。先行SELECTだけに頼らず、同時保存でUNIQUE制約へ当たった場合も409 `column_already_exists` へ安全に直す。
+- 署名付きEC連携との共通化はURL検査・項目の正規化・紹介文組み立てに限る。既存のHMAC認証、外部slug、upsert、外部IDの仕様は変えない。
+- 成功は201 `{ success: true, data: { id } }`。重複409、入力400、権限403、超過413、保存失敗500を内部文言なしで区別できる契約にする。
+- Worker試験は、アカウント未選択・権限外・role不足・正常保存・本文を受け取らない・公開日null・HTTPS検査・slug生成・タイムゾーン・入力上限・重複競合409・別アカウントを上書きしない、を固定する。
 - Web APIへ `createColumn(accountId, data)` を追加する。通常・入力エラー・重複・保存失敗の固定データとモックを同梱する。
 - Claude側は `data-qa-open="ymXJK"` を押し口に付け、1440px・1920pxで本文欄が無いことも確認する。
 
@@ -62,6 +65,13 @@
 - 公開、配信予約、既存記事の更新。
 - 署名付きEC連携の認証・upsert仕様の変更。
 - slug、external ID、LINEアカウントIDなど内部の値を利用者へ入力させる欄。
+
+### `ymXJK` の実装前監査（2026-08-31）
+
+- #526 `1c91a7bc` の実DBでは `nen_columns` に必要な列がすべてあり、migrationは不要。
+- `slug` は全アカウント共通のUNIQUE列なので、管理画面の作成は他アカウントを含む重複を409で止める。存在するアカウントや記事の情報は返さない。
+- `published_at` は文字列で並べ替えるため、タイムゾーン無しの日時をそのまま保存せずUTC ISOへ正規化する。
+- 同じNodeを実装するopen PRは無い。#597をbaseにしたClaude画面PRも、監査時点では0本。
 
 ## `gBp2J` を軽い契約から外した理由
 
