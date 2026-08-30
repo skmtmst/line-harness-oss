@@ -291,6 +291,16 @@
             "ee0sk"
           ],
           "note": "Claudeが直した。連動OFF時の説明・★の切り替え方・OFFに戻したときの断り。#422 の上"
+        },
+        {
+          "pr": 578,
+          "head": "a744c582",
+          "on": "2026-08-31",
+          "screens": [
+            "A1ZYeP",
+            "hqrOv"
+          ],
+          "note": "Claudeが撮り直して判定を書き直した。A1ZYeP は絵ではなく `FriendFieldType` を読んで数え直した"
         }
       ]
     },

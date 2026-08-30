@@ -2110,8 +2110,8 @@ export const SCREENS = [
     `capture.spec.mjs` が撮っている（`tags-csv-*`）。
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**P2 4つのタブのうち、帯を持つのはここだけ。** ルート `/tags`。帯4つは タグ数101件「未使用24件」／付与済み友だち186人「1つ以上付与」／今月の付与214回「手動・自動」／**整理候補26件「未使用・重複名」**。フォルダの縦帯も 101件／すべて101／VIP14／ペット12／会員18／健康16／購入21／未分類20 と**実データで出る**。**`rIhbN` `HBTk0` `QKx8Q` には帯が無く、同じ画面なのにタブ間で作りが揃っていない。** 特に `QKx8Q`（保存した検索）は帯はあるが3つが `—件`。**良い点**：「フォルダを削除しても、中のタグは未分類として残ります。」と**消したときどうなるか**を書く。「整理候補」が**次にやることを名指し**している。**推奨修正**：4タブで帯の作りをそろえる（無いタブに足すか、この画面の帯を共通の位置へ出す）。取得元：`friend-attributes-v6/hqrOv.txt`。1440・1920とも横スクロール0',
-    verdictSource: 'friend-attributes-v6/hqrOv.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**#578 `a744c582` で撮り直した。** ルート `/tags`。1440・1920とも横スクロール0。 帯4つは タグ数101件「未使用24件」／付与済み友だち186人「1つ以上付与」／今月の付与214回「手動・自動」／整理候補26件「未使用・重複名」。フォルダの縦帯も 101件／すべて101／VIP14／ペット12／会員18／健康16／購入21／未分類20 と実データ。 「フォルダを削除しても、中のタグは未分類として残ります。」と、消したときどうなるかを先に言う形は保たれている。 P2 **4つのタブのうち帯を持つのはここだけ。** `rIhbN` `HBTk0` `QKx8Q` には帯が無く、同じ画面なのにタブ間で作りが揃っていない。`QKx8Q`（保存した検索）は帯はあるが3つが `—件`。 取得元：`friend-attributes-v6/hqrOv.txt`。推奨修正：4タブで帯の作りをそろえる。**4画面をまたぐので、4つを1本のPRで一度に動かす**（片方だけ直すと、ちぐはぐが増える）',
+    verdictSource: 'friend-attributes-v6/hqrOv.txt', verdictHead: 'a744c582',
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
@@ -2214,8 +2214,8 @@ export const SCREENS = [
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
     dir: 'friend-attributes-v6', route: '/tags/fields/new', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**P1 種類の選択肢が設計より2つ少なく、1つ増えている。判定は head `87c150ad` で撮った絵から書いている（`.txt` は取れていない）。** ルート `/tags/fields/new`。設計は12種類（1行・複数行・数値・日付・**日時**・電話・メール・URL・単一選択・複数選択・**画像**・**PDF**）。実装は10種類で、**日時・画像・PDFが無く、真偽が増えている**。**日時が無いと、予約時刻のような値を1つの欄で持てない**（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。**P2 既定値の決め方が違う**——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。**P2 注記が2つ足りない**：「200字まで」「移すとタブの並びも変わります」。**推奨修正**：日時の種類を足すのが先（`vCqUj` のフォームが日付ブロックからリマインダを起動できるのと対になる）。**残作業**：`87c150ad` を含む枝で `--only A1ZYeP` を撮り、本文で数え直す。取得元：`friend-attributes-v6/A1ZYeP-1920.png`',
-    verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '87c150ad',
+    verdict: 'needs_fix', verdictNote: '**#578 `a744c582`（#420 を含む）で撮り直した。絵ではなく型を読んで数え直した。** ルート `/tags/fields/new`。1440・1920とも横スクロール0。 P1 種類が設計の12に対し10。`FriendFieldType`（`packages/shared/src/types.ts:177`）は text／textarea／number／date／select／multi_select／checkbox／url／tel／email。**設計にある 日時・画像・PDF が無く、設計に無い 真偽（checkbox）が増えている。** 日時が無いと、予約時刻のような値を1つの欄で持てない（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。 **これは画面だけでは作れない。** 種類を足すには共有の型・Workerの検査・保存先がそろって要る。Codex側。 P2 既定値の決め方が違う——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。 取得元：`friend-attributes-v6/A1ZYeP-1440.png` ＋ `packages/shared/src/types.ts:177`。推奨修正：`FriendFieldType` に datetime／image／file を足す（Codex側・P1）',
+    verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: 'a744c582',
   },
   {
     /*
@@ -2310,6 +2310,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' },
     { pr: 420, head: 'f77de350', on: '2026-08-30', screens: ['HBTk0', 'yKEdO', 'KoT6c'], note: '入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた' },
       { pr: 605, head: '3b5098a3', on: '2026-08-31', screens: ['l25rlp', 'ee0sk'], note: 'Claudeが直した。連動OFF時の説明・★の切り替え方・OFFに戻したときの断り。#422 の上' },
+      { pr: 578, head: 'a744c582', on: '2026-08-31', screens: ['A1ZYeP', 'hqrOv'], note: 'Claudeが撮り直して判定を書き直した。A1ZYeP は絵ではなく `FriendFieldType` を読んで数え直した' },
   ],
   10: [
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
