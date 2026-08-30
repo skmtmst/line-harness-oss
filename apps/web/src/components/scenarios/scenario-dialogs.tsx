@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import ConditionBuilder, {
   isEmptyCondition,
   pruneCondition,
@@ -260,33 +261,59 @@ export function OnCompleteDialog({
 
 export function TestSendDialog({
   scenarioId,
+  lineAccountId,
   stepId,
   stepLabel,
   onClose,
 }: {
   scenarioId: string
+  /** アカウント専用シナリオは、送り先も必ず同じアカウントから選ぶ。 */
+  lineAccountId: string | null
   /** null なら全通を送る。 */
   stepId: string | null
   stepLabel: string
   onClose: () => void
 }) {
+  const { selectedAccountId } = useAccount()
   const [search, setSearch] = useState('')
   const [friends, setFriends] = useState<{ id: string; displayName: string | null }[]>([])
+  const [friendsStatus, setFriendsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+    setFriends([])
+    setSelected(null)
+    setResult(null)
+    setFriendsStatus('loading')
     const timer = setTimeout(() => {
       void (async () => {
-        const res = await api.friends.list({ limit: 20, search, includeTags: false })
-        if (res.success) {
-          setFriends(res.data.items.map((f) => ({ id: f.id, displayName: f.displayName })))
+        try {
+          const res = await api.friends.list({
+            accountId: lineAccountId ?? selectedAccountId ?? undefined,
+            limit: 20,
+            search,
+            includeTags: false,
+          })
+          if (cancelled) return
+          if (res.success) {
+            setFriends(res.data.items.map((f) => ({ id: f.id, displayName: f.displayName })))
+            setFriendsStatus('ready')
+          } else {
+            setFriendsStatus('error')
+          }
+        } catch {
+          if (!cancelled) setFriendsStatus('error')
         }
       })()
     }, 300)
-    return () => clearTimeout(timer)
-  }, [search])
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [lineAccountId, search, selectedAccountId])
 
   return (
     <Shell
@@ -309,15 +336,25 @@ export function TestSendDialog({
               if (!selected) return
               setSending(true)
               setResult(null)
-              const res = stepId
-                ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
-                : await api.scenarios.testSend(scenarioId, selected)
-              setSending(false)
-              setResult(
-                res.success
-                  ? { ok: true, message: `${res.data.sent} 通を送りました。` }
-                  : { ok: false, message: res.error },
-              )
+              try {
+                const res = stepId
+                  ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
+                  : await api.scenarios.testSend(scenarioId, selected)
+                setResult(
+                  res.success
+                    ? { ok: true, message: `${res.data.sent} 通を送りました。` }
+                    : { ok: false, message: res.error },
+                )
+              } catch (sendError) {
+                setResult({
+                  ok: false,
+                  message: sendError instanceof Error
+                    ? sendError.message
+                    : 'テスト送信に失敗しました。',
+                })
+              } finally {
+                setSending(false)
+              }
             }}
             className="bg-accent text-on-accent hover:bg-accent-hover rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
@@ -336,7 +373,7 @@ export function TestSendDialog({
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
       />
       <div className="border-hairline rounded-card mt-3 max-h-64 overflow-y-auto border">
-        {friends.map((friend) => (
+        {friendsStatus === 'ready' && friends.map((friend) => (
           <button
             key={friend.id}
             type="button"
@@ -348,7 +385,13 @@ export function TestSendDialog({
             {friend.displayName || '（名前なし）'}
           </button>
         ))}
-        {friends.length === 0 && (
+        {friendsStatus === 'loading' && (
+          <p className="text-ink-faint px-4 py-6 text-center text-sm">友だちを読み込んでいます。</p>
+        )}
+        {friendsStatus === 'error' && (
+          <p className="text-danger px-4 py-6 text-center text-sm">友だちを読み込めませんでした。</p>
+        )}
+        {friendsStatus === 'ready' && friends.length === 0 && (
           <p className="text-ink-faint px-4 py-6 text-center text-sm">見つかりません</p>
         )}
       </div>
