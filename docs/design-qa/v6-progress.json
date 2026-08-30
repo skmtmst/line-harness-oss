@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 228,
-  "unimplemented": 30,
+  "compared": 232,
+  "unimplemented": 26,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 36,
+  "match": 40,
   "structureMatchDataPending": 18,
   "needsFix": 174,
   "unjudged": 0,
-  "remaining": 222,
+  "remaining": 218,
   "features": [
     {
       "feature": 1,
@@ -478,16 +478,16 @@
       "feature": 8,
       "name": "自動応答",
       "total": 11,
-      "compared": 7,
-      "unimplemented": 4,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 5,
       "structureMatchDataPending": 0,
       "needsFix": 6,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 544,
@@ -529,6 +529,18 @@
             "K7vg2"
           ],
           "note": "判定を具体化するため撮った"
+        },
+        {
+          "pr": 596,
+          "head": "338dfe6a",
+          "on": "2026-08-30",
+          "screens": [
+            "U9hzqH",
+            "g46ja",
+            "Yj6CQ",
+            "e6iJG"
+          ],
+          "note": "Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している"
         }
       ]
     },
@@ -1736,34 +1748,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 8,
-      "node": "U9hzqH",
-      "name": "8-1-D 競合と優先順位",
-      "gap": "api",
-      "gapNote": "`GET /api/auto-replies/conflicts` とsimulateが要る。候補、実際に勝つルール、勝つ理由、優先順位変更後の差を同じ評価器から返す"
-    },
-    {
-      "feature": 8,
-      "node": "g46ja",
-      "name": "8-1-E 自動応答テスト",
-      "gap": "api",
-      "gapNote": "`POST /api/auto-replies/test` のdry-runが要る。評価順、一致・不一致理由、勝ったルール、返信、実行予定アクション、抑止理由を返し、状態を更新しない"
-    },
-    {
-      "feature": 8,
-      "node": "Yj6CQ",
-      "name": "8-1-F 最終確認",
-      "gap": "api",
-      "gapNote": "下書き・validate・conflicts・test・publishが要る。競合とループ防止をサーバーで確認し、公開版を固定してから有効化する"
-    },
-    {
-      "feature": 8,
-      "node": "e6iJG",
-      "name": "8-1-G 有効化完了",
-      "gap": "api",
-      "gapNote": "`publish` の返事（公開版、優先順位、監視、競合解消結果）を受けて完了画面を出す。8-1-Fと同じ契約で作る"
     },
     {
       "feature": 9,

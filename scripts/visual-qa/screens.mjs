@@ -839,29 +839,42 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
-    gap: 'api',
-    gapNote: '`GET /api/auto-replies/conflicts` とsimulateが要る。候補、実際に勝つルール、勝つ理由、優先順位変更後の差を同じ評価器から返す',
-    status: 'unimplemented',
-    why: '`priority` の一覧だけでは、完全一致・部分一致・全メッセージ・時間帯・友だち条件の包含関係を判定できない。現行routeに競合／simulate APIが無く、画面側で推測するとWebhook本番評価と食い違う',
+    route: '/auto-replies/publish?id=ar-2', mode: 'page',
+    /* 重なりの確認。最初に開く段 */
+    /*
+      通常・読込・空・失敗に加え、**権限不足**も撮る。本番のルールを
+      書き換える手前なので、**権限が無いときにどう見えるか**まで見る。
+    */
+    states: {
+      apis: ['**/api/auto-replies/*/draft*', '**/api/auto-replies/*/conflicts*'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
+    verdict: 'match', verdictNote: '**#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **通常・読込・空・失敗・権限不足の5状態を撮った。** 失敗は「下書きを表示できませんでした／**保存した下書きは消えていません。**」、**権限不足は別の文**——「この自動応答を公開する権限がありません／**下書きの中身も表示していません。**担当者に公開を依頼してください。」。**403 を「読めなかった」と混ぜない**——運用者の側でできることが違う（人に頼む）ため。 重なりは**確かなもの（必ず重なります）と、そうでないもの（重なることがあります）を分け**、**どちらが先に返すか**も出す（「この下書きより先に返します」）。空のときは「重なる自動応答はありません」。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
+    verdictSource: 'auto-replies-v6/U9hzqH.txt + publish-flow.test.ts', verdictHead: '338dfe6a',
   },
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
-    gap: 'api',
-    gapNote: '`POST /api/auto-replies/test` のdry-runが要る。評価順、一致・不一致理由、勝ったルール、返信、実行予定アクション、抑止理由を返し、状態を更新しない',
-    status: 'unimplemented',
-    why: '画面側でキーワード一致だけを再現しても、曜日・時間・友だち条件・クールダウン・担当者対応中・競合の本番評価と一致しない。現行routeにdry-run APIが無い',
+    route: '/auto-replies/publish?id=ar-2', mode: 'page',
+    /* 「確認したので次へ」で試す段へ */
+    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }],
+    verdict: 'match', verdictNote: '**#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **試験は本番と同じ順番で回す。** 評価の順番と結果を全候補ぶん出し（`1. …これが返します` `2. …見送りました`）、**落ちた理由を日本語**にする（`keyword_not_matched`→「キーワードに当たりません」、`outside_active_window`→「受け付ける時間帯の外です」ほか8種）。**内部の記号を画面へ出さない。** 試す前の帯は **`—（未取得）`まだ試していません**で、0や「当たりません」と混ぜない。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
+    verdictSource: 'auto-replies-v6/g46ja.txt + publish-flow.test.ts', verdictHead: '338dfe6a',
   },
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
-    gap: 'api',
-    gapNote: '下書き・validate・conflicts・test・publishが要る。競合とループ防止をサーバーで確認し、公開版を固定してから有効化する',
-    status: 'unimplemented', why: '現行の編集窓は保存すると即時に本番ルールを更新する。設計が確認する競合2件、推定ヒット、テスト完了、公開版を返すAPIが無く、確認窓だけでは安全に有効化できない',
+    route: '/auto-replies/publish?id=ar-2', mode: 'page',
+    /* 試してから最後の確認へ */
+    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }],
+    verdict: 'match', verdictNote: '**#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **公開前の確認は3項目**：競合をすべて確認しました／試験でこの下書きが返しました／入力に不足がありません。**確かめられないものは `—（未取得）`** にし、「**「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。**」と明記。**1つでも `ok` でなければ公開させない**（`unknown` も押させない）。押せないときは `title` に理由が出る。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
+    verdictSource: 'auto-replies-v6/Yj6CQ.txt + publish-flow.test.ts', verdictHead: '338dfe6a',
   },
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
-    gap: 'api',
-    gapNote: '`publish` の返事（公開版、優先順位、監視、競合解消結果）を受けて完了画面を出す。8-1-Fと同じ契約で作る',
-    status: 'unimplemented', why: '現行saveは公開結果を返さない。8-1-Fのdraft/validate/publish APIが前提',
+    route: '/auto-replies/publish?id=ar-2', mode: 'page',
+    /* 公開まで押し切る */
+    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }, { click: 'この内容で公開する', after: 1200 }],
+    verdict: 'match', verdictNote: '**#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **公開の結果を出す**：公開した版 7版「**この版は書き換えられません**」／確認した重なり 2件「公開前に確かめた数」／すでに届いた分 **`—（未取得）`公開前の返信はそのまま残ります**。**「公開より前に届いたメッセージへの返信は、前の版のままです。あとから書き換わることはありません。」**と、**さかのぼらないこと**を明記する。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
+    verdictSource: 'auto-replies-v6/e6iJG.txt + publish-flow.test.ts', verdictHead: '338dfe6a',
   },
   {
     /*
@@ -2335,11 +2348,12 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' }],
   11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
-
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
     { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' },
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['K7vg2'], note: '判定を具体化するため撮った' }],
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['K7vg2'], note: '判定を具体化するため撮った' },
+    { pr: 596, head: '338dfe6a', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
+  ],
   5: [
     { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },

@@ -604,6 +604,20 @@ const EMPTY_BODIES = [
  */
 const BARE_EMPTY = [
   /*
+    自動応答の下書きと重なり（`U9hzqH` ほか・#595）。**一覧の既定（配列）だと
+    落ちる**——画面は下書きを1件の中身、重なりを `{ conflicts }` で読む。
+    「空」は**下書きは在るが、重なる自動応答が1つも無い**状態。
+  */
+  [/\/api\/auto-replies\/[^/]+\/conflicts(\?|$)/, { success: true, data: { conflicts: [] } }],
+  [/\/api\/auto-replies\/[^/]+\/draft(\?|$)/, {
+    success: true,
+    data: {
+      autoReplyId: 'ar-2', versionId: 'arv-7', versionNumber: 7, status: 'draft',
+      settings: { name: '営業時間外の自動返信', keywords: [], keywordMatch: 'any', responseType: 'text', responseContent: '' },
+      lastTestStatus: null, lastTestedAt: null, publishedAt: null,
+    },
+  }],
+  /*
     イベントの申込者・キャンセル待ち・詳細（`i5SN2j`・#593）。
     画面は3つを同時に読む（`bookings/page.tsx:90`）。**どれか1つでも
     一覧の既定（配列）が返ると落ちる**ので、器をそれぞれ合わせる。

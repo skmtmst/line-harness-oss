@@ -4886,3 +4886,102 @@ export const EVENT_BOOKINGS = [
     friend_display_name: '山田 太郎', friend_line_user_id: 'U-visual-4',
   },
 ]
+
+/**
+ * 自動応答の下書き・確認・試験・公開（設計 `U9hzqH` `g46ja` `Yj6CQ` `e6iJG`）。
+ * 型は `packages/shared/src/types.ts:1297` 以降。**#595 の契約に合わせている。**
+ *
+ * この一式が守っている決めごと：
+ * - **下書きだけを持ち、公開中の版は変えない**（`status: 'draft'`）
+ * - **試験は本番の評価順で回すが、状態は動かさない**（`stateChanged: false`）
+ * - **競合は全件返す。**「たぶん当たる」も落とさず `certainty` で分ける
+ * - **試験で下書き自身が勝つまで公開させない**（`draftWon`）
+ */
+export const AUTO_REPLY_DRAFT = {
+  autoReplyId: 'ar-2', versionId: 'arv-7', versionNumber: 7, status: 'draft',
+  settings: {
+    name: '営業時間外の自動返信',
+    keywords: ['営業時間', '何時から'],
+    keywordMatch: 'any',
+    responseType: 'text',
+    responseContent: '平日 10:00〜19:00 に受け付けています。',
+  },
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-08-30T02:10:00.000Z',
+  publishedAt: null,
+}
+
+/** まだ試していない下書き。**公開前チェックが通らない状態を撮るため。** */
+export const AUTO_REPLY_DRAFT_UNTESTED = {
+  ...AUTO_REPLY_DRAFT, lastTestStatus: null, lastTestedAt: null,
+}
+
+/**
+ * 競合（`U9hzqH`）。**確かに当たるものと、当たるかもしれないものを分ける。**
+ * どちらが勝つかも `winnerAutoReplyId` で示すので、**この下書きが負ける組み合わせ**が分かる。
+ */
+export const AUTO_REPLY_CONFLICTS = [
+  {
+    autoReplyId: 'ar-1', name: '「営業時間」への一律返信', certainty: 'certain',
+    winnerAutoReplyId: 'ar-1',
+    reason: '同じ「営業時間」を全メッセージで受けており、順番が上のためこちらが先に返します',
+  },
+  {
+    autoReplyId: 'ar-5', name: '予約の問い合わせ', certainty: 'possible',
+    winnerAutoReplyId: 'ar-2',
+    reason: '「何時から」が部分一致する場合があります。時間帯が重なるときだけ競合します',
+  },
+]
+
+/** 公開前チェック（`Yj6CQ`）。**通らない理由を全部返す。** */
+export const AUTO_REPLY_VALIDATION = {
+  valid: false,
+  errors: [],
+  warnings: ['「営業時間」は、ほかの自動応答でも受けています'],
+  conflicts: AUTO_REPLY_CONFLICTS,
+  lastTestStatus: 'succeeded',
+}
+
+/** 通る側。 */
+export const AUTO_REPLY_VALIDATION_OK = {
+  valid: true, errors: [], warnings: [], conflicts: [], lastTestStatus: 'succeeded',
+}
+
+/**
+ * 試験の結果（`g46ja`）。**本番と同じ評価順で候補を全部返す。**
+ * 落ちた理由は `reasonCodes` で、**なぜ当たらなかったかが1件ずつ分かる。**
+ * `stateChanged: false` は型が `false` の直値。**送信も状態更新もしない印。**
+ */
+export const AUTO_REPLY_DRY_RUN = {
+  matched: true,
+  draftWon: true,
+  winner: {
+    autoReplyId: 'ar-2', name: '営業時間外の自動返信',
+    responseType: 'text', responseContent: '平日 10:00〜19:00 に受け付けています。',
+  },
+  candidates: [
+    { autoReplyId: 'ar-1', name: '「営業時間」への一律返信', priority: 1, result: 'skipped', reasonCodes: ['outside_active_window'] },
+    { autoReplyId: 'ar-2', name: '営業時間外の自動返信', priority: 2, result: 'won', reasonCodes: [] },
+    { autoReplyId: 'ar-5', name: '予約の問い合わせ', priority: 3, result: 'not_matched', reasonCodes: ['keyword_not_matched'] },
+  ],
+  actions: [{ kind: 'send_text' }],
+  stateChanged: false,
+}
+
+/** 下書きが負ける試験。**このときは公開させない。** */
+export const AUTO_REPLY_DRY_RUN_LOST = {
+  ...AUTO_REPLY_DRY_RUN,
+  draftWon: false,
+  winner: { autoReplyId: 'ar-1', name: '「営業時間」への一律返信', responseType: 'text', responseContent: '受付時間は追ってご案内します。' },
+  candidates: [
+    { autoReplyId: 'ar-1', name: '「営業時間」への一律返信', priority: 1, result: 'won', reasonCodes: [] },
+    { autoReplyId: 'ar-2', name: '営業時間外の自動返信', priority: 2, result: 'skipped', reasonCodes: ['already_replied_once'] },
+  ],
+}
+
+/** 公開の結果（`e6iJG`）。 */
+export const AUTO_REPLY_PUBLISHED = {
+  autoReplyId: 'ar-2', versionId: 'arv-7', versionNumber: 7,
+  publishedAt: '2026-08-30T02:30:00.000Z',
+  acknowledgedConflictIds: ['ar-1', 'ar-5'],
+}

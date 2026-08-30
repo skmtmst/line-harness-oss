@@ -22,7 +22,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { ANALYTICS_FUNNEL_DEFS, ANALYTICS_FUNNEL_RUN, SAVED_ANALYTICS, SAVED_ANALYTICS_SNAPSHOTS, ANALYTICS_URL_CLICKS, ANALYTICS_FRIENDS, ANALYTICS_REACTIONS, ANALYTICS_ROUTES, ANALYTICS_USAGE, AD_PLATFORMS, AD_CONVERSION_LOGS, SAVED_SEARCHES, SEGMENT_PRESETS, SUPPORT_MARKS, STAFF_MEMBERS, LOGIN_AUDIT, OPERATION_CONTROL_PREVIEW, OPERATION_CONTROL_PREVIEW_ONE, EVENTS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_TAKEN_SLOT, bookingAvailability, BOOKING_REQUESTS, OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, INTEGRATION_RECORDS, AUTOMATIONS, AUTOMATION_TEMPLATES, AUTOMATION_LOGS, AUTOMATION_RUNS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, EC_NOTIFICATION_RUNS, EC_NOTIFICATION_FAILURES, NOTIFICATION_RULES, NOTIFICATION_CENTER, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_REWARDS, MILEAGE_RULES, MILEAGE_HISTORY, ACTION_SCORES, ACTION_SCORE_RULE_CONFIG, ACTION_SCORE_BANDS, testActionScoreRules, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, AFFILIATE_REPORT_V2, AFFILIATE_LINKS, AFFILIATE_JOURNEYS, CONVERSION_POINTS, CONVERSION_POINT_IMPACTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, COMMON_VAR_IMPACT, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, WEBINAR_NOTIFICATIONS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_RUNS, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, FRIEND_FIELD_SUMMARY, REMINDERS, REMINDER_DRAFT, REMINDER_PREVIEW, REMINDER_VALIDATION, REMINDER_PUBLISHED, REMINDER_RUNS, REMINDER_FOLDERS, BROADCASTS, BROADCAST_STATS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, QUESTION_TEMPLATE_PUBLISHED, QUESTION_TEMPLATE_DRAFT, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS, EVENT_BOOKINGS, AFFILIATE_PAYMENTS, AFFILIATE_PAYMENTS_EMPTY, AFFILIATE_PAYMENT_PERIODS, AFFILIATE_PAYMENT_PERIODS_EMPTY, NEN_COLUMN_DRAFT } from './fixtures.mjs'
+import { ANALYTICS_FUNNEL_DEFS, ANALYTICS_FUNNEL_RUN, SAVED_ANALYTICS, SAVED_ANALYTICS_SNAPSHOTS, ANALYTICS_URL_CLICKS, ANALYTICS_FRIENDS, ANALYTICS_REACTIONS, ANALYTICS_ROUTES, ANALYTICS_USAGE, AD_PLATFORMS, AD_CONVERSION_LOGS, SAVED_SEARCHES, SEGMENT_PRESETS, SUPPORT_MARKS, STAFF_MEMBERS, LOGIN_AUDIT, OPERATION_CONTROL_PREVIEW, OPERATION_CONTROL_PREVIEW_ONE, EVENTS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_TAKEN_SLOT, bookingAvailability, BOOKING_REQUESTS, OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, INTEGRATION_RECORDS, AUTOMATIONS, AUTOMATION_TEMPLATES, AUTOMATION_LOGS, AUTOMATION_RUNS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, EC_NOTIFICATION_RUNS, EC_NOTIFICATION_FAILURES, NOTIFICATION_RULES, NOTIFICATION_CENTER, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_REWARDS, MILEAGE_RULES, MILEAGE_HISTORY, ACTION_SCORES, ACTION_SCORE_RULE_CONFIG, ACTION_SCORE_BANDS, testActionScoreRules, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, AFFILIATE_REPORT_V2, AFFILIATE_LINKS, AFFILIATE_JOURNEYS, CONVERSION_POINTS, CONVERSION_POINT_IMPACTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, COMMON_VAR_IMPACT, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, WEBINAR_NOTIFICATIONS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_RUNS, AUTO_REPLY_FOLDERS, AUTO_REPLY_DRAFT, AUTO_REPLY_DRAFT_UNTESTED, AUTO_REPLY_CONFLICTS, AUTO_REPLY_VALIDATION, AUTO_REPLY_VALIDATION_OK, AUTO_REPLY_DRY_RUN, AUTO_REPLY_DRY_RUN_LOST, AUTO_REPLY_PUBLISHED, FRIEND_FIELDS, FRIEND_FIELD_SUMMARY, REMINDERS, REMINDER_DRAFT, REMINDER_PREVIEW, REMINDER_VALIDATION, REMINDER_PUBLISHED, REMINDER_RUNS, REMINDER_FOLDERS, BROADCASTS, BROADCAST_STATS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, QUESTION_TEMPLATE_PUBLISHED, QUESTION_TEMPLATE_DRAFT, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS, EVENT_BOOKINGS, AFFILIATE_PAYMENTS, AFFILIATE_PAYMENTS_EMPTY, AFFILIATE_PAYMENT_PERIODS, AFFILIATE_PAYMENT_PERIODS_EMPTY, NEN_COLUMN_DRAFT } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -1007,6 +1007,35 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  /*
+    自動応答の下書き・確認・試験・公開（`U9hzqH` `g46ja` `Yj6CQ` `e6iJG`・#595）。
+
+    **`?deny=1` で権限不足（403）を返せる。**この4画面は本番のルールを
+    書き換える手前なので、**権限が無いときにどう見えるか**まで撮る。
+    **`?untested=1` は試験がまだの下書き**、**`?lost=1` は下書きが負ける試験。**
+  */
+  {
+    const draft = /^\/api\/auto-replies\/([^/]+)\/draft$/.exec(pathname)
+    if (draft) {
+      if (query.get('deny') === '1') return { status: 403, body: { success: false, error: 'forbidden' } }
+      return { success: true, data: query.get('untested') === '1' ? AUTO_REPLY_DRAFT_UNTESTED : AUTO_REPLY_DRAFT }
+    }
+    const conflicts = /^\/api\/auto-replies\/([^/]+)\/conflicts$/.exec(pathname)
+    if (conflicts) {
+      if (query.get('deny') === '1') return { status: 403, body: { success: false, error: 'forbidden' } }
+      return { success: true, data: { conflicts: query.get('empty') === '1' ? [] : AUTO_REPLY_CONFLICTS } }
+    }
+    const validate = /^\/api\/auto-replies\/([^/]+)\/validate$/.exec(pathname)
+    if (validate) {
+      return { success: true, data: query.get('ok') === '1' ? AUTO_REPLY_VALIDATION_OK : AUTO_REPLY_VALIDATION }
+    }
+    const test = /^\/api\/auto-replies\/([^/]+)\/test$/.exec(pathname)
+    if (test) {
+      return { success: true, data: query.get('lost') === '1' ? AUTO_REPLY_DRY_RUN_LOST : AUTO_REPLY_DRY_RUN }
+    }
+    const publish = /^\/api\/auto-replies\/([^/]+)\/publish$/.exec(pathname)
+    if (publish) return { success: true, data: AUTO_REPLY_PUBLISHED }
+  }
   const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
   if (autoReplyOne) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
@@ -1324,6 +1353,22 @@ const server = createServer((req, res) => {
     405 に落ちる。
   */
   const READ_ONLY_POSTS = new Set(['/api/broadcasts/preflight'])
+  /*
+    **自動応答の確認と試験は何も保存しない。**契約が
+    `stateChanged: false`（送信もタグ変更も状態更新もしない）と決めている。
+    405 に落とすと、公開前チェックと試験の面が一度も撮れず未確認で残る。
+    **公開（`/publish`）は保存なので通さない。**
+  */
+  const AUTO_REPLY_READ_ONLY =
+    /^\/api\/auto-replies\/[^/]+\/(validate|test)$/.test(url.pathname)
+  /*
+    **公開だけは書き込みだが、通す。**通さないと `e6iJG`（有効化完了）が
+    一度も撮れず、未確認のまま残る。**返すのは契約どおりの結果だけ**で、
+    ここで何かが保存されるわけではない。**同じ鍵で押し直しても同じ版を返す**
+    （契約の `Idempotency-Key`）ことも、この口の返り値が固定なので保たれる。
+  */
+  const AUTO_REPLY_PUBLISH =
+    /^\/api\/auto-replies\/[^/]+\/publish$/.test(url.pathname)
 
   /*
     **「ルールをテスト」は何も保存しません。** 画面にも
@@ -1495,10 +1540,22 @@ const server = createServer((req, res) => {
     return
   }
 
+  /*
+    **返り値が `{ status, body }` の形なら、その番号で返す。**
+    権限不足（403）や見つからない（404）を撮るために要る。
+    ふつうの返り値は今までどおりそのまま 200 で返す。
+  */
+  const send = (payload) => {
+    if (payload && typeof payload === 'object' && 'status' in payload && 'body' in payload) {
+      res.writeHead(payload.status).end(JSON.stringify(payload.body))
+      return
+    }
+    res.writeHead(200).end(JSON.stringify(payload))
+  }
+
   if (method !== 'GET') {
-    if (READ_ONLY_POSTS.has(url.pathname) && method === 'POST') {
-      const body = bodyFor(url.pathname, url.searchParams)
-      res.writeHead(200).end(JSON.stringify(body ?? { success: false, error: 'not found' }))
+    if ((READ_ONLY_POSTS.has(url.pathname) || AUTO_REPLY_READ_ONLY || AUTO_REPLY_PUBLISH) && method === 'POST') {
+      send(bodyFor(url.pathname, url.searchParams) ?? { success: false, error: 'not found' })
       return
     }
     if (url.pathname === '/api/client-errors') {
@@ -1515,7 +1572,7 @@ const server = createServer((req, res) => {
     res.writeHead(200).end(JSON.stringify(RAW[url.pathname]))
     return
   }
-  res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname, url.searchParams)))
+  send(bodyFor(url.pathname, url.searchParams))
 })
 
 /*
