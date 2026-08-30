@@ -19,7 +19,18 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIENDS,
+  FRIEND_SCENARIOS,
+  FRIEND_STATS,
+  LIST_STATS,
+  MEDIA_DELETE_IMPACT,
+  MEDIA_DELETE_IMPACT_EMPTY,
+  MEDIA_ITEMS,
+  OPERATORS,
+  TAGS,
+  TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -268,6 +279,7 @@ const SHAPES = {
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
+  '/api/media': MEDIA_ITEMS,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },
@@ -399,6 +411,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (mediaDeleteImpact) {
+    const impact = mediaDeleteImpact[1] === MEDIA_DELETE_IMPACT_EMPTY.media.id
+      ? MEDIA_DELETE_IMPACT_EMPTY
+      : MEDIA_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
