@@ -8,6 +8,10 @@ import { api, ApiError, fetchApi } from '@/lib/api'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import SavedViewRowMenu from '@/components/chats/saved-view-row-menu'
+import { normalizeSavedViewConditions, savedViewSummary } from '@/components/chats/saved-view-summary'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -392,6 +396,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [nameQuery, setNameQuery] = useState('')
   const [debouncedNameQuery, setDebouncedNameQuery] = useState('')
   const [savedViews, setSavedViews] = useState<InboxSavedView[]>([])
+  /** 「…」から開く。名前を変える／消すは、押し間違いを避けてここへ畳んだ。 */
+  const [renamingView, setRenamingView] = useState<InboxSavedView | null>(null)
+  const [renameText, setRenameText] = useState('')
+  const [deletingView, setDeletingView] = useState<InboxSavedView | null>(null)
+  const [savedViewBusy, setSavedViewBusy] = useState(false)
   const [savedViewsOpen, setSavedViewsOpen] = useState(false)
   const [savedViewName, setSavedViewName] = useState('')
   const [savedViewError, setSavedViewError] = useState('')
@@ -674,7 +683,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   const applySavedView = (view: InboxSavedView) => {
-    const conditions = view.conditions
+    /*
+     * **決めつけて読まない。** Workerは保存された中身をそのまま返すので、
+     * 受信箱より前に作られた保存は別の形（`{ all: [], any: [] }`）で入っている。
+     * そのまま `statuses.length` を読むと、開いた瞬間に受信箱ごと落ちる。
+     */
+    const conditions = normalizeSavedViewConditions(view.conditions)
     setNameQuery(conditions.query ?? '')
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
@@ -1143,27 +1157,38 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     まだ保存した検索はありません。
                   </p>
                 ) : savedViews.map((view) => (
-                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-lg px-2 py-1.5">
+                  /*
+                    **名前の下に条件を出す。** 名前だけ並んでいると、どれを押せば
+                    よいか名前から推測することになる（設計 `ASsb3`）。
+                    **消すは「…」へ畳む。** 赤字の「削除」を名前の隣に直に並べると、
+                    選ぶつもりで押し間違える。
+                  */
+                  <div key={view.id} className="hover:bg-canvas-sunken flex items-start gap-2 rounded-lg px-2 py-1.5">
                     <button
                       type="button"
                       onClick={() => applySavedView(view)}
-                      className="text-ink min-w-0 flex-1 truncate text-left text-xs font-semibold"
+                      className="min-w-0 flex-1 text-left"
                       title={view.name}
                     >
-                      {view.name}{view.isShared ? '（共有）' : ''}
+                      <span className="text-ink block truncate text-xs font-semibold">
+                        {view.name}{view.isShared ? '（共有）' : ''}
+                      </span>
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro">
+                        {savedViewSummary(normalizeSavedViewConditions(view.conditions), operators)}
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!selectedAccountId) return
-                        await api.chats.savedViews.delete(view.id, selectedAccountId)
-                        await loadSavedViews()
+                    <SavedViewRowMenu
+                      name={view.name}
+                      onRename={() => {
+                        setSavedViewError('')
+                        setRenamingView(view)
+                        setRenameText(view.name)
                       }}
-                      className="text-danger hover:bg-danger-bg shrink-0 rounded px-1.5 py-1 text-xs"
-                      aria-label={`${view.name}を削除`}
-                    >
-                      削除
-                    </button>
+                      onDelete={() => {
+                        setSavedViewError('')
+                        setDeletingView(view)
+                      }}
+                    />
                   </div>
                 ))}
               </div>
@@ -1182,6 +1207,90 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           )}
         </div>
+        {/*
+          保存した検索の名前を変える。口（`savedViews.update`）は元からあり、
+          出す場所だけの話だった。
+        */}
+        <Dialog
+          open={renamingView !== null}
+          title="保存した検索の名前を変える"
+          description="条件はそのままです。名前だけが変わります。"
+          busy={savedViewBusy}
+          error={savedViewError || undefined}
+          onCancel={() => setRenamingView(null)}
+          footer={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button type="button" onClick={() => setRenamingView(null)} disabled={savedViewBusy}>
+                やめる
+              </Button>
+              {/* 名前が空のまま押せると、何という検索なのか分からなくなる。 */}
+              <Button
+                type="button"
+                variant="primary"
+                disabled={renameText.trim().length === 0 || savedViewBusy}
+                onClick={async () => {
+                  if (!renamingView || !selectedAccountId) return
+                  setSavedViewBusy(true)
+                  setSavedViewError('')
+                  try {
+                    const res = await api.chats.savedViews.update(renamingView.id, selectedAccountId, {
+                      name: renameText.trim(),
+                    })
+                    if (!res.success) throw new Error('failed')
+                    setRenamingView(null)
+                    await loadSavedViews()
+                  } catch {
+                    setSavedViewError('名前を変えられませんでした。もう一度お試しください。')
+                  } finally {
+                    setSavedViewBusy(false)
+                  }
+                }}
+              >
+                {savedViewBusy ? '処理中…' : '変更する'}
+              </Button>
+            </div>
+          }
+        >
+          <label className="block">
+            <span className="text-ink-secondary text-xs font-semibold">名前</span>
+            <input
+              value={renameText}
+              onChange={(e) => setRenameText(e.target.value)}
+              className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+            />
+          </label>
+          {renameText.trim().length === 0 && (
+            <p className="text-ink-faint mt-1 text-xs">名前を入れると変更できます。</p>
+          )}
+        </Dialog>
+
+        {/* 消す。**何が消えて何が残るか**を押す前に言う。 */}
+        <ConfirmDialog
+          open={deletingView !== null}
+          title={deletingView ? `「${deletingView.name}」を消しますか？` : ''}
+          description="この保存した検索だけが消えます。会話や絞り込みの条件そのものは残り、いま見ている一覧も変わりません。この操作は取り消せません。"
+          confirmLabel="消す"
+          destructive
+          busy={savedViewBusy}
+          error={savedViewError || undefined}
+          onCancel={() => setDeletingView(null)}
+          onConfirm={async () => {
+            if (!deletingView || !selectedAccountId) return
+            setSavedViewBusy(true)
+            setSavedViewError('')
+            try {
+              const res = await api.chats.savedViews.delete(deletingView.id, selectedAccountId)
+              if (!res.success) throw new Error('failed')
+              setDeletingView(null)
+              await loadSavedViews()
+            } catch {
+              setSavedViewError('消せませんでした。状態を読み直してから、もう一度お試しください。')
+            } finally {
+              setSavedViewBusy(false)
+            }
+          }}
+        />
+
         <SavedViewDialog
           open={saveDialogOpen}
           conditions={[
