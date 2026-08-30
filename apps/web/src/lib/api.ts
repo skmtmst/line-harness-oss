@@ -3,6 +3,10 @@ import type { SegmentCondition } from './segment-condition'
 import type {
   Friend,
   FriendAddRouting,
+  FriendAddRoutingDraftTestResult,
+  FriendAddRoutingPublishResult,
+  FriendAddRoutingValidation,
+  FriendAddRoutingVersion,
   FriendAddEventList,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
@@ -3341,6 +3345,34 @@ export const api = {
       fetchApi<ApiResponse<{ routing: FriendAddRouting }>>(
         `/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify({ routing }) },
+      ),
+    getDraft: (accountId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
+        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    saveDraft: (accountId: string, routing: FriendAddRouting) =>
+      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
+        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify({ routing }) },
+      ),
+    validateDraft: (accountId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingValidation>>(
+        `/api/friend-add-routing/validate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST' },
+      ),
+    conflicts: (accountId: string) =>
+      fetchApi<ApiResponse<{ conflicts: FriendAddRoutingValidation['conflicts'] }>>(
+        `/api/friend-add-routing/conflicts?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    testDraft: (accountId: string, friendId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingDraftTestResult>>(
+        `/api/friend-add-routing/draft/test?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ friendId }) },
+      ),
+    publish: (accountId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingPublishResult>>(
+        `/api/friend-add-routing/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),
     /** テスト実行。登録も配信もしない。振り分け先だけを返す。 */
     test: (accountId: string, friendId: string) =>
