@@ -726,7 +726,15 @@ export const USERS_GROUPED = {
     ['Kenta Kawano (Obama)', 'uid', false, ['kenta@example.com'], []],
     ['菅野 亮', 'solo', false, [], ['090-0000-0003']],
   ].map(([displayName, kind, isDuplicate, emails, phones], index) => ({
-    identityKey: `identity-${index}`,
+    /*
+      一覧の鍵は Worker が `COALESCE(url_token, 'uid:'||friends.user_id,
+      'solo:'||friends.id)` で組む（`services/users-grouped.ts`）。
+      **種別ごとに形が違う。** 全部を `identity-N` にしていたころは、
+      統合ユーザー詳細（`w8W4Eh`）を開く先が取り出せなかった。
+    */
+    identityKey: kind === 'uid'
+      ? 'uid:merged-person-1'
+      : kind === 'solo' ? `solo:friend-${index}` : `tok_${index}`,
     identityKeyKind: String(kind),
     displayName: String(displayName),
     pictureUrl: null,
@@ -5180,4 +5188,76 @@ export const IDENTITY_CANDIDATE_LISTS = {
 
 export const IDENTITY_CANDIDATE_ERROR = {
   success: false, error: '本人照合の候補を読み込めませんでした', code: 'VISUAL_QA_ERROR',
+}
+
+/** `w8W4Eh` 統合ユーザー詳細。平文のメール・電話は置かない。 */
+export const MERGED_PERSON_DETAIL = {
+  id: 'merged-person-1', status: 'active', revision: 4, primaryDisplayName: '田中 花子',
+  linkedFriends: [
+    {
+      friendId: 'friend-identity-right', displayName: '田中 花子',
+      lineAccountId: 'visual-qa-account', lineAccountName: '本店', isFollowing: true,
+      linkedAt: '2026-08-28T10:00:00.000Z', linkMethod: 'operator_review', confidence: 92,
+      candidateId: 'identity-friend-1', candidateVersion: 2,
+    },
+    {
+      friendId: 'friend-identity-left', displayName: '田中 はなこ',
+      lineAccountId: 'visual-qa-account-sub', lineAccountName: '支店', isFollowing: true,
+      linkedAt: '2026-08-28T10:00:00.000Z', linkMethod: 'operator_review', confidence: 92,
+      candidateId: 'identity-friend-1', candidateVersion: 2,
+    },
+  ],
+  profileValues: [
+    {
+      fieldKey: 'email', fieldLabel: 'メールアドレス', valuePreview: 'ta***@example.jp',
+      sourceType: 'form', sourceLabel: '来店アンケート', sourceFriendId: 'friend-identity-right',
+      verifiedAt: '2026-08-28T09:00:00.000Z', selectedByName: '画面確認',
+      selectedAt: '2026-08-28T10:10:00.000Z', updateMode: 'fixed',
+    },
+    {
+      fieldKey: 'phone', fieldLabel: '電話番号', valuePreview: '090-****-0001',
+      sourceType: 'friend_field', sourceLabel: '支店の友だち情報',
+      sourceFriendId: 'friend-identity-left', verifiedAt: null, selectedByName: '画面確認',
+      selectedAt: '2026-08-28T10:12:00.000Z', updateMode: 'auto',
+    },
+  ],
+  deliveryPriorities: [
+    {
+      purpose: 'broadcast', friendId: 'friend-identity-right',
+      lineAccountId: 'visual-qa-account', lineAccountName: '本店', priority: 1,
+      isActive: true, reason: '通常の配信は本店から送ります',
+    },
+    {
+      purpose: 'broadcast', friendId: 'friend-identity-left',
+      lineAccountId: 'visual-qa-account-sub', lineAccountName: '支店', priority: 2,
+      isActive: true, reason: '本店から送れないときの代替です',
+    },
+  ],
+  history: [
+    {
+      id: 'merged-event-2', eventType: 'profile',
+      summary: 'プロフィールの採用値を2件更新しました', actorName: '画面確認',
+      occurredAt: '2026-08-28T10:12:00.000Z',
+    },
+    {
+      id: 'merged-event-1', eventType: 'link', summary: '本人照合で友だちを結び付けました',
+      actorName: '画面確認', occurredAt: '2026-08-28T10:00:00.000Z',
+    },
+  ],
+  createdAt: '2026-08-28T10:00:00.000Z', updatedAt: '2026-08-28T10:12:00.000Z',
+  archivedAt: null,
+}
+
+/** 0件を未取得へ変えないため、器は通常時と同じまま空配列を返す。 */
+export const MERGED_PERSON_EMPTY = {
+  ...MERGED_PERSON_DETAIL,
+  revision: 1,
+  linkedFriends: [MERGED_PERSON_DETAIL.linkedFriends[0]],
+  profileValues: [],
+  deliveryPriorities: [],
+  history: [],
+}
+
+export const MERGED_PERSON_ERROR = {
+  success: false, error: '統合ユーザーを読み込めませんでした', code: 'VISUAL_QA_ERROR',
 }

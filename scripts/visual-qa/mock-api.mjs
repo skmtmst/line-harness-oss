@@ -117,6 +117,9 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_USAGE,
+  MERGED_PERSON_DETAIL,
+  MERGED_PERSON_EMPTY,
+  MERGED_PERSON_ERROR,
   MILEAGE_HISTORY,
   MILEAGE_OVERVIEW,
   MILEAGE_REWARDS,
@@ -591,6 +594,14 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ? IDENTITY_CANDIDATE_EC
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
+  }
+  const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
+  if (mergedPerson) {
+    if (query.get('visualState') === 'error') return MERGED_PERSON_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: MERGED_PERSON_EMPTY }
+    }
+    return { success: true, data: MERGED_PERSON_DETAIL }
   }
   if (pathname === '/api/dashboard/preferences') {
     /*

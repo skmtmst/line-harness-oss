@@ -404,10 +404,39 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
-    route: '/friends?tab=merged', gap: 'api',
-    gapNote: '元の友だちを残した非破壊リンク、解除履歴、項目ごとの採用値と出所、配信優先順位を扱う `friend_identity_links`・`user_profile_values`・`user_delivery_priorities` と詳細APIが要る',
-    status: 'unimplemented',
-    why: '現行の統合一覧は集計表示までで、設計が求める友だちの関連付け・解除、プロフィール競合、採用元、配信優先順位を保存・更新する口が無い。正式要件 §10・§11・§14 が新しい履歴付きモデルを要求している',
+    route: '/friends?tab=merged',
+    /*
+      一覧の行から1件開く。同じ画面を二重に作らないため、詳細に別のルートは
+      無い。押し口の印（`data-qa-open`）で開く。
+    */
+    steps: [{ qaOpen: 'w8W4Eh', after: 900 }],
+    states: {
+      apis: ['**/api/friends/people/**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
+    variants: [
+      {
+        suffix: '-edit',
+        steps: [
+          { qaOpen: 'w8W4Eh', after: 900 },
+          { click: '優先順位を変更', after: 700 },
+        ],
+      },
+      {
+        /* 保存だけ 409 にして、押した先の版競合を撮る。読み込みは素通し。 */
+        suffix: '-conflict',
+        state: { apis: ['**/api/friends/people/**'], kind: 'conflict' },
+        steps: [
+          { qaOpen: 'w8W4Eh', after: 900 },
+          { click: '優先順位を変更', after: 700 },
+          { click: '保存する', after: 900 },
+        ],
+      },
+    ],
+    verdict: 'match',
+    verdictNote: '**#601 `cfab56e0`（#599 `3385ba56` の上）で新規実装。設計 `w8W4Eh` 3-3-A。** ルート `/friends?tab=merged`。一覧の押し口（`data-qa-open="w8W4Eh"`）から開き、**同じ画面を二重に作らないよう詳細に別のルートは足していない**。1440・1920とも横スクロール0。 **① 4状態を撮り分けた**：通常・読込・失敗・権限不足は面ごと差し替え、**取得できた0件は各節の中で「まだありません」**（`w8W4Eh-empty` は 統合された属性 0件・採用した値はまだありません・まだ記録がありません、で 結び付いている友だち 1件 は実値）。失敗と0件が同じ文にならない。 **② 未取得と実値を分けている**：確からしさは本店 `92%`、移行で入った結び付きは `—`。`null` は「記録していない」で 0% ではない（`merged-person-view.ts:confidenceText`）。空の絵では メールアドレス・電話番号・担当 が `—`。 **③ 内部IDを本文へ出さない**：`friendId` は「友だちを開く」の行き先だけ。`candidateId`・`lineAccountId` は本文に出ない（`w8W4Eh-*.txt` に `merged-person-1`・`friend-identity-*`・`visual-qa-account` は0件）。 **④ メール・電話はマスク済みのまま** `ta***@example.jp` ／ `090-****-0001`。 **⑤ 版競合**（`w8W4Eh-conflict`）：保存だけ409にして押した先を撮った。「別の人が先に変更しました。最新の状態を読み直してから、もう一度変更してください。」と「読み直す」が、窓の中と面の上の両方に出る。**撮って初めて、409が一般のエラーへ落ちていたのが分かった**——`extractApiErrorCode` は本文の `error` が英小文字snake_caseのときだけコードを拾うので、Workerの `code:\'STALE_PERSON\'` は画面へ届かない。状態番号で判断する形に直した（同じ誤りが `InCDe`/`ELayY` にもあり #600 で直した）。 **⑥ 配信元**（`w8W4Eh-edit`）：用途ごとにまとめて順位で並べ、上へ・下へ・使わないを出す。全部を「使わない」にすると承知の印がつくまで保存できない（空配列＝全部解除のため）。 設計にある「統合を解除」「採用値の変更」「UID」「タグ」「履歴のアカウント列」は、**解除APIも候補値の読み口も無く、内部IDは出せず、タグと列は契約が返さない**ので作っていない。押しても何も起きない操作を置かず、代わりに解除の道筋を文で書いた。P2。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friends-v6/w8W4Eh-normal.txt`・`w8W4Eh-empty.txt`・`w8W4Eh-conflict.txt` ＋ `merged-person-view.ts` ＋ `components/users/user-row.tsx`',
+    verdictSource: 'friends-v6/w8W4Eh-normal.txt + merged-person-view.ts',
+    verdictHead: 'cfab56e0',
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
@@ -2434,6 +2463,7 @@ export const CAPTURED_AT = {
     { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' },
   { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'YzxU1'], note: '判定を具体化するため撮った' },
       { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['InCDe'], note: 'Claudeが #598 の読み口の上に実装した2画面のうち友だち同士のほう。5状態＋判定窓で12枚' },
+      { pr: 601, head: 'cfab56e0', on: '2026-08-31', screens: ['w8W4Eh'], note: 'Claudeが #599 の読み口の上に実装した統合ユーザー詳細。通常・読込・空・失敗・権限不足＋変更窓＋版競合で14枚' },
   ],
   28: [
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },

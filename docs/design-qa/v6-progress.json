@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 234,
-  "unimplemented": 24,
+  "compared": 235,
+  "unimplemented": 23,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 42,
+  "match": 43,
   "structureMatchDataPending": 18,
   "needsFix": 174,
   "unjudged": 0,
-  "remaining": 216,
+  "remaining": 215,
   "features": [
     {
       "feature": 1,
@@ -125,16 +125,16 @@
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 8,
-      "unimplemented": 3,
+      "compared": 9,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 3,
       "structureMatchDataPending": 0,
       "needsFix": 6,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 520,
@@ -174,6 +174,15 @@
             "InCDe"
           ],
           "note": "Claudeが #598 の読み口の上に実装した2画面のうち友だち同士のほう。5状態＋判定窓で12枚"
+        },
+        {
+          "pr": 601,
+          "head": "cfab56e0",
+          "on": "2026-08-31",
+          "screens": [
+            "w8W4Eh"
+          ],
+          "note": "Claudeが #599 の読み口の上に実装した統合ユーザー詳細。通常・読込・空・失敗・権限不足＋変更窓＋版競合で14枚"
         }
       ]
     },
@@ -1975,13 +1984,6 @@
       "name": "3-1-C 友だち（一括アクション）",
       "gap": "api",
       "gapNote": "複数人へまとめて タグ・シナリオ・担当者・対応マーク・リマインダ・メッセージ を反映する口が無い。画面も別ページとして作る必要がある"
-    },
-    {
-      "feature": 3,
-      "node": "w8W4Eh",
-      "name": "3-3-A 統合ユーザー詳細",
-      "gap": "api",
-      "gapNote": "元の友だちを残した非破壊リンク、解除履歴、項目ごとの採用値と出所、配信優先順位を扱う `friend_identity_links`・`user_profile_values`・`user_delivery_priorities` と詳細APIが要る"
     },
     {
       "feature": 3,

@@ -341,10 +341,28 @@ async function runSteps(page, steps = [], node = '') {
  * 「1件も無い」と「読めなかった」に同じ文が出ると、運用する人からは
  * 「登録したものが消えた」ように見えます。
  */
+/*
+  統合ユーザー詳細の「取得できて0件」。**一覧の既定（配列）では作れない**——
+  画面は `data.linkedFriends` などを読む。器は通常時と同じまま、
+  中の配列だけが空になる形を固定データから借りる。
+*/
+const { MERGED_PERSON_EMPTY } = await import('./fixtures.mjs')
+
 const LIST_STATES = {
   empty: { status: 200, body: { success: true, data: [] } },
   error: { status: 500, body: { success: false, error: 'internal error' } },
   forbidden: { status: 403, body: { success: false, error: 'forbidden' } },
+  /*
+    版の競合。**保存のときだけ返す。**
+    読み込みまで 409 にすると、画面は開いた時点で失敗の1枚になり、
+    「保存しようとしたら先を越されていた」という**本当に見たい絵**が撮れない。
+    下の `applyState` で GET は素通しにしている。
+  */
+  conflict: {
+    status: 409,
+    body: { success: false, error: '別の人が先に変更しました。最新の状態を読み直してください', code: 'STALE_PERSON' },
+    writeOnly: true,
+  },
 }
 
 /**
@@ -601,6 +619,7 @@ const EMPTY_BODIES = [
     画面は `data.items` を読む。「空」は**同じ人の疑いが1件も無い**状態。
   */
   [/\/api\/identity-candidates(\?|$)/, { items: [], total: 0, limit: 20, offset: 0 }],
+  [/\/api\/friends\/people\/[^/?]+(\?|$)/, MERGED_PERSON_EMPTY],
 ]
 
 /**
@@ -709,6 +728,8 @@ async function applyState(page, apis, kind) {
     }
     const state = LIST_STATES[kind]
     await page.route(glob, (route) => {
+      /* 保存だけを差し替えるものは、読み込みを素通しにする。 */
+      if (state.writeOnly && route.request().method() === 'GET') return route.continue()
       /* 空のときだけ、口ごとの形に合わせる。エラーはどの口でも同じ。 */
       const body = kind === 'empty' ? emptyBodyFor(route.request().url()) : state.body
       if (body === null) return route.continue()
@@ -813,7 +834,11 @@ async function captureImpl(feature) {
         `route` を書くと、その変種だけ別のURLで開く（誕生日配信のように、
         同じ編集画面でも `?key=` で中身が変わるもの）。
       */
-      for (const v of s.variants) shots.push({ kind: null, suffix: v.suffix, steps: v.steps, mode: v.mode, route: v.route })
+      /*
+        `state` を書くと、その変種だけ口を差し替えてから押す。
+        保存の失敗（版の競合）のように、**押して初めて出る失敗**を撮るため。
+      */
+      for (const v of s.variants) shots.push({ kind: null, suffix: v.suffix, steps: v.steps, mode: v.mode, route: v.route, state: v.state })
     }
     for (const width of WIDTHS) {
      for (const shotSpec of shots) {
@@ -823,6 +848,9 @@ async function captureImpl(feature) {
           `'normal'` は口を差し替えない。**ふつうの絵も同じ行から撮る**ため。
           別の行にすると、状態の絵と本体の絵が別々のheadになりうる。
         */
+        if (shotSpec.state) {
+          await applyState(page, shotSpec.state.apis, shotSpec.state.kind)
+        }
         if (shotSpec.kind && shotSpec.kind !== 'normal') {
           await applyState(page, s.states.apis, shotSpec.kind)
         }
