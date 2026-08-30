@@ -5077,3 +5077,89 @@ export const FRIEND_ADD_PUBLISHED = {
   /* **監視先。**取得元が無ければ `null` にして、画面は `—（未取得）`。 */
   monitoring: { runsPath: '/friend-add-settings/runs', slackChannel: null },
 }
+
+/**
+ * 「候補を1件ずつ判定する」台帳（設計 `InCDe` 3-2-A と `ELayY` 23-1-A）。
+ *
+ * **Codexが作る前の下ごしらえ。API head が届くまで使わない。**
+ * `screens.mjs` の2行は `unimplemented` のままにしてある。
+ *
+ * **口もルートも「想定」で正本ではない。** head が届いたら実装で確かめる。
+ * - `InCDe` 想定ルート：`/friends/duplicates/review?id=dup-1`
+ * - `ELayY` 想定ルート：`/ec-commerce/identity/review?id=idc-1`
+ * - 想定の口：`/api/identity-candidates/:id` と `/api/identity-candidates/:id/decide`
+ *
+ * **2つは同じ形にしてある。** どちらも「2件が同じ人かを、根拠を見て決める」
+ * 画面で、違うのは**何と何を突き合わせるか**だけ——`InCDe` は友だち同士、
+ * `ELayY` はECの注文とLINEの友だち。**別々の形にすると、画面も試験も
+ * 二重に持つことになる。**
+ *
+ * 判定は5つ（要件 §9）：`pending` / `linked` / `different` / `deferred` /
+ * `invalidated`。**「別人」と決めたものを毎回出さない**（再提示の抑止）ため、
+ * `different` を残す必要がある。**消してしまうと、また候補に出てくる。**
+ */
+export const IDENTITY_CANDIDATE = {
+  candidateId: 'idc-1',
+  status: 'pending',
+  certainty: 'high',
+  /** 突き合わせる2件。**どちらも消さずに残す**（非破壊）。 */
+  left: {
+    kind: 'friend', id: 'friend-1', label: 'Kenta Kawano',
+    attributes: [
+      { name: 'メールアドレス', value: 'kenta@example.com', verified: true },
+      { name: '電話番号', value: '090-0000-0001', verified: true },
+      { name: '追加日', value: '2026/08/13', verified: false },
+    ],
+  },
+  right: {
+    kind: 'friend', id: 'friend-7', label: '川野 健太',
+    attributes: [
+      { name: 'メールアドレス', value: 'kenta@example.com', verified: true },
+      { name: '電話番号', value: null, verified: false },
+      { name: '追加日', value: '2026/05/02', verified: false },
+    ],
+  },
+  /** **なぜ候補になったか。**根拠を出さないと判定できない。 */
+  reasons: [
+    { label: '確認済みのメールアドレスが同じ', weight: 'strong' },
+    { label: '表示名が似ている', weight: 'weak' },
+  ],
+  /** **結びつけると何が変わるか。**押す前に見せる。 */
+  impact: {
+    mergedMileage: 2450,
+    duplicateDeliveriesAvoided: 3,
+    /** 取得元が無いものは `null`。画面は `—（未取得）` にする。 */
+    ordersLinked: null,
+  },
+  history: [
+    { at: '2026-08-20T01:00:00.000Z', status: 'deferred', by: '川野 健太', reason: '本人に確認中' },
+  ],
+}
+
+/** 一度「別人」と決めたもの。**再提示を抑えるため残す。** */
+export const IDENTITY_CANDIDATE_DIFFERENT = {
+  ...IDENTITY_CANDIDATE,
+  candidateId: 'idc-2', status: 'different', certainty: 'low',
+  reasons: [{ label: '電話番号の下4桁が同じ', weight: 'weak' }],
+  history: [
+    { at: '2026-08-22T03:00:00.000Z', status: 'different', by: '菅野 亮', reason: '住所が別で、家族と判断' },
+  ],
+}
+
+/** ECの注文とLINEの友だちを突き合わせる側（`ELayY`）。**器は同じ。** */
+export const IDENTITY_CANDIDATE_EC = {
+  ...IDENTITY_CANDIDATE,
+  candidateId: 'idc-3',
+  left: {
+    kind: 'ec_order', id: 'ec-1042', label: '注文 #1042（2026/08/24）',
+    attributes: [
+      { name: 'メールアドレス', value: 'kenta@example.com', verified: true },
+      { name: '電話番号', value: '090-0000-0001', verified: true },
+      { name: '金額', value: '¥12,800', verified: false },
+    ],
+  },
+  impact: { mergedMileage: null, duplicateDeliveriesAvoided: null, ordersLinked: 24 },
+}
+
+/** 候補が1件も無い状態。**「もう見るものが無い」と「読めなかった」を分ける。** */
+export const IDENTITY_CANDIDATES_EMPTY = { candidates: [], total: 0 }
