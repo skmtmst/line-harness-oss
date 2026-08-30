@@ -35,3 +35,22 @@ describe('一斉配信の削除確認', () => {
     expect(PAGE).toContain('error={deleteError}')
   })
 })
+
+describe('一覧の未取得表示', () => {
+  const source = PAGE
+
+  it('未取得を半角ハイフンで書かない', () => {
+    /*
+     * 半角の `-` は「値が入っていない」ではなく、マイナスや区切りに見える。
+     * 設計（`q76C35`）は全角の `—`。実値0とも見分けが付かなくなる。
+     */
+    expect(source).not.toMatch(/return '-'/)
+    expect(source).not.toMatch(/\n\s*'-'\n/)
+    expect(source).toContain("return '—'")
+  })
+
+  it('権限不足を読み込み失敗と別の1枚にする', () => {
+    expect(source).toContain('kind="forbidden"')
+    expect(source).toContain('err.status === 403')
+  })
+})

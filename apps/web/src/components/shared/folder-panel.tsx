@@ -1,6 +1,7 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import React, { useState, type ReactNode } from 'react'
+import ActionMenu from './action-menu'
 
 /**
  * 一覧の左に置くフォルダの縦パネル。
@@ -29,6 +30,10 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /** 消せる行だけ渡す。中身は消えず未分類に戻る。 */
+  onDelete?: () => void
+  /** 撮影の押し口の印（`data-qa-open`）。文言で探さないため。 */
+  qaOpen?: string
 }
 
 export default function FolderPanel({
@@ -89,22 +94,69 @@ export default function FolderPanel({
               <span className="min-w-0 flex-1 truncate">{row.label}</span>
               <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>
             </button>
-            {/* 直す入口は行にカーソルを置いたときだけ。常に出していると、
-                選ぶつもりで押し間違える。消すのは編集の中に置く。 */}
-            {row.onEdit && (
-              <button
-                onClick={row.onEdit}
-                aria-label={`フォルダ「${row.label}」を編集`}
-                title={`フォルダ「${row.label}」の名前と色を変える`}
-                className="text-ink-faint hover:text-accent px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-              >
-                編集
-              </button>
+            {/*
+              直す入口は設計（`q76C35`）の「…」。
+              **以前はカーソルを置いたときだけ出る「編集」だった。**
+              撮った絵にも写らず、触って初めて分かる形だったので、
+              名前を変えられること自体が伝わっていなかった。
+            */}
+            {(row.onEdit || row.onDelete) && (
+              <FolderRowMenu row={row} />
             )}
           </div>
         ))}
       </nav>
       {children && <div className="border-hairline space-y-2 border-t p-3">{children}</div>}
     </aside>
+  )
+}
+
+/** 1行ぶんの「…」。開いている行はひとつだけになるよう、行ごとに持つ。 */
+function FolderRowMenu({ row }: { row: FolderPanelRow }) {
+  const [open, setOpen] = useState(false)
+  const items = [
+    row.onEdit && {
+      id: 'rename',
+      label: '名前を変える',
+      onSelect: () => {
+        setOpen(false)
+        row.onEdit?.()
+      },
+    },
+    row.onDelete && {
+      id: 'delete',
+      label: '消す',
+      tone: 'danger' as const,
+      onSelect: () => {
+        setOpen(false)
+        row.onDelete?.()
+      },
+    },
+  ].filter(Boolean) as Array<{ id: string; label: string; tone?: 'danger'; onSelect: () => void }>
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={`フォルダ「${row.label}」の操作`}
+        aria-expanded={open}
+        data-qa-open={row.qaOpen}
+        className="text-ink-faint hover:text-accent hover:bg-canvas-sunken rounded-control px-1.5 py-1 text-sm leading-none"
+      >
+        …
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-10">
+          <ActionMenu
+            open
+            items={items}
+            note="フォルダを消しても、入っていた配信は未分類として残ります。"
+            ariaLabel={`フォルダ「${row.label}」の操作`}
+            onClose={() => setOpen(false)}
+          />
+        </div>
+      )}
+    </div>
   )
 }

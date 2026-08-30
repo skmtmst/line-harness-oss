@@ -3,13 +3,14 @@
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
-import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
+import ListState from '@/components/shared/list-state'
 import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -25,7 +26,7 @@ const statusConfig: Record<
 }
 
 function formatDatetime(iso: string | null): string {
-  if (!iso) return '-'
+  if (!iso) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
     month: '2-digit',
@@ -58,6 +59,11 @@ function BroadcastList() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+   * **権限不足を「読み込み失敗」に混ぜない。** 直し方がまったく違う——
+   * 失敗は読み直せば直るが、権限不足は誰かに足してもらうしかない。
+   */
+  const [forbidden, setForbidden] = useState(false)
   /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
   const [scheduledOnly, setScheduledOnly] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
@@ -77,6 +83,13 @@ function BroadcastList() {
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  /** 名前を変えるフォルダ。設計 `q76C35` の「…」から開く。 */
+  const [folderRenaming, setFolderRenaming] = useState<Folder | null>(null)
+  const [folderRenameText, setFolderRenameText] = useState('')
+  /** 消すフォルダ。中身は消えず未分類に戻ることを、押す前に言う。 */
+  const [folderDeleting, setFolderDeleting] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
@@ -117,6 +130,7 @@ function BroadcastList() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    setForbidden(false)
     try {
       const [broadcastsRes, tagsRes] = await Promise.all([
         api.broadcasts.list({ accountId: selectedAccountId || undefined }),
@@ -125,8 +139,9 @@ function BroadcastList() {
       if (broadcastsRes.success) setBroadcasts(broadcastsRes.data)
       else setError(broadcastsRes.error)
       if (tagsRes.success) setTags(tagsRes.data)
-    } catch {
-      setError('データの読み込みに失敗しました。もう一度お試しください。')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else setError('データの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       setLoading(false)
     }
@@ -232,6 +247,85 @@ function BroadcastList() {
       />
       </div>
 
+      {/*
+        フォルダの名前を変える（設計 `q76C35` の「…」→「名前を変える」）。
+        口は既にある（`api.folders.update`）ので、出す場所だけの話だった。
+      */}
+      <ConfirmDialog
+        open={folderRenaming !== null}
+        title="フォルダの名前を変える"
+        description="この箱に入っている配信はそのままです。"
+        confirmLabel="変更する"
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => setFolderRenaming(null)}
+        onConfirm={
+          folderRenameText.trim().length > 0 && !folderBusy
+            ? async () => {
+                if (!folderRenaming) return
+                setFolderBusy(true)
+                setFolderError('')
+                try {
+                  const res = await api.folders.update(folderRenaming.id, {
+                    name: folderRenameText.trim(),
+                  })
+                  if (!res.success) throw new Error('failed')
+                  setFolderRenaming(null)
+                  await loadFolders()
+                } catch {
+                  setFolderError('フォルダの名前を変えられませんでした。もう一度お試しください。')
+                } finally {
+                  setFolderBusy(false)
+                }
+              }
+            : undefined
+        }
+      >
+        <label className="block">
+          <span className="text-ink-secondary text-xs font-semibold">フォルダ名</span>
+          <input
+            value={folderRenameText}
+            onChange={(e) => setFolderRenameText(e.target.value)}
+            placeholder="例: 01_キャンペーン"
+            className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+          />
+        </label>
+        {folderRenameText.trim().length === 0 && (
+          <p className="text-ink-faint mt-1 text-xs">名前を入れると変更できます。</p>
+        )}
+      </ConfirmDialog>
+
+      {/*
+        フォルダを消す。**消えるもの・残るもの・戻せないことを先に言う**
+        （`EGMb1` の削除確認と同じ形）。
+      */}
+      <ConfirmDialog
+        open={folderDeleting !== null}
+        title={folderDeleting ? `フォルダ「${folderDeleting.name}」を消しますか？` : ''}
+        description="入っていた配信は消えず、未分類として残ります。フォルダの分け方だけが失われ、この操作は取り消せません。"
+        confirmLabel="消す"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => setFolderDeleting(null)}
+        onConfirm={async () => {
+          if (!folderDeleting) return
+          setFolderBusy(true)
+          setFolderError('')
+          try {
+            const res = await api.folders.delete(folderDeleting.id)
+            if (!res.success) throw new Error('failed')
+            if (folderFilter === folderDeleting.id) setFolderFilter('')
+            setFolderDeleting(null)
+            await loadFolders()
+          } catch {
+            setFolderError('フォルダを消せませんでした。状態を読み直してから、もう一度お試しください。')
+          } finally {
+            setFolderBusy(false)
+          }
+        }}
+      />
+
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -256,11 +350,22 @@ function BroadcastList() {
               onSelect={setFolderFilter}
               rows={[
                 { id: '', label: 'すべて', count: broadcasts.length },
-                ...folders.map((f) => ({
+                ...folders.map((f, index) => ({
                   id: f.id,
+                  /* 撮影の押し口。文言で探すと、フォルダ名が変わるたびに当たらなくなる。 */
+                  qaOpen: index === 0 ? 'xkRDb' : undefined,
                   label: f.name,
                   count: broadcasts.filter((b) => b.folderId === f.id).length,
                   color: f.color,
+                  onEdit: () => {
+                    setFolderError('')
+                    setFolderRenameText(f.name)
+                    setFolderRenaming(f)
+                  },
+                  onDelete: () => {
+                    setFolderError('')
+                    setFolderDeleting(f)
+                  },
                 })),
                 {
                   id: UNFILED,
@@ -358,7 +463,7 @@ function BroadcastList() {
           </div>
 
       {/* Error */}
-      {error && (
+      {error && !forbidden && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
@@ -415,21 +520,22 @@ function BroadcastList() {
             </div>
           ))}
         </div>
+      ) : forbidden ? (
+        /* 権限不足。「ありません」とも「失敗しました」とも別の1枚にする。 */
+        <ListState kind="forbidden" title="配信を見る権限がありません" />
       ) : broadcasts.length === 0 && !showCreate ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          {/* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */}
-          <p className="text-ink-faint">
-            {error
-              ? 'いまは読み込めていません。上の案内をご覧ください。'
-              : '配信がありません。「新規配信」から作成してください。'}
-          </p>
-        </div>
+        /* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */
+        error ? (
+          <ListState kind="error" title="配信を読み込めませんでした" description="上の案内をご覧ください。読み直しても直らない場合はエラー報告へ。" />
+        ) : (
+          <ListState kind="empty" title="配信がありません" description="「新規配信」から作成してください。" />
+        )
       ) : visibleBroadcasts.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">
-            {activeTab === 'dedup' ? '複数アカ重複除外配信はまだありません。' : 'このタブに該当する配信はありません。'}
-          </p>
-        </div>
+        <ListState
+          kind="empty"
+          title={activeTab === 'dedup' ? '複数アカ重複除外配信はまだありません' : 'このタブに該当する配信はありません'}
+          description="絞り込みを変えるか、新しく作成してください。"
+        />
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
@@ -562,7 +668,7 @@ function BroadcastList() {
                           )}
                         </div>
                       ) : (
-                        '-'
+                        '—'
                       )}
                     </td>
 

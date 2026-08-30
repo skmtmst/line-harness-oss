@@ -19,15 +19,20 @@ describe('一斉配信のKPI', () => {
     expect(html).not.toContain('>件<')
   })
 
+  it('設計どおりの4枚を、設計の順で出す', () => {
+    // 設計 `q76C35` は 予約中 → 下書き → 今月の配信 → 平均開封率。
+    expect(buildBroadcastKpiCards(null).map((card) => card.title))
+      .toEqual(['予約中', '下書き', '今月の配信', '平均開封率'])
+  })
+
   it('集計の一部が欠けてもundefinedを文へつながない', () => {
     const cards = buildBroadcastKpiCards({
       thisMonth: 12,
-      delivered: 1842,
       openRate: 69.4,
     })
 
+    expect(cards.find((card) => card.title === '予約中')?.value).toBeNull()
     expect(cards.find((card) => card.title === '今月の配信')?.detail).toBe('—')
-    expect(cards.find((card) => card.title === '到達')?.detail).toBe('—')
     expect(JSON.stringify(cards)).not.toContain('undefined')
   })
 
@@ -40,7 +45,24 @@ describe('一斉配信のKPI', () => {
       openRate: null,
     })
 
-    expect(cards.find((card) => card.title === '今月の配信')?.detail).toBe('予約中 0件')
-    expect(cards.find((card) => card.title === '到達')?.detail).toBe('失敗 0通')
+    expect(cards.find((card) => card.title === '予約中')?.value).toBe(0)
+    expect(cards.find((card) => card.title === '今月の配信')?.value).toBe(0)
+    expect(cards.find((card) => card.title === '今月の配信')?.detail).toBe('0人へ到達')
+    // 開封率だけは取得できていない。0% と混ぜない。
+    expect(cards.find((card) => card.title === '平均開封率')?.value).toBeNull()
+  })
+
+  it('下書きの件数は作らず、未取得だと書く', () => {
+    /*
+     * 一覧は全件返るので数えられそうに見えるが、一覧はLINEアカウントで
+     * 絞れるのに集計は絞らない。基準の違う数を同じ帯に並べない。
+     */
+    const cards = buildBroadcastKpiCards({
+      thisMonth: 12, scheduled: 4, delivered: 1842, failed: 3, openRate: 69.4,
+    })
+    const draft = cards.find((card) => card.title === '下書き')
+
+    expect(draft?.value).toBeNull()
+    expect(draft?.detail).toContain('未取得')
   })
 })
