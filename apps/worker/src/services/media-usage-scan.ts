@@ -33,6 +33,59 @@ export interface ScanResult {
   pruned: number;
 }
 
+type MediaToScan = { id: string; r2_key: string };
+
+async function findMatches(
+  db: D1Database,
+  item: MediaToScan,
+  skipMissingSources: boolean,
+): Promise<Array<{ refKind: MediaRefKind; refId: string }>> {
+  const matches: Array<{ refKind: MediaRefKind; refId: string }> = [];
+  for (const source of SOURCES) {
+    const conditions = source.columns.map((col) => `${col} LIKE ?`).join(' OR ');
+    const binds = source.columns.map(() => `%${item.r2_key}%`);
+    let rows;
+    try {
+      rows = await db
+        .prepare(
+          `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions} LIMIT 200`,
+        )
+        .bind(...binds)
+        .all<{ ref_id: string }>();
+    } catch (err) {
+      if (!skipMissingSources) throw err;
+      // 定期走査は、機能を使っていない古い環境で表が無くても続ける。
+      console.error(`media usage scan skipped ${source.table}:`, err);
+      continue;
+    }
+    for (const row of rows.results) matches.push({ refKind: source.refKind, refId: row.ref_id });
+  }
+  return matches;
+}
+
+/**
+ * 削除確認のため、1件だけを厳密に走査する。
+ *
+ * 定期走査と違い、1つでも読み口が失敗したら例外にする。途中まで読めた結果を
+ * 「使用先0件」にして削除させないため、全問い合わせの成功後にだけ記録を更新する。
+ */
+export async function scanSingleMediaUsage(
+  db: D1Database,
+  now: string,
+  item: MediaToScan,
+): Promise<ScanResult> {
+  const matches = await findMatches(db, item, false);
+  for (const match of matches) {
+    await recordMediaUsage(db, {
+      mediaId: item.id,
+      refKind: match.refKind,
+      refId: match.refId,
+    });
+  }
+  const pruned = await pruneStaleMediaUsages(db, now, [item.id]);
+  return { scanned: 1, matched: matches.length, pruned };
+}
+
 /**
  * R2のキーで探す。
  *
@@ -51,31 +104,10 @@ export async function scanMediaUsage(
 
   let matched = 0;
   for (const item of media.results) {
-    for (const source of SOURCES) {
-      const conditions = source.columns.map((col) => `${col} LIKE ?`).join(' OR ');
-      const binds = source.columns.map(() => `%${item.r2_key}%`);
-      let rows;
-      try {
-        rows = await db
-          .prepare(
-            `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions} LIMIT 200`,
-          )
-          .bind(...binds)
-          .all<{ ref_id: string }>();
-      } catch (err) {
-        // 表や列が無い環境もある（機能を使っていない場合）。
-        // 1つ欠けたせいで走査全体が止まる方が困る。
-        console.error(`media usage scan skipped ${source.table}:`, err);
-        continue;
-      }
-      for (const row of rows.results) {
-        await recordMediaUsage(db, {
-          mediaId: item.id,
-          refKind: source.refKind,
-          refId: row.ref_id,
-        });
-        matched++;
-      }
+    const matches = await findMatches(db, item, true);
+    for (const match of matches) {
+      await recordMediaUsage(db, { mediaId: item.id, ...match });
+      matched++;
     }
   }
 

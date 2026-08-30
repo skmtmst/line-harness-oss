@@ -10,6 +10,8 @@ const mocks = {
   deleteMedia: vi.fn(),
   getMediaUsages: vi.fn(),
   countMediaUsages: vi.fn(),
+  getMediaDeleteImpact: vi.fn(),
+  jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
   getCommonVarById: vi.fn(),
   createCommonVar: vi.fn(),
@@ -27,6 +29,8 @@ const mocks = {
 vi.mock('@line-crm/db', () => mocks);
 const accessMocks = { canAccessAllLineAccounts: vi.fn(async () => true) };
 vi.mock('../services/account-access.js', () => accessMocks);
+const scanMocks = { scanSingleMediaUsage: vi.fn() };
+vi.mock('../services/media-usage-scan.js', () => scanMocks);
 
 const { contents } = await import('./contents.js');
 
@@ -79,6 +83,16 @@ const MEDIA = {
   usage_count: 3,
 };
 
+const DELETE_IMPACT = {
+  media: { id: 'md-1', filename: 'a.png', kind: 'image' },
+  usageCount: 0,
+  references: [],
+  checkedAt: '2026-08-31T10:00:00.000',
+  lastScannedAt: null,
+  canDelete: true,
+  recommendedAction: 'delete',
+};
+
 const VAR = {
   id: 'cv-1',
   folder_id: null,
@@ -98,12 +112,14 @@ beforeEach(() => {
   put.mockResolvedValue(undefined);
   del.mockResolvedValue(undefined);
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  scanMocks.scanSingleMediaUsage.mockResolvedValue({ scanned: 1, matched: 0, pruned: 0 });
   mocks.getMedia.mockResolvedValue([MEDIA]);
   mocks.getMediaById.mockResolvedValue(MEDIA);
   mocks.createMedia.mockResolvedValue(MEDIA);
   mocks.updateMedia.mockResolvedValue(MEDIA);
   mocks.countMediaUsages.mockResolvedValue(0);
   mocks.getMediaUsages.mockResolvedValue([]);
+  mocks.getMediaDeleteImpact.mockResolvedValue(DELETE_IMPACT);
   mocks.getCommonVars.mockResolvedValue([VAR]);
   mocks.getCommonVarById.mockResolvedValue(VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
@@ -234,19 +250,73 @@ describe('メディアのアップロード', () => {
 });
 
 describe('メディアの削除', () => {
-  it('使われていれば件数を返して止める', async () => {
-    mocks.countMediaUsages.mockResolvedValue(5);
+  it('影響確認は使用先の名前と導線を返す', async () => {
+    mocks.getMediaDeleteImpact.mockResolvedValue({
+      ...DELETE_IMPACT,
+      usageCount: 1,
+      canDelete: false,
+      recommendedAction: 'review_references',
+      lastScannedAt: '2026-08-31T10:00:00.000',
+      references: [{
+        kind: 'broadcast',
+        name: '来店後のご案内',
+        href: '/broadcasts/detail?id=broadcast-1',
+        state: 'available',
+        scannedAt: '2026-08-31T10:00:00.000',
+      }],
+    });
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        usageCount: 1,
+        references: [{ name: '来店後のご案内' }],
+        canDelete: false,
+      },
+    });
+  });
+
+  it('影響を取得できないときは0件を作らず503', async () => {
+    scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: '削除したときの影響を確認できませんでした',
+    });
+  });
+
+  it('使われていれば最新の影響を返して止める', async () => {
+    mocks.getMediaDeleteImpact.mockResolvedValue({
+      ...DELETE_IMPACT,
+      usageCount: 5,
+      canDelete: false,
+      recommendedAction: 'review_references',
+    });
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { usageCount: number };
-    expect(body.usageCount).toBe(5);
+    const body = (await res.json()) as { code: string; data: { usageCount: number } };
+    expect(body.code).toBe('media_delete_blocked');
+    expect(body.data.usageCount).toBe(5);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
   it('force=1 を付けても使用中は消さない', async () => {
-    mocks.countMediaUsages.mockResolvedValue(5);
+    mocks.getMediaDeleteImpact.mockResolvedValue({
+      ...DELETE_IMPACT,
+      usageCount: 5,
+      canDelete: false,
+      recommendedAction: 'review_references',
+    });
     const res = await req('/api/media/md-1?accountId=account-1&force=1', 'DELETE');
     expect(res.status).toBe(409);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it('削除時に影響を読み直せなければ削除しない', async () => {
+    scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
+    expect(res.status).toBe(503);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 

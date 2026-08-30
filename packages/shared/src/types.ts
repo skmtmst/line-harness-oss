@@ -275,6 +275,43 @@ export interface MediaUsage {
   scannedAt: string;
 }
 
+export type MediaDeleteImpactReferenceKind =
+  | "template"
+  | "broadcast"
+  | "rich_menu"
+  | "scenario_step"
+  | "nen_column"
+  | "event"
+  | "webinar";
+
+/** 登録メディアを消す前に、運用者が確認する現在の使用先。 */
+export interface MediaDeleteImpactReference {
+  kind: MediaDeleteImpactReferenceKind;
+  /** 権限内で現在の正本を引けたときだけ入る。内部IDは画面へ返さない。 */
+  name: string | null;
+  /** 同じLINEアカウントの使用先へ移動できるときだけ入る。 */
+  href: string | null;
+  /** 参照先が削除済み、または別アカウントで詳細を見せられない場合。 */
+  state: "available" | "unavailable";
+  scannedAt: string;
+}
+
+/** `GET /api/media/:id/delete-impact` の返り値。 */
+export interface MediaDeleteImpact {
+  media: {
+    id: string;
+    filename: string;
+    kind: MediaItem["kind"];
+  };
+  usageCount: number;
+  references: MediaDeleteImpactReference[];
+  /** 7種類すべてを削除直前に読み切った時刻。0件でも必ず入る。 */
+  checkedAt: string;
+  lastScannedAt: string | null;
+  canDelete: boolean;
+  recommendedAction: "delete" | "review_references";
+}
+
 /** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
 export interface CommonVar {
   id: string;

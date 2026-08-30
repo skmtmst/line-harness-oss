@@ -6,7 +6,8 @@ import {
   updateMedia,
   deleteMedia,
   getMediaUsages,
-  countMediaUsages,
+  getMediaDeleteImpact,
+  jstNow,
   getCommonVars,
   getCommonVarById,
   createCommonVar,
@@ -26,6 +27,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
 
 /**
  * メディアライブラリと共通情報。
@@ -297,7 +299,34 @@ contents.get('/api/media/:id/usages', async (c) => {
   }
 });
 
-// 使われていれば件数を返して止める。消すと、その箇所の画像が表示されなくなる。
+// 削除前に、現在記録されている使用先を名前と導線付きで確認する。
+contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const checkedAt = jstNow();
+    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+      id: existing.id,
+      r2_key: existing.r2_key,
+    });
+    const impact = await getMediaDeleteImpact(c.env.DB, c.req.param('id'), accountId, checkedAt);
+    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: impact });
+  } catch (err) {
+    console.error('GET /api/media/:id/delete-impact error:', err);
+    return c.json(
+      { success: false, error: '削除したときの影響を確認できませんでした' },
+      503,
+    );
+  }
+});
+
+// 使われていれば最新の影響を返して止める。画面で前に読んだ結果は信用しない。
 contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -309,14 +338,20 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
-    const usage = await countMediaUsages(c.env.DB, id);
-    if (usage > 0) {
+    const checkedAt = jstNow();
+    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+      id: existing.id,
+      r2_key: existing.r2_key,
+    });
+    const impact = await getMediaDeleteImpact(c.env.DB, id, accountId, checkedAt);
+    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!impact.canDelete) {
       return c.json(
         {
           success: false,
-          error: `このファイルは ${usage} か所で使われています。使用先から外すか、別のメディアへ差し替えてください。`,
-          code: 'IN_USE',
-          usageCount: usage,
+          error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
+          code: 'media_delete_blocked',
+          data: impact,
         },
         409,
       );
@@ -340,7 +375,7 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/media/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
 

@@ -19,6 +19,7 @@ import type {
   SavedSearch,
   MediaItem,
   MediaUsage,
+  MediaDeleteImpact,
   CommonVar,
   CommonVarSchedule,
   Scenario,
@@ -1587,6 +1588,11 @@ export const api = {
         body: JSON.stringify(data),
       }),
     usages: (id: string, accountId: string) => fetchApi<ApiResponse<MediaUsage[]>>(`/api/media/${id}/usages?accountId=${encodeURIComponent(accountId)}`),
+    /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */
+    deleteImpact: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MediaDeleteImpact>>(
+        `/api/media/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`,
+      ),
     /** 使用中は 409 で止まり、使用先から外すまで消せない。 */
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
