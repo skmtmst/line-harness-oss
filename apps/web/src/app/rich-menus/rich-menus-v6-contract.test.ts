@@ -9,6 +9,10 @@ const PUBLISHER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'lib', 'rich-menu-publisher.ts'),
   'utf8',
 )
+const TARGETING_DB = readFileSync(
+  join(HERE, '..', '..', '..', '..', '..', 'packages', 'db', 'src', 'rich-menus.ts'),
+  'utf8',
+)
 
 describe('V6リッチメニューの画面契約', () => {
   it('GO8RQどおり画面名は共通トップバーだけに置く', () => {
@@ -30,7 +34,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGE).toContain('pageCount={pageCount}')
-    expect(PAGE).toContain('const list = sorted')
+    expect(PAGE).toContain('const shownGroups = sorted.slice')
     expect(PAGE).not.toContain('「表示」を増やすと出ます')
   })
 
@@ -42,6 +46,23 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain("groupKpiReady ? targetingCount : '—'")
     expect(PAGE).toContain('公開中 —・${groupKpiUnavailableText}')
     expect(PAGE).toContain("'一覧を取得できませんでした'")
+  })
+
+  it('GO8RQどおり実際に友だちへ出す優先順を既定表示にする', () => {
+    expect(PAGE).toContain("useState<SortKey>('priority')")
+    expect(PAGE).toContain('出す順番（自分で決めた順）')
+    expect(PAGE).toContain('上にあるメニューが優先されます。')
+    expect(PAGE).toContain('いちばん上の1つだけが表示されます。')
+    expect(PAGE).toContain('priorityRankByGroup.get(g.id)')
+    expect(TARGETING_DB).toContain('ORDER BY g.targeting_priority ASC, g.created_at ASC')
+  })
+
+  it('並び替えは見た目だけでなく実際の判定順を全件そろえる', () => {
+    expect(PAGE).toContain('targetingPriority: item.priority')
+    expect(PAGE).toContain('displayOrder: item.priority')
+    expect(PAGE).toContain('moveTargetingGroup(groups, group.id')
+    expect(PAGE).toContain('reordered.map((item) =>')
+    expect(PAGE).not.toContain("setSortKey('manual')")
   })
 })
 

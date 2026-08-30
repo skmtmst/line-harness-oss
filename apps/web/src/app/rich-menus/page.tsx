@@ -11,11 +11,16 @@ import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import {
+  compareTargetingGroups,
+  moveTargetingGroup,
+  orderTargetingGroups,
+} from './targeting-order'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
 
-type SortKey = 'taps' | 'updated' | 'name' | 'manual'
+type SortKey = 'taps' | 'updated' | 'name' | 'priority'
 
 type RichMenuAction = 'load' | 'reorder' | 'delete' | 'externalDelete' | 'import'
 
@@ -68,11 +73,14 @@ type RichMenuGroupListItem = {
   isDefaultForAll: boolean
   targetingEnabled: boolean
   targetingCondition: string | null
+  /** 複数の条件に当てはまったときに、実際に見る順番。小さいほど先。 */
+  targetingPriority: number
   /** 159: フォルダ。分けていなければ null。 */
   folderId: string | null
   /** 160: 自分で決める並び順。 */
   displayOrder: number
   thumbnailR2Key: string | null
+  createdAt: string
   updatedAt: string
 }
 
@@ -125,7 +133,7 @@ export default function RichMenusListPage() {
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>('taps')
+  const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [savedFilter, setSavedFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
@@ -215,28 +223,25 @@ export default function RichMenusListPage() {
 
   const [reorderBusy, setReorderBusy] = useState(false)
 
-  /**
-   * 1つ上／下と順番を入れ替える。
-   *
-   * 画面に出ている並びの中で入れ替える。フォルダや絞り込みで隠れているものは
-   * 動かさない。見えていないものが動くと、何が起きたか分からなくなる。
-   */
+  /** 1つ上／下と、友だちへ実際に出す優先順を入れ替える。 */
   async function moveGroup(group: RichMenuGroupListItem, delta: number) {
-    // ページ送りで隠れている行も含めた現在の絞り込み結果を基準にする。
-    // 表示中の20件だけで0から振り直すと、2ページ目以降が1ページ目と
-    // 同じ displayOrder になり、次回の並びが不定になる。
-    const list = sorted
-    const index = list.findIndex((g) => g.id === group.id)
-    const target = list[index + delta]
-    if (!target) return
+    // 実際の判定と同じ targetingPriority 順で全件を並べる。絞り込み中の
+    // 画面だけを基準にすると、隠れているメニューとの優先関係が壊れる。
+    const reordered = moveTargetingGroup(groups, group.id, delta === -1 ? -1 : 1)
+    if (!reordered) return
     setReorderBusy(true)
     try {
-      // 同じ数字どうしだと入れ替えても並びが変わらない。並んでいる位置を
-      // そのまま番号にして、確実に前後が入れ替わるようにする。
-      await Promise.all([
-        api.richMenuGroups.update(group.id, { displayOrder: index + delta }),
-        api.richMenuGroups.update(target.id, { displayOrder: index }),
-      ])
+      // 古いデータは同じ優先番号を持つことがある。変更した2件だけを交換すると
+      // 同順位が残るため、全件を0,1,2…へそろえる。displayOrder も同じ値へ寄せ、
+      // 以前の「自分で決めた順」を読む場所とも食い違わせない。
+      await Promise.all(
+        reordered.map((item) =>
+          api.richMenuGroups.update(item.id, {
+            targetingPriority: item.priority,
+            displayOrder: item.priority,
+          }),
+        ),
+      )
       await reload()
     } catch (e) {
       alert(richMenuError(e, 'reorder'))
@@ -330,16 +335,18 @@ export default function RichMenusListPage() {
         : '一覧を取得できませんでした'
 
   const q = query.trim()
-  const byQuery = q
+  const byQuery = !reordering && q
     ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
     : groups
   const inFolder = byQuery.filter((g) => {
+    if (reordering) return true
     if (folderFilter === UNFILED) return !g.folderId
     if (folderFilter) return g.folderId === folderFilter
     return true
   })
 
   const inSaved = inFolder.filter((g) => {
+    if (reordering) return true
     if (savedFilter === 'published') return g.status === 'published'
     if (savedFilter === 'draft') return g.status === 'draft'
     if (savedFilter === 'used') return (tapsByGroup.get(g.id) ?? 0) > 0
@@ -355,11 +362,16 @@ export default function RichMenusListPage() {
         return a.name.localeCompare(b.name, 'ja')
       case 'updated':
         return b.updatedAt.localeCompare(a.updatedAt)
-      case 'manual':
-        // 自分で決めた順。同じ数字なら更新の新しい順（一覧の既定と同じ）。
-        return a.displayOrder - b.displayOrder || b.updatedAt.localeCompare(a.updatedAt)
+      case 'priority':
+        // Worker が友だちへ出すメニューを選ぶ順番と同じ。
+        return compareTargetingGroups(a, b)
     }
   })
+
+  const priorityRankByGroup = new Map(
+    orderTargetingGroups(groups)
+      .map((group, index) => [group.id, index + 1]),
+  )
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -459,10 +471,10 @@ export default function RichMenusListPage() {
           aria-label="並び順"
           className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
         >
+          <option value="priority">出す順番（自分で決めた順）</option>
           <option value="taps">タップ数が多い順</option>
           <option value="updated">更新が新しい順</option>
           <option value="name">名前順</option>
-          <option value="manual">自分で決めた順</option>
         </select>
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
         <select
@@ -479,9 +491,9 @@ export default function RichMenusListPage() {
         </select>
         <button
           onClick={() => {
-            // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
-            // 他の順で上下させても、次に開いたときその順で並ばない。
-            setSortKey('manual')
+            // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
+            setSortKey('priority')
+            setPage(1)
             setReordering((v) => !v)
           }}
           aria-pressed={reordering}
@@ -493,6 +505,12 @@ export default function RichMenusListPage() {
         >
           {reordering ? '並び替えを終える' : '出す順番を変える'}
         </button>
+      </div>
+
+      <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
+        <span className="font-semibold">出す順番：</span>
+        上にあるメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、
+        いちばん上の1つだけが表示されます。
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
@@ -649,6 +667,9 @@ export default function RichMenusListPage() {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
                     <span className="whitespace-nowrap">
+                      出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
+                    </span>
+                    <span className="whitespace-nowrap">
                       サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}
                     </span>
                     {tapStats && (
@@ -671,7 +692,9 @@ export default function RichMenusListPage() {
               </Link>
               {reordering && (
                 <div className="border-hairline bg-canvas-sunken flex items-center justify-between gap-2 border-t px-4 py-2">
-                  <span className="text-ink-faint text-[11px]">並び順 {g.displayOrder}</span>
+                  <span className="text-ink-faint text-[11px]">
+                    出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
+                  </span>
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => void moveGroup(g, -1)}
