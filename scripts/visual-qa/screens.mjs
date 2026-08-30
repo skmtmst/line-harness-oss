@@ -321,8 +321,8 @@ export const SCREENS = [
 
   // ── 機能3 友だち ────────────────────────────────────────
   { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち',
-    verdict: 'needs_fix', verdictNote: 'P2 担当者の顔チップ（イニシャルの丸）が無く、未割り当ての「−」も出ない。ほかは設計どおり',
-    verdictSource: 'friends-v6/PhxG6-1920.png', verdictHead: '728deca0',
+    verdict: 'needs_fix', verdictNote: '**P2 友だち一覧の作りが設計とそろわない。** ルート `/friends`。タブは 友だち一覧／重複検出／統合ユーザー／UID移行 で、帯に 有効友だち・ブロック非表示・未対応・今月の追加。設計との差は列の並びと絞り込みの位置。**#520 で失敗のときの帯が `—人` になった**（束1・束4は解決済み）。取得元：`friends-v6/PhxG6.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friends-v6/PhxG6.txt', verdictHead: 'c275749d',
   },
   {
     /*
@@ -341,8 +341,8 @@ export const SCREENS = [
   {
     ...FRIENDS, node: 'Igi72', name: '3-1-B 友だち（詳細検索・14軸）',
     steps: [{ click: '詳細条件' }],
-    verdict: 'needs_fix', verdictNote: 'P1 OR条件が4つだけで、しかも全部押せない（設計は対応マーク・シナリオ・イベント予約・カレンダー予約・回答フォーム・最終反応日・リマインダ・個別メモ・ステータスメッセージ・友だち登録日・その他）。「表示する友だち」（表示中・非表示・ブロックした人・友だちの状態）が丸ごと無い。「保存した検索から読み込む」が無い',
-    verdictSource: 'friends-v6/Igi72-1920.png', verdictHead: '728deca0',
+    verdict: 'needs_fix', verdictNote: '**P2 詳細条件の組み立てが設計とそろわない。** ルート `/friends`（詳細条件）。設計は入れ子の and/or を作れる。取得元：`friends-v6/Igi72.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friends-v6/Igi72.txt', verdictHead: 'c275749d',
   },
   {
     ...FRIENDS, node: 'IAf7j', name: '3-1-C 友だち（一括アクション）',
@@ -359,8 +359,8 @@ export const SCREENS = [
     why: '一覧での選択までしか無く、一括操作のページが無い',
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0',
-    verdict: 'needs_fix', verdictNote: 'P1 画面の作りが設計と大きく違う。見出しが友だちの名前でなく「友だち詳細」。タブが概要・履歴・友だち情報・回答フォーム・配信/シナリオ・予約・リマインダ・アクション・マイル・リッチメニューでなく、タイムライン・健康記録ほか。概要の「進行中の配信・自動処理」「同じ人としてつながる情報」「最近の履歴」「この友だちに行う操作」が無い',
-    verdictSource: 'friends-v6/I6UAdr-1920.png', verdictHead: '728deca0',
+    verdict: 'needs_fix', verdictNote: '**P2 友だち詳細が設計とそろわない。** ルート `/friends/detail?id=friend-1`。撮った本文は「追加 2026/8/13／非表示／ブロック／個別トークを開く」。設計は来店回数・前回の申し送り・つながる先をその場で出す。取得元：`friends-v6/I6UAdr.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friends-v6/I6UAdr.txt', verdictHead: 'c275749d',
   },
   {
     ...FRIENDS, node: 'bzDn6', name: '3-1-E 友だち一覧の状態（空・読込・エラー）',
@@ -375,8 +375,8 @@ export const SCREENS = [
     verdictSource: 'friends-v6/bzDn6-error.txt', verdictHead: '4848a8f3',
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
-    verdict: 'needs_fix', verdictNote: 'P1 重複候補の一覧（候補・確信度・一致した根拠・所属アカウント・状態・確認ボタン）が丸ごと無い。アカウント間の重複マトリックスも無い。KPIの名前と粒度が設計と違う（設計は重複候補・確認済み・重複配信の削減・1配信あたりの無駄・根拠不足）。絞り込みと判定ルールが無い',
-    verdictSource: 'friends-v6/YzxU1-1920.png', verdictHead: '728deca0',
+    verdict: 'needs_fix', verdictNote: '**P2 重複検出の面が設計とそろわない。** ルート `/friends?tab=duplicates`。帯は 友だち総数231／ユニ…。設計は候補ごとに根拠と確信度を出して1件ずつ判定する（`InCDe` が未実装で、その手前まで）。取得元：`friends-v6/YzxU1.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'friends-v6/YzxU1.txt', verdictHead: 'c275749d',
   },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
@@ -424,8 +424,8 @@ export const SCREENS = [
     verdictSource: 'scenarios-v6/cCB7r.txt', verdictHead: '92f03199',
   },
   { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0',
-    verdict: 'needs_fix', verdictNote: 'P2 STEP表示が無い。右側にLINEプレビューの吹き出しと設定サマリー（配信対象・配信日時・送信数・配信後）が無い。本文の字数（52 / 5,000）が出ない。種類のタブが設計の6つ（テキスト・画像・テンプレート・質問・カルーセル・その他）と違う9つ。時刻欄が「10:00 AM」と英語書式になるのは撮影側のブラウザ言語の癖で、実装の不具合ではない',
-    verdictSource: 'scenarios-v6/kk8dz-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P2 ステップの作成が設計とそろわない。** ルート `/scenarios/new`。撮った本文は「ステップの作成／シナリオの名前と、い…」の1枚。設計は 名前 → 配信方式 → 1通目 の段で、**#569 が配信方式の段（`cCB7r`）を足した**ので、取り込み後に段が通るか見直す。取得元：`scenarios-v6/kk8dz.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'scenarios-v6/kk8dz.txt', verdictHead: 'c275749d',
   },
   { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT,
     verdict: 'needs_fix', verdictNote: '**#427 `5f09837c` で撮り直した。`NaN%` は0件**（到達率の直し自体は #534 `0158ba8e`。#427 でも壊れていない）。内部語・`undefined`・`Invalid Date` も0件。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 一覧に配信対象の列が無く、配信後がどの行も `—`。設計の注意帯（作成しただけでは配信されません…）が無い',
@@ -447,8 +447,8 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '条件なし' }],
-    verdict: 'needs_fix', verdictNote: 'P1 条件軸が設計と違う。設計は標準互換15軸＋この画面だけの6軸で、イベント予約・カレンダー予約・共通情報・リマインダ・その他・担当者・流入経路・配信状況・予約状況・購入履歴がある。実装は13個で、それらが無い代わりに反応状態・表示状態がある。P2 現在の条件の要約と「条件を初期化」が無く、条件1行の4つの選び欄も出ない',
-    verdictSource: 'scenarios-v6/r6Gzsu-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P2 シナリオ編集の1枚に、複数のNodeが同居している。** ルート `/scenarios/detail?id=scenario-0`。`hz9ti`（送信後アクション）`EvVO5`（開始条件）`g2UNV`（一括テスト送信）と**同じ1枚**。設計はそれぞれ別の窓や段。取得元：`scenarios-v6/r6Gzsu.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'scenarios-v6/r6Gzsu.txt', verdictHead: 'c275749d',
   },
   {
     /*
@@ -460,8 +460,8 @@ export const SCREENS = [
     */
     ...SCENARIO, node: 'hz9ti', name: '5-1-F シナリオ・送信後アクションを開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: 'アクション', nth: 1 }],
-    verdict: 'needs_fix', verdictNote: 'P1 選べる動作が設計の8つ（テキスト送信・テンプレート送信・タグ操作・友だち情報操作・シナリオ操作・リマインダ操作・対応マーク/表示操作・イベント予約操作）のうち5つで、テキスト送信・テンプレート送信・リマインダ操作・イベント予約操作が無い。実行の順番も、動作ごとの条件分岐（条件ON/OFF）も、保存済みセットの呼び出しも、「発動2回目以降も各動作を実行」も無い',
-    verdictSource: 'scenarios-v6/hz9ti-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P1 選べる動作が設計の8つのうち5つ。** ルート `/scenarios/detail?id=scenario-0`（アクション）。設計は テキスト送信・テンプレート送信・タグ操作・友だち情報操作・シナリオ操作・リマインダ操作・対応マーク/表示操作・イベント予約操作 の8つ。**テキスト送信・テンプレート送信・リマインダ操作・イベント予約操作が無い。** 実行の順番も、動作ごとの条件分岐も、保存済みセットの呼び出しも、「発動2回目以降も各動作を実行」も無い。取得元：`scenarios-v6/hz9ti.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'scenarios-v6/hz9ti.txt', verdictHead: 'c275749d',
   },
   {
     ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
@@ -472,8 +472,8 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '変更' }],
-    verdict: 'needs_fix', verdictNote: 'P1 設計の「シナリオの開始条件」の窓が無い。きっかけの6種類（友だち追加・タグ追加・フォーム回答・予約確定・手動開始・API/Webhook）を選ぶ面も、開始する友だちの条件も、初回のみ/毎回の選択も、一致人数の再計算（一致124人・すでに購読中8人・新規開始予定116人）も無い。実装は設定欄のトリガーのセレクト1つ',
-    verdictSource: 'scenarios-v6/EvVO5-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P1 設計の「シナリオの開始条件」の窓が無い。** ルート `/scenarios/detail?id=scenario-0`（変更）。設計はきっかけ6種類（友だち追加・タグ追加・フォーム回答・予約確定・手動開始・API/Webhook）を選ぶ面、開始する友だちの条件、初回のみ/毎回の選択、一致人数の再計算（一致124人・すでに購読中8人・新規開始予定116人）を持つ。**実装は設定欄のトリガーの選び口1つ。** 「何人が新しく始まるか」を押す前に見られない。取得元：`scenarios-v6/EvVO5.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'scenarios-v6/EvVO5.txt', verdictHead: 'c275749d',
   },
   {
     /*
@@ -563,8 +563,8 @@ export const SCREENS = [
     verdictHead: 'f7c5a99e',
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC,
-    verdict: 'needs_fix', verdictNote: 'P1 本文の上限が設計と違う。設計は1通あたり5,000文字・合計22,500文字・最大5通で、4,500文字を超えると自動分割。実装は0/500・吹き出しは最大3。ボタン（最大4つ、ラベルと押したときの動作）の編集が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなくセレクト',
-    verdictSource: 'broadcasts-v6/XQfMD-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P1 本文の上限が設計と違う。** ルート `/broadcasts/new`。設計は1通5,000字・合計22,500字・最大5通で、4,500字を超えると自動分割。実装は 0/500・吹き出しは最大3。**長い本文が書けず、書けても分割されない。** P1 ボタンの編集（最大4つ、ラベルと押したときの動作）が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなく選び口。取得元：`broadcasts-v6/XQfMD.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'broadcasts-v6/XQfMD.txt', verdictHead: 'c275749d',
   },
   {
     /*
@@ -574,8 +574,8 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択', route: NEW_BC,
     mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
-    verdict: 'needs_fix', verdictNote: 'P1 ひな形が約60件、フォルダの絞り込みも検索も無く2列でそのまま並ぶ（設計はフォルダ選択＋検索＋3件の候補）。選んだひな形の更新日・使用回数・プレビューが出ず、読み込む前の確認窓も無い。P2 1件ごとの★（よく使う）が無い。カードの補足に内部の値「text」がそのまま出ている',
-    verdictSource: 'broadcasts-v6/p97Tf-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P2 カードの補足に内部の語 `text` が出る（束3）。** ルート `/broadcasts/new`。設計は日本語の種類名。取得元：`broadcasts-v6/p97Tf.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'broadcasts-v6/p97Tf.txt', verdictHead: 'c275749d',
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定', route: NEW_BC,
@@ -619,8 +619,8 @@ export const SCREENS = [
     steps: [
       { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P1 送信枠を見ない。設計は残り3,787/5,000通を出し、足りなければ「配信枠が不足しています」で止めて対象を見直させる。実装の配信前チェック6件に送信枠の行が無く、足りなくても進める。確認項目の3つのチェック（対象人数・メッセージ表示・配信日時）も無い。実装の6件（文字数・ブロック除外・同じ本文の重複・URL・テスト送信・開封集計）は設計より細かく、そこは良い',
-    verdictSource: 'broadcasts-v6/vW4Es-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P2 送る時間の面が設計とそろわない。** ルート `/broadcasts/new`。設計は 今すぐ／予約／くり返し を段で選び、予約なら送信直前の再集計を断る。取得元：`broadcasts-v6/vW4Es.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'broadcasts-v6/vW4Es.txt', verdictHead: 'c275749d',
   },
   {
     /*
@@ -699,8 +699,8 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: 'フォルダを追加' }],
-    verdict: 'needs_fix', verdictNote: 'P2 フォルダの追加はできるが、フォルダごとの「…」（名前を変える・消す・並べ替える）が無い。設計の一覧はフォルダごとに件数と「…」を持つ',
-    verdictSource: 'broadcasts-v6/xkRDb-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P2 一覧のフォルダまわりが設計とそろわない。** ルート `/broadcasts`。フォルダごとの「…」（名前を変える・消す）が無い。取得元：`broadcasts-v6/xkRDb.txt`。1440・1920とも横スクロール0',
+    verdictSource: 'broadcasts-v6/xkRDb.txt', verdictHead: 'c275749d',
   },
   {
     ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）', route: '/broadcasts',
@@ -713,8 +713,8 @@ export const SCREENS = [
       apis: ['**/api/broadcasts?**', '**/api/broadcasts', '**/api/broadcasts/stats*', '**/api/list-stats*'],
       kinds: ['loading', 'empty', 'error'],
     },
-    verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」）。中身は正しい。失敗のとき帯は—、一覧の中は「いまは読み込めていません。上の案内をご覧ください。」。ただし共通部品の data-list-state が付いておらず、状態を名前で言えていない（試験から状態を見分けられない）',
-    verdictSource: 'broadcasts-v6/TmHjF-error-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**P1 空・失敗のとき帯の補助行に `undefined` が出る。** ルート `/broadcasts`。口を空で返すと **「今月の配信 — 件／予約中 undefined」「到達 — 通／失敗 undefined」** となる（値そのものは `—` に落ちるが、**補助の行だけ守りが無い**）。**これは #557 `697cee2c` が直すP1で、development にはまだ入っていない**——#557 では `buildBroadcastKpiCards()` が `?? null` で受け、`stats?.scheduled == null ? \'—\'` と分ける。撮影ハーネスは `undefined` を見つけて撮影を止めた（絵として残していない）。**推奨修正**：#557 の取り込み。取得元：口を空にして再現。1440・1920とも横スクロール0',
+    verdictSource: 'broadcasts-v6/TmHjF-normal.txt', verdictHead: 'c275749d',
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
@@ -817,9 +817,9 @@ export const SCREENS = [
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: '**#566 `d0680774` で束3の完了条件を満たした。** `silent rule` `automation rule` `line_account_id` `inline` `TEMPLATE` `keyword` `match` `silent` `flex` `image` を数えて**すべて0件**。**#540（実行結果側）では直らない**——#540 と #566 は同じ `auto-reply-runs` の上の兄弟で、一覧の言葉を直しているのは #566。実際に #540 `857cebc5` で撮ると7語とも残っていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（ルールごとの当たり方の推移）はこの直しの外', verdictSource: 'auto-replies-v6/cmDfJ.txt' , verdictHead: 'd0680774' },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'needs_fix', verdictNote: 'P1 ルール編集の段が無い。設計の A・B・C（ルール編集／反応条件／応答とアクション）が、実装では一覧の上に出る1枚の窓に全部入っている。右の「設定内容」も無い', verdictSource: 'auto-replies-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 自動応答の編集が段になっていない。** ルート `/auto-replies/edit?id=ar-2`。撮った本文は「自動応答を編集／決めた言葉が届いたときに、自動で返します。」の1枚で、`nzWIX` `ivDoe` と同居。設計は 一致条件 → 返信内容 → 送信後の動き の段。取得元：`auto-replies-v6/K7vg2.txt`。1440・1920とも横スクロール0', verdictSource: 'auto-replies-v6/K7vg2.txt',
     route: '/auto-replies/edit?id=ar-2',
-    verdictHead: '6053c271',
+    verdictHead: 'c275749d',
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
@@ -970,16 +970,16 @@ export const SCREENS = [
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。** **P1 どのウェビナーが効いているかを一覧で比べられない。** 設計は行ごとに **申込184人 / 視聴142人** を出す。実装の帯は 申込 `—`「一覧では数えられません」／平均視聴率 `—`「申込者のうち」／平均視聴時間 `—`「視聴ログの集計は未対応」の3つとも `—`。**断り方は正しい**（数えていないものを0にしない）が、比べるには1本ずつ「概要・分析を見る」を開いて覚えておくことになる。6本あれば6回開く。`WebinarAnalytics` は1本ぶんを全部返せるので、**足りないのはまとめて数える口だけ**。P2 設計は表、実装は札の格子で作りが違う。1440・1920とも横スクロール0、壊れ値・内部語0件', verdictSource: 'webinars-v6/ZC13r.txt + webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P1 作成の段が無い。設計は 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 と進むが、実装は1枚に並ぶ。P2 公開前確認（`D6yO7e`）と公開完了（`TimXl`）が未実装で、段の終わりが無い。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt + webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '**P1 作成の段が無い。** ルート `/webinars/new`。撮った本文の見出しは「ウェビナーを作る／録画と配信枠を設定すると、友だちが『◯』…」の1枚で、設計の 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 という段が無い。**段の終わり（公開前確認 `D6yO7e`・公開完了 `TimXl`）が未実装**なので、作り終えたかどうかを画面が言えない。**推奨修正**：#508 が `D6yO7e` を実装済みなので、#507 → #508 の取り込み後に段を通す。取得元：`webinars-v6/lvaY5.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt' , verdictHead: 'c275749d' },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 設計との差は動画の入れ方と公開範囲の並び。`Xjk8q`（視聴後アクション）と同じタブに同居していて、設計のように段で分かれていない。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/PV1Vh.txt + webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 動画・公開設定が1枚に同居している。** ルート `/webinars/edit?id=wb-1`。撮った本文は「ウェビナーの編集／動画セミナーの公開設定と、視聴中・視聴後…」で始まり、**`d3rFGD`（CTA・フォーム）`Xjk8q`（視聴後アクション）と同じ1枚**。設計はそれぞれ別の段。**同じ画面を3つのNodeで指しているので、どこを直したか追いにくい。** 取得元：`webinars-v6/PV1Vh.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/PV1Vh.txt',
     steps: [{ click: 'いつ見られるようにするか' }],
     verdictHead: 'c275749d',
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 CTA・フォームの作りが設計とそろわない。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/d3rFGD.txt + webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 CTA・フォームが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/d3rFGD.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/d3rFGD.txt',
     steps: [{ click: '見ている途中に出すもの' }],
     verdictHead: 'c275749d',
   },
@@ -993,7 +993,7 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 視聴後アクションが `PV1Vh` と同じタブに同居している。設計は別の段。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Xjk8q.txt + webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 視聴後アクションが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/Xjk8q.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Xjk8q.txt',
     steps: [{ click: 'いつ見られるようにするか' }],
     verdictHead: 'c275749d',
   },
@@ -1026,13 +1026,13 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 参加者管理が `yxyzQ`（分析）と同じタブに同居している。設計は別の画面。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Q8sHa.txt + webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 参加者管理が `yxyzQ`（分析）と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の画面。取得元：`webinars-v6/Q8sHa.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Q8sHa.txt',
     steps: [{ click: '概要・分析' }],
     verdictHead: 'c275749d',
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。P2 `Q8sHa` と同じタブに同居。**一覧側でまとめて数える口が無い**ので、`ZC13r` の帯が `—` のままになる（同じ根）。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/yxyzQ.txt + webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 分析が `Q8sHa` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。**一覧側でまとめて数える口が無い**ので `ZC13r` の帯が `—` のままになる（同じ根）。取得元：`webinars-v6/yxyzQ.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/yxyzQ.txt',
     steps: [{ click: '概要・分析' }],
     verdictHead: 'c275749d',
   },
@@ -1058,13 +1058,13 @@ export const SCREENS = [
   { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 種類のタブが設計より1つ少ない（**「質問」が無い**。#572 で `NNDMR` として入ったので、取り込み後に数え直す）。P2 フォルダを作る導線は #493 が担当。1440・1920とも横スクロール0', verdictSource: 'templates-v6/W7LBc.txt + templates-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 メッセージを作る面が設計とそろわない（本文の上限、ボタンの編集、URLの扱いの表）。1440・1920とも横スクロール0', verdictSource: 'templates-v6/GFlD7.txt + templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 メッセージを作る面が設計とそろわない。** ルート `/templates`。**タブに件数は付いている**（メッセージ22／カルーセル24／リッチメッセージ10／クーポン6／リサーチ4）。設計との差は本文の上限（1通5,000字・合計22,500字・最大5通・4,500字で自動分割）、ボタンの編集（最大4つ・ラベルと動き）、URLの扱いの表（サイト名・URL・計測）。取得元：`templates-v6/GFlD7.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/GFlD7.txt',
     steps: [{ click: 'テンプレートを作る' }],
     verdictHead: 'c275749d',
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 カルーセルを作る面が設計とそろわない（カードごとの並べ替え、画像の比率）。1440・1920とも横スクロール0', verdictSource: 'templates-v6/FRkls.txt + templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カードセットを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/FRkls.txt',
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
     verdictHead: 'c275749d',
   },
@@ -1083,7 +1083,7 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
-    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 リッチメッセージを作る面が設計とそろわない（領域の分け方の見本）。1440・1920とも横スクロール0', verdictSource: 'templates-v6/j9ixI.txt + templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**P2 リッチメッセージを作る面が設計とそろわない。** ルート `/templates`（リッチメッセージ→作る）。設計との差は領域の分け方の見本を選ぶところ。取得元：`templates-v6/j9ixI.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/j9ixI.txt',
     steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
     verdictHead: 'c275749d',
   },
@@ -1149,8 +1149,8 @@ export const SCREENS = [
     突き合わせる形にする。
   */
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。P1 どれが出るかを決める『順番』が画面に出ない。** リッチメニューは**同じ友だちが複数に当てはまったとき、いちばん上の1つだけ**が出る。つまり順番がそのまま「お客さまに何が見えるか」。設計は3つで支える——見出しの「出す順番を変える」／「上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、いちばん上の1つだけが出ます。」の断り／並び順の既定を「出す順番（自分で決めた順）」にする。**実装はどれも無い**（本文を数えて「評価順」「順番」「上から順」「優先」すべて0件）。並び順の既定は「タップ数が多い順」（`page.tsx:93`）なので、**画面に出ている並びは実際に出る順番と関係が無い**。上から2番目に見えるメニューが最後に判定されることがある。`targetingPriority` はデータとして持っているのに、画面が一度も出していない。P2 設計は表、実装は札の格子。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/GO8RQ.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 形とボタンの段が無く、`kQ1bs`（誰に出すか）`UMiJ9`（公開のしかた）と同じ1枚に同居している。設計は段で分ける。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/XtfO3.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 `XtfO3` と同じ1枚の中にある。P1 出し分けの条件を決める画面なのに、**当てはまったときにどれが優先されるか**が出ない（`GO8RQ` と同じ根）。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/kQ1bs.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: '**P2 形とボタンが1枚に同居している。** ルート `/rich-menus/new`。撮った本文は「リッチメニューを作る／名前と土台のレイアウトを決め…」で、`kQ1bs`（誰に出すか）`UMiJ9`（公開のしかた）と**同じ1枚**。設計は段で分ける。**`GO8RQ` のP1（出る順番が見えない）と同じ根で、ここでも優先の説明が無い。** 取得元：`rich-menus-v6/XtfO3.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/XtfO3.txt' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**P1 出し分けの条件を決める画面なのに、当てはまったときにどれが優先されるかが出ない。** ルート `/rich-menus/edit?id=rmg-1`。`XtfO3` `UMiJ9` と同じ1枚の中にある。**`targetingPriority` は持っているのに画面が出さない**（`GO8RQ` と同じ根）。**推奨修正**：この節に「上にあるものが優先されます」の断りと、いまの順番を出す。取得元：`rich-menus-v6/kQ1bs.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/kQ1bs.txt' , verdictHead: 'c275749d' },
   {
     /*
       **#509 で `/rich-menus/connections?id=` が入った。**
@@ -1172,8 +1172,8 @@ export const SCREENS = [
     verdictSource: 'rich-menus-v6/NXdDk-1920.png',
     verdictHead: 'e148615c',
   },
-  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 公開のしかたが `XtfO3` と同じ1枚の中にある。設計は別の段。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/UMiJ9.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 管理画面の外のメニューが、設計では別画面だが実装は一覧の中の節になっている。取り込みと削除はできる。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/TL7tp.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**P2 公開のしかたが `XtfO3` と同じ1枚の中にある。** ルート `/rich-menus/edit?id=rmg-1`。設計は別の段。取得元：`rich-menus-v6/UMiJ9.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/UMiJ9.txt' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '**P2 管理画面の外のメニューが、設計では別画面だが実装は一覧の中の節。** ルート `/rich-menus`。取り込みと削除はできる。取得元：`rich-menus-v6/TL7tp.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/TL7tp.txt' , verdictHead: 'c275749d' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     gap: 'api',
@@ -1297,8 +1297,8 @@ export const SCREENS = [
     「レポート」がある。支払いの2枚（`njLGA` `GqFTV`）は行き先が無い。
   */
   { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: '**#558 で「決まった額で払う人がずっと ¥0 に見える」が直った。** 率が0%の合同会社ノースが **¥144,000**（承認ずみ16件×¥9,000）と出る。`calculateAffiliateReward`（`affiliates/affiliate-reward.ts`）が、率が0のときだけ確定した定額へ切り替える。**割合方式は後退していない**：田中 明 ¥860,000×10%＝¥86,000、木村 亮 ¥620,000×15%＝¥93,000、成果0の旧パートナーAは¥0。1440・1920とも横スクロール0。P1 帯4つ（今月の成果42件／承認待ち8件 合計¥96,000／確定した報酬¥312,000 8/31締め9/30払い／ほか）が無い。P1 「支払い」のタブが無い。まだ払っていない額・次の締め・次の支払日・振込先が未登録の人を、画面から知る方法が無い', verdictSource: 'affiliates-v6/PouPn.txt + apps/web/src/app/affiliates/affiliate-reward.ts' , verdictHead: 'c275749d' },
-  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: 'P1 案件の面が設計とそろわない。報酬の決め方が「案件ごとの決まった額」を主にできない', verdictSource: 'affiliates-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: 'P1 成果承認の面が設計とそろわない。承認したあと支払いへつなぐ先が無い', verdictSource: 'affiliates-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: '**P2 案件の一覧が設計とそろわない。** ルート `/affiliates?tab=offers`。タブは アフィリエイター／案件／成果承認／成果地点（CV）／レポート の5本。設計との差は案件ごとの成果数と支払い予定の見せ方。取得元：`affiliates-v6/GH8VL.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/GH8VL.txt' , verdictHead: 'c275749d' },
+  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: '**P2 成果承認の面が設計とそろわない。** ルート `/affiliates?tab=approvals`。承認待ち／承認済み／却下 で分かれる。設計との差はまとめて承認する導線と、却下の理由の残し方。取得元：`affiliates-v6/n5VVTb.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/n5VVTb.txt' , verdictHead: 'c275749d' },
   {
     ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
     gap: 'api',
@@ -1316,7 +1316,7 @@ export const SCREENS = [
     steps: [{ click: '田中 明', role: 'text' }],
     verdictHead: '64798425',
   },
-  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: 'P1 案件をつくる面で、報酬の決め方（案件ごとの決まった額）を主にできない', verdictSource: 'affiliates-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: '**P2 案件を作る面。節番号は付いている。** ルート `/affiliates/offers/new`。撮った本文は「1 どの案件か（案件名・対象アカウント・説明）／2 いくら払うか」と段になっており、**「1つに絞ると、そのアカウントで起きた成果だけを数えます。」「現金とマイルは併用できます」**と、選んだときに何が起きるかを添える。設計との差は成果地点の紐づけと、支払い条件（締め日・最低支払額）。取得元：`affiliates-v6/GPWzq.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/GPWzq.txt' , verdictHead: 'c275749d' },
   {
     ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
     gap: 'drop',
@@ -2210,7 +2210,8 @@ export const CAPTURED_AT = {
 
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
-    { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' }],
+    { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['K7vg2'], note: '判定を具体化するため撮った' }],
   5: [
     { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
@@ -2223,6 +2224,7 @@ export const CAPTURED_AT = {
       note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
     },
     { pr: 530, head: '2568c474', on: '2026-08-29', screens: ['xfYLn'], note: '通の編集から `cron` を外す。束3' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['kk8dz', 'r6Gzsu', 'hz9ti', 'EvVO5'], note: '判定を具体化するため撮った。development そのもの' },
     { pr: 569, head: '92f03199', on: '2026-08-30', screens: ['cCB7r'], note: '配信方式の選択。段の表示と、作り直しになる断りが入っている' },
     { pr: 427, head: '5f09837c', on: '2026-08-30', screens: ['TC1b1', 'bV5Vs', 'g2UNV'], note: '`codex/development` 直結へ張り替え。**#529 の母数の直りは入っていない**（#427 単体では 41% だけ）' },
     { pr: 529, head: 'a3511980', on: '2026-08-30', screens: ['TC1b1'], note: '読了済の母数を明記。束6。**development 直結へ張り替わり head も動いたが撮り直していない**——`scenarios/page.tsx` の blob が同一' },
@@ -2279,6 +2281,7 @@ export const CAPTURED_AT = {
   16: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' }],
   23: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' }],
   4: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['hqrOv', 'dKlkz', 'sfTEW', 'HBTk0', 'yKEdO', 'rIhbN', 'tP0RW', 'LfrQs', 'VjXGX', 'byqIW', 'KoT6c', 'zGZMA'], note: '判定を具体化するため撮り直した（本文が無かった）。development そのもの' }],
+  3: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'YzxU1'], note: '判定を具体化するため撮った' }],
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },

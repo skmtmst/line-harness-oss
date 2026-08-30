@@ -1119,7 +1119,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     **`tags` と `formSubmissions` を必ず配列で返す。** どちらかが
     無いと `.length` で**受信箱ごと落ちる**。
   */
-  const friendDetail = /^\/api\/friends\/([^/]+)$/.exec(pathname)
+  /* **`stats` を隠さない。** 足した道が、先にある道を覆うことがある（一斉配信で一度やった）。 */
+  const friendDetail = /^\/api\/friends\/(?!stats$)([^/]+)$/.exec(pathname)
   if (friendDetail) {
     const f = FRIENDS.find((x) => x.id === friendDetail[1])
     return { success: true, data: {
