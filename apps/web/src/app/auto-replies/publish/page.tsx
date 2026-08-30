@@ -146,9 +146,9 @@ function AutoReplyPublishInner() {
       />
 
       <Notice tone="validation" message={`公開するまで、いまお客様へ返している内容は変わりません。ここで確かめているのは
-        下書き（第{draft.versionNumber}版）です。`} />
+        下書き（第${draft.versionNumber}版）です。`} />
 
-      {actionError ? <Notice tone="error" message={`{actionError}`} /> : null}
+      {actionError ? <Notice tone="error" message={actionError} /> : null}
 
       {stage === 'conflicts' ? (
         <Card>
