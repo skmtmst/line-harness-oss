@@ -13,18 +13,23 @@ import { recordMediaUsage, pruneStaleMediaUsages, type MediaRefKind } from '@lin
 /** どのテーブルの、どの列を見るか。 */
 const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; columns: string[] }> = [
   { refKind: 'template', table: 'templates', idColumn: 'id', columns: ['message_content'] },
-  { refKind: 'broadcast', table: 'broadcasts', idColumn: 'id', columns: ['message_content'] },
+  {
+    refKind: 'broadcast',
+    table: 'broadcasts',
+    idColumn: 'id',
+    columns: ['message_content', 'message_bubbles_json'],
+  },
   // 旧 rich_menus 表は存在しない。LINEへ送る実画像はページのR2キーで持つ。
   { refKind: 'rich_menu', table: 'rich_menu_pages', idColumn: 'id', columns: ['image_r2_key'] },
   {
     refKind: 'scenario_step',
     table: 'scenario_steps',
     idColumn: 'id',
-    columns: ['message_content'],
+    columns: ['message_content', 'message_bubbles_json'],
   },
-  { refKind: 'nen_column', table: 'nen_columns', idColumn: 'id', columns: ['body'] },
+  { refKind: 'nen_column', table: 'nen_columns', idColumn: 'id', columns: ['image_url'] },
   { refKind: 'event', table: 'events', idColumn: 'id', columns: ['image_url', 'og_image_url'] },
-  { refKind: 'webinar', table: 'webinars', idColumn: 'id', columns: ['thumbnail_url'] },
+  { refKind: 'webinar', table: 'webinars', idColumn: 'id', columns: ['video_prefix'] },
 ];
 
 export interface ScanResult {
@@ -44,11 +49,14 @@ async function findMatches(
   for (const source of SOURCES) {
     const conditions = source.columns.map((col) => `${col} LIKE ?`).join(' OR ');
     const binds = source.columns.map(() => `%${item.r2_key}%`);
+    // 定期走査は全体の処理量を抑える。削除直前は、使用先を200件に
+    // 丸めると「全使用先を外した」か確かめられないため全件読む。
+    const limit = skipMissingSources ? ' LIMIT 200' : '';
     let rows;
     try {
       rows = await db
         .prepare(
-          `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions} LIMIT 200`,
+          `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}${limit}`,
         )
         .bind(...binds)
         .all<{ ref_id: string }>();
