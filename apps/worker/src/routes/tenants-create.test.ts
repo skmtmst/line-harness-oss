@@ -111,11 +111,18 @@ describe('tenant creation and feature packs', () => {
     expect(await response.text()).not.toContain('ec');
   });
 
-  it.each([
-    operator({ tenantId: 'another-tenant' }),
-    operator({ role: 'admin' }),
-    operator({ readOnly: true }),
-  ])('既定統括の書き込み可能owner以外を403にする', async (staff) => {
+  it('既定の統括に属さないownerによる作成を403にする', async () => {
+    const staff = operator({ tenantId: 'another-tenant' });
+    expect((await request('/api/tenants', { name: '拒否対象' }, staff)).status).toBe(403);
+  });
+
+  it('adminによる作成を403にする', async () => {
+    const staff = operator({ role: 'admin' });
+    expect((await request('/api/tenants', { name: '拒否対象' }, staff)).status).toBe(403);
+  });
+
+  it('読み取り専用ownerによる作成を403にする', async () => {
+    const staff = operator({ readOnly: true });
     expect((await request('/api/tenants', { name: '拒否対象' }, staff)).status).toBe(403);
   });
 
