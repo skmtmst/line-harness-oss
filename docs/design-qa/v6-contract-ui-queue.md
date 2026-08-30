@@ -1,6 +1,6 @@
 # V6 契約・画面の受け渡しキュー
 
-更新: 2026-08-31 06:32 JST
+更新: 2026-08-31 06:37 JST
 
 この文書は、Codexが用意するAPI・DB契約と、Claudeが載せる画面を一対一で追うための正本です。
 同じ契約を重ねて作らず、画面PRを確認してから次の契約へ進みます。
@@ -38,14 +38,30 @@
 
 #526 head `1c91a7bc` を固定baseにします。DBの列追加はしません。
 
-- `POST /api/nen-campaigns/columns` を管理画面向けに追加する。
-- 既存の署名付きEC連携が使う検証・保存処理を共通化し、同じ値を別の流儀で保存しない。
+- `POST /api/nen-campaigns/columns?lineAccountId=<選択中のアカウント>` を管理画面向けに追加する。
+- owner / adminだけが使え、#526の `requireAccount()` で選択中アカウントと操作権限を確定する。bodyからアカウントIDは受け取らない。
+- 最初の契約は**作成専用**にする。`ymXJK` は「コラムを書く」画面であり、既存記事の更新画面ではない。更新は別Nodeと受け入れ条件ができるまで足さない。
+- 既存の署名付きEC連携が使う値の検証と保存値の組み立ては共通化する。ただしEC連携のupsertを管理画面へそのまま持ち込まない。
+- 管理画面で既存のslugに当たったときは409 `column_already_exists` で止め、別アカウントの記事を黙って上書きしない。署名付きEC連携の同期動作は変えない。
 - 保存するのは題名・分類・抜粋・記事URL・画像URL・公開日。**本文は保存しない。**
-- `articleUrl` は必須。空や不正URLは400で、画面が項目の言葉へ直せる安全なコードを返す。
-- `publishedAt: null` はnullのまま保存し、今日の日付で補わない。
+- 管理画面のbodyは `{ title, category?, excerpt?, articleUrl, imageUrl?, publishedAt? }`。`slug`、`externalId`、`lineAccountId`、`body` は画面から送らない。
+- 内部slugは記事URLの末尾からWorkerで作り、空のパスなどで作れない場合は400 `article_url_invalid` にする。画面側でslugを推測・表示しない。
+- `articleUrl` は必須かつHTTPS。空・HTTP・不正URLは400 `article_url_invalid`。任意の `imageUrl` もHTTPSだけを許し、違反は400 `image_url_invalid` にする。
+- `title` は空白だけを許さず120文字以内、`excerpt` は500文字以内。違反は400 `title_invalid` / `excerpt_too_long` とし、画面が項目の言葉へ安全に直せるコードを返す。
+- `publishedAt` は省略またはnullならnullのまま保存し、今日の日付で補わない。値がある場合だけ有効な日時か検査し、無効なら400 `published_at_invalid` にする。
 - 管理画面から作った時点は下書き。公開や配信を同時に始めない。
-- 通常・入力エラー・保存失敗の固定データとモックを同梱する。
+- `external_id` はnull、`delivery_status` はdraft、`line_account_id` はqueryで確定した値、`intro_text` は既存の `buildDefaultColumnIntro()` で作る。
+- 成功は `{ success: true, data: { id } }`。重複409、入力400、権限403、保存失敗500を内部文言なしで区別できる契約にする。
+- Worker試験は、アカウント未選択・権限外・role不足・正常保存・本文を受け取らない・公開日null・HTTPS検査・重複409・別アカウントを上書きしない、を固定する。
+- Web APIへ `createColumn(accountId, data)` を追加する。通常・入力エラー・重複・保存失敗の固定データとモックを同梱する。
 - Claude側は `data-qa-open="ymXJK"` を押し口に付け、1440px・1920pxで本文欄が無いことも確認する。
+
+### `ymXJK` で作らないもの
+
+- DB migration、本文列、記事本文の入力欄。
+- 公開、配信予約、既存記事の更新。
+- 署名付きEC連携の認証・upsert仕様の変更。
+- slug、external ID、LINEアカウントIDなど内部の値を利用者へ入力させる欄。
 
 ## `gBp2J` を軽い契約から外した理由
 

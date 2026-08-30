@@ -65,13 +65,17 @@
 ## 2. `ymXJK` 21-1-E コラムを書く
 
 - **想定ルート**：`/nen-campaigns`（コラムのタブの中）
-- **想定の口**：`POST /api/nen-campaigns/columns`
+- **想定の口**：`POST /api/nen-campaigns/columns?lineAccountId=`（作成専用）
 - **列は推測ではない**——`nen_columns`（`bootstrap.sql:1458`）そのまま
 
 **決まっていること：V6は外部記事リンク方式。本文をDBに持たない。**
 よって `article_url` は必ず埋まり、本文の列は増やさない。いまの取り込み口
 （EC-CUBEからの署名付きWebhook `verifyEccubeSignature`）と同じ形で、
 管理画面からも作れるようにするだけ。
+
+**管理画面は既存記事を黙って更新しない。** 記事URLの末尾からWorkerが内部slugを作り、
+同じslugがすでにあれば409で止める。slug・external ID・LINEアカウントID・本文は
+画面の入力にもbodyにも入れない。署名付きEC連携のupsertは従来どおり残す。
 
 **固定データ**：`NEN_COLUMN_DRAFT`（`fixtures.mjs`）。
 場合分けは **公開済み・下書き・画像なし・公開日未取得**。
@@ -81,6 +85,8 @@
 
 - 本文を書く欄が**無い**こと（外部記事リンク方式なので、あったら設計と違う）
 - `article_url` が必須で、空のまま保存できないこと
+- HTTPや壊れたURLを保存できず、項目の言葉で直し方が分かること
+- 重複した記事を別アカウントへ上書きせず、409後も入力が窓に残ること
 - 公開日が未取得のとき `—`（今日の日付で埋めない）
 - 日時が日本時間で出ること（`formatNenJobDateTime` と同じ扱い）
 
