@@ -428,35 +428,41 @@ function InflowLinksPageInner() {
   const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
   const addRate = totalClicks > 0 ? Math.round((totalFriends / totalClicks) * 100) : null
-  const dataReady = !loading && !error
+  const kpiState = loading ? 'loading' : error ? 'error' : 'ready'
+  const dataReady = kpiState === 'ready'
+  const kpiUnavailableDetail = kpiState === 'loading' ? '読み込んでいます' : '取得できませんでした'
 
   return (
     <div>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        data-design="KPIs"
+        data-inflow-kpi-state={kpiState}
+        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <KpiCard
           title="流入元"
           value={dataReady ? sortedRows.length : null}
           unit="件"
-          detail={dataReady ? `稼働中 ${activeRouteCount}` : '取得できませんでした'}
+          detail={dataReady ? `稼働中 ${activeRouteCount}` : kpiUnavailableDetail}
         />
         {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
         <KpiCard
           title="今月の追加"
           value={null}
           unit="人"
-          detail={dataReady ? '前月比は出せません' : '取得できませんでした'}
+          detail={dataReady ? '前月比は出せません' : kpiUnavailableDetail}
         />
         <KpiCard
           title="クリック"
           value={dataReady ? totalClicks : null}
           unit="回"
-          detail={dataReady ? '累計' : '取得できませんでした'}
+          detail={dataReady ? '累計' : kpiUnavailableDetail}
         />
         <KpiCard
           title="平均の追加率"
           value={dataReady ? addRate : null}
           unit="%"
-          detail={dataReady ? 'クリックのうち' : '取得できませんでした'}
+          detail={dataReady ? 'クリックのうち' : kpiUnavailableDetail}
         />
       </div>
 

@@ -46,7 +46,11 @@ describe('V6 流入と計測', () => {
 
   it('一覧の読込・空・失敗を分け、失敗を0件として表示しない', () => {
     expect(page).toContain("import ListState from '@/components/shared/list-state'");
-    expect(page).toContain('const dataReady = !loading && !error');
+    expect(page).toContain("const kpiState = loading ? 'loading' : error ? 'error' : 'ready'");
+    expect(page).toContain("const dataReady = kpiState === 'ready'");
+    expect(page).toContain("const kpiUnavailableDetail = kpiState === 'loading' ? '読み込んでいます' : '取得できませんでした'");
+    expect(page).toContain('data-inflow-kpi-state={kpiState}');
+    expect(page).toContain('detail={dataReady ? `稼働中 ${activeRouteCount}` : kpiUnavailableDetail}');
     expect(page).toContain('<ListState kind="loading" title="流入リンクを読み込んでいます" />');
     expect(page).toContain('kind="error"');
     expect(page).toContain('title="流入リンクを表示できませんでした"');
