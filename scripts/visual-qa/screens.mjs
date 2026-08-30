@@ -359,7 +359,7 @@ export const SCREENS = [
     why: '一覧での選択までしか無く、一括操作のページが無い',
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0',
-    verdict: 'needs_fix', verdictNote: '**P2 友だち詳細が設計とそろわない。** ルート `/friends/detail?id=friend-1`。撮った本文は「追加 2026/8/13／非表示／ブロック／個別トークを開く」。設計は来店回数・前回の申し送り・つながる先をその場で出す。取得元：`friends-v6/I6UAdr.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P1 設計の「来店回数」「前回の申し送り」「つながる先」が無い。** ルート `/friends/detail?id=friend-1`。実装が出すのは 基本（マイル・対応・個別メモ・名前・タグ・リッチメニュー・友だち情報・フォーム回答）とタイムライン（全件／★のみ／受信／送信／システム通知）。**良い点**：マイルが「2,450mile 利用可能 ・ 確定待ち 300」と**使える分と確定待ちを分けて**出す。空の欄は「メモはありません」「タグはありません」「回答はまだありません」「やり取りはまだありません」と**何が無いかを書く**（空欄にしていない）。「本名 未登録／システム表示名 未登録」も同じ。流入元は「不明」。**P2 差**：設計はタイムラインに 健康記録・リマインダ・アクション・注文/定期便 を混ぜて1本の時系列にするが、実装はタブで切り替える。**推奨修正**：来店回数と前回の申し送りは EC連携（`ec_events`）が要るので `ELayY` と同じ束。取得元：`friends-v6/I6UAdr.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friends-v6/I6UAdr.txt', verdictHead: 'c275749d',
   },
   {
@@ -375,7 +375,7 @@ export const SCREENS = [
     verdictSource: 'friends-v6/bzDn6-error.txt', verdictHead: '4848a8f3',
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
-    verdict: 'needs_fix', verdictNote: '**P2 重複検出の面が設計とそろわない。** ルート `/friends?tab=duplicates`。帯は 友だち総数231／ユニ…。設計は候補ごとに根拠と確信度を出して1件ずつ判定する（`InCDe` が未実装で、その手前まで）。取得元：`friends-v6/YzxU1.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P1 候補を1件ずつ判定する面が無い（`InCDe` 未実装のため）。** ルート `/friends?tab=duplicates`。実装は**集計まで**——友だち総数231／ユニーク人数214／余分な配信回数17／1配信あたり浪費 ¥51（¥3/通 換算）と、アカウント別の内訳表（画面確認アカウント 231／17／7%）。**良い点**：浪費を「月10本配信なら約 ¥510 の浪費です。」と**行動に結びつく形**で言い換えている。「266時間前に計算」「再計算」で**いつの数字かを出す**。**P1 の中身**：設計 3-2 は候補ごとに 根拠・確信度・統合するかしないか を出すが、実装にその表が無い。`/api/duplicates/stats` が候補行を返さないため（`InCDe` の未実装理由と同じ）。**推奨修正**：候補台帳の口が入るまでこの画面は集計止まり。**先に `InCDe` の口が要る。** 取得元：`friends-v6/YzxU1.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friends-v6/YzxU1.txt', verdictHead: 'c275749d',
   },
   {
@@ -424,7 +424,7 @@ export const SCREENS = [
     verdictSource: 'scenarios-v6/cCB7r.txt', verdictHead: '92f03199',
   },
   { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0',
-    verdict: 'needs_fix', verdictNote: '**P2 ステップの作成が設計とそろわない。** ルート `/scenarios/new`。撮った本文は「ステップの作成／シナリオの名前と、い…」の1枚。設計は 名前 → 配信方式 → 1通目 の段で、**#569 が配信方式の段（`cCB7r`）を足した**ので、取り込み後に段が通るか見直す。取得元：`scenarios-v6/kk8dz.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P2 1通目の作成。作りは設計に近い。** ルート `/scenarios/new`。段は 配信方式（#569 が足した `cCB7r`）→ 配信対象の絞り込み（シナリオ購読中の全員／タグで絞り込む／詳細条件で絞り込む）→ 1通目（購読開始から◯日後・配信する時刻・本文）。**良い点**：「空のままでも進めます。テンプレートや画像は、このあとの編集画面で選べます。」と**やらなくていいことを書く**。「開始のきっかけは、このあとの編集画面で決められます。」と**どこで決めるかを書く**。選べる種類は テキスト／スタンプ／画像／質問／カルーセル／位置情報／紹介／音声／動画 の9つ。差し込みは 名前・友だち情報・共通情報。**P2 残る差**：設計は1通目の下見（実際に届く吹き出し）をこの段で出すが、実装は編集画面へ回している。取得元：`scenarios-v6/kk8dz.txt`。1440・1920とも横スクロール0',
     verdictSource: 'scenarios-v6/kk8dz.txt', verdictHead: 'c275749d',
   },
   { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT,
@@ -817,19 +817,19 @@ export const SCREENS = [
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: '**#566 `d0680774` で束3の完了条件を満たした。** `silent rule` `automation rule` `line_account_id` `inline` `TEMPLATE` `keyword` `match` `silent` `flex` `image` を数えて**すべて0件**。**#540（実行結果側）では直らない**——#540 と #566 は同じ `auto-reply-runs` の上の兄弟で、一覧の言葉を直しているのは #566。実際に #540 `857cebc5` で撮ると7語とも残っていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（ルールごとの当たり方の推移）はこの直しの外', verdictSource: 'auto-replies-v6/cmDfJ.txt' , verdictHead: 'd0680774' },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'needs_fix', verdictNote: '**P2 自動応答の編集が段になっていない。** ルート `/auto-replies/edit?id=ar-2`。撮った本文は「自動応答を編集／決めた言葉が届いたときに、自動で返します。」の1枚で、`nzWIX` `ivDoe` と同居。設計は 一致条件 → 返信内容 → 送信後の動き の段。取得元：`auto-replies-v6/K7vg2.txt`。1440・1920とも横スクロール0', verdictSource: 'auto-replies-v6/K7vg2.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 段の作りは設計に近い。`nzWIX` `ivDoe` と同じ1枚。** ルート `/auto-replies/edit?id=ar-2`。段は「1. どのメッセージに反応するか」から始まり、自動応答名・フォルダ・キーワード・キーワードで応答/一律で応答・複数キーワードの扱い（どれか1つに当たれば返す／すべて当たったときだけ返す）。**良い点**：自動応答名に「一覧に出る名前です。友だちには見えません。空にすると、キーワードが名前の代わりに出ます。」と**空にしたときどうなるかまで**書く。「すべて」の意味を「『予約』と『キャンセル』の両方が…」と**例で**説明する。**P2 残る差**：設計は 一致条件 → 返信内容 → 送信後の動き の3段を別々の面にするが、実装は1枚に縦に並べる。**推奨修正**：段の口（下書き・検証・公開）が入る `Yj6CQ` `e6iJG` と合わせて見る。取得元：`auto-replies-v6/K7vg2.txt`。1440・1920とも横スクロール0', verdictSource: 'auto-replies-v6/K7vg2.txt',
     route: '/auto-replies/edit?id=ar-2',
     verdictHead: 'c275749d',
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
-    verdict: 'needs_fix', verdictNote: '**#491 → #544 `6053c271` で撮った**（#544 は #491 を含む）。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の編集は段ごとに 一致条件・返信内容・送信後の動き へ進む。実装との差は段の口がつながってから見る', verdictSource: 'auto-replies-v6/nzWIX.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 反応条件。**#491 → #544 `6053c271` で撮った（#544 は #491 を含む）。ルート `/auto-replies/edit?id=ar-2`。内部語・壊れ値は0件、1440・1920とも横スクロール0。**キーワードの当て方は設計どおり**——キーワードで応答／一律で応答、複数のときは どれか1つ／すべて。**P2 残る差**：設計 8-1-B は曜日・時間帯・友だちの条件を**この段で**決めるが、実装は同じ1枚の下のほうにある（`K7vg2` `ivDoe` と同居）。**P1 は別の画面の担当**——競合と優先順位（`U9hzqH`）・テスト（`g46ja`）は未実装で、**当たり方を試す道が無い**。取得元：`auto-replies-v6/nzWIX.txt`', verdictSource: 'auto-replies-v6/nzWIX.txt',
     route: '/auto-replies/edit?id=ar-2',
     verdictHead: '6053c271',
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'needs_fix', verdictNote: '**#491 → #544 `6053c271` で撮った**（#544 は #491 を含む）。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差は、送信後の動きの並びと、条件の組み立て。段の口がつながってから見る', verdictSource: 'auto-replies-v6/ivDoe.txt',
+    verdict: 'needs_fix', verdictNote: '**P2 応答とアクション。**#491 → #544 `6053c271` で撮った。ルート `/auto-replies/edit?id=ar-2`。内部語・壊れ値は0件、1440・1920とも横スクロール0。**P2 残る差**：設計 8-1-C は 返信内容 と 送信後の動き（タグ付け・シナリオ開始・対応マーク）を別の段に分けるが、実装は `K7vg2` `nzWIX` と同じ1枚に縦に並ぶ。動作の並びも設計と違う。**P1 は別の画面の担当**——保存すると即座に本番のルールが変わる（下書き・検証・公開の口が無い。`Yj6CQ` `e6iJG` が未実装）。**推奨修正**：段の口が入るまで、この画面の並びだけ直しても安全にはならない。取得元：`auto-replies-v6/ivDoe.txt`', verdictSource: 'auto-replies-v6/ivDoe.txt',
     route: '/auto-replies/edit?id=ar-2',
     verdictHead: '6053c271',
   },
@@ -1055,7 +1055,7 @@ export const SCREENS = [
     設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
-  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 種類のタブが設計より1つ少ない（**「質問」が無い**。#572 で `NNDMR` として入ったので、取り込み後に数え直す）。P2 フォルダを作る導線は #493 が担当。1440・1920とも横スクロール0', verdictSource: 'templates-v6/W7LBc.txt + templates-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '**P1 「フォルダ」の縦帯が、フォルダを読んでいない。** ルート `/templates`。縦帯は `templates.reduce(... template.category ...)`（`templates/page.tsx:180`）で **`category` を数えている**。`templates` 表には `folder_id`（`folders` への外部キー）が別にあり、`/api/folders?kind=template` も お問い合わせ8・予約5・EC4 を返しているのに、**画面はそれを一度も使わない**。撮った絵では22件が「general 20／未分類 2」の2つに潰れ、3つのフォルダがどこにも出ない。**フォルダを作っても一覧で効かない。** 担当は #493。**推奨修正**：縦帯を `/api/folders?kind=template` と `folderId` から作る。**（縦帯に出ていた `text` の字は撮影用の固定データの値で、実装の不具合ではない。DBの既定 `general` に直した。指摘は値に関係なく残る。）** P2 種類の札が 全て／テキスト／Flex／画像／未使用 の5つで、**設計の「質問」が無い**（#572 で `NNDMR` として入ったので、取り込み後に数え直す）。P2 送信数は全行 `—` で未取得（0で埋めていないのは良い）。取得元：`templates-v6/W7LBc.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/W7LBc.txt + templates/page.tsx:180' , verdictHead: 'c275749d' },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
     verdict: 'needs_fix', verdictNote: '**P2 メッセージを作る面が設計とそろわない。** ルート `/templates`。**タブに件数は付いている**（メッセージ22／カルーセル24／リッチメッセージ10／クーポン6／リサーチ4）。設計との差は本文の上限（1通5,000字・合計22,500字・最大5通・4,500字で自動分割）、ボタンの編集（最大4つ・ラベルと動き）、URLの扱いの表（サイト名・URL・計測）。取得元：`templates-v6/GFlD7.txt`。1440・1920とも横スクロール0', verdictSource: 'templates-v6/GFlD7.txt',
@@ -1168,12 +1168,12 @@ export const SCREENS = [
     ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし',
     route: '/rich-menus/connections?id=rmg-2', mode: 'page',
     verdict: 'needs_fix',
-    verdictNote: '**#509 でつながりなしの状態も入った。** 「切替のつながりはありません／このメニューには、別ページへ切り替えるボタンがまだありません。」＋「メニューのボタンを編集」。上に「ページを切り替えるボタンを作ると、ここで行き先と戻り道を確認できます。」。**空を失敗と混ぜず、次にやることを出している。** P2 設計との細かな差は未確認',
+    verdictNote: '**P2 つながりなしの状態。**#509 `e148615c` で、切替のつながりが無いときの絵も入った。ルート `/rich-menus/connections?id=rmg-2`。出るのは「切替のつながりはありません／このメニューには、別ページへ切り替えるボタンがまだありません。」＋「メニューのボタンを編集」で、上に「ページを切り替えるボタンを作ると、ここで行き先と戻り道を確認できます。」。**空を失敗と混ぜず、次にやることを出している。** **P2 残る差は未確認**——この画面の `.txt` が取れておらず、判定は #509 の head で撮った絵から書いている。**残作業**：`e148615c` を含む枝で `--only NXdDk` を撮り、本文から設計との差を詰める。**development で撮り直さない**（#509 の直しを古い head で巻き戻さないため）。取得元：`rich-menus-v6/NXdDk-1920.png`',
     verdictSource: 'rich-menus-v6/NXdDk-1920.png',
     verdictHead: 'e148615c',
   },
-  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**P2 公開のしかたが `XtfO3` と同じ1枚の中にある。** ルート `/rich-menus/edit?id=rmg-1`。設計は別の段。取得元：`rich-menus-v6/UMiJ9.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/UMiJ9.txt' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '**P2 管理画面の外のメニューが、設計では別画面だが実装は一覧の中の節。** ルート `/rich-menus`。取り込みと削除はできる。取得元：`rich-menus-v6/TL7tp.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/TL7tp.txt' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**P2 公開のしかたが `XtfO3` `kQ1bs` と同じ1枚の中にある。** ルート `/rich-menus/edit?id=rmg-1`。上の並びは プレビュー／下書き保存／**LINE に再登録**／← 一覧に戻る で、公開の操作は**画面の頭のボタン**として置かれている。設計 12-1-D は「誰に出すか」を決めたあとの**別の段**で、公開前に 対象人数・切替元・いつから出るか を確かめてから登録する。**実装はその確認が無く、押すとすぐ LINE へ登録される。** **P2 良い点**：「LINE に再登録」という言葉が、**すでに登録済みのものを差し替える**操作だと分かる（「保存」ではない）。基本設定に「サイズ 2500×1686 ・ LINE 登録済み」と現状が出る。**推奨修正**：`szXsT`（削除確認）と同じ束で、登録前の影響確認を足す。取得元：`rich-menus-v6/UMiJ9.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/UMiJ9.txt' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '**P2 管理画面の外のメニューが、設計では別画面だが実装は一覧の中の節。** ルート `/rich-menus`。「LINE 公式アカウントの現状」の節に、LINE 上のメニューが並び、行ごとに **「管理画面に取り込む」「LINE から削除」** が出る。取り込みと削除はできる。**良い点**：「LINE 上に登録されているメニュー 3 個／うち 2 個が管理画面外」と**管理下と管理外を数えて分ける**。名前の無いメニューを「テスト用（名前なし）」と書き、空欄にしない。管理下のものは「管理画面 → 通常メニュー（会員向け）(トップ)」と**どれに対応するか**を出す。**P2 残る差**：設計 12-1-E は取り込む前に「何が上書きされるか」を出すが、実装は押すとすぐ取り込む。**この画面の並び順は #583 より前の絵**（「タップ数が多い順」が既定）。取得元：`rich-menus-v6/TL7tp.txt`。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/TL7tp.txt' , verdictHead: 'c275749d' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     gap: 'api',
@@ -1226,7 +1226,7 @@ export const SCREENS = [
 
   // ── 機能14 共通情報 ─────────────────────────────────────
   { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: '**P1 一覧に「使われている場所」の列が無い。** ルート `/contents/vars`。列は 共通情報名／種別／値／スケジュール の4つだけ（撮った本文どおり）。共通情報は1か所直すと差し込んでいる全部の文が同時に変わるので、**消す前・変える前に「何か所で使っているか」が一覧で見えないと危ない**。設計は「使用箇所」列を持つ。**良い点**：差し込み名（`{{var.会社名}}`）を名前の下に出す、値が空のものは「（空）」と書く、予約された変更を「2026/09/30(水) 15:00 から → （空）」と出す、フォルダを消したときの行き先を注記で断る——いずれも設計どおり。**推奨修正**：一覧に使用箇所数の列を足す（`uNBlA` の影響確認と同じ口を使える）。取得元：`common-vars-v6/WuKzU.txt`。1440・1920とも横スクロール0', verdictSource: 'common-vars-v6/WuKzU.txt' , verdictHead: 'c275749d' },
-  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: 'P1 編集画面そのものには、どこで使われているかが1つも出ない（名前・フォルダ・差し込み名・値・更新スケジュールだけ）。**ただし #548 で「保存」を押すと影響確認の面（`uNBlA`）へ進むようになった**ので、「どこが変わるか見えないまま保存する」状態ではなくなった。P2 設計は値の下に「保存すると、下の15か所すべてが すぐに変わります」と常に出す。実装は押してから出る', verdictSource: 'common-vars-v6/uNBlA-1920.png' , verdictHead: 'c275749d' },
+  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: '**P1 編集画面に「どこで使われているか」が1つも出ない。** ルート `/contents/vars/edit?id=cv-1`。出るのは 共通情報名・フォルダ・差し込み名・種別・値・更新スケジュール だけ。共通情報は**1か所直すと差し込んでいる全部の文が同時に変わる**ので、変える前に使用先が見えないと危ない。**ただし #548 で「保存」を押すと影響確認の面（`uNBlA`）へ進むようになった**ので、「どこが変わるか見えないまま保存する」状態ではなくなった。**良い点**：差し込み名に「あとから変えられません。変えるとテンプレートの差し込みが空になります。」と**理由まで**書く。種別は「※変更できません。」と断る。更新スケジュールに「過去の日時は指定できません。指定した時刻を過ぎると、自動で値が入れ替わります。」と書き、無いときは「スケジュールが設定されていません」と出す。**P2 残る差**：設計は値の下に「保存すると、下の15か所すべてが すぐに変わります」と**常に**出す。実装は保存を押してから出る。**推奨修正**：`uNBlA` と同じ口（使用先の数）を編集画面でも先に読んで、値の下に常に出す。取得元：`common-vars-v6/gBtaK.txt`。1440・1920とも横スクロール0', verdictSource: 'common-vars-v6/gBtaK.txt' , verdictHead: 'c275749d' },
   {
     /*
       **#548 で「変える前に影響を見る」が入った。**
@@ -1297,8 +1297,8 @@ export const SCREENS = [
     「レポート」がある。支払いの2枚（`njLGA` `GqFTV`）は行き先が無い。
   */
   { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: '**#558 で「決まった額で払う人がずっと ¥0 に見える」が直った。** 率が0%の合同会社ノースが **¥144,000**（承認ずみ16件×¥9,000）と出る。`calculateAffiliateReward`（`affiliates/affiliate-reward.ts`）が、率が0のときだけ確定した定額へ切り替える。**割合方式は後退していない**：田中 明 ¥860,000×10%＝¥86,000、木村 亮 ¥620,000×15%＝¥93,000、成果0の旧パートナーAは¥0。1440・1920とも横スクロール0。P1 帯4つ（今月の成果42件／承認待ち8件 合計¥96,000／確定した報酬¥312,000 8/31締め9/30払い／ほか）が無い。P1 「支払い」のタブが無い。まだ払っていない額・次の締め・次の支払日・振込先が未登録の人を、画面から知る方法が無い', verdictSource: 'affiliates-v6/PouPn.txt + apps/web/src/app/affiliates/affiliate-reward.ts' , verdictHead: 'c275749d' },
-  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: '**P2 案件の一覧が設計とそろわない。** ルート `/affiliates?tab=offers`。タブは アフィリエイター／案件／成果承認／成果地点（CV）／レポート の5本。設計との差は案件ごとの成果数と支払い予定の見せ方。取得元：`affiliates-v6/GH8VL.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/GH8VL.txt' , verdictHead: 'c275749d' },
-  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: '**P2 成果承認の面が設計とそろわない。** ルート `/affiliates?tab=approvals`。承認待ち／承認済み／却下 で分かれる。設計との差はまとめて承認する導線と、却下の理由の残し方。取得元：`affiliates-v6/n5VVTb.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/n5VVTb.txt' , verdictHead: 'c275749d' },
+  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: '**P2 案件の一覧。作りは設計に近い。** ルート `/affiliates?tab=offers`。帯4つは 公開中の案件4件／今月の成果8件「確定した件数」／**支払い予定 29,800円「確定した報酬の合計」**／付与予定マイル 4,000mile「報酬をマイルで払う分」。**良い点**：「『何をしたら成果になり、いくら払うか』の組み合わせです。」と**案件が何かを一文で**書く。帯の副題が全部「何を数えたか」になっている。**P2 残る差**：設計 16-1-A は案件ごとに 成果数と支払い予定 を行に出すが、実装は帯の合計まで（列は 案件名／説明／報酬／マイル／対象）。**「支払い予定」の言葉は `njLGA` の決めごと（2026-08-30）と食い違う**——払った記録を持つ表がまだ無いので、正しくは**「確定した報酬の合計」**（副題のほうが正確）。**推奨修正**：帯の見出しを「確定した報酬の合計」にそろえる。取得元：`affiliates-v6/GH8VL.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/GH8VL.txt' , verdictHead: 'c275749d' },
+  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: '**P2 成果承認。行ごとの判定はできている。** ルート `/affiliates?tab=approvals`。札は 承認待ち／承認済み／却下済み。列は 日時／友だち／アフィリエイター／案件／CVポイント／金額／**フラグ**／操作（承認・却下）。**良い点**：**注意の要る行に `⚠` が付き、要らない行は `—`**（空欄にしていない）。友だちは表示名と `friend-4…` を並べ、**同名の別人を取り違えないようにしている**。**P1 却下の理由を残す場所が無い。** 押すとすぐ却下になり、あとから「なぜ落としたか」が分からない。**P2 まとめて承認する導線が無い**（1件ずつ）。**推奨修正**：却下に理由の入力を足す。まとめ承認は `hold_days` を超えた行だけに絞ると安全。取得元：`affiliates-v6/n5VVTb.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/n5VVTb.txt' , verdictHead: 'c275749d' },
   {
     ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
     gap: 'api',
@@ -1308,7 +1308,7 @@ export const SCREENS = [
     verdictHead: 'ef7b5773',
     verdictNote: '**判断済み（2026-08-30）：「未払い残高」ではなく「承認済み報酬の合計」と書く。振込先は 銀行・支店・種別・末尾4桁だけ。** ルート `/conversions?tab=payment`（想定）、読み口 `/api/affiliate-payments`（想定）。**Codexが実装中。PR番号とheadが届くまで、こちらは固定データと撮影手順の準備だけを行う。** **確かめた土台**：`conversion_events` が `affiliate_id` `approval_status`（pending/approved/rejected）`approved_at` を持ち、`affiliates` が `hold_days`（返品・キャンセルを見る保留日数）と `payout_cycle`（**覚書。計算には使わないと `095_affiliate_settlement.sql` に明記**）を持つ。報酬額は `affiliate_offers` 側（#558 で 定額／割合／なし の3通り）。**承認済みの合計はいまある表から出せる。** **払った記録がまだ無いので「未払い」とは書かない。** 振込先は `affiliates` に列が無く、**銀行名・支店名・口座種別・末尾4桁だけ**を持つ（口座番号の全桁と名義は画面に出さない）。**この画面はまだ未実装のまま。headを見るまで判定を変えない。**',
   },
-  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**#558 で「報酬が売上×率でしか出ない」が直った。** どう支払うかを **成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。1440・1920とも横スクロール0。P2 設計との細かな差（連絡先・支払い条件の並び）は未確認', verdictSource: 'affiliates-v6/xqT1Z.txt' , verdictHead: 'c275749d' },
+  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**P2 アフィリエイターを追加する。#558 で報酬の決め方が直り、作りは設計に近い。** ルート `/affiliates/new`。段は 1 どなたを登録するか（名前・屋号／連絡先メール／紹介コード）→ 報酬の決め方。**#558 で「報酬が売上×率でしか出ない」が直った**——**成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。**良い点**：紹介コードに「空欄にすると、推測されにくいコードを自動で作ります（そのほうが、他の人にコードを当てられにくくなります）」と**なぜ自動が良いか**まで書く。連絡先メールに「報酬の確定連絡に使います。」と用途を書く。**P2 残る差**：設計 16-1-D は 支払い条件（締め日・支払サイクル・振込先）もこの段で決めるが、実装は名前・連絡先・コード・報酬まで。**振込先は `njLGA` の決めごと（銀行・支店・種別・末尾4桁だけ）に沿って足す。** 取得元：`affiliates-v6/xqT1Z.txt`。1440・1920とも横スクロール0', verdictSource: 'affiliates-v6/xqT1Z.txt' , verdictHead: 'c275749d' },
   {
     ...AFFILIATE, node: 'jwrbf', name: '16-1-E アフィリエイターの成果内訳',
     verdict: 'needs_fix', verdictNote: '**#563 `64798425` で `ref_tracking` が画面から消えた**（本文を数えて0件）。帯の見出しは「クリック」だけになった。**ほかの集計に後退は無い**——確定報酬 ¥86,000／¥144,000／¥93,000、案件別は 無料体験7×¥3,000＝¥21,000・定期便2×¥8,000＝¥16,000・友だち追加1×¥300＝¥300 で、審査中2件は入らない。1440・1920とも横スクロール0。**P2 同じ束の言葉がもう1つ残っている**——内訳の下の表に **`ref_code`** が列見出しとして出ている（「リンク別クリック」と「帰属ジャーニー」の2か所）。これもDBの列名で、`ref_tracking` と同じ理由で運用の人には読めない。「計測コード」などの画面の言葉にしてほしい', verdictSource: 'affiliates-v6/jwrbf.txt',
@@ -1339,8 +1339,8 @@ export const SCREENS = [
     実装は `/scoring` の**1枚もの**で、帯・付与ルール・ランキングの3つだけ。
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
-  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。P1は解決済み。** 日時は日本時間、内部の言葉は出さない。**残高0の人は `0`、最終行動が無い人は `—`** と、**数えて0と取れていないを分けている**（束4の手本）。実装が自分の穴（何が未接続か）を画面に書いているのも良い。P2 設計との細かな差（絞り込みの並び）は残る。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/s98Vfw.txt + mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。P1は解決済み。** P2 設計との細かな差（決めごとの並びと、効いている範囲の見せ方）は残る。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/N46cQ.txt + mileage-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: '**P2 マイルの帯。前のP1（日時が生のUTC・内部の言葉）は解決済み。** ルート `/mileage?tab=balances`。帯は マイル対象者1,284人／保有マイル合計486,200 mile／30日アクティブ498人／記録済みアクション4,180件／もうすぐ消えるマイル **未取得 `— mile`「失効ロットを接続後に表示」**。**取れていないものを `—` と書き、なぜ取れないかまで添えている**（束4の手本）。「同じ人が複数アカウント…」の断りも出る。**P2 残る差**：設計 17-1 は絞り込み（残高の帯・最終行動）を左に置くが、実装は上の検索欄だけ。**推奨修正**：失効ロットの口が入るまでこの帯は `—` のままで正しい。取得元：`mileage-v6/s98Vfw.txt`。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/s98Vfw.txt' , verdictHead: 'c275749d' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: '**P2 たまる決めごと。作りは設計に近い。** ルート `/mileage?tab=earning-rules`。決めごとごとに 名前・説明・停止/再開・稼働（動いています／止めています）・付与数・上限（対象ごとに1回／1日1回まで／紹介された人1人につき1回）が並ぶ。**良い点**：「付与数を変更すると、変更後に発生した行動から新しい値が使われます。」と**いつから効くかを書く**（さかのぼらないことが分かる）。**撮った本文で付与数が空に見えるのは撮影の都合**——付与数は `<input type="number">`（`mileage/page.tsx:339`）で、本文の書き出しに入力欄の値は入らない。**実装の不具合ではない。** **P2 残る差**：設計は決めごとの並び替えと、効いている範囲（どのアカウント・どの友だち）をその場で出す。実装は一覧まで。取得元：`mileage-v6/N46cQ.txt`。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/N46cQ.txt' , verdictHead: 'c275749d' },
   {
     /*
       **#549 で「マイルの使い道」が入った。**
@@ -1525,7 +1525,7 @@ export const SCREENS = [
   { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 集計前は帯4つとも `—` で、「たて・よこの軸を選び、『直近30日を集計』を押してください。」と次にすることを書く。**押す前に数字を見せていない。** 残るのは実データの接続', verdictSource: 'analytics-v6/f5HsX.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 1段目の通過率が `—`。**前の段が無いので割合が出せない**のを 0% と書いていない。残るのは実データの接続', verdictSource: 'analytics-v6/C2I7ry.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
   { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 同じ列に **`0%`（押されていない）** と **`—`（数えられない）** が並び、**見分けられる**。束4の手本にできる形。残るのは実データの接続', verdictSource: 'analytics-v6/Fh2Qj.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。前のP1（一覧に集計状態が無い）は直っている**——「集計状態」列があり、利用可能／一部集計／取得不可／`—` を言い分ける。P2 設計の保存した分析は、保存時の条件と最後に見た日をその場で開ける。実装は一覧まで。1440・1920とも横スクロール0', verdictSource: 'analytics-v6/dfwD4.txt + analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: '**P2 保存した分析。前のP1（一覧に集計状態が無い）は解決済み。** ルート `/analytics?tab=saved`。列は 分析名／種類／作成者／定義版／最新の期間／集計状態／結果 で、集計状態は **利用可能／一部集計／取得不可／`—`** を言い分ける。**良い点**：「条件の定義と集計結果を分けて保存しています」「あとから条件が変わっても、保存時点の結果は書き換わりません。」と**なぜ版を持つのかを書く**。「定期レポートは現在『なし』です。」と**まだ無い機能を正直に書く**（`URqOA` が未実装）。**P2 残る差**：設計 20-2-C は保存時の条件と最後に見た日をその場で開けるが、実装は一覧まで（開くと再集計の画面へ移る）。**推奨修正**：行を開いたときに保存時の条件を出す。取得元：`analytics-v6/dfwD4.txt`。1440・1920とも横スクロール0', verdictSource: 'analytics-v6/dfwD4.txt' , verdictHead: 'c275749d' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
@@ -1730,8 +1730,8 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5-error.txt', verdictHead: '6ce43563',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。実装は設計にかなり近い。** 版（v4）と、どこから呼ばれているか、**古い版のまま呼んでいる先**まである（本文に「古い版」4件、「版」8件）。**設計との差1（別ページになっている）は #552 で解消**——タブ帯に「オートメーション / 共通アクション」が入り、件数（4）も付く。P2 残る差は帯の中身。設計は 共通アクション14／呼び出し元38・5機能から／今月2,847回・失敗6／**古い版のまま 要確認2** の4つ。実装は「共通アクション 4／公開中と下書き」まで。**「古い版のまま 要確認」が帯に無い**ので、直し忘れに気づく場所が一覧に無い。P2 「複製して作る」が無い。1440・1920とも横スクロール0', verdictSource: 'automations-v6/xOpDs.txt + automations-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。実装は設計に近い。** P2 残る差は「複製して作る」の扱い。**タブ帯の位置の差は #552 で解消**。1440・1920とも横スクロール0', verdictSource: 'automations-v6/py5CG.txt + automations-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。実装は設計に近く、版と使われている場所、古い版のまま呼んでいる先まで出せている。** P2 残る差は帯（`xOpDs` と同じ）。**タブ帯の位置の差は #552 で解消**。1440・1920とも横スクロール0', verdictSource: 'automations-v6/syWp4.txt + automations-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '**P2 共通アクションをつくる。実装は設計に近い。** ルート `/common-actions/new`。段は 名前と説明 → 順番に動かす処理 → 失敗したとき。処理は12種類（タグを付ける／外す・友だち情報を設定・シナリオを開始/停止/再開・LINEメッセージを送る・外部サービスへ送る・リッチメニューを切り替える/外す・待つ・別の共通アクションを呼ぶ）。**良い点**：「上から順に実行します。公開後の版は書き換わりません。」と**版の決めごとを作る前に書く**。**P2 残る差**：「複製して作る」が無い（設計は既存の共通アクションから写して作れる）。**タブ帯の位置の差は #552 で解消。** **推奨修正**：一覧の行に「複製」を足すのが早い（新規画面を増やさずに済む）。取得元：`common-actions-v6/py5CG.txt`。1440・1920とも横スクロール0', verdictSource: 'common-actions-v6/py5CG.txt' , verdictHead: 'c275749d' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: '**P2 版と使われている場所。実装は設計に近く、いちばんよくできている画面のひとつ。** ルート `/common-actions/versions?id=ca-1`。帯は 現在の公開版4「v4を利用できます」／版の数4「下書きを含む」／使われている場所2「版を固定した利用先」／**古い版のまま1「確認して更新します」**。**良い点**：「新版を公開しても、利用先は現在の版を使い続けます。差分を確認した利用先だけ切り替えてください。」と**公開しても勝手に切り替わらないこと**を書く。「公開した版は書き換えられません。」も出る。**古い版のまま呼んでいる先を数えて出せている**のが設計の要。**P2 残る差**：帯の作りが `xOpDs` と同じで、設計の並びと違う。**タブ帯の位置の差は #552 で解消。** 取得元：`common-actions-v6/syWp4.txt`。1440・1920とも横スクロール0', verdictSource: 'common-actions-v6/syWp4.txt' , verdictHead: 'c275749d' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
@@ -1899,7 +1899,7 @@ export const SCREENS = [
 
   // ── 機能29 イベント予約 ─────────────────────────────────
   { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'needs_fix', verdictNote: '**#467 `6bb950f3` で撮り直した。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P1 帯が「数」で「次に何をするか」になっていない。設計の3つめ「あと少しで満席 2回（声をかけると埋まります）」と4つめ「申し込みが少ない 1回（8/31の回。あと3日です）」は、そのまま行動になる帯。実装の「定員の充足 55%」は全体の平均で、**どの回が危ないかは分からない**', verdictSource: 'events-v6/ugP5y.txt' , verdictHead: '6bb950f3' },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: '**#467 `6bb950f3` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計のイベント作成は回ごとの枠（日時・定員・受付終了）をその場で並べて作る。実装との差は枠の口がつながってから見る', verdictSource: 'events-v6/MKrPY.txt' , verdictHead: '6bb950f3' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: '**P2 イベントをつくる。段の骨組みは設計どおり。**#467 `6bb950f3` で撮った。ルート `/events/new`。段は 1 概要（イベント名・場所・詳細）→ 2 予約枠（友だちが選べる日時を追加）→ 3 公開設定（承認制・リマインダ・公開）で、**設計の3段がそのまま出ている**。**良い点**：「友だちの予約ページにそのまま出ます」と**どこに出るかを書く**。会場URLに「オンライン開催の場合に入力します。」、1人あたりの予約回数に「同じ友だちが何回まで申し込めるか」と添える。詳細は 0 / 20,000 の字数表示付き。**P2 残る差**：設計は回ごとの枠（日時・定員・受付終了）を**この画面で並べて作る**が、実装は段2へ進んでから足す。実装との細かな差は枠の口がつながってから見る。内部語・壊れ値は0件、1440・1920とも横スクロール0。取得元：`events-v6/MKrPY.txt`', verdictSource: 'events-v6/MKrPY.txt' , verdictHead: '6bb950f3' },
   { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: '**#467 `6bb950f3` で予約者の一覧が撮れるようになった。** 帯は 申込 0人（定員12・残り12）／承認待ち 0件（対応が必要）／**キャンセル待ち 2人**／キャンセル 0件。状態の札は 承認待ち・確定・拒否・キャンセル・期限切れ・参加済・無断・キャンセル待ち・全件 で、**内部の語（`confirmed` `requested` `waiting` `invited`）は0件**。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は「あと少しで満席」「声をかけると埋まります」のように、次にする行動を帯へ出す。実装は数まで。**撮影の断り**：キャンセル待ちの固定データを2人入れているため、帯が「2人／受け付けない設定です」と並ぶ。イベント側の受付設定と別の値なので、実装の食い違いではない', verdictSource: 'events-v6/i5SN2j.txt' , verdictHead: '6bb950f3' },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
@@ -1913,7 +1913,7 @@ export const SCREENS = [
     設計のタブは4本（いまいる人8／招待中2／入った記録／権限のかたまり5）。
     実装は1枚もの。
   */
-  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の役割の編集は、権限を項目ごとに見せて差分を確かめてから保存する。実装との差は権限の口がつながってから見る', verdictSource: 'staff-v6/e3jz3.txt' , verdictHead: '15febf7f' },
+  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: '**P2 ログインユーザー。実装は設計に近い。**#475 `15febf7f` で撮った。ルート `/staff`。帯は 管理スタッフ5人（管理者2・その他3）／二要素認証 2 / 5「未設定3人」／過去30日のログイン2回「失敗1」／最終ログイン 09:02 佐々木 亮太。上に **「🔑 二段階認証が未設定のユーザーが 3人 います」** の注意が出る。列は ユーザー／役割／担当範囲／LINE連携／二段階認証／利用状態／操作。**良い点**：**二段階認証の未設定を数えて上に出す**——設計が求める「危ないものを先に見せる」ができている。**P2 残る差**：設計 30-1 は役割の編集で権限を項目ごとに見せ、差分を確かめてから保存するが、実装は「範囲を編集」まで。権限の口がつながってから見る。内部語・壊れ値は0件、1440・1920とも横スクロール0。取得元：`staff-v6/e3jz3.txt`', verdictSource: 'staff-v6/e3jz3.txt' , verdictHead: '15febf7f' },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
     verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 帯は 管理スタッフ 5人（管理者2・その他3）／二要素認証 **2 / 5**（未設定3人）／過去30日のログイン 2回（失敗1）／最終ログイン 09:02 佐々木 亮太。上に **「🔑 二段階認証が未設定のユーザーが 3人 います」** と、**数ではなく次にすることを出す帯**がある。表は ユーザー・役割・担当範囲・LINE連携・二段階認証・利用状態・操作。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧は最後の操作と、権限の変更履歴への導線を持つ', verdictSource: 'staff-v6/EOTS4.txt',
@@ -1929,7 +1929,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 「入った記録」が記録の一覧ではない。staff/page.tsx:114 が記録ではなくログインユーザーを繰り返し、1人につき1行「最後の操作」を出すだけなので、過去の操作を追えない。設計は4,286件を新しい順に並べる。P1 記録できる操作が5種類（ログイン・ログアウト・ログイン失敗・個人情報を表示・CSVを書き出し。ACTION_LABEL）しかなく、設計の「テンプレートを消しました」「マイルを手で増やしました」「一斉配信を出しました」「外部連携を止めました」は口が持っていない。P2 「対象」と「元の値 → 新しい値」の列が無く、何がどう変わったか分からない。いつもと違う場所からのログインを赤く出す扱いも無い。帯・絞り込みチップ・CSV・ページ送りも無い',
     verdictSource: 'staff-v6/jwVlo-1920.png + apps/web/src/app/staff/page.tsx:114', verdictHead: '15febf7f',
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の追加画面は、招待の送り方（LINE連携・メール）と担当範囲の割り当てを1枚で決める。実装との細かな差は、招待の口がつながってから見る', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '15febf7f' },
+  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '**P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値は0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt`', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '15febf7f' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '**#478 `66883866` で撮った。** **オフにしたときに何が起きないかを先に書く**——「オフにしても作ったデータは削除されません。**公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。**」。機能設定・並び替え・初期値に戻すが揃う。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。実装は一覧と並び替えまで', verdictSource: 'settings-v6/c4R6F.txt' , verdictHead: '66883866' },
@@ -1965,7 +1965,7 @@ export const SCREENS = [
     `capture.spec.mjs` が撮っている（`tags-csv-*`）。
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**P2 文言だけ。** ルート `/tags`。**この画面の4タブのうち、帯4つを持つのはここだけ**（撮った本文で 101件／186人／26件／101件／20件 と実値が出る）。`rIhbN` `HBTk0` `QKx8Q` には帯が無く、**同じ画面なのに作りが揃っていない**。取得元：`friend-attributes-v6/hqrOv.txt`。1440・1920とも横スクロール0',
+    verdict: 'needs_fix', verdictNote: '**P2 4つのタブのうち、帯を持つのはここだけ。** ルート `/tags`。帯4つは タグ数101件「未使用24件」／付与済み友だち186人「1つ以上付与」／今月の付与214回「手動・自動」／**整理候補26件「未使用・重複名」**。フォルダの縦帯も 101件／すべて101／VIP14／ペット12／会員18／健康16／購入21／未分類20 と**実データで出る**。**`rIhbN` `HBTk0` `QKx8Q` には帯が無く、同じ画面なのにタブ間で作りが揃っていない。** 特に `QKx8Q`（保存した検索）は帯はあるが3つが `—件`。**良い点**：「フォルダを削除しても、中のタグは未分類として残ります。」と**消したときどうなるか**を書く。「整理候補」が**次にやることを名指し**している。**推奨修正**：4タブで帯の作りをそろえる（無いタブに足すか、この画面の帯を共通の位置へ出す）。取得元：`friend-attributes-v6/hqrOv.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friend-attributes-v6/hqrOv.txt', verdictHead: 'c275749d',
   },
   {
@@ -1988,8 +1988,8 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-preview',
     why: '同上。`tags-csv-preview` が撮っている',
-    verdict: 'needs_fix', verdictNote: '**P1 CSV取り込みの確認が設計と別の仕掛け。** ルート `/tags?tab=fields`（取り込み）。設計は取り込む前に**何行が新規で何行が更新か、はじかれた行とその理由**を見せてから進む。実装は別の作りで、行ごとの内訳を出さない。取得元：`friend-attributes-v6/sfTEW.txt`。1440・1920とも横スクロール0',
-    verdictSource: 'friend-attributes-v6/sfTEW.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**訂正：前の判定「行ごとの内訳を出さない」は誤り。取り消す。** ルート `/tags`（CSVで一括登録 → 取り込む内容を確認）。撮影は `capture.spec.mjs` の `tags-csv-preview`（ファイルを選ばせる操作が要るため、こちらの仕掛けでは撮らない）。**実装は確認画面を持ち、件数も理由も出している**（`tag-csv-import-dialog.tsx:205-225`）——**読み込んだ行／新しく登録／重複で見送り／入力確認**の4つを件数で出し、その4つで**行を絞り込める**。失敗した行は **タグ名・フォルダ・エラー理由** の3列でCSVに書き出せる（`tag-csv-import.ts:89`）。**良い点**：「登録できる行だけを登録します。入力確認の行は、直してからもう一度取り込めます。」「入力確認があっても、登録できる行だけ先に登録できます。」と**部分的に進めることを先に書く**。「フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。」と**勝手に捨てないこと**も書く。上限は「UTF-8・最大500件」。**P2 残る差**：設計は **新規と更新**を分けるが、実装に「更新」が無い——**すでにあるタグは『重複で見送り』**になり、上書きできない。**推奨修正**：既存タグのフォルダだけ直したいときの道が無いので、「更新」を足すか、見送りの理由に「すでにあります」と出して編集画面へ誘導する。取得元：`tag-csv-import-dialog.tsx` ＋ `tag-csv-import.ts`',
+    verdictSource: 'tag-csv-import-dialog.tsx:205 + tag-csv-import.ts:89', verdictHead: 'c275749d',
   },
   {
     node: 'op1rh', feature: 4, name: '4-1-H-B CSV取り込み・完了',
@@ -2022,7 +2022,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: '**P1 人数が「人」だけで数字が出ない。** ルート `/tags?tab=marks`。撮った本文の「いまの人数」列は **未対応・対応中・保留・対応済・気にかける の5行とも「人」だけ**で、数字が入っていない（`[0-9]+人` を数えて0件）。原因は `mark-list.tsx:176` が `{mark.friendCount}人` を出すのに、**`SupportMark` の型に `friendCount` が無い**こと。どの口も返さないので常に空になる。設計は 未対応23人／対応中19人／対応済186人／保留3人 を出す。**推奨修正**：数を返す口ができるまでは **`—人`** と出す（空にしない）。空欄は「0人」とも「取れていない」とも読めない。**P1 帯4つが無い**（設計は マークの種類4件（使用中4件）／未対応23人（全体の10.0%）／対応中19人／過去7日の変更74回）。同じ画面の4タブのうち**タグ（`hqrOv`）だけが帯を持ち**、作りが揃っていない。取得元：`friend-attributes-v6/rIhbN.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friend-attributes-v6/rIhbN.txt', verdictHead: 'c275749d',
   },
-  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした。** 保存した検索の一覧に内部の識別子（`ss-`）や `support_mark` `scenario_id` といった列名が出なくなった（数えて0件）。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（条件の要約、使用先の表示）はこの直しの外', verdictSource: 'tags-v6/QKx8Q.txt' , verdictHead: 'e929f22a' },
+  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした（内部の識別子 `ss-` や `support_mark` `scenario_id` が0件）。画面全体は要修正のまま。** ルート `/tags?tab=searches`。帯は 保存した条件5件「上限50件」／配信で使用中 **`—件`**「変更時は影響確認」／該当者0人 **`—件`**「条件の見直し候補」／今月の呼び出し **`—回`**「呼び出し記録は未接続」。**取れていないものを `—` と書き、なぜ取れないかを添えている**のは良い（0で埋めていない）。**P1 4つの帯のうち3つが未取得のまま。** 「配信で使用中」が出ないと、**消してよい条件かどうかが判断できない**。**P2 この画面でできるのは名前の確認と削除だけ**——「新しく保存するときは、友だち一覧の絞り込みから『この条件を保存』を押してください。」と**どこで作るかを書いている**のは良いが、設計 4-4 は条件の要約と使用先をこの一覧に出す。**推奨修正**：使用先の口（`uNBlA` と同じ考え方）をつなぐ。取得元：`friend-attributes-v6/QKx8Q.txt`。1440・1920とも横スクロール0', verdictSource: 'friend-attributes-v6/QKx8Q.txt' , verdictHead: 'e929f22a' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
@@ -2050,7 +2050,7 @@ export const SCREENS = [
   {
     node: 'ee0sk', feature: 4, name: '4-1-D タグを編集・既存設定あり',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
-    verdict: 'needs_fix', verdictNote: 'P2 連動アクションの種類名が設計と違う（設計 テキスト送信・タグ追加・シナリオ開始／実装 メッセージ・シナリオ）。複製のボタンが無い。「OFFに戻すと…すでに積んだマイルは取り消されません。」の注記が無い。4.の4枚のカードに設計の補足（このタグを持つ友だち／まだ受け取っていない人／紹介者が登録されている人／さかのぼりません）が無い',
+    verdict: 'needs_fix', verdictNote: '**P2 タグを編集（既存設定あり）。判定は #? の head `baeb644b` で撮った絵から書いている（`.txt` は取れていない）。** ルート `/tags/edit?id=tag-0`。**P2 連動アクションの種類名が設計と違う**——設計は テキスト送信・タグ追加・シナリオ開始 の3つ、実装は メッセージ・シナリオ の2つ。**P2 複製のボタンが無い**（設計は既存のタグから写して作れる）。**P2 注記が2か所足りない**——①「OFFに戻すと…すでに積んだマイルは取り消されません。」②4枚のカードの補足（このタグを持つ友だち／まだ受け取っていない人／紹介者が登録されている人／さかのぼりません）。**この4つはどれも「元に戻せるか」「さかのぼるか」を伝える文で、無いと運用者が判断できない。** **推奨修正**：文言は既存部品だけで足せる。**残作業**：`baeb644b` を含む枝で `--only ee0sk` を撮り、本文で数え直す。取得元：`friend-attributes-v6/ee0sk-1920.png`',
     verdictSource: 'friend-attributes-v6/ee0sk-1920.png', verdictHead: 'baeb644b',
   },
   {
@@ -2063,13 +2063,13 @@ export const SCREENS = [
   {
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
     dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/byqIW.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める',
+    verdict: 'needs_fix', verdictNote: '**P2 フォルダを追加。作りは設計に近い。** ルート `/tags/folders/new`。入力は フォルダ名（必須）／フォルダの色／作成する場所（タグ・友だち情報欄）。**良い点**：色に「選んだ色は、フォルダと中に入れた属性の印に使われます。」と**どこに効くか**を書く。「フォルダをあとで削除しても、中に入れたタグや友だち情報欄は削除されず『未分類』に残ります。」と**消したときどうなるか**を先に書く（`hqrOv` の一覧と同じ文言でそろっている）。**P2 残る差**：設計 4-1-G は色を選ぶと**その場で見え方が変わる**下見を置くが、実装は色の選択だけ。**推奨修正**：色の横に、その色でフォルダ名を出す小さな見本を置く。取得元：`friend-attributes-v6/byqIW.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friend-attributes-v6/byqIW.txt', verdictHead: 'c275749d',
   },
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
     dir: 'friend-attributes-v6', route: '/tags/fields/new', mode: 'page',
-    verdict: 'needs_fix', verdictNote: 'P1 種類の選択肢が設計と違う（設計 1行・複数行・数値・日付・日時・電話・メール・URL・単一選択・複数選択・画像・PDF の12種類。実装は日時・画像・PDFが無く、真偽が増えて10種類）。P2 既定値が設計は「未設定」「［お名前］を使う」の選択、実装は自由入力。「200字まで」と「移すとタブの並びも変わります」の注記が無い',
+    verdict: 'needs_fix', verdictNote: '**P1 種類の選択肢が設計より2つ少なく、1つ増えている。判定は head `87c150ad` で撮った絵から書いている（`.txt` は取れていない）。** ルート `/tags/fields/new`。設計は12種類（1行・複数行・数値・日付・**日時**・電話・メール・URL・単一選択・複数選択・**画像**・**PDF**）。実装は10種類で、**日時・画像・PDFが無く、真偽が増えている**。**日時が無いと、予約時刻のような値を1つの欄で持てない**（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。**P2 既定値の決め方が違う**——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。**P2 注記が2つ足りない**：「200字まで」「移すとタブの並びも変わります」。**推奨修正**：日時の種類を足すのが先（`vCqUj` のフォームが日付ブロックからリマインダを起動できるのと対になる）。**残作業**：`87c150ad` を含む枝で `--only A1ZYeP` を撮り、本文で数え直す。取得元：`friend-attributes-v6/A1ZYeP-1920.png`',
     verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '87c150ad',
   },
   {
@@ -2079,7 +2079,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/KoT6c.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: 'c275749d',
+    verdict: 'needs_fix', verdictNote: '**訂正：前の判定（「設計との差は並びと文言」）は 404 の絵から書かれていた。取り消す。** ルート `/tags/fields/migrate?id=field-birthday`。**development `c275749d` にこの道は無く、撮った本文は「404 This page could not be found.」だけだった。** `apps/web/src/app/tags/fields/` の下に `migrate` が無く、`field-list.tsx` にも「移行」の押し口が無い（数えて0件）。**この画面は #537 の枝にだけある**（`b296cb04:apps/web/src/app/tags/fields/migrate/page.tsx`）。#537 は open のまま。**P1 development では項目移行ができない。** 使用中の項目は消せないので、移行の道が無いと**行き止まりになる**。**残作業**：#537 の head で `--only KoT6c` を撮り、そこから設計との差を詰める。**development の絵で判定しない**（無い画面を「並びが違う」とは書けない）。取得元：`friend-attributes-v6/KoT6c.txt`（404の記録）', verdictSource: 'friend-attributes-v6/KoT6c.txt（404の記録）', verdictHead: 'c275749d',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
   },
   {

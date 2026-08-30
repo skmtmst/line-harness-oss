@@ -627,7 +627,14 @@ export const TEMPLATES = (() => {
       rows.push({
         id: `template-${n}`,
         name: `${label}のひな形 ${i + 1}`,
-        category: 'text',
+        /*
+          **`category` は古い欄で、いまは誰も入れない。**`templates` 表の既定は
+          `'general'`（`bootstrap.sql`）。ここに `'text'` と書いていたせいで、
+          フォルダの縦帯に「text」と出て**種別の不具合のように見えていた**。
+          既定値に戻す。**縦帯が `folderId` でなく `category` を数えている**
+          という指摘は、値に関係なく残る（`templates/page.tsx:180`）。
+        */
+        category: 'general',
         messageType: 'text',
         messageContent: `${label}のご連絡です。内容をご確認ください。`,
         folderId,
