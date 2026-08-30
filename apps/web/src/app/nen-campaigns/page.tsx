@@ -1,10 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import { api, type NenCampaignSetting, type NenColumn, type NenPetProfile } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
 
 type Tab = 'flow' | 'columns' | 'pets' | 'history'
 type Notice = { tone: 'success' | 'error'; text: string }
@@ -12,6 +15,10 @@ type FriendOption = { id: string; displayName: string | null }
 
 const categoryLabel: Record<NenCampaignSetting['category'], string> = {
   transactional: '購入通知', follow_up: '購入後フォロー', column: 'コンテンツ', birthday: '記念日',
+}
+const jobStatusLabel: Record<string, string> = {
+  pending: '配信待ち', processing: '送信中', sent: '送信済み', skipped: '対象外',
+  failed: '送信できませんでした', cancelled: '取り消し済み',
 }
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled?: boolean; onChange: () => void; label: string }) {
@@ -143,15 +150,26 @@ export default function NenCampaignsPage() {
   const [testFriendId, setTestFriendId] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [petDraft, setPetDraft] = useState({ friendId: '', name: '', animalType: 'dog', gender: 'unknown', birthday: '' })
+  const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setLoading(true)
+    setLoadError('')
+    if (!selectedAccountId) {
+      setSettings([]); setColumns([]); setPets([]); setJobs([]); setOverview(null)
+      setLoading(false)
+      return
+    }
     try {
       const [settingRes, columnRes, petRes, jobRes, overviewRes, couponRes] = await Promise.all([
-        api.nenCampaigns.settings(), api.nenCampaigns.columns(), api.nenCampaigns.pets(),
-        api.nenCampaigns.jobs(), api.nenCampaigns.overview(), api.nenCampaigns.birthdayCoupon(),
+        api.nenCampaigns.settings(selectedAccountId), api.nenCampaigns.columns(selectedAccountId),
+        api.nenCampaigns.pets(selectedAccountId), api.nenCampaigns.jobs(selectedAccountId),
+        api.nenCampaigns.overview(selectedAccountId), api.nenCampaigns.birthdayCoupon(selectedAccountId),
       ])
+      if (sequence !== loadSequence.current) return
       if (!settingRes.success || !columnRes.success || !petRes.success || !jobRes.success || !overviewRes.success || !couponRes.success) throw new Error()
       setSettings(settingRes.data)
       setColumns(columnRes.data)
@@ -160,17 +178,23 @@ export default function NenCampaignsPage() {
       setOverview(overviewRes.data)
       setCoupon(couponRes.data)
     } catch {
-      setNotice({ tone: 'error', text: 'フォロー配信の情報を読み込めませんでした。' })
-    } finally { setLoading(false) }
-  }, [])
+      if (sequence === loadSequence.current) setLoadError('フォロー配信の情報を読み込めませんでした。')
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false)
+    }
+  }, [selectedAccountId])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
+    setFriends([])
+    setTestFriendId('')
     if (!selectedAccountId) return
+    let cancelled = false
     void Promise.allSettled([
       api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }),
       api.accountSettings.getTestRecipientLoginUsers(selectedAccountId),
     ]).then(([friendResult, loginUserResult]) => {
+      if (cancelled) return
       if (friendResult.status !== 'fulfilled' || !friendResult.value.success) return
       const friendResponse = friendResult.value
       // 100件より古い友だちでも、LINE連携済みログインユーザーは先頭へ残す。
@@ -189,6 +213,7 @@ export default function NenCampaignsPage() {
       )
       setPetDraft((current) => ({ ...current, friendId: current.friendId || list[0]?.id || '' }))
     }).catch(() => undefined)
+    return () => { cancelled = true }
   }, [selectedAccountId])
 
   const updateDraft = (key: string, patch: Partial<NenCampaignSetting>) => {
@@ -196,11 +221,12 @@ export default function NenCampaignsPage() {
   }
 
   const saveSetting = async (setting: NenCampaignSetting, override?: Partial<NenCampaignSetting>) => {
+    if (!selectedAccountId) return
     const next = { ...setting, ...override }
     setSaving(setting.campaignKey)
     setNotice(null)
     try {
-      await api.nenCampaigns.updateSetting(setting.campaignKey, {
+      await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, {
         isEnabled: next.isEnabled, title: next.title, bodyText: next.bodyText,
         delayDays: next.delayDays, deliveryTime: next.deliveryTime,
         buttonLabel: next.buttonLabel, buttonUrl: next.buttonUrl, imageUrl: next.imageUrl,
@@ -238,12 +264,13 @@ export default function NenCampaignsPage() {
   }
 
   const saveColumnMessage = async (column: NenColumn) => {
+    if (!selectedAccountId) return
     if (!column.introText.trim()) {
       setNotice({ tone: 'error', text: '挨拶・要約文を入力してください。' }); return
     }
     setSavingColumnId(column.id)
     try {
-      await api.nenCampaigns.updateColumnMessage(column.id, column.introText)
+      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, column.introText)
       setNotice({ tone: 'success', text: `「${column.title}」の配信文を保存しました。` })
       setEditingColumnId(null)
     } catch { setNotice({ tone: 'error', text: 'コラムの配信文を保存できませんでした。' }) }
@@ -251,9 +278,9 @@ export default function NenCampaignsPage() {
   }
 
   const addPet = async () => {
-    if (!petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEユーザーとペットのお名前を入力してください。' }); return }
+    if (!selectedAccountId || !petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEアカウント、LINEユーザー、ペットのお名前を入力してください。' }); return }
     try {
-      await api.nenCampaigns.createPet({ ...petDraft, birthday: petDraft.birthday || undefined })
+      await api.nenCampaigns.createPet(selectedAccountId, { ...petDraft, birthday: petDraft.birthday || undefined })
       setPetDraft((current) => ({ ...current, name: '', birthday: '', gender: 'unknown' }))
       setNotice({ tone: 'success', text: 'ペット情報を登録しました。' })
       await load()
@@ -261,13 +288,33 @@ export default function NenCampaignsPage() {
   }
 
   const saveCoupon = async () => {
+    if (!selectedAccountId) return
     try {
-      await api.nenCampaigns.updateBirthdayCoupon(coupon)
+      await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon)
       setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' })
     } catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
   }
 
-  if (loading) return <><Header title="フォロー配信" /><main className="p-6 text-sm text-gray-500">読み込み中...</main></>
+  if (loading) return <><Header title="フォロー配信" /><main className="p-6"><ListState kind="loading" /></main></>
+
+  if (loadError) {
+    return (
+      <>
+        <Header title="フォロー配信" />
+        <main className="p-6">
+          <ListState
+            kind="error"
+            description={loadError}
+            action={(
+              <Button variant="primary" onClick={() => void load()}>
+                フォロー配信を再読み込み
+              </Button>
+            )}
+          />
+        </main>
+      </>
+    )
+  }
 
   return (
     <>
@@ -313,15 +360,20 @@ export default function NenCampaignsPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">待機中</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {jobs.length}
+            {overview?.jobs.pending ?? '—'}
             <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">送信待ちのジョブ</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">失敗</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">失敗の記録がありません</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {overview?.jobs.failed ?? '—'}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {overview ? (overview.jobs.failed === 0 ? '失敗の記録はありません' : '失敗した配信を確認してください') : '確認できません'}
+          </p>
         </div>
       </div>
       <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
@@ -358,7 +410,7 @@ export default function NenCampaignsPage() {
                 <div className="flex items-center gap-4">
                   <Toggle checked={setting.isEnabled} disabled={saving === setting.campaignKey} label={`${setting.label}を切り替える`} onChange={() => void saveSetting(setting, { isEnabled: !setting.isEnabled })} />
                   <div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-gray-900">{setting.label}</h3><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{categoryLabel[setting.category]}</span></div>
-                    <p className="mt-1 text-xs text-gray-500">{setting.delayDays === 0 ? 'イベント発生後すぐ' : `発送完了から${setting.delayDays}日後 ${setting.deliveryTime}`}</p></div>
+                    <p className="mt-1 text-xs text-gray-500">{formatCampaignTiming(setting)}</p></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -432,11 +484,11 @@ export default function NenCampaignsPage() {
 
         {tab === 'pets' && <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           <div className="space-y-4"><div className="rounded-2xl border border-gray-200 bg-white p-5"><h2 className="text-lg font-bold text-gray-900">ペット情報を登録</h2><p className="mt-1 text-sm text-gray-500">LINEログイン会員が任意入力した情報も、ここに自動保存されます。</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><select value={petDraft.friendId} onChange={(e) => setPetDraft({ ...petDraft, friendId: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5"><option value="">LINEユーザーを選択</option>{friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName || '名前未取得'}</option>)}</select><input placeholder="わんちゃん・ねこちゃんのお名前" value={petDraft.name} onChange={(e) => setPetDraft({ ...petDraft, name: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5" /><select value={petDraft.animalType} onChange={(e) => setPetDraft({ ...petDraft, animalType: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5"><option value="dog">わんちゃん</option><option value="cat">ねこちゃん</option><option value="other">その他</option></select><select value={petDraft.gender} onChange={(e) => setPetDraft({ ...petDraft, gender: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5"><option value="unknown">回答しない</option><option value="male">男の子</option><option value="female">女の子</option></select><input type="date" value={petDraft.birthday} onChange={(e) => setPetDraft({ ...petDraft, birthday: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5" /><button onClick={() => void addPet()} className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white">登録する</button></div></div>
-            <div className="space-y-3">{pets.map((pet) => <div key={pet.id} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4"><div><p className="font-bold text-gray-900">{pet.name} <span className="ml-1 text-xs font-normal text-gray-400">{pet.animalType === 'dog' ? 'わんちゃん' : pet.animalType === 'cat' ? 'ねこちゃん' : 'その他'}</span></p><p className="mt-1 text-sm text-gray-500">{pet.ownerName || '名前未取得'} · {pet.gender === 'male' ? '男の子' : pet.gender === 'female' ? '女の子' : '性別未回答'} · {pet.birthday || '誕生日未登録'}</p></div><button onClick={() => void api.nenCampaigns.deletePet(pet.id).then(load)} className="text-sm text-red-500">削除</button></div>)}</div></div>
-          <div className="h-fit rounded-2xl border border-gray-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-lg font-bold text-gray-900">お誕生日クーポン</h2><p className="mt-1 text-xs text-gray-500">誕生日月の1日に自動送信</p></div><Toggle checked={coupon.isEnabled} label="誕生日クーポンを切り替える" onChange={() => setCoupon({ ...coupon, isEnabled: !coupon.isEnabled })} /></div><div className="mt-5 space-y-4"><label className="block text-sm font-semibold text-gray-700">コードの先頭<input value={coupon.codePrefix} onChange={(e) => setCoupon({ ...coupon, codePrefix: e.target.value.toUpperCase() })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">特典名<input value={coupon.benefitLabel} onChange={(e) => setCoupon({ ...coupon, benefitLabel: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">割引金額<input type="number" min={1} max={100000} value={coupon.discountAmount} onChange={(e) => setCoupon({ ...coupon, discountAmount: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">有効日数<input type="number" min={1} max={365} value={coupon.validityDays} onChange={(e) => setCoupon({ ...coupon, validityDays: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><button onClick={() => void saveCoupon()} className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white">設定を保存</button></div></div>
+            <div className="space-y-3">{pets.map((pet) => <div key={pet.id} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4"><div><p className="font-bold text-gray-900">{pet.name} <span className="ml-1 text-xs font-normal text-gray-400">{pet.animalType === 'dog' ? 'わんちゃん' : pet.animalType === 'cat' ? 'ねこちゃん' : 'その他'}</span></p><p className="mt-1 text-sm text-gray-500">{pet.ownerName || '名前未取得'} · {pet.gender === 'male' ? '男の子' : pet.gender === 'female' ? '女の子' : '性別未回答'} · {pet.birthday || '誕生日未登録'}</p></div><button onClick={() => selectedAccountId && void api.nenCampaigns.deletePet(selectedAccountId, pet.id).then(load)} className="text-sm text-red-500">削除</button></div>)}</div></div>
+          <div className="h-fit rounded-2xl border border-gray-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-lg font-bold text-gray-900">お誕生日クーポン</h2><p className="mt-1 text-xs text-gray-500">誕生日の3日前、10:00に自動送信</p></div><Toggle checked={coupon.isEnabled} label="誕生日クーポンを切り替える" onChange={() => setCoupon({ ...coupon, isEnabled: !coupon.isEnabled })} /></div><div className="mt-5 space-y-4"><label className="block text-sm font-semibold text-gray-700">コードの先頭<input value={coupon.codePrefix} onChange={(e) => setCoupon({ ...coupon, codePrefix: e.target.value.toUpperCase() })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">特典名<input value={coupon.benefitLabel} onChange={(e) => setCoupon({ ...coupon, benefitLabel: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">割引金額<input type="number" min={1} max={100000} value={coupon.discountAmount} onChange={(e) => setCoupon({ ...coupon, discountAmount: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">有効日数<input type="number" min={1} max={365} value={coupon.validityDays} onChange={(e) => setCoupon({ ...coupon, validityDays: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><button onClick={() => void saveCoupon()} className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white">設定を保存</button></div></div>
         </section>}
 
-        {tab === 'history' && <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white"><div className="border-b border-gray-100 p-5"><h2 className="font-bold text-gray-900">直近100件の配信</h2></div><div className="divide-y divide-gray-100">{jobs.length === 0 ? <p className="p-8 text-center text-sm text-gray-500">配信履歴はまだありません。</p> : jobs.map((job) => <div key={job.id} className="grid gap-2 p-4 text-sm sm:grid-cols-[1.2fr_1fr_1fr_auto]"><div><p className="font-semibold text-gray-900">{job.label}</p><p className="text-xs text-gray-400">{job.friendName || '名前未取得'}</p></div><p className="text-gray-600">予定：{job.scheduledAt}</p><p className="text-gray-600">試行：{job.attempts}回</p><span className={`h-fit rounded-full px-2.5 py-1 text-xs font-semibold ${job.status === 'sent' ? 'bg-emerald-50 text-emerald-700' : job.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{job.status}</span>{job.lastError && <p className="sm:col-span-4 text-xs text-red-500">{job.lastError}</p>}</div>)}</div></section>}
+        {tab === 'history' && <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white"><div className="border-b border-gray-100 p-5"><h2 className="font-bold text-gray-900">直近100件の配信</h2></div><div className="divide-y divide-gray-100">{jobs.length === 0 ? <p className="p-8 text-center text-sm text-gray-500">配信履歴はまだありません。</p> : jobs.map((job) => <div key={job.id} className="grid gap-2 p-4 text-sm sm:grid-cols-[1.2fr_1fr_1fr_auto]"><div><p className="font-semibold text-gray-900">{job.label}</p><p className="text-xs text-gray-400">{job.friendName || '名前未取得'}</p></div><p className="text-gray-600">予定：{formatNenJobDateTime(job.scheduledAt)}</p><p className="text-gray-600">試行：{job.attempts}回</p><span className={`h-fit rounded-full px-2.5 py-1 text-xs font-semibold ${job.status === 'sent' ? 'bg-emerald-50 text-emerald-700' : job.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{jobStatusLabel[job.status] ?? '状態を確認できません'}</span>{job.lastError && <p className="sm:col-span-4 text-xs text-red-500">{job.lastError}</p>}</div>)}</div></section>}
       </main>
     </>
   )
