@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 23,
+  "match": 29,
   "structureMatchDataPending": 18,
-  "needsFix": 187,
+  "needsFix": 181,
   "unjudged": 0,
-  "remaining": 235,
+  "remaining": 229,
   "features": [
     {
       "feature": 1,
@@ -166,11 +166,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 4,
       "structureMatchDataPending": 0,
-      "needsFix": 13,
+      "needsFix": 10,
       "unjudged": 0,
-      "remaining": 13,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 534,
@@ -294,6 +294,18 @@
             "M1EXwB"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "2d0ee180",
+          "on": "2026-08-30",
+          "screens": [
+            "cCB7r",
+            "TC1b1",
+            "RUxNf",
+            "q5G45"
+          ],
+          "note": "同上。配信方式の見本は設計より丁寧に入っていた"
         }
       ]
     },
@@ -1004,11 +1016,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 2,
       "structureMatchDataPending": 0,
-      "needsFix": 8,
+      "needsFix": 7,
       "unjudged": 0,
-      "remaining": 8,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 443,
@@ -1041,6 +1053,15 @@
             "UIaM7"
           ],
           "note": "refの初期選択、一覧の4状態、削除確認の窓。撮影モックに詳細・ファネル・流入元の口を足した"
+        },
+        {
+          "pr": 589,
+          "head": "3d469740",
+          "on": "2026-08-30",
+          "screens": [
+            "TEVk8"
+          ],
+          "note": "Claudeが直した。タグをフォルダで束ねる。直した本人が比較している"
         }
       ]
     },
@@ -1302,11 +1323,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 3,
       "structureMatchDataPending": 0,
-      "needsFix": 7,
+      "needsFix": 5,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 5,
       "capturedAt": [
         {
           "pr": 502,
@@ -1339,6 +1360,17 @@
             "syWp4"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "2d0ee180",
+          "on": "2026-08-30",
+          "screens": [
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "development そのもので撮り直した。帯4つと複製は既に入っていた"
         }
       ]
     },
