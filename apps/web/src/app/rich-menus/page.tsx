@@ -140,6 +140,8 @@ export default function RichMenusListPage() {
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [publishedDeleteTarget, setPublishedDeleteTarget] =
+    useState<RichMenuGroupListItem | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -152,6 +154,7 @@ export default function RichMenusListPage() {
     setExternalError(null)
     setApplyTo(null)
     setDeleteTarget(null)
+    setPublishedDeleteTarget(null)
     setDeleteBusy(false)
     setDeleteError(null)
     setPage(1)
@@ -252,10 +255,7 @@ export default function RichMenusListPage() {
 
   function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
-      alert(
-        `「${group.name}」は LINE に登録されています。\n\n` +
-          '編集画面の「危険な操作」から「LINE から取り下げ」を実行してから、改めて削除してください。',
-      )
+      setPublishedDeleteTarget(group)
       return
     }
     setDeleteError(null)
@@ -738,6 +738,7 @@ export default function RichMenusListPage() {
                 </Link>
                 <button
                   onClick={() => handleDelete(g)}
+                  data-qa-open={g.status === 'published' ? 'szXsT-published' : 'szXsT'}
                   className="text-ink-faint hover:text-red-600 hover:underline"
                   title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
                 >
@@ -771,6 +772,34 @@ export default function RichMenusListPage() {
           onClose={() => setApplyTo(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={publishedDeleteTarget !== null}
+        designNode="szXsT"
+        title={
+          publishedDeleteTarget
+            ? `「${publishedDeleteTarget.name}」は先にLINEから取り下げてください`
+            : '先にLINEから取り下げてください'
+        }
+        description="LINEに登録中のリッチメニューは、管理画面だけから削除できません。いまは削除していません。"
+        cancelLabel="閉じる"
+        onCancel={() => setPublishedDeleteTarget(null)}
+      >
+        <ol className="space-y-2 text-sm text-ink-secondary">
+          <li>
+            <strong className="text-ink">次にすること：</strong>
+            「編集」→「危険な操作」→「LINEから取り下げ」の順に進んでください。
+          </li>
+          <li>
+            <strong className="text-ink">そのあと：</strong>
+            一覧へ戻り、改めて「削除」を選んでください。
+          </li>
+          <li>
+            <strong className="text-ink">いま残っているもの：</strong>
+            LINE上の表示、管理画面の設定、これまでのタップ記録は変更していません。
+          </li>
+        </ol>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={deleteTarget !== null}
