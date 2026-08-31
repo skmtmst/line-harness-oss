@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 240,
-  "unimplemented": 18,
+  "compared": 241,
+  "unimplemented": 17,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 57,
   "structureMatchDataPending": 18,
-  "needsFix": 165,
+  "needsFix": 166,
   "unjudged": 0,
   "remaining": 201,
   "features": [
@@ -821,14 +821,14 @@
       "feature": 10,
       "name": "ウェビナー",
       "total": 13,
-      "compared": 11,
-      "unimplemented": 2,
+      "compared": 12,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "needsFix": 12,
       "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
@@ -850,6 +850,21 @@
             "Ho8z4"
           ],
           "note": "通知とリマインド。既存の申込と5分ごとの仕掛けを使う"
+        },
+        {
+          "pr": 623,
+          "head": "988cc37a",
+          "on": "2026-08-31",
+          "screens": [
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ"
+          ],
+          "note": "Claudeが実装して撮った。編集画面を設計の段（STEP 1〜5）へ。#546 の上（#546 は #524 → #508 → #507 を含む）。**`Xjk8q` はそれまで「いつ見られるようにするか」タブを撮っていて、視聴後の話が写っていなかった**"
         },
         {
           "pr": 524,
@@ -2146,13 +2161,6 @@
       "name": "9-1-I 削除確認",
       "gap": "drop",
       "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
-    },
-    {
-      "feature": 10,
-      "node": "D6yO7e",
-      "name": "10-1-G 公開前確認",
-      "gap": "pending",
-      "gapNote": "#508 head `61eeb3c7` で動画・配信枠・長さを検査し、公開内容を読む確認窓を実装済み。取り込み順は #507 → #508"
     },
     {
       "feature": 10,
