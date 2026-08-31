@@ -98,6 +98,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
         run: npx wrangler deploy --config apps/worker/wrangler.staging.toml
 
+      - name: Build Admin Panel dependencies
+        if: inputs.target != 'worker'
+        run: pnpm --filter @line-harness/update-engine build
+
       - name: Build Admin Panel for staging
         if: inputs.target != 'worker'
         run: pnpm --filter web build
