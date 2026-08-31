@@ -10,6 +10,7 @@ import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@l
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
+import { exportFileName, toCsv } from './inflow-export'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AdIntegration from './ad-integration'
@@ -432,6 +433,24 @@ function InflowLinksPageInner() {
   const dataReady = kpiState === 'ready'
   const kpiUnavailableDetail = kpiState === 'loading' ? '読み込んでいます' : '取得できませんでした'
 
+  const exportCurrentRows = () => {
+    const csv = toCsv(sortedRows.map((row) => ({
+      name: row.name,
+      ref: row.refCode,
+      clicks: row.stats?.clickCount ?? 0,
+      friendAdds: row.stats?.friendCount ?? 0,
+      /* 取れていない日時は `null` のまま渡す。**0や空文字にしない。** */
+      lastAddedAt: row.stats?.latestAt ?? null,
+    })))
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = exportFileName(sortedRows.length, new Date().toISOString().slice(0, 10))
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       <div
@@ -445,12 +464,21 @@ function InflowLinksPageInner() {
           unit="件"
           detail={dataReady ? `稼働中 ${activeRouteCount}` : kpiUnavailableDetail}
         />
-        {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
+        {/*
+          設計は「今月 友だちになった 312人／そのうち経路が分かる人 289人」。
+          **今月ぶんに絞る術が無い**（`stats` は期間を受け取らず累計で返る）ので、
+          今月とは名乗らずに累計で出す。**経路が分かる人の数は口が返している**
+          （`friendsWithRef`）ので、設計が分けて見せたかった値はここで出せる。
+        */}
         <KpiCard
-          title="今月の追加"
-          value={null}
+          title="友だちになった"
+          value={dataReady ? (summary?.totalFriends ?? null) : null}
           unit="人"
-          detail={dataReady ? '前月比は出せません' : kpiUnavailableDetail}
+          detail={dataReady
+            ? summary
+              ? `累計。そのうち経路が分かる人 ${summary.friendsWithRef.toLocaleString('ja-JP')}人`
+              : '人数を読み込めませんでした'
+            : kpiUnavailableDetail}
         />
         <KpiCard
           title="クリック"
@@ -465,6 +493,16 @@ function InflowLinksPageInner() {
           detail={dataReady ? 'クリックのうち' : kpiUnavailableDetail}
         />
       </div>
+
+      {/*
+        設計の帯。**なぜこの画面が要るのか**を先に書く。
+        「友だち追加」だけでは経路が分からないことを知らないと、
+        ここで発行したURLを通さずに配って、あとから数が合わないことになる。
+      */}
+      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
+        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
+        ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
+      </p>
 
       <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
         {dataReady ? <aside>
@@ -564,6 +602,13 @@ function InflowLinksPageInner() {
               >
                 ＋ このフォルダにURLを発行
               </button>
+              {/*
+                **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
+                無視して全件を出すと、画面と手元のファイルが食い違う。
+              */}
+              <Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>
+                CSVで書き出す
+              </Button>
             </div>
           </div>
 

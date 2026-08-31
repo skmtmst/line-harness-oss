@@ -48,7 +48,8 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
     // 2026-08-30: 流入リンク一覧の取得失敗へ、共通Buttonの再読込を1つ追加。
-    expect(openings).toHaveLength(30)
+    // 2026-08-31: 流入経路の一覧へ「CSVで書き出す」を1つ追加（設計 Q4bkTg）。
+    expect(openings).toHaveLength(31)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
   })
 
