@@ -2,9 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { Copy, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
+import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
+import StickyBar from '@/components/shared/sticky-bar'
 
 export type LinkedAction = {
   id: string
@@ -39,7 +44,7 @@ const MULTIPLIERS = [
 ]
 
 const ACTION_TYPES = [
-  ['テキスト送信', 'メッセージ'],
+  ['テキスト送信', 'テキスト送信'],
   ['テンプレート送信', 'テンプレート'],
   ['タグ追加', 'タグ'],
   ['タグ解除', 'タグ'],
@@ -230,6 +235,7 @@ export default function TagEditorV4({
   onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean) => Promise<void>
   onDelete?: () => void
 }) {
+  usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')
   const [name, setName] = useState(initialValues?.name ?? tag?.name ?? '')
   const [groupId, setGroupId] = useState(initialValues?.groupId ?? tag?.groupId ?? '')
   const [isStarred, setIsStarred] = useState(initialValues?.isStarred ?? tag?.isStarred ?? false)
@@ -242,10 +248,8 @@ export default function TagEditorV4({
   const [priority, setPriority] = useState(String(initialValues?.multiplierPriority ?? tag?.mileageMultiplierPriority ?? 0))
   const [applyToExisting, setApplyToExisting] = useState(initialValues?.applyToExisting ?? initialApplyToExisting)
   const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>('once')
-  const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? (hasStoredLink ? [
-    { id: 'sample-1', type: 'メッセージ', label: '会員登録のお礼を送信', timing: 'すぐに' },
-    { id: 'sample-2', type: 'シナリオ', label: '会員フォローを開始', timing: '10分後' },
-  ] : []))
+  // マイル設定から連動アクションを推測しない。保存先が別なので、取得できた定義だけを出す。
+  const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? [])
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
   const [retroactiveOpen, setRetroactiveOpen] = useState(initialRetroactiveOpen)
 
@@ -269,22 +273,18 @@ export default function TagEditorV4({
     void onSave(values, andAnother, false)
   }
 
+  const duplicateAction = (action: LinkedAction, index: number) => {
+    const copy = { ...action, id: crypto.randomUUID() }
+    setActions((current) => [
+      ...current.slice(0, index + 1),
+      copy,
+      ...current.slice(index + 1),
+    ])
+  }
+
   return (
-    <div>
-      <nav className="mb-4 text-xs text-ink-faint"><Link href="/tags" className="text-action hover:underline">友だち属性</Link><span className="mx-2">›</span>{mode === 'create' ? 'タグを作る' : 'タグを編集'}</nav>
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[32px] font-bold tracking-tight text-ink">{mode === 'create' ? 'タグを作る' : 'タグを編集'}</h1>
-          <p className="mt-1 text-sm text-ink-secondary">友だちを分類するタグを作ります。タグが付いた瞬間の連動（マイル付与・メッセージ送信など）もここで決められます。</p>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {mode === 'edit' && <button type="button" onClick={onDelete} className="rounded-control border border-danger/40 px-4 py-2.5 text-sm font-medium text-danger">削除</button>}
-          <button type="button" onClick={onCancel} className="rounded-control border border-hairline bg-canvas px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button>
-          {mode === 'edit' && <Link href={`/tags/new?copy=${tag?.id ?? ''}`} className="rounded-control border border-hairline bg-canvas px-4 py-2.5 text-sm font-medium text-ink-secondary">複製して新規作成</Link>}
-          {mode === 'create' && <button type="button" disabled={saving} onClick={() => requestSave(true)} className="rounded-control border border-hairline bg-canvas px-4 py-2.5 text-sm font-medium text-ink-secondary disabled:opacity-40">保存して続けて作る</button>}
-          <button type="button" disabled={saving} onClick={() => requestSave(false)} className="rounded-control bg-accent px-5 py-2.5 text-sm font-bold text-on-accent hover:bg-accent-hover disabled:opacity-40">{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : '保存する'}</button>
-        </div>
-      </header>
+    <div className="pb-24">
+      <nav className="mb-5 text-xs text-ink-faint"><Link href="/tags" className="text-action hover:underline">友だち属性</Link><span className="mx-2">›</span>{mode === 'create' ? 'タグを作る' : 'タグを編集'}</nav>
 
       {error && <Notice className="mb-4" tone="error" message={error} />}
       {notice && <Notice className="mb-4" tone="success" message={notice} />}
@@ -331,7 +331,7 @@ export default function TagEditorV4({
                 </fieldset>
                 <div className="border-t border-hairline pt-5">
                   <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
-                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={action.id} className="grid grid-cols-[28px_32px_110px_minmax(0,1fr)_90px_34px] items-center gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm"><span className="cursor-grab text-ink-faint">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className="rounded-pill bg-action-soft px-2 py-1 text-center text-xs text-action">{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className="text-xs text-ink-faint">{action.timing}</span><button type="button" onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label="削除">×</button></li>)}</ol>}
+                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={action.id} className="grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm"><span className="cursor-grab text-ink-faint">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ' || action.type === 'マイル' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報' || action.type === '対応' || action.type === 'リマインダ' ? 'border-warning bg-warning-bg text-warning' : action.type === 'シナリオ' || action.type === 'リッチメニュー' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol>}
                 </div>
               </div>
             )}
@@ -357,6 +357,21 @@ export default function TagEditorV4({
           )}
         </aside>
       </div>
+
+      <StickyBar
+        className="sticky bottom-0 z-30 mt-4"
+        status={mode === 'edit' && onDelete ? (
+          <button type="button" onClick={onDelete} className="rounded-control border border-danger/25 px-3 py-2 text-sm font-medium text-danger hover:bg-danger-bg">タグを削除</button>
+        ) : 'まだ保存していません'}
+        actions={(
+          <>
+            <Button onClick={onCancel}>キャンセル</Button>
+            {mode === 'edit' ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して新規作成</Button> : null}
+            {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
+            <Button variant="primary" disabled={saving} onClick={() => requestSave(false)}>{saving ? '保存中…' : mode === 'create' ? 'タグを作る' : 'タグを保存'}</Button>
+          </>
+        )}
+      />
 
       {drawerOpen && <ActionDrawer referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
       {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={() => { setRetroactiveOpen(false); void onSave(values, false, true) }} />}
