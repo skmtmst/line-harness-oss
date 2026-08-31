@@ -146,7 +146,7 @@ export default function RemindersPage() {
         setError(res.error)
       }
     } catch {
-      setError('リマインダの読み込みに失敗しました。もう一度お試しください。')
+      setError('表示できませんでした。再読み込みしても直らない場合はエラー報告へ。')
     } finally {
       setLoading(false)
     }
@@ -435,7 +435,7 @@ export default function RemindersPage() {
                             * ものが消えたように読める**。
                             */}
                           {error
-                            ? 'いまは読み込めていません。上の案内をご覧ください。'
+                            ? '表示できませんでした。上の案内をご覧ください。'
                             : reminders.length === 0
                               ? 'リマインダがありません。「＋ 新しいリマインダ」から作成してください。'
                               : 'この条件に合うリマインダはありません。'}
