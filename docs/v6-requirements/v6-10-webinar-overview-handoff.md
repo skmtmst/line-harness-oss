@@ -1,9 +1,11 @@
 # V6 機能10 ウェビナー一覧KPI・通知対象 契約引き継ぎ
 
-- Node: `ZC13r`
-- ルート: `/webinars`
-- 読み口: `GET /api/webinars/overview?account_id={選択中のLINEアカウントID}`
-- 固定base: `codex/kenta-v6-webinar-notifications` `de0848b9`
+- Node: `ZC13r`（一覧KPI）・`Ho8z4`（通知対象）
+- ルート: `/webinars`・`/webinars/edit?id=…`
+- 読み口: `GET /api/webinars/overview?account_id={選択中のLINEアカウントID}` と
+  既存の `GET /api/webinars/:id/notifications`
+- 固定base: #623 head `cd2954bc`
+- 契約commit: `62b217ef` → `dadd827c`
 
 ## 0. `Ho8z4` 通知・リマインド
 
