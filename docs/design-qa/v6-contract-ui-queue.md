@@ -20,7 +20,7 @@
 
 | 順番 | 契約PR / 固定head | Claudeの画面 | 状態 | 次にすること |
 | --- | --- | --- | --- | --- |
-| 1 | #597 `1c061faa` | `ec9vg` / `quhg6` | 契約済み・CI 3本pass・画面PR待ち | #597を固定baseに2画面を1本のDraft PRへ載せる |
+| 1 | #597 `eaa4050b` | `ec9vg` / `quhg6` | 契約済み・CI 3本pass・画面PR待ち | #597を固定baseに2画面を1本のDraft PRへ載せる。実行結果は未接続の理由を出し、リンクにしない |
 | 2 | #608 `c9747e9d` | `szXsT` | 契約済み・CI 3本pass | #597の画面確認後、通常・参照0件・失敗・409再読込を実装する |
 | 3 | #610 `c1b97aff` | `YfTfJ` | 契約済み・CI 3本pass | 通常・使用先0件・失敗・409再読込を実装する |
 | 4 | #611 `18e7d41e` | `yPkWe` | 契約済み・CI 3本pass | 通常・使用先0件・失敗・409再読込を実装する |
@@ -96,6 +96,9 @@
 #597は画面着手前の再監査で、対象見込みが公開後にしか返らない不足を直しました。
 `FriendAddRoutingValidation.estimatedAudienceCount` を追加し、公開前と公開後が同じ集計を使います。
 固定データは128人、未取得はnullで、Claude側は0人と混ぜません。
+加えて、まだ存在しない `/friend-add-settings/runs` を公開完了画面の導線として返していたため、
+`monitoringPath: null` と `monitoringUnavailableReason` に直しました。画面側は理由を表示し、
+404になるリンクを作りません。`eaa4050b` より前のheadは使いません。
 
 #608・#610・#611 は、最新 `codex/development` に入った日付非依存テスト修正だけを取り込みました。
 4本とも `deploy-scripts-ci` / `worker-ci` / `required-pr-gate` がpassしています。
