@@ -5,12 +5,21 @@ import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import type { RichMenuTapStats } from '@/lib/api'
+import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import {
+  audienceReason,
+  audienceText,
+  blockerTexts,
+  canDelete as canDeleteImpact,
+  nextDisplayText,
+  recommendedActionText,
+  referenceKindText,
+} from './delete-impact'
 import {
   compareTargetingGroups,
   moveTargetingGroup,
@@ -140,6 +149,12 @@ export default function RichMenusListPage() {
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  /*
+    消したときの影響（契約 #608）。**窓を開けてから読む。**
+    一覧を出すたびに全件ぶん読むと、消さない人にも重い問い合わせが走る。
+  */
+  const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
+  const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [publishedDeleteTarget, setPublishedDeleteTarget] =
     useState<RichMenuGroupListItem | null>(null)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
@@ -261,6 +276,23 @@ export default function RichMenusListPage() {
     }
   }
 
+  async function loadImpact(groupId: string) {
+    setImpactPhase('loading')
+    setImpact(null)
+    try {
+      const res = await api.richMenuGroups.deleteImpact(groupId)
+      if (!res.success) throw new Error('impact_failed')
+      setImpact(res.data)
+      setImpactPhase('ready')
+    } catch {
+      /*
+        影響が読めないときは**消させない**。何が起きるか分からないまま
+        取り消せない操作をさせるより、読み直してもらうほうがよい。
+      */
+      setImpactPhase('error')
+    }
+  }
+
   function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
       setPublishedDeleteTarget(group)
@@ -268,6 +300,7 @@ export default function RichMenusListPage() {
     }
     setDeleteError(null)
     setDeleteTarget({ kind: 'managed', group })
+    void loadImpact(group.id)
   }
 
   function handleDeleteExternal(menu: LineMenu) {
@@ -883,23 +916,76 @@ export default function RichMenusListPage() {
           if (deleteBusy) return
           setDeleteTarget(null)
           setDeleteError(null)
+          setImpact(null)
+          setImpactPhase('idle')
         }}
-        onConfirm={() => void confirmDelete()}
+        {...(deleteTarget?.kind === 'external' || canDeleteImpact({ impact, busy: deleteBusy })
+          ? { onConfirm: () => void confirmDelete() }
+          : {})}
       >
         {deleteTarget?.kind === 'managed' ? (
-          <ul className="space-y-2 text-sm text-ink-secondary">
-            <li>
-              <strong className="text-ink">消えるもの：</strong>
-              このリッチメニューの設定と画像
-            </li>
-            <li>
-              <strong className="text-ink">残るもの：</strong>
-              同じフォルダのほかのメニューと、これまでのタップ記録
-            </li>
-            <li>
-              <strong className="text-danger">元に戻せません。</strong>
-            </li>
-          </ul>
+          <>
+            <ul className="space-y-2 text-sm text-ink-secondary">
+              <li>
+                <strong className="text-ink">消えるもの：</strong>
+                このリッチメニューの設定と画像
+              </li>
+              <li>
+                <strong className="text-ink">残るもの：</strong>
+                同じフォルダのほかのメニューと、これまでのタップ記録
+              </li>
+              <li>
+                <strong className="text-danger">元に戻せません。</strong>
+              </li>
+            </ul>
+            {/*
+              消したあとに何が起きるか（契約 #608）。読込・失敗・通常を
+              分ける。**読めないときは消させない。**
+            */}
+            {impactPhase === 'loading' ? (
+              <p className="mt-3 text-xs text-ink-faint">消したときの影響を確認しています…</p>
+            ) : impactPhase === 'error' ? (
+              <p className="mt-3 text-xs font-semibold text-danger" role="alert">
+                消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。
+              </p>
+            ) : impact ? (
+              <div className="border-hairline mt-3 space-y-1.5 border-t pt-3 text-xs leading-5 text-ink-secondary">
+                <p>
+                  <strong className="text-ink">いま表示している人数：</strong>
+                  {audienceText(impact.currentAudience)}
+                  {audienceReason(impact.currentAudience)
+                    ? `（${audienceReason(impact.currentAudience)}）`
+                    : ''}
+                </p>
+                <p>
+                  <strong className="text-ink">次に出るメニュー：</strong>
+                  {nextDisplayText(impact.nextDisplay)}
+                </p>
+                <p>
+                  <strong className="text-ink">切替元：</strong>
+                  {impact.incomingSwitches.length === 0
+                    ? 'ありません'
+                    : impact.incomingSwitches
+                        .map((sw) => `${sw.sourceGroupName}の「${sw.areaLabel ?? sw.sourcePageName}」`)
+                        .join('・')}
+                </p>
+                <p>
+                  <strong className="text-ink">使っている自動処理：</strong>
+                  {impact.operationalReferences.length === 0
+                    ? 'ありません'
+                    : impact.operationalReferences
+                        .map((ref) => `${referenceKindText(ref.kind)}「${ref.ownerName}」`)
+                        .join('・')}
+                </p>
+                {blockerTexts(impact.blockers).map((text) => (
+                  <p key={text} className="font-semibold text-danger" role="alert">{text}</p>
+                ))}
+                {impact.blockers.length === 0 ? null : (
+                  <p className="text-ink-faint">{recommendedActionText(impact.recommendedAction)}</p>
+                )}
+              </div>
+            ) : null}
+          </>
         ) : (
           <ul className="space-y-2 text-sm text-ink-secondary">
             <li>
