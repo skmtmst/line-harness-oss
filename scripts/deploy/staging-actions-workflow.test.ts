@@ -29,6 +29,13 @@ describe('Deploy Cloudflare Staging workflow', () => {
     );
   });
 
+  it('binds the ephemeral config to the staging Environment account', () => {
+    expect(workflow).toContain('Bind the staging Cloudflare account');
+    expect(workflow).toContain('CLOUDFLARE_ACCOUNT_ID');
+    expect(workflow).toContain('apps/worker/wrangler.staging.toml');
+    expect(workflow).not.toContain('echo "$CLOUDFLARE_ACCOUNT_ID"');
+  });
+
   it('keeps cron disabled and migrations in their separate workflow', () => {
     expect(workflow).toContain("grep -q '^\\[triggers\\]'");
     expect(workflow).not.toContain('d1 migrations apply');

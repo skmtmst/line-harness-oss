@@ -58,6 +58,14 @@ jobs:
             pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
           fi
 
+      - name: Bind the staging Cloudflare account
+        run: |
+          sed -i -E \
+            "s/^account_id[[:space:]]*=.*/account_id = \"$CLOUDFLARE_ACCOUNT_ID\"/" \
+            apps/worker/wrangler.staging.toml
+          grep -q "^account_id = \"$CLOUDFLARE_ACCOUNT_ID\"$" \
+            apps/worker/wrangler.staging.toml
+
       - name: Build Worker and LIFF assets
         run: pnpm --filter worker build
 
