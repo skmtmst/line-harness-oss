@@ -47,7 +47,9 @@ Claudeが確認窓を実装するための読み口と安全な削除条件だ�
 - 別メニューからの切替が残る
 - 自動処理・共通アクションから参照される
 
-409の `code` は `rich_menu_delete_blocked` です。`data` に最新の影響を返します。
+409の `code` は `rich_menu_delete_blocked` です。`ApiError.code` で判定し、
+`ApiError.data` に保持された最新の影響で窓を描き直します。`ApiError.message` は
+利用者へそのまま出さず、画面の言葉へ置き換えます。
 
 ## Claudeの画面実装条件
 

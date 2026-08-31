@@ -25,6 +25,12 @@ describe('rich menu delete-impact handoff contract', () => {
     expect(deleteMethod).not.toContain('?force=true')
   })
 
+  test('keeps the fresh 409 impact available without showing its message directly', () => {
+    expect(API).toContain('readonly data: unknown')
+    expect(API).toContain('extractApiErrorData(raw)')
+    expect(API).toContain("typeof body.code === 'string'")
+  })
+
   test('ships normal and zero-reference fixtures without inventing an audience count', () => {
     expect(FIXTURES).toContain('export const RICH_MENU_DELETE_IMPACT =')
     expect(FIXTURES).toContain('export const RICH_MENU_DELETE_IMPACT_EMPTY =')
