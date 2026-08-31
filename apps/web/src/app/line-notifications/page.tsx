@@ -68,14 +68,16 @@ export default function LineNotificationsPage() {
     }
     setLoading(true)
     try {
-      const [settingRes, overviewRes] = await Promise.all([api.ecCommerce.settings(), api.ecCommerce.overview()])
+      const [settingRes, overviewRes] = await Promise.all([
+        api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
+      ])
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
       setSettings(settingRes.data)
       setOverview(overviewRes.data)
       setExpanded((current) => current ?? settingRes.data[0]?.eventType ?? null)
     } catch { setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' }) }
     finally { setLoading(false) }
-  }, [tab])
+  }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
   const visible = useMemo(() => category === 'all' ? settings : settings.filter((setting) => setting.category === category), [category, settings])
