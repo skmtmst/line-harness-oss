@@ -243,6 +243,86 @@ export const WEBINAR_NOTIFICATION_SETTINGS_FAILURE = {
   error: 'Internal server error',
 }
 
+/** ウェビナー一覧・編集で共通して読む、実型どおりの1件。 */
+export const WEBINARS = [{
+  id: 'webinar-1',
+  accountId: 'visual-qa-account',
+  title: '商品説明ウェビナー',
+  slug: 'product-guide',
+  status: 'active',
+  videoPrefix: 'webinars/product-guide',
+  durationSeconds: 3600,
+  schedule: [{ type: 'weekly', time: '11:00', days: [2, 4] }],
+  cta: { label: '詳しく見る', url: 'https://example.test/guide', showAtSeconds: 1800 },
+  tagOnAttend: null,
+  tagOnCtaClick: null,
+  createdAt: '2026-01-10T00:00:00.000Z',
+  updatedAt: '2026-01-13T00:00:00.000Z',
+}]
+
+/** `Xjk8q` の通常・空・失敗。公開版IDは選択値で、画面本文には出さない。 */
+export const WEBINAR_ACTION_SETTINGS = {
+  settings: [
+    {
+      trigger: 'completed',
+      version: 2,
+      action: {
+        id: 'common-action-follow', name: '視聴後フォロー',
+        versionId: 'common-action-follow-v2', versionNumber: 2,
+      },
+      updatedAt: '2026-01-13T00:00:00.000Z',
+    },
+    {
+      trigger: 'cta_click',
+      version: 1,
+      action: {
+        id: 'common-action-cta', name: '案内を押した人へタグ付け',
+        versionId: 'common-action-cta-v1', versionNumber: 1,
+      },
+      updatedAt: '2026-01-12T00:00:00.000Z',
+    },
+    { trigger: 'missed', version: 0, action: null, updatedAt: null },
+  ],
+  availableActions: [
+    {
+      id: 'common-action-follow', name: '視聴後フォロー',
+      versionId: 'common-action-follow-v2', versionNumber: 2,
+    },
+    {
+      id: 'common-action-cta', name: '案内を押した人へタグ付け',
+      versionId: 'common-action-cta-v1', versionNumber: 1,
+    },
+  ],
+  triggerDefinitions: [
+    {
+      trigger: 'completed', label: '視聴完了', availability: 'estimated',
+      definition: '動画の90%地点まで再生位置が進んだ人',
+      limitation: '実際に見た区間の計測はまだ接続されていないため、早送りを除いた視聴完了ではありません。',
+    },
+    {
+      trigger: 'cta_click', label: '案内を押した', availability: 'available',
+      definition: 'この回で案内を初めて押した人', limitation: null,
+    },
+    {
+      trigger: 'missed', label: '未視聴', availability: 'available',
+      definition: '申込が有効で、翌日の設定時刻（未設定なら10:00）まで視聴記録がない人', limitation: null,
+    },
+  ],
+}
+
+export const WEBINAR_ACTION_SETTINGS_EMPTY = {
+  ...WEBINAR_ACTION_SETTINGS,
+  settings: WEBINAR_ACTION_SETTINGS.settings.map((setting) => ({
+    ...setting, version: 0, action: null, updatedAt: null,
+  })),
+  availableActions: [],
+}
+
+export const WEBINAR_ACTION_SETTINGS_FAILURE = {
+  success: false,
+  error: 'Internal server error',
+}
+
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,

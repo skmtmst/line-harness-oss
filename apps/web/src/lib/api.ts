@@ -4283,6 +4283,37 @@ export type WebinarNotificationOverview = {
   }
 }
 
+export type WebinarActionTrigger = 'completed' | 'cta_click' | 'missed'
+
+export type WebinarActionSetting = {
+  trigger: WebinarActionTrigger
+  version: number
+  action: null | {
+    id: string
+    name: string
+    versionId: string
+    versionNumber: number
+  }
+  updatedAt: string | null
+}
+
+export type WebinarActionSettings = {
+  settings: WebinarActionSetting[]
+  availableActions: Array<{
+    id: string
+    name: string
+    versionId: string
+    versionNumber: number
+  }>
+  triggerDefinitions: Array<{
+    trigger: WebinarActionTrigger
+    label: string
+    availability: 'available' | 'estimated'
+    definition: string
+    limitation: string | null
+  }>
+}
+
 export type WebinarSakuraComment = { id?: string; atSeconds: number; authorName: string; body: string }
 
 export type WebinarAnalytics = {
@@ -4383,6 +4414,17 @@ export const webinarApi = {
   testNotifications: (id: string) => fetchApi<{
     data: { sent: number; failed: number }
   }>(`/api/webinars/${id}/notifications/test`, { method: 'POST' }),
+  actions: (id: string) => fetchApi<{ data: WebinarActionSettings }>(
+    `/api/webinars/${id}/actions`,
+  ),
+  saveAction: (
+    id: string,
+    trigger: WebinarActionTrigger,
+    input: { commonActionVersionId: string | null; expectedVersion: number },
+  ) => fetchApi<{ data: WebinarActionSetting }>(`/api/webinars/${id}/actions/${trigger}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  }),
   comments: (id: string) =>
     fetchApi<{ data: WebinarSakuraComment[] }>(`/api/webinars/${id}/comments`),
   saveComments: (id: string, comments: WebinarSakuraComment[]) =>
