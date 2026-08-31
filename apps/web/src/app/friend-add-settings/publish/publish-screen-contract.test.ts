@@ -75,4 +75,24 @@ describe('友だち追加時配信の公開画面', () => {
     expect(PAGE).toContain('current={5}')
     expect(PAGE).not.toContain('current={4}')
   })
+
+  it('公開中にアカウントを変えられたら、返事を映さない', () => {
+    /*
+     * 公開はWorker側で進むが、その結果を**別のアカウントを見ている画面へ
+     * 出すと、切替先で公開したように読める**。押した時点のアカウントと
+     * 読み込み回数を控え、戻ってきたときに一致するかを見る。
+     */
+    expect(PAGE).toContain('const stillHere = ()')
+    expect(PAGE).toContain('if (!stillHere()) return')
+    expect(PAGE).toContain('if (stillHere()) setBusy(false)')
+  })
+
+  it('同じアカウントで読み直したときも取り違えない', () => {
+    /*
+     * アカウントIDだけでは、同じアカウントで読み直したときの
+     * 取り違えを止められない。読み込み回数も一緒に見る。
+     */
+    expect(PAGE).toContain('generation')
+    expect(PAGE).toContain('requestRef.current.generation === generation')
+  })
 })

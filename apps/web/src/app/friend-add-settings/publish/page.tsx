@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Suspense, useCallback, useEffect, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type {
   FriendAddRoutingPublishResult,
   FriendAddRoutingValidation,
@@ -76,10 +76,26 @@ function FriendAddPublishInner() {
   const [publishError, setPublishError] = useState('')
   const [busy, setBusy] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  /*
+    **どのアカウントの、何回目の読み込みかを持つ。**
+    アカウントを変えたり読み直したりしたあとに、前の要求の返事が遅れて
+    届くことがある。アカウントIDだけでは、同じアカウントで読み直した
+    ときの取り違えを止められないので、回数も一緒に見る。
+  */
+  const requestRef = useRef<{ accountId: string | null; generation: number }>({
+    accountId: null,
+    generation: 0,
+  })
 
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
+    const generation = requestRef.current.generation + 1
+    requestRef.current = { accountId: selectedAccountId, generation }
+    const isCurrent = () =>
+      alive
+      && requestRef.current.accountId === selectedAccountId
+      && requestRef.current.generation === generation
     setPhase('loading')
     setFailure(null)
     /*
@@ -94,7 +110,7 @@ function FriendAddPublishInner() {
     ;(async () => {
       try {
         const draftRes = await api.friendAddRouting.getDraft(selectedAccountId)
-        if (!alive) return
+        if (!isCurrent()) return
         if (!draftRes.success) {
           setFailure({ title: '下書きを読み込めませんでした', description: '時間をおいて読み直してください。' })
           setPhase('error')
@@ -111,11 +127,11 @@ function FriendAddPublishInner() {
           最後の試験の結果は、下書きと確認の返事から読む。
         */
         const validationRes = await api.friendAddRouting.validateDraft(selectedAccountId)
-        if (!alive) return
+        if (!isCurrent()) return
         if (validationRes.success) setValidation(validationRes.data)
         setPhase('ready')
       } catch (error: unknown) {
-        if (!alive) return
+        if (!isCurrent()) return
         /*
          * 404 は「確認する下書きがない」。**失敗と混ぜない。**
          * 混ぜると、まだ作っていないだけなのに壊れて見える。
@@ -143,13 +159,25 @@ function FriendAddPublishInner() {
 
   const publish = useCallback(async () => {
     if (!selectedAccountId || !draft) return
+    /*
+      **公開中にアカウントを変えられたら、返事を映さない。**
+      公開はWorker側で進むが、その結果を**別のアカウントを見ている画面へ
+      出すと、切替先で公開したように読める**。押した時点のアカウントと
+      読み込み回数を控えておき、戻ってきたときに一致するかを見る。
+    */
+    const at = { accountId: selectedAccountId, generation: requestRef.current.generation }
+    const stillHere = () =>
+      requestRef.current.accountId === at.accountId
+      && requestRef.current.generation === at.generation
     setBusy(true)
     setPublishError('')
     try {
-      const res = await api.friendAddRouting.publish(selectedAccountId, idempotencyKeyFor(draft))
+      const res = await api.friendAddRouting.publish(at.accountId, idempotencyKeyFor(draft))
+      if (!stillHere()) return
       if (!res.success) throw new Error('failed')
       setPublished(res.data)
     } catch (error: unknown) {
+      if (!stillHere()) return
       const forbidden = error instanceof ApiError && error.status === 403
       setPublishError(
         forbidden
@@ -157,7 +185,7 @@ function FriendAddPublishInner() {
           : '有効化できませんでした。状態を読み直してから、もう一度お試しください。',
       )
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }, [draft, selectedAccountId])
 
