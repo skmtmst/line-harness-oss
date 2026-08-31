@@ -159,6 +159,45 @@ export const LIST_STATS = {
   reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0 },
 }
 
+/**
+ * `GET /api/webinars/overview` の3状態。
+ *
+ * 視聴人数・率・平均時間は、最後の再生位置ではなく有効な視聴区間から出す。
+ * 現在はその記録が無いため、設計の312人・72.9%を固定値として入れない。
+ */
+export const WEBINAR_OVERVIEW = {
+  state: 'partial',
+  registrationMode: 'people',
+  metrics: {
+    webinars: { value: 6, state: 'available', reason: null },
+    activeWebinars: { value: 3, state: 'available', reason: null },
+    registrations: { value: 428, state: 'available', reason: null },
+    registrationBookings: { value: 451, state: 'available', reason: null },
+    viewers: { value: null, state: 'unavailable', reason: '実際に見た区間の記録をまだ集計できないため' },
+    viewRate: { value: null, state: 'unavailable', reason: '視聴人数を取得できないため' },
+    averageWatchSeconds: { value: null, state: 'unavailable', reason: '実際に見た時間の記録をまだ集計できないため' },
+    ctaUniquePeople: { value: 86, state: 'available', reason: null },
+    ctaTotalClicks: { value: null, state: 'unavailable', reason: '同じ視聴中の複数クリックを数える記録がないため' },
+  },
+}
+
+export const WEBINAR_OVERVIEW_EMPTY = {
+  ...WEBINAR_OVERVIEW,
+  metrics: {
+    ...WEBINAR_OVERVIEW.metrics,
+    webinars: { value: 0, state: 'available', reason: null },
+    activeWebinars: { value: 0, state: 'available', reason: null },
+    registrations: { value: 0, state: 'available', reason: null },
+    registrationBookings: { value: 0, state: 'available', reason: null },
+    ctaUniquePeople: { value: 0, state: 'available', reason: null },
+  },
+}
+
+export const WEBINAR_OVERVIEW_FAILURE = {
+  success: false,
+  error: 'Internal server error',
+}
+
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,

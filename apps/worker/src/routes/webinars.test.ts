@@ -25,6 +25,7 @@ const dbMocks = {
   getWebinarDropoff: vi.fn(),
   getWebinarParticipantStats: vi.fn(),
   getWebinarAnalyticsSummary: vi.fn(),
+  getWebinarOverview: vi.fn(),
   getWebinarDailyStats: vi.fn(),
   getWebinarFormFunnelStats: vi.fn(),
   getFriendByLineUserId: vi.fn(),
@@ -175,6 +176,51 @@ beforeEach(() => {
 });
 
 describe('admin webinar tenant scope', () => {
+  test('一覧KPIは選択中アカウントだけを集計する', async () => {
+    dbMocks.getWebinarOverview.mockResolvedValue({
+      state: 'partial',
+      registrationMode: 'people',
+      metrics: {
+        webinars: { value: 6, state: 'available', reason: null },
+        activeWebinars: { value: 3, state: 'available', reason: null },
+        registrations: { value: 428, state: 'available', reason: null },
+        registrationBookings: { value: 451, state: 'available', reason: null },
+        viewers: { value: null, state: 'unavailable', reason: '実際に見た区間の記録をまだ集計できないため' },
+      },
+    });
+
+    const res = await adminReq('/api/webinars/overview?account_id=account-a');
+
+    expect(res.status).toBe(200);
+    expect(accountAccessMock.canAccessAllLineAccounts).toHaveBeenCalledWith(
+      env.DB, expect.anything(), ['account-a'],
+    );
+    expect(dbMocks.getWebinarOverview).toHaveBeenCalledWith(env.DB, 'account-a');
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { metrics: { registrations: { value: 428 } } },
+    });
+  });
+
+  test('一覧KPIはアカウント未指定と権限外を集計前に拒否する', async () => {
+    const missing = await adminReq('/api/webinars/overview');
+    expect(missing.status).toBe(400);
+
+    accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
+    const forbidden = await adminReq('/api/webinars/overview?account_id=account-b');
+    expect(forbidden.status).toBe(403);
+    expect(dbMocks.getWebinarOverview).not.toHaveBeenCalled();
+  });
+
+  test('一覧KPIの集計失敗を0件の成功として返さない', async () => {
+    dbMocks.getWebinarOverview.mockRejectedValue(new Error('D1 unavailable'));
+
+    const res = await adminReq('/api/webinars/overview?account_id=account-a');
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+  });
+
   test('一覧はリクエスト元の統括から見えるアカウントだけをSQLで絞る', async () => {
     const all = vi.fn(async () => ({ results: [makeWebinar({ account_id: 'account-a' })] }));
     const bind = vi.fn(() => ({ all }));

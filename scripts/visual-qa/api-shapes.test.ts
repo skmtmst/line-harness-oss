@@ -9,6 +9,12 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { readArrayGetPaths } from './api-shapes.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import {
+  WEBINAR_OVERVIEW,
+  WEBINAR_OVERVIEW_EMPTY,
+  WEBINAR_OVERVIEW_FAILURE,
+} from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -31,5 +37,20 @@ describe('画面確認モックの口の形', () => {
     // 静かに0件になると、全部の口が `{items:[],total:0}` に落ちて
     // 全画面が真っ白になる。原因はどこにも出ない。
     expect(() => readArrayGetPaths('// api.ts が読めなかった場合')).toThrow(/配列の口/);
+  });
+
+  it('ウェビナー一覧は通常・空・失敗を同じ形にせず、未取得を0にしない', () => {
+    expect(WEBINAR_OVERVIEW.metrics.registrations).toMatchObject({
+      value: 428, state: 'available',
+    });
+    expect(WEBINAR_OVERVIEW.metrics.viewers).toMatchObject({
+      value: null, state: 'unavailable',
+    });
+    expect(WEBINAR_OVERVIEW_EMPTY.metrics.registrations).toMatchObject({
+      value: 0, state: 'available',
+    });
+    expect(WEBINAR_OVERVIEW_FAILURE).toEqual({
+      success: false, error: 'Internal server error',
+    });
   });
 });

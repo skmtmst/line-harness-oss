@@ -4225,6 +4225,28 @@ export type Webinar = {
 
 export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>>
 
+export type WebinarOverviewMetric = {
+  value: number | null
+  state: 'available' | 'unavailable'
+  reason: string | null
+}
+
+export type WebinarOverview = {
+  state: 'partial'
+  registrationMode: 'people'
+  metrics: {
+    webinars: WebinarOverviewMetric
+    activeWebinars: WebinarOverviewMetric
+    registrations: WebinarOverviewMetric
+    registrationBookings: WebinarOverviewMetric
+    viewers: WebinarOverviewMetric
+    viewRate: WebinarOverviewMetric
+    averageWatchSeconds: WebinarOverviewMetric
+    ctaUniquePeople: WebinarOverviewMetric
+    ctaTotalClicks: WebinarOverviewMetric
+  }
+}
+
 export type WebinarNotificationSettings = {
   webinarId: string
   version: number
@@ -4326,6 +4348,9 @@ export type WebinarCtaCard = {
 
 export const webinarApi = {
   list: () => fetchApi<{ data: Webinar[] }>('/api/webinars'),
+  overview: (accountId: string) => fetchApi<{ data: WebinarOverview }>(
+    `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,
+  ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   create: (input: WebinarInput) =>
     fetchApi<{ data: Webinar }>('/api/webinars', { method: 'POST', body: JSON.stringify(input) }),

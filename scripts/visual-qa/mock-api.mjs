@@ -19,7 +19,16 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIENDS,
+  FRIEND_SCENARIOS,
+  FRIEND_STATS,
+  LIST_STATS,
+  OPERATORS,
+  TAGS,
+  TAG_GROUPS,
+  WEBINAR_OVERVIEW,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -268,6 +277,7 @@ const SHAPES = {
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
+  '/api/webinars/overview': WEBINAR_OVERVIEW,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },

@@ -87,6 +87,124 @@ export interface WebinarAnalyticsSummaryRow {
   form_submissions: number;
 }
 
+export type WebinarOverviewMetricState = 'available' | 'unavailable';
+
+export interface WebinarOverviewMetric {
+  value: number | null;
+  state: WebinarOverviewMetricState;
+  reason: string | null;
+}
+
+export interface WebinarOverview {
+  state: 'partial';
+  registrationMode: 'people';
+  metrics: {
+    webinars: WebinarOverviewMetric;
+    activeWebinars: WebinarOverviewMetric;
+    registrations: WebinarOverviewMetric;
+    registrationBookings: WebinarOverviewMetric;
+    viewers: WebinarOverviewMetric;
+    viewRate: WebinarOverviewMetric;
+    averageWatchSeconds: WebinarOverviewMetric;
+    ctaUniquePeople: WebinarOverviewMetric;
+    ctaTotalClicks: WebinarOverviewMetric;
+  };
+}
+
+interface WebinarOverviewRow {
+  webinar_count: number;
+  active_webinar_count: number;
+  registration_people: number;
+  registration_bookings: number;
+  cta_unique_people: number;
+}
+
+function overviewMetric(
+  value: number | null,
+  state: WebinarOverviewMetricState = 'available',
+  reason: string | null = null,
+): WebinarOverviewMetric {
+  return { value, state, reason };
+}
+
+/**
+ * V6一覧のKPI。選択中のLINEアカウントだけを集計し、人数と延べ予約を混ぜない。
+ *
+ * webinar_viewers.last_position_seconds は最後の再生位置であり、実際に見た区間では
+ * ない。そのため視聴人数・率・平均時間には流用せず、区間記録が入るまで未取得を
+ * 明示する。CTAも同じ視聴中の複数クリックを保存していないため、実人数だけを返す。
+ */
+export async function getWebinarOverview(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<WebinarOverview> {
+  const row = await db.prepare(
+    `WITH visible_webinars AS (
+       SELECT id, status
+       FROM webinars
+       WHERE account_id = ? AND status <> 'archived'
+     ), webinar_counts AS (
+       SELECT COUNT(*) AS webinar_count,
+              COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0)
+                AS active_webinar_count
+       FROM visible_webinars
+     ), registration_counts AS (
+       SELECT COUNT(DISTINCT r.friend_id) AS registration_people,
+              COUNT(*) AS registration_bookings
+       FROM webinar_registrations r
+       JOIN visible_webinars w ON w.id = r.webinar_id
+       WHERE r.status = 'active'
+     ), cta_counts AS (
+       SELECT COUNT(DISTINCT v.friend_id) AS cta_unique_people
+       FROM webinar_viewers v
+       JOIN visible_webinars w ON w.id = v.webinar_id
+       WHERE v.cta_clicked_at IS NOT NULL
+     )
+     SELECT webinar_count, active_webinar_count,
+            registration_people, registration_bookings, cta_unique_people
+     FROM webinar_counts, registration_counts, cta_counts`,
+  ).bind(lineAccountId).first<WebinarOverviewRow>();
+
+  const counts = row ?? {
+    webinar_count: 0,
+    active_webinar_count: 0,
+    registration_people: 0,
+    registration_bookings: 0,
+    cta_unique_people: 0,
+  };
+  return {
+    state: 'partial',
+    registrationMode: 'people',
+    metrics: {
+      webinars: overviewMetric(counts.webinar_count),
+      activeWebinars: overviewMetric(counts.active_webinar_count),
+      registrations: overviewMetric(counts.registration_people),
+      registrationBookings: overviewMetric(counts.registration_bookings),
+      viewers: overviewMetric(
+        null,
+        'unavailable',
+        '実際に見た区間の記録をまだ集計できないため',
+      ),
+      viewRate: overviewMetric(
+        null,
+        'unavailable',
+        '視聴人数を取得できないため',
+      ),
+      averageWatchSeconds: overviewMetric(
+        null,
+        'unavailable',
+        '実際に見た時間の記録をまだ集計できないため',
+      ),
+      ctaUniquePeople: overviewMetric(counts.cta_unique_people),
+      ctaTotalClicks: overviewMetric(
+        null,
+        'unavailable',
+        '同じ視聴中の複数クリックを数える記録がないため',
+      ),
+    },
+  };
+}
+
 export type WebinarFunnelEventType =
   | 'cta_impression'
   | 'cta_click'
