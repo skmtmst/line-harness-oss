@@ -2487,6 +2487,7 @@ export const CAPTURED_AT = {
       { pr: 605, head: '3b5098a3', on: '2026-08-31', screens: ['l25rlp', 'ee0sk'], note: 'Claudeが直した。連動OFF時の説明・★の切り替え方・OFFに戻したときの断り。#422 の上' },
       { pr: 578, head: 'a744c582', on: '2026-08-31', screens: ['A1ZYeP', 'hqrOv'], note: 'Claudeが撮り直して判定を書き直した。A1ZYeP は絵ではなく `FriendFieldType` を読んで数え直した' },
     { pr: 0, head: '3aef8ded', on: '2026-08-31', screens: ['GMvBd'], note: 'Claudeが実装して撮った。契約枝 codex/kenta-v6-support-mark-rules-api（head e95ac2b5）の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
+    { pr: 605, head: '3b5098a3', on: '2026-09-01', screens: ['l25rlp', 'ee0sk'], note: '**#605 が codex/development へマージされた**（#422 の取り込み後）' },
   ],
   10: [
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
@@ -2661,6 +2662,7 @@ export const CAPTURED_AT = {
       { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['InCDe'], note: 'Claudeが #598 の読み口の上に実装した2画面のうち友だち同士のほう。5状態＋判定窓で12枚' },
       { pr: 601, head: 'cfab56e0', on: '2026-08-31', screens: ['w8W4Eh'], note: 'Claudeが #599 の読み口の上に実装した統合ユーザー詳細。通常・読込・空・失敗・権限不足＋変更窓＋版競合で14枚' },
     { pr: 628, head: '846be01f', on: '2026-08-31', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'bzDn6', 'YzxU1', 'r7eSi'], note: 'Claudeが実装して撮った。#520 の上（`/friends/page.tsx` を触る唯一の開いているPR）。**#565 が development 経由で入っていることを確かめてから撮った**' },
+    { pr: 628, head: '846be01f', on: '2026-09-01', screens: ['bzDn6'], note: '**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本' },
   ],
   28: [
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },

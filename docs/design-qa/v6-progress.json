@@ -224,6 +224,15 @@
             "r7eSi"
           ],
           "note": "Claudeが実装して撮った。#520 の上（`/friends/page.tsx` を触る唯一の開いているPR）。**#565 が development 経由で入っていることを確かめてから撮った**"
+        },
+        {
+          "pr": 628,
+          "head": "846be01f",
+          "on": "2026-09-01",
+          "screens": [
+            "bzDn6"
+          ],
+          "note": "**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本"
         }
       ]
     },
@@ -333,6 +342,16 @@
             "GMvBd"
           ],
           "note": "Claudeが実装して撮った。契約枝 codex/kenta-v6-support-mark-rules-api（head e95ac2b5）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 605,
+          "head": "3b5098a3",
+          "on": "2026-09-01",
+          "screens": [
+            "l25rlp",
+            "ee0sk"
+          ],
+          "note": "**#605 が codex/development へマージされた**（#422 の取り込み後）"
         }
       ]
     },
