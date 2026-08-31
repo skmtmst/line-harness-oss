@@ -778,26 +778,26 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー',
     route: '/reminders/edit?id=reminder-3&stage=preview', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**#551 `44692a37` で配信予定プレビューが入り、未実装ではなくなった。** `POST /api/reminders/:id/preview` の返事をそのまま描く（**ブラウザで時刻を再計算していない**——これが未実装のままだった理由。画面とWorkerで別々に計算すると「画面では届くのに送られない」が起きる）。1通目 前日19:00 → 2026/09/02 19:00、2通目 当日08:00 → 2026/09/03 08:00。見込みは 対象 124人・7日以内 38通・30日以内 162通・重なり 0件。型（`ReminderPreviewResult`）は各通に `state`（`scheduled` / `past` / `duplicate`）を持ち、**過去になる通と重なる通を隠さない**作りになっている。1440・1920とも横スクロール0。P2 設計は「条件で外れる通」「取消時に止まる通」も予定表の中で色分けする。実装は状態の欄を持つが、その2つを出す絵はまだ確かめていない **ルート**：`/reminders/edit?id=reminder-3&stage=preview`。**取得元**：`reminders-v6/JCz6J.txt` ＋ `ReminderPreviewResult` の型。**推奨修正**：**ブラウザで時刻を再計算しない**という作りを崩さない。ここを変えると「画面では届くのに送られない」が戻る。',
+    verdict: 'match',
+    verdictNote: '**#551 `44692a37` で配信予定プレビューが入り、#613 で撮り直して差が無いことを確かめた。** ルート `/reminders/edit?id=reminder-3&stage=preview`。1440・1920とも横スクロール0。 `POST /api/reminders/:id/preview` の返事をそのまま描く。**ブラウザで時刻を再計算していない**——これが長く未実装だった理由で、画面とWorkerで別々に計算すると「画面では届くのに送られない」が起きる。この作りは崩さない。 取得元：`reminders-v6/JCz6J.txt`',
     verdictSource: 'reminders-v6/JCz6J.txt',
-    verdictHead: '44692a37',
+    verdictHead: 'a504fec0',
   },
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**#551 `44692a37` でテスト送信の段が入り、未実装ではなくなった。** **この節を止めていた条件が満たされている**——画面が「本番の登録 **増えません**／配信予定 **作りません**」と、実登録も予定も動かさないことを書いており、口も `POST /api/reminders/:id/test-send` の専用口。以前は一斉配信・シナリオのテスト口を借りるしかなく、リマインダの基準日・版・予定時刻を確かめられなかった。テストの状態は 結果「届きました」・確認した日時 2026/08/28 18:12 で、済んでいないときは「テスト送信が必要です」に変わる。1440・1920とも横スクロール0。P2 設計はテスト受信先を画面で選べる。実装は「登録済みのテスト受信先」へ送る **ルート**：`/reminders/edit?id=reminder-3&stage=test`。**取得元**：`reminders-v6/W98zZQ.txt`。**推奨修正**：専用のテスト口（`POST /api/reminders/:id/test-send`）を残す。一斉配信やシナリオの口を借りると、リマインダの基準日・版・予定時刻を確かめられない。',
+    verdict: 'match',
+    verdictNote: '**#551 `44692a37` でテスト送信の段が入り、#613 で撮り直して差が無いことを確かめた。** ルート `/reminders/edit?id=reminder-3&stage=test`。1440・1920とも横スクロール0。 画面が「本番の登録 増えません／配信予定 作りません」と、実登録も予定も動かさないことを書いている。口も `POST /api/reminders/:id/test-send` の専用口。**一斉配信やシナリオの口を借りると、リマインダの基準日・版・予定時刻を確かめられない。**この専用口は残す。 取得元：`reminders-v6/W98zZQ.txt`',
     verdictSource: 'reminders-v6/W98zZQ.txt',
-    verdictHead: '44692a37',
+    verdictHead: 'a504fec0',
   },
   {
     ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認',
     route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**#551 `44692a37` で最終確認が入り、未実装ではなくなった。** 公開前チェック5項目（基準日が決まっています／すべての通に送る時刻があります／テスト送信が終わっています／止める条件があります／届く人がいます）が 確認済み・注意 で並ぶ。**未取得を0にしない**——除外人数は `—人` と出る（型の `audience.excluded` が `null`。返事を差し替えて確かめた）。**版を固定することも書いてある**：「公開しても、すでに登録済みの友だちが使う版は変わりません。新版は、公開後に新しく対象になった友だちから使われます。」。見出しに `v2` が出て、どの版を公開するのかが分かる。1440・1920とも横スクロール0。P2 チェックが `warning` でも「公開できます」と出る。注意の内容によっては止めたほうがよい場合がある **ルート**：`/reminders/edit?id=reminder-3&stage=confirm`。**取得元**：`reminders-v6/s6Vvp.txt`（`audience.excluded` を `null` にして確かめた）。**推奨修正**：この画面の「版を固定する」断りを、`syWp4`（共通アクションの版）と同じ言い回しにそろえる。同じ考え方を2か所で別々の言葉にしない。',
+    verdict: 'match',
+    verdictNote: '**#551 `44692a37` で最終確認が入り、#613 で撮り直して差が無いことを確かめた。前の推奨は取り下げる。** ルート `/reminders/edit?id=reminder-3&stage=confirm`。1440・1920とも横スクロール0。 公開前チェック5項目（基準日が決まっています／すべての通に送る時刻があります／テスト送信が終わっています／止める条件があります／届く人がいます）が 確認済み・注意 で並ぶ。**未取得を0にしない**——除外人数は `—人`（型の `audience.excluded` が `null`）。 版の断りも在る：「公開しても、すでに登録済みの友だちが使う版は変わりません。新版は、公開後に新しく対象になった友だちから使われます。」 **「`syWp4` と言い回しをそろえる」という前の推奨は取り下げた。** 読み比べると主語が違い（`syWp4` は利用先、こちらは登録済みの友だち）、そろえると具体性が落ちる。同じ考え方を同じ形（いま動いているものは前の版のまま＋新しく始まるものから新版）で言えていれば十分。 取得元：`reminders-v6/s6Vvp.txt:52`',
     verdictSource: 'reminders-v6/s6Vvp.txt',
-    verdictHead: '44692a37',
+    verdictHead: 'a504fec0',
   },
   {
     ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了',
@@ -843,8 +843,8 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」、実装「リマインダの読み込みに失敗しました。もう一度お試しください。」＋「いまは読み込めていません。上の案内をご覧ください。」）。**中身は正しい。** 失敗のとき帯は—と「取得できませんでした」、一覧の中は空の文でなく読めていない旨を出す。ほかの機能の手本になる **ルート**：`/reminders`（空・読込・失敗）。**取得元**：`reminders-v6/dC0yg.txt`。**推奨修正**：文言を設計へそろえるだけ。**中身は正しく、ほかの機能の手本になるので作りは変えない。**',
-    verdictSource: 'reminders-v6/dC0yg-error-1920.png', verdictHead: '409f00bb',
+    verdict: 'match', verdictNote: '**#613 `a504fec0`（#551 `44692a37` の上）で解けた。** ルート `/reminders`（空・読込・失敗）。1440・1920とも横スクロール0。 **文言を設計へそろえた。** 「リマインダの読み込みに失敗しました。もう一度お試しください。」では**押し直しても直らないときの行き先が無い**。いまは「表示できませんでした。再読み込みしても直らない場合はエラー報告へ。」。一覧の中の文も「表示できませんでした。上の案内をご覧ください。」にそろえた。 中身は元から正しい——失敗を「ありません」と言わず、帯は `—` と「取得できませんでした」、絞り込みで0件になった場合（「この条件に合うリマインダはありません。」）とそもそも0件（「リマインダがありません。…から作成してください。」）を分ける。**この作りはほかの機能の手本。** 取得元：`reminders-v6/dC0yg-error.txt:34,48`',
+    verdictSource: 'reminders-v6/dC0yg-error-1920.png', verdictHead: 'a504fec0',
   },
 
   // ── 機能8 自動応答 ──────────────────────────────────────
@@ -2409,6 +2409,7 @@ export const CAPTURED_AT = {
     { pr: 498, head: 'f30890f2', on: '2026-08-30', screens: ['Y0Sn3'], note: '`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま' },
     { pr: 514, head: 'd064bded', on: '2026-08-30', screens: ['Y0Sn3'], note: '一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' },
+      { pr: 613, head: 'a504fec0', on: '2026-08-31', screens: ['dC0yg', 's6Vvp', 'JCz6J', 'W98zZQ', 'M1EXwB', 'uJP22', 'J64xI', 'PSmHo', 'GC4St'], note: 'Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ' },
   ],
   8: [
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },

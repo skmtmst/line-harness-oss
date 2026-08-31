@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 52,
+  "match": 56,
   "structureMatchDataPending": 18,
-  "needsFix": 165,
+  "needsFix": 161,
   "unjudged": 0,
-  "remaining": 206,
+  "remaining": 202,
   "features": [
     {
       "feature": 1,
@@ -599,11 +599,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 5,
       "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "needsFix": 6,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 429,
@@ -680,6 +680,23 @@
             "M1EXwB"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 613,
+          "head": "a504fec0",
+          "on": "2026-08-31",
+          "screens": [
+            "dC0yg",
+            "s6Vvp",
+            "JCz6J",
+            "W98zZQ",
+            "M1EXwB",
+            "uJP22",
+            "J64xI",
+            "PSmHo",
+            "GC4St"
+          ],
+          "note": "Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ"
         }
       ]
     },
