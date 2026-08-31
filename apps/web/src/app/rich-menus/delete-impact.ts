@@ -94,3 +94,24 @@ export function canDelete(input: {
   if (!input.impact || input.busy) return false
   return input.impact.canDelete && input.impact.blockers.length === 0
 }
+
+/**
+ * 409 の返事に入っている最新の影響を、型を確かめて取り出す。
+ *
+ * **消せると出したまま失敗を出さない。** 削除の直前に状態が変わると
+ * Workerは409と一緒に**その時点の影響**を返す。古い「消せます」を
+ * 窓に残したままにすると、何が変わったのか読めない。
+ *
+ * `unknown` を素通ししない——形が違うものを入れると、次の描画で落ちる。
+ */
+export function impactFromError(data: unknown): RichMenuDeleteImpact | null {
+  if (typeof data !== 'object' || data === null) return null
+  const raw = data as Record<string, unknown>
+  const body = (typeof raw.data === 'object' && raw.data !== null ? raw.data : raw) as Record<string, unknown>
+  if (typeof body.canDelete !== 'boolean') return null
+  if (!Array.isArray(body.blockers)) return null
+  if (typeof body.group !== 'object' || body.group === null) return null
+  if (typeof body.nextDisplay !== 'object' || body.nextDisplay === null) return null
+  if (!Array.isArray(body.incomingSwitches) || !Array.isArray(body.operationalReferences)) return null
+  return body as unknown as RichMenuDeleteImpact
+}

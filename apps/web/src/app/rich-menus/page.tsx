@@ -16,6 +16,7 @@ import {
   audienceText,
   blockerTexts,
   canDelete as canDeleteImpact,
+  impactFromError,
   nextDisplayText,
   recommendedActionText,
   referenceKindText,
@@ -155,6 +156,8 @@ export default function RichMenusListPage() {
   */
   const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /** いま影響を読んでいる対象。遅れて返った別の結果を捨てるために持つ。 */
+  const impactRequestRef = useRef<string | null>(null)
   const [publishedDeleteTarget, setPublishedDeleteTarget] =
     useState<RichMenuGroupListItem | null>(null)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
@@ -277,14 +280,23 @@ export default function RichMenusListPage() {
   }
 
   async function loadImpact(groupId: string) {
+    /*
+      **遅れて返った別のメニューの結果を映さない。** Aを読み込み中に窓を
+      閉じてBを開くと、あとから返るAの結果がBの窓に出る。表示とボタンの
+      可否が別のメニューのものになる（サーバは削除時に確かめ直すので
+      誤って消しはしないが、読んでいるものと押せるものが食い違う）。
+    */
+    impactRequestRef.current = groupId
     setImpactPhase('loading')
     setImpact(null)
     try {
       const res = await api.richMenuGroups.deleteImpact(groupId)
+      if (impactRequestRef.current !== groupId) return
       if (!res.success) throw new Error('impact_failed')
       setImpact(res.data)
       setImpactPhase('ready')
     } catch {
+      if (impactRequestRef.current !== groupId) return
       /*
         影響が読めないときは**消させない**。何が起きるか分からないまま
         取り消せない操作をさせるより、読み直してもらうほうがよい。
@@ -329,6 +341,19 @@ export default function RichMenusListPage() {
       setDeleteTarget(null)
       await reload()
     } catch (e) {
+      /*
+        **409は「読んだあとに状態が変わった」。** Workerがその時点の影響を
+        一緒に返すので、古い「消せます」を残さず描き直す。
+      */
+      if (e instanceof ApiError && e.status === 409) {
+        const latest = impactFromError(e.data)
+        if (latest) {
+          setImpact(latest)
+          setImpactPhase('ready')
+        } else if (deleteTarget.kind === 'managed') {
+          void loadImpact(deleteTarget.group.id)
+        }
+      }
       setDeleteError(richMenuError(e, action))
     } finally {
       setDeleteBusy(false)

@@ -53,4 +53,19 @@ describe('リッチメニューの削除確認', () => {
     // 前に開いたメニューの影響が、次の窓に残ってはいけない。
     expect(PAGE).toContain('setImpactPhase(\'idle\')')
   })
+
+  it('409 は最新の影響へ描き直す', () => {
+    // 消せると出したまま失敗を出さない。何が変わったのか読めなくなる。
+    expect(PAGE).toContain('e.status === 409')
+    expect(PAGE).toContain('impactFromError(e.data)')
+  })
+
+  it('遅れて返った別のメニューの結果を映さない', () => {
+    /*
+     * Aを読み込み中に窓を閉じてBを開くと、あとから返るAの結果がBの窓に
+     * 出る。読んでいるものと押せるものが食い違う。
+     */
+    expect(PAGE).toContain('impactRequestRef.current = groupId')
+    expect(PAGE).toContain('impactRequestRef.current !== groupId')
+  })
 })

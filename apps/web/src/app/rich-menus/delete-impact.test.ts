@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   audienceReason,
+  impactFromError,
   audienceText,
   blockerTexts,
   canDelete,
@@ -88,5 +89,32 @@ describe('消してよいか', () => {
   it('読み込めていないときと送信中は押せない', () => {
     expect(canDelete({ impact: null, busy: false })).toBe(false)
     expect(canDelete({ impact: impact(), busy: true })).toBe(false)
+  })
+})
+
+describe('409に入っている最新の影響', () => {
+  const valid = {
+    group: { id: 'g', accountId: 'a', name: 'n', status: 'draft' },
+    currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+    nextDisplay: { guaranteedGroupId: null, reason: 'friend_specific_rules', candidates: [] },
+    incomingSwitches: [], operationalReferences: [],
+    lineResources: { pageCount: 0, pagesWithLineRichMenuId: 0, isDefaultForAll: false, publishing: false },
+    blockers: ['incoming_switches'], canDelete: false, recommendedAction: 'review_references',
+  }
+
+  it('器に入っていても中身を取り出す', () => {
+    // Workerは `{ success:false, error, data }` の形で返す。
+    expect(impactFromError({ success: false, error: '使用中', data: valid })).not.toBeNull()
+    expect(impactFromError(valid)).not.toBeNull()
+  })
+
+  it('形が違うものを素通ししない', () => {
+    /*
+     * `unknown` をそのまま入れると、次の描画で落ちる。
+     * 古い「消せます」を残すより落ちるほうが悪い。
+     */
+    for (const bad of [null, undefined, 'x', 42, {}, { canDelete: true }, { ...valid, blockers: 'x' }]) {
+      expect(impactFromError(bad)).toBeNull()
+    }
   })
 })
