@@ -262,3 +262,40 @@ export const FRIENDS = [
     tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
   }),
 ]
+
+/**
+ * 写真審査の1件詳細（V6 `hHrz8`）。
+ *
+ * 取得できる事実と未接続を同じ1枚で確認する。AI判定や安全な原画像取得は
+ * まだ無いので、作り物の合格値を置かず `unavailable` / `false` のまま返す。
+ * 画像そのものは画面実装側で既存の撮影資産へ差し替える前提の無効URL。
+ */
+export const PHOTO_REVIEW_DETAIL = {
+  id: 'photo-review-1',
+  revision: 'pending:2026-08-27 12:00:00',
+  status: 'pending',
+  reviewImageUrl: 'https://example.invalid/visual-qa-photo-review.jpg',
+  contentType: 'image/jpeg',
+  caption: '公園で元気に遊んでいます',
+  submittedAt: '2026-08-27 12:00:00',
+  reviewedAt: null,
+  awardedPoints: 0,
+  submitter: { displayName: '山田 花子' },
+  pet: { name: 'こむぎ', animalType: 'dog' },
+  consent: { publication: 'granted', publicPetName: true },
+  review: null,
+  history: [],
+  queue: { position: 2, total: 8, previousId: 'photo-review-2', nextId: 'photo-review-0' },
+  imageSafety: {
+    source: 'legacy_submission_url',
+    derivativeAvailable: false,
+    originalDownloadAvailable: false,
+    explanation: '審査用の縮小画像と、原画像を安全に取得する仕組みはまだ接続していません。',
+  },
+  riskAssessment: {
+    state: 'unavailable',
+    items: [],
+    explanation: '画像の安全確認は自動判定に接続していません。担当者が画像を確認してください。',
+  },
+  capabilities: { canReview: true, canDownloadOriginal: false, canPublish: false },
+}

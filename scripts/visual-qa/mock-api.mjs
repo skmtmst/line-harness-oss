@@ -19,7 +19,10 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, PHOTO_REVIEW_DETAIL,
+  TAGS, TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -402,6 +405,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
+  const photoDetail = /^\/api\/nen-members\/photos\/([^/]+)$/.exec(pathname)
+  if (photoDetail) {
+    if (photoDetail[1] !== PHOTO_REVIEW_DETAIL.id) return { success: false, error: 'Not found' }
+    return { success: true, data: PHOTO_REVIEW_DETAIL }
+  }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {
     /*
       `{status,checks}` ではない。ダッシュボードは `logs` を数える。

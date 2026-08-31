@@ -29,6 +29,41 @@ const PHOTO_REVIEW_REASON_LABELS = {
 } as const;
 type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
 
+type PhotoReviewStatus = 'pending' | 'adopted' | 'rejected';
+
+type PhotoDetailRow = Record<string, unknown> & {
+  id: string;
+  image_url: string;
+  content_type: string;
+  caption: string;
+  status: PhotoReviewStatus;
+  awarded_points: number;
+  created_at: string;
+  reviewed_at: string | null;
+  updated_at: string;
+  publication_consent_at: string | null;
+  publication_withdrawn_at: string | null;
+  public_pet_name: number;
+  review_reason_code: PhotoReviewReasonCode | null;
+  review_reason_note: string | null;
+  reviewed_by_name: string | null;
+  review_notification_status: 'not_required' | 'pending' | 'sent' | 'failed';
+  owner_name: string | null;
+  pet_name: string;
+  animal_type: string;
+};
+
+function photoRevision(photo: Pick<PhotoDetailRow, 'status' | 'updated_at'>): string {
+  return `${photo.status}:${photo.updated_at}`;
+}
+
+function photoReviewReasonLabel(code: unknown): string | null {
+  return typeof code === 'string'
+    && Object.prototype.hasOwnProperty.call(PHOTO_REVIEW_REASON_LABELS, code)
+    ? PHOTO_REVIEW_REASON_LABELS[code as PhotoReviewReasonCode]
+    : null;
+}
+
 const CONSULTATION_TAG_RULES = [
   { key: '食事', pattern: /ご飯|ごはん|フード|食欲|食いつき|食べ|偏食|おやつ|栄養|サプリ|水分|飲み水/ },
   { key: '排泄', pattern: /便|うんち|ウンチ|下痢|軟便|便秘|血便|おしっこ|オシッコ|尿|トイレ|排泄/ },
@@ -138,6 +173,8 @@ async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<strin
 type ReviewPhotoRow = Record<string, unknown> & {
   id: string;
   friend_id: string;
+  status: PhotoReviewStatus;
+  updated_at: string;
   line_user_id: string;
   line_account_id: string;
   is_following: number;
@@ -670,12 +707,125 @@ nenMembers.get('/api/nen-members/photos', async (c) => {
   return c.json({ success: true, data: rows.results });
 });
 
+nenMembers.get('/api/nen-members/photos/:id', async (c) => {
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+
+  const photo = await c.env.DB.prepare(
+    `SELECT ps.id, ps.image_url, ps.content_type, ps.caption, ps.status, ps.awarded_points,
+            ps.created_at, ps.reviewed_at, ps.updated_at,
+            ps.publication_consent_at, ps.publication_withdrawn_at, ps.public_pet_name,
+            ps.review_reason_code, ps.review_reason_note, ps.reviewed_by_name,
+            ps.review_notification_status,
+            f.display_name owner_name, p.name pet_name, p.animal_type
+       FROM nen_photo_submissions ps
+       JOIN friends f ON f.id = ps.friend_id
+       JOIN nen_pet_profiles p ON p.id = ps.pet_id
+      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
+      LIMIT 1`,
+  ).bind(c.req.param('id'), accountId, accountId).first<PhotoDetailRow>();
+  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+
+  const [history, queue] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT from_status, to_status, reason_code, reason_note, awarded_points,
+              reviewed_by_name, notification_status, created_at
+         FROM nen_photo_review_events
+        WHERE photo_id = ? AND line_account_id = ?
+        ORDER BY created_at DESC`,
+    ).bind(photo.id, accountId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT id, queue_position, queue_total, previous_id, next_id
+         FROM (
+           SELECT ps.id,
+                  ROW_NUMBER() OVER (ORDER BY ps.created_at DESC, ps.id DESC) queue_position,
+                  COUNT(*) OVER () queue_total,
+                  LAG(ps.id) OVER (ORDER BY ps.created_at DESC, ps.id DESC) previous_id,
+                  LEAD(ps.id) OVER (ORDER BY ps.created_at DESC, ps.id DESC) next_id
+             FROM nen_photo_submissions ps
+             JOIN friends f ON f.id = ps.friend_id
+            WHERE ps.status = 'pending'
+              AND ps.line_account_id = ? AND f.line_account_id = ?
+         ) queued
+        WHERE id = ?`,
+    ).bind(accountId, accountId, photo.id).first<Record<string, unknown>>(),
+  ]);
+
+  const consentState = photo.publication_withdrawn_at
+    ? 'withdrawn'
+    : photo.publication_consent_at ? 'granted' : 'not_recorded';
+  const reasonLabel = photoReviewReasonLabel(photo.review_reason_code);
+
+  return c.json({ success: true, data: {
+    id: photo.id,
+    revision: photoRevision(photo),
+    status: photo.status,
+    reviewImageUrl: photo.image_url,
+    contentType: photo.content_type,
+    caption: photo.caption,
+    submittedAt: photo.created_at,
+    reviewedAt: photo.reviewed_at,
+    awardedPoints: Number(photo.awarded_points || 0),
+    submitter: { displayName: photo.owner_name || '名前未取得' },
+    pet: { name: photo.pet_name, animalType: photo.animal_type },
+    consent: {
+      publication: consentState,
+      publicPetName: photo.public_pet_name === 1,
+    },
+    review: photo.status === 'pending' ? null : {
+      decision: photo.status,
+      reasonCode: photo.review_reason_code,
+      reasonLabel,
+      reasonNote: photo.review_reason_note,
+      reviewedByName: photo.reviewed_by_name,
+      notificationStatus: photo.review_notification_status,
+    },
+    history: history.results.map((event) => ({
+      fromStatus: event.from_status,
+      toStatus: event.to_status,
+      reasonCode: event.reason_code,
+      reasonLabel: photoReviewReasonLabel(event.reason_code),
+      reasonNote: event.reason_note,
+      awardedPoints: Number(event.awarded_points || 0),
+      reviewedByName: event.reviewed_by_name,
+      notificationStatus: event.notification_status,
+      decidedAt: event.created_at,
+    })),
+    queue: queue ? {
+      position: Number(queue.queue_position),
+      total: Number(queue.queue_total),
+      previousId: queue.previous_id || null,
+      nextId: queue.next_id || null,
+    } : null,
+    imageSafety: {
+      source: 'legacy_submission_url',
+      derivativeAvailable: false,
+      originalDownloadAvailable: false,
+      explanation: '審査用の縮小画像と、原画像を安全に取得する仕組みはまだ接続していません。',
+    },
+    riskAssessment: {
+      state: 'unavailable',
+      items: [],
+      explanation: '画像の安全確認は自動判定に接続していません。担当者が画像を確認してください。',
+    },
+    capabilities: {
+      canReview: photo.status === 'pending',
+      canDownloadOriginal: false,
+      canPublish: false,
+    },
+  } });
+});
+
 nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     status?: string;
     reasonCode?: string;
     reasonNote?: string;
+    expectedRevision?: string;
   }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
@@ -702,6 +852,14 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
   ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow>();
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  if (body?.expectedRevision && body.expectedRevision !== photoRevision(photo)) {
+    return c.json({
+      success: false,
+      error: '同じ写真がほかの担当者により更新されました',
+      code: 'photo_revision_conflict',
+      data: { revision: photoRevision(photo) },
+    }, 409);
+  }
   if (photo.status !== 'pending') return c.json({ success: false, error: 'Already reviewed' }, 409);
   let awarded = 0;
   let pointBalance: number | null = null;
@@ -810,6 +968,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       pointBalance,
       pointSync: status === 'adopted' ? 'synced' : 'not_required',
       notificationStatus,
+      revision: photoRevision({ status: status as PhotoReviewStatus, updated_at: now }),
     },
   });
 });

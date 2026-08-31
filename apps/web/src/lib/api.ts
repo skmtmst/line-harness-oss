@@ -586,6 +586,67 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+export type NenPhotoReviewStatus = 'pending' | 'adopted' | 'rejected'
+
+export type NenPhotoReviewDetail = {
+  id: string
+  revision: string
+  status: NenPhotoReviewStatus
+  reviewImageUrl: string
+  contentType: string
+  caption: string
+  submittedAt: string
+  reviewedAt: string | null
+  awardedPoints: number
+  submitter: { displayName: string }
+  pet: { name: string; animalType: string }
+  consent: {
+    publication: 'granted' | 'withdrawn' | 'not_recorded'
+    publicPetName: boolean
+  }
+  review: null | {
+    decision: 'adopted' | 'rejected'
+    reasonCode: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other' | null
+    reasonLabel: string | null
+    reasonNote: string | null
+    reviewedByName: string | null
+    notificationStatus: 'not_required' | 'pending' | 'sent' | 'failed'
+  }
+  history: Array<{
+    fromStatus: 'pending'
+    toStatus: 'adopted' | 'rejected'
+    reasonCode: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other' | null
+    reasonLabel: string | null
+    reasonNote: string | null
+    awardedPoints: number
+    reviewedByName: string
+    notificationStatus: 'pending' | 'sent' | 'failed'
+    decidedAt: string
+  }>
+  queue: null | {
+    position: number
+    total: number
+    previousId: string | null
+    nextId: string | null
+  }
+  imageSafety: {
+    source: 'legacy_submission_url'
+    derivativeAvailable: false
+    originalDownloadAvailable: false
+    explanation: string
+  }
+  riskAssessment: {
+    state: 'unavailable'
+    items: []
+    explanation: string
+  }
+  capabilities: {
+    canReview: boolean
+    canDownloadOriginal: false
+    canPublish: false
+  }
+}
+
 /* ---- リッチメニューのボタン（147） ---- */
 
 /**
@@ -2872,16 +2933,21 @@ export const api = {
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    photo: (id: string, accountId: string) => fetchApi<ApiResponse<NenPhotoReviewDetail>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+    ),
     reviewPhoto: (id: string, data: {
       accountId: string
       status: 'adopted' | 'rejected'
       reasonCode?: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
       reasonNote?: string
+      expectedRevision?: string
     }) => fetchApi<ApiResponse<{
       awardedPoints: number
       pointBalance: number | null
       pointSync: string
       notificationStatus: 'sent' | 'failed'
+      revision: string
     }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
     retryPhotoReviewNotification: (id: string, accountId: string) => fetchApi<ApiResponse<{
       notificationStatus: 'sent'
