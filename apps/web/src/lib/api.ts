@@ -96,6 +96,31 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+export type FormDeleteImpact = {
+  form: {
+    id: string
+    name: string
+    isActive: boolean
+    status: 'active' | 'archived'
+  }
+  submissionCount: number
+  openCount: number
+  references: Array<{
+    kind: 'webinar' | 'rich_menu'
+    name: string | null
+    href: string | null
+    state: 'available' | 'unavailable'
+  }>
+  referenceCount: number
+  answerUrl: string | null
+  revision: number
+  checkedAt: string
+  canDelete: boolean
+  canArchive: boolean
+  recommendedAction: 'delete' | 'archive' | 'none'
+  blockers: Array<'published' | 'has_submissions' | 'has_opens' | 'in_use' | 'already_archived'>
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -529,12 +554,15 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
+  /** 409でWorkerが返した、画面が読み直すための安全な最新状態。 */
+  readonly data: unknown
 
-  constructor(status: number, message?: string, code?: string) {
+  constructor(status: number, message?: string, code?: string, data?: unknown) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.data = data
   }
 }
 
@@ -585,6 +613,17 @@ export function extractApiErrorCode(raw: string): string | undefined {
     // JSONでなければ機械コードも無い。
   }
   return undefined
+}
+
+/** 競合時の最新状態だけを受け取る。500等の内部本文は呼び出し元へ渡さない。 */
+export function extractApiErrorData(raw: string, status: number): unknown {
+  if (!raw || status !== 409) return undefined
+  try {
+    const body = JSON.parse(raw) as { data?: unknown }
+    return body.data && typeof body.data === 'object' ? body.data : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function reportServerFailure(path: string, status: number): void {
@@ -648,6 +687,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       res.status,
       extractApiErrorMessage(raw, res.status),
       extractApiErrorCode(raw),
+      extractApiErrorData(raw, res.status),
     )
   }
   if (res.status === 204) return undefined as T
@@ -2003,9 +2043,27 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    remove: (id: string, accountId: string) =>
+    deleteImpact: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<FormDeleteImpact>>(
+        `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    archive: (id: string, accountId: string, expectedRevision: number) =>
+      fetchApi<ApiResponse<{
+        status: 'archived'
+        archivedAt: string
+        retainedSubmissionCount: number
+        retainedOpenCount: number
+        retainedReferenceCount: number
+        answerUrlUnavailable: true
+      }>>(`/api/forms/${id}/archive?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevision }),
+      }),
+    remove: (id: string, accountId: string, expectedRevision?: number) =>
       fetchApi<ApiResponse<null>>(
-        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
+        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}${
+          expectedRevision == null ? '' : `&expected_revision=${encodeURIComponent(String(expectedRevision))}`
+        }`,
         { method: 'DELETE' },
       ),
   },

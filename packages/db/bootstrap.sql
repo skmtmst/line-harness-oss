@@ -986,7 +986,9 @@ CREATE TABLE forms (
   submit_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT);
+, on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT, status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'archived')), archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
+  CHECK (revision >= 1));
 
 CREATE TABLE friend_add_attribution_candidates (
   id                   TEXT PRIMARY KEY,
@@ -2949,6 +2951,9 @@ CREATE INDEX idx_form_submissions_form_friend
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
+CREATE INDEX idx_forms_status_updated
+  ON forms(status, updated_at DESC);
+
 CREATE INDEX idx_friend_add_candidates_expiry
   ON friend_add_attribution_candidates(status, expires_at);
 
@@ -3486,6 +3491,75 @@ CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
+
+CREATE TRIGGER trg_forms_revision_account_delete
+AFTER DELETE ON form_accounts
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = OLD.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_account_insert
+AFTER INSERT ON form_accounts
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = NEW.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_account_update
+AFTER UPDATE OF form_id, line_account_id ON form_accounts
+WHEN OLD.form_id IS NOT NEW.form_id OR OLD.line_account_id IS NOT NEW.line_account_id
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id IN (OLD.form_id, NEW.form_id); END;
+
+CREATE TRIGGER trg_forms_revision_open_delete
+AFTER DELETE ON form_opens
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = OLD.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_open_insert
+AFTER INSERT ON form_opens
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = NEW.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_open_update
+AFTER UPDATE OF form_id ON form_opens
+WHEN OLD.form_id IS NOT NEW.form_id
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id IN (OLD.form_id, NEW.form_id); END;
+
+CREATE TRIGGER trg_forms_revision_rich_menu_delete
+AFTER DELETE ON rich_menu_areas
+WHEN OLD.form_id IS NOT NULL
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = OLD.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_rich_menu_insert
+AFTER INSERT ON rich_menu_areas
+WHEN NEW.form_id IS NOT NULL
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = NEW.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_rich_menu_update
+AFTER UPDATE OF form_id ON rich_menu_areas
+WHEN OLD.form_id IS NOT NEW.form_id
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id IN (OLD.form_id, NEW.form_id); END;
+
+CREATE TRIGGER trg_forms_revision_submission_delete
+AFTER DELETE ON form_submissions
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = OLD.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_submission_insert
+AFTER INSERT ON form_submissions
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = NEW.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_submission_update
+AFTER UPDATE OF form_id ON form_submissions
+WHEN OLD.form_id IS NOT NEW.form_id
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id IN (OLD.form_id, NEW.form_id); END;
+
+CREATE TRIGGER trg_forms_revision_webinar_cta_delete
+AFTER DELETE ON webinar_ctas
+WHEN OLD.form_id IS NOT NULL
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = OLD.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_webinar_cta_insert
+AFTER INSERT ON webinar_ctas
+WHEN NEW.form_id IS NOT NULL
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id = NEW.form_id; END;
+
+CREATE TRIGGER trg_forms_revision_webinar_cta_update
+AFTER UPDATE OF form_id ON webinar_ctas
+WHEN OLD.form_id IS NOT NEW.form_id
+BEGIN UPDATE forms SET revision = revision + 1 WHERE id IN (OLD.form_id, NEW.form_id); END;
 
 CREATE TRIGGER trg_messages_log_queue_url_exposure
 AFTER INSERT ON messages_log

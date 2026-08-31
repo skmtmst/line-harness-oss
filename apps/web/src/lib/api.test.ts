@@ -148,6 +148,39 @@ describe('fetchApi error response', () => {
     })
   })
 
+  it('409の最新影響を画面の読み直し用に保持する', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        success: false,
+        error: 'form_delete_changed',
+        data: { revision: 5, submissionCount: 4 },
+      }), { status: 409, headers: { 'Content-Type': 'application/json' } }),
+    ))
+
+    await expect(fetchApi('/api/forms/form-1/archive', { method: 'POST' })).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 409,
+      code: 'form_delete_changed',
+      data: { revision: 5, submissionCount: 4 },
+      message: 'API error: 409',
+    })
+  })
+
+  it('500の本文データは呼び出し元へ渡さない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        error: 'D1_ERROR',
+        data: { sql: 'SELECT secret FROM hidden' },
+      }), { status: 500 }),
+    ))
+
+    await expect(fetchApi('/api/forms/form-1/archive', { method: 'POST' })).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 500,
+      data: undefined,
+    })
+  })
+
   it('500 の本文は JSON でも表示せず status にフォールバックする', async () => {
     // LINE API 失敗や未処理例外は 500 で返る。内部情報を管理画面へ出さない。
     vi.stubGlobal('fetch', vi.fn(async () =>
