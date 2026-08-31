@@ -384,7 +384,7 @@ describe('共通情報', () => {
     expect(res.status).toBe(409);
     expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
     expect(await res.json()).toMatchObject({
-      code: 'COMMON_VAR_IN_USE',
+      code: 'common_var_delete_blocked',
       data: { total: 3, canDelete: false },
     });
   });

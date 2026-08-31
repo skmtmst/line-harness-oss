@@ -4,11 +4,12 @@ let fetchApi: typeof import('./api').fetchApi
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
+let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi } = await import('./api'))
+  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, extractApiErrorData, eventsApi } = await import('./api'))
 })
 
 describe('eventsApi.createSlots', () => {
@@ -86,12 +87,25 @@ describe('extractApiErrorCode', () => {
   it('409や422でもsnake_caseの機械コードだけを取り出す', () => {
     expect(extractApiErrorCode(JSON.stringify({ error: 'slot_conflict' }))).toBe('slot_conflict')
     expect(extractApiErrorCode(JSON.stringify({ error: 'slot_not_available' }))).toBe('slot_not_available')
+    expect(extractApiErrorCode(JSON.stringify({
+      code: 'common_var_delete_blocked',
+      error: '使用先から外してください',
+    }))).toBe('common_var_delete_blocked')
   })
 
   it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
     expect(extractApiErrorCode(JSON.stringify({ error: 'D1_ERROR: no such table' }))).toBeUndefined()
+    expect(extractApiErrorCode(JSON.stringify({ code: 'COMMON_VAR_IN_USE' }))).toBeUndefined()
     expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
+  })
+})
+
+describe('extractApiErrorData', () => {
+  it('409の最新影響だけを機械処理用に保持する', () => {
+    const impact = { blockingTotal: 2, canDelete: false }
+    expect(extractApiErrorData(JSON.stringify({ data: impact }))).toEqual(impact)
+    expect(extractApiErrorData('<html>proxy error</html>')).toBeUndefined()
   })
 })
 
@@ -146,6 +160,31 @@ describe('fetchApi error response', () => {
       code: 'slot_conflict',
       message: 'API error: 409',
     })
+  })
+
+  it('共通情報削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+    const impact = {
+      blockingTotal: 2,
+      canDelete: false,
+      items: [{ name: '営業時間のお知らせ', blocksDeletion: true }],
+    }
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        success: false,
+        code: 'common_var_delete_blocked',
+        error: '2件で使用中のため削除できません',
+        data: impact,
+      }), { status: 409 }),
+    ))
+
+    await expect(fetchApi('/api/common-vars/common-var-1?accountId=account-1', { method: 'DELETE' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 409,
+        code: 'common_var_delete_blocked',
+        message: 'API error: 409',
+        data: impact,
+      })
   })
 
   it('500 の本文は JSON でも表示せず status にフォールバックする', async () => {

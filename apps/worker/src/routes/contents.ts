@@ -537,7 +537,7 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
         {
           success: false,
           error: `${impact.blockingTotal}件で使用中のため削除できません`,
-          code: 'COMMON_VAR_IN_USE',
+          code: 'common_var_delete_blocked',
           data: deleteImpact,
         },
         409,
