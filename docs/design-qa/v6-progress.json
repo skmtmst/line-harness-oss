@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 56,
+  "match": 57,
   "structureMatchDataPending": 18,
-  "needsFix": 164,
+  "needsFix": 163,
   "unjudged": 0,
-  "remaining": 202,
+  "remaining": 201,
   "features": [
     {
       "feature": 1,
@@ -962,11 +962,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
+      "match": 7,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
+      "needsFix": 2,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 509,
@@ -1058,12 +1058,12 @@
         },
         {
           "pr": 616,
-          "head": "1e9654f8",
+          "head": "0a11c9e8",
           "on": "2026-08-31",
           "screens": [
             "szXsT"
           ],
-          "note": "Claude実装。#608 の delete-impact で、消したときの影響4つを削除の窓へ出した"
+          "note": "Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した"
         }
       ]
     },
@@ -1212,12 +1212,12 @@
         },
         {
           "pr": 617,
-          "head": "6a81d166",
+          "head": "b7e58a51",
           "on": "2026-08-31",
           "screens": [
             "YfTfJ"
           ],
-          "note": "Claude実装。#610 の delete-impact で、使われている場所と確かめた時刻を削除の窓へ出した。差し替えの口は契約待ち"
+          "note": "Claude実装。使われている場所と確認時刻を表示。差し替えAPI待ちに加え、アカウント切替の遅延応答P1を監査で記録"
         }
       ]
     },

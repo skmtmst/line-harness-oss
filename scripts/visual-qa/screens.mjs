@@ -1280,8 +1280,8 @@ export const SCREENS = [
       /* 失敗は**消せる下書き**（`rmg-5`）で撮る。塞がれた行には押し口が出ない。 */
       { suffix: '-managed-fail', steps: [{ click: '削除', nth: 6 }, { click: '削除する' }, { wait: 1200 }] },
     ],
-    verdict: 'needs_fix', verdictNote: '**#616 `1e9654f8`（#608 `4923de9d` の上）で影響4つと安全な削除禁止は入ったが、再監査でP1が2件残った。** ルート `/rich-menus`（削除の窓）。1440・1920とも横スクロール0。**解消済み**：いま表示している人数／次に出るメニュー／切替元／使っている自動処理を表示。人数の `null` は `—（未取得）`、実値0は0人。内部のblockerを日本語にし、塞がれている・影響が読めない場合は確認ボタン自体を出さない。**P1-1：削除直前に状態が変わりWorkerが409を返すと、`ApiError.data` に最新impactがあるのに画面は `richMenuError()` へ渡すだけで、古い「消せます」が窓に残る。** 最新dataを型検査して `impact` へ反映する。**P1-2：Aの影響を読込中に窓を閉じてBを開くと、遅れて返ったAの結果をBへ表示し得る。** 対象IDまたは要求世代が一致する返事だけをstateへ反映する。サーバは削除時に再検査するため誤削除は止まるが、確認表示とボタン可否が別対象になる。取得元：`rich-menus/page.tsx:276-291,304-329`、対象21件・required-pr-gate pass。指摘：[#616 コメント](https://github.com/skmtmst/line-harness-oss/pull/616#issuecomment-5473025241)',
-    verdictSource: 'rich-menus-v6/szXsT-managed-1440.png + -managed-fail-1440.png + rich-menus/page.tsx:249', verdictHead: '1e9654f8',
+    verdict: 'match', verdictNote: '**#616 `0a11c9e8`（#608 `4923de9d` の上）で一致。** ルート `/rich-menus`（削除の窓）。1440・1920とも横スクロール0。いま表示している人数／次に出るメニュー／切替元／使っている自動処理を表示。人数の `null` は `—（未取得）`、実値0は0人。内部のblockerを日本語にし、塞がれている・影響が読めない場合は確認ボタン自体を出さない。再監査で返した2件も解消した：DELETE 409 の `ApiError.data` から最新impactを型確認して再描画し、影響取得は対象groupIdと照合して別メニューの遅延応答を捨てる。対象21件・required-pr-gate SUCCESS・CLEAN。再監査：[#616 コメント](https://github.com/skmtmst/line-harness-oss/pull/616#issuecomment-5473175349)',
+    verdictSource: 'rich-menus-v6/szXsT-managed-1440.png + -managed-fail-1440.png + rich-menus/page.tsx', verdictHead: '0a11c9e8',
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
@@ -1395,9 +1395,9 @@ export const SCREENS = [
       { suffix: '-deletable', steps: [{ click: '削除', nth: 2, after: 900 }] },
     ],
     verdict: 'needs_fix',
-    verdictNote: '**#617 `6a81d166`（#610 `d82192e3` の上）でClaudeが実装した。未実装ではなくなった。** ルート `/contents`（削除の窓）。1440・1920とも横スクロール0。 **1件ずつの削除確認が無かった。** まとめて削除しかなく、しかもブラウザ標準の `confirm` だった——何件消えるかは出るが、戻せないことも、どこにも使われていないと確かめた結果も出ない。 **① 消せないときは「削除しますか？」と聞かない**（「「夏の定番セット.jpg」は削除できません」）。**押し口ごと出さない。** **② 使われている場所を種類つきで並べる**（一斉配信「8月のお知らせ」／シナリオの通「来店後シナリオ・1通目」）。内部IDは出さず、開ける先があるときだけ「ここを開く」。 **③ 0件は「どこでも使っていません」**で未取得と混ぜない。名前が無い理由も書き分ける（別アカウントで見せられない／未取得）。 **④ いつ時点で確かめたかを書く**（「2026/08/31 19:00 時点で…7種類を確認しました。」）。「いつの話か」が無いと消す判断ができない。 **⑤ 使用先が読めないときは消させない。** 7種類のどれかに残ったまま消すと、その画面が壊れた画像を指す。 **⑥ 409は読み直してから見せる。** 読んだあとに使われ始めた場合、消せない理由が変わっている。 **契約待ち：設計の「別の画像に差し替える」は差し替える口がまだ無い。** 押しても何も起きない操作は置かず、「まとめて差し替える操作は、まだ用意していません。」と書いた。使用先を一括で別メディアへ差し替える口が要る（Codex側）。 取得元：`media-v6/YfTfJ-1440.png`・`YfTfJ-deletable-1440.png` ＋ `media-delete-impact.ts`',
+    verdictNote: '**#617 `b7e58a51`（#610 `d82192e3` の上）で未実装ではなくなった。** ルート `/contents`（削除の窓）。1440・1920とも横スクロール0。消せないときは「削除しますか？」と聞かず、押し口を出さない。使用先を7種類・名前・安全な導線つきで並べ、0件と未取得を分け、確認時刻を出す。使用先が読めないときは消さず、409では影響を読み直す。**P1 残存：影響取得の遅延応答ガードがmedia IDだけで、LINEアカウントIDを含まず、アカウント切替時も削除対象と要求を無効化しない。** Aで影響取得中にBへ切り替えると、Aの影響が切替後の窓へ入り得る。`accountId + mediaId + requestGeneration` で照合し、切替・close・409後の再取得でも古い返事を捨てる。指摘：[#617 コメント](https://github.com/skmtmst/line-harness-oss/pull/617#issuecomment-5473175497)。**契約待ち：設計の「別の画像に差し替える」は差し替える口がまだ無い。** 押しても何も起きない操作は置かず、「まとめて差し替える操作は、まだ用意していません。」と書いた。使用先を一括で別メディアへ差し替える口が要る。取得元：`media-v6/YfTfJ-1440.png`・`YfTfJ-deletable-1440.png`＋`page.tsx:181-188,308-363`',
     verdictSource: 'media-v6/YfTfJ-1440.png',
-    verdictHead: '6a81d166',
+    verdictHead: 'b7e58a51',
 
   },
   {
@@ -2371,7 +2371,7 @@ export const CAPTURED_AT = {
     { pr: 577, head: '7b8df2f4', on: '2026-08-30', screens: ['RW5Tb'], note: '失敗のとき帯を — に。実値0と未取得を言い分ける' },
     { pr: 583, head: 'bb1e4dfd', on: '2026-08-30', screens: ['kQ1bs', 'XtfO3'], note: '編集画面に「出す順番」。表示は1番始まり、保存は0始まりのまま' },
     { pr: 592, head: '84f35a0b', on: '2026-08-30', screens: ['XtfO3'], note: 'Claudeが直した。3段の進み方。段の見た目は cCB7r と共通の部品へ切り出した。直した本人が比較している' },
-      { pr: 616, head: '1e9654f8', on: '2026-08-31', screens: ['szXsT'], note: 'Claude実装。#608 の delete-impact で、消したときの影響4つを削除の窓へ出した' },
+      { pr: 616, head: '0a11c9e8', on: '2026-08-31', screens: ['szXsT'], note: 'Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した' },
   ],
   14: [
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
@@ -2387,7 +2387,7 @@ export const CAPTURED_AT = {
     { pr: 559, head: '7922c002', on: '2026-08-29', screens: ['g89Tc'], note: '未取得を一括削除で選べないようにした。**#559 は #438 を含む**' },
     { pr: 560, head: '7c1acd0f', on: '2026-08-29', screens: ['g89Tc'], note: '寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eXAJP'], note: 'development そのもので撮った' },
-      { pr: 617, head: '6a81d166', on: '2026-08-31', screens: ['YfTfJ'], note: 'Claude実装。#610 の delete-impact で、使われている場所と確かめた時刻を削除の窓へ出した。差し替えの口は契約待ち' },
+      { pr: 617, head: 'b7e58a51', on: '2026-08-31', screens: ['YfTfJ'], note: 'Claude実装。使われている場所と確認時刻を表示。差し替えAPI待ちに加え、アカウント切替の遅延応答P1を監査で記録' },
   ],
   16: [
     { pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' },
