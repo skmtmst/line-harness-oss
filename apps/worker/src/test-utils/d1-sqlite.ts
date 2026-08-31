@@ -61,9 +61,16 @@ export function createTestD1(): SqliteD1 {
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),
     batch: async (statements: D1PreparedStatement[]) => {
-      const results = []
-      for (const statement of statements) results.push(await statement.run())
-      return results
+      raw.exec('BEGIN IMMEDIATE')
+      try {
+        const results = []
+        for (const statement of statements) results.push(await statement.run())
+        raw.exec('COMMIT')
+        return results
+      } catch (error) {
+        raw.exec('ROLLBACK')
+        throw error
+      }
     },
   } as unknown as D1Database
 
