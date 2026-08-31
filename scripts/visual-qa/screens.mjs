@@ -1070,28 +1070,28 @@ export const SCREENS = [
     }, verdict: 'needs_fix', verdictNote: '契約枝 `codex/kenta-v6-webinar-contracts-v2`（head `7b2dc2f9`）の `GET /api/webinars/overview` を読むようにした。**前の判定「一覧では数えられません」は解消。** ウェビナー数6件（公開中3）／申込428人（**延べ予約451件を分けて添える**）／視聴 `—`「実際に見た区間の記録をまだ集計できないため」／CTAを押した人86人。**設計の視聴312人・72.9%は固定値で置かない**——口が unavailable と理由を返すので、そのまま出す。**CTAは押した実人数**で、設計の「CTA反応…件 クリック」という件数の名前は使わない（クリック延べ数は取れない）。通常・0件・取得失敗・権限不足を別に撮った（8枚）。失敗は帯ごと失敗にして「集計を読み直す」を出す。**アカウント切替時は前の集計をその場で捨てる**。残る差：設計は行ごとに申込・視聴を出すが、実装は1本ぶんの数を一覧で持たない。フォルダの縦帯も無い', verdictSource: 'webinars-v6/ZC13r.txt + webinars-v6/design-qa.md' , verdictHead: 'f4c3f012' },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '**P1 作成の段が無い。** ルート `/webinars/new`。撮った本文の見出しは「ウェビナーを作る／録画と配信枠を設定すると、友だちが『◯』…」の1枚で、設計の 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 という段が無い。**段の終わり（公開前確認 `D6yO7e`・公開完了 `TimXl`）が未実装**なので、作り終えたかどうかを画面が言えない。**推奨修正**：#508 が `D6yO7e` を実装済みなので、#507 → #508 の取り込み後に段を通す。取得元：`webinars-v6/lvaY5.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt' , verdictHead: 'c275749d' },
   {
-    ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT, verdictNote: '**P2 動画・公開設定が1枚に同居している。** ルート `/webinars/edit?id=wb-1`。撮った本文は「ウェビナーの編集／動画セミナーの公開設定と、視聴中・視聴後…」で始まり、**`d3rFGD`（CTA・フォーム）`Xjk8q`（視聴後アクション）と同じ1枚**。設計はそれぞれ別の段。**同じ画面を3つのNodeで指しているので、どこを直したか追いにくい。** 取得元：`webinars-v6/PV1Vh.txt`。1440・1920とも横スクロール0 **推奨修正**：`d3rFGD` `Xjk8q` と同じ1枚なので、**3つまとめて段へ分ける**。1枚ずつ直すと同じ画面を3回触ることになり、どこを直したか追えなくなる。', verdictSource: 'webinars-v6/PV1Vh.txt',
+    ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT, verdictNote: '#623の段の上に、設計の**LINEプレビュー**を右へ置いた（head `96ed41b6`）。**中身は各段の入力から組み立てる**——口は増やしていない。入力がまだ無いときは「何を入れれば埋まるか」だけを書き、**それらしい文を作らない**（見本を置くと、保存すればそれが届くと読める）。設計画像のCTA文言「個別相談を予約する」を固定値で置いていない。残る差：「テスト送信」の押し口、設計の「公開期間」「視聴条件」は実装では配信スケジュールの1枚にまとまっている', verdictSource: 'Claude実装',
     steps: [{ qaOpen: 'PV1Vh' }],
     verdict: 'needs_fix',
     verdictNote: '#623で設計の段（STEP 1〜5）を入れた。上に進み表示、右に設定サマリー、下に「下書き保存／CTA・フォームへ」。動画の欄を基本設定から切り出し、「動画 R2 プレフィックス」を「動画ファイルの置き場所」に言い換えた。申込は1本ぶんの集計から出し、読めていなければ `—`。残る差：右のLINEプレビューと「テスト送信」、設計の「公開期間」「視聴条件」は実装では配信スケジュールの1枚にまとまっている',
     verdictSource: 'Claude実装',
-    verdictHead: '988cc37a',
+    verdictHead: '96ed41b6',
   },
   {
-    ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT, verdictNote: '**P2 CTA・フォームが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/d3rFGD.txt`。1440・1920とも横スクロール0 **推奨修正**：`PV1Vh` `Xjk8q` と同じ束。**3つまとめて段へ分ける。**', verdictSource: 'webinars-v6/d3rFGD.txt',
+    ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT, verdictNote: '#623で段の3番目になり、head `96ed41b6` で右にLINEプレビュー（ボタン文言をそのまま見せる）を足した。**保存の押し口が2つある**ことは画面で先に断っている。残る差：設計は入力項目・完了アクションを1行ずつたたんで見せる', verdictSource: 'Claude実装',
     steps: [{ qaOpen: 'd3rFGD' }],
     verdict: 'needs_fix',
     verdictNote: '#623で段の3番目になった。設計のCTA設定（表示タイミング・ボタン文言）は「動画の下に出すボタン」、申込フォームは「動画の途中に出すカード」に当たる。**保存の押し口が2つある**ことを画面で先に断っている。残る差：設計は入力項目・完了アクションを1行ずつたたんで見せる。右のLINEプレビューも無い',
     verdictSource: 'Claude実装',
-    verdictHead: '988cc37a',
+    verdictHead: '96ed41b6',
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
     verdict: 'needs_fix',
-    verdictNote: '#623で段の4番目になり、契約枝の overview.audience で**通知の対象人数**が出るようになった。「通知の対象 184人／取消を除いた有効な申込。延べ予約は191件」。**実人数と延べ予約を分け**、definition（active_registrations）は内部語なので画面へ出さない。設計の184人を固定値で書いていない。残る差：右のLINEプレビュー、設計の設定サマリーのタグ「配信済み」',
+    verdictNote: '契約枝の overview.audience で**通知の対象人数**が出る（「通知の対象 184人／取消を除いた有効な申込。延べ予約は191件」）。**実人数と延べ予約を分け**、definition は内部語なので出さない。head `96ed41b6` で右にLINEプレビューも足した。残る差：設計の設定サマリーのタグ「配信済み」（データ待ち）',
     verdictSource: 'Claude実装',
-    verdictHead: 'f4c3f012',
+    verdictHead: '96ed41b6',
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT, verdictNote: '**P2 視聴後アクションが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/Xjk8q.txt`。1440・1920とも横スクロール0 **推奨修正**：`PV1Vh` `d3rFGD` と同じ束。**3つまとめて段へ分ける。**', verdictSource: 'webinars-v6/Xjk8q.txt',
@@ -1132,16 +1132,16 @@ export const SCREENS = [
     verdictHead: '61eeb3c7',
   },
   {
-    ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT, verdictNote: '**P2 参加者管理が `yxyzQ`（分析）と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の画面。取得元：`webinars-v6/Q8sHa.txt`。1440・1920とも横スクロール0 **推奨修正**：`yxyzQ` と同じ1枚なので**2つまとめて分ける**。設計は別画面。', verdictSource: 'webinars-v6/Q8sHa.txt',
-    steps: [{ click: '概要・分析' }],
+    ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT, verdictNote: 'head `96ed41b6` で**参加者管理と分析を別の画面に分けた**（設計どおり）。同じ1枚に混ぜると、どちらを見ているのか分からなくなる。口も数も増やさず、出し分けだけを変えた。残る差：設計の参加者管理は絞り込みと並び替えを持つ', verdictSource: 'Claude実装',
+    steps: [{ click: '参加者' }],
     verdict: 'needs_fix',
     verdictNote: '#623で段の外へ移した（「概要・分析」）。段に混ぜると、作り終えるのに必要な手順に見えるため。**`yxyzQ` と同じ1枚のまま**で、設計は別画面。参加者の一覧・視聴の維持・コメントが1枚に載っている',
     verdictSource: 'Claude実装',
-    verdictHead: '988cc37a',
+    verdictHead: '96ed41b6',
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT, verdictNote: '**P2 分析が `Q8sHa` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。**一覧側でまとめて数える口が無い**ので `ZC13r` の帯が `—` のままになる（同じ根）。取得元：`webinars-v6/yxyzQ.txt`。1440・1920とも横スクロール0 **推奨修正**：**一覧側でまとめて数える口を足すのが先**——`ZC13r` の帯が `—` のままなのはこれが根。1本ぶんは `WebinarAnalytics` から出せているので、**同じ集計を一覧用にまとめて返す**だけ。', verdictSource: 'webinars-v6/yxyzQ.txt',
-    steps: [{ click: '概要・分析' }],
+    steps: [{ click: '分析' }],
     verdict: 'needs_fix',
     verdictNote: '#623で段の外へ移した（「概要・分析」）。1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。**一覧側でまとめて数える口が無い**ので `ZC13r` の帯が `—` のままなのは同じ根。`Q8sHa` と同じ1枚',
     verdictSource: 'Claude実装',
@@ -1902,7 +1902,12 @@ export const SCREENS = [
     設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
     送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
   */
-  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '**#504 `806ed169` で撮った。** 帯は 通知テンプレート 4件（顧客向けの重要通知）／通知ON 3件（現在送信する設定）／送信完了 2,412件（EC連携からの累計）／要確認 2件（送信に失敗した通知）で、**札ごとに何の数かを書く**。種類の絞り込みも すべて4・注文1・銀行振込1・発送1・キャンセル・返金1・定期便**0** と、数えて0のものを0で出す。「通知のON/OFFを切り替えても、ECから受け取った記録は消えません」と、切っても消えないことを断る。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は種類ごとに直近の送信結果と失敗理由をその場で開く。実装は数と絞り込みまで **ルート**：`/line-notifications`。**推奨修正**：種類ごとに直近の送信結果と失敗理由をその場で開けるようにする。**「要確認 2件（送信に失敗した通知）」の帯から、その2件へ飛べれば足りる**——数は既に出せている。「通知のON/OFFを切り替えても、ECから受け取った記録は消えません」の断りは残す。', verdictSource: 'line-notify-v6/festr.txt' , verdictHead: '806ed169' },
+  { ...LINE_NOTIFY, node: 'festr',
+    /* 通常・0件・取得失敗・権限不足を分けて撮る。 */
+    states: {
+      apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
+      kinds: ['normal', 'empty', 'error', 'forbidden'],
+    }, name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: 'head `4af43fb6` で「要確認 N件」から**送れなかったものの一覧へ渡す**ようにした。数を出すだけでは、その N件がどれかを探す場所が無かった。**0件のときは押し口を出さない**（押しても何も無い）。通常・0件・取得失敗・権限不足の4状態を撮った。残る差：設計は種類ごとに直近の送信結果と失敗理由をその場で開く', verdictSource: 'Claude実装' , verdictHead: '4af43fb6' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
     verdict: 'needs_fix', verdictNote: '**#504 `806ed169` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の通知テンプレート編集は、差し込みの一覧と送信前の見え方を並べて確かめる。実装との差は送信処理がつながってから見る **ルート**：`/line-notifications`（お知らせの中身を編集）。**取得元**：`line-notify-v6/Q55bb.txt`。**推奨修正**：差し込みの一覧と送信前の見え方を並べる。**`vCqUj`（フォーム）と `NNDMR`（質問）が差し込みの選び口を既に持っている**ので写す。送信処理がつながってから細かな差を見る。', verdictSource: 'line-notify-v6/Q55bb.txt',
@@ -2154,7 +2159,16 @@ export const SCREENS = [
     `/booking/staff/shifts` の別ルートにある。
   */
   { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'needs_fix', verdictNote: 'P1 タブの分けかたが違う。設計は「メニュー8／受付枠／休業日／予約のルール」を1つの帯に並べるが、実装はメニューと担当スタッフの2タブで、**受付枠と休業日は /booking/staff/shifts の別ルート**。予約管理の画面からは飛べるが、予約設定の画面のタブには出てこない。「予約のルール」（先の予約が取れる範囲・締め切り・キャンセル期限）は BookingMenu が持っている（booking_window_days / cutoff_hours_before / cancel_deadline_hours_before）のに、**メニューごとに散っていてまとめて見る場所が無い**。P2 帯が設計と違う（設計は 出しているメニュー6つ／いちばん選ばれた トリミング小型犬142件／受け付けている時間9:00〜19:00／先の予約が取れる範囲60日先まで）。枠の稼働率が—なのは、受付時間の総枠数を数える仕組みが無いためで、正直な出し方 **取得元**：`booking-settings-v6/QSLEH.txt`。**推奨修正**：**「予約のルール」をまとめて見る場所を作るのが先**。先の予約が取れる範囲・締め切り・キャンセル期限は `BookingMenu` が持っている（`booking_window_days` / `cutoff_hours_before` / `cancel_deadline_hours_before`）が、**メニューごとに散っていて全体を見られない**。タブに受付枠・休業日を寄せるのはそのあと。枠の稼働率が `—` なのは受付時間の総枠数を数える仕組みが無いためで、**正直な出し方**。', verdictSource: 'booking-settings-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: '**#517 `43d3d20e` で撮った。** 「スタッフごとの受付時間を決めます。**Googleカレンダーをつなぐと、そちらの予定が入っている時間は自動で受付を止めます。**」と、外の予定との関係を先に書く。「特別休業日を設定」「変更を保存」があり、編集する人を選ぶまでは何も出さない。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の受付時間は曜日×時間の格子で、休業日と重ねて見せる。実装は人ごとの一覧まで **ルート**：`/booking/staff/shifts`。**推奨修正**：受付時間を曜日×時間の格子にし、休業日と重ねて見せる。**「Googleカレンダーをつなぐと、そちらの予定が入っている時間は自動で受付を止めます。」の断りは残す**（外の予定との関係を先に書く手本）。', verdictSource: 'booking-settings-v6/tksPc.txt' , verdictHead: '43d3d20e' },
+  { ...BOOKING_SET, node: 'tksPc',
+    /*
+      スタッフを選ぶまで受付時間が出ない画面。選ばずに撮ると
+      「選んでください」の1枚しか残らない。
+    */
+    steps: [{ click: '佐々木' }],
+    states: {
+      apis: ['**/api/booking/admin/staff/**'],
+      kinds: ['normal', 'loading', 'error'],
+    }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: 'head `595c8359` で**受付時間を曜日×時間の格子**にした。1行ずつだと「何曜の何時なら受け付けるか」を見比べられない。受け付ける時間が入っている幅だけを出す。**特別な日を「休業」と決めつけない**——見出しは「特別な休み・営業」で、どちらかは口が言っていないので件数だけ示して一覧へ渡す。通常・読込中・取得失敗の3状態を撮った。**`getDay()` が閲覧側の時計で曜日を出す不具合を直した**（開発機がUTC+7で月曜が日曜に化けた）。残る差：設計はGoogleカレンダーの予定も格子に重ねる（予定を返す口が要る）', verdictSource: 'Claude実装' , verdictHead: '595c8359' },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: '**P2 予約のルールをメニューの中だけで決める形。設計より作りは細かい。** ルート `/booking/menus/new`。段は 1 お客様に見える情報（名前・所要時間・料金・分類・説明）／2 予約の受け方（同時に受けられる件数・受付期間・締め切り・キャンセル期限・後の空き時間）／3 このメニューを担当できる人。**良い点**：どの欄にも**何を入れる欄か**が添えてある（「同じ時間帯に何組まで受けるかです。」「片づけや移動の時間です。次の予約はこのぶん後ろから入ります。」「空欄なら制限なし。」）。**P2 設計との差**：設計は受付期間・締め切りを**予約設定側の共通ルール**に置き、メニューでは上書きだけを許す。実装はメニューごとに全部決める形なので、**メニューが増えるとルールがばらける**。取得元：`booking-settings-v6/GhOb3.txt`。1440・1920とも横スクロール0 **推奨修正**：受付期間・締め切りを**予約設定側の共通ルール**へ寄せ、メニューでは上書きだけを許す（`QSLEH` の「予約のルールをまとめて見る場所」と同じ束）。**メニューが増えるとルールがばらける**のがこの差の重さ。欄ごとの説明はそのまま残す。', verdictSource: 'booking-settings-v6/GhOb3.txt' , verdictHead: 'c275749d' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
@@ -2481,6 +2495,7 @@ export const CAPTURED_AT = {
   { pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZC13r', 'lvaY5', 'PV1Vh', 'd3rFGD', 'Xjk8q', 'Q8sHa', 'yxyzQ'], note: 'development そのもので撮った' },
     { pr: 0, head: 'f4c3f012', on: '2026-09-01', screens: ['ZC13r', 'Ho8z4'], note: 'Claudeが実装して撮った。契約枝 codex/kenta-v6-webinar-contracts-v2（head 7b2dc2f9）の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
+    { pr: 0, head: '96ed41b6', on: '2026-09-01', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Q8sHa'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   11: [
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
@@ -2556,6 +2571,7 @@ export const CAPTURED_AT = {
     { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
     { pr: 545, head: 'c9bb193d', on: '2026-08-30', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）' },
     { pr: 564, head: 'ad59fde6', on: '2026-08-29', screens: ['DpxOK'], note: '絞り込みチップを状態で言い分ける。失敗・権限不足は `—`' },
+    { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
@@ -2650,6 +2666,7 @@ export const CAPTURED_AT = {
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['QSLEH', 'GhOb3'], note: 'development そのもので撮った' },
+    { pr: 0, head: '595c8359', on: '2026-09-01', screens: ['tksPc'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   29: [
     { pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' },

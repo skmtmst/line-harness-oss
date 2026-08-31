@@ -779,6 +779,34 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/booking/admin/menus') return { menus: BOOKING_MENUS }
   if (pathname === '/api/booking/admin/staff') return { staff: BOOKING_STAFF }
   /*
+    受付時間の画面（`tksPc`）はスタッフを選んでから3つの口を読む。
+    **この3つが無いと、選んだ瞬間に失敗の絵になる。**
+    曜日ごとの受付時間と、特別な日を1件ずつ入れておく
+    （格子が「受け付ける時間だけ」を出せるかを見るため）。
+  */
+  {
+    const shifts = /^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/.exec(pathname)
+    if (shifts) {
+      return { shifts: [{ id: 'bshift-1', work_date: '2026-09-07', start_time: '10:00', end_time: '15:00' }] }
+    }
+    const rules = /^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/.exec(pathname)
+    if (rules) {
+      return {
+        rules: [
+          { id: 'br-1', weekday: 1, start_time: '10:00', end_time: '19:00' },
+          { id: 'br-2', weekday: 2, start_time: '10:00', end_time: '19:00' },
+          { id: 'br-3', weekday: 3, start_time: '10:00', end_time: '19:00' },
+          { id: 'br-4', weekday: 4, start_time: '12:00', end_time: '20:00' },
+          { id: 'br-5', weekday: 5, start_time: '10:00', end_time: '19:00' },
+          { id: 'br-6', weekday: 6, start_time: '09:00', end_time: '17:00' },
+        ],
+      }
+    }
+    /* 口の名前は `google-calendar`。形は `{ connection, service_account }`。 */
+    const calendar = /^\/api\/booking\/admin\/staff\/[^/]+\/google-calendar$/.exec(pathname)
+    if (calendar) return { connection: null, service_account: { configured: false, email: null } }
+  }
+  /*
     代理予約の担当者と空き時間。**メニュー側から引く担当者は値段を持つ。**
     空きは問い合わせた日をそのまま返す（撮影日に左右されないため）。
   */

@@ -955,6 +955,18 @@
             "Ho8z4"
           ],
           "note": "Claudeが実装して撮った。契約枝 codex/kenta-v6-webinar-contracts-v2（head 7b2dc2f9）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
+        },
+        {
+          "pr": 0,
+          "head": "96ed41b6",
+          "on": "2026-09-01",
+          "screens": [
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Q8sHa"
+          ],
+          "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
         }
       ]
     },
@@ -1852,6 +1864,15 @@
             "DpxOK"
           ],
           "note": "絞り込みチップを状態で言い分ける。失敗・権限不足は `—`"
+        },
+        {
+          "pr": 0,
+          "head": "4af43fb6",
+          "on": "2026-09-01",
+          "screens": [
+            "festr"
+          ],
+          "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
         }
       ]
     },
@@ -2079,6 +2100,15 @@
             "GhOb3"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 0,
+          "head": "595c8359",
+          "on": "2026-09-01",
+          "screens": [
+            "tksPc"
+          ],
+          "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
         }
       ]
     },
