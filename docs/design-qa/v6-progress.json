@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 57,
+  "match": 58,
   "structureMatchDataPending": 18,
-  "needsFix": 166,
+  "needsFix": 165,
   "unjudged": 0,
-  "remaining": 201,
+  "remaining": 200,
   "features": [
     {
       "feature": 1,
@@ -313,11 +313,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
+      "match": 6,
       "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 534,
@@ -462,6 +462,21 @@
             "RUxNf"
           ],
           "note": "Claudeが直した。配信前チェック4項目。確かめられない2つは —（未取得）。直した本人が比較している"
+        },
+        {
+          "pr": 625,
+          "head": "73d25b41",
+          "on": "2026-08-31",
+          "screens": [
+            "bV5Vs",
+            "xfYLn",
+            "r6Gzsu",
+            "hz9ti",
+            "dqFft",
+            "EvVO5",
+            "g2UNV"
+          ],
+          "note": "Claudeが実装して撮った。#591 の上（#591 は #553 と scenario-started を含む）。**dqFft の「シナリオごと削除がまだ confirm」は #591 で解決済みだった**"
         }
       ]
     },
