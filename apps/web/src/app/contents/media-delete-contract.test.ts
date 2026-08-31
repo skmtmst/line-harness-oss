@@ -54,4 +54,13 @@ describe('メディアの削除確認', () => {
     expect(PAGE).toContain('data-qa-open="YfTfJ"')
     expect(PAGE).toContain('data-design-node="YfTfJ"')
   })
+
+  it('遅れて返った別のメディアの結果を映さない', () => {
+    /*
+     * Aを読み込み中に窓を閉じてBを開くと、あとから返るAの結果がBの窓に
+     * 出る。読んでいるものと押せるものが食い違う。
+     */
+    expect(PAGE).toContain('impactRequestRef.current = item.id')
+    expect(PAGE).toContain('impactRequestRef.current !== item.id')
+  })
 })

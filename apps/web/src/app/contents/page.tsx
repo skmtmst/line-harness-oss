@@ -145,6 +145,8 @@ export default function MediaLibraryPage() {
   const [deleting, setDeleting] = useState<MediaItem | null>(null)
   const [impact, setImpact] = useState<MediaDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /** いま影響を読んでいる対象。遅れて返った別の結果を捨てるために持つ。 */
+  const impactRequestRef = useRef<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
@@ -312,12 +314,20 @@ export default function MediaLibraryPage() {
       setImpactPhase('error')
       return
     }
+    /*
+      **遅れて返った別のメディアの結果を映さない。** Aを読み込み中に窓を
+      閉じてBを開くと、あとから返るAの結果がBの窓に出る。読んでいるものと
+      押せるものが食い違う。
+    */
+    impactRequestRef.current = item.id
     try {
       const res = await api.media.deleteImpact(item.id, selectedAccountId)
+      if (impactRequestRef.current !== item.id) return
       if (!res.success) throw new Error('impact_failed')
       setImpact(res.data)
       setImpactPhase('ready')
     } catch {
+      if (impactRequestRef.current !== item.id) return
       /*
         使用先が読めないときは**消させない**。7種類のどれかに残ったまま
         消すと、その画面が壊れた画像を指す。
