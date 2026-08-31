@@ -76,6 +76,9 @@ import {
   CHATS,
   COMMON_ACTIONS,
   COMMON_VARS,
+  COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_DELETE_IMPACT_EMPTY,
+  COMMON_VAR_DELETE_IMPACT_ERROR,
   COMMON_VAR_FOLDERS,
   COMMON_VAR_IMPACT,
   COMMON_VAR_SCHEDULES,
@@ -1524,6 +1527,26 @@ function bodyFor(pathname, query = new URLSearchParams()) {
             : MEDIA_DELETE_IMPACT_EMPTY.media,
         }
     return { success: true, data: impact }
+  }
+  /* 共通情報を消したときの影響（PR #611）。 */
+  const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (commonVarDeleteImpact) {
+    if (query.get('visualState') === 'error') return COMMON_VAR_DELETE_IMPACT_ERROR
+    /*
+      **一覧の「使われている場所」と食い違わせない。** 一覧が使用先を
+      出しているので、削除確認だけ「どこにも差し込まれていません」に
+      なると、どちらが本当か分からなくなる。先頭の1件だけ使用中にする。
+    */
+    const first = (COMMON_VARS ?? [])[0]
+    const used = first && commonVarDeleteImpact[1] === first.id
+    const base = used ? COMMON_VAR_DELETE_IMPACT : COMMON_VAR_DELETE_IMPACT_EMPTY
+    const item = (COMMON_VARS ?? []).find((v) => v.id === commonVarDeleteImpact[1])
+    return {
+      success: true,
+      data: item
+        ? { ...base, variable: { id: item.id, name: item.name, varKey: item.varKey } }
+        : base,
+    }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }

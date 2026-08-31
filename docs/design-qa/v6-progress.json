@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 238,
-  "unimplemented": 20,
+  "compared": 239,
+  "unimplemented": 19,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 57,
   "structureMatchDataPending": 18,
-  "needsFix": 163,
+  "needsFix": 164,
   "unjudged": 0,
   "remaining": 201,
   "features": [
@@ -1135,14 +1135,14 @@
       "feature": 14,
       "name": "共通情報",
       "total": 4,
-      "compared": 3,
-      "unimplemented": 1,
+      "compared": 4,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -1165,6 +1165,15 @@
             "gBtaK"
           ],
           "note": "development そのもので撮った"
+        },
+        {
+          "pr": 619,
+          "head": "31b44202",
+          "on": "2026-08-31",
+          "screens": [
+            "yPkWe"
+          ],
+          "note": "Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち"
         }
       ]
     },
@@ -2156,13 +2165,6 @@
       "name": "13-1-E フォームの削除確認",
       "gap": "api",
       "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
-    {
-      "feature": 14,
-      "node": "yPkWe",
-      "name": "14-1-C 共通情報の削除確認",
-      "gap": "api",
-      "gapNote": "確認窓だけでは作れない。使用先と版、変更前後の文、予約中・公開中を返す影響確認、互換種類の代替候補、全使用先の差し替え、旧定義のアーカイブ、実行結果の記録が要る。#437の削除影響APIは件数と種類別集計までで、V6の差し替えは未実装"
     },
     {
       "feature": 16,

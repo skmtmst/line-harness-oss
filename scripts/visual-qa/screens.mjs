@@ -991,10 +991,10 @@ export const SCREENS = [
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'needs_fix',
-    verdictNote: '**#615 `5bfbd382`（#597 `eaa4050b` の上）でP0と前回のP1・P2は解消したが、再監査で公開処理の競合P1が残った。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。**解消済み**：画面を開くだけのdry-runと固定友だちIDを外し、下書きの `lastTestStatus` / `lastTestedAt` だけを読む。アカウント切替時に `draft`・`validation`・`published`・`publishError` を先に消し、読込要求はeffectの `alive` で古い返事を捨てる。現在地も5段目「確認」になった。**P1 残存：公開処理中にLINEアカウントを切り替えると、前のアカウントの `publish()` の返事が後から `setPublished(res.data)` へ入り、切替先で前アカウントの有効化完了を表示し得る。** 読込には要求世代のガードがあるが、書込の `publish` には無い。公開開始時のアカウントIDを保持し、返答時に現在のアカウントと一致するときだけ完了・失敗を反映する。切替後に古い公開応答を返す振る舞い試験を足す。取得元：`publish/page.tsx:132-153`、対象26件・required-pr-gate pass。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5473025101)',
+    verdictNote: '**#615 `5bfbd382`（#597 `eaa4050b` の上）でP0と前回のP1・P2は解消したが、再監査で公開処理の競合P1が残った。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。**解消済み**：画面を開くだけのdry-runと固定友だちIDを外し、下書きの `lastTestStatus` / `lastTestedAt` だけを読む。アカウント切替時に `draft`・`validation`・`published`・`publishError` を先に消し、読込要求はeffectの `alive` で古い返事を捨てる。現在地も5段目「確認」になった。**P1 残存：公開処理中にLINEアカウントを切り替えると、前のアカウントの `publish()` の返事が後から `setPublished(res.data)` へ入り、切替先で前アカウントの有効化完了を表示し得る。** 読込には要求世代のガードがあるが、書込の `publish` には無い。公開開始時のアカウントIDを保持し、返答時に現在のアカウントと一致するときだけ完了・失敗を反映する。切替後に古い公開応答を返す振る舞い試験を足す。取得元：`publish/page.tsx:132-153`、対象26件・required-pr-gate pass。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5473025101) **#615 `5bfbd382` で、監査で挙がったP0・P1・P2を直した。** P0：読み込みでdry-runを呼んでいたのをやめ、下書きが持つ `lastTestStatus` / `lastTestedAt` を読むだけにした。P1：アカウントを変えたら前の結果を捨てる。P2：段の現在地を5段目へ。3つとも戻すと落ちる試験を足した。再監査待ち。',
     verdictSource: 'friend-add-v6/ec9vg-1440.png',
     /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
-    verdictHead: '5873f18b',
+    verdictHead: '5bfbd382',
 
   },
   {
@@ -1002,10 +1002,10 @@ export const SCREENS = [
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
     verdict: 'needs_fix',
-    verdictNote: '**#615 `5bfbd382` で未実装ではなくなり、画面単体の内容は設計と一致するが、公開処理の競合P1が残る。** ルート `/friend-add-settings/publish`（公開を押した先）。1440・1920とも横スクロール0。公開した版・公開日時・対象人数・二重送信防止を公開の返事から出し、実行結果へは `monitoringPath` があるときだけリンクする。**P1：公開処理中にアカウントを切り替えると、古いアカウントの返事が後から `setPublished` され、切替先に前アカウントの完了内容を表示し得る。** `publish` にアカウントIDまたは要求世代のガードを足し、切替後の古い応答を捨てる。取得元：`friend-add-v6/quhg6-1440.png`、`publish/page.tsx:132-153`。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5473025101)',
+    verdictNote: '**#615 `5bfbd382` で未実装ではなくなり、画面単体の内容は設計と一致するが、公開処理の競合P1が残る。** ルート `/friend-add-settings/publish`（公開を押した先）。1440・1920とも横スクロール0。公開した版・公開日時・対象人数・二重送信防止を公開の返事から出し、実行結果へは `monitoringPath` があるときだけリンクする。**P1：公開処理中にアカウントを切り替えると、古いアカウントの返事が後から `setPublished` され、切替先に前アカウントの完了内容を表示し得る。** `publish` にアカウントIDまたは要求世代のガードを足し、切替後の古い応答を捨てる。取得元：`friend-add-v6/quhg6-1440.png`、`publish/page.tsx:132-153`。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5473025101) **#615 `5bfbd382` で、同じ画面のP0・P1・P2を直した（`ec9vg` の注記を参照）。** 再監査待ち。',
     verdictSource: 'friend-add-v6/quhg6-1440.png',
     /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
-    verdictHead: '5873f18b',
+    verdictHead: '5bfbd382',
 
   },
   {
@@ -1363,10 +1363,17 @@ export const SCREENS = [
   },
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
-    gap: 'api',
-    gapNote: '確認窓だけでは作れない。使用先と版、変更前後の文、予約中・公開中を返す影響確認、互換種類の代替候補、全使用先の差し替え、旧定義のアーカイブ、実行結果の記録が要る。#437の削除影響APIは件数と種類別集計までで、V6の差し替えは未実装',
-    status: 'unimplemented',
-    why: 'V6要件 §11 は使用中の物理削除を禁止し、代替への差し替え後に旧定義をアーカイブする。#437は使用中DELETEを409で止める安全柵を追加したが、代替選択・プレビュー・一括差し替え・版履歴・アーカイブは無い。ブラウザの `confirm()` を共通部品へ替えるだけでは正本の操作にならない',
+    mode: 'viewport', height: 1080,
+    steps: [{ qaOpen: 'yPkWe', after: 900 }],
+    variants: [
+      /* 消せるもの（どこにも差し込まれていない2件目）。 */
+      { suffix: '-deletable', steps: [{ click: '削除', nth: 1, after: 900 }] },
+    ],
+    verdict: 'needs_fix',
+    verdictNote: '**#619 `31b44202`（#611 `c93c52fc` の上）でClaudeが実装した。未実装ではなくなった。** ルート `/contents/vars`（削除の窓）。1440・1920とも横スクロール0。 **この画面のいちばん大事なところ：消すと、差し込んでいた場所が空欄のまま送られる。** 文そのものは送られ続けるので「ご不明な点は までお気軽にどうぞ。」のようになる。**「消えます」と書くと文ごと止まると読める**ので「空欄のまま送られます」と書いた。 **① 差し込みキーを打つまで押し口を出さない。** 取り消せない操作を、対象を取り違えたまま押せる形にしない。**一覧と同じ `{{var.キー}}` の形で聞く**（一覧は `page.tsx:482` でその形で出している。設計は `{会社名}` だが、確認だけ形を変えるとどちらを打つのか分からない）。 **② 送信済みを消せない理由に混ぜない。** もう送ったものはこれから変わらない。「すでに送った1件は、これから変わりません」と別に書く。 **③ 見せられない使用先も件数は出す**（「回答フォーム1件（所属するLINEアカウントを確認できないため、名前と内容は表示しません）」）。 **④ 使用先が読めないときは消させない。** 「参照0件」と読み違えて消すと、差し込んでいた文が空欄のまま送られ続ける。 **⑤ 409は読み直してから見せる。⑥ 遅れて返った別の共通情報の結果を映さない**（#616 の再監査と同じ形を最初から入れた）。 **契約待ち：設計の「別の共通情報に差し替えてから削除する」は差し替える口がまだ無い。** 押しても何も起きない操作は置かず、「まとめて差し替える操作は、まだ用意していません。」と書いた。`YfTfJ`（メディア）と同じ口が要る（Codex側）。 取得元：`common-vars-v6/yPkWe-1440.png`・`yPkWe-deletable-1440.png` ＋ `contents/vars/delete-impact.ts`',
+    verdictSource: 'common-vars-v6/yPkWe-1440.png',
+    verdictHead: '31b44202',
+
   },
 
   // ── 機能15 登録メディア ─────────────────────────────────
@@ -2376,6 +2383,7 @@ export const CAPTURED_AT = {
   14: [
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['WuKzU', 'gBtaK'], note: 'development そのもので撮った' },
+      { pr: 619, head: '31b44202', on: '2026-08-31', screens: ['yPkWe'], note: 'Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち' },
   ],
   26: [
     { pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' },

@@ -5452,6 +5452,54 @@ export const MEDIA_DELETE_IMPACT_ERROR = {
   error: '削除したときの影響を確認できませんでした',
 }
 
+/* PR #611 の共通情報の削除影響。契約と同じ項目名で置く。 */
+export const COMMON_VAR_DELETE_IMPACT = {
+  variable: { id: 'common-var-delete-target', name: '営業時間', varKey: 'shop_hours' },
+  total: 3,
+  blockingTotal: 2,
+  historicalTotal: 1,
+  unscopedFormTotal: 1,
+  canDelete: false,
+  byKind: { template: 1, broadcast: 1, scenario: 0, reminder: 0, auto_reply: 0, form: 1, automation: 0 },
+  items: [
+    {
+      kind: 'template', kindLabel: 'テンプレート', name: '来店後のご案内',
+      status: '使われています', href: '/templates/edit?id=template-usage-1',
+      blocksDeletion: true, currentPreview: '営業時間は10:00〜19:00です',
+    },
+    {
+      kind: 'broadcast', kindLabel: '一斉配信', name: '夏季営業のお知らせ',
+      status: '送信済み・変わりません', href: '/broadcasts/detail?id=broadcast-history-1',
+      blocksDeletion: false, currentPreview: '本日は10:00〜19:00で営業しました',
+    },
+  ],
+  unavailableReferences: [{
+    kind: 'form', kindLabel: '回答フォーム', count: 1,
+    reason: '所属するLINEアカウントを確認できないため、名前と内容は表示しません',
+  }],
+  checkedAt: '2026-08-31T10:00:00.000+09:00',
+  recommendedAction: 'review_references',
+}
+
+export const COMMON_VAR_DELETE_IMPACT_EMPTY = {
+  variable: { id: 'common-var-delete-safe', name: '臨時のお知らせ', varKey: 'temporary_notice' },
+  total: 0,
+  blockingTotal: 0,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  canDelete: true,
+  byKind: { template: 0, broadcast: 0, scenario: 0, reminder: 0, auto_reply: 0, form: 0, automation: 0 },
+  items: [],
+  unavailableReferences: [],
+  checkedAt: '2026-08-31T10:00:00.000+09:00',
+  recommendedAction: 'delete',
+}
+
+export const COMMON_VAR_DELETE_IMPACT_ERROR = {
+  success: false,
+  error: '使用先を確認できないため削除できません',
+}
+
 export const IDENTITY_CANDIDATE_ERROR = {
   success: false, error: '本人照合の候補を読み込めませんでした', code: 'VISUAL_QA_ERROR',
 }
