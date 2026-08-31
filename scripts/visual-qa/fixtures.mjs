@@ -3051,12 +3051,58 @@ export const STAFF_MEMBERS = [
  * **`autoOnInbound` を必ず入れる。** 「新しい返事が来たら自動で戻す」印で、
  * 落とすとダッシュボードの対応マークの帯が `—` のまま撮れる。
  */
+/*
+  対応マークの自動変更ルール（設計 `GMvBd`）。
+  **契約枝 codex/kenta-v6-support-mark-rules-api の固定データを写したもの。**
+  型は `SupportMarkAutomationRule`、並びはWorkerの
+  `ORDER BY priority DESC, created_at ASC` と同じ。
+*/
+export const SUPPORT_MARK_AUTOMATION_RULES = [
+  {
+    id: 'support-rule-assigned',
+    name: '担当者が決まったら対応中へ',
+    markId: 'mark-hold',
+    event: 'staff_assigned',
+    condition: null,
+    priority: 100,
+    manualProtectionMinutes: 60,
+    isActive: true,
+    version: 2,
+    updatedAt: '2026-08-31T10:00:00+09:00',
+  },
+  {
+    id: 'support-rule-overdue',
+    name: '期限を過ぎたら確認待ちへ',
+    markId: 'mark-hold',
+    event: 'response_overdue',
+    condition: { operator: 'AND', rules: [] },
+    priority: 50,
+    manualProtectionMinutes: 0,
+    isActive: false,
+    version: 1,
+    updatedAt: '2026-08-30T15:00:00+09:00',
+  },
+]
+
+export const SUPPORT_MARK_AUTOMATION_RULES_EMPTY = []
+
+export const SUPPORT_MARK_AUTOMATION_RULES_ERROR = {
+  success: false,
+  error: '自動変更ルールを読み込めませんでした',
+}
+
+/*
+  画面の型は `SupportMark & { friendCount: number }`（`mark-list.tsx`）。
+  **`friendCount` を書いていなかったので、「いまの人数」が「人」だけになり、
+  削除の分岐（`friendCount > 0`）も常に false になっていた。**
+  実装の不具合ではなく、固定データの不足。実値0の行も1つ残す。
+*/
 export const SUPPORT_MARKS = [
-  { id: 'mark-1', name: '未対応', color: '#dc2626', isDefault: true, autoOnInbound: true, displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z' },
-  { id: 'mark-2', name: '対応中', color: '#d97706', isDefault: false, autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z' },
-  { id: 'mark-3', name: '保留', color: '#2563eb', isDefault: false, autoOnInbound: false, displayOrder: 3, createdAt: '2026-01-05T00:00:00.000Z' },
-  { id: 'mark-4', name: '対応済', color: '#059669', isDefault: false, autoOnInbound: false, displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z' },
-  { id: 'mark-5', name: '気にかける', color: '#7c3aed', isDefault: false, autoOnInbound: false, displayOrder: 5, createdAt: '2026-04-10T00:00:00.000Z' },
+  { id: 'mark-1', name: '未対応', color: '#dc2626', isDefault: true, autoOnInbound: true, displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 8 },
+  { id: 'mark-2', name: '対応中', color: '#d97706', isDefault: false, autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 5 },
+  { id: 'mark-3', name: '保留', color: '#2563eb', isDefault: false, autoOnInbound: false, displayOrder: 3, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 3 },
+  { id: 'mark-4', name: '対応済', color: '#059669', isDefault: false, autoOnInbound: false, displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 12 },
+  { id: 'mark-5', name: '気にかける', color: '#7c3aed', isDefault: false, autoOnInbound: false, displayOrder: 5, createdAt: '2026-04-10T00:00:00.000Z', friendCount: 0 },
 ]
 
 /**

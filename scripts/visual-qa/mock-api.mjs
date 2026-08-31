@@ -186,8 +186,7 @@ import {
   WEBINAR_ANALYTICS,
   WEBINAR_NOTIFICATIONS,
   bookingAvailability,
-  testActionScoreRules,
-} from './fixtures.mjs'
+  testActionScoreRules, SUPPORT_MARK_AUTOMATION_RULES} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -724,6 +723,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     if (query.get('format') === 'segment_v1') return { success: true, data: SEGMENT_PRESETS }
     return { success: true, data: SAVED_SEARCHES }
+  }
+  if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
+    return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }

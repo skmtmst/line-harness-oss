@@ -2340,10 +2340,33 @@ export const SCREENS = [
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
-    dir: 'friend-attributes-v6', route: '/tags?tab=marks', gap: 'api',
-    gapNote: '**既存部品だけでは作れません。** 設計は1枚の画面で、名前・色・並び順・初期値のほかに**「自動変更ルール」**（担当者を割り当てたときなど、きっかけでマークを自動で変える）を持つ。ここに新しい口とテーブルが要る。名前・色・並び順・初期値までなら既存部品で作れる',
-    status: 'unimplemented',
-    why: '追加・編集の画面が無い。一覧の下に名前と色だけの追加欄がある（`components/friend-fields/mark-list.tsx`）。設計の自動変更ルールに当たるものは、口も画面も無い',
+    dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
+    /*
+      設計は名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。
+      マークを1つ選ぶとルールが出るので、押してから撮る。
+    */
+    steps: [{ click: '保留' }],
+    states: {
+      apis: ['**/api/support-marks/*/automation-rules**'],
+      kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
+    },
+    variants: [
+      {
+        // 版競合。**押して初めて出る失敗**なので、読み込みは素通しにする。
+        suffix: 'conflict',
+        state: { apis: ['**/api/support-marks/**/automation-rules**', '**/api/support-mark-rules/**'], kind: 'conflict' },
+        steps: [
+          { click: '保留' },
+          { qaOpen: 'GMvBd' },
+          { fill: 'ルールの名前', text: '期限を過ぎたら確認待ちへ' },
+          { qaOpen: 'GMvBd-save' },
+        ],
+      },
+    ],
+    verdict: 'needs_fix',
+    verdictNote: '契約枝 `codex/kenta-v6-support-mark-rules-api`（head `e95ac2b5`）の上に画面を実装。**未実装から外した。** 名前・色・並び順・初期値と自動変更ルールを同じ面で扱い、きっかけ5つ・優先順位・手動変更の保護時間を確認して保存できる。**並びは実行順そのもの**（Workerの `ORDER BY priority DESC, created_at ASC` と同じ）で、複数一致したときは上から1本だけ動くことを先に言う。読込中・0件・取得失敗・権限不足・版競合を混ぜず、5状態を撮った。**409では窓を閉じず**、書いた内容を残したまま「最新の内容を読み直す」を出す。停止は履歴を消さないことを確認窓に書く。残る差：設計は追加専用の1枚（パンくず「対応マーク > マークを追加」と下部の「キャンセル／対応マークを追加」）で、実装は一覧と同じ面に置いている。設計のルールは畳んだチップ（「担当者を割り当てたとき」→「このマークに変更」）で、実装は行に開いて出す。**条件（`condition`）の組み立ては未対応**——口は `SegmentCondition` を受けるが、組み立ての部品は `XBkiQ` と共通化してから入れる',
+    verdictSource: 'Claude実装',
+    verdictHead: '3aef8ded',
   },
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
@@ -2422,6 +2445,7 @@ export const CAPTURED_AT = {
     { pr: 420, head: 'f77de350', on: '2026-08-30', screens: ['HBTk0', 'yKEdO', 'KoT6c'], note: '入力済みを withUsage で読み、未取得は —。帯4つと表示先の列。項目移行の画面も撮れた' },
       { pr: 605, head: '3b5098a3', on: '2026-08-31', screens: ['l25rlp', 'ee0sk'], note: 'Claudeが直した。連動OFF時の説明・★の切り替え方・OFFに戻したときの断り。#422 の上' },
       { pr: 578, head: 'a744c582', on: '2026-08-31', screens: ['A1ZYeP', 'hqrOv'], note: 'Claudeが撮り直して判定を書き直した。A1ZYeP は絵ではなく `FriendFieldType` を読んで数え直した' },
+    { pr: 0, head: '3aef8ded', on: '2026-08-31', screens: ['GMvBd'], note: 'Claudeが実装して撮った。契約枝 codex/kenta-v6-support-mark-rules-api（head e95ac2b5）の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
   ],
   10: [
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },

@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 241,
-  "unimplemented": 17,
+  "compared": 242,
+  "unimplemented": 16,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 59,
   "structureMatchDataPending": 18,
-  "needsFix": 164,
+  "needsFix": 165,
   "unjudged": 0,
   "remaining": 199,
   "features": [
@@ -222,14 +222,14 @@
       "feature": 4,
       "name": "友だち属性",
       "total": 21,
-      "compared": 16,
-      "unimplemented": 1,
+      "compared": 17,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
       "match": 3,
       "structureMatchDataPending": 1,
-      "needsFix": 12,
+      "needsFix": 13,
       "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
@@ -315,6 +315,15 @@
             "hqrOv"
           ],
           "note": "Claudeが撮り直して判定を書き直した。A1ZYeP は絵ではなく `FriendFieldType` を読んで数え直した"
+        },
+        {
+          "pr": 0,
+          "head": "3aef8ded",
+          "on": "2026-08-31",
+          "screens": [
+            "GMvBd"
+          ],
+          "note": "Claudeが実装して撮った。契約枝 codex/kenta-v6-support-mark-rules-api（head e95ac2b5）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
         }
       ]
     },
@@ -2306,13 +2315,6 @@
       "name": "23-1-C EC連携のつなぎ先",
       "gap": "api",
       "gapNote": "つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記"
-    },
-    {
-      "feature": 4,
-      "node": "GMvBd",
-      "name": "4-3-A 対応マークを追加・編集",
-      "gap": "api",
-      "gapNote": "**既存部品だけでは作れません。** 設計は1枚の画面で、名前・色・並び順・初期値のほかに**「自動変更ルール」**（担当者を割り当てたときなど、きっかけでマークを自動で変える）を持つ。ここに新しい口とテーブルが要る。名前・色・並び順・初期値までなら既存部品で作れる"
     }
   ]
 }
