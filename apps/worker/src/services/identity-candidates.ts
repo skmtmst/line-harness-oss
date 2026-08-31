@@ -483,6 +483,12 @@ export async function decideIdentityCandidate(
   request: DecideIdentityCandidateRequest,
 ): Promise<IdentityCandidateDetail> {
   const row = await findRow(db, actor.tenantId, id);
+  await assertLineAccountTenant(db, actor.tenantId, row.left_line_account_id);
+  await assertLineAccountTenant(db, actor.tenantId, row.right_line_account_id);
+  await assertFriendScope(db, actor.tenantId, row.right_subject_id, row.right_line_account_id);
+  if (row.kind === 'friend_duplicate') {
+    await assertFriendScope(db, actor.tenantId, row.left_subject_id, row.left_line_account_id);
+  }
   if (row.version !== request.expectedVersion) {
     throw new IdentityCandidateError(409, 'STALE_CANDIDATE', '別の人が先に判定しました。最新の状態を読み直してください');
   }
@@ -528,13 +534,10 @@ export async function decideIdentityCandidate(
             id, tenant_id, candidate_id, user_id, friend_id, link_method,
             evidence_snapshot_json, confidence_score, linked_by, linked_at
           )
-          SELECT ?, ?, ?, ?, ?, 'operator_review', ?, ?, ?, ?
-          WHERE NOT EXISTS (
-            SELECT 1 FROM friend_identity_links WHERE friend_id = ? AND unlinked_at IS NULL
-          )`,
+          VALUES (?, ?, ?, ?, ?, 'operator_review', ?, ?, ?, ?)`,
         ).bind(
           crypto.randomUUID(), row.tenant_id, row.id, userId, friendId,
-          row.evidence_json, row.confidence_score, actor.id, now, friendId,
+          row.evidence_json, row.confidence_score, actor.id, now,
         ),
       );
       statements.push(
@@ -586,7 +589,19 @@ export async function decideIdentityCandidate(
       row.id, row.tenant_id, row.version,
     ),
   );
-  await db.batch(statements);
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('friend_identity_links.friend_id')) {
+      throw new IdentityCandidateError(
+        409,
+        'IDENTITY_LINK_CONFLICT',
+        '別の人が先にこの友だちを結び付けました。最新の状態を読み直してください',
+      );
+    }
+    throw error;
+  }
   return getIdentityCandidate(db, actor.tenantId, id);
 }
 

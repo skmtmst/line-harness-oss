@@ -225,6 +225,46 @@ describe('identity candidate contract', () => {
     })).rejects.toMatchObject({ code: 'IDENTITY_USER_CONFLICT', status: 409 });
   });
 
+  it('rechecks the current friend account before applying a decision', async () => {
+    const { db, raw } = seed();
+    await upsertIdentityCandidate(db, friendDraft());
+    raw.prepare("UPDATE friends SET line_account_id = 'account-b' WHERE id = 'friend-a'").run();
+
+    await expect(decideIdentityCandidate(db, actor, 'candidate-friend', {
+      expectedVersion: 1, decision: 'linked', reason: '本人確認済みのメールが一致しました',
+    })).rejects.toMatchObject({ code: 'FRIEND_SCOPE_MISMATCH', status: 403 });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM friend_identity_links').get()).toEqual({ count: 0 });
+    expect(raw.prepare("SELECT user_id FROM friends WHERE id = 'friend-a'").get()).toEqual({ user_id: null });
+  });
+
+  it('rolls back the decision when another link wins the race', async () => {
+    const { db, raw } = seed();
+    await upsertIdentityCandidate(db, friendDraft());
+    raw.prepare("INSERT INTO users (id, display_name) VALUES ('existing-user', '既存ユーザー')").run();
+    const originalBatch = db.batch.bind(db);
+    const racingDb = {
+      prepare: db.prepare.bind(db),
+      batch: async (statements: D1PreparedStatement[]) => {
+        raw.prepare(`
+          INSERT INTO friend_identity_links (
+            id, tenant_id, candidate_id, user_id, friend_id, link_method,
+            evidence_snapshot_json, confidence_score, linked_by, linked_at
+          ) VALUES ('existing-link', ?, 'candidate-friend', 'existing-user', 'friend-a',
+            'operator_review', '[]', 100, 'other-owner', '2026-08-30T12:00:00.000Z')
+        `).run(DEFAULT_TENANT_ID);
+        return originalBatch(statements);
+      },
+    } as unknown as D1Database;
+
+    await expect(decideIdentityCandidate(racingDb, actor, 'candidate-friend', {
+      expectedVersion: 1, decision: 'linked', reason: '本人確認済みのメールが一致しました',
+    })).rejects.toMatchObject({ code: 'IDENTITY_LINK_CONFLICT', status: 409 });
+    expect(raw.prepare("SELECT status, version FROM identity_candidates WHERE id = 'candidate-friend'").get())
+      .toEqual({ status: 'pending', version: 1 });
+    expect(raw.prepare("SELECT user_id FROM friends WHERE id = 'friend-b'").get()).toEqual({ user_id: null });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM friend_identity_links').get()).toEqual({ count: 1 });
+  });
+
   it('records an EC link and past-event scope without replaying LINE or changing event state', async () => {
     const { db, raw } = seed();
     await upsertIdentityCandidate(db, ecDraft());

@@ -140,7 +140,7 @@ identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'adm
     }
     const accountIds = await candidateAccountIds(c.env.DB, tenantId(c), data.id);
     if (!await canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds)) {
-      return c.json({ success: false, error: 'この候補を表示する権限がありません', code: 'FORBIDDEN' }, 403);
+      return c.json({ success: false, error: '候補が見つかりません', code: 'CANDIDATE_NOT_FOUND' }, 404);
     }
     return c.json({ success: true, data });
   } catch (error) {
@@ -148,7 +148,7 @@ identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'adm
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin', 'staff'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin'), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
@@ -171,7 +171,7 @@ identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owne
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin', 'staff'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin'), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
