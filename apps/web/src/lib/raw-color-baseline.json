@@ -54,7 +54,7 @@
   "app/updates/page.tsx": 18,
   "app/users/page.tsx": 4,
   "app/webhooks/page.tsx": 137,
-  "app/webinars/edit/page.tsx": 211,
+  "app/webinars/edit/page.tsx": 200,
   "app/webinars/page.tsx": 25,
   "components/accounts/account-edit-modal.tsx": 17,
   "components/accounts/account-form-fields.tsx": 21,
@@ -120,5 +120,5 @@
   "components/users/user-row.tsx": 25,
   "components/users/users-filters.tsx": 2,
   "components/users/users-table.tsx": 15,
-  "components/webinars/webinar-form.tsx": 67
+  "components/webinars/webinar-form.tsx": 64
 }

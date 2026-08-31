@@ -7,6 +7,15 @@ import Header from '@/components/layout/header'
 import WebinarForm from '@/components/webinars/webinar-form'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { useAccount } from '@/contexts/account-context'
+import {
+  STEPS,
+  nextLabelOf,
+  nextStepOf,
+  publishBlockers,
+  stepStateOf,
+  summaryRows,
+  type StepKey,
+} from './edit-steps'
 import Button from '@/components/shared/button'
 import {
   fetchApi,
@@ -826,19 +835,63 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
 }
 
 /**
- * タブの並び。設計（4-8-1）は「どのウェビナーか → いつ見られるようにするか →
- * 見ている途中に出すもの → 見終わったあとの動き」の順に並べている。
- * 実装は分析タブを先頭に置いていたが、編集画面なので設定を先にする。
+ * 段の外にあるもの。**設計の5段には無いが、実装が持っている。**
+ * 段に混ぜると「作り終えるのに必要な手順」に見えてしまうので、分けて置く。
  */
-const TABS = [
-  ['settings', 'いつ見られるようにするか'],
-  ['ctas', '見ている途中に出すもの'],
-  ['notifications', '通知とリマインド'],
+const EXTRAS = [
   ['comments', 'コメント演出'],
   ['analytics', '概要・分析'],
 ] as const
 
-type TabKey = (typeof TABS)[number][0]
+type ExtraKey = (typeof EXTRAS)[number][0]
+type PaneKey = StepKey | ExtraKey
+
+/**
+ * STEP 5 確認（設計 `D6yO7e`）。**公開の前に、足りないものを1つずつ言う。**
+ * ここで言えないと、公開してから友だちの画面で気づくことになる。
+ */
+function ReviewStep({ webinar, onBack }: { webinar: Webinar; onBack: (key: StepKey) => void }) {
+  const blockers = publishBlockers(webinar)
+  return (
+    <section className="space-y-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm sm:p-6" data-design-node="D6yO7e">
+      <div>
+        <h2 className="font-bold text-ink">公開の前に確認</h2>
+        <p className="mt-1 text-xs text-ink-faint">公開すると、友だちが申込・視聴できるようになります。</p>
+      </div>
+      {blockers.length > 0 ? (
+        <div className="text-warning bg-warning-bg rounded-card p-4 text-sm">
+          <p className="font-bold">このままでは公開できません。</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+            {blockers.map((text) => <li key={text}>{text}</li>)}
+          </ul>
+        </div>
+      ) : (
+        <p className="rounded-card bg-success-bg p-4 text-sm font-bold text-success">
+          必要なものは揃っています。
+        </p>
+      )}
+      <dl className="divide-y divide-hairline rounded-xl border border-hairline">
+        {[
+          ['タイトル', webinar.title || '未設定'],
+          ['公開ページ', `/webinar/${webinar.slug || '未設定'}`],
+          ['動画の長さ', `${Math.round(webinar.durationSeconds / 60)}分`],
+          ['配信枠', `${webinar.schedule.length}件`],
+        ].map(([label, value]) => (
+          <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+            <dt className="text-xs font-semibold text-ink-faint">{label}</dt>
+            <dd className="text-sm text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
+        <Button onClick={() => onBack('video')}>動画へ戻る</Button>
+      </div>
+      {/* 公開そのものは「基本設定」の公開状態を変えて保存します。ここに2つ目の公開口を作らない。 */}
+      <p className="text-xs text-ink-faint">公開するときは、基本設定の「公開状態」を公開中にして保存してください。</p>
+    </section>
+  )
+}
 
 function EditWebinarInner() {
   const id = useSearchParams().get('id')
@@ -846,7 +899,8 @@ function EditWebinarInner() {
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabKey>('analytics')
+  const [pane, setPane] = useState<PaneKey>('basic')
+  const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -856,6 +910,12 @@ function EditWebinarInner() {
       .then((res) => setWebinar(res.data))
       .catch((err) => setLoadError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false))
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    /* 読めないときは黙って `—` のまま。右の帯を数字で埋めない。 */
+    webinarApi.analytics(id).then((res) => setAnalytics(res.data)).catch(() => setAnalytics(null))
   }, [id])
 
   if (!id) {
@@ -948,29 +1008,131 @@ function EditWebinarInner() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid grid-cols-2 gap-1 border-b border-slate-200 bg-slate-50/70 p-2 sm:flex sm:gap-0 sm:overflow-x-auto sm:px-4 sm:pb-0 sm:pt-2">
-            {TABS.map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`shrink-0 rounded-lg border px-2 py-2.5 text-xs font-semibold transition-colors sm:rounded-b-none sm:rounded-t-xl sm:border-x-0 sm:border-t-0 sm:border-b-2 sm:px-5 sm:py-3 sm:text-sm ${
-                  tab === key
-                    ? 'border-blue-200 bg-blue-50 text-blue-700 sm:border-b-blue-600 sm:bg-white sm:shadow-[0_-1px_0_0_rgba(226,232,240,1)]'
-                    : 'border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-800'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {/*
+          段の進み表示（設計 4-8）。**いま何段目で、あと何が残っているか**を出す。
+          印は通り過ぎたかではなく、その段の入力が入っているかで決める。
+        */}
+        <ol className="mb-4 flex flex-wrap items-center gap-1 rounded-2xl border border-hairline bg-canvas p-3 shadow-sm">
+          {STEPS.map((step, index) => {
+            const state = stepStateOf(step.key, pane as StepKey, webinar)
+            return (
+              <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  onClick={() => setPane(step.key)}
+                  data-qa-open={step.mark}
+                  {...(step.node ? { 'data-design-node': step.node } : {})}
+                  aria-current={state === 'current' ? 'step' : undefined}
+                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
+                    state === 'current' ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      state === 'done'
+                        ? 'bg-success text-on-accent'
+                        : state === 'current'
+                          ? 'border-2 border-accent text-accent'
+                          : 'border border-hairline text-ink-faint'
+                    }`}
+                  >
+                    {state === 'done' ? '✓' : step.no}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold tracking-wide text-ink-faint">STEP {step.no}</span>
+                    <span className={`block truncate text-sm font-bold ${state === 'todo' ? 'text-ink-faint' : 'text-ink'}`}>{step.title}</span>
+                  </span>
+                </button>
+                {index < STEPS.length - 1 && <span className="hidden h-px w-4 shrink-0 bg-slate-200 sm:block" />}
+              </li>
+            )
+          })}
+        </ol>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0">
+            <div className="mb-3 flex flex-wrap gap-2">
+              {EXTRAS.map(([key, label]) => (
+                <Button
+                  key={key}
+                  variant={pane === key ? 'primary' : 'secondary'}
+                  onClick={() => setPane(key)}
+                >
+                  {label}
+                </Button>
+              ))}
+              <span className="self-center text-xs text-ink-faint">段を作り終えたあとに見るところです</span>
+            </div>
+
+            {pane === 'basic' && (
+              <WebinarForm
+                initial={webinar}
+                step="basic"
+                nextLabel={nextLabelOf('basic')}
+                onNext={() => setPane(nextStepOf('basic') as PaneKey)}
+              />
+            )}
+            {pane === 'video' && (
+              <WebinarForm
+                initial={webinar}
+                step="video"
+                nextLabel={nextLabelOf('video')}
+                onNext={() => setPane(nextStepOf('video') as PaneKey)}
+              />
+            )}
+            {pane === 'cta' && (
+              <div className="space-y-4">
+                <WebinarForm
+                  initial={webinar}
+                  step="cta"
+                  nextLabel={null}
+                />
+                <section className="rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
+                  <h2 className="font-bold text-ink">動画の途中に出すカード</h2>
+                  {/* 上の「動画の下に出すボタン」とは別に保存します。押し口が2つあることを先に言う。 */}
+                  <p className="mt-1 text-xs text-ink-faint">上のボタンとは別に保存します。</p>
+                  <div className="mt-4">
+                    <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button variant="primary" onClick={() => setPane('notifications')}>
+                      {nextLabelOf('cta')}
+                    </Button>
+                  </div>
+                </section>
+              </div>
+            )}
+            {pane === 'notifications' && (
+              <div className="space-y-4">
+                <WebinarNotifications webinar={webinar} publicUrl={publicUrl} />
+                <div className="flex justify-end">
+                  <Button variant="primary" onClick={() => setPane('review')}>
+                    {nextLabelOf('notifications')}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {pane === 'review' && <ReviewStep webinar={webinar} onBack={(key) => setPane(key)} />}
+            {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
+            {pane === 'analytics' && (
+              <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />
+            )}
           </div>
-          <div className="bg-slate-50/40 p-4 sm:p-6 xl:p-8">
-            {tab === 'settings' && <WebinarForm initial={webinar} />}
-            {tab === 'comments' && <CommentsTab webinarId={webinar.id} />}
-            {tab === 'ctas' && <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />}
-            {tab === 'notifications' && <WebinarNotifications webinar={webinar} publicUrl={publicUrl} />}
-            {tab === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
-          </div>
+
+          <aside className="min-w-0">
+            <section className="rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
+              <h2 className="font-bold text-ink">設定サマリー</h2>
+              <p className="mt-1 text-xs text-ink-faint">いま保存されている内容です。</p>
+              <dl className="mt-4 divide-y divide-hairline">
+                {summaryRows(webinar, analytics).map((row) => (
+                  <div key={row.label} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
+                    <dt className="text-xs font-semibold text-ink-faint">{row.label}</dt>
+                    <dd className="text-sm font-bold text-ink">{row.value}</dd>
+                    {row.note && <p className="w-full text-xs text-ink-faint">{row.note}</p>}
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </aside>
         </div>
       </div>
     </>

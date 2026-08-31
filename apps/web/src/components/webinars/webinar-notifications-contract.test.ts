@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const VIEW = fs.readFileSync(path.join(__dirname, 'webinar-notifications.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'webinars', 'edit', 'page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
+const STEPS = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'webinars', 'edit', 'edit-steps.ts'), 'utf8')
 
 describe('V6 ウェビナー通知とリマインドの契約', () => {
   it('実Nodeと通知設定の6種類を同じ画面で扱う', () => {
@@ -38,7 +39,13 @@ describe('V6 ウェビナー通知とリマインドの契約', () => {
   })
 
   it('既存の編集画面とAPIへ配線されている', () => {
-    expect(PAGE).toContain("['notifications', '通知とリマインド']")
+    /*
+      並びはタブから段（設計 4-8 の STEP 1〜5）へ変わった。
+      **確かめたいのは「押して行ける場所があること」**なので、
+      段の定義と、そこで実際に描かれることの両方を見る。
+    */
+    expect(STEPS).toContain("{ key: 'notifications', no: 4, title: '通知', mark: 'Ho8z4', node: 'Ho8z4' }")
+    expect(PAGE).toContain("pane === 'notifications'")
     expect(PAGE).toContain('<WebinarNotifications webinar={webinar} publicUrl={publicUrl} />')
     expect(API).toContain('/notifications/test')
     expect(API).toContain('saveNotifications')

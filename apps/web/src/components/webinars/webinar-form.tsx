@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -31,11 +32,22 @@ function inferDailySchedule(rules: WebinarScheduleRule[]): { start: string; end:
   return { start: times[0] ?? '00:00', end: times[times.length - 1] ?? '23:30', interval: interval > 0 ? interval : 30 }
 }
 
+/**
+ * どの段を描くか。設計（4-8）は 基本設定 → 動画 → CTA・フォーム と分けている。
+ * `'all'` は作成画面（`/webinars/new`）のように1枚で全部を出すとき。
+ */
+export type WebinarFormStep = 'basic' | 'video' | 'cta' | 'all'
+
 export interface WebinarFormProps {
   initial?: Webinar
+  step?: WebinarFormStep
+  /** 段の下の押し口の文言。段を進む画面では「動画へ」のように行き先で書く。 */
+  nextLabel?: string | null
+  onNext?: () => void
 }
 
-export default function WebinarForm({ initial }: WebinarFormProps) {
+export default function WebinarForm({ initial, step = 'all', nextLabel, onNext }: WebinarFormProps) {
+  const shows = (which: Exclude<WebinarFormStep, 'all'>) => step === 'all' || step === which
   const router = useRouter()
   const [title, setTitle] = useState(initial?.title ?? '')
   const [slug, setSlug] = useState(initial?.slug ?? '')
@@ -152,7 +164,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </div>
       )}
 
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      {shows('basic') && <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="font-bold text-slate-900">基本情報</h2><p className="mt-1 text-xs text-slate-500">普段変更する項目だけを表示しています</p></div>
         <div>
           <label className={labelClass}>
@@ -180,16 +192,6 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
             <option value="archived">アーカイブ</option>
           </select>
         </div>
-        <div>
-          <label className={labelClass}>動画の長さ（分）</label>
-          <input
-            type="number"
-            value={durationMinutes}
-            min={1}
-            onChange={(e) => setDurationMinutes(Number(e.target.value))}
-            className={`${inputClass} w-32`}
-          />
-        </div>
         <details className="group rounded-xl border border-slate-200 bg-slate-50/60">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700">
             URL・動画ファイルの詳細設定
@@ -200,15 +202,35 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
               <label className={labelClass}>slug（URL 用・半角英数とハイフン）</label>
               <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-seminar" className={`${inputClass} font-mono text-xs`} />
             </div>
-            <div>
-              <label className={labelClass}>動画 R2 プレフィックス</label>
-              <input value={videoPrefix} onChange={(e) => setVideoPrefix(e.target.value)} className={`${inputClass} font-mono text-xs`} />
-            </div>
           </div>
         </details>
-      </section>
+      </section>}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {shows('video') && <section className="space-y-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm sm:p-6">
+        <div><h2 className="font-bold text-ink">動画</h2><p className="mt-1 text-xs text-ink-faint">動画ファイルの置き場所と、再生時間を決めます</p></div>
+        <div>
+          <label className={labelClass}>動画の長さ（分）</label>
+          <input
+            type="number"
+            value={durationMinutes}
+            min={1}
+            onChange={(e) => setDurationMinutes(Number(e.target.value))}
+            className={`${inputClass} w-32`}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>動画ファイルの置き場所</label>
+          <input value={videoPrefix} onChange={(e) => setVideoPrefix(e.target.value)} placeholder="webinars/nen-start" className={`${inputClass} font-mono text-xs`} />
+          {/* 空のままだと、公開しても友だちの画面で再生が始まらない。 */}
+          {!videoPrefix.trim() && (
+            <p className="text-warning bg-warning-bg rounded-card mt-2 p-3 text-xs">
+              動画が未設定です。このままでは友だちが視聴できません。
+            </p>
+          )}
+        </div>
+      </section>}
+
+      {shows('video') && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><h2 className="font-bold text-slate-900">配信スケジュール</h2><p className="mt-1 text-xs text-slate-500">日本時間。参加画面には直近の候補だけが表示されます。</p></div>
@@ -316,10 +338,11 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </button>
           </div>
         </details>
-      </section>
+      </section>}
 
-      <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between p-5 text-sm font-bold text-slate-900 sm:p-6">従来CTAボタンの設定<span className="text-xs text-slate-400 group-open:rotate-180">▾</span></summary>
+      {shows('cta') && <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" open>
+        {/* 「従来」は作り手の言い方。読む人には、動画のどこに何を出すかで伝える。 */}
+        <summary className="flex cursor-pointer list-none items-center justify-between p-5 text-sm font-bold text-slate-900 sm:p-6">動画の下に出すボタン<span className="text-xs text-slate-400 group-open:rotate-180">▾</span></summary>
         <section className="space-y-3 border-t border-slate-200 p-5 sm:p-6">
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={ctaEnabled} onChange={(e) => setCtaEnabled(e.target.checked)} />
@@ -353,11 +376,16 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
           </>
         )}
         </section>
-      </details>
+      </details>}
 
       <div className="sticky bottom-3 z-10 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
         <span className="hidden text-xs text-slate-500 sm:block">変更内容を確認して本番へ反映します</span>
-        <button onClick={requestSave} disabled={saving} className="ml-auto rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開内容を確認' : '変更を保存'}</button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button onClick={requestSave} disabled={saving}>{saving ? '保存中...' : isPublishing ? '公開内容を確認' : '下書き保存'}</Button>
+          {nextLabel && onNext && (
+            <Button variant="primary" onClick={onNext}>{nextLabel}</Button>
+          )}
+        </div>
       </div>
     </div>
   )
