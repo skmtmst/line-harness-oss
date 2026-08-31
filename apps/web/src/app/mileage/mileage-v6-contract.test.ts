@@ -102,7 +102,14 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
     expect(ACTION_SCORE).toContain('data-design-node="z3PB2"')
     expect(ACTION_SCORE).toContain('api.actionScores.friends')
-    expect(ACTION_SCORE).toContain('顧客の価値を表すものではありません')
+    /*
+      断りの文はV6の面（`z3PB2`）の言い方へそろえた。確かめたいのは
+      **「スコアはマイルではない」と3つの言い方で断ること**なので、
+      1文ではなく3つとも見る。
+    */
+    expect(ACTION_SCORE).toContain('スコアはマイルではありません')
+    expect(ACTION_SCORE).toContain('お客様には見せず、交換もできません')
+    expect(ACTION_SCORE).toContain('マイル残高はスコアで増えも減りもしません')
     expect(ACTION_SCORE).toContain('kind="loading"')
     expect(ACTION_SCORE).toContain('kind="empty"')
     expect(ACTION_SCORE).toContain('kind="error"')

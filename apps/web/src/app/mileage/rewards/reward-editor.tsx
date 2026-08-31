@@ -49,13 +49,20 @@ const EMPTY_FORM: FormState = {
   couponCodes: '',
 }
 
-const KIND_OPTIONS = [
-  { value: 'coupon', label: '交換コードを渡す' },
-  { value: 'tag', label: 'タグを付ける' },
-  { value: 'scenario', label: 'シナリオを始める' },
-  { value: 'template', label: '案内を送る' },
-  { value: 'early_access', label: '先行案内を届ける' },
-  { value: 'rank', label: 'ランクを変更する' },
+/**
+ * 渡すもの。設計（`p9CcEB`）は選ぶ欄ではなく**並べたタイル**で、
+ * それぞれ何が起きるかを添えている。選ぶ欄だと開くまで中身が見えない。
+ *
+ * **設計の「回答フォームへ」「品もの」は入れていない。**
+ * `MileageRewardKind` に無く、勝手に足すと選べるように見えて保存できない。
+ */
+const KIND_OPTIONS: ReadonlyArray<{ value: MileageRewardKind; label: string; note: string }> = [
+  { value: 'coupon', label: '交換コードを渡す', note: '用意したコードを1件ずつ渡します' },
+  { value: 'tag', label: 'タグを付ける', note: '交換した人に印を付けます' },
+  { value: 'scenario', label: 'シナリオを始める', note: '交換をきっかけに配信を始めます' },
+  { value: 'template', label: '案内を送る', note: '決めておいた文をその場で送ります' },
+  { value: 'early_access', label: '先行案内を届ける', note: '公開前のお知らせを先に届けます' },
+  { value: 'rank', label: 'ランクを変更する', note: '交換した人のランクを変えます' },
 ]
 
 function dateTimeInput(value: string | null) {
@@ -283,7 +290,28 @@ export default function MileageRewardEditor({ rewardId }: { rewardId?: string })
           <section className="space-y-4 border-t border-v6-divider pt-5">
             <h2 className="text-sm font-semibold text-v6-ink">3. 交換したときに渡すもの</h2>
             <Field label="渡すもの" required>
-              <Select aria-label="渡すもの" size="full" value={form.rewardKind} options={KIND_OPTIONS} onChange={(value) => set('rewardKind', value as MileageRewardKind)} />
+              <div role="radiogroup" aria-label="渡すもの" className="grid gap-2 sm:grid-cols-2">
+                {KIND_OPTIONS.map((option) => {
+                  const selected = form.rewardKind === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => set('rewardKind', option.value)}
+                      className={`rounded-v6-control border px-4 py-3 text-left transition-colors ${
+                        selected
+                          ? 'border-v6-accent bg-v6-accent-soft'
+                          : 'border-v6-divider hover:bg-v6-surface'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-v6-ink">{option.label}</span>
+                      <span className="block text-xs text-v6-ink-secondary">{option.note}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </Field>
             {form.rewardKind === 'coupon' ? (
               <Field label="交換コード" htmlFor="reward-codes" required={!reward?.currentPublishedVersionId} note="1行に1件。保存後は安全のため画面へ戻しません。追加分だけを入力してください。">
