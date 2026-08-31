@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import TagEditorV4, { type TagEditorValues } from './tag-editor-v4'
 
 export function DeleteDialog({ tag, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
@@ -31,6 +32,7 @@ export function DeleteDialog({ tag, onCancel, onDelete, deleting, initialConfirm
 }
 
 export default function EditTagPageV4() {
+  usePageTitle('タグを編集')
   const router = useRouter()
   const params = useSearchParams()
   const tagId = params.get('id') ?? ''
