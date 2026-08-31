@@ -7,9 +7,7 @@
  * どちらも実際に起きた（2026-08-26）。
  */
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { readArrayGetPaths } from './api-shapes.mjs';
-// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import {
   WEBINAR_ACTION_SETTINGS,
   WEBINAR_ACTION_SETTINGS_EMPTY,
