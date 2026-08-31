@@ -145,8 +145,18 @@ export default function MediaLibraryPage() {
   const [deleting, setDeleting] = useState<MediaItem | null>(null)
   const [impact, setImpact] = useState<MediaDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  /** いま影響を読んでいる対象。遅れて返った別の結果を捨てるために持つ。 */
-  const impactRequestRef = useRef<string | null>(null)
+  /*
+    いま影響を読んでいる対象。遅れて返った別の結果を捨てるために持つ。
+
+    **メディアIDだけでは足りない。** 同じメディアを開き直したときや、
+    アカウントを変えたあとに前の要求の返事が届いたときを止められない。
+    アカウント・メディア・読み込み回数の3つで照合する。
+  */
+  const impactRequestRef = useRef<{ accountId: string | null; mediaId: string | null; generation: number }>({
+    accountId: null,
+    mediaId: null,
+    generation: 0,
+  })
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
@@ -319,15 +329,21 @@ export default function MediaLibraryPage() {
       閉じてBを開くと、あとから返るAの結果がBの窓に出る。読んでいるものと
       押せるものが食い違う。
     */
-    impactRequestRef.current = item.id
+    const generation = impactRequestRef.current.generation + 1
+    const at = { accountId: selectedAccountId, mediaId: item.id, generation }
+    impactRequestRef.current = at
+    const isCurrent = () =>
+      impactRequestRef.current.accountId === at.accountId
+      && impactRequestRef.current.mediaId === at.mediaId
+      && impactRequestRef.current.generation === at.generation
     try {
-      const res = await api.media.deleteImpact(item.id, selectedAccountId)
-      if (impactRequestRef.current !== item.id) return
+      const res = await api.media.deleteImpact(item.id, at.accountId)
+      if (!isCurrent()) return
       if (!res.success) throw new Error('impact_failed')
       setImpact(res.data)
       setImpactPhase('ready')
     } catch {
-      if (impactRequestRef.current !== item.id) return
+      if (!isCurrent()) return
       /*
         使用先が読めないときは**消させない**。7種類のどれかに残ったまま
         消すと、その画面が壊れた画像を指す。
@@ -354,13 +370,17 @@ export default function MediaLibraryPage() {
           いるので、影響を読み直してから見せる。
         */
         setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
-        if (selectedAccountId) {
-          try {
-            const again = await api.media.deleteImpact(deleting.id, selectedAccountId)
-            if (again.success) setImpact(again.data)
-          } catch {
-            setImpactPhase('error')
-          }
+        /* 読み直しの返事も、同じ3つで照合してから映す。 */
+        const at = { ...impactRequestRef.current }
+        try {
+          const again = await api.media.deleteImpact(deleting.id, at.accountId ?? selectedAccountId)
+          const same =
+            impactRequestRef.current.accountId === at.accountId
+            && impactRequestRef.current.mediaId === at.mediaId
+            && impactRequestRef.current.generation === at.generation
+          if (same && again.success) setImpact(again.data)
+        } catch {
+          setImpactPhase('error')
         }
         return
       }

@@ -55,12 +55,23 @@ describe('メディアの削除確認', () => {
     expect(PAGE).toContain('data-design-node="YfTfJ"')
   })
 
-  it('遅れて返った別のメディアの結果を映さない', () => {
+  it('遅れて返った別の結果を、3つで照合して捨てる', () => {
     /*
      * Aを読み込み中に窓を閉じてBを開くと、あとから返るAの結果がBの窓に
      * 出る。読んでいるものと押せるものが食い違う。
+     *
+     * **メディアIDだけでは足りない。** 同じメディアを開き直したときや、
+     * アカウントを変えたあとに前の返事が届いたときを止められない。
      */
-    expect(PAGE).toContain('impactRequestRef.current = item.id')
-    expect(PAGE).toContain('impactRequestRef.current !== item.id')
+    expect(PAGE).toContain('impactRequestRef.current.accountId === at.accountId')
+    expect(PAGE).toContain('impactRequestRef.current.mediaId === at.mediaId')
+    expect(PAGE).toContain('impactRequestRef.current.generation === at.generation')
+    expect(PAGE).toContain('if (!isCurrent()) return')
+  })
+
+  it('409の読み直しも同じ3つで照合する', () => {
+    // 読み直しの返事だけ素通しにすると、そこから取り違えが入る。
+    expect(PAGE).toContain('読み直しの返事も、同じ3つで照合してから映す')
+    expect(PAGE).toContain('if (same && again.success) setImpact(again.data)')
   })
 })
