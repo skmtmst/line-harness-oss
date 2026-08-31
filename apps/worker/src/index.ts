@@ -1218,6 +1218,19 @@ async function scheduled(
     console.error('webinar-reminders error:', e);
   }
 
+  // 未視聴の共通アクションは通知設定と独立して動かす。
+  try {
+    const { processDueMissedWebinarActions } = await import('./services/webinar-actions.js');
+    const result = await processDueMissedWebinarActions(env.DB, {
+      credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    if (result.processed + result.failed > 0) {
+      console.log(`[webinar-missed-actions] processed=${result.processed} failed=${result.failed}`);
+    }
+  } catch (e) {
+    console.error('webinar-missed-actions error:', e);
+  }
+
   // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
   // 同じ申込へ二重送信しない。
   try {

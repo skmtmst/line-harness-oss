@@ -11,12 +11,16 @@ import { describe, expect, it } from 'vitest';
 import { readArrayGetPaths } from './api-shapes.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import {
+  WEBINAR_ACTION_SETTINGS,
+  WEBINAR_ACTION_SETTINGS_EMPTY,
+  WEBINAR_ACTION_SETTINGS_FAILURE,
   WEBINAR_NOTIFICATION_SETTINGS,
   WEBINAR_NOTIFICATION_SETTINGS_EMPTY,
   WEBINAR_NOTIFICATION_SETTINGS_FAILURE,
   WEBINAR_OVERVIEW,
   WEBINAR_OVERVIEW_EMPTY,
   WEBINAR_OVERVIEW_FAILURE,
+  WEBINARS,
 } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
@@ -69,6 +73,40 @@ describe('画面確認モックの口の形', () => {
       definition: 'active_registrations',
     });
     expect(WEBINAR_NOTIFICATION_SETTINGS_FAILURE).toEqual({
+      success: false,
+      error: 'Internal server error',
+    });
+  });
+
+  it('ウェビナー一覧の1件は実画面が読む配列の形で返す', () => {
+    expect(WEBINARS).toHaveLength(1);
+    expect(WEBINARS[0]).toMatchObject({
+      id: 'webinar-1',
+      accountId: 'visual-qa-account',
+      status: 'active',
+      durationSeconds: 3600,
+    });
+    expect(Array.isArray(WEBINARS[0].schedule)).toBe(true);
+  });
+
+  it('視聴後アクションは通常・未設定・失敗を分け、公開版を固定する', () => {
+    expect(WEBINAR_ACTION_SETTINGS.settings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        trigger: 'completed',
+        version: 2,
+        action: expect.objectContaining({ versionId: 'common-action-follow-v2' }),
+      }),
+      expect.objectContaining({ trigger: 'missed', version: 0, action: null }),
+    ]));
+    expect(WEBINAR_ACTION_SETTINGS.triggerDefinitions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ trigger: 'completed', availability: 'estimated' }),
+      expect.objectContaining({ trigger: 'cta_click', availability: 'available' }),
+    ]));
+    expect(WEBINAR_ACTION_SETTINGS_EMPTY.availableActions).toEqual([]);
+    expect(WEBINAR_ACTION_SETTINGS_EMPTY.settings.every(
+      (setting) => setting.version === 0 && setting.action === null,
+    )).toBe(true);
+    expect(WEBINAR_ACTION_SETTINGS_FAILURE).toEqual({
       success: false,
       error: 'Internal server error',
     });
