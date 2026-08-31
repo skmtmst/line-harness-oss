@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ListState, { type ListStateKind } from '@/components/shared/list-state'
-import { ApiError, webinarApi, type Webinar } from '@/lib/api'
+import { ApiError, webinarApi, type Webinar, type WebinarOverview } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { overviewCards } from './overview-view'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -79,6 +81,41 @@ export default function WebinarsPage() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
+  const { selectedAccountId } = useAccount()
+  const [overview, setOverview] = useState<WebinarOverview | null>(null)
+  const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
+
+  /* 遅い返事を別のアカウントへ映さない。切り替えた時点で世代を進める。 */
+  const overviewRef = useRef<{ accountId: string | null; generation: number }>({
+    accountId: null, generation: 0,
+  })
+
+  const refreshOverview = useCallback(async () => {
+    /*
+      **アカウントを切り替えたら、前の集計はその場で捨てる。**
+      読み終わるまで前の数字を残すと、別のアカウントの数を見たまま
+      操作することになる。
+    */
+    setOverview(null)
+    setOverviewFailure(null)
+    overviewRef.current = {
+      accountId: selectedAccountId, generation: overviewRef.current.generation + 1,
+    }
+    const at = { ...overviewRef.current }
+    const stillHere = () =>
+      overviewRef.current.accountId === at.accountId
+      && overviewRef.current.generation === at.generation
+    if (!selectedAccountId) return
+    try {
+      const res = await webinarApi.overview(selectedAccountId)
+      if (!stillHere()) return
+      setOverview(res.data)
+    } catch (e) {
+      if (!stillHere()) return
+      /* 失敗を0件にしない。帯ごと失敗として描く。 */
+      setOverviewFailure(webinarLoadFailure(e))
+    }
+  }, [selectedAccountId])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -96,6 +133,10 @@ export default function WebinarsPage() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    void refreshOverview()
+  }, [refreshOverview])
 
   // タイトルと slug の両方を見る。URLで探すこともあるため。
   const q = query.trim()
@@ -143,35 +184,38 @@ export default function WebinarsPage() {
         />
       </div>
 
-      <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ウェビナー</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {hasListData ? items.length : '—'}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {hasListData ? items.filter((w) => w.status === 'active').length : '—'}
-          </p>
+      {/*
+        帯は `GET /api/webinars/overview` を読む。**数えられないものを
+        0にしない**——口が `unavailable` と理由を返すので、`—` と理由を
+        そのまま出す。設計の視聴312人・72.9%は固定値で置かない。
+      */}
+      {overviewFailure ? (
+        <div className="mx-auto mb-4 max-w-6xl px-6">
+          <ListState
+            kind={overviewFailure.kind}
+            title={overviewFailure.title}
+            description={overviewFailure.description}
+            action={
+              overviewFailure.kind === 'error'
+                ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button>
+                : undefined
+            }
+          />
         </div>
-        {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
-            一覧でまとめて数える経路を持っていない。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">申込</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">一覧では数えられません</p>
+      ) : (
+        <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
+          {overviewCards(overview).map((card) => (
+            <div key={card.key} className="bg-canvas rounded-card border-hairline border p-4">
+              <p className="text-ink-faint text-xs">{card.title}</p>
+              <p className={`mt-1 text-2xl font-bold tabular-nums ${card.view.available ? 'text-ink' : 'text-ink-faint'}`}>
+                {card.view.text}
+              </p>
+              {/* 未取得のときは理由、読めているときだけ添え字。 */}
+              <p className="text-ink-faint mt-0.5 text-xs">{card.view.note ?? card.detail ?? ''}</p>
+            </div>
+          ))}
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">平均視聴率</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">申込者のうち</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">平均視聴時間</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">視聴ログの集計は未対応</p>
-        </div>
-      </div>
+      )}
       <div className="p-6 max-w-6xl mx-auto">
         <div
           data-design="Bar"

@@ -12,6 +12,7 @@ import {
   type WebinarNotificationOverview,
   type WebinarNotificationSettingsInput,
 } from '@/lib/api'
+import { audienceText } from '@/app/webinars/overview-view'
 
 const DEFAULT_SETTINGS: WebinarNotificationSettingsInput = {
   registrationEnabled: true,
@@ -86,6 +87,7 @@ export default function WebinarNotifications({
 }) {
   const [settings, setSettings] = useState<WebinarNotificationSettingsInput>(DEFAULT_SETTINGS)
   const [overview, setOverview] = useState<WebinarNotificationOverview>(EMPTY_OVERVIEW)
+  const audience = audienceText(overview.audience)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -291,6 +293,16 @@ export default function WebinarNotifications({
           <section className="rounded-card border-hairline border bg-canvas p-4 shadow-sm">
             <h2 className="text-ink text-sm font-bold">設定サマリー</h2>
             <dl className="mt-4 divide-y divide-hairline text-sm">
+              {/*
+                通知が届く相手の数。**実人数と延べ予約を混ぜない**——
+                1人が2回申し込めば、人は1・予約は2。`definition` は口の言葉
+                なので、画面では「有効な申込」と説明する。
+              */}
+              <div className="flex flex-wrap justify-between gap-4 py-3">
+                <dt className="text-ink-faint">通知の対象</dt>
+                <dd className="text-ink font-semibold tabular-nums">{audience.people}</dd>
+                <p className="text-ink-faint w-full text-xs">{audience.note}</p>
+              </div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-ink-faint">通知</dt><dd className="text-ink font-semibold">{enabledCount}種類</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-ink-faint">送信待ち</dt><dd className="text-ink font-semibold tabular-nums">{overview.pending}件</dd></div>
               <div className="flex justify-between gap-4 py-3"><dt className="text-ink-faint">送信済み</dt><dd className="text-ink font-semibold tabular-nums">{overview.sent}件</dd></div>
