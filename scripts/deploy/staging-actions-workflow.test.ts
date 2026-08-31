@@ -36,6 +36,15 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('echo "$CLOUDFLARE_ACCOUNT_ID"');
   });
 
+  it('prefers deploy credentials over the D1 migration fallback', () => {
+    expect(workflow).toContain(
+      'secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN',
+    );
+    expect(workflow).toContain(
+      'secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID',
+    );
+  });
+
   it('keeps cron disabled and migrations in their separate workflow', () => {
     expect(workflow).toContain("grep -q '^\\[triggers\\]'");
     expect(workflow).not.toContain('d1 migrations apply');
