@@ -23,6 +23,7 @@ describe('共通部品の影響範囲', () => {
       'app/common-actions/versions/page.tsx',
       'app/conversions/page.tsx',
       'app/form-submissions/page.tsx',
+      'app/friends/page.tsx',
       'app/hq/open/page.tsx',
       'app/hq/page.tsx',
       'app/hq/settings/hq-staff-section.tsx',
