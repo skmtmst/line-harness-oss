@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { SupportMark } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SupportMarkRulesPanel from './support-mark-rules-panel'
 
 type MarkRow = SupportMark & { friendCount: number }
 
@@ -24,6 +25,8 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   const [color, setColor] = useState(PRESET_COLORS[0])
   const [adding, setAdding] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
+  /* 設計 `GMvBd` は名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。 */
+  const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null)
   const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
@@ -141,15 +144,27 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
               </tr>
             ) : (
               items.map((mark) => (
-                <tr key={mark.id} className="hover:bg-canvas-sunken">
+                <tr
+                  key={mark.id}
+                  className={`hover:bg-canvas-sunken ${selectedMarkId === mark.id ? 'bg-accent-soft' : ''}`}
+                >
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-2">
+                    {/*
+                      押せるものは押せる形にする。行全体を押し口にすると、
+                      キーボードで辿れず、読み上げにも押せると伝わらない。
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMarkId(mark.id)}
+                      aria-pressed={selectedMarkId === mark.id}
+                      className="inline-flex w-full items-center gap-2 text-left"
+                    >
                       <span
-                        className="inline-block h-3 w-3 rounded-full"
+                        className="inline-block h-3 w-3 shrink-0 rounded-full"
                         style={{ backgroundColor: mark.color }}
                       />
                       <span className="text-ink truncate text-sm font-medium" title={mark.name}>{mark.name}</span>
-                    </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     {/* 初期値は1つだけ。選ばれているものは札で出す。
@@ -180,14 +195,15 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                     <input
                       type="checkbox"
                       checked={mark.autoOnInbound}
-                      onChange={(e) => patch(mark, { autoOnInbound: e.target.checked })}
+                      onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => patch(mark, { autoOnInbound: e.target.checked })}
                       aria-label={`${mark.name}を受信時に自動で付ける`}
                       className="rounded border-gray-300"
                     />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => remove(mark)}
+                      onClick={(e) => { e.stopPropagation(); remove(mark) }}
                       disabled={mark.isDefault}
                       title={mark.isDefault ? '初期値のマークは削除できません' : undefined}
                       className="hover:bg-danger-bg text-danger rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-30"
@@ -200,6 +216,18 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
             )}
           </tbody>
         </table>
+      </div>
+
+      {/*
+        設計 `GMvBd` は、名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。
+        別画面にすると「このマークがいつ付くのか」を見るのに行き来することになる。
+      */}
+      <div className="mt-4">
+        <SupportMarkRulesPanel
+          accountId={accountId}
+          markId={selectedMarkId}
+          markName={items.find((mark) => mark.id === selectedMarkId)?.name ?? ''}
+        />
       </div>
 
       <div className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-end gap-3 border p-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
