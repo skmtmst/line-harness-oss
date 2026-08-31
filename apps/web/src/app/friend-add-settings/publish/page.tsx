@@ -2,7 +2,6 @@
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react'
 import type {
-  FriendAddRoutingDraftTestResult,
   FriendAddRoutingPublishResult,
   FriendAddRoutingValidation,
   FriendAddRoutingVersion,
@@ -21,7 +20,6 @@ import {
   idempotencyKeyFor,
   monitoringLink,
   NOT_AVAILABLE,
-  testResultText,
 } from './publish-flow'
 import styles from './publish.module.css'
 
@@ -73,7 +71,6 @@ function FriendAddPublishInner() {
   const [phase, setPhase] = useState<Phase>('loading')
   const [draft, setDraft] = useState<FriendAddRoutingVersion | null>(null)
   const [validation, setValidation] = useState<FriendAddRoutingValidation | null>(null)
-  const [test, setTest] = useState<FriendAddRoutingDraftTestResult | null>(null)
   const [published, setPublished] = useState<FriendAddRoutingPublishResult | null>(null)
   const [failure, setFailure] = useState<{ title: string; description: string } | null>(null)
   const [publishError, setPublishError] = useState('')
@@ -85,6 +82,15 @@ function FriendAddPublishInner() {
     let alive = true
     setPhase('loading')
     setFailure(null)
+    /*
+      **アカウント固有の結果を先に捨てる。** 消さないと、切替先の取得に
+      失敗したときに前のアカウントの下書き・確認・公開の結果が残り、
+      別のアカウントの数を見ながら公開することになる。
+    */
+    setDraft(null)
+    setValidation(null)
+    setPublished(null)
+    setPublishError('')
     ;(async () => {
       try {
         const draftRes = await api.friendAddRouting.getDraft(selectedAccountId)
@@ -95,15 +101,18 @@ function FriendAddPublishInner() {
           return
         }
         setDraft(draftRes.data)
-        const [validationRes, testRes] = await Promise.allSettled([
-          api.friendAddRouting.validateDraft(selectedAccountId),
-          api.friendAddRouting.testDraft(selectedAccountId, 'friend-kyohei'),
-        ])
+        /*
+          **画面を開くだけで試験を走らせない。** dry-runの返事は
+          `stateChanged: false` だが、**Worker側は `last_test_status` と
+          `last_tested_at` をDBへ記録する**（`friend-add-routing.ts`）。
+          読み込みで呼ぶと、利用者が意図して試験していない下書きでも
+          公開条件（試験が成功していること）を満たしてしまう。
+          固定の友だちIDを当てるのも同じ理由で危ない。
+          最後の試験の結果は、下書きと確認の返事から読む。
+        */
+        const validationRes = await api.friendAddRouting.validateDraft(selectedAccountId)
         if (!alive) return
-        if (validationRes.status === 'fulfilled' && validationRes.value.success) {
-          setValidation(validationRes.value.data)
-        }
-        if (testRes.status === 'fulfilled' && testRes.value.success) setTest(testRes.value.data)
+        if (validationRes.success) setValidation(validationRes.data)
         setPhase('ready')
       } catch (error: unknown) {
         if (!alive) return
@@ -190,7 +199,7 @@ function FriendAddPublishInner() {
         title="友だち追加時・最終確認"
         description="有効化すると、新しく追加された友だちへ初回案内を送ります。"
       />
-      <StepTrail steps={STEPS} current={4} />
+      <StepTrail steps={STEPS} current={5} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -232,13 +241,23 @@ function FriendAddPublishInner() {
             <p className={styles.note}>24時間に1回だけ実行し、LINE公式のあいさつとの二重送信を防ぎます。</p>
           </Card>
 
-          {test ? (
-            <Card layout="vertical" className={styles.section} data-friend-add-part="test">
-              <CardHeader title="最後のテスト結果" />
-              {/* dry-run なので「送信済み」と書かない。 */}
-              <p className={styles.note}>{testResultText(test)}</p>
-            </Card>
-          ) : null}
+          <Card layout="vertical" className={styles.section} data-friend-add-part="test">
+            <CardHeader title="最後のテスト送信" />
+            {/*
+              **ここでは試験を走らせない。** 走らせると、記録だけが付いて
+              「試験済み」になってしまう。下書きが持っている記録を読むだけ。
+            */}
+            <div className={styles.rows}>
+              <Row
+                label="結果"
+                value={draft.lastTestStatus === 'succeeded' ? '成功' : draft.lastTestStatus === 'failed' ? '失敗' : NOT_AVAILABLE}
+              />
+              <Row label="実施日時" value={draft.lastTestedAt ? draft.lastTestedAt.slice(0, 16).replace('T', ' ') : NOT_AVAILABLE} />
+            </div>
+            <p className={styles.note}>
+              テスト送信は編集画面から実行します。実際の送信・登録・タグ付けはしません。
+            </p>
+          </Card>
         </div>
 
         <aside className={styles.side}>

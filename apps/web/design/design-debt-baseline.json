@@ -169,7 +169,7 @@
     "unresolved-classname": 1
   },
   "app/friend-add-settings/publish/page.tsx": {
-    "unresolved-classname": 44
+    "unresolved-classname": 45
   },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 4,

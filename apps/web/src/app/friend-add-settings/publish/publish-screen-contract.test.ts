@@ -44,4 +44,35 @@ describe('友だち追加時配信の公開画面', () => {
     expect(PAGE).toContain('monitoring.href ?')
     expect(PAGE).toContain('monitoringLink(result)')
   })
+
+  it('画面を開くだけで試験を走らせない', () => {
+    /*
+     * dry-runの返事は `stateChanged: false` だが、**Worker側は
+     * `last_test_status` と `last_tested_at` をDBへ記録する**。
+     * 読み込みで呼ぶと、意図して試験していない下書きでも公開条件
+     * （試験が成功していること）を満たしてしまう。
+     * 固定の友だちIDを当てるのも同じ理由で危ない。
+     */
+    expect(PAGE).not.toContain('testDraft')
+    expect(PAGE).not.toContain('friend-kyohei')
+    // 最後の試験は、下書きが持っている記録から読む。
+    expect(PAGE).toContain('draft.lastTestStatus')
+    expect(PAGE).toContain('draft.lastTestedAt')
+  })
+
+  it('アカウントを変えたら前の結果を捨てる', () => {
+    /*
+     * 消さないと、切替先の取得に失敗したときに前のアカウントの
+     * 下書き・確認・公開の結果が残り、別のアカウントの数を見ながら
+     * 公開することになる。
+     */
+    for (const reset of ['setDraft(null)', 'setValidation(null)', 'setPublished(null)', "setPublishError('')"]) {
+      expect(PAGE).toContain(reset)
+    }
+  })
+
+  it('最終確認は5段目を現在地にする', () => {
+    expect(PAGE).toContain('current={5}')
+    expect(PAGE).not.toContain('current={4}')
+  })
 })
