@@ -389,6 +389,26 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    ウェビナーの集計（`ZC13r` の帯）。**一覧の既定（配列）だと `metrics` が
+    無くなり、実値0のはずが全部「未取得」の絵になる。**
+    「空」は数えて0。視聴の指標は口が取れないままなので `unavailable` を保つ。
+  */
+  [/\/api\/webinars\/overview(\?|$)/, {
+    state: 'partial',
+    registrationMode: 'people',
+    metrics: {
+      webinars: { value: 0, state: 'available', reason: null },
+      activeWebinars: { value: 0, state: 'available', reason: null },
+      registrations: { value: 0, state: 'available', reason: null },
+      registrationBookings: { value: 0, state: 'available', reason: null },
+      viewers: { value: null, state: 'unavailable', reason: '実際に見た区間の記録をまだ集計できないため' },
+      viewRate: { value: null, state: 'unavailable', reason: '視聴人数を取得できないため' },
+      averageWatchSeconds: { value: null, state: 'unavailable', reason: '実際に見た時間の記録をまだ集計できないため' },
+      ctaUniquePeople: { value: 0, state: 'available', reason: null },
+      ctaTotalClicks: { value: null, state: 'unavailable', reason: '同じ視聴中の複数クリックを数える記録がないため' },
+    },
+  }],
+  /*
     タップの集計（`RW5Tb` の帯）。**一覧の既定（配列）だと落ちる**——
     `RichMenuTapStats` は `{ from, to, byArea, byGroup, total }` の1件。
     「空」は**押された記録が1つも無い**状態で、`total` は数えて0。

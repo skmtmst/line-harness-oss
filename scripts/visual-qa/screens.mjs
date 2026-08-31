@@ -1040,7 +1040,15 @@ export const SCREENS = [
     実装は作成が1枚、編集が4つのタブ。**「通知・リマインド」の段だけが
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
-  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。** **P1 どのウェビナーが効いているかを一覧で比べられない。** 設計は行ごとに **申込184人 / 視聴142人** を出す。実装の帯は 申込 `—`「一覧では数えられません」／平均視聴率 `—`「申込者のうち」／平均視聴時間 `—`「視聴ログの集計は未対応」の3つとも `—`。**断り方は正しい**（数えていないものを0にしない）が、比べるには1本ずつ「概要・分析を見る」を開いて覚えておくことになる。6本あれば6回開く。`WebinarAnalytics` は1本ぶんを全部返せるので、**足りないのはまとめて数える口だけ**。P2 設計は表、実装は札の格子で作りが違う。1440・1920とも横スクロール0、壊れ値・内部語0件 **ルート**：`/webinars`。**取得元**：`webinars-v6/ZC13r.txt`。**推奨修正**：`WebinarAnalytics` は1本ぶんを全部返せるので、**一覧用にまとめて返す口を足す**（1本ずつ開かせない）。断り方は正しいので、文言は変えずに数だけつなぐ。', verdictSource: 'webinars-v6/ZC13r.txt + webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
+    /*
+      帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
+      権限不足を混ぜないので、口を差し替えて1つずつ撮る。
+    */
+    states: {
+      apis: ['**/api/webinars/overview**'],
+      kinds: ['normal', 'empty', 'error', 'forbidden'],
+    }, verdict: 'needs_fix', verdictNote: '契約枝 `codex/kenta-v6-webinar-contracts-v2`（head `7b2dc2f9`）の `GET /api/webinars/overview` を読むようにした。**前の判定「一覧では数えられません」は解消。** ウェビナー数6件（公開中3）／申込428人（**延べ予約451件を分けて添える**）／視聴 `—`「実際に見た区間の記録をまだ集計できないため」／CTAを押した人86人。**設計の視聴312人・72.9%は固定値で置かない**——口が unavailable と理由を返すので、そのまま出す。**CTAは押した実人数**で、設計の「CTA反応…件 クリック」という件数の名前は使わない（クリック延べ数は取れない）。通常・0件・取得失敗・権限不足を別に撮った（8枚）。失敗は帯ごと失敗にして「集計を読み直す」を出す。**アカウント切替時は前の集計をその場で捨てる**。残る差：設計は行ごとに申込・視聴を出すが、実装は1本ぶんの数を一覧で持たない。フォルダの縦帯も無い', verdictSource: 'webinars-v6/ZC13r.txt + webinars-v6/design-qa.md' , verdictHead: 'f4c3f012' },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '**P1 作成の段が無い。** ルート `/webinars/new`。撮った本文の見出しは「ウェビナーを作る／録画と配信枠を設定すると、友だちが『◯』…」の1枚で、設計の 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 という段が無い。**段の終わり（公開前確認 `D6yO7e`・公開完了 `TimXl`）が未実装**なので、作り終えたかどうかを画面が言えない。**推奨修正**：#508 が `D6yO7e` を実装済みなので、#507 → #508 の取り込み後に段を通す。取得元：`webinars-v6/lvaY5.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt' , verdictHead: 'c275749d' },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT, verdictNote: '**P2 動画・公開設定が1枚に同居している。** ルート `/webinars/edit?id=wb-1`。撮った本文は「ウェビナーの編集／動画セミナーの公開設定と、視聴中・視聴後…」で始まり、**`d3rFGD`（CTA・フォーム）`Xjk8q`（視聴後アクション）と同じ1枚**。設計はそれぞれ別の段。**同じ画面を3つのNodeで指しているので、どこを直したか追いにくい。** 取得元：`webinars-v6/PV1Vh.txt`。1440・1920とも横スクロール0 **推奨修正**：`d3rFGD` `Xjk8q` と同じ1枚なので、**3つまとめて段へ分ける**。1枚ずつ直すと同じ画面を3回触ることになり、どこを直したか追えなくなる。', verdictSource: 'webinars-v6/PV1Vh.txt',
@@ -1062,9 +1070,9 @@ export const SCREENS = [
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
     verdict: 'needs_fix',
-    verdictNote: '#623で段の4番目になった。通知の中身（6種類）は #546 のまま。残る差：右のLINEプレビュー、設計の設定サマリーの中身（対象184人・タグ「配信済み」）。**この画面に対象人数の取得元が無い**ので数字は作っていない',
+    verdictNote: '#623で段の4番目になり、契約枝の overview.audience で**通知の対象人数**が出るようになった。「通知の対象 184人／取消を除いた有効な申込。延べ予約は191件」。**実人数と延べ予約を分け**、definition（active_registrations）は内部語なので画面へ出さない。設計の184人を固定値で書いていない。残る差：右のLINEプレビュー、設計の設定サマリーのタグ「配信済み」',
     verdictSource: 'Claude実装',
-    verdictHead: '988cc37a',
+    verdictHead: 'f4c3f012',
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT, verdictNote: '**P2 視聴後アクションが `PV1Vh` と同じ1枚の中にある。** ルート `/webinars/edit?id=wb-1`。設計は別の段。取得元：`webinars-v6/Xjk8q.txt`。1440・1920とも横スクロール0 **推奨修正**：`PV1Vh` `d3rFGD` と同じ束。**3つまとめて段へ分ける。**', verdictSource: 'webinars-v6/Xjk8q.txt',
@@ -2453,6 +2461,7 @@ export const CAPTURED_AT = {
     { pr: 623, head: '988cc37a', on: '2026-08-31', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'D6yO7e', 'Q8sHa', 'yxyzQ'], note: 'Claudeが実装して撮った。編集画面を設計の段（STEP 1〜5）へ。#546 の上（#546 は #524 → #508 → #507 を含む）。**`Xjk8q` はそれまで「いつ見られるようにするか」タブを撮っていて、視聴後の話が写っていなかった**' },
   { pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['ZC13r', 'lvaY5', 'PV1Vh', 'd3rFGD', 'Xjk8q', 'Q8sHa', 'yxyzQ'], note: 'development そのもので撮った' },
+    { pr: 0, head: 'f4c3f012', on: '2026-09-01', screens: ['ZC13r', 'Ho8z4'], note: 'Claudeが実装して撮った。契約枝 codex/kenta-v6-webinar-contracts-v2（head 7b2dc2f9）の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
   ],
   11: [
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },

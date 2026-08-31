@@ -1228,7 +1228,15 @@ export const WEBINAR_NOTIFICATIONS = {
     missedTime: '10:00',
     completedEnabled: true,
   },
-  overview: { total: 184, pending: 42, sent: 138, failed: 2, skipped: 1, cancelled: 1 },
+  /*
+    `audience` は契約枝 codex/kenta-v6-webinar-contracts-v2 で追加された。
+    **`people`（実人数）と `bookings`（延べ予約）は別の数。**
+    1人が2回申し込めば人は1・予約は2になる。
+  */
+  overview: {
+    total: 184, pending: 42, sent: 138, failed: 2, skipped: 1, cancelled: 1,
+    audience: { people: 184, bookings: 191, definition: 'active_registrations' },
+  },
 }
 
 export const WEBINAR_ANALYTICS = {
@@ -3097,6 +3105,44 @@ export const SUPPORT_MARK_AUTOMATION_RULES_ERROR = {
   削除の分岐（`friendCount > 0`）も常に false になっていた。**
   実装の不具合ではなく、固定データの不足。実値0の行も1つ残す。
 */
+/*
+  ウェビナー一覧の集計（設計 `ZC13r`）。
+  **契約枝 codex/kenta-v6-webinar-contracts-v2 の固定データを写したもの。**
+  視聴の指標は口が `unavailable` と理由を返す。0で埋めない。
+*/
+export const WEBINAR_OVERVIEW = {
+  state: 'partial',
+  registrationMode: 'people',
+  metrics: {
+    webinars: { value: 6, state: 'available', reason: null },
+    activeWebinars: { value: 3, state: 'available', reason: null },
+    registrations: { value: 428, state: 'available', reason: null },
+    registrationBookings: { value: 451, state: 'available', reason: null },
+    viewers: { value: null, state: 'unavailable', reason: '実際に見た区間の記録をまだ集計できないため' },
+    viewRate: { value: null, state: 'unavailable', reason: '視聴人数を取得できないため' },
+    averageWatchSeconds: { value: null, state: 'unavailable', reason: '実際に見た時間の記録をまだ集計できないため' },
+    ctaUniquePeople: { value: 86, state: 'available', reason: null },
+    ctaTotalClicks: { value: null, state: 'unavailable', reason: '同じ視聴中の複数クリックを数える記録がないため' },
+  },
+}
+
+export const WEBINAR_OVERVIEW_EMPTY = {
+  ...WEBINAR_OVERVIEW,
+  metrics: {
+    ...WEBINAR_OVERVIEW.metrics,
+    webinars: { value: 0, state: 'available', reason: null },
+    activeWebinars: { value: 0, state: 'available', reason: null },
+    registrations: { value: 0, state: 'available', reason: null },
+    registrationBookings: { value: 0, state: 'available', reason: null },
+    ctaUniquePeople: { value: 0, state: 'available', reason: null },
+  },
+}
+
+export const WEBINAR_OVERVIEW_FAILURE = {
+  success: false,
+  error: 'Internal server error',
+}
+
 export const SUPPORT_MARKS = [
   { id: 'mark-1', name: '未対応', color: '#dc2626', isDefault: true, autoOnInbound: true, displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 8 },
   { id: 'mark-2', name: '対応中', color: '#d97706', isDefault: false, autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 5 },
