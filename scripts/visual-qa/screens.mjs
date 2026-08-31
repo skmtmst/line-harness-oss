@@ -683,8 +683,8 @@ export const SCREENS = [
     steps: [
       { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
     ],
-    verdict: 'needs_fix', verdictNote: '**#603 `c86d7242` の時点で残るP2。** ルート `/broadcasts/new`（送る時間）。1440・1920とも横スクロール0。 節の番号は 3. 送る時間 になり、画面の並びと合った。 P2 設計は 今すぐ／予約／くり返し を段で選び、予約なら送信直前の再集計を断る。実装は3つの押しボタンで、再集計の断りが無い。 推奨修正：再集計の断りは `cPk8A` の対象条件と対になる——予約時点の人数と送る時点の人数が違うことを、選ぶ前に書く',
-    verdictSource: 'broadcasts-v6/vW4Es.txt', verdictHead: 'c86d7242',
+    verdict: 'needs_fix', verdictNote: '#603 の上（head `0857c068`）で、設計の「予約するときの断り」を入れた。**選ぶ前に断る**——予約すると送るのはあとになり、送る相手は**送る時点でもう一度数え直される**（`processSegmentSend` が送信時に `buildSegmentQuery` を実行する。Workerの実装で確かめた）。いま出ている人数はそのまま届く約束ではない。人数が未取得のときは数字を作らず「いま出ている人数は」とだけ書く。1440・1920とも横スクロール0、壊れ値0件。**残る差は契約待ち**：設計は 今すぐ／予約／くり返し を段で選ぶが、**くり返しの仕掛けが無い**（「友だちごとの最適な時間」も開封の時間帯を持っていないため押せないまま）',
+    verdictSource: 'Claude実装', verdictHead: '0857c068',
   },
   {
     /*
@@ -2507,6 +2507,7 @@ export const CAPTURED_AT = {
     { pr: 550, head: 'f7c5a99e', on: '2026-08-29', screens: ['cPk8A', 'sqFXf'], note: '対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした' },
       { pr: 602, head: 'd02be6d8', on: '2026-08-31', screens: ['q76C35', 'xkRDb', 'EGMb1', 'TmHjF'], note: 'Claudeが一覧を直した。帯の4枚・フォルダの「…」・権限不足の分離' },
     { pr: 603, head: 'c86d7242', on: '2026-08-31', screens: ['zZ9fA', 'cPk8A', 'XQfMD', 'p97Tf', 'Bw0zt', 'vW4Es'], note: '同じくClaude。節の番号・本文の上限5,000字・内部の語の除去。#602 の上に積む' },
+    { pr: 0, head: '0857c068', on: '2026-09-01', screens: ['vW4Es'], note: 'Claudeが実装して撮った。#603（codex/kenta-v6-feature6-form-ui）の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
   ],
   12: [
     { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },

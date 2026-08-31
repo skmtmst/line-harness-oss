@@ -634,6 +634,15 @@
             "vW4Es"
           ],
           "note": "同じくClaude。節の番号・本文の上限5,000字・内部の語の除去。#602 の上に積む"
+        },
+        {
+          "pr": 0,
+          "head": "0857c068",
+          "on": "2026-09-01",
+          "screens": [
+            "vW4Es"
+          ],
+          "note": "Claudeが実装して撮った。#603（codex/kenta-v6-feature6-form-ui）の上。**doctorが要確認のため push していない。ローカルcommitのみ**"
         }
       ]
     },
