@@ -282,7 +282,8 @@ export const FRIEND_ADD_LIFECYCLE_PUBLISHED = {
   publishedAt: '2026-08-30T10:30:00.000Z',
   estimatedAudienceCount: 128,
   duplicatePrevention: 'webhook_event',
-  monitoringPath: '/friend-add-settings/runs',
+  monitoringPath: null,
+  monitoringUnavailableReason: '実行結果の画面はまだ接続されていません。',
 }
 
 /** 取得できて下書きが無い状態。失敗とは別に404で返す。 */

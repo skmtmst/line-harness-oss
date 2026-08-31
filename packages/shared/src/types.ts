@@ -1516,7 +1516,9 @@ export interface FriendAddRoutingPublishResult {
   publishedAt: string;
   estimatedAudienceCount: number | null;
   duplicatePrevention: "webhook_event";
-  monitoringPath: "/friend-add-settings/runs";
+  /** 実行結果画面が接続済みのときだけ導線を返す。未接続を404のリンクにしない。 */
+  monitoringPath: "/friend-add-settings/runs" | null;
+  monitoringUnavailableReason: string | null;
 }
 
 /**

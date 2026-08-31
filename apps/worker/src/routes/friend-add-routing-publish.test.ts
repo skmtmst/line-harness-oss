@@ -236,7 +236,12 @@ describe('friend-add routing draft/test/publish contract', () => {
       makeEnv(),
     )
     const body = await response.json() as {
-      data: { estimatedAudienceCount: number; duplicatePrevention: string }
+      data: {
+        estimatedAudienceCount: number
+        duplicatePrevention: string
+        monitoringPath: string | null
+        monitoringUnavailableReason: string | null
+      }
     }
 
     expect(response.status).toBe(200)
@@ -248,6 +253,8 @@ describe('friend-add routing draft/test/publish contract', () => {
     expect(body.data).toMatchObject({
       estimatedAudienceCount: 12,
       duplicatePrevention: 'webhook_event',
+      monitoringPath: null,
+      monitoringUnavailableReason: '実行結果の画面はまだ接続されていません。',
     })
   })
 

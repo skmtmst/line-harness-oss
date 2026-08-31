@@ -21,7 +21,8 @@ describe('友だち追加時配信の画面確認データ', () => {
     expect(FRIEND_ADD_LIFECYCLE_TEST_RESULT.stateChanged).toBe(false);
     expect(FRIEND_ADD_LIFECYCLE_PUBLISHED).toMatchObject({
       duplicatePrevention: 'webhook_event',
-      monitoringPath: '/friend-add-settings/runs',
+      monitoringPath: null,
+      monitoringUnavailableReason: '実行結果の画面はまだ接続されていません。',
     });
   });
 

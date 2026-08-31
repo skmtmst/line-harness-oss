@@ -471,7 +471,8 @@ friendAddRouting.post(
           publishedAt: published.published_at,
           estimatedAudienceCount,
           duplicatePrevention: 'webhook_event' as const,
-          monitoringPath: '/friend-add-settings/runs' as const,
+          monitoringPath: null,
+          monitoringUnavailableReason: '実行結果の画面はまだ接続されていません。',
         },
       });
     } catch (err) {
