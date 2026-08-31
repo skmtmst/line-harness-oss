@@ -535,7 +535,7 @@ const EMPTY_BODIES = [
     層の数も**0で埋める**。空は「取れて0件」なので `—` にしない。
   */
   [/\/api\/action-scores\/friends/, {
-    summary: { scoredFriends: 0, high: 0, normal: 0, low: 0, decreased30d: 0, highMin: 70, normalMin: 40 },
+    summary: { scoredFriends: 0, high: 0, normal: 0, low: 0, decreased30d: 0, highMin: 70, normalMin: 30 },
     items: [],
     pagination: { total: 0, limit: 20, offset: 0 },
   }],

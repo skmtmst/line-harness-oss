@@ -3633,8 +3633,13 @@ export const MILEAGE_HISTORY = {
  * 未取得（`—`）と実値0（`0`）を、同じ列で見分けられるかを見る。
  * `currentScore: 0` と `change30d: 0` の行も別に置いてある。
  *
- * `highMin` `normalMin` は層の境目。**帯の数と一覧の数が食い違わない**よう、
+ * `highMin` `normalMin` は帯の境目。**帯の数と一覧の数が食い違わない**よう、
  * `high` `normal` `low` の合計は `scoredFriends` に合わせる。
+ *
+ * **境目は `packages/db` の `DEFAULT_BANDS`（30 / 70）と同じにする。**
+ * ここに 40 と書いていたせいで、画面が「ふつう 40〜69点」と出し、
+ * **実装が設計と違うように見えていた。**実装は口が返した値をそのまま
+ * 描いており、間違っていたのは固定データのほう。
  */
 const scoreRow = (i, name, currentScore, band, change30d, lastReason, lastChangedAt) => ({
   friendId: `friend-${i}`,
@@ -3652,7 +3657,7 @@ export const ACTION_SCORES = {
     scoredFriends: 6,
     high: 2, normal: 2, low: 2,
     decreased30d: 2,
-    highMin: 70, normalMin: 40,
+    highMin: 70, normalMin: 30,
   },
   items: [
     scoreRow(1, '高橋 直人', 92, 'high', 14, 'リンクを押した', '2026-08-24T16:30:00.000Z'),
