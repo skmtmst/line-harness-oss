@@ -991,8 +991,9 @@ export const SCREENS = [
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'needs_fix',
-    verdictNote: '**#615 `5873f18b`（#597 `eaa4050b` の上）で未実装ではなくなったが、コード監査でP0を確認したため一致を取り下げた。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。対象見込みは `validation.estimatedAudienceCount` を使い、未取得と0を分け、空・失敗・権限不足も別の面にしている。**P0：画面を開くだけで `POST /api/friend-add-routing/draft/test` を固定の `friend-kyohei` に対して実行する。** Workerのdry-runは `last_test_status` と `last_tested_at` をDBへ記録するため、その友だちが選択中アカウントに存在すると、利用者が意図して試験していない下書きでも公開条件を満たし得る。読込時のPOSTと固定友だちIDを外し、下書きが返す `lastTestStatus` / `lastTestedAt` とvalidationだけを読む。初期表示で `testDraft` を呼ばない契約試験を足す。**P1：アカウント変更・再読込の開始時に `draft`・`validation`・`test`・`published`・`publishError` を消していない。** 新しいアカウントの取得失敗後も前のアカウントの結果が残り得るので、アカウント固有状態を先に初期化し、切替先が失敗した試験を足す。**P2：最終確認なのに5段目「確認」ではなく4段目「アクション」を現在地にしている。** 取得元：`friend-add-v6/ec9vg-normal-1440.png`・`ec9vg-empty.txt`、`publish/page.tsx:83-107`、`friend-add-routing.ts:365-419`。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5472836618)',
+    verdictNote: '**#615 `5bfbd382`（#597 `eaa4050b` の上）でP0と前回のP1・P2は解消したが、再監査で公開処理の競合P1が残った。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。**解消済み**：画面を開くだけのdry-runと固定友だちIDを外し、下書きの `lastTestStatus` / `lastTestedAt` だけを読む。アカウント切替時に `draft`・`validation`・`published`・`publishError` を先に消し、読込要求はeffectの `alive` で古い返事を捨てる。現在地も5段目「確認」になった。**P1 残存：公開処理中にLINEアカウントを切り替えると、前のアカウントの `publish()` の返事が後から `setPublished(res.data)` へ入り、切替先で前アカウントの有効化完了を表示し得る。** 読込には要求世代のガードがあるが、書込の `publish` には無い。公開開始時のアカウントIDを保持し、返答時に現在のアカウントと一致するときだけ完了・失敗を反映する。切替後に古い公開応答を返す振る舞い試験を足す。取得元：`publish/page.tsx:132-153`、対象26件・required-pr-gate pass。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5473025101)',
     verdictSource: 'friend-add-v6/ec9vg-1440.png',
+    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
     verdictHead: '5873f18b',
 
   },
@@ -1000,9 +1001,10 @@ export const SCREENS = [
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
-    verdict: 'match',
-    verdictNote: '**#615 `5873f18b` でClaudeが実装した。未実装ではなくなった。** ルート `/friend-add-settings/publish`（公開を押した先）。1440・1920とも横スクロール0。 公開した版（第2版）・公開日時・対象人数（128人）・二重送信防止（有効／webhookの記録で判定）を公開の返事から出す。**確認の段と同じ `estimatedAudienceCount` を使うので、数が食い違わない。** **実行結果へは `monitoringPath` があるときだけリンクする。** 固定データでは `null` なので、「実行結果の画面はまだ接続されていません。」と理由を出し、リンクにしない。**無い画面へ送らない。** 取得元：`friend-add-v6/quhg6-1440.png` ＋ `publish-flow.ts:monitoringLink`',
+    verdict: 'needs_fix',
+    verdictNote: '**#615 `5bfbd382` で未実装ではなくなり、画面単体の内容は設計と一致するが、公開処理の競合P1が残る。** ルート `/friend-add-settings/publish`（公開を押した先）。1440・1920とも横スクロール0。公開した版・公開日時・対象人数・二重送信防止を公開の返事から出し、実行結果へは `monitoringPath` があるときだけリンクする。**P1：公開処理中にアカウントを切り替えると、古いアカウントの返事が後から `setPublished` され、切替先に前アカウントの完了内容を表示し得る。** `publish` にアカウントIDまたは要求世代のガードを足し、切替後の古い応答を捨てる。取得元：`friend-add-v6/quhg6-1440.png`、`publish/page.tsx:132-153`。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5473025101)',
     verdictSource: 'friend-add-v6/quhg6-1440.png',
+    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
     verdictHead: '5873f18b',
 
   },
@@ -1278,7 +1280,7 @@ export const SCREENS = [
       /* 失敗は**消せる下書き**（`rmg-5`）で撮る。塞がれた行には押し口が出ない。 */
       { suffix: '-managed-fail', steps: [{ click: '削除', nth: 6 }, { click: '削除する' }, { wait: 1200 }] },
     ],
-    verdict: 'match', verdictNote: '**#616 `1e9654f8`（#608 `4923de9d` の上）でClaudeが実装し、残っていた差が解けた。** ルート `/rich-menus`（削除の窓）。1440・1920とも横スクロール0。 **消したときの影響4つを出した**——いま表示している人数／次に出るメニュー／切替元／使っている自動処理。読み口（#608 の `delete-impact`）が無くて出せなかったもの。 **① 表示中の人数の `null` は0人ではない。** 誰に出ているかの記録がまだ無いだけなので、「—（未取得）（誰に出ているかの記録がまだ無いため、人数は数えられません。）」と理由を添える。切替元・自動処理の0件は「ありません」で、未取得と見分けが付く。 **②「次に必ずこれが出ます」とは言わない。** 友だちごとの条件で決まり、契約も `guaranteedGroupId: null` を返す。候補が無いときは「リッチメニューが出なくなる友だちがいます。」 **③ 消せない理由を内部の記号で出さない**（`published` → 「LINEに登録中です。先に取り下げてください。」）。 **④ 塞がれているときは確認のボタンごと出さない。** 押せるように見えて何も起きない形にしない。 **⑤ 影響が読めないときは消させない。** 何が起きるか分からないまま取り消せない操作をさせない。 前に挙げたP2（公開中の止め方がブラウザ標準の `alert`）は、#575 以降で `ConfirmDialog` になっており解消済み。 固定データも直した——**「下書きなのに公開中の理由で塞がれる」形**だった。公開中は削除の窓自体が出ないので、**参照で塞がれた下書き**が正しい形。消せる下書き（`rmg-5`）を1件足した。塞がれた1件だけでは押した先が撮れない。 取得元：`rich-menus-v6/szXsT-managed-1440.png`・`szXsT-managed-fail-1440.png` ＋ `delete-impact.ts`',
+    verdict: 'needs_fix', verdictNote: '**#616 `1e9654f8`（#608 `4923de9d` の上）で影響4つと安全な削除禁止は入ったが、再監査でP1が2件残った。** ルート `/rich-menus`（削除の窓）。1440・1920とも横スクロール0。**解消済み**：いま表示している人数／次に出るメニュー／切替元／使っている自動処理を表示。人数の `null` は `—（未取得）`、実値0は0人。内部のblockerを日本語にし、塞がれている・影響が読めない場合は確認ボタン自体を出さない。**P1-1：削除直前に状態が変わりWorkerが409を返すと、`ApiError.data` に最新impactがあるのに画面は `richMenuError()` へ渡すだけで、古い「消せます」が窓に残る。** 最新dataを型検査して `impact` へ反映する。**P1-2：Aの影響を読込中に窓を閉じてBを開くと、遅れて返ったAの結果をBへ表示し得る。** 対象IDまたは要求世代が一致する返事だけをstateへ反映する。サーバは削除時に再検査するため誤削除は止まるが、確認表示とボタン可否が別対象になる。取得元：`rich-menus/page.tsx:276-291,304-329`、対象21件・required-pr-gate pass。指摘：[#616 コメント](https://github.com/skmtmst/line-harness-oss/pull/616#issuecomment-5473025241)',
     verdictSource: 'rich-menus-v6/szXsT-managed-1440.png + -managed-fail-1440.png + rich-menus/page.tsx:249', verdictHead: '1e9654f8',
   },
   {
