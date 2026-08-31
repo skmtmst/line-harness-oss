@@ -1,6 +1,7 @@
 'use client'
 
 import React, { Suspense, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -12,10 +13,11 @@ import {
   CATEGORY_MAX,
   EMPTY_DRAFT,
   EXCERPT_MAX,
-  TITLE_MAX,
+  TITLE_NOTICE_LENGTH,
   canSubmit,
   failureOf,
   toCreateInput,
+  titleNotice,
   validateDraft,
   type ColumnDraft,
   type Failure,
@@ -37,6 +39,8 @@ function NewNenColumnInner() {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [touched, setTouched] = useState(false)
+  /* 打ち間違えたURLは読み込めない。**壊れた画像の印を出さない。** */
+  const [imageBroken, setImageBroken] = useState(false)
 
   if (!selectedAccountId) {
     return (
@@ -98,25 +102,27 @@ function NewNenColumnInner() {
         <div className={styles.main}>
           <Card layout="vertical" className={styles.section} data-nen-part="title">
             <CardHeader title="題名と分類" />
-            <Field
-              label="題名"
-              required
-              value={draft.title}
-              max={TITLE_MAX}
-              error={errorFor('title')}
-              onChange={(v) => setDraft((d) => ({ ...d, title: v }))}
-            />
+            <div className={styles.row}>
+              <Field
+                label="題名"
+                required
+                value={draft.title}
+                error={errorFor('title')}
+                onChange={(v) => setDraft((d) => ({ ...d, title: v }))}
+              />
+              <Field
+                label="分類"
+                value={draft.category}
+                max={CATEGORY_MAX}
+                placeholder="例: 季節のこと"
+                error={errorFor('category')}
+                onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
+              />
+            </div>
+            {/* 数えるのは入力そのもの。どこかから取ってきた値ではない。 */}
             <p className={styles.note}>
-              LINEの通知に出るのは20文字までです。長いと途中で切れます。
+              {titleNotice(draft.title) ?? `題名はLINEの通知に${TITLE_NOTICE_LENGTH}文字まで出ます。`}
             </p>
-            <Field
-              label="分類"
-              value={draft.category}
-              max={CATEGORY_MAX}
-              placeholder="例: 季節のこと"
-              error={errorFor('category')}
-              onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
-            />
           </Card>
 
           <Card layout="vertical" className={styles.section} data-nen-part="article">
@@ -141,7 +147,7 @@ function NewNenColumnInner() {
               value={draft.imageUrl}
               placeholder="https://cdn.example.com/..."
               error={errorFor('imageUrl')}
-              onChange={(v) => setDraft((d) => ({ ...d, imageUrl: v }))}
+              onChange={(v) => { setImageBroken(false); setDraft((d) => ({ ...d, imageUrl: v })) }}
             />
             <Field
               label="概要"
@@ -154,36 +160,89 @@ function NewNenColumnInner() {
           </Card>
 
           <Card layout="vertical" className={styles.section} data-nen-part="publish">
-            <CardHeader title="公開日時" meta="空のままにすると、下書きとして保存します。" />
+            <CardHeader title="公開日時" />
             <Field
-              label="公開日時"
+              label="公開日時（日本時間）"
+              type="datetime-local"
               value={draft.publishedAt}
-              placeholder="2026-08-31T10:00:00+09:00"
               error={errorFor('publishedAt')}
               onChange={(v) => setDraft((d) => ({ ...d, publishedAt: v }))}
             />
             {/* 空のときに今日を補わない。補うと、書いただけのものが公開済みになる。 */}
             <p className={styles.note}>
-              空のままなら公開日時は入りません。時差を含む形（+09:00）で書いてください。
+              空のままなら公開日時は入りません。日本時間で保存します。
             </p>
           </Card>
         </div>
 
         <aside className={styles.side}>
           <Card layout="vertical" className={styles.section} data-nen-part="preview">
-            <CardHeader title="LINEに届く形" meta="入力した内容から組み立てています。" />
+            {/* 設計は「高橋 直人さんに届く形」だが、宛先を選ぶ口がまだ無い。
+                誰か1人の名前を出すと、その人に出るように読めてしまう。 */}
+            <CardHeader title="届く形" />
             <div className={styles.preview}>
-              {draft.category.trim() ? <p className={styles.previewKind}>{draft.category.trim()}</p> : null}
-              <p className={styles.previewTitle}>{draft.title.trim() || '（題名がまだありません）'}</p>
-              <p className={styles.previewBody}>{draft.excerpt.trim() || '（概要がまだありません）'}</p>
-              <p className={styles.previewCta}>コラムを読む</p>
+              <div className={styles.previewImage}>
+                {draft.imageUrl.trim() && !imageBroken ? (
+                  <img
+                    src={draft.imageUrl.trim()}
+                    alt=""
+                    className={styles.previewImageFile}
+                    onError={() => setImageBroken(true)}
+                  />
+                ) : (
+                  <span className={styles.previewImageEmpty}>
+                    {imageBroken ? '写真を読み込めません' : '写真はまだありません'}
+                  </span>
+                )}
+              </div>
+              <div className={styles.previewBodyArea}>
+                {draft.category.trim() ? <p className={styles.previewKind}>{draft.category.trim()}</p> : null}
+                <p className={styles.previewTitle}>{draft.title.trim() || '（題名がまだありません）'}</p>
+                <p className={styles.previewBody}>{draft.excerpt.trim() || '（概要がまだありません）'}</p>
+                <p className={styles.previewCta}>コラムを読む</p>
+              </div>
             </div>
+          </Card>
+
+          <Card layout="vertical" className={styles.section} data-nen-part="tips">
+            <CardHeader title="読まれるコラムの書きかた" />
+            {/*
+              設計にある「開封率が平均より12pt高い」などの数字は出さない。
+              **この画面に取得元が無い。** 設計の数字をそのまま書くと、
+              測ってもいない値を測ったように見せることになる。
+            */}
+            <ul className={styles.tips}>
+              <li>
+                <b>題名は{TITLE_NOTICE_LENGTH}文字まで</b>
+                LINEの通知に出るのは{TITLE_NOTICE_LENGTH}文字。長いと途中で切れます
+              </li>
+              <li>
+                <b>相談の言葉から始める</b>
+                「うちの子、〜なんです」のように、読む人の言葉で始めます
+              </li>
+              <li>
+                <b>売り込みを入れない</b>
+                商品名を並べると、次の配信を止められやすくなります
+              </li>
+            </ul>
+          </Card>
+
+          <Card layout="vertical" className={styles.section} data-nen-part="links">
+            <CardHeader title="つながる先" />
+            <ul className={styles.links}>
+              <li><Link href="/contents">登録メディア</Link><span>上の写真</span></li>
+              <li><Link href="/friend-fields">友だち属性</Link><span>差し込む言葉</span></li>
+              <li><Link href="/broadcasts">一斉配信</Link><span>出しかたは一斉配信と同じ</span></li>
+              <li><Link href="/analytics">分析</Link><span>読まれた割合</span></li>
+              <li><Link href="/rich-menus">リッチメニュー</Link><span>コラムへの入口</span></li>
+            </ul>
           </Card>
 
           <Card layout="vertical" className={styles.section}>
             <CardHeader title="この画面でできないこと" />
             <p className={styles.note}>
-              配信の予約・公開・読んだ人への処理は、保存したあとにNENコラムの一覧から行います。
+              記事本文の編集、配信の予約・公開、読んだ人へのタグ付けはここでは行いません。
+              本文は外部サイトで、配信は保存したあとNENコラムの一覧から行います。
             </p>
           </Card>
         </aside>
@@ -214,7 +273,7 @@ function NewNenColumnInner() {
 }
 
 function Field({
-  label, value, onChange, required, max, placeholder, error,
+  label, value, onChange, required, max, placeholder, error, type,
 }: {
   label: string
   value: string
@@ -223,6 +282,7 @@ function Field({
   max?: number
   placeholder?: string
   error?: string
+  type?: 'text' | 'datetime-local'
 }) {
   return (
     <label className={styles.field}>
@@ -232,6 +292,7 @@ function Field({
         {max ? <span className={styles.count}>{value.trim().length} / {max}</span> : null}
       </span>
       <input
+        type={type ?? 'text'}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}

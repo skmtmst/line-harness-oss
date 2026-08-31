@@ -3,6 +3,8 @@ import {
   canSubmit,
   EMPTY_DRAFT,
   failureOf,
+  publishedAtIso,
+  titleNotice,
   toCreateInput,
   validateDraft,
 } from './column-form'
@@ -102,5 +104,37 @@ describe('送ってよいか', () => {
     expect(canSubmit({ draft: draft(), busy: false })).toBe(true)
     expect(canSubmit({ draft: draft({ articleUrl: 'http://a' }), busy: false })).toBe(false)
     expect(canSubmit({ draft: draft(), busy: true })).toBe(false)
+  })
+})
+
+describe('題名の長さの知らせ', () => {
+  it('入力そのものから数える', () => {
+    expect(titleNotice('')).toBeNull()
+    expect(titleNotice('夏の水分補給、どれくらい？')).toContain('題名 13文字。')
+  })
+
+  it('20文字までは全部見えると言う', () => {
+    expect(titleNotice('あ'.repeat(20))).toContain('いまなら全部見えます。')
+    expect(titleNotice('あ'.repeat(21))).toContain('途中で切れます。')
+  })
+})
+
+describe('公開日時', () => {
+  it('この端末の時差を使わず、日本時間を明示する', () => {
+    /*
+      開発機はUTC+7のこともある。そのまま渡すと実際の予定と1〜2時間ずれる。
+      事業の時計は日本時間なので、+09:00を明示する。
+    */
+    expect(publishedAtIso('2026-08-31T10:00')).toBe('2026-08-31T10:00:00+09:00')
+  })
+
+  it('空なら入らない', () => {
+    expect(publishedAtIso('')).toBeNull()
+    expect(publishedAtIso('   ')).toBeNull()
+  })
+
+  it('日付だけ・時刻だけでは送らない', () => {
+    expect(publishedAtIso('2026-08-31')).toBeNull()
+    expect(validateDraft(draft({ publishedAt: '2026-08-31' })).map((e) => e.field)).toContain('publishedAt')
   })
 })

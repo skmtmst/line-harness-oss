@@ -9,6 +9,8 @@ import type { NenColumnCreateInput } from '@/lib/api'
  */
 
 export const TITLE_MAX = 120
+/** LINEの通知に出るのはここまで。設計の「20文字までしか出ません」と同じ。 */
+export const TITLE_NOTICE_LENGTH = 20
 export const CATEGORY_MAX = 40
 export const EXCERPT_MAX = 200
 
@@ -23,6 +25,17 @@ export type ColumnDraft = {
 
 export const EMPTY_DRAFT: ColumnDraft = {
   title: '', category: '', excerpt: '', articleUrl: '', imageUrl: '', publishedAt: '',
+}
+
+/**
+ * 題名の長さの知らせ。**設計の「題名 14文字。…いまなら全部 見えます。」と同じ。**
+ * 数えるのは入力そのもので、どこかから取ってきた値ではない。
+ */
+export function titleNotice(title: string): string | null {
+  const length = title.trim().length
+  if (length === 0) return null
+  const head = `題名 ${length}文字。LINEの通知では${TITLE_NOTICE_LENGTH}文字までしか出ません。`
+  return length <= TITLE_NOTICE_LENGTH ? `${head}いまなら全部見えます。` : `${head}途中で切れます。`
 }
 
 /** HTTPSだけ。httpや相対URLは、押したときにLINE側で開けない。 */
@@ -60,6 +73,9 @@ export function validateDraft(draft: ColumnDraft): FieldError[] {
   if (draft.excerpt.trim().length > EXCERPT_MAX) {
     errors.push({ field: 'excerpt', message: `概要を${EXCERPT_MAX}文字以内にしてください。` })
   }
+  if (draft.publishedAt.trim() && publishedAtIso(draft.publishedAt) === null) {
+    errors.push({ field: 'publishedAt', message: '公開日時は日付と時刻の両方を選んでください。' })
+  }
   return errors
 }
 
@@ -70,6 +86,19 @@ export function validateDraft(draft: ColumnDraft): FieldError[] {
  * 公開済みとして扱われる。空は「下書きのまま」。
  * `body` `slug` `externalId` `lineAccountId` は送らない（送ると400になる）。
  */
+export function publishedAtIso(value: string): string | null {
+  /*
+    入れ物は `datetime-local` で、時差を持たない文字列（`2026-08-31T10:00`）を返す。
+    **この端末の時差を使わない。** 開発機はUTC+7のこともあり、そのまま渡すと
+    実際の予定と1〜2時間ずれる。事業の時計は日本時間なので、+09:00を明示する。
+  */
+  const raw = value.trim()
+  if (!raw) return null
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2})?$/.exec(raw)
+  if (!match) return null
+  return `${match[1]}T${match[2]}${match[3] ?? ':00'}+09:00`
+}
+
 export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
   const optional = (value: string) => (value.trim() ? value.trim() : undefined)
   return {
@@ -78,7 +107,7 @@ export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
     ...(optional(draft.excerpt) ? { excerpt: draft.excerpt.trim() } : {}),
     articleUrl: draft.articleUrl.trim(),
     imageUrl: optional(draft.imageUrl) ?? null,
-    publishedAt: optional(draft.publishedAt) ?? null,
+    publishedAt: publishedAtIso(draft.publishedAt),
   }
 }
 
