@@ -6,7 +6,9 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import WebinarForm from '@/components/webinars/webinar-form'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
+import WebinarLinePreview from '@/components/webinars/webinar-line-preview'
 import { useAccount } from '@/contexts/account-context'
+import { ctaPreview, notificationPreview, videoPreview } from './preview-body'
 import {
   STEPS,
   nextLabelOf,
@@ -252,7 +254,16 @@ function ParticipantAvatar({
   )
 }
 
-function AnalyticsTab({ webinarId, durationSeconds }: { webinarId: string; durationSeconds: number }) {
+function AnalyticsTab({
+  webinarId,
+  durationSeconds,
+  view,
+}: {
+  webinarId: string
+  durationSeconds: number
+  /** 設計は参加者管理（`Q8sHa`）と分析（`yxyzQ`）を別の画面にしている。 */
+  view: 'analytics' | 'participants'
+}) {
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [userComments, setUserComments] = useState<WebinarUserComment[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -502,6 +513,12 @@ function AnalyticsTab({ webinarId, durationSeconds }: { webinarId: string; durat
         </section>
       </div>
 
+      {/*
+        設計は「参加者管理」と「分析」を別の画面にしている。
+        **同じ1枚に混ぜると、どちらを見ているのか分からなくなる。**
+        口も数も増やさず、出し分けだけを変える。
+      */}
+      {view === 'participants' && (<>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -588,6 +605,8 @@ function AnalyticsTab({ webinarId, durationSeconds }: { webinarId: string; durat
         )}
       </section>
 
+      </>)}
+      {view === 'analytics' && (<>
       <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
           <div>
@@ -648,6 +667,7 @@ function AnalyticsTab({ webinarId, durationSeconds }: { webinarId: string; durat
           </div>
         </details>
       )}
+      </>)}
     </div>
   )
 }
@@ -840,7 +860,9 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
  */
 const EXTRAS = [
   ['comments', 'コメント演出'],
-  ['analytics', '概要・分析'],
+  /* 設計は参加者管理（`Q8sHa`）と分析（`yxyzQ`）を別の画面にしている。 */
+  ['participants', '参加者'],
+  ['analytics', '分析'],
 ] as const
 
 type ExtraKey = (typeof EXTRAS)[number][0]
@@ -952,6 +974,12 @@ function EditWebinarInner() {
   const previewUnavailableReason = webinar.status !== 'active'
     ? '公開すると、友だちが見るページを確認できます'
     : 'このLINE公式アカウントにはLIFF IDが設定されていません'
+
+  /* 段ごとのプレビュー。確認・コメント演出・分析では出さない。 */
+  const preview = pane === 'video' ? videoPreview(webinar)
+    : pane === 'cta' ? ctaPreview(webinar)
+    : pane === 'notifications' ? notificationPreview(null)
+    : null
 
   return (
     <>
@@ -1113,8 +1141,11 @@ function EditWebinarInner() {
             )}
             {pane === 'review' && <ReviewStep webinar={webinar} onBack={(key) => setPane(key)} />}
             {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
+            {pane === 'participants' && (
+              <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" />
+            )}
             {pane === 'analytics' && (
-              <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />
+              <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="analytics" />
             )}
           </div>
 
@@ -1132,6 +1163,16 @@ function EditWebinarInner() {
                 ))}
               </dl>
             </section>
+
+          {/*
+            設計は設定サマリーの下にLINEプレビューを置く。
+            **中身は段ごとに変わる。** 段に関係ない文を出すと、
+            いま何を直しているのかが読めなくなる。
+            確認・コメント演出・分析では出さない（送るものが無い）。
+          */}
+          {preview ? (
+            <WebinarLinePreview body={preview.body} buttonLabel={preview.buttonLabel} empty={preview.empty} />
+          ) : null}
           </aside>
         </div>
       </div>
