@@ -590,10 +590,10 @@
     "unresolved-classname": 51
   },
   "components/friend-fields/tag-editor-v4.tsx": {
-    "direct-primary-button": 4,
-    "direct-secondary-button": 6,
+    "direct-primary-button": 3,
+    "direct-secondary-button": 3,
     "unresolved-classname": 17,
-    "arbitrary-value": 17
+    "arbitrary-value": 16
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 3,
