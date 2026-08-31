@@ -122,6 +122,9 @@ import {
   INTEGRATION_RECORDS,
   LIST_STATS,
   LOGIN_AUDIT,
+  MEDIA_DELETE_IMPACT,
+  MEDIA_DELETE_IMPACT_EMPTY,
+  MEDIA_DELETE_IMPACT_ERROR,
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_USAGE,
@@ -1495,6 +1498,31 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT.group.id
       ? RICH_MENU_DELETE_IMPACT
       : RICH_MENU_DELETE_IMPACT_EMPTY
+    return { success: true, data: impact }
+  }
+  /* メディアを消したときの影響（PR #610）。 */
+  const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (mediaDeleteImpact) {
+    if (query.get('visualState') === 'error') return MEDIA_DELETE_IMPACT_ERROR
+    /*
+      **一覧の表示と食い違わせない。** 一覧は `usageCount` を出しているので、
+      「3か所で使用中」と書いてある行の削除確認が「どこでも使っていません」
+      になると、どちらが本当か分からなくなる。使用数で分ける。
+    */
+    const item = MEDIA_ITEMS.find((media) => media.id === mediaDeleteImpact[1])
+    const used = (item?.usageCount ?? 0) > 0
+    const impact = used
+      ? {
+          ...MEDIA_DELETE_IMPACT,
+          media: { id: item.id, filename: item.filename, kind: item.kind },
+          usageCount: item.usageCount,
+        }
+      : {
+          ...MEDIA_DELETE_IMPACT_EMPTY,
+          media: item
+            ? { id: item.id, filename: item.filename, kind: item.kind }
+            : MEDIA_DELETE_IMPACT_EMPTY.media,
+        }
     return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }

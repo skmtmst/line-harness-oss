@@ -5415,6 +5415,43 @@ export const RICH_MENU_DELETE_IMPACT_ERROR = {
   error: '削除したときの影響を確認できませんでした',
 }
 
+/* PR #610 のメディア削除影響。契約と同じ項目名で置く。 */
+export const MEDIA_DELETE_IMPACT = {
+  media: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
+  usageCount: 2,
+  references: [
+    {
+      kind: 'broadcast', name: '8月のお知らせ',
+      href: '/broadcasts/detail?id=broadcast-visual', state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000Z',
+    },
+    {
+      kind: 'scenario_step', name: '来店後シナリオ・1通目',
+      href: '/scenarios/detail?id=scenario-visual', state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000Z',
+    },
+  ],
+  checkedAt: '2026-08-31T10:00:00.000Z',
+  lastScannedAt: '2026-08-31T10:00:00.000Z',
+  canDelete: false,
+  recommendedAction: 'review_references',
+}
+
+export const MEDIA_DELETE_IMPACT_EMPTY = {
+  media: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  usageCount: 0,
+  references: [],
+  checkedAt: '2026-08-31T10:00:00.000Z',
+  lastScannedAt: null,
+  canDelete: true,
+  recommendedAction: 'delete',
+}
+
+export const MEDIA_DELETE_IMPACT_ERROR = {
+  success: false,
+  error: '削除したときの影響を確認できませんでした',
+}
+
 export const IDENTITY_CANDIDATE_ERROR = {
   success: false, error: '本人照合の候補を読み込めませんでした', code: 'VISUAL_QA_ERROR',
 }
