@@ -777,18 +777,35 @@ CREATE TABLE ec_events (
   source            TEXT NOT NULL,
   external_event_id TEXT NOT NULL,
   event_type        TEXT NOT NULL,
+  line_account_id   TEXT REFERENCES line_accounts(id),
   customer_id       TEXT,
-  line_user_id      TEXT NOT NULL,
+  line_user_id      TEXT,
   friend_id         TEXT,
   payload           TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'received'
-                    CHECK (status IN ('received', 'processing', 'processed', 'skipped', 'failed')),
+                    CHECK (status IN ('received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed')),
   error_message     TEXT,
   received_at       TEXT NOT NULL,
   processed_at      TEXT,
   updated_at        TEXT NOT NULL,
   UNIQUE (source, external_event_id),
   FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL
+);
+
+CREATE TABLE ec_identity_links (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  source_key TEXT NOT NULL,
+  shop_key TEXT NOT NULL,
+  external_customer_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  linked_by TEXT,
+  linked_at TEXT NOT NULL,
+  unlinked_by TEXT,
+  unlinked_at TEXT,
+  unlink_reason TEXT
 );
 
 CREATE TABLE ec_notification_settings (
@@ -1134,6 +1151,22 @@ CREATE TABLE friend_fields (
   updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
+CREATE TABLE friend_identity_links (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  link_method TEXT NOT NULL,
+  evidence_snapshot_json TEXT NOT NULL CHECK (json_valid(evidence_snapshot_json)),
+  confidence_score INTEGER NOT NULL CHECK (confidence_score BETWEEN 0 AND 100),
+  linked_by TEXT,
+  linked_at TEXT NOT NULL,
+  unlinked_by TEXT,
+  unlinked_at TEXT,
+  unlink_reason TEXT
+);
+
 CREATE TABLE friend_reminder_deliveries (
   id                TEXT PRIMARY KEY,
   friend_reminder_id TEXT NOT NULL REFERENCES friend_reminders (id) ON DELETE CASCADE,
@@ -1234,6 +1267,69 @@ CREATE TABLE google_calendar_connections (
   last_error    TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE identity_candidate_decisions (
+  id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  candidate_version INTEGER NOT NULL CHECK (candidate_version >= 2),
+  from_status TEXT NOT NULL
+    CHECK (from_status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  to_status TEXT NOT NULL
+    CHECK (to_status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  actor_staff_id TEXT,
+  actor_name TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  evidence_fingerprint TEXT NOT NULL,
+  impact_snapshot_json TEXT NOT NULL CHECK (json_valid(impact_snapshot_json)),
+  reprocess_scope_json TEXT CHECK (reprocess_scope_json IS NULL OR json_valid(reprocess_scope_json)),
+  decided_at TEXT NOT NULL,
+  UNIQUE(candidate_id, candidate_version)
+);
+
+CREATE TABLE identity_candidates (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK (kind IN ('friend_duplicate', 'ec_member')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  confidence_score INTEGER NOT NULL CHECK (confidence_score BETWEEN 0 AND 100),
+  detector_version TEXT NOT NULL,
+  left_subject_kind TEXT NOT NULL CHECK (left_subject_kind IN ('friend', 'ec_event')),
+  left_subject_id TEXT NOT NULL,
+  left_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  left_shop_key TEXT,
+  left_snapshot_json TEXT NOT NULL CHECK (json_valid(left_snapshot_json)),
+  right_subject_kind TEXT NOT NULL CHECK (right_subject_kind = 'friend'),
+  right_subject_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  right_line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  right_shop_key TEXT,
+  right_snapshot_json TEXT NOT NULL CHECK (json_valid(right_snapshot_json)),
+  source_key TEXT,
+  external_customer_id TEXT,
+  evidence_fingerprint TEXT NOT NULL,
+  evidence_json TEXT NOT NULL CHECK (json_valid(evidence_json)),
+  impact_json TEXT NOT NULL CHECK (json_valid(impact_json)),
+  detected_at TEXT NOT NULL,
+  reviewed_by TEXT,
+  reviewed_at TEXT,
+  reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (
+    (kind = 'friend_duplicate' AND left_subject_kind = 'friend'
+      AND left_line_account_id IS NOT NULL AND left_subject_id < right_subject_id)
+    OR
+    (kind = 'ec_member' AND left_subject_kind = 'ec_event'
+      AND left_line_account_id = right_line_account_id
+      AND left_shop_key IS NOT NULL AND source_key IS NOT NULL
+      AND external_customer_id IS NOT NULL)
+  ),
+  UNIQUE (
+    tenant_id, kind, left_subject_kind, left_subject_id,
+    right_subject_kind, right_subject_id
+  )
 );
 
 CREATE TABLE inbox_conversation_events (
@@ -2929,14 +3025,23 @@ CREATE INDEX idx_cvs_pending
 CREATE INDEX idx_dashboard_preferences_account
   ON dashboard_preferences(line_account_id, updated_at DESC);
 
-CREATE INDEX idx_ec_events_customer
-  ON ec_events(customer_id, received_at DESC);
+CREATE INDEX idx_ec_events_account_received ON ec_events(line_account_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_friend
-  ON ec_events(friend_id, received_at DESC);
+CREATE INDEX idx_ec_events_customer ON ec_events(customer_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_status_received
-  ON ec_events(status, received_at);
+CREATE INDEX idx_ec_events_friend ON ec_events(friend_id, received_at DESC);
+
+CREATE INDEX idx_ec_events_identity_pending
+  ON ec_events(line_account_id, received_at DESC) WHERE status = 'identity_pending';
+
+CREATE INDEX idx_ec_events_status_received ON ec_events(status, received_at);
+
+CREATE UNIQUE INDEX idx_ec_identity_links_active_customer
+  ON ec_identity_links(tenant_id, source_key, shop_key, external_customer_id)
+  WHERE unlinked_at IS NULL;
+
+CREATE INDEX idx_ec_identity_links_friend
+  ON ec_identity_links(tenant_id, line_account_id, friend_id, linked_at DESC);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
@@ -3028,6 +3133,12 @@ CREATE INDEX idx_friend_daily_snapshots_date
 
 CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
 
+CREATE UNIQUE INDEX idx_friend_identity_links_active_friend
+  ON friend_identity_links(friend_id) WHERE unlinked_at IS NULL;
+
+CREATE INDEX idx_friend_identity_links_user
+  ON friend_identity_links(tenant_id, user_id, linked_at DESC);
+
 CREATE INDEX idx_friend_reminders_friend ON friend_reminders (friend_id);
 
 CREATE INDEX idx_friend_reminders_status ON friend_reminders (status);
@@ -3070,6 +3181,18 @@ CREATE INDEX idx_google_calendar_connections_staff
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
 CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
+
+CREATE INDEX idx_identity_candidate_decisions_history
+  ON identity_candidate_decisions(candidate_id, decided_at DESC);
+
+CREATE INDEX idx_identity_candidates_left_account
+  ON identity_candidates(tenant_id, left_line_account_id, status);
+
+CREATE INDEX idx_identity_candidates_review_queue
+  ON identity_candidates(tenant_id, kind, status, detected_at DESC);
+
+CREATE INDEX idx_identity_candidates_right_account
+  ON identity_candidates(tenant_id, right_line_account_id, status);
 
 CREATE UNIQUE INDEX idx_inbox_conversation_events_correlation
   ON inbox_conversation_events (correlation_id, event_type);

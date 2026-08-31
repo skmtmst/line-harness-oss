@@ -207,12 +207,14 @@
     "198_form_account_scope.sql",
     "200_nen_delivery_snapshot_safety.sql",
     "201_nen_photo_publication_consent.sql",
+    "202_ec_event_account_and_identity.sql",
     "202_nen_photo_review_decisions.sql",
     "203_saved_search_references.sql",
     "204_analytics_saved_results.sql",
     "205_tenant_feature_packs.sql",
     "252_template_questions.sql",
-    "253_friend_bulk_runs.sql"
+    "253_friend_bulk_runs.sql",
+    "257_identity_candidates.sql"
   ],
-  "migrationCount": 213
+  "migrationCount": 215
 }

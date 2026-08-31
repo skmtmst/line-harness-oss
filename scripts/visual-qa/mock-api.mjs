@@ -19,7 +19,12 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
+  IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
+  IDENTITY_CANDIDATE_LISTS,
+  LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -349,6 +354,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+  }
+  if (pathname === '/api/identity-candidates') {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: IDENTITY_CANDIDATE_LISTS.empty }
+    }
+    const kind = query.get('kind') === 'ec_member' ? 'ec_member' : 'friend_duplicate'
+    return { success: true, data: IDENTITY_CANDIDATE_LISTS[kind] }
+  }
+  const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
+  if (identityCandidate) {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
+      ? IDENTITY_CANDIDATE_EC
+      : IDENTITY_CANDIDATE_FRIEND
+    return { success: true, data: candidate }
   }
   if (pathname === '/api/dashboard/preferences') {
     /*

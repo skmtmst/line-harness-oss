@@ -99,8 +99,13 @@ type TagUsageCountRow = {
   count: number;
 };
 
-/** D1 の未知の上限へ余裕を持たせた、1クエリ当たりの複合SELECT項数。 */
-export const MAX_TAG_USAGE_COMPOUND_SELECT_TERMS = 10;
+type TagUsageReferenceRow = {
+  tag_id: string;
+  entity_id: string;
+};
+
+/** D1実測：5項まで。6項で SQLITE_ERROR 7500。1項の余裕を確保する。 */
+export const MAX_TAG_USAGE_COMPOUND_SELECT_TERMS = 4;
 
 /**
  * 削除を妨げる運用設定からタグIDを読むSELECT。
@@ -240,6 +245,38 @@ export async function getTagsWithUsage(
     'used_in_scenarios' | 'used_in_auto_replies' |
     'used_in_saved_searches' | 'other_action_count'>>();
 
+  const scenarioReferenceSelects = [
+    'SELECT trigger_tag_id AS tag_id, id AS entity_id FROM scenarios WHERE trigger_tag_id IS NOT NULL',
+    `SELECT CAST(j.value AS TEXT) AS tag_id, s.id AS entity_id
+       FROM scenarios s,
+            json_tree(CASE WHEN json_valid(s.audience_condition_json)
+                           THEN s.audience_condition_json ELSE 'null' END) j
+      WHERE j.type = 'text'`,
+    'SELECT tag_id, scenario_id AS entity_id FROM scenario_triggers WHERE tag_id IS NOT NULL',
+    `SELECT on_reach_tag_id AS tag_id, scenario_id AS entity_id
+       FROM scenario_steps WHERE on_reach_tag_id IS NOT NULL`,
+    `SELECT CAST(j.value AS TEXT) AS tag_id, a.scenario_id AS entity_id
+       FROM scenario_actions a,
+            json_tree(CASE WHEN json_valid(a.config_json)
+                           THEN a.config_json ELSE 'null' END) j
+      WHERE j.type = 'text'`,
+    `SELECT CAST(j.value AS TEXT) AS tag_id, a.scenario_id AS entity_id
+       FROM scenario_actions a,
+            json_tree(CASE WHEN json_valid(a.condition_json)
+                           THEN a.condition_json ELSE 'null' END) j
+      WHERE j.type = 'text'`,
+  ] as const;
+  const scenarioReferenceQueries: string[] = [];
+  for (let offset = 0; offset < scenarioReferenceSelects.length;
+    offset += MAX_TAG_USAGE_COMPOUND_SELECT_TERMS) {
+    const references = scenarioReferenceSelects
+      .slice(offset, offset + MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)
+      .join('\nUNION\n');
+    scenarioReferenceQueries.push(`WITH refs(tag_id, entity_id) AS (${references})
+      SELECT DISTINCT r.tag_id, r.entity_id
+        FROM refs r JOIN tags known ON known.id = r.tag_id`);
+  }
+
   const usageQueries = {
     used_in_broadcasts: `WITH refs(tag_id, entity_id) AS (
          SELECT target_tag_id, id FROM broadcasts WHERE target_tag_id IS NOT NULL
@@ -256,32 +293,6 @@ export async function getTagsWithUsage(
          SELECT CAST(j.value AS TEXT), f.id
            FROM forms f,
                 json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j
-          WHERE j.type = 'text'
-       )`,
-    used_in_scenarios: `WITH refs(tag_id, entity_id) AS (
-         SELECT trigger_tag_id, id FROM scenarios WHERE trigger_tag_id IS NOT NULL
-         UNION
-         SELECT CAST(j.value AS TEXT), s.id
-           FROM scenarios s,
-                json_tree(CASE WHEN json_valid(s.audience_condition_json)
-                               THEN s.audience_condition_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT tag_id, scenario_id FROM scenario_triggers WHERE tag_id IS NOT NULL
-         UNION
-         SELECT on_reach_tag_id, scenario_id
-           FROM scenario_steps WHERE on_reach_tag_id IS NOT NULL
-         UNION
-         SELECT CAST(j.value AS TEXT), a.scenario_id
-           FROM scenario_actions a,
-                json_tree(CASE WHEN json_valid(a.config_json)
-                               THEN a.config_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT), a.scenario_id
-           FROM scenario_actions a,
-                json_tree(CASE WHEN json_valid(a.condition_json)
-                               THEN a.condition_json ELSE 'null' END) j
           WHERE j.type = 'text'
        )`,
     used_in_auto_replies: `WITH refs(tag_id, entity_id) AS (
@@ -352,7 +363,8 @@ export async function getTagsWithUsage(
        )`,
   } as const;
 
-  const usageCounts = new Map<keyof typeof usageQueries, Map<string, number>>();
+  type UsageField = keyof typeof usageQueries | 'used_in_scenarios';
+  const usageCounts = new Map<UsageField, Map<string, number>>();
   for (const [field, refsQuery] of Object.entries(usageQueries) as
     [keyof typeof usageQueries, string][]) {
     const distinctKey = field === 'other_action_count' ? 'action_key' : 'entity_id';
@@ -364,6 +376,19 @@ export async function getTagsWithUsage(
       counts.results.map((row) => [row.tag_id, Number(row.count)]),
     ));
   }
+
+  const scenarioReferences = new Map<string, Set<string>>();
+  for (const query of scenarioReferenceQueries) {
+    const references = await db.prepare(query).all<TagUsageReferenceRow>();
+    for (const reference of references.results) {
+      const entityIds = scenarioReferences.get(reference.tag_id) ?? new Set<string>();
+      entityIds.add(reference.entity_id);
+      scenarioReferences.set(reference.tag_id, entityIds);
+    }
+  }
+  usageCounts.set('used_in_scenarios', new Map(
+    [...scenarioReferences].map(([tagId, entityIds]) => [tagId, entityIds.size]),
+  ));
 
   const rows: TagWithUsageRow[] = result.results.map((tag) => {
     const usedInForms = usageCounts.get('used_in_forms')?.get(tag.id) ?? 0;
