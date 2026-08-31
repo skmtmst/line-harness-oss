@@ -12,6 +12,7 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toMatch(/^\s+push:/m);
     expect(workflow).toContain('default: dry-run');
+    expect(workflow).toContain('default: all');
   });
 
   it('can only run from codex/development against staging', () => {
@@ -36,13 +37,24 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('echo "$CLOUDFLARE_ACCOUNT_ID"');
   });
 
-  it('prefers deploy credentials over the D1 migration fallback', () => {
+  it('uses separate Worker and Pages credentials with safe fallbacks', () => {
     expect(workflow).toContain(
-      'secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN',
+      'secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN',
     );
     expect(workflow).toContain(
       'secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID',
     );
+    expect(workflow).toContain(
+      'secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN',
+    );
+    expect(workflow).toContain('CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}');
+    expect(workflow).toContain('CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}');
+  });
+
+  it('can deploy Worker and Admin independently', () => {
+    expect(workflow).toContain("inputs.target != 'admin'");
+    expect(workflow).toContain("inputs.target != 'worker'");
+    expect(workflow).toContain('TARGET: ${{ inputs.target }}');
   });
 
   it('keeps cron disabled and migrations in their separate workflow', () => {
