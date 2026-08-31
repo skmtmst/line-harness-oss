@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 235,
-  "unimplemented": 23,
+  "compared": 237,
+  "unimplemented": 21,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 56,
+  "match": 58,
   "structureMatchDataPending": 18,
   "needsFix": 161,
   "unjudged": 0,
-  "remaining": 202,
+  "remaining": 200,
   "features": [
     {
       "feature": 1,
@@ -774,16 +774,16 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 10,
-      "compared": 4,
-      "unimplemented": 6,
+      "compared": 6,
+      "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 2,
       "structureMatchDataPending": 0,
       "needsFix": 4,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 431,
@@ -804,6 +804,16 @@
             "P2J0Te"
           ],
           "note": "友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む"
+        },
+        {
+          "pr": 615,
+          "head": "5873f18b",
+          "on": "2026-08-31",
+          "screens": [
+            "ec9vg",
+            "quhg6"
+          ],
+          "note": "Claude実装。#597 の公開の読み口の上に、最終確認と有効化完了を1本で作った"
         }
       ]
     },
@@ -2093,20 +2103,6 @@
       "name": "9-1-C 初回案内",
       "gap": "drop",
       "gapNote": "最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**"
-    },
-    {
-      "feature": 9,
-      "node": "ec9vg",
-      "name": "9-1-F 最終確認",
-      "gap": "api",
-      "gapNote": "`friend-add-rules` のdraft、validate、conflicts、test、publishと冪等キーが要る。流入条件・初回案内・アクション・二重送信防止を確認し、公開版を固定する"
-    },
-    {
-      "feature": 9,
-      "node": "quhg6",
-      "name": "9-1-G 有効化完了",
-      "gap": "api",
-      "gapNote": "`publish` の返事（公開版、対象見込み、二重送信防止、監視先）を受けて完了画面を出す。9-1-Fと同じ契約で作る"
     },
     {
       "feature": 9,

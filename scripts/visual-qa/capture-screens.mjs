@@ -705,7 +705,30 @@ const BARE_EMPTY = [
   [/\/api\/booking\/admin\/staff/, { staff: [] }],
   [/\/api\/booking\/admin\/requests/, { requests: [] }],
   [/\/api\/events\/admin\/events/, { items: [] }],
+  /*
+    下書きが無い（404）。**契約の「空」は404**なので、器も失敗の形で返す。
+    200の配列を返すと、画面は中身を読もうとして落ちる。
+  */
+  [/\/api\/friend-add-routing\/draft(\?|$)/, { success: false, error: '確認する下書きがありません' }],
 ]
+
+/*
+  **「空」が200とは限らない。** 下書きの口（PR #597）は
+  「確認する下書きがありません」を404で返す契約で、画面もそれを見て
+  空の面へ分けている。200の配列を返すと、画面は中身を読もうとして落ちる。
+  口ごとに状態番号を持てるようにする。
+*/
+const EMPTY_STATUSES = [
+  [/\/api\/friend-add-routing\/draft(\?|$)/, 404],
+]
+
+/** その口の「空」の状態番号。既定は200。 */
+function emptyStatusFor(url) {
+  for (const [pattern, status] of EMPTY_STATUSES) {
+    if (pattern.test(url)) return status
+  }
+  return 200
+}
 
 /** その口の「空」の返事を組み立てる。`null` なら差し替えない（そのまま通す）。 */
 function emptyBodyFor(url) {
@@ -734,7 +757,7 @@ async function applyState(page, apis, kind) {
       const body = kind === 'empty' ? emptyBodyFor(route.request().url()) : state.body
       if (body === null) return route.continue()
       return route.fulfill({
-        status: state.status,
+        status: kind === 'empty' ? emptyStatusFor(route.request().url()) : state.status,
         contentType: 'application/json; charset=utf-8',
         body: JSON.stringify(body),
       })

@@ -988,15 +988,23 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    gap: 'api',
-    gapNote: '`friend-add-rules` のdraft、validate、conflicts、test、publishと冪等キーが要る。流入条件・初回案内・アクション・二重送信防止を確認し、公開版を固定する',
-    status: 'unimplemented', why: '現行はアカウント単位のJSONを「保存」で即時反映する。設計の対象見込み、二重経路、テスト完了、公開版を保証するAPIが無く、正式要件 §7 のrule/validate/publish契約が未実装',
+    route: '/friend-add-settings/publish',
+    states: { apis: ['**/api/friend-add-routing/draft*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'match',
+    verdictNote: '**#615 `5873f18b`（#597 `eaa4050b` の上）でClaudeが実装した。未実装ではなくなった。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。 **① 公開は3つがそろって初めて押せる**——Workerの `canPublish`、最後の試験が成功していること、送信中でないこと。`canPublish` だけに頼ると**試験していない下書きを公開できる形**になり得るので、画面でも見る。 **② 押せないときは理由を書く**（テストがまだ／失敗している／直す項目の名前）。 **③ 対象見込みは `validation.estimatedAudienceCount`。** 設計の数字（214人）を置かず、固定データの128人が出る。`null` は0人でなく `—（未取得）`。 **④ dry-runを「送信済み」「反映済み」と書かない**（`stateChanged: false` なので誰にも届いていない）。 **⑤ 公開には版ごとの `Idempotency-Key`（16文字以上）。押すたびに作り直さない**ので二重に押しても2回公開されない。 **⑥ 4状態を分けた**：読込・空（404「確認する下書きがありません」＋設定へ戻る導線）・失敗（500）・権限不足。**空を失敗にしない。** `undefined`・`NaN`・`Invalid Date`・`API error` は0件。 取得元：`friend-add-v6/ec9vg-normal-1440.png`・`ec9vg-empty.txt` ＋ `publish-flow.ts`',
+    verdictSource: 'friend-add-v6/ec9vg-1440.png',
+    verdictHead: '5873f18b',
+
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    gap: 'api',
-    gapNote: '`publish` の返事（公開版、対象見込み、二重送信防止、監視先）を受けて完了画面を出す。9-1-Fと同じ契約で作る',
-    status: 'unimplemented', why: '現行PUTは公開結果や版を返さない。9-1-Fのdraft/validate/publish実装が前提',
+    route: '/friend-add-settings/publish',
+    steps: [{ qaOpen: 'ec9vg', after: 900 }],
+    verdict: 'match',
+    verdictNote: '**#615 `5873f18b` でClaudeが実装した。未実装ではなくなった。** ルート `/friend-add-settings/publish`（公開を押した先）。1440・1920とも横スクロール0。 公開した版（第2版）・公開日時・対象人数（128人）・二重送信防止（有効／webhookの記録で判定）を公開の返事から出す。**確認の段と同じ `estimatedAudienceCount` を使うので、数が食い違わない。** **実行結果へは `monitoringPath` があるときだけリンクする。** 固定データでは `null` なので、「実行結果の画面はまだ接続されていません。」と理由を出し、リンクにしない。**無い画面へ送らない。** 取得元：`friend-add-v6/quhg6-1440.png` ＋ `publish-flow.ts:monitoringLink`',
+    verdictSource: 'friend-add-v6/quhg6-1440.png',
+    verdictHead: '5873f18b',
+
   },
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
@@ -2500,6 +2508,7 @@ export const CAPTURED_AT = {
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },
+      { pr: 615, head: '5873f18b', on: '2026-08-31', screens: ['ec9vg', 'quhg6'], note: 'Claude実装。#597 の公開の読み口の上に、最終確認と有効化完了を1本で作った' },
   ],
   18: [
     { pr: 443, head: 'f372ff30', on: '2026-08-28' },

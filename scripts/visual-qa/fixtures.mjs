@@ -5222,6 +5222,100 @@ export const IDENTITY_CANDIDATE_LISTS = {
   empty: { items: [], total: 0, limit: 20, offset: 0 },
 }
 
+/* PR #597 の公開前確認。契約と同じ項目名で置く。 */
+export const FRIEND_ADD_LIFECYCLE_ROUTING = {
+  firstTime: {
+    scenarioId: 'scenario-paused',
+    timing: 'immediate',
+    actions: [{ kind: 'tag', tagId: 'tag-0' }],
+  },
+  returning: {
+    scenarioId: null,
+    mode: 'same',
+    startPosition: 'beginning',
+    actions: [],
+  },
+  criteria: { firstTime: 'unfollow_count_zero' },
+}
+
+export const FRIEND_ADD_LIFECYCLE_DRAFT = {
+  accountId: 'visual-qa-account',
+  versionId: 'friend-add-version-2',
+  versionNumber: 2,
+  status: 'draft',
+  routing: FRIEND_ADD_LIFECYCLE_ROUTING,
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-08-30T10:00:00.000Z',
+  publishedAt: null,
+}
+
+export const FRIEND_ADD_LIFECYCLE_VALIDATION = {
+  canPublish: true,
+  estimatedAudienceCount: 128,
+  checks: [
+    {
+      key: 'first_time',
+      label: 'はじめて友だち追加した人への配信',
+      status: 'passed',
+      detail: '配信するシナリオを確認できました。',
+    },
+    {
+      key: 'returning',
+      label: '以前からの友だち・ブロック解除後の配信',
+      status: 'passed',
+      detail: '配信方法を確認できました。',
+    },
+    {
+      key: 'actions',
+      label: '配信と一緒に行うこと',
+      status: 'passed',
+      detail: '1件の操作を、並べた順に実行します。',
+    },
+    {
+      key: 'duplicate_prevention',
+      label: '同じ友だち追加通知の二重実行防止',
+      status: 'passed',
+      detail: 'LINEアカウントとWebhookイベントの組み合わせで、同じ通知を1回だけ処理します。',
+    },
+  ],
+  conflicts: [],
+  lastTestStatus: 'succeeded',
+}
+
+export const FRIEND_ADD_LIFECYCLE_TEST_RESULT = {
+  versionId: 'friend-add-version-2',
+  displayName: '山田 花子',
+  kind: 'first_time',
+  scenarioId: 'scenario-paused',
+  scenarioName: '停止中',
+  suppressed: false,
+  actionCount: 1,
+  stateChanged: false,
+}
+
+export const FRIEND_ADD_LIFECYCLE_PUBLISHED = {
+  accountId: 'visual-qa-account',
+  versionId: 'friend-add-version-2',
+  versionNumber: 2,
+  publishedAt: '2026-08-30T10:30:00.000Z',
+  estimatedAudienceCount: 128,
+  duplicatePrevention: 'webhook_event',
+  monitoringPath: null,
+  monitoringUnavailableReason: '実行結果の画面はまだ接続されていません。',
+}
+
+/** 取得できて下書きが無い状態。失敗とは別に404で返す。 */
+export const FRIEND_ADD_LIFECYCLE_EMPTY = {
+  status: 404,
+  body: { success: false, error: '確認する下書きがありません' },
+}
+
+/** 読み口が失敗した状態。0件や「まだありません」に変換しない。 */
+export const FRIEND_ADD_LIFECYCLE_ERROR = {
+  status: 500,
+  body: { success: false, error: '下書きを読み込めませんでした' },
+}
+
 export const IDENTITY_CANDIDATE_ERROR = {
   success: false, error: '本人照合の候補を読み込めませんでした', code: 'VISUAL_QA_ERROR',
 }

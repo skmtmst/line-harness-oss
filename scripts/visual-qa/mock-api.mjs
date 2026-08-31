@@ -98,6 +98,12 @@ import {
   FRIENDS,
   FRIEND_ADD_BREAKDOWN,
   FRIEND_ADD_EVENTS,
+  FRIEND_ADD_LIFECYCLE_DRAFT,
+  FRIEND_ADD_LIFECYCLE_EMPTY,
+  FRIEND_ADD_LIFECYCLE_ERROR,
+  FRIEND_ADD_LIFECYCLE_PUBLISHED,
+  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
+  FRIEND_ADD_LIFECYCLE_VALIDATION,
   FRIEND_ADD_ROUTING,
   FRIEND_DETAILS,
   FRIEND_FIELDS,
@@ -107,8 +113,8 @@ import {
   FRIEND_SCENARIOS,
   FRIEND_STATS,
   IDENTITY_CANDIDATE_EC,
-  IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_ERROR,
+  IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   INBOX_SAVED_VIEWS,
   INBOX_STATS,
@@ -1166,6 +1172,24 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/friends/add-breakdown') return { success: true, data: FRIEND_ADD_BREAKDOWN }
   if (pathname === '/api/friend-add-routing/events') return { success: true, data: FRIEND_ADD_EVENTS }
+  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
+  if (pathname === '/api/friend-add-routing/draft') {
+    if (query.get('visualState') === 'empty') return { status: 404, body: FRIEND_ADD_LIFECYCLE_EMPTY }
+    if (query.get('visualState') === 'error') return { status: 500, body: FRIEND_ADD_LIFECYCLE_ERROR }
+    return { success: true, data: FRIEND_ADD_LIFECYCLE_DRAFT }
+  }
+  if (pathname === '/api/friend-add-routing/validate') {
+    return { success: true, data: FRIEND_ADD_LIFECYCLE_VALIDATION }
+  }
+  if (pathname === '/api/friend-add-routing/draft/test') {
+    return { success: true, data: FRIEND_ADD_LIFECYCLE_TEST_RESULT }
+  }
+  if (pathname === '/api/friend-add-routing/publish') {
+    return { success: true, data: FRIEND_ADD_LIFECYCLE_PUBLISHED }
+  }
+  if (pathname === '/api/friend-add-routing/conflicts') {
+    return { success: true, data: { conflicts: [] } }
+  }
   if (pathname === '/api/friend-add-routing') {
     /* **`{routing, scenarios, tags}` の通。** 一覧の既定を返すと画面が読めない。 */
     return {
@@ -1548,6 +1572,19 @@ const server = createServer((req, res) => {
     /^\/api\/auto-replies\/[^/]+\/publish$/.test(url.pathname)
 
   /*
+    **友だち追加時配信の確認・試験・公開（PR #597）。**
+    確認と試験は契約が `stateChanged: false` と決めていて何も保存しない。
+    公開だけは書き込みだが、通さないと `quhg6`（有効化完了）が一度も撮れず
+    未確認のまま残る。**返すのは契約どおりの固定結果だけ**で、ここで
+    何かが保存されるわけではない。
+  */
+  const FRIEND_ADD_PUBLISH_FLOW = new Set([
+    '/api/friend-add-routing/validate',
+    '/api/friend-add-routing/draft/test',
+    '/api/friend-add-routing/publish',
+  ]).has(url.pathname)
+
+  /*
     **「ルールをテスト」は何も保存しません。** 画面にも
     「友だちの点数や履歴は変えません」と書いてあります。405 に落とすと
     テスト結果の面が一度も撮れず、未確認のまま残ります。
@@ -1731,7 +1768,8 @@ const server = createServer((req, res) => {
   }
 
   if (method !== 'GET') {
-    if ((READ_ONLY_POSTS.has(url.pathname) || AUTO_REPLY_READ_ONLY || AUTO_REPLY_PUBLISH) && method === 'POST') {
+    if ((READ_ONLY_POSTS.has(url.pathname) || AUTO_REPLY_READ_ONLY || AUTO_REPLY_PUBLISH
+      || FRIEND_ADD_PUBLISH_FLOW) && method === 'POST') {
       send(bodyFor(url.pathname, url.searchParams) ?? { success: false, error: 'not found' })
       return
     }
