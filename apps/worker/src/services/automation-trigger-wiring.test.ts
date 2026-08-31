@@ -36,4 +36,10 @@ describe('V6オートメーションの発生元配線', () => {
     expect(text).toContain('processDueAutomationRuns(env.DB');
     expect(text).toContain('createAutomationActionExecutors({');
   });
+
+  it('未視聴ウェビナーの共通アクションを通知と別の5分処理で起動する', () => {
+    const text = source('index.ts');
+    expect(text).toContain('processDueMissedWebinarActions(env.DB');
+    expect(text).toContain('[webinar-missed-actions]');
+  });
 });

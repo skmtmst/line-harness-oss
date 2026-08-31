@@ -205,7 +205,8 @@
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
     "198_form_account_scope.sql",
-    "199_webinar_notification_jobs.sql"
+    "199_webinar_notification_jobs.sql",
+    "260_webinar_common_actions.sql"
   ],
-  "migrationCount": 206
+  "migrationCount": 207
 }

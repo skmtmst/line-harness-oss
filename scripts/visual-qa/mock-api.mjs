@@ -28,7 +28,9 @@ import {
   TAGS,
   TAG_GROUPS,
   WEBINAR_NOTIFICATION_SETTINGS,
+  WEBINAR_ACTION_SETTINGS,
   WEBINAR_OVERVIEW,
+  WEBINARS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -279,6 +281,7 @@ const SHAPES = {
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
   '/api/webinars/overview': WEBINAR_OVERVIEW,
+  '/api/webinars': WEBINARS,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },
@@ -402,6 +405,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/tags') return { success: true, data: TAGS }
   if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) {
     return { success: true, data: WEBINAR_NOTIFICATION_SETTINGS }
+  }
+  if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) {
+    return { success: true, data: WEBINAR_ACTION_SETTINGS }
+  }
+  if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
+    return { success: true, data: WEBINARS[0] }
   }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**

@@ -58,6 +58,14 @@ import {
   sendWebinarNotificationTest,
   type WebinarNotificationSettingsInput,
 } from '../services/webinar-notifications.js';
+import {
+  getWebinarActionSettings,
+  saveWebinarActionSetting,
+  startWebinarActionExecution,
+  WEBINAR_ACTION_TRIGGERS,
+  WebinarActionError,
+  type WebinarActionTrigger,
+} from '../services/webinar-actions.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { signWebinarToken, verifyWebinarToken } from '../lib/webinar-token.js';
 import {
@@ -356,12 +364,29 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
       durationSeconds: loaded.webinar.duration_seconds,
     }));
     if (positionSeconds >= Math.floor(loaded.webinar.duration_seconds * 0.9)) {
-      c.executionCtx.waitUntil(enqueueWebinarCompletedNotification(
-        c.env.DB,
-        loaded.webinar.id,
-        auth.friendId,
-        sessionStartAt,
-      ));
+      c.executionCtx.waitUntil(Promise.allSettled([
+        enqueueWebinarCompletedNotification(
+          c.env.DB,
+          loaded.webinar.id,
+          auth.friendId,
+          sessionStartAt,
+        ),
+        loaded.webinar.account_id
+          ? startWebinarActionExecution(c.env.DB, {
+              webinarId: loaded.webinar.id,
+              lineAccountId: loaded.webinar.account_id,
+              trigger: 'completed',
+              friendId: auth.friendId,
+              sessionStartAt,
+              sourceEventId: `webinar:${loaded.webinar.id}:${sessionStartAt}:${auth.friendId}:completed`,
+              credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+            })
+          : Promise.resolve(null),
+      ]).then((results) => {
+        for (const result of results) {
+          if (result.status === 'rejected') console.error('webinar completed side effect error:', result.reason);
+        }
+      }));
     }
     return c.json({ ok: true });
   } catch (err) {
@@ -537,6 +562,17 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
           ),
         ).catch((err) => console.error('webinar cta tag error:', err)),
       );
+    }
+    if (loaded.webinar.account_id) {
+      c.executionCtx.waitUntil(startWebinarActionExecution(c.env.DB, {
+        webinarId: loaded.webinar.id,
+        lineAccountId: loaded.webinar.account_id,
+        trigger: 'cta_click',
+        friendId: auth.friendId,
+        sessionStartAt,
+        sourceEventId: `webinar:${loaded.webinar.id}:${sessionStartAt}:${auth.friendId}:cta_click`,
+        credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      }).catch((error) => console.error('webinar CTA action error:', error)));
     }
     return c.json({ ok: true });
   } catch (err) {
@@ -862,6 +898,93 @@ webinarRoutes.get('/api/webinars/:id/notifications', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+webinarRoutes.get(
+  '/api/webinars/:id/actions',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
+      if (!webinar?.account_id || !await canAccessAllLineAccounts(
+        c.env.DB,
+        c.get('staff'),
+        [webinar.account_id],
+      )) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const data = await getWebinarActionSettings(c.env.DB, webinar.id, webinar.account_id);
+      return c.json({ success: true, data });
+    } catch (error) {
+      if (error instanceof WebinarActionError && error.code === 'not_found') {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      console.error('GET /api/webinars/:id/actions error:', error);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+webinarRoutes.put(
+  '/api/webinars/:id/actions/:trigger',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const trigger = c.req.param('trigger') as WebinarActionTrigger;
+      if (!WEBINAR_ACTION_TRIGGERS.includes(trigger)) {
+        return c.json({ success: false, error: 'invalid_trigger' }, 400);
+      }
+      const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
+      if (!webinar?.account_id || !await canAccessAllLineAccounts(
+        c.env.DB,
+        c.get('staff'),
+        [webinar.account_id],
+      )) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const body = await c.req.json<{
+        commonActionVersionId?: unknown;
+        expectedVersion?: unknown;
+      }>();
+      const commonActionVersionId = body.commonActionVersionId === null
+        ? null
+        : typeof body.commonActionVersionId === 'string' && body.commonActionVersionId.trim()
+          ? body.commonActionVersionId.trim()
+          : undefined;
+      if (
+        commonActionVersionId === undefined ||
+        !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0
+      ) {
+        return c.json({ success: false, error: 'invalid_input' }, 400);
+      }
+      const setting = await saveWebinarActionSetting(c.env.DB, {
+        webinarId: webinar.id,
+        lineAccountId: webinar.account_id,
+        trigger,
+        commonActionVersionId,
+        expectedVersion: Number(body.expectedVersion),
+        updatedBy: c.get('staff').id,
+      });
+      return c.json({ success: true, data: setting });
+    } catch (error) {
+      if (error instanceof WebinarActionError) {
+        if (error.code === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
+        if (error.code === 'version_not_found') {
+          return c.json({ success: false, error: error.code, message: error.message }, 422);
+        }
+        if (error.code === 'version_conflict') {
+          return c.json({
+            success: false,
+            error: error.code,
+            message: error.message,
+            current: error.current,
+          }, 409);
+        }
+      }
+      console.error('PUT /api/webinars/:id/actions/:trigger error:', error);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 webinarRoutes.put(
   '/api/webinars/:id/notifications',

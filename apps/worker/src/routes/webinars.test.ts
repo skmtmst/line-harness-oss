@@ -61,6 +61,21 @@ const webinarNotificationMocks = {
 };
 vi.mock('../services/webinar-notifications.js', () => webinarNotificationMocks);
 
+const webinarActionMocks = {
+  getWebinarActionSettings: vi.fn(),
+  saveWebinarActionSetting: vi.fn(),
+  startWebinarActionExecution: vi.fn(),
+  WEBINAR_ACTION_TRIGGERS: ['completed', 'cta_click', 'missed'],
+  WebinarActionError: class WebinarActionError extends Error {
+    constructor(
+      public code: string,
+      message: string,
+      public current?: unknown,
+    ) { super(message); }
+  },
+};
+vi.mock('../services/webinar-actions.js', () => webinarActionMocks);
+
 const accountAccessMock = {
   canAccessAllLineAccounts: vi.fn(async (
     _db: D1Database, _staff: unknown, _ids: Array<string | null>,
@@ -251,6 +266,8 @@ describe('admin webinar tenant scope', () => {
     ['GET', '/api/webinars/w-other/notifications'],
     ['PUT', '/api/webinars/w-other/notifications'],
     ['POST', '/api/webinars/w-other/notifications/test'],
+    ['GET', '/api/webinars/w-other/actions'],
+    ['PUT', '/api/webinars/w-other/actions/completed'],
   ])('%s %s は別統括のウェビナーを404にする', async (method, path) => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ id: 'w-other', account_id: 'account-b' }));
     accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
@@ -688,6 +705,25 @@ describe('POST /api/liff/webinars/:slug/heartbeat', () => {
     });
     expect(res.status).toBe(422);
   });
+
+  test('90%以上では通知と同じ実イベントから視聴完了アクションを一度だけ開始する', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarActionMocks.startWebinarActionExecution.mockResolvedValue({
+      kind: 'created', runId: 'run-1', status: 'success',
+    });
+    const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
+      sessionStartAt: SESSION_START,
+      positionSeconds: 6480,
+    });
+    expect(res.status).toBe(200);
+    expect(webinarActionMocks.startWebinarActionExecution).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        webinarId: 'w1', lineAccountId: 'account-a', trigger: 'completed',
+        friendId: 'friend-1', sessionStartAt: SESSION_START,
+      }),
+    );
+  });
 });
 
 describe('POST /api/liff/webinars/:slug/comments', () => {
@@ -787,6 +823,21 @@ describe('POST /api/liff/webinars/:slug/cta-click', () => {
       sessionStartAt: SESSION_START,
     });
     expect(execCtx.waitUntil).toHaveBeenCalled();
+  });
+
+  test('CTAの記録後に同じ人・同じ回の共通アクションを開始する', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarActionMocks.startWebinarActionExecution.mockResolvedValue({
+      kind: 'created', runId: 'run-cta', status: 'success',
+    });
+    const res = await postJson('/api/liff/webinars/test-webinar/cta-click', {
+      sessionStartAt: SESSION_START,
+    });
+    expect(res.status).toBe(200);
+    expect(webinarActionMocks.startWebinarActionExecution).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ trigger: 'cta_click', friendId: 'friend-1' }),
+    );
   });
 });
 
@@ -930,6 +981,51 @@ describe('webinar notification settings', () => {
       expect.objectContaining({ id: 'w1', accountId: 'account-a' }),
       SESSION_START,
       expect.objectContaining({ defaultLiffId: '999-test' }),
+    );
+  });
+});
+
+describe('webinar common actions', () => {
+  test('GET は3つの利用箇所と同じアカウントの公開版を返す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarActionMocks.getWebinarActionSettings.mockResolvedValue({
+      settings: [
+        { trigger: 'completed', version: 0, action: null, updatedAt: null },
+        { trigger: 'cta_click', version: 0, action: null, updatedAt: null },
+        { trigger: 'missed', version: 0, action: null, updatedAt: null },
+      ],
+      availableActions: [{
+        id: 'action-1', name: 'フォロー', versionId: 'action-1-v1', versionNumber: 1,
+      }],
+    });
+    const res = await adminReq('/api/webinars/w1/actions');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(expect.objectContaining({
+      data: expect.objectContaining({ settings: expect.arrayContaining([
+        expect.objectContaining({ trigger: 'completed', version: 0 }),
+      ]) }),
+    }));
+    expect(webinarActionMocks.getWebinarActionSettings).toHaveBeenCalledWith(
+      expect.anything(), 'w1', 'account-a',
+    );
+  });
+
+  test('PUT は画面が見た版番号と公開版IDだけを保存する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarActionMocks.saveWebinarActionSetting.mockResolvedValue({
+      trigger: 'missed', version: 3, action: null, updatedAt: 'x',
+    });
+    const res = await adminReq('/api/webinars/w1/actions/missed', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commonActionVersionId: null, expectedVersion: 2 }),
+    });
+    expect(res.status).toBe(200);
+    expect(webinarActionMocks.saveWebinarActionSetting).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        webinarId: 'w1', lineAccountId: 'account-a', trigger: 'missed',
+        commonActionVersionId: null, expectedVersion: 2,
+      }),
     );
   });
 });
