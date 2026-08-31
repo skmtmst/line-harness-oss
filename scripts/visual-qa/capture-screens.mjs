@@ -389,6 +389,17 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    受信箱の集計（`YZaDK` の担当者ごとの未読）。**一覧の既定（配列）だと
+    `assigneeUnread` が無くなり、未読数が全部「未取得」の絵になる。**
+    「空」は未読が1件も無い状態で、担当者一覧はそのまま。
+  */
+  [/\/api\/chats\/stats(\?|$)/, {
+    waiting: 0, oldestWaitingMinutes: null, averageFirstReplyMinutes: null,
+    waitingOverAnHour: 0, mine: 0, todayInbound: 0,
+    todayByChannel: { line: 0, email: 0 },
+    assigneeUnread: [],
+  }],
+  /*
     ウェビナーの集計（`ZC13r` の帯）。**一覧の既定（配列）だと `metrics` が
     無くなり、実値0のはずが全部「未取得」の絵になる。**
     「空」は数えて0。視聴の指標は口が取れないままなので `unavailable` を保つ。

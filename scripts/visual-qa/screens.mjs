@@ -246,11 +246,30 @@ export const SCREENS = [
     2-8 は一覧の絞り込み、2-9 は会話の見出し、2-10 は対応マーク。
   */
   {
-    ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
+    ...INBOX, node: 'YZaDK',
+    /*
+      担当者ごとの未読数。**集計の口を差し替えて、通常・0件・失敗を分けて撮る。**
+      失敗のときも担当者一覧そのものは残る（別の口）ので、数だけ `—` になる。
+    */
+    states: {
+      apis: ['**/api/chats/stats**'],
+      kinds: ['normal', 'empty', 'error'],
+    }, name: '2-8 担当者プルダウンを開く',
     /* **「担当者で絞り込む」は選ぶ口**（ボタンではない）。 */
-    steps: [{ select: '担当者で絞り込む', label: 'Kenta' }],
-    verdict: 'needs_fix', verdictNote: '**#604 `6011cfeb` で撮り直した。** ルート `/chats`。1440・1920とも横スクロール0。 選択肢は すべて／未割り当て／Masato／Kenta。 P2 設計は担当ごとの未読数を添えた選び口（「Kenta 3」）。**数を作らないため添えていない。** 前の判定で「`f0zn6` の一覧が既に持っている」と書いたのは誤りで、取り消す。`InboxStats` は waiting・mine・todayInbound しか返さず、**担当ごとの内訳が無い**。一覧から数えることもできるが、一覧は20件ずつのページなので数え落とす。 取得元：`inbox-v6/YZaDK.txt:28` ＋ `lib/api.ts:732`。推奨修正：`/api/chats/stats` に担当ごとの未読を足す（Codex側・P2）',
-    verdictSource: 'inbox-v6/YZaDK.txt', verdictHead: '6011cfeb',
+    /*
+      **選ぶ言葉は状態ごとに変わる**（`Kenta 3` / `Kenta 0` / `Kenta —`）ので、
+      3状態で共通に選べる「すべて」にする。数は選択肢の一覧に出る。
+    */
+    steps: [{ select: '担当者で絞り込む', label: 'すべて' }],
+    variants: [
+      {
+        // 通常のときだけ、選んだ担当者の未読数が閉じた欄にも出ることを撮る。
+        suffix: 'selected',
+        steps: [{ select: '担当者で絞り込む', label: 'Kenta 3' }],
+      },
+    ],
+    verdict: 'needs_fix', verdictNote: '契約枝のローカルcommit `4b97fab1` が足した `InboxStats.assigneeUnread` を読むようにした。**前の判定（担当者ごとの未読が出ない）は解消。** 「未割り当て 2」「Kenta 3」のように未読数を添え、**配列に出てこない担当者は実値0**として「Masato 0」と描く（0件は配列に載らない契約）。**集計の失敗は0件と扱わず、数だけ `—`** にして担当者一覧そのものは残す（別の口）。**画面に見えている行から数えない**——一覧はページ送りされるので2ページ目の未読が落ちる。通常・0件・失敗・選択中の4状態を撮った（8枚、はみ出し0）。`GET /api/chats/stats` はアカウント引数を取らない作りなので、**新しい契約は足さず**切り替えのたびに読み直すだけにした。残る差：設計は担当者ごとの未読を左の縦帯にも出すが、実装は絞り込みの選択肢まで',
+    verdictSource: 'Claude実装', verdictHead: '4196cc7b',
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
@@ -2598,6 +2617,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['f0zn6'], note: '本文が取れていなかったので撮った。development そのもの' },
     { pr: 555, head: '9eee9655', on: '2026-08-30', screens: ['tBlkL', 'ANgda', 'AuSDY', 'LHjwD'], note: '重複エラーの文言を設計へ。変更はこの1行だけ' },
       { pr: 604, head: '6011cfeb', on: '2026-08-31', screens: ['ASsb3', 'Xi4x9', 'NfgOs', 'NWbuF', 'TUveA', 'w72a2', 'B7CER8', 'YZaDK', 'L35UOV', 'H3lAOB'], note: 'Claudeが直した。古い形の保存を開くと受信箱が落ちる不具合を撮影中に見つけた。条件の要約と「…」、右パネルの「初期状態に戻す」も足した' },
+    { pr: 0, head: '4196cc7b', on: '2026-09-01', screens: ['YZaDK'], note: 'Claudeが実装して撮った。契約枝のローカルcommit 4b97fab1 の上。**doctorが要確認のため push していない。ローカルcommitのみ**' },
   ],
   13: [
     { pr: 436, head: '35c613a6', on: '2026-08-29', screens: ['EMBIK', 'v9tYhl'], note: '#436 の最新head。**`ZOPyc` は撮り直していない**——旧head `950073ab` から `apps/web` の差分0件で、判定は #556 `6037aeef` のまま。受入条件5項目の確認と、画面全体の一致判定は分けて記録した' },

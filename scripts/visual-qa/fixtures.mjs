@@ -446,6 +446,23 @@ export const INBOX_STATS = {
   mine: 0,
   todayInbound: 0,
   todayByChannel: { line: 0, email: 0 },
+  /*
+    担当者ごとの未読（設計 `YZaDK`）。契約枝
+    codex/kenta-v6-inbox-assignee-unread（`4b97fab1`）の引き継ぎどおり。
+    **0件の担当者は配列に載らない。** `OPERATORS` の Masato は出てこないので、
+    画面が実値0として描けるかをここで試す。
+    担当未設定は `operatorId` / `operatorName` が null。
+  */
+  assigneeUnread: [
+    { operatorId: null, operatorName: null, unread: 2 },
+    { operatorId: 'operator-kenta', operatorName: 'Kenta', unread: 3 },
+  ],
+}
+
+/** 未読が1件も無いとき。**配列が空**で、担当者一覧は変わらない。 */
+export const INBOX_STATS_NO_UNREAD = {
+  ...INBOX_STATS,
+  assigneeUnread: [],
 }
 
 /**
