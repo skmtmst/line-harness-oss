@@ -1189,6 +1189,7 @@ export type DashboardPreferenceResponse = {
 export type EcCommerceOverview = {
   total: number
   processed: number
+  identityPending: number
   failed: number
   skipped: number
   last24h: number
@@ -1205,7 +1206,7 @@ export type EcCommerceEvent = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  status: 'received' | 'processing' | 'processed' | 'skipped' | 'failed'
+  status: 'received' | 'identity_pending' | 'processing' | 'processed' | 'skipped' | 'failed'
   errorMessage: string | null
   receivedAt: string
   processedAt: string | null
@@ -3284,10 +3285,13 @@ export const api = {
     },
   },
   ecCommerce: {
-    overview: () =>
-      fetchApi<ApiResponse<EcCommerceOverview>>('/api/ec-commerce/overview'),
-    events: (params?: { eventType?: string; status?: string; limit?: number; offset?: number }) => {
+    overview: (lineAccountId?: string) =>
+      fetchApi<ApiResponse<EcCommerceOverview>>(lineAccountId
+        ? `/api/ec-commerce/overview?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : '/api/ec-commerce/overview'),
+    events: (params?: { lineAccountId?: string; eventType?: string; status?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
+      if (params?.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params?.eventType) query.set('eventType', params.eventType)
       if (params?.status) query.set('status', params.status)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
