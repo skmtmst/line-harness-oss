@@ -55,6 +55,9 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain("inputs.target != 'admin'");
     expect(workflow).toContain("inputs.target != 'worker'");
     expect(workflow).toContain('TARGET: ${{ inputs.target }}');
+    expect(workflow).toContain(
+      'pnpm --filter @line-harness/update-engine build',
+    );
   });
 
   it('keeps cron disabled and migrations in their separate workflow', () => {
