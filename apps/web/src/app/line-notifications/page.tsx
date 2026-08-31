@@ -1,5 +1,7 @@
 'use client'
 
+import Button from '@/components/shared/button'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
@@ -119,12 +121,31 @@ export default function LineNotificationsPage() {
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
     {tab === 'customer' ? <>
     <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {[
-        ['通知テンプレート', settings.length, '顧客向けの重要通知'],
-        ['通知ON', settings.filter((x) => x.isEnabled).length, '現在送信する設定'],
-        ['送信完了', overview?.processed ?? 0, 'EC連携からの累計'],
-        ['要確認', overview?.failed ?? 0, '送信に失敗した通知'],
-      ].map(([label, value, note]) => <div key={label} className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs">{label}</p><p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}<span className="text-ink-faint ml-1 text-xs font-normal">件</span></p><p className="text-ink-faint mt-0.5 text-xs">{note}</p></div>)}
+      {([
+        ['通知テンプレート', settings.length, '顧客向けの重要通知', null],
+        ['通知ON', settings.filter((x) => x.isEnabled).length, '現在送信する設定', null],
+        ['送信完了', overview?.processed ?? 0, 'EC連携からの累計', null],
+        /*
+          **数を出すだけで終わらせない。** 「要確認 2件」と言われても、
+          その2件がどれかを探す場所が無かった。送れなかったものの一覧は
+          既に別のタブにあるので、そこへ渡す。
+          0件のときは押せる形にしない——押しても何も無い。
+        */
+        ['要確認', overview?.failed ?? 0, '送信に失敗した通知', '/line-notifications?tab=failures'],
+      ] as Array<[string, number, string, string | null]>).map(([label, value, note, href]) => {
+        const body = <>
+          <p className="text-ink-faint text-xs">{label}</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}<span className="text-ink-faint ml-1 text-xs font-normal">件</span></p>
+          <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
+        </>
+        return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
+          {body}
+          {/* 0件のときは押し口を出さない。押しても何も無い。 */}
+          {href && value > 0
+            ? <Button href={href} className="mt-2">送れなかったものを見る</Button>
+            : null}
+        </div>
+      })}
     </div>
     <main className="grid min-w-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="bg-canvas rounded-card border-hairline h-fit border p-2 lg:sticky lg:top-4">
