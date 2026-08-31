@@ -17,6 +17,7 @@ import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { emptyMessageOf } from './friend-list-empty'
 import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
@@ -75,6 +76,23 @@ function FriendsPageInner({
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const loadRequestRef = useRef(0)
+
+  /*
+    **URLから来る絞り込みも数える。** 行動スコアの「この帯の人を見る」は
+    `?scoreMin=` で開く。数え落とすと、その帯に誰もいないときに
+    「まだ友だちがいません」と出て、絞り込んだ結果だと分からなくなる。
+  */
+  const emptyMessage = emptyMessageOf({
+    search: searchSubmitted,
+    tagId: selectedTagId,
+    advanced: advanced !== null,
+    others: responseFilter !== 'all'
+      || operatorId !== ''
+      || scenarioId !== ''
+      || attentionOnly
+      || hasScoreRange
+      || audienceId !== '',
+  })
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -346,6 +364,14 @@ function FriendsPageInner({
           description="登録した友だちは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
           action={<Button variant="secondary" onClick={() => void loadFriends()}>友だちを再読み込み</Button>}
         />
+      ) : friends.length === 0 ? (
+        /*
+          **絞り込んで0件と、そもそも1人もいないのは別のこと。**
+          以前はどちらも「検索条件を外すか」と言っていたので、まだ誰も
+          友だちになっていないアカウントで、外すべき条件が無いのに
+          条件を外せと言われた。共通部品を通して、状態を名前で言えるようにする。
+        */
+        <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
       ) : (
         <FriendListTable
           friends={friends}
