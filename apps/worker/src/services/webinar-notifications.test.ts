@@ -4,6 +4,7 @@ import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import {
   calculateWebinarNotificationSchedule,
   enqueueWebinarCompletedNotification,
+  getWebinarNotificationOverview,
   processWebinarNotificationJobs,
   registerWebinarSession,
   saveWebinarNotificationSettings,
@@ -56,6 +57,27 @@ describe('calculateWebinarNotificationSchedule', () => {
 });
 
 describe('webinar notification jobs', () => {
+  test('通知対象は有効な申込だけを数え、同じ人を人数へ重ねない', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    insertFriend(raw, 'friend-2', { line_account_id: 'account-1', line_user_id: 'U002' });
+    const insert = raw.prepare(
+      `INSERT INTO webinar_registrations
+         (id, webinar_id, friend_id, session_start_at, notified_at, created_at, status, cancelled_at)
+       VALUES (?, 'webinar-1', ?, ?, NULL, ?, ?, ?)`,
+    );
+    insert.run('reg-1', 'friend-1', SESSION, NOW.toISOString(), 'active', null);
+    insert.run('reg-2', 'friend-1', SESSION + 3600, NOW.toISOString(), 'active', null);
+    insert.run('reg-3', 'friend-2', SESSION, NOW.toISOString(), 'active', null);
+    insert.run('reg-4', 'friend-2', SESSION + 3600, NOW.toISOString(), 'cancelled', NOW.toISOString());
+
+    expect((await getWebinarNotificationOverview(db, 'webinar-1')).audience).toEqual({
+      people: 2,
+      bookings: 3,
+      definition: 'active_registrations',
+    });
+  });
+
   test('設定の版を上げ、古い未送信予定を取り消して新しい予定を作る', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);

@@ -27,6 +27,7 @@ import {
   OPERATORS,
   TAGS,
   TAG_GROUPS,
+  WEBINAR_NOTIFICATION_SETTINGS,
   WEBINAR_OVERVIEW,
 } from './fixtures.mjs'
 
@@ -399,6 +400,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) {
+    return { success: true, data: WEBINAR_NOTIFICATION_SETTINGS }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という

@@ -198,6 +198,51 @@ export const WEBINAR_OVERVIEW_FAILURE = {
   error: 'Internal server error',
 }
 
+/** `Ho8z4` の通知設定。人数は有効な申込だけを数え、取消済みを含めない。 */
+export const WEBINAR_NOTIFICATION_SETTINGS = {
+  settings: {
+    webinarId: 'webinar-1',
+    version: 2,
+    registrationEnabled: true,
+    dayBeforeEnabled: true,
+    dayBeforeTime: '20:00',
+    hourBeforeEnabled: true,
+    hourBeforeMinutes: 60,
+    startEnabled: true,
+    missedEnabled: true,
+    missedTime: '10:00',
+    completedEnabled: true,
+    updatedAt: '2026-01-13T00:00:00.000Z',
+  },
+  overview: {
+    total: 191,
+    pending: 18,
+    sent: 168,
+    failed: 3,
+    skipped: 2,
+    cancelled: 0,
+    audience: { people: 184, bookings: 191, definition: 'active_registrations' },
+  },
+}
+
+export const WEBINAR_NOTIFICATION_SETTINGS_EMPTY = {
+  settings: null,
+  overview: {
+    total: 0,
+    pending: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    cancelled: 0,
+    audience: { people: 0, bookings: 0, definition: 'active_registrations' },
+  },
+}
+
+export const WEBINAR_NOTIFICATION_SETTINGS_FAILURE = {
+  success: false,
+  error: 'Internal server error',
+}
+
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,

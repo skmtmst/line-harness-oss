@@ -4274,6 +4274,13 @@ export type WebinarNotificationOverview = {
   failed: number
   skipped: number
   cancelled: number
+  audience: {
+    /** 取消済みを除いた申込の、重複しない友だち数。 */
+    people: number
+    /** 取消済みを除いた申込行数。 */
+    bookings: number
+    definition: 'active_registrations'
+  }
 }
 
 export type WebinarSakuraComment = { id?: string; atSeconds: number; authorName: string; body: string }

@@ -1,11 +1,31 @@
-# V6 機能10 ウェビナー一覧KPI 契約引き継ぎ
+# V6 機能10 ウェビナー一覧KPI・通知対象 契約引き継ぎ
 
 - Node: `ZC13r`
 - ルート: `/webinars`
 - 読み口: `GET /api/webinars/overview?account_id={選択中のLINEアカウントID}`
 - 固定base: `codex/kenta-v6-webinar-notifications` `de0848b9`
 
-## 1. 返す形
+## 0. `Ho8z4` 通知・リマインド
+
+既存の `GET /api/webinars/:id/notifications` に次を追加した。
+
+```ts
+overview.audience = {
+  people: number
+  bookings: number
+  definition: 'active_registrations'
+}
+```
+
+- `people` は取消済みを除く有効な申込の、重複しない友だち数。
+- `bookings` は取消済みを除く申込行数。
+- 0は実値0。取得失敗時はこの値を0へせず、取得口全体を失敗にする。
+- 設計の184人を固定値で書かず、`overview.audience.people` を表示する。
+- `definition` は画面へ内部語のまま出さず、「有効な申込」と説明する。
+
+通常184人・予約191件、空0人・0件、取得失敗の固定データを同梱した。
+
+## 1. 一覧で返す形
 
 ```ts
 type WebinarOverviewMetric = {
@@ -78,4 +98,3 @@ type WebinarOverview = {
 4. CTAを押した実人数とクリック延べ数を混ぜない
 5. 通常・空・失敗・権限不足を別に描く
 6. 1440px・1920pxでページと一覧の横スクロール0
-

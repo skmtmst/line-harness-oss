@@ -32,6 +32,7 @@ const EMPTY_OVERVIEW: WebinarNotificationOverview = {
   failed: 0,
   skipped: 0,
   cancelled: 0,
+  audience: { people: 0, bookings: 0, definition: 'active_registrations' },
 }
 
 function SettingRow({

@@ -11,6 +11,9 @@ import { describe, expect, it } from 'vitest';
 import { readArrayGetPaths } from './api-shapes.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import {
+  WEBINAR_NOTIFICATION_SETTINGS,
+  WEBINAR_NOTIFICATION_SETTINGS_EMPTY,
+  WEBINAR_NOTIFICATION_SETTINGS_FAILURE,
   WEBINAR_OVERVIEW,
   WEBINAR_OVERVIEW_EMPTY,
   WEBINAR_OVERVIEW_FAILURE,
@@ -51,6 +54,23 @@ describe('画面確認モックの口の形', () => {
     });
     expect(WEBINAR_OVERVIEW_FAILURE).toEqual({
       success: false, error: 'Internal server error',
+    });
+  });
+
+  it('ウェビナー通知は申込人数と予約件数を混ぜず、空だけを0にする', () => {
+    expect(WEBINAR_NOTIFICATION_SETTINGS.overview.audience).toEqual({
+      people: 184,
+      bookings: 191,
+      definition: 'active_registrations',
+    });
+    expect(WEBINAR_NOTIFICATION_SETTINGS_EMPTY.overview.audience).toEqual({
+      people: 0,
+      bookings: 0,
+      definition: 'active_registrations',
+    });
+    expect(WEBINAR_NOTIFICATION_SETTINGS_FAILURE).toEqual({
+      success: false,
+      error: 'Internal server error',
     });
   });
 });

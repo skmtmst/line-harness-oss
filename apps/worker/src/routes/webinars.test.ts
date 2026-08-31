@@ -145,6 +145,7 @@ beforeEach(() => {
   webinarNotificationMocks.getWebinarNotificationSettings.mockResolvedValue(null);
   webinarNotificationMocks.getWebinarNotificationOverview.mockResolvedValue({
     total: 0, pending: 0, sent: 0, failed: 0, skipped: 0, cancelled: 0,
+    audience: { people: 0, bookings: 0, definition: 'active_registrations' },
   });
   webinarNotificationMocks.registerWebinarSession.mockResolvedValue({
     registration: {
@@ -870,6 +871,7 @@ describe('webinar notification settings', () => {
     });
     webinarNotificationMocks.getWebinarNotificationOverview.mockResolvedValue({
       total: 8, pending: 4, sent: 2, failed: 1, skipped: 1, cancelled: 0,
+      audience: { people: 184, bookings: 191, definition: 'active_registrations' },
     });
 
     const res = await adminReq('/api/webinars/w1/notifications');
@@ -879,7 +881,11 @@ describe('webinar notification settings', () => {
       success: true,
       data: expect.objectContaining({
         settings: expect.objectContaining({ version: 2 }),
-        overview: expect.objectContaining({ total: 8, failed: 1 }),
+        overview: expect.objectContaining({
+          total: 8,
+          failed: 1,
+          audience: { people: 184, bookings: 191, definition: 'active_registrations' },
+        }),
       }),
     }));
   });
