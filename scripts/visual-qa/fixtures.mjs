@@ -284,6 +284,13 @@ export const MEDIA_ITEMS = [
     url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23f4f5f4"/></svg>',
     uploadedBy: 'visual-qa-owner', createdAt: '2026-08-30T09:00:00.000Z', usageCount: 0,
   },
+  {
+    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'image', filename: '新しい来店案内.png', mimeType: 'image/png',
+    sizeBytes: 204800, width: 1040, height: 1040, durationMs: null,
+    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23d9efe3"/></svg>',
+    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-31T08:00:00.000Z', usageCount: 0,
+  },
 ]
 
 export const MEDIA_DELETE_IMPACT = {
@@ -320,4 +327,44 @@ export const MEDIA_DELETE_IMPACT_EMPTY = {
 export const MEDIA_DELETE_IMPACT_ERROR = {
   success: false,
   error: '削除したときの影響を確認できませんでした',
+}
+
+export const MEDIA_REPLACEMENT_IMPACT = {
+  source: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
+  replacement: { id: 'media-replacement', filename: '新しい来店案内.png', kind: 'image' },
+  usageCount: 2,
+  replaceableCount: 2,
+  references: MEDIA_DELETE_IMPACT.references.map((reference) => ({
+    ...reference, replaceable: true, blocker: null, reason: null,
+  })),
+  blockers: [],
+  canReplace: true,
+  checkedAt: '2026-08-31T10:00:00.000Z',
+  revision: 'visual-qa-media-replacement-v1',
+}
+
+export const MEDIA_REPLACEMENT_IMPACT_EMPTY = {
+  ...MEDIA_REPLACEMENT_IMPACT,
+  source: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  usageCount: 0,
+  replaceableCount: 0,
+  references: [],
+  revision: 'visual-qa-media-replacement-empty-v1',
+}
+
+export const MEDIA_REPLACEMENT_IMPACT_BLOCKED = {
+  ...MEDIA_REPLACEMENT_IMPACT,
+  replaceableCount: 1,
+  blockers: ['shared_reference'],
+  canReplace: false,
+  references: [
+    MEDIA_REPLACEMENT_IMPACT.references[0],
+    {
+      ...MEDIA_REPLACEMENT_IMPACT.references[1],
+      replaceable: false,
+      blocker: 'shared_reference',
+      reason: '複数のLINEアカウントで共有しているため、この画面からは差し替えません。',
+    },
+  ],
+  revision: 'visual-qa-media-replacement-blocked-v1',
 }

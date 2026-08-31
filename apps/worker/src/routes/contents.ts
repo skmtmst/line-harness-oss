@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getMedia,
   getMediaById,
@@ -7,6 +7,8 @@ import {
   deleteMedia,
   getMediaUsages,
   getMediaDeleteImpact,
+  getMediaReplacementPlan,
+  applyMediaReplacementPlan,
   jstNow,
   getCommonVars,
   getCommonVarById,
@@ -28,6 +30,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
+import type { MediaReplacementImpact } from '@line-crm/shared';
 
 /**
  * メディアライブラリと共通情報。
@@ -36,6 +39,82 @@ import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
  * タブなので1つのルータにまとめている。
  */
 const contents = new Hono<Env>();
+const REPLACEMENT_BODY_MAX_BYTES = 16 * 1024;
+
+class RequestBodyError extends Error {
+  constructor(readonly status: 400 | 413, message: string) {
+    super(message);
+  }
+}
+
+async function readBoundedJson(request: Request): Promise<Record<string, unknown>> {
+  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
+  if (Number.isFinite(declared) && declared > REPLACEMENT_BODY_MAX_BYTES) {
+    throw new RequestBodyError(413, '送信内容が大きすぎます');
+  }
+  const reader = request.body?.getReader();
+  if (!reader) return {};
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > REPLACEMENT_BODY_MAX_BYTES) {
+      await reader.cancel();
+      throw new RequestBodyError(413, '送信内容が大きすぎます');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new RequestBodyError(400, '送信内容を読み取れませんでした');
+  }
+}
+
+async function replacementRevision(
+  sourceId: string,
+  replacementId: string,
+  usages: Array<{ ref_kind: string; ref_id: string; scanned_at: string }>,
+): Promise<string> {
+  const raw = [sourceId, replacementId, ...usages.map((usage) =>
+    `${usage.ref_kind}:${usage.ref_id}`).sort()].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function replacementImpact(
+  c: Context<Env>,
+  sourceId: string,
+  replacementId: string,
+  accountId: string,
+): Promise<{
+  plan: NonNullable<Awaited<ReturnType<typeof getMediaReplacementPlan>>>;
+  impact: MediaReplacementImpact;
+} | null> {
+  const checkedAt = jstNow();
+  const source = await getMediaById(c.env.DB, sourceId, accountId);
+  const replacement = await getMediaById(c.env.DB, replacementId, accountId);
+  if (!source || !replacement) return null;
+  await scanSingleMediaUsage(c.env.DB, checkedAt, { id: source.id, r2_key: source.r2_key });
+  const plan = await getMediaReplacementPlan(c.env.DB, {
+    sourceId, replacementId, lineAccountId: accountId, checkedAt,
+  });
+  if (!plan) return null;
+  return {
+    plan,
+    impact: { ...plan.impact, revision: await replacementRevision(sourceId, replacementId, plan.usages) },
+  };
+}
 
 // ── メディア ────────────────────────────────────────────────
 
@@ -323,6 +402,109 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
       { success: false, error: '削除したときの影響を確認できませんでした' },
       503,
     );
+  }
+});
+
+// 差し替える前に、現在の使用先を7種類すべて読み直す。内部IDは返さない。
+contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    const replacementId = c.req.query('replacementId')?.trim();
+    if (!accountId || !replacementId) {
+      return c.json({ success: false, error: 'accountId と replacementId が必要です' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const current = await replacementImpact(c, c.req.param('id'), replacementId, accountId);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: current.impact });
+  } catch (err) {
+    console.error('GET /api/media/:id/replacement-impact error:', err);
+    return c.json({ success: false, error: '差し替えたときの影響を確認できませんでした' }, 503);
+  }
+});
+
+// 画面で読んだ影響は信用せず、同じ7種類を実行直前にも読み直す。
+contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const body = await readBoundedJson(c.req.raw);
+    const replacementId = typeof body.replacementMediaId === 'string'
+      ? body.replacementMediaId.trim()
+      : '';
+    const expectedRevision = typeof body.expectedRevision === 'string'
+      ? body.expectedRevision.trim()
+      : '';
+    if (!replacementId || !expectedRevision) {
+      return c.json({ success: false, error: '差し替え先と、確認した版が必要です' }, 400);
+    }
+
+    const current = await replacementImpact(c, c.req.param('id'), replacementId, accountId);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    if (current.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_changed',
+        error: '使用先が変わりました。最新の影響を読み直してから、もう一度お試しください。',
+        data: current.impact,
+      }, 409);
+    }
+    if (!current.impact.canReplace || !current.plan) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_blocked',
+        error: '一括で差し替えられない使用先があります。表示された使用先を個別に確認してください。',
+        data: current.impact,
+      }, 409);
+    }
+
+    const replacedUsageCount = await applyMediaReplacementPlan(c.env.DB, current.plan, accountId);
+    let remainingUsageCount: number | null = null;
+    let verification: 'verified' | 'partial' | 'unavailable' = 'unavailable';
+    const verifiedAt = jstNow();
+    try {
+      await Promise.all([
+        scanSingleMediaUsage(c.env.DB, verifiedAt, {
+          id: current.plan.source.id,
+          r2_key: current.plan.source.r2_key,
+        }),
+        scanSingleMediaUsage(c.env.DB, verifiedAt, {
+          id: current.plan.replacement.id,
+          r2_key: current.plan.replacement.r2_key,
+        }),
+      ]);
+      remainingUsageCount = (await getMediaUsages(c.env.DB, current.plan.source.id)).length;
+      verification = remainingUsageCount === 0
+        && replacedUsageCount === current.impact.replaceableCount
+        ? 'verified'
+        : 'partial';
+    } catch (verifyError) {
+      // 差し替え自体はD1のbatchで確定済み。ここで500を返すと、利用者が
+      // 再実行して二重操作するため「確認できなかった」と成功レスポンスに残す。
+      console.error('media replacement verification failed:', verifyError);
+    }
+    return c.json({
+      success: true,
+      data: {
+        sourceId: current.plan.source.id,
+        replacementId: current.plan.replacement.id,
+        replacedUsageCount,
+        remainingUsageCount,
+        verification,
+        checkedAt: verifiedAt,
+      },
+    });
+  } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
+    console.error('POST /api/media/:id/replace-usages error:', err);
+    return c.json({ success: false, error: '使用先を差し替えられませんでした' }, 503);
   }
 });
 

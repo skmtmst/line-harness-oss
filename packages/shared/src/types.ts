@@ -312,6 +312,43 @@ export interface MediaDeleteImpact {
   recommendedAction: "delete" | "review_references";
 }
 
+export type MediaReplacementBlocker =
+  | "same_media"
+  | "different_kind"
+  | "unavailable_reference"
+  | "shared_reference"
+  | "unsupported_reference";
+
+/** 一括差し替えの対象になる使用先。内部IDは画面へ返さない。 */
+export interface MediaReplacementReference extends MediaDeleteImpactReference {
+  replaceable: boolean;
+  blocker: MediaReplacementBlocker | null;
+  reason: string | null;
+}
+
+/** `GET /api/media/:id/replacement-impact` の返り値。 */
+export interface MediaReplacementImpact {
+  source: MediaDeleteImpact["media"];
+  replacement: MediaDeleteImpact["media"];
+  usageCount: number;
+  replaceableCount: number;
+  references: MediaReplacementReference[];
+  blockers: MediaReplacementBlocker[];
+  canReplace: boolean;
+  checkedAt: string;
+  /** 影響確認後に使用先が変わっていないことを、実行直前に照合する値。 */
+  revision: string;
+}
+
+export interface MediaReplacementResult {
+  sourceId: string;
+  replacementId: string;
+  replacedUsageCount: number;
+  remainingUsageCount: number | null;
+  verification: "verified" | "partial" | "unavailable";
+  checkedAt: string;
+}
+
 /** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
 export interface CommonVar {
   id: string;
