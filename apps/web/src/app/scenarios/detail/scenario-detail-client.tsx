@@ -46,6 +46,8 @@ import ScheduleInput, {
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { Th } from '@/components/shared/table'
+import { afterSendIsPause, afterSendText, stepTargetText } from './step-row-view'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -1125,7 +1127,7 @@ export default function ScenarioDetailClient({
       <div data-design="Head">
         <Header
           title="シナリオ編集"
-          description="配信のタイミングと内容を並べます。作成しただけでは配信されません。開始するには友だち追加時の配信やアクションから呼び出します。"
+          description="配信のタイミングと内容を並べます。"
           action={
             /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
                一覧へ戻る導線は設計では最下部にあり、ここには置かない
@@ -1192,6 +1194,18 @@ export default function ScenarioDetailClient({
         いたが、実際は列（allow_concurrent）で持っていて、作るときにしか
         決められなかった。読むだけの説明の隣に、それを決める場所が無い。
       */}
+      {/*
+        設計（`bV5Vs`）は**作っただけでは届かない**ことを黄色い帯で先に断る。
+        以前は見出しの下の説明文に混ぜていたので、ほかの説明と同じ重さで流れ、
+        「保存したのに誰にも届いていない」に気づけなかった。
+      */}
+      <section className="bg-warning-bg rounded-card mb-4 flex flex-wrap items-start gap-3 p-4">
+        <p className="text-warning min-w-0 flex-1 text-sm">
+          <strong className="font-semibold">作成しただけでは配信されません。</strong>
+          {' '}開始条件を設定し、テスト送信後に配信を開始してください。
+        </p>
+      </section>
+
       <section className="bg-info-bg rounded-card mb-4 flex flex-wrap items-start gap-4 p-4">
         <div className="min-w-0 flex-1">
           <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
@@ -1512,26 +1526,29 @@ export default function ScenarioDetailClient({
             桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
           */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
+            <table className="w-full min-w-[960px]">
               <thead>
                 <tr className="border-hairline border-b">
-                  <th className="w-16 px-2 py-2" aria-label="並び" />
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                  <Th className="w-16" aria-label="並び" />
+                  <Th>
                     タイミング
-                  </th>
-                  <th className="text-ink-faint w-full max-w-0 px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                  </Th>
+                  <Th className="w-full min-w-52 max-w-0">
                     内容
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                  </Th>
+                  <Th>
                     種別
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                  </Th>
+                  <Th>
+                    配信対象
+                  </Th>
+                  <Th>
                     到達人数
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    配信後
-                  </th>
-                  <th className="px-3 py-2" aria-label="操作" />
+                  </Th>
+                  <Th>
+                    送信後
+                  </Th>
+                  <Th aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
@@ -1556,7 +1573,7 @@ export default function ScenarioDetailClient({
                     <Fragment key={step.id}>
                       {idx > 0 && (
                         <tr className="group">
-                          <td colSpan={7} className="px-0 py-0">
+                          <td colSpan={8} className="px-0 py-0">
                             {/*
                               通と通のあいだに差し込む入口。末尾にしか足せないと、
                               3通目と4通目のあいだに1通入れたいときに後ろを
@@ -1605,7 +1622,7 @@ export default function ScenarioDetailClient({
                         <td className="text-ink px-3 py-3 align-top text-sm whitespace-nowrap">
                           {formatScheduleLabel(deliveryMode, step)}
                         </td>
-                        <td className="w-full max-w-0 px-3 py-3 align-top">
+                        <td className="w-full min-w-52 max-w-0 px-3 py-3 align-top">
                           <button
                             type="button"
                             onClick={() =>
@@ -1628,6 +1645,18 @@ export default function ScenarioDetailClient({
                           </span>
                         </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
+                          {/*
+                            `targetCondition` が `null` なら「購読中の全員」。
+                            **未取得ではない**ので `—` にしない。
+                          */}
+                          <span className="text-ink-secondary text-sm">
+                            {stepTargetText(
+                              (step.targetCondition as SegmentCondition | null) ?? null,
+                              (id) => tags.find((t) => t.id === id)?.name,
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
                               <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
@@ -1646,12 +1675,17 @@ export default function ScenarioDetailClient({
                           )}
                         </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
-                          {step.afterSend === 'pause' ? (
+                          {/*
+                            `continue` は「次へ進む」という決まっている値。
+                            `—` にすると、決めていないのか読めていないのか
+                            見分けられなくなる。
+                          */}
+                          {afterSendIsPause(step.afterSend) ? (
                             <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
-                              送信後 一時停止
+                              {afterSendText(step.afterSend)}
                             </span>
                           ) : (
-                            <span className="text-ink-faint text-sm">—</span>
+                            <span className="text-ink-secondary text-sm">{afterSendText(step.afterSend)}</span>
                           )}
                         </td>
                         <td className="px-3 py-3 text-right align-top whitespace-nowrap">
@@ -1725,7 +1759,7 @@ export default function ScenarioDetailClient({
                       </tr>
                       {previewStepId === step.id && (
                         <tr className="border-hairline border-b">
-                          <td colSpan={7} className="px-3 pb-3">
+                          <td colSpan={8} className="px-3 pb-3">
                             <div className="text-ink-secondary bg-canvas-sunken rounded-card px-3 py-2 text-sm">
                               {(() => {
                                 // テンプレ参照時は「いまのテンプレの中身」を見せる。
@@ -1741,7 +1775,7 @@ export default function ScenarioDetailClient({
                       )}
                       {editingStepId === step.id && (
                         <tr>
-                          <td colSpan={7} className="px-3 pb-3">
+                          <td colSpan={8} className="px-3 pb-3">
                             {renderStepForm()}
                           </td>
                         </tr>
