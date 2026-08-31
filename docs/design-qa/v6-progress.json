@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 58,
+  "match": 59,
   "structureMatchDataPending": 18,
-  "needsFix": 165,
+  "needsFix": 164,
   "unjudged": 0,
-  "remaining": 200,
+  "remaining": 199,
   "features": [
     {
       "feature": 1,
@@ -916,11 +916,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 2,
       "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 433,
@@ -980,6 +980,22 @@
             "W7LBc"
           ],
           "note": "縦帯が category ではなく folderId で数えるようになった。通常・読込・0件・失敗と、押した2つ"
+        },
+        {
+          "pr": 626,
+          "head": "d0af5581",
+          "on": "2026-08-31",
+          "screens": [
+            "CzndJ",
+            "M9cij",
+            "GFlD7",
+            "FRkls",
+            "j9ixI",
+            "hsBtl",
+            "J3GxEZ",
+            "NKyoA"
+          ],
+          "note": "Claudeが実装して撮った。#528 の上（#528 は #493 と #433 の両方を含む）。**M9cij の推奨修正は到達しないコードだったので取りやめた**"
         }
       ]
     },
