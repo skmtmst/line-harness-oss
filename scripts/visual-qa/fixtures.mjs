@@ -262,3 +262,34 @@ export const FRIENDS = [
     tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
   }),
 ]
+
+/**
+ * V6 `ymXJK` NENコラム下書き作成。Workerの公開契約と同じ6項目だけを持つ。
+ * 画面側は通常・入力エラー・重複・保存失敗を、このstatus/bodyで描き分ける。
+ */
+export const NEN_COLUMN_CREATE = {
+  request: {
+    title: '鹿肉の選び方',
+    category: '食事',
+    excerpt: '原材料表示の基本をご紹介します。',
+    articleUrl: 'https://example.com/columns/venison-guide',
+    imageUrl: 'https://cdn.example.com/columns/venison-guide.jpg',
+    publishedAt: null,
+  },
+  success: {
+    status: 201,
+    body: { success: true, data: { id: 'nen-column-draft-1' } },
+  },
+  inputError: {
+    status: 400,
+    body: { success: false, error: 'article_url_invalid' },
+  },
+  duplicate: {
+    status: 409,
+    body: { success: false, error: 'column_already_exists' },
+  },
+  failure: {
+    status: 500,
+    body: { success: false, error: 'column_create_failed' },
+  },
+}

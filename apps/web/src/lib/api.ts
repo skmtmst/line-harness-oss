@@ -1322,6 +1322,16 @@ export type NenColumn = {
   updatedAt: string
 }
 
+export type NenColumnCreateInput = {
+  title: string
+  category?: string
+  excerpt?: string
+  articleUrl: string
+  imageUrl?: string | null
+  /** タイムゾーン付きISO 8601。未公開の下書きはnullまたは省略。 */
+  publishedAt?: string | null
+}
+
 export type NenPetProfile = {
   id: string
   friendId: string
@@ -3398,6 +3408,12 @@ export const api = {
     columns: (accountId: string) => fetchApi<ApiResponse<NenColumn[]>>(
       `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
     ),
+    /** NENコラムの管理画面下書き。本文・slug・アカウントIDはWorkerで受け取らない。 */
+    createColumn: (accountId: string, data: NenColumnCreateInput) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
     deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string }) =>
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),

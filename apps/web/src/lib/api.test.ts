@@ -5,10 +5,45 @@ let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let eventsApi: typeof import('./api').eventsApi
+let api: typeof import('./api').api
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi } = await import('./api'))
+  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi, api } = await import('./api'))
+})
+
+describe('api.nenCampaigns.createColumn', () => {
+  it('sends only the selected account query and the public create fields', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { id: 'column-1' } }),
+      { status: 201, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.nenCampaigns.createColumn('account/a', {
+      title: '鹿肉の選び方',
+      category: '食事',
+      excerpt: '原材料表示の基本',
+      articleUrl: 'https://example.com/columns/guide',
+      imageUrl: null,
+      publishedAt: null,
+    })
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/nen-campaigns/columns?lineAccountId=account%2Fa',
+    )
+    const init = fetchSpy.mock.calls[0]?.[1]
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({
+      title: '鹿肉の選び方',
+      category: '食事',
+      excerpt: '原材料表示の基本',
+      articleUrl: 'https://example.com/columns/guide',
+      imageUrl: null,
+      publishedAt: null,
+    })
+  })
 })
 
 describe('eventsApi.createSlots', () => {

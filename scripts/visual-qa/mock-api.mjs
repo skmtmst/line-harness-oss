@@ -9,7 +9,7 @@
  *
  * 守っていること
  * - ローカル専用。`NODE_ENV=production` では起動しない。127.0.0.1 にだけ開く
- * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない
+ * - **更新は原則失敗させる。** 契約PRが明示した固定の成功だけを返す
  * - 実データ・秘密値を持たない。名前も固定の作り物
  * - 毎回まったく同じものを返す。乱数も時刻も使わない（画像が毎回同じになる）
  *
@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -433,7 +433,7 @@ const server = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
@@ -450,6 +450,12 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    // `ymXJK` の下書き保存だけは、契約どおりの固定201を返す。
+    // DB更新はせず、ほかのPOSTは従来どおり405にする。
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
+      res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
       return
     }
     res.writeHead(405).end(
@@ -493,5 +499,5 @@ process.on('uncaughtException', (error) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（GETのみ・更新は405）`)
+  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（固定契約以外の更新は405）`)
 })
