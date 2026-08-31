@@ -177,6 +177,40 @@ export const SUPPORT_MARKS = [
   },
 ]
 
+export const SUPPORT_MARK_AUTOMATION_RULES = [
+  {
+    id: 'support-rule-assigned',
+    name: '担当者が決まったら対応中へ',
+    markId: 'mark-hold',
+    event: 'staff_assigned',
+    condition: null,
+    priority: 100,
+    manualProtectionMinutes: 60,
+    isActive: true,
+    version: 2,
+    updatedAt: '2026-08-31T10:00:00+09:00',
+  },
+  {
+    id: 'support-rule-overdue',
+    name: '期限を過ぎたら確認待ちへ',
+    markId: 'mark-hold',
+    event: 'response_overdue',
+    condition: { operator: 'AND', rules: [] },
+    priority: 50,
+    manualProtectionMinutes: 0,
+    isActive: false,
+    version: 1,
+    updatedAt: '2026-08-30T15:00:00+09:00',
+  },
+]
+
+export const SUPPORT_MARK_AUTOMATION_RULES_EMPTY = []
+
+export const SUPPORT_MARK_AUTOMATION_RULES_ERROR = {
+  success: false,
+  error: '自動変更ルールを読み込めませんでした',
+}
+
 export const SUPPORT_MARK_DELETE_IMPACT = {
   mark: {
     id: 'mark-hold', name: '保留', color: '#94A3B8',

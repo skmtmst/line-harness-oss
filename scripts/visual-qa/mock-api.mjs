@@ -21,7 +21,7 @@ import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
   FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
-  SUPPORT_MARKS, SUPPORT_MARK_DELETE_IMPACT, SUPPORT_MARK_DELETE_IMPACT_EMPTY,
+  SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES, SUPPORT_MARK_DELETE_IMPACT, SUPPORT_MARK_DELETE_IMPACT_EMPTY,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -393,6 +393,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
+    return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
+  }
   const supportMarkImpact = /^\/api\/support-marks\/([^/]+)\/delete-impact$/.exec(pathname)
   if (supportMarkImpact) {
     if (supportMarkImpact[1] === 'mark-hold') {

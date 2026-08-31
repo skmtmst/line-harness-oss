@@ -28,7 +28,10 @@ import { processDueEventReminders } from './services/event-booking-reminders.js'
 import { processDueMeetConsultationReminders } from './services/meet-consultation-reminders.js';
 import { processDueAutomationRuns } from './services/automation-engine.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
-import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
+import {
+  processOverdueSupportMarkTriggers,
+  processScheduledAutomationTriggers,
+} from './services/automation-triggers.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -1121,6 +1124,9 @@ async function scheduled(
     const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
       now, executors, limit: 100,
     });
+    const overdueResults = await processOverdueSupportMarkTriggers(env.DB, {
+      now, executors, limit: 100,
+    });
     for (const result of scheduledResult.results) {
       if (result.kind === 'configuration_error') {
         console.error(JSON.stringify({
@@ -1133,10 +1139,11 @@ async function scheduled(
     const dueResult = await processDueAutomationRuns(env.DB, {
       now, executors, limit: 100,
     });
-    if (scheduledResult.results.length + dueResult.processed > 0) {
+    if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
       console.log(JSON.stringify({
         event: 'automation_v6_cron',
         scheduled: scheduledResult.results.length,
+        support_mark_overdue: overdueResults.length,
         resumed: dueResult.processed,
       }));
     }

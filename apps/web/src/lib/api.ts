@@ -118,6 +118,31 @@ export type SupportMarkDeleteImpact = {
   revision: string
 }
 
+export type SupportMarkAutomationEvent =
+  | 'message_received'
+  | 'manual_reply_sent'
+  | 'staff_assigned'
+  | 'response_overdue'
+  | 'condition_matched'
+
+export type SupportMarkAutomationRule = {
+  id: string
+  name: string
+  markId: string
+  event: SupportMarkAutomationEvent
+  condition: SegmentCondition | null
+  priority: number
+  manualProtectionMinutes: number
+  isActive: boolean
+  version: number
+  updatedAt: string
+}
+
+export type SaveSupportMarkAutomationRule = Omit<
+  SupportMarkAutomationRule,
+  'id' | 'markId' | 'version' | 'updatedAt'
+>
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -1773,6 +1798,32 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ friendIds, markId }),
         },
+      ),
+    automationRules: (markId: string, accountId: string) =>
+      fetchApi<ApiResponse<SupportMarkAutomationRule[]>>(
+        `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    createAutomationRule: (
+      markId: string,
+      accountId: string,
+      data: SaveSupportMarkAutomationRule,
+    ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
+      `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    updateAutomationRule: (
+      ruleId: string,
+      accountId: string,
+      expectedVersion: number,
+      data: SaveSupportMarkAutomationRule,
+    ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
+      `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'PATCH', body: JSON.stringify({ ...data, expectedVersion }) },
+    ),
+    archiveAutomationRule: (ruleId: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
       ),
   },
   /** 保存した検索。上限50件。 */

@@ -42,6 +42,7 @@ import {
   acquireInboxReplyLease,
   releaseInboxReplyLease,
 } from '../services/inbox-events.js';
+import { fireEvent } from '../services/event-bus.js';
 
 const chats = new Hono<Env>();
 
@@ -976,6 +977,20 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
           code: 'REVISION_CONFLICT',
         }, 409);
       }
+      if (body.operatorId !== undefined
+        && body.operatorId !== null
+        && body.operatorId !== resolved.operator_id) {
+        const assignedFriend = await getFriendById(c.env.DB, resolved.friend_id);
+        await fireEvent(c.env.DB, 'staff_assigned', {
+          sourceEventId: correlationId,
+          sourceKind: 'inbox_assignment',
+          occurredAt: now,
+          friendId: resolved.friend_id,
+          eventData: { staffId: body.operatorId },
+        }, undefined, assignedFriend?.line_account_id).catch((error) => {
+          console.error('staff_assigned automation error:', error);
+        });
+      }
     }
     const updated = await getChatById(c.env.DB, resolved.id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1218,6 +1233,16 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     } catch (e) {
       console.error('first_replied_at update error:', e);
     }
+
+    await fireEvent(c.env.DB, 'manual_reply_sent', {
+      sourceEventId: logId,
+      sourceKind: 'manual_reply',
+      occurredAt: sentAt,
+      friendId: friend.id,
+      eventData: { staffId: c.get('staff').id },
+    }, undefined, friend.line_account_id).catch((error) => {
+      console.error('manual_reply_sent automation error:', error);
+    });
 
     await releaseInboxReplyLease(c.env.DB, {
       channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
