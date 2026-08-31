@@ -20,7 +20,8 @@
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
-  FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, PHOTO_REVIEW_DETAIL,
+  FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, PHOTO_PUBLICATIONS,
+  PHOTO_REVIEW_DETAIL,
   TAGS, TAG_GROUPS,
 } from './fixtures.mjs'
 
@@ -405,6 +406,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
+  if (pathname === '/api/nen-members/photo-publications') {
+    return { success: true, data: PHOTO_PUBLICATIONS }
+  }
   const photoDetail = /^\/api\/nen-members\/photos\/([^/]+)$/.exec(pathname)
   if (photoDetail) {
     if (photoDetail[1] !== PHOTO_REVIEW_DETAIL.id) return { success: false, error: 'Not found' }

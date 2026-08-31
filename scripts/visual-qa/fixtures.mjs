@@ -299,3 +299,93 @@ export const PHOTO_REVIEW_DETAIL = {
   },
   capabilities: { canReview: true, canDownloadOriginal: false, canPublish: false },
 }
+
+/**
+ * 公開中の写真と掲載先（V6 `J3Wxl8`）。
+ *
+ * 公開用の派生画像と投稿者名の公開同意はまだ未接続なので、
+ * 無効URLや作り物の名前を置かない。表示回数は実値0と未取得を別の写真で確認する。
+ */
+export const PHOTO_PUBLICATIONS = {
+  items: [
+    {
+      photoId: 'photo-published-1',
+      publicationVersion: 2,
+      publicImage: { state: 'unavailable', url: null, version: null },
+      caption: '緑の公園で遊ぶこむぎ',
+      publishedAt: '2026-08-25 10:00:00',
+      pet: { displayName: 'こむぎ', state: 'visible' },
+      submitter: {
+        displayName: null,
+        state: 'unavailable',
+        explanation: '投稿者名を公開する同意記録はまだ接続していません。',
+      },
+      consent: { publication: 'granted', publicPetName: true },
+      placements: [
+        {
+          type: 'rich_menu', typeLabel: 'リッチメニュー', name: '会員メニュー', status: 'active',
+          displayCount: 1240, measurementState: 'measured', measuredAt: '2026-08-31 09:00:00',
+          placedAt: '2026-08-25 10:00:00',
+        },
+        {
+          type: 'form', typeLabel: '回答フォーム', name: '来店アンケート', status: 'active',
+          displayCount: 0, measurementState: 'measured', measuredAt: '2026-08-31 09:00:00',
+          placedAt: '2026-08-26 11:00:00',
+        },
+      ],
+      totalDisplayCount: 1240,
+      measurementState: 'measured',
+      capabilities: {
+        canChangePlacement: false,
+        canWithdraw: false,
+        reason: '掲載先の更新・取り外し処理はまだ接続していません。',
+      },
+    },
+    {
+      photoId: 'photo-published-2',
+      publicationVersion: 1,
+      publicImage: { state: 'unavailable', url: null, version: null },
+      caption: 'お気に入りの場所でくつろぐ写真',
+      publishedAt: '2026-08-24 14:00:00',
+      pet: { displayName: null, state: 'hidden' },
+      submitter: {
+        displayName: null,
+        state: 'unavailable',
+        explanation: '投稿者名を公開する同意記録はまだ接続していません。',
+      },
+      consent: { publication: 'granted', publicPetName: false },
+      placements: [
+        {
+          type: 'website', typeLabel: 'サイト', name: '公式サイト', status: 'active',
+          displayCount: null, measurementState: 'unavailable', measuredAt: null,
+          placedAt: '2026-08-24 14:00:00',
+        },
+      ],
+      totalDisplayCount: null,
+      measurementState: 'unavailable',
+      capabilities: {
+        canChangePlacement: false,
+        canWithdraw: false,
+        reason: '掲載先の更新・取り外し処理はまだ接続していません。',
+      },
+    },
+  ],
+  summary: {
+    publishedPhotos: 2,
+    placementTypeCount: 3,
+    mostViewed: { photoId: 'photo-published-1', petName: 'こむぎ', displayCount: 1240 },
+    consentedPhotos: 2,
+    allConsented: true,
+    destinations: [
+      { type: 'rich_menu', label: 'リッチメニュー', count: 1 },
+      { type: 'nen_column', label: 'コラム', count: 0 },
+      { type: 'form', label: '回答フォーム', count: 1 },
+      { type: 'website', label: 'サイト', count: 1 },
+    ],
+  },
+  limitations: [
+    '掲載先の更新と取り外しは、それぞれの配布先の処理とまだ接続していません。',
+    '投稿者名は、名前の公開同意を記録できるまで表示しません。',
+    '表示回数が接続していない掲載先は、0回ではなく未取得として返します。',
+  ],
+}

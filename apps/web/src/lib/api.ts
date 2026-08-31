@@ -647,6 +647,56 @@ export type NenPhotoReviewDetail = {
   }
 }
 
+export type NenPhotoPublicationPlacement = {
+  type: 'rich_menu' | 'nen_column' | 'form' | 'website'
+  typeLabel: string
+  name: string
+  status: 'active' | 'removing' | 'failed'
+  displayCount: number | null
+  measurementState: 'measured' | 'unavailable'
+  measuredAt: string | null
+  placedAt: string
+}
+
+export type NenPhotoPublicationList = {
+  items: Array<{
+    photoId: string
+    publicationVersion: number
+    publicImage:
+      | { state: 'ready'; url: string; version: string }
+      | { state: 'unavailable'; url: null; version: null }
+    caption: string
+    publishedAt: string
+    pet: { displayName: string | null; state: 'visible' | 'hidden' }
+    submitter: { displayName: null; state: 'unavailable'; explanation: string }
+    consent: {
+      publication: 'granted' | 'withdrawn' | 'not_recorded'
+      publicPetName: boolean
+    }
+    placements: NenPhotoPublicationPlacement[]
+    totalDisplayCount: number | null
+    measurementState: 'measured' | 'unavailable'
+    capabilities: {
+      canChangePlacement: false
+      canWithdraw: false
+      reason: string
+    }
+  }>
+  summary: {
+    publishedPhotos: number
+    placementTypeCount: number
+    mostViewed: null | { photoId: string; petName: string | null; displayCount: number }
+    consentedPhotos: number
+    allConsented: boolean
+    destinations: Array<{
+      type: 'rich_menu' | 'nen_column' | 'form' | 'website'
+      label: string
+      count: number
+    }>
+  }
+  limitations: string[]
+}
+
 /* ---- リッチメニューのボタン（147） ---- */
 
 /**
@@ -2933,6 +2983,9 @@ export const api = {
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    photoPublications: (accountId: string) => fetchApi<ApiResponse<NenPhotoPublicationList>>(
+      `/api/nen-members/photo-publications?accountId=${encodeURIComponent(accountId)}`,
+    ),
     photo: (id: string, accountId: string) => fetchApi<ApiResponse<NenPhotoReviewDetail>>(
       `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
     ),

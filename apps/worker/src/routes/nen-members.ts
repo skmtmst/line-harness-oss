@@ -31,6 +31,41 @@ type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
 
 type PhotoReviewStatus = 'pending' | 'adopted' | 'rejected';
 
+const PHOTO_PLACEMENT_LABELS = {
+  rich_menu: 'リッチメニュー',
+  nen_column: 'コラム',
+  form: '回答フォーム',
+  website: 'サイト',
+} as const;
+type PhotoPlacementType = keyof typeof PHOTO_PLACEMENT_LABELS;
+
+type PhotoPublicationRow = Record<string, unknown> & {
+  publication_id: string;
+  photo_id: string;
+  publication_version: number;
+  public_asset_kind: 'public_derivative' | null;
+  public_asset_url: string | null;
+  public_asset_version: string | null;
+  published_at: string;
+  caption: string;
+  publication_consent_at: string | null;
+  publication_withdrawn_at: string | null;
+  public_pet_name: number;
+  pet_name: string;
+  placement_type: PhotoPlacementType | null;
+  placement_name: string | null;
+  placement_status: 'active' | 'removing' | 'failed' | null;
+  display_count: number | null;
+  display_count_updated_at: string | null;
+  placed_at: string | null;
+};
+
+function measuredCount(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const count = Number(value);
+  return Number.isFinite(count) && count >= 0 ? count : null;
+}
+
 type PhotoDetailRow = Record<string, unknown> & {
   id: string;
   image_url: string;
@@ -705,6 +740,147 @@ nenMembers.get('/api/nen-members/photos', async (c) => {
       ORDER BY ps.created_at DESC LIMIT 200`,
   ).bind(accountId, accountId).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
+});
+
+nenMembers.get('/api/nen-members/photo-publications', async (c) => {
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+
+  const rows = await c.env.DB.prepare(
+    `SELECT pub.id publication_id, pub.photo_id, pub.version publication_version,
+            pub.public_asset_kind, pub.public_asset_url, pub.public_asset_version,
+            pub.published_at, ps.caption, ps.publication_consent_at,
+            ps.publication_withdrawn_at, ps.public_pet_name, p.name pet_name,
+            pl.placement_type, pl.placement_name, pl.status placement_status,
+            pl.display_count, pl.display_count_updated_at,
+            pl.placed_at
+       FROM nen_photo_publications pub
+       JOIN nen_photo_submissions ps ON ps.id = pub.photo_id
+       JOIN friends f ON f.id = ps.friend_id
+       JOIN nen_pet_profiles p ON p.id = ps.pet_id
+       LEFT JOIN nen_photo_publication_placements pl
+         ON pl.publication_id = pub.id
+        AND pl.line_account_id = pub.line_account_id
+        AND pl.status IN ('active', 'removing', 'failed')
+      WHERE pub.line_account_id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
+        AND pub.status = 'published' AND ps.status = 'adopted'
+      ORDER BY pub.published_at DESC, pub.id, pl.placed_at, pl.placement_type`,
+  ).bind(accountId, accountId, accountId).all<PhotoPublicationRow>();
+
+  const grouped = new Map<string, {
+    row: PhotoPublicationRow;
+    placements: Array<{
+      type: PhotoPlacementType;
+      typeLabel: string;
+      name: string;
+      status: 'active' | 'removing' | 'failed';
+      displayCount: number | null;
+      measurementState: 'measured' | 'unavailable';
+      measuredAt: string | null;
+      placedAt: string;
+    }>;
+  }>();
+
+  for (const row of rows.results) {
+    const current = grouped.get(row.publication_id) ?? { row, placements: [] };
+    if (row.placement_type && row.placement_name && row.placement_status && row.placed_at) {
+      const displayCount = measuredCount(row.display_count);
+      current.placements.push({
+        type: row.placement_type,
+        typeLabel: PHOTO_PLACEMENT_LABELS[row.placement_type],
+        name: row.placement_name,
+        status: row.placement_status,
+        displayCount,
+        measurementState: displayCount === null ? 'unavailable' : 'measured',
+        measuredAt: row.display_count_updated_at,
+        placedAt: row.placed_at,
+      });
+    }
+    grouped.set(row.publication_id, current);
+  }
+
+  const items = [...grouped.values()].map(({ row, placements }) => {
+    const allCountsMeasured = placements.length > 0
+      && placements.every((placement) => placement.displayCount !== null);
+    const totalDisplayCount = allCountsMeasured
+      ? placements.reduce((sum, placement) => sum + (placement.displayCount ?? 0), 0)
+      : null;
+    const consentState = row.publication_withdrawn_at
+      ? 'withdrawn'
+      : row.publication_consent_at ? 'granted' : 'not_recorded';
+    return {
+      photoId: row.photo_id,
+      publicationVersion: Number(row.publication_version),
+      publicImage: row.public_asset_kind === 'public_derivative'
+        && row.public_asset_url && row.public_asset_version
+        ? { state: 'ready' as const, url: row.public_asset_url, version: row.public_asset_version }
+        : { state: 'unavailable' as const, url: null, version: null },
+      caption: row.caption,
+      publishedAt: row.published_at,
+      pet: {
+        displayName: row.public_pet_name === 1 ? row.pet_name : null,
+        state: row.public_pet_name === 1 ? 'visible' as const : 'hidden' as const,
+      },
+      submitter: {
+        displayName: null,
+        state: 'unavailable' as const,
+        explanation: '投稿者名を公開する同意記録はまだ接続していません。',
+      },
+      consent: {
+        publication: consentState,
+        publicPetName: row.public_pet_name === 1,
+      },
+      placements,
+      totalDisplayCount,
+      measurementState: totalDisplayCount === null ? 'unavailable' as const : 'measured' as const,
+      capabilities: {
+        canChangePlacement: false as const,
+        canWithdraw: false as const,
+        reason: '掲載先の更新・取り外し処理はまだ接続していません。',
+      },
+    };
+  });
+
+  const destinationCounts = Object.entries(PHOTO_PLACEMENT_LABELS).map(([type, label]) => ({
+    type: type as PhotoPlacementType,
+    label,
+    count: items.reduce(
+      (sum, item) => sum + item.placements.filter(
+        (placement) => placement.type === type && placement.status !== 'failed',
+      ).length,
+      0,
+    ),
+  }));
+  const measuredItems = items.filter((item) => item.totalDisplayCount !== null);
+  const mostViewed = measuredItems.reduce<(typeof measuredItems)[number] | null>(
+    (best, item) => !best || (item.totalDisplayCount ?? 0) > (best.totalDisplayCount ?? 0) ? item : best,
+    null,
+  );
+  const consentedPhotos = items.filter((item) => item.consent.publication === 'granted').length;
+
+  return c.json({ success: true, data: {
+    items,
+    summary: {
+      publishedPhotos: items.length,
+      placementTypeCount: destinationCounts.filter((destination) => destination.count > 0).length,
+      mostViewed: mostViewed ? {
+        photoId: mostViewed.photoId,
+        petName: mostViewed.pet.displayName,
+        displayCount: mostViewed.totalDisplayCount,
+      } : null,
+      consentedPhotos,
+      allConsented: items.length > 0 && consentedPhotos === items.length,
+      destinations: destinationCounts,
+    },
+    limitations: [
+      '掲載先の更新と取り外しは、それぞれの配布先の処理とまだ接続していません。',
+      '投稿者名は、名前の公開同意を記録できるまで表示しません。',
+      '表示回数が接続していない掲載先は、0回ではなく未取得として返します。',
+    ],
+  } });
 });
 
 nenMembers.get('/api/nen-members/photos/:id', async (c) => {
