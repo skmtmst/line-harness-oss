@@ -989,9 +989,9 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
     route: '/friend-add-settings/publish',
-    states: { apis: ['**/api/friend-add-routing/draft*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: 'match',
-    verdictNote: '**#615 `5873f18b`（#597 `eaa4050b` の上）でClaudeが実装した。未実装ではなくなった。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。 **① 公開は3つがそろって初めて押せる**——Workerの `canPublish`、最後の試験が成功していること、送信中でないこと。`canPublish` だけに頼ると**試験していない下書きを公開できる形**になり得るので、画面でも見る。 **② 押せないときは理由を書く**（テストがまだ／失敗している／直す項目の名前）。 **③ 対象見込みは `validation.estimatedAudienceCount`。** 設計の数字（214人）を置かず、固定データの128人が出る。`null` は0人でなく `—（未取得）`。 **④ dry-runを「送信済み」「反映済み」と書かない**（`stateChanged: false` なので誰にも届いていない）。 **⑤ 公開には版ごとの `Idempotency-Key`（16文字以上）。押すたびに作り直さない**ので二重に押しても2回公開されない。 **⑥ 4状態を分けた**：読込・空（404「確認する下書きがありません」＋設定へ戻る導線）・失敗（500）・権限不足。**空を失敗にしない。** `undefined`・`NaN`・`Invalid Date`・`API error` は0件。 取得元：`friend-add-v6/ec9vg-normal-1440.png`・`ec9vg-empty.txt` ＋ `publish-flow.ts`',
+    states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'needs_fix',
+    verdictNote: '**#615 `5873f18b`（#597 `eaa4050b` の上）で未実装ではなくなったが、コード監査でP0を確認したため一致を取り下げた。** ルート `/friend-add-settings/publish`。1440・1920とも横スクロール0。対象見込みは `validation.estimatedAudienceCount` を使い、未取得と0を分け、空・失敗・権限不足も別の面にしている。**P0：画面を開くだけで `POST /api/friend-add-routing/draft/test` を固定の `friend-kyohei` に対して実行する。** Workerのdry-runは `last_test_status` と `last_tested_at` をDBへ記録するため、その友だちが選択中アカウントに存在すると、利用者が意図して試験していない下書きでも公開条件を満たし得る。読込時のPOSTと固定友だちIDを外し、下書きが返す `lastTestStatus` / `lastTestedAt` とvalidationだけを読む。初期表示で `testDraft` を呼ばない契約試験を足す。**P1：アカウント変更・再読込の開始時に `draft`・`validation`・`test`・`published`・`publishError` を消していない。** 新しいアカウントの取得失敗後も前のアカウントの結果が残り得るので、アカウント固有状態を先に初期化し、切替先が失敗した試験を足す。**P2：最終確認なのに5段目「確認」ではなく4段目「アクション」を現在地にしている。** 取得元：`friend-add-v6/ec9vg-normal-1440.png`・`ec9vg-empty.txt`、`publish/page.tsx:83-107`、`friend-add-routing.ts:365-419`。指摘：[#615 コメント](https://github.com/skmtmst/line-harness-oss/pull/615#issuecomment-5472836618)',
     verdictSource: 'friend-add-v6/ec9vg-1440.png',
     verdictHead: '5873f18b',
 
