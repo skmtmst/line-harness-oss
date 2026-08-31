@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import { api, ApiError, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi, type InboxStats } from '@/lib/api'
+import { assigneeOptions } from '@/components/chats/assignee-unread'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -392,6 +393,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [savingView, setSavingView] = useState(false)
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  /*
+    担当者ごとの未読数（設計 `YZaDK`）。**画面に見えている行から数えない**——
+    一覧はページ送りされるので、2ページ目の未読が落ちる。
+    `null` は「まだ読めていない」。**実値0とは別。**
+  */
+  const [assigneeUnread, setAssigneeUnread] = useState<InboxStats['assigneeUnread'] | null>(null)
   /*
    * 友だち詳細を出すか。既定は閉じる。
    *
@@ -999,6 +1006,38 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    /*
+      **アカウントを切り替えたら、前の集計をその場で捨てる。**
+      読み終わるまで残すと、別のアカウントの未読数を見たまま担当者を選ぶ。
+    */
+    setAssigneeUnread(null)
+    ;(async () => {
+      try {
+        /*
+          この口はアカウント引数を取らない（担当者の見える範囲で絞る作り）。
+          **新しい契約は足さない。** 切り替えのたびに読み直して、
+          前のアカウントの数を残さないことだけを守る。
+        */
+        const res = await api.chatStats.get()
+        if (cancelled) return
+        /* 失敗の返事を成功として読まない。`—` のままにする。 */
+        if (!res.success) throw new Error('failed')
+        setAssigneeUnread(res.data.assigneeUnread)
+      } catch {
+        /*
+          **集計の失敗を0件と扱わない。** `null` のままにして数だけ `—` にする。
+          担当者一覧そのものは `/api/operators` の結果を保つ。
+        */
+        if (!cancelled) setAssigneeUnread(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId])
+
   const handleStatusUpdate = async (newStatus: Chat['status']) => {
     if (!selectedChatId || !chatDetail) return
     try {
@@ -1223,10 +1262,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 aria-label="担当者で絞り込む"
                 className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-canvas px-2 py-1.5 text-[11px] font-medium text-[#344054] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               >
-                <option value="all">すべて</option>
-                <option value="unassigned">未割り当て</option>
-                {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>{operator.name}</option>
+                {/*
+                  未読数は集計の口から。0件の担当者も選択肢に残す
+                  （契約上、0件は配列に載らないので実値0として描く）。
+                */}
+                {assigneeOptions(operators, assigneeUnread).map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </label>
