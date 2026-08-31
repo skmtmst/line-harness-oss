@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Header from '@/components/layout/header'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import NotificationRunList from '@/components/line-notifications/notification-run-list'
+import OperatorNotificationRules from '@/components/line-notifications/operator-notification-rules'
 import { api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
@@ -10,6 +12,13 @@ const categories = [
   ['shipping', '発送'], ['support', 'キャンセル・返金'], ['subscription', '定期便'],
 ] as const
 type Category = typeof categories[number][0]
+
+const TABS = [
+  { key: 'customer', label: '顧客へのお知らせ' },
+  { key: 'operator', label: '運用者へのお知らせ' },
+  { key: 'failures', label: '送れなかったもの' },
+  { key: 'history', label: '記録' },
+] as const
 
 function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
   return <button type="button" role="switch" aria-checked={setting.isEnabled} disabled={busy} onClick={onToggle}
@@ -43,6 +52,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
 
 export default function LineNotificationsPage() {
   const { selectedAccountId } = useAccount()
+  const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [category, setCategory] = useState<Category>('all')
@@ -52,16 +62,22 @@ export default function LineNotificationsPage() {
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
   const load = useCallback(async () => {
+    if (tab !== 'customer') {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const [settingRes, overviewRes] = await Promise.all([api.ecCommerce.settings(), api.ecCommerce.overview()])
+      const [settingRes, overviewRes] = await Promise.all([
+        api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
+      ])
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
       setSettings(settingRes.data)
       setOverview(overviewRes.data)
       setExpanded((current) => current ?? settingRes.data[0]?.eventType ?? null)
     } catch { setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' }) }
     finally { setLoading(false) }
-  }, [])
+  }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
   const visible = useMemo(() => category === 'all' ? settings : settings.filter((setting) => setting.category === category), [category, settings])
@@ -97,7 +113,11 @@ export default function LineNotificationsPage() {
   }
 
   return <>
-    <div data-design="Head"><Header title="LINE通知" description="注文・入金・発送・返金・定期便の大切なお知らせを、然-NEN-らしいカードで届けます。" /></div>
+    <MergedTabs basePath="/line-notifications" tabs={TABS} active={tab} defaultKey="customer" />
+    {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
+    {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
+    {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
+    {tab === 'customer' ? <>
     <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[
         ['通知テンプレート', settings.length, '顧客向けの重要通知'],
@@ -134,5 +154,6 @@ export default function LineNotificationsPage() {
         </article>)}
       </section>
     </main>
+    </> : null}
   </>
 }
