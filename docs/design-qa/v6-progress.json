@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 239,
-  "unimplemented": 19,
+  "compared": 240,
+  "unimplemented": 18,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 57,
   "structureMatchDataPending": 18,
-  "needsFix": 164,
+  "needsFix": 165,
   "unjudged": 0,
   "remaining": 201,
   "features": [
@@ -1546,14 +1546,14 @@
       "feature": 21,
       "name": "NEN配信",
       "total": 7,
-      "compared": 6,
-      "unimplemented": 1,
+      "compared": 7,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 2,
-      "needsFix": 3,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
@@ -1601,6 +1601,15 @@
             "VLMGH"
           ],
           "note": "誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み"
+        },
+        {
+          "pr": 620,
+          "head": "197b69bd",
+          "on": "2026-08-31",
+          "screens": [
+            "ymXJK"
+          ],
+          "note": "Claudeが実装して撮った。コラムの下書き作成（#618 の作成契約の上）。通常・入力の誤り・重複・権限不足・保存失敗の5状態。**本文エディタは作っていない**——引き継ぎが「本文の入力欄を作らない」と定めており、記事の正本はEC側"
         }
       ]
     },
@@ -2186,13 +2195,6 @@
       "name": "20-1-D 定期レポートをつくる",
       "gap": "api",
       "gapNote": "決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る"
-    },
-    {
-      "feature": 21,
-      "node": "ymXJK",
-      "name": "21-1-E コラムを書く",
-      "gap": "api",
-      "gapNote": "コラムの正本はEC側。管理画面で書くなら保存先が要る"
     },
     {
       "feature": 22,

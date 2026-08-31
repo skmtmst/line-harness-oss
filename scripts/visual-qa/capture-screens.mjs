@@ -358,6 +358,16 @@ const LIST_STATES = {
     「保存しようとしたら先を越されていた」という**本当に見たい絵**が撮れない。
     下の `applyState` で GET は素通しにしている。
   */
+  /*
+    送った中身が通らなかった。**保存のときだけ返す。**
+    本文に英語の記号（`article_url_invalid` など）を入れない——
+    入れると「画面がその記号を出していないか」を確かめられなくなる。
+  */
+  invalid: {
+    status: 400,
+    body: { success: false, error: '送信内容を確認してください' },
+    writeOnly: true,
+  },
   conflict: {
     status: 409,
     body: { success: false, error: '別の人が先に変更しました。最新の状態を読み直してください', code: 'STALE_PERSON' },

@@ -1707,11 +1707,66 @@ export const SCREENS = [
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
-    gap: 'api',
-    gapNote: 'コラムの正本はEC側。管理画面で書くなら保存先が要る',
-    status: 'unimplemented',
-    why: 'コラムを新しく書く画面が無い。実装は**外から取り込んだコラムの「配信文」だけ**を直せる（`page.tsx:414`「配信文を編集」）。題名・本文・写真・分類はこちらで作れない',
-    verdictNote: '**判断済み（2026-08-30）：V6は外部記事リンク方式。本文をDBに持たない。** ルート `/nen-campaigns`。**この決めごとにより、表の作り替えは不要になった**——`nen_columns` の `article_url TEXT NOT NULL` と `external_id` はそのままで正しい。**残る作業は管理画面から作る口だけ。** いまコラムを入れられるのは EC-CUBE からの署名付きWebhookだけで（`apps/worker/src/routes/nen-campaigns.ts:300` の `verifyEccubeSignature`）、管理画面から作れるのは `intro_text`（配信文）だけ（`page.tsx:414`「配信文を編集」）。**必要なもの**：管理画面向けの作成・更新API（題名・分類・抜粋・記事URL・画像URL・公開日）。本文の列は足さない。区分：新規API（DBの変更は不要）。P1。',
+    route: '/nen-campaigns/columns/new', mode: 'page',
+    gap: 'parts',
+    gapNote: '設計の本文エディタ・配信予約・タグ付けは、この契約（#618）の外',
+    verdict: 'needs_fix',
+    verdictNote: '#620で下書き作成を実装（題名・分類・記事URL・画像URL・概要・公開日時、通常/入力の誤り/重複/権限不足/保存失敗）。設計の本文エディタは作らない——引き継ぎ `v6-nen-column-create-handoff.md` が「本文の入力欄を作らない」と定めており、記事の正本はEC側。設計の「開封率が平均より12pt高い」などの数字も出さない（この画面に取得元が無い）。残る差は、いつ・だれに出すか（予約・宛先・人数）、読んだ人へのタグ付け、前のコラムを下敷きにする、自分にテスト送信',
+    verdictSource: 'Claude実装',
+    verdictHead: '197b69bd',
+    states: {
+      apis: ['**/api/nen-campaigns/columns**'],
+      kinds: ['normal'],
+    },
+    variants: [
+      {
+        suffix: 'filled',
+        steps: [
+          { fill: '題名', text: '鹿肉の選び方' },
+          { fill: '分類', text: '食事' },
+          { fill: '記事のURL', text: 'https://example.com/columns/venison-guide' },
+          { fill: '画像のURL', text: 'https://cdn.example.com/columns/venison-guide.jpg' },
+          { fill: '概要', text: '原材料表示の基本をご紹介します。' },
+        ],
+      },
+      {
+        // 押して初めて出る失敗。読み込みは素通しにして、保存だけ差し替える。
+        suffix: 'invalid',
+        state: { apis: ['**/api/nen-campaigns/columns**'], kind: 'invalid' },
+        steps: [
+          { fill: '題名', text: '鹿肉の選び方' },
+          { fill: '記事のURL', text: 'https://example.com/columns/venison-guide' },
+          { qaOpen: 'ymXJK' },
+        ],
+      },
+      {
+        suffix: 'duplicate',
+        state: { apis: ['**/api/nen-campaigns/columns**'], kind: 'conflict' },
+        steps: [
+          { fill: '題名', text: '鹿肉の選び方' },
+          { fill: '記事のURL', text: 'https://example.com/columns/venison-guide' },
+          { qaOpen: 'ymXJK' },
+        ],
+      },
+      {
+        suffix: 'forbidden',
+        state: { apis: ['**/api/nen-campaigns/columns**'], kind: 'forbidden' },
+        steps: [
+          { fill: '題名', text: '鹿肉の選び方' },
+          { fill: '記事のURL', text: 'https://example.com/columns/venison-guide' },
+          { qaOpen: 'ymXJK' },
+        ],
+      },
+      {
+        suffix: 'failed',
+        state: { apis: ['**/api/nen-campaigns/columns**'], kind: 'error' },
+        steps: [
+          { fill: '題名', text: '鹿肉の選び方' },
+          { fill: '記事のURL', text: 'https://example.com/columns/venison-guide' },
+          { qaOpen: 'ymXJK' },
+        ],
+      },
+    ],
   },
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
@@ -2551,6 +2606,7 @@ export const CAPTURED_AT = {
     { pr: 526, head: 'dfcc9a53', on: '2026-08-29', screens: ['HpKyF'], note: 'きっかけの内部名を日本語へ。束3' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['VLMGH', 'q4lajm', 'WeXbL', 'i9sQP'], note: 'development そのもので撮った' },
     { pr: 526, head: '1c91a7bc', on: '2026-08-30', screens: ['HpKyF', 'VLMGH'], note: '誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み' },
+    { pr: 620, head: '197b69bd', on: '2026-08-31', screens: ['ymXJK'], note: 'Claudeが実装して撮った。コラムの下書き作成（#618 の作成契約の上）。通常・入力の誤り・重複・権限不足・保存失敗の5状態。**本文エディタは作っていない**——引き継ぎが「本文の入力欄を作らない」と定めており、記事の正本はEC側' },
   ],
   22: [
     { pr: 447, head: '65adbc59', on: '2026-08-28' },
