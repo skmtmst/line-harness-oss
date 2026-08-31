@@ -442,7 +442,7 @@ export default function NenCampaignsPage() {
 
         {tab === 'columns' && <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-gray-600">EC側から届いたコラムと、ここで書いた下書きが並びます。</p>
+            <p className="text-sm text-ink-secondary">EC側から届いたコラムと、ここで書いた下書きが並びます。</p>
             {/* 記事本文はEC側が正本。ここで作れるのは「外部記事へつなぐ下書き」だけ。 */}
             <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
           </div>

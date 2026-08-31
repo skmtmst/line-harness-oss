@@ -231,7 +231,7 @@ function NewNenColumnInner() {
             <CardHeader title="つながる先" />
             <ul className={styles.links}>
               <li><Link href="/contents">登録メディア</Link><span>上の写真</span></li>
-              <li><Link href="/friend-fields">友だち属性</Link><span>差し込む言葉</span></li>
+              <li><Link href="/tags">友だち属性</Link><span>差し込む言葉</span></li>
               <li><Link href="/broadcasts">一斉配信</Link><span>出しかたは一斉配信と同じ</span></li>
               <li><Link href="/analytics">分析</Link><span>読まれた割合</span></li>
               <li><Link href="/rich-menus">リッチメニュー</Link><span>コラムへの入口</span></li>
