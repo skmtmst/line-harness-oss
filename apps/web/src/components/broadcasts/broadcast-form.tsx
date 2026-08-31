@@ -914,6 +914,18 @@ export default function BroadcastForm({
         {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <p className="text-ink mb-3 text-sm font-bold">3. 送る時間</p>
+          {/*
+            **選ぶ前に断る。** 予約すると、送るのはあとになる。
+            送る相手は**送る時点でもう一度数え直される**
+            （`processSegmentSend` が送信時に条件を実行する）ので、
+            いま出ている人数はそのまま届く約束ではない。
+            あとから「予約したときと人数が違う」と気づくより、先に書く。
+          */}
+          <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-relaxed">
+            日時を指定すると、送る相手は<strong className="font-semibold">送るときにもう一度数え直します</strong>。
+            いま出ている{targetCount === null ? '人数' : `${targetCount.toLocaleString('ja-JP')}人`}は、
+            予約した時点の数です。条件に合う人が増えれば増え、外れれば減ります。
+          </p>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
               type="button"
