@@ -382,6 +382,80 @@ describe('Codex Slack relay', () => {
     expect(text).toContain('追い越し候補（古いPRはDraft、変更重複なし）');
   });
 
+  test('日本語の長い項目もUTF-8で3800バイト以内かつ行単位で省略する', () => {
+    const prs = Array.from({ length: 20 }, (_, index) => ({
+      number: 300 + index,
+      title: `長い日本語のPR題名${'あ'.repeat(200)}`,
+      url: `https://github.com/example/repo/pull/${300 + index}`,
+      author: 'skmtmst',
+      headRefName: `codex/masato-long-${index}`,
+      isDraft: false,
+      mergeStateStatus: 'CLEAN',
+      updatedAt: '2026-08-22T00:00:00Z',
+      fileCount: 2,
+      overlapsWith: [],
+      checks: 'pass' as const,
+    }));
+    const tasks = Array.from({ length: 15 }, (_, index) => ({
+      taskId: `TASK-${String(index).padStart(16, '0')}`,
+      status: 'working' as const,
+      operator: 'マサト',
+      title: `長い日本語のタスク題名${'い'.repeat(300)}`,
+      sourceChannel: 'C0SOURCE123',
+      sourceThreadTs: `1787326000.${String(index).padStart(6, '0')}`,
+      environment: 'development' as const,
+    }));
+
+    const text = buildSlackCommandCenterText(prs, tasks, '2026-08-22T01:00:00.000Z');
+
+    expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(3_800);
+    expect(text).toContain('*【LINE Harness 開発指令盤】*');
+    expect(text).toContain('更新：');
+    expect(text).toContain('一部の項目を省略しています');
+    for (const line of text.split('\n')) {
+      expect(line.match(/</g)?.length ?? 0).toBe(line.match(/>/g)?.length ?? 0);
+    }
+  });
+
+  test('chat.updateのmsg_too_longだけは項目を半減して1回だけ再送する', async () => {
+    const existingBoard = {
+      ts: '400.001',
+      text: '*【LINE Harness 開発指令盤】*\n更新：古い時刻',
+      metadata: { event_type: 'line_harness_command_center', event_payload: { version: '1' } },
+    };
+    const openPrs = Array.from({ length: 10 }, (_, index) => ({
+      number: 400 + index,
+      title: `PR ${index}`,
+      url: `https://github.com/example/repo/pull/${400 + index}`,
+      author: 'skmtmst',
+      headRefName: `codex/masato-retry-${index}`,
+      isDraft: false,
+      mergeStateStatus: 'CLEAN',
+      updatedAt: '2026-08-22T00:00:00Z',
+      fileCount: 1,
+      overlapsWith: [],
+      checks: 'pass' as const,
+    }));
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [existingBoard] }))
+      .mockResolvedValueOnce(slackResponse({ ok: false, error: 'msg_too_long' }))
+      .mockResolvedValueOnce(slackResponse({ ts: existingBoard.ts }));
+
+    await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+      SLACK_COMMAND_CHANNEL_ID: 'C-COMMAND',
+    }, event({ commandCenterOnly: true, openPrs }), fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    const first = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
+    const retry = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    expect(String(fetcher.mock.calls[3]?.[0])).toContain('chat.update');
+    expect(new TextEncoder().encode(retry.text).length).toBeLessThan(new TextEncoder().encode(first.text).length);
+    expect(retry.text).toContain('一部の項目を省略しています');
+  });
+
   test('同じ画面のAPI 500と未処理Promiseを同じエラーとしてまとめる', () => {
     const direct = harnessErrorIncidentKey({
       source: 'admin',
