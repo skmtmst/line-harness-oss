@@ -1713,7 +1713,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '#620で下書き作成を実装（題名・分類・記事URL・画像URL・概要・公開日時、通常/入力の誤り/重複/権限不足/保存失敗）。設計の本文エディタは作らない——引き継ぎ `v6-nen-column-create-handoff.md` が「本文の入力欄を作らない」と定めており、記事の正本はEC側。設計の「開封率が平均より12pt高い」などの数字も出さない（この画面に取得元が無い）。残る差は、いつ・だれに出すか（予約・宛先・人数）、読んだ人へのタグ付け、前のコラムを下敷きにする、自分にテスト送信',
     verdictSource: 'Claude実装',
-    verdictHead: '197b69bd',
+    verdictHead: 'ed5c0932',
     states: {
       apis: ['**/api/nen-campaigns/columns**'],
       kinds: ['normal'],
@@ -2606,7 +2606,7 @@ export const CAPTURED_AT = {
     { pr: 526, head: 'dfcc9a53', on: '2026-08-29', screens: ['HpKyF'], note: 'きっかけの内部名を日本語へ。束3' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['VLMGH', 'q4lajm', 'WeXbL', 'i9sQP'], note: 'development そのもので撮った' },
     { pr: 526, head: '1c91a7bc', on: '2026-08-30', screens: ['HpKyF', 'VLMGH'], note: '誕生日配信の効かない「何日後」を外し、3日前10:00の固定を書いた。Workerの birthdayDeliveryTarget と突き合わせ済み' },
-    { pr: 620, head: '197b69bd', on: '2026-08-31', screens: ['ymXJK'], note: 'Claudeが実装して撮った。コラムの下書き作成（#618 の作成契約の上）。通常・入力の誤り・重複・権限不足・保存失敗の5状態。**本文エディタは作っていない**——引き継ぎが「本文の入力欄を作らない」と定めており、記事の正本はEC側' },
+    { pr: 620, head: 'ed5c0932', on: '2026-08-31', screens: ['ymXJK'], note: 'Claudeが実装して撮った。コラムの下書き作成（#618 の作成契約の上）。通常・入力の誤り・重複・権限不足・保存失敗の5状態。**本文エディタは作っていない**——引き継ぎが「本文の入力欄を作らない」と定めており、記事の正本はEC側' },
   ],
   22: [
     { pr: 447, head: '65adbc59', on: '2026-08-28' },
