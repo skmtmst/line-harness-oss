@@ -4,10 +4,9 @@ import {
   getSupportMarkById,
   createSupportMark,
   updateSupportMark,
-  deleteSupportMark,
-  replaceAndDeleteSupportMark,
   countFriendsWithMark,
-  getDefaultSupportMark,
+  getSupportMarkDeleteImpact,
+  deleteSupportMarkAtImpact,
   setFriendSupportMark,
   setFriendSupportMarkBulk,
   getSavedSearches,
@@ -246,65 +245,99 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
   }
 });
 
+friendAttributes.get(
+  '/api/support-marks/:id/delete-impact',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      const impact = await getSupportMarkDeleteImpact(c.env.DB, c.req.param('id'), scope);
+      if (!impact) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
+      return c.json({ success: true, data: impact });
+    } catch (err) {
+      console.error('GET /api/support-marks/:id/delete-impact error:', err);
+      return c.json(
+        { success: false, error: '削除したときの影響を確認できませんでした' },
+        503,
+      );
+    }
+  },
+);
+
 friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
     const id = c.req.param('id');
-    const existing = await getSupportMarkById(c.env.DB, id, scope);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    if (existing.is_inherited === 1) {
-      return c.json(
-        {
-          success: false,
-          error: '共通マークは削除できません。編集すると、このLINE公式アカウント専用になります。',
-        },
-        409,
-      );
-    }
-    if (existing.is_default === 1) {
-      return c.json(
-        {
-          success: false,
-          error: '既定のマークは削除できません。先に別のマークを既定にしてください。',
-        },
-        409,
-      );
-    }
-    const defaultMark = await getDefaultSupportMark(c.env.DB, scope);
-    if (!defaultMark || defaultMark.id === id) {
-      return c.json(
-        {
-          success: false,
-          error: '置換先の初期値マークがありません。先に別のマークを初期値にしてください。',
-        },
-        409,
-      );
-    }
+    const impact = await getSupportMarkDeleteImpact(c.env.DB, id, scope);
+    if (!impact) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
 
-    // 使用中なら、削除前に置換先と人数を確認させる。
-    const count = await countFriendsWithMark(c.env.DB, id, scope);
-    if (count > 0 && c.req.query('force') !== '1') {
+    let body: { expectedRevision?: unknown } = {};
+    try {
+      body = await c.req.json<{ expectedRevision?: unknown }>();
+    } catch {
+      // DELETE の本文が無い旧画面も、影響確認なしでは実行させない。
+    }
+    const expectedRevision =
+      typeof body.expectedRevision === 'string' ? body.expectedRevision : '';
+    if (!expectedRevision) {
       return c.json(
         {
           success: false,
-          error: `このマークは ${count} 人に付いています。削除すると「${defaultMark.name}」へ変更されます。`,
-          code: 'IN_USE',
-          friendCount: count,
-          replacementMark: serializeMark(defaultMark),
+          error: '削除前に最新の影響を確認してください',
+          code: 'support_mark_impact_required',
+          data: impact,
+        },
+        428,
+      );
+    }
+    if (expectedRevision !== impact.revision) {
+      return c.json(
+        {
+          success: false,
+          error: '削除の影響が変わりました。最新の状態を確認してください',
+          code: 'support_mark_impact_changed',
+          data: impact,
         },
         409,
       );
     }
-    if (count > 0) {
-      const staff = c.get('staff');
-      await replaceAndDeleteSupportMark(c.env.DB, id, defaultMark.id, scope, staff.id);
-    } else {
-      await deleteSupportMark(c.env.DB, id, scope);
+    if (!impact.canDelete) {
+      return c.json(
+        {
+          success: false,
+          error: 'この対応マークは現在削除できません',
+          code: 'support_mark_delete_blocked',
+          data: impact,
+        },
+        409,
+      );
+    }
+    const deleted = await deleteSupportMarkAtImpact(
+      c.env.DB,
+      impact,
+      scope,
+      c.get('staff').id,
+    );
+    if (deleted.status === 'stale') {
+      const latest = await getSupportMarkDeleteImpact(c.env.DB, id, scope);
+      return c.json(
+        {
+          success: false,
+          error: '削除の影響が変わりました。最新の状態を確認してください',
+          code: 'support_mark_impact_changed',
+          data: latest,
+        },
+        409,
+      );
     }
     return c.json({
       success: true,
-      data: { replacedFriendCount: count, replacementMark: serializeMark(defaultMark) },
+      data: {
+        replacedFriendCount: deleted.replacedFriendCount,
+        replacementMark: impact.replacementMark,
+      },
     });
   } catch (err) {
     console.error('DELETE /api/support-marks/:id error:', err);

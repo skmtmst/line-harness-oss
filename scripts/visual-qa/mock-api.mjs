@@ -19,7 +19,10 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
+  SUPPORT_MARKS, SUPPORT_MARK_DELETE_IMPACT, SUPPORT_MARK_DELETE_IMPACT_EMPTY,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -389,6 +392,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  const supportMarkImpact = /^\/api\/support-marks\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (supportMarkImpact) {
+    if (supportMarkImpact[1] === 'mark-hold') {
+      return { success: true, data: SUPPORT_MARK_DELETE_IMPACT }
+    }
+    if (supportMarkImpact[1] === 'mark-unused') {
+      return { success: true, data: SUPPORT_MARK_DELETE_IMPACT_EMPTY }
+    }
+    return { success: false, error: '対応マークが見つかりません' }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という

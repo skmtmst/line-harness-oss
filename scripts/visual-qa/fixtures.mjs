@@ -159,6 +159,50 @@ export const LIST_STATS = {
   reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0 },
 }
 
+export const SUPPORT_MARKS = [
+  {
+    id: 'mark-default', name: '未対応', color: '#F59E0B', isDefault: true,
+    autoOnInbound: true, displayOrder: 0, createdAt: '2026-01-01T00:00:00.000Z',
+    isInherited: false, friendCount: 8,
+  },
+  {
+    id: 'mark-hold', name: '保留', color: '#94A3B8', isDefault: false,
+    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
+    isInherited: false, friendCount: 3,
+  },
+  {
+    id: 'mark-unused', name: '確認待ち', color: '#3B82F6', isDefault: false,
+    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
+    isInherited: false, friendCount: 0,
+  },
+]
+
+export const SUPPORT_MARK_DELETE_IMPACT = {
+  mark: {
+    id: 'mark-hold', name: '保留', color: '#94A3B8',
+    isDefault: false, isInherited: false, autoOnInbound: false,
+  },
+  friendCount: 3,
+  replacementMark: { id: 'mark-default', name: '未対応', color: '#F59E0B' },
+  operationalReferenceCount: 0,
+  automaticRuleStops: false,
+  blockers: [],
+  canDelete: true,
+  revision: 'v1.visual-qa-hold-3',
+}
+
+export const SUPPORT_MARK_DELETE_IMPACT_EMPTY = {
+  ...SUPPORT_MARK_DELETE_IMPACT,
+  mark: { ...SUPPORT_MARK_DELETE_IMPACT.mark, id: 'mark-unused', name: '確認待ち', color: '#3B82F6' },
+  friendCount: 0,
+  revision: 'v1.visual-qa-unused-0',
+}
+
+export const SUPPORT_MARK_DELETE_IMPACT_ERROR = {
+  success: false,
+  error: '削除したときの影響を確認できませんでした',
+}
+
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,

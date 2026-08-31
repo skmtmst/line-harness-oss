@@ -21,6 +21,8 @@ import {
   setFriendSupportMarkBulk,
   applyInboundSupportMark,
   replaceAndDeleteSupportMark,
+  getSupportMarkDeleteImpact,
+  deleteSupportMarkAtImpact,
 } from '../src/support-marks.js';
 import {
   validateSearchConditions,
@@ -428,6 +430,66 @@ describe('対応マーク', () => {
           `{"previousMarkId":"${accountMark.id}","replacementMarkId":"${replacementMark!.id}","reason":"deleted_mark_replacement"}`,
       },
     ]);
+  });
+
+  test('削除前に人数・置換先・運用設定の参照を同じ正本で返す', async () => {
+    await getSupportMarks(db, SCOPE);
+    const mark = await createSupportMark(db, SCOPE, { name: '保留' });
+    insertFriend('f-impact');
+    await setFriendSupportMarkBulk(db, ['f-impact'], mark.id, SCOPE);
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, conditions_json, line_account_id)
+       VALUES ('search-mark', '保留中', ?, 'account-1')`,
+    ).run(JSON.stringify({ all: [{ type: 'support_mark', value: { markIds: [mark.id] } }] }));
+
+    const impact = await getSupportMarkDeleteImpact(db, mark.id, SCOPE);
+    expect(impact).toMatchObject({
+      friendCount: 1,
+      replacementMark: { name: '未対応' },
+      operationalReferenceCount: 1,
+      blockers: ['operational_references'],
+      canDelete: false,
+    });
+    expect(impact?.revision).toMatch(/^v1\./);
+  });
+
+  test('確認後に人数が変わったら付け替えも削除も行わない', async () => {
+    await getSupportMarks(db, SCOPE);
+    const mark = await createSupportMark(db, SCOPE, { name: '保留' });
+    insertFriend('f-before');
+    await setFriendSupportMarkBulk(db, ['f-before'], mark.id, SCOPE);
+    const impact = await getSupportMarkDeleteImpact(db, mark.id, SCOPE);
+    expect(impact?.canDelete).toBe(true);
+
+    insertFriend('f-late');
+    await setFriendSupportMarkBulk(db, ['f-late'], mark.id, SCOPE);
+    const result = await deleteSupportMarkAtImpact(db, impact!, SCOPE, 'staff-1');
+
+    expect(result).toEqual({ status: 'stale' });
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS c FROM friends WHERE support_mark_id = ?`).get(mark.id),
+    ).toEqual({ c: 2 });
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = ?`).get(mark.id),
+    ).toEqual({ c: 1 });
+  });
+
+  test('確認した影響が同じなら付け替え・履歴・削除を同じバッチで完了する', async () => {
+    await getSupportMarks(db, SCOPE);
+    const mark = await createSupportMark(db, SCOPE, { name: '保留' });
+    insertFriend('f-safe');
+    await setFriendSupportMarkBulk(db, ['f-safe'], mark.id, SCOPE);
+    const impact = await getSupportMarkDeleteImpact(db, mark.id, SCOPE);
+
+    const result = await deleteSupportMarkAtImpact(db, impact!, SCOPE, 'staff-1');
+    expect(result).toEqual({ status: 'deleted', replacedFriendCount: 1 });
+    expect(
+      sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-safe'`).get(),
+    ).toEqual({ support_mark_id: impact!.replacementMark!.id });
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = ?`).get(mark.id),
+    ).toEqual({ c: 0 });
   });
 
   test('空の配列ではクエリを投げない', async () => {

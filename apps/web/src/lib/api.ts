@@ -97,6 +97,27 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+/** 対応マークを消す直前に再確認する影響。 */
+export type SupportMarkDeleteImpact = {
+  mark: {
+    id: string
+    name: string
+    color: string
+    isDefault: boolean
+    isInherited: boolean
+    autoOnInbound: boolean
+  }
+  friendCount: number
+  replacementMark: { id: string; name: string; color: string } | null
+  operationalReferenceCount: number
+  automaticRuleStops: boolean
+  blockers: Array<
+    'default_mark' | 'inherited_mark' | 'replacement_missing' | 'operational_references'
+  >
+  canDelete: boolean
+  revision: string
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -530,12 +551,15 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
+  /** 409で確認窓を最新状態へ描き直す機械データ。利用者へ直接表示しない。 */
+  readonly data: unknown
 
-  constructor(status: number, message?: string, code?: string) {
+  constructor(status: number, message?: string, code?: string, data?: unknown) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.data = data
   }
 }
 
@@ -578,14 +602,26 @@ export function extractApiErrorMessage(raw: string, status: number): string {
 export function extractApiErrorCode(raw: string): string | undefined {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { error?: unknown }
-    if (typeof body.error === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.error)) {
-      return body.error
+    const body = JSON.parse(raw) as { code?: unknown; error?: unknown }
+    const candidate = typeof body.code === 'string' ? body.code : body.error
+    if (typeof candidate === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(candidate)) {
+      return candidate
     }
   } catch {
     // JSONでなければ機械コードも無い。
   }
   return undefined
+}
+
+/** エラー本文の `data` だけを機械処理用に保持する。文言の表示契約とは分ける。 */
+export function extractApiErrorData(raw: string): unknown {
+  if (!raw) return undefined
+  try {
+    const body = JSON.parse(raw) as { data?: unknown }
+    return body && typeof body === 'object' ? body.data : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function reportServerFailure(path: string, status: number): void {
@@ -649,6 +685,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       res.status,
       extractApiErrorMessage(raw, res.status),
       extractApiErrorCode(raw),
+      extractApiErrorData(raw),
     )
   }
   if (res.status === 204) return undefined as T
@@ -1706,11 +1743,20 @@ export const api = {
         body: JSON.stringify(data),
         },
       ),
-    /** 付いている人がいると 409。force で初期値マークへ置換して消す。 */
-    delete: (id: string, accountId: string, opts?: { force?: boolean }) =>
+    deleteImpact: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<SupportMarkDeleteImpact>>(
+        `/api/support-marks/${id}/delete-impact?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    /** 直前に読んだ revision が同じ場合だけ、初期値マークへ置換して消す。 */
+    delete: (id: string, accountId: string, expectedRevision: string | { force?: boolean }) =>
       fetchApi<ApiResponse<{ replacedFriendCount: number; replacementMark: SupportMark }>>(
-        `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}${opts?.force ? '&force=1' : ''}`,
-        { method: 'DELETE' },
+        `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({
+            expectedRevision: typeof expectedRevision === 'string' ? expectedRevision : '',
+          }),
+        },
       ),
     setForFriend: (friendId: string, accountId: string, markId: string | null) =>
       fetchApi<ApiResponse<null>>(

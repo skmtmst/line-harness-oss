@@ -5,10 +5,30 @@ let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let eventsApi: typeof import('./api').eventsApi
+let api: typeof import('./api').api
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi } = await import('./api'))
+  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi, api } = await import('./api'))
+})
+
+describe('supportMarks delete impact contract', () => {
+  it('reads the selected account impact and returns the revision on delete', async () => {
+    const fetchSpy = vi.fn(async () =>
+      new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.supportMarks.deleteImpact('mark-1', 'account 1')
+    await api.supportMarks.delete('mark-1', 'account 1', 'v1.current')
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      '/api/support-marks/mark-1/delete-impact?lineAccountId=account%201',
+    )
+    expect(fetchSpy.mock.calls[1][1]).toMatchObject({
+      method: 'DELETE',
+      body: JSON.stringify({ expectedRevision: 'v1.current' }),
+    })
+  })
 })
 
 describe('eventsApi.createSlots', () => {
@@ -146,6 +166,23 @@ describe('fetchApi error response', () => {
       code: 'slot_conflict',
       message: 'API error: 409',
     })
+  })
+
+  it('409の最新影響を表示文とは分けて保持する', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        code: 'support_mark_impact_changed',
+        data: { friendCount: 4, revision: 'v1.latest' },
+      }), { status: 409 }),
+    ))
+
+    await expect(fetchApi('/api/support-marks/mark-1', { method: 'DELETE' }))
+      .rejects.toMatchObject({
+        status: 409,
+        code: 'support_mark_impact_changed',
+        data: { friendCount: 4, revision: 'v1.latest' },
+        message: 'API error: 409',
+      })
   })
 
   it('500 の本文は JSON でも表示せず status にフォールバックする', async () => {
