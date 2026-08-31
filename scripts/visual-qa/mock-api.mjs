@@ -155,6 +155,9 @@ import {
   REMINDER_PUBLISHED,
   REMINDER_RUNS,
   REMINDER_VALIDATION,
+  RICH_MENU_DELETE_IMPACT,
+  RICH_MENU_DELETE_IMPACT_EMPTY,
+  RICH_MENU_DELETE_IMPACT_ERROR,
   RICH_MENU_EXTERNAL,
   RICH_MENU_FOLDERS,
   RICH_MENU_GROUPS,
@@ -1479,6 +1482,20 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  /* リッチメニューを消したときの影響（PR #608）。 */
+  const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (richMenuDeleteImpact) {
+    if (query.get('visualState') === 'error') return RICH_MENU_DELETE_IMPACT_ERROR
+    /*
+      **参照で塞がれた下書き（`rmg-4`）だけが消せない。** ほかは消せる。
+      1つの影響を全部の行へ返すと、消せるはずのメニューにも赤い理由が
+      並び、どれが本当に消せないのか読めなくなる。
+    */
+    const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT.group.id
+      ? RICH_MENU_DELETE_IMPACT
+      : RICH_MENU_DELETE_IMPACT_EMPTY
+    return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }

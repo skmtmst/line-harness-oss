@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 57,
+  "match": 58,
   "structureMatchDataPending": 18,
-  "needsFix": 162,
+  "needsFix": 161,
   "unjudged": 0,
-  "remaining": 201,
+  "remaining": 200,
   "features": [
     {
       "feature": 1,
@@ -962,11 +962,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
+      "match": 7,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
+      "needsFix": 2,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 509,
@@ -1055,6 +1055,15 @@
             "XtfO3"
           ],
           "note": "Claudeが直した。3段の進み方。段の見た目は cCB7r と共通の部品へ切り出した。直した本人が比較している"
+        },
+        {
+          "pr": 616,
+          "head": "1e9654f8",
+          "on": "2026-08-31",
+          "screens": [
+            "szXsT"
+          ],
+          "note": "Claude実装。#608 の delete-impact で、消したときの影響4つを削除の窓へ出した"
         }
       ]
     },

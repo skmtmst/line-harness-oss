@@ -1383,6 +1383,19 @@ export const RICH_MENU_GROUPS = [
     folderId: 'rmf-store', displayOrder: 4, thumbnailR2Key: null,
     updatedAt: '2026-08-15T00:00:00.000Z',
   },
+  {
+    /*
+      **消せる下書き。** 削除の失敗（405）を撮るのに要る。
+      `rmg-4` はほかから参照されていて削除の押し口が出ないので、
+      その1件だけでは「押した先」を撮れない。
+    */
+    id: 'rmg-5', accountId: 'visual-qa-account', name: '未使用の下書き',
+    chatBarText: 'メニュー', size: 'compact', defaultPageId: null,
+    isDefaultForAll: false, status: 'draft', publishingAt: null,
+    targetingCondition: null, targetingPriority: 5, targetingEnabled: false,
+    folderId: null, displayOrder: 5, thumbnailR2Key: null,
+    updatedAt: '2026-08-14T00:00:00.000Z',
+  },
 ]
 
 /** 設計 `GO8RQ` の「今月のタップ 12,480回」。 */
@@ -5314,6 +5327,92 @@ export const FRIEND_ADD_LIFECYCLE_EMPTY = {
 export const FRIEND_ADD_LIFECYCLE_ERROR = {
   status: 500,
   body: { success: false, error: '下書きを読み込めませんでした' },
+}
+
+/* PR #608 のリッチメニュー削除影響。契約と同じ項目名で置く。 */
+/*
+  **下書きでも消せないことがある。** ほかのメニューからの切替先になって
+  いたり、自動処理から使われていたりすると、消すとその先が壊れる。
+  公開中のメニューは削除の窓自体が出ない（先に取り下げる案内へ回る）ので、
+  この影響は**参照で塞がれた下書き**の形にする。
+*/
+export const RICH_MENU_DELETE_IMPACT = {
+  group: {
+    id: 'rmg-4',
+    accountId: 'visual-qa-account',
+    name: '店舗A限定メニュー',
+    status: 'draft',
+  },
+  currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+  nextDisplay: {
+    guaranteedGroupId: null,
+    reason: 'friend_specific_rules',
+    candidates: [
+      {
+        groupId: 'rich-menu-next',
+        name: '通常メニュー',
+        targetingPriority: 20,
+        isTargetingEnabled: false,
+        isDefaultForAll: true,
+      },
+    ],
+  },
+  incomingSwitches: [
+    {
+      sourceGroupId: 'rich-menu-source',
+      sourceGroupName: '会員向けメニュー',
+      sourcePageId: 'rich-menu-source-page',
+      sourcePageName: '特典',
+      areaId: 'rich-menu-source-area',
+      areaLabel: '来店後のご案内',
+      targetPageId: 'rich-menu-target-page',
+      targetPageName: 'フォロー',
+    },
+  ],
+  operationalReferences: [
+    { kind: 'automation', ownerId: 'automation-visual', ownerName: '来店後の自動案内' },
+    { kind: 'common_action', ownerId: 'common-action-visual', ownerName: 'フォローを始める' },
+  ],
+  lineResources: {
+    pageCount: 2,
+    pagesWithLineRichMenuId: 0,
+    isDefaultForAll: false,
+    publishing: false,
+  },
+  blockers: ['incoming_switches', 'operational_references'],
+  canDelete: false,
+  recommendedAction: 'review_references',
+}
+
+export const RICH_MENU_DELETE_IMPACT_EMPTY = {
+  group: {
+    id: 'rich-menu-safe',
+    accountId: 'visual-qa-account',
+    name: '未使用の下書き',
+    status: 'draft',
+  },
+  currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+  nextDisplay: {
+    guaranteedGroupId: null,
+    reason: 'friend_specific_rules',
+    candidates: [],
+  },
+  incomingSwitches: [],
+  operationalReferences: [],
+  lineResources: {
+    pageCount: 1,
+    pagesWithLineRichMenuId: 0,
+    isDefaultForAll: false,
+    publishing: false,
+  },
+  blockers: [],
+  canDelete: true,
+  recommendedAction: 'delete',
+}
+
+export const RICH_MENU_DELETE_IMPACT_ERROR = {
+  success: false,
+  error: '削除したときの影響を確認できませんでした',
 }
 
 export const IDENTITY_CANDIDATE_ERROR = {
