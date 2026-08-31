@@ -326,6 +326,8 @@ export default function TemplatesPage() {
         setFolderActionError('')
         setPendingFolderDelete(folder)
       },
+      // 中身ごと消えると読ませない。属性フォルダ・共通情報と同じ言い方。
+      deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
   ]
 

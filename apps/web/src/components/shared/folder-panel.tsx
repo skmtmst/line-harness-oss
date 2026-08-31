@@ -37,6 +37,13 @@ export interface FolderPanelRow {
   onMoveUp?: () => void
   onMoveDown?: () => void
   onDelete?: () => void
+  /**
+   * 削除のあと何が残るかの但し書き（例：「削除しても、中の項目は未分類に
+   * 残ります。」）。**中身ごと消えると読ませない。**
+   * 呼ぶ側が言葉を決める——この部品はテンプレートにも属性にも使うので、
+   * ここで「テンプレート」と書くと、ほかの画面で嘘になる。
+   */
+  deleteNote?: string
 }
 
 export default function FolderPanel({
@@ -152,6 +159,9 @@ export default function FolderPanel({
                         <button type="button" onClick={() => runAction(row.onDelete)} className="text-danger hover:bg-danger-bg w-full px-3 py-2 text-left text-sm">
                           フォルダを削除
                         </button>
+                        {row.deleteNote && (
+                          <p className="text-ink-faint px-3 pb-2 text-xs leading-relaxed">{row.deleteNote}</p>
+                        )}
                       </div>
                     )}
                   </div>
