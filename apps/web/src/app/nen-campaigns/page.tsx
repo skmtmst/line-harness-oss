@@ -441,6 +441,11 @@ export default function NenCampaignsPage() {
         </section>}
 
         {tab === 'columns' && <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">EC側から届いたコラムと、ここで書いた下書きが並びます。</p>
+            {/* 記事本文はEC側が正本。ここで作れるのは「外部記事へつなぐ下書き」だけ。 */}
+            <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
+          </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><strong>EC-CUBEと自動連携します。</strong><br />NENコラムを保存すると、タイトル・概要・アイキャッチ・記事URLがここへ下書きとして届きます。確認後にLINE配信してください。</div>
           {columns.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">同期されたコラムはまだありません。</div> : columns.map((column) => {
             const isPreviewOpen = previewColumnId === column.id
