@@ -417,6 +417,38 @@ describe('Codex Slack relay', () => {
     }
   });
 
+  test('重複行だけで予算を超えても見出しと更新行を残してUTF-8で3800バイト以内にする', () => {
+    const tasks = Array.from({ length: 200 }, (_, index) => ({
+      taskId: `TASK-${String(index).padStart(4, '0')}-${'長'.repeat(100)}`,
+      status: 'working' as const,
+      operator: 'マサト',
+      title: '重複確認',
+      prNumber: 614,
+      environment: 'staging' as const,
+    }));
+
+    const text = buildSlackCommandCenterText([], tasks, '2026-08-22T01:00:00.000Z');
+
+    expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(3_800);
+    expect(text).toContain('*【LINE Harness 開発指令盤】*');
+    expect(text).toContain('更新：');
+    expect(text).toContain('一部の項目を省略しています');
+  });
+
+  test('タスクが16件以上なら省略の注記を表示する', () => {
+    const tasks = Array.from({ length: 16 }, (_, index) => ({
+      taskId: `TASK-${String(index).padStart(16, '0')}`,
+      status: 'working' as const,
+      operator: 'マサト',
+      title: `タスク${index}`,
+      environment: 'development' as const,
+    }));
+
+    const text = buildSlackCommandCenterText([], tasks, '2026-08-22T01:00:00.000Z');
+
+    expect(text).toContain('一部の項目を省略しています');
+  });
+
   test('chat.updateのmsg_too_longだけは項目を半減して1回だけ再送する', async () => {
     const existingBoard = {
       ts: '400.001',

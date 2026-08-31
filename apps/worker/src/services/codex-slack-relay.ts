@@ -848,6 +848,7 @@ export function buildSlackCommandCenterText(
   const allPrs = [...(openPrs || [])].sort((a, b) => a.number - b.number).slice(0, 20);
   const prs = allPrs.slice(0, itemLimits?.prs ?? allPrs.length);
   const duplicateLines = taskDuplicateLines(tasks);
+  const duplicateCount = duplicateLines.length;
   const reviewCount = tasks.filter((task) => task.status === 'review').length;
   let prLines: string[];
   if (openPrs) {
@@ -879,10 +880,10 @@ export function buildSlackCommandCenterText(
       ].join('\n');
     });
   let omitted = Boolean(itemLimits?.halvePreviousPrs) ||
-    prs.length < allPrs.length || visibleTasks.length < Math.min(tasks.length, 15);
+    prs.length < allPrs.length || tasks.length > visibleTasks.length;
   const render = () => [
     '*【LINE Harness 開発指令盤】*',
-    `更新：${formattedJst(occurredAt)} JST｜作業中 ${tasks.length - reviewCount}｜確認待ち ${reviewCount}｜未完了PR ${openPrs ? allPrs.length : '前回同期'}｜重複候補 ${duplicateLines.length}`,
+    `更新：${formattedJst(occurredAt)} JST｜作業中 ${tasks.length - reviewCount}｜確認待ち ${reviewCount}｜未完了PR ${openPrs ? allPrs.length : '前回同期'}｜重複候補 ${duplicateCount}`,
     '',
     '*PR順・追い越し判断*',
     ...prLines,
@@ -905,7 +906,34 @@ export function buildSlackCommandCenterText(
     prLines.splice(Math.max(1, prLines.length - 2), 2);
     omitted = true;
   }
-  return render();
+  while (byteLength(render()) > MAX_COMMAND_CENTER_BYTES && duplicateLines.length > 0) {
+    duplicateLines.pop();
+    omitted = true;
+  }
+  if (byteLength(render()) <= MAX_COMMAND_CENTER_BYTES) return render();
+
+  omitted = true;
+  const lines = render().split('\n');
+  const protectedLines = new Set([
+    '*PR順・追い越し判断*',
+    '*作業・停止・反映状況*',
+    '*重複*',
+    '- なし',
+    COMMAND_CENTER_OMISSION_NOTE,
+    '_PR番号は作成順です。先に上げてよいかは「変更重複・Draft・チェック・競合」で判定します。正本はGitHubです。_',
+  ]);
+  while (byteLength(lines.join('\n')) > MAX_COMMAND_CENTER_BYTES) {
+    let removableIndex = -1;
+    for (let index = lines.length - 1; index > 1; index -= 1) {
+      if (!protectedLines.has(lines[index])) {
+        removableIndex = index;
+        break;
+      }
+    }
+    if (removableIndex < 0) break;
+    lines.splice(removableIndex, 1);
+  }
+  return lines.join('\n');
 }
 
 async function refreshSlackCommandCenter(
