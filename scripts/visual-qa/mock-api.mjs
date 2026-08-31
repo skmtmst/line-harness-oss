@@ -19,7 +19,16 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FORM_DELETE_IMPACT_FIXTURES,
+  FRIENDS,
+  FRIEND_SCENARIOS,
+  FRIEND_STATS,
+  LIST_STATS,
+  OPERATORS,
+  TAGS,
+  TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -389,6 +398,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (formDeleteImpact) {
+    const data = formDeleteImpact[1] === 'form-empty'
+      ? FORM_DELETE_IMPACT_FIXTURES.delete
+      : FORM_DELETE_IMPACT_FIXTURES.archive
+    return { success: true, data }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という

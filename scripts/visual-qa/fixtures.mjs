@@ -262,3 +262,48 @@ export const FRIENDS = [
     tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
   }),
 ]
+
+/**
+ * 回答フォーム削除確認（`gBp2J`）の読み口。
+ *
+ * - `archive`: 回答と利用先があるので、物理削除ではなく保管する
+ * - `delete`: 取得できた実値0。未取得を0件へ丸めた状態ではない
+ * - `failure`: ブラウザ側の route.fulfill で使い、0件の絵を作らない
+ */
+export const FORM_DELETE_IMPACT_FIXTURES = {
+  archive: {
+    form: { id: 'form-visit', name: '来店アンケート', isActive: true, status: 'active' },
+    submissionCount: 128,
+    openCount: 214,
+    references: [
+      { kind: 'webinar', name: '使い方講座', href: '/webinars/edit?id=webinar-guide', state: 'available' },
+      { kind: 'rich_menu', name: '通常メニュー・予約', href: '/rich-menus/edit?id=rich-menu-main', state: 'available' },
+    ],
+    referenceCount: 2,
+    answerUrl: 'https://liff.line.me/visual-qa/?page=form&id=form-visit',
+    revision: 7,
+    checkedAt: '2026-08-31T11:00:00.000',
+    canDelete: false,
+    canArchive: true,
+    recommendedAction: 'archive',
+    blockers: ['published', 'has_submissions', 'has_opens', 'in_use'],
+  },
+  delete: {
+    form: { id: 'form-empty', name: '下書きフォーム', isActive: false, status: 'active' },
+    submissionCount: 0,
+    openCount: 0,
+    references: [],
+    referenceCount: 0,
+    answerUrl: 'https://liff.line.me/visual-qa/?page=form&id=form-empty',
+    revision: 2,
+    checkedAt: '2026-08-31T11:00:00.000',
+    canDelete: true,
+    canArchive: true,
+    recommendedAction: 'delete',
+    blockers: [],
+  },
+  failure: {
+    status: 503,
+    body: { success: false, error: 'form_delete_impact_unavailable', message: '削除の影響を確認できませんでした。' },
+  },
+}
