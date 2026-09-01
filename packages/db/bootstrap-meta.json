@@ -222,7 +222,8 @@
     "258_merged_people_detail.sql",
     "259_form_archive_safety.sql",
     "261_media_account_scope.sql",
-    "262_support_mark_archive.sql"
+    "262_support_mark_archive.sql",
+    "263_webhook_interaction_logs.sql"
   ],
-  "migrationCount": 223
+  "migrationCount": 224
 }

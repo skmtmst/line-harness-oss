@@ -10,6 +10,7 @@ import NotificationsPage from '@/app/notifications/page'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import WebhookInteractions from './webhook-interactions'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -37,6 +38,7 @@ function isHttpsUrl(value: string): boolean {
 
 const MERGED_TABS = [
   { key: 'webhooks', label: 'Webhook' },
+  { key: 'interactions', label: 'やり取りの記録' },
   { key: 'notify', label: '未対応の通知' },
 ]
 
@@ -849,6 +851,7 @@ function WebhooksPageHost() {
     <div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'webhooks' && <WebhooksPageInner />}
+      {tab === 'interactions' && <WebhookInteractions />}
       {tab === 'notify' && <NotificationsPage />}
     </div>
   )

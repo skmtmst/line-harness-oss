@@ -2775,6 +2775,32 @@ CREATE TABLE users (
 , tenant_id TEXT REFERENCES tenants(id) ON DELETE RESTRICT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'review', 'archived')), primary_display_name TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1), created_by TEXT, archived_at TEXT);
 
+CREATE TABLE webhook_interaction_logs (
+  id                 TEXT PRIMARY KEY,
+  line_account_id    TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  direction          TEXT NOT NULL CHECK (direction IN ('outgoing', 'incoming')),
+  webhook_id         TEXT,
+  webhook_name       TEXT NOT NULL,
+  event_type         TEXT NOT NULL,
+  trigger_summary    TEXT NOT NULL,
+  status             TEXT NOT NULL CHECK (status IN ('pending', 'succeeded', 'failed', 'retried')),
+  request_body_json  TEXT,
+  response_status    INTEGER,
+  attempt_count      INTEGER NOT NULL DEFAULT 0,
+  duration_ms        INTEGER,
+  failure_reason     TEXT CHECK (
+    failure_reason IS NULL OR failure_reason IN (
+      'connection_failed', 'response_4xx', 'response_429',
+      'response_5xx', 'processing_failed', 'unknown'
+    )
+  ),
+  idempotency_key    TEXT NOT NULL,
+  retry_of_id        TEXT REFERENCES webhook_interaction_logs(id) ON DELETE SET NULL,
+  started_at         TEXT NOT NULL,
+  completed_at       TEXT,
+  created_at         TEXT NOT NULL
+);
+
 CREATE TABLE webinar_comments (
   id TEXT PRIMARY KEY,
   webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -3671,6 +3697,15 @@ CREATE INDEX idx_users_phone ON users (phone);
 
 CREATE INDEX idx_users_tenant_status
   ON users(tenant_id, status, updated_at DESC);
+
+CREATE INDEX idx_webhook_interactions_account_created
+  ON webhook_interaction_logs (line_account_id, created_at DESC);
+
+CREATE INDEX idx_webhook_interactions_account_status
+  ON webhook_interaction_logs (line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_webhook_interactions_webhook
+  ON webhook_interaction_logs (line_account_id, webhook_id, created_at DESC);
 
 CREATE INDEX idx_webinar_comments_webinar
   ON webinar_comments (webinar_id, at_seconds);

@@ -12,6 +12,17 @@ vi.mock('@line-crm/db', () => ({
   createOutgoingWebhook: vi.fn(),
   updateOutgoingWebhook: vi.fn(),
   deleteOutgoingWebhook: vi.fn(),
+  createWebhookInteraction: vi.fn(),
+  finishWebhookInteraction: vi.fn(),
+  getWebhookInteractionById: vi.fn(),
+  listFailedWebhookInteractionsForRetry: vi.fn(),
+  listWebhookInteractions: vi.fn(),
+}));
+
+vi.mock('../services/webhook-interactions.js', () => ({
+  retryWebhookInteraction: vi.fn(),
+  webhookFailureLabel: vi.fn((reason: string | null) => reason ? '安全な失敗理由' : null),
+  webhookResponseLabel: vi.fn((row: { status: string }) => row.status === 'failed' ? '処理できませんでした' : '届きました'),
 }));
 
 // Stub fireEvent to keep receive-endpoint tests focused on signature
@@ -35,7 +46,13 @@ import {
   createOutgoingWebhook,
   updateOutgoingWebhook,
   deleteOutgoingWebhook,
+  createWebhookInteraction,
+  finishWebhookInteraction,
+  getWebhookInteractionById,
+  listFailedWebhookInteractionsForRetry,
+  listWebhookInteractions,
 } from '@line-crm/db';
+import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
 import type { Env } from '../index.js';
@@ -63,6 +80,21 @@ const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(canAccessAllLineAccounts).mockResolvedValue(true);
+  vi.mocked(createWebhookInteraction).mockResolvedValue({
+    id: 'interaction-1', line_account_id: ACCOUNT_ID, direction: 'incoming',
+    webhook_id: 'iwh-1', webhook_name: 'test', event_type: 'incoming_webhook.custom',
+    trigger_summary: 'testから受け取った', status: 'pending', request_body_json: null,
+    response_status: null, attempt_count: 0, duration_ms: null, failure_reason: null,
+    idempotency_key: 'delivery-1', retry_of_id: null,
+    started_at: '2026-05-08T00:00:00.000+09:00', completed_at: null,
+    created_at: '2026-05-08T00:00:00.000+09:00',
+  });
+  vi.mocked(finishWebhookInteraction).mockResolvedValue(undefined);
+  vi.mocked(listWebhookInteractions).mockResolvedValue({
+    items: [], total: 0, page: 1, limit: 20,
+    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, averageDurationMs: null },
+  });
+  vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
   vi.mocked(getIncomingWebhookById).mockResolvedValue({
     id: 'iwh-1', name: 'test', source_type: 'custom', secret: VALID_SECRET,
     is_active: 1, line_account_id: ACCOUNT_ID, created_at: '2026-05-08', updated_at: '2026-05-08',
@@ -723,5 +755,74 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       undefined,
       'account-a',
     );
+    expect(createWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      lineAccountId: 'account-a',
+      direction: 'incoming',
+      requestBodyJson: null,
+    }));
+    expect(finishWebhookInteraction).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'interaction-1',
+      'account-a',
+      expect.objectContaining({ status: 'succeeded', responseStatus: 200 }),
+    );
+  });
+});
+
+describe('Webhookやり取り記録', () => {
+  const failedRow = {
+    id: 'run-a', line_account_id: ACCOUNT_ID, direction: 'outgoing' as const,
+    webhook_id: 'wh-1', webhook_name: '顧客管理', event_type: 'friend.added',
+    trigger_summary: '友だちが追加されたとき', status: 'failed' as const,
+    request_body_json: '{"private":"本文"}', response_status: 500,
+    attempt_count: 2, duration_ms: 820, failure_reason: 'response_5xx' as const,
+    idempotency_key: 'delivery-a', retry_of_id: null,
+    started_at: '2026-08-29T10:00:00.000+09:00', completed_at: '2026-08-29T10:00:00.820+09:00',
+    created_at: '2026-08-29T10:00:00.000+09:00',
+  };
+
+  test('一覧はアカウントを検査し、本文・配送ID・Webhook IDを返さない', async () => {
+    vi.mocked(listWebhookInteractions).mockResolvedValue({
+      items: [failedRow], total: 1, page: 1, limit: 20,
+      summary: { total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1, averageDurationMs: 820 },
+    });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(canAccessAllLineAccounts).toHaveBeenCalledWith(baseEnv.DB, expect.anything(), [ACCOUNT_ID]);
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      id: 'run-a', webhookName: '顧客管理', responseLabel: '処理できませんでした', canRetry: true,
+    });
+    expect(body.data.items[0]).not.toHaveProperty('request_body_json');
+    expect(body.data.items[0]).not.toHaveProperty('idempotency_key');
+    expect(body.data.items[0]).not.toHaveProperty('webhook_id');
+  });
+
+  test('権限外のアカウントは一覧を読めない', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
+    const res = await setupApp().request(
+      '/api/webhooks/interactions?lineAccountId=account-b',
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(listWebhookInteractions).not.toHaveBeenCalled();
+  });
+
+  test('失敗した送信だけを同じアカウントの中でやり直す', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
+    vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, id: 'retry-a', status: 'succeeded' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(getWebhookInteractionById).toHaveBeenCalledWith(baseEnv.DB, 'run-a', ACCOUNT_ID);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow);
   });
 });

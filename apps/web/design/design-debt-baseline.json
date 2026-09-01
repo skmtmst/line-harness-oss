@@ -413,6 +413,9 @@
     "arbitrary-value": 6,
     "direct-th": 15
   },
+  "app/webhooks/webhook-interactions.tsx": {
+    "unresolved-classname": 29
+  },
   "app/webinars/edit/page.tsx": {
     "direct-th": 13,
     "unresolved-classname": 8,
