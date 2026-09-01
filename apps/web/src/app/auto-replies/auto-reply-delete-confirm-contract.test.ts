@@ -12,7 +12,7 @@ describe('V6 自動応答の削除確認 Gy9OK', () => {
   })
 
   it('消すルールの名前と、止まる動作、残る履歴を読む', () => {
-    expect(PAGE).toContain('pendingDelete?.name || pendingDelete?.keyword')
+    expect(PAGE).toContain('pendingDelete?.item.name || pendingDelete?.item.keyword')
     expect(PAGE).toContain('新しく届くメッセージへの自動返信')
     expect(PAGE).toContain('タグ付けなどの後続処理が止まります')
     expect(PAGE).toContain('過去の実行履歴は削除されません')
@@ -27,5 +27,13 @@ describe('V6 自動応答の削除確認 Gy9OK', () => {
   it('処理中は閉じたり二重実行したりできない', () => {
     expect(PAGE).toContain('busy={deleting}')
     expect(PAGE).toContain('if (deleting) return')
+  })
+
+  it('対象を選んだアカウントを固定し、切替後に古い対象を削除・再読込しない', () => {
+    expect(PAGE).toContain('setPendingDelete({ item: r, accountId: selectedAccountId })')
+    expect(PAGE).toContain('pendingDelete.accountId !== selectedAccountId')
+    expect(PAGE).toContain('const targetId = pendingDelete.item.id')
+    expect(PAGE).toContain('selectedAccountIdRef.current === requestAccountId')
+    expect(PAGE).toContain('削除する自動応答を選び直してください')
   })
 })

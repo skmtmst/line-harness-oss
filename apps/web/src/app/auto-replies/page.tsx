@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import FolderPanel from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -53,6 +53,12 @@ interface AutoReply {
   hits?: { period: number; total: number }
   createdAt: string
   effectiveAccounts?: EffectiveAccount[]
+}
+
+interface PendingDelete {
+  item: AutoReply
+  /** 削除対象を選んだ時点のアカウント。切替後に古い対象を消さないために固定する。 */
+  accountId: string | null
 }
 
 /**
@@ -141,9 +147,11 @@ export default function AutoRepliesPage() {
   const [savedFilter, setSavedFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [editing, setEditing] = useState<AutoReplyDraft | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<AutoReply | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -246,16 +254,23 @@ export default function AutoRepliesPage() {
 
   const handleDelete = async () => {
     if (!pendingDelete) return
+    if (pendingDelete.accountId !== selectedAccountId) {
+      setDeleteError('アカウントが切り替わりました。削除する自動応答を選び直してください。')
+      return
+    }
+    const requestAccountId = pendingDelete.accountId
+    const targetId = pendingDelete.item.id
     setDeleting(true)
     setDeleteError('')
     try {
-      const result = await api.autoReplies.delete(pendingDelete.id)
+      const result = await api.autoReplies.delete(targetId)
       if (!result.success) {
         setDeleteError('自動応答を削除できませんでした。状態を読み直してからお試しください。')
         return
       }
       setPendingDelete(null)
-      await load()
+      // 削除中にアカウントが変わった場合、古いアカウントの一覧で上書きしない。
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
       setDeleteError('自動応答を削除できませんでした。状態を読み直してからお試しください。')
     } finally {
@@ -610,7 +625,7 @@ export default function AutoRepliesPage() {
                       <button
                         onClick={() => {
                           setDeleteError('')
-                          setPendingDelete(r)
+                          setPendingDelete({ item: r, accountId: selectedAccountId })
                         }}
                         className="ml-1 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
                       >
@@ -644,7 +659,7 @@ export default function AutoRepliesPage() {
       <div data-design-node="Gy9OK">
         <ConfirmDialog
           open={pendingDelete !== null}
-          title={`自動応答「${pendingDelete?.name || pendingDelete?.keyword || 'すべてのメッセージ'}」を削除しますか？`}
+          title={`自動応答「${pendingDelete?.item.name || pendingDelete?.item.keyword || 'すべてのメッセージ'}」を削除しますか？`}
           description="新しく届くメッセージへの自動返信と、タグ付けなどの後続処理が止まります。過去の実行履歴は削除されません。この操作は元に戻せません。"
           confirmLabel="自動応答を削除"
           destructive
