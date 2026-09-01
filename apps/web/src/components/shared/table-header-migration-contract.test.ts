@@ -52,9 +52,12 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 4-1 の表に「表示」列（★）を足したあと、シナリオ一覧の見出し9個を
-    // 共通の `Th` へ寄せて288。減ったぶんを戻せないよう締め直す。
-    expect(debt['direct-th']).toBe(288)
+    // 2026-08-29: 統合ユーザー一覧の見出し6つを共通 `Th` へ寄せ、
+    // V6の7列へ増やしても直書きを残さなかった。
+    // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
+    // 共通の `Th` を通すため、この数へは戻さない。
+    // シナリオ一覧の見出し9個も共通の `Th` へ寄せ、両方を合わせて267まで減った。
+    expect(debt['direct-th']).toBe(267)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

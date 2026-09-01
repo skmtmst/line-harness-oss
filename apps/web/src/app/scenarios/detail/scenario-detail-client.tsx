@@ -156,6 +156,7 @@ interface TemplateOpt {
   category: string
   messageType: string
   messageContent: string
+  question: ScenarioQuestion | null
 }
 
 interface TagOpt {
@@ -350,12 +351,15 @@ export default function ScenarioDetailClient({
       if (cancelled) return
       if (statsRes && statsRes.success) setStats(statsRes.data)
       if (tplRes && tplRes.success) {
-        setTemplates(tplRes.data.map((t) => ({
+        setTemplates(tplRes.data
+          .filter((t) => !t.question || t.questionStatus === 'published')
+          .map((t) => ({
           id: t.id,
           name: t.name,
           category: t.category,
           messageType: t.messageType,
           messageContent: t.messageContent,
+          question: (t.question as ScenarioQuestion | null) ?? null,
         })))
       }
       if (tagRes && tagRes.success) {
@@ -612,8 +616,18 @@ export default function ScenarioDetailClient({
   }
 
   const handleSaveStep = async () => {
+    if (stepForm.question) {
+      if (!stepForm.question.text.trim()) {
+        setStepError('質問文を入力してください')
+        return
+      }
+      if (stepForm.question.choices.length === 0 || stepForm.question.choices.some((choice) => !choice.label.trim())) {
+        setStepError('すべての選択肢に文字を入力してください')
+        return
+      }
+    }
     // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
-    if (stepForm.inputMode === 'direct') {
+    if (!stepForm.question && stepForm.inputMode === 'direct') {
       if (!stepForm.messageContent.trim()) {
         setStepError('メッセージ内容を入力してください')
         return
@@ -875,7 +889,17 @@ export default function ScenarioDetailClient({
             <select
               className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               value={stepForm.templateId ?? ''}
-              onChange={(e) => setStepForm({ ...stepForm, templateId: e.target.value || null })}
+              onChange={(e) => {
+                const templateId = e.target.value || null
+                const template = templates.find((item) => item.id === templateId)
+                setStepForm({
+                  ...stepForm,
+                  templateId,
+                  question: template?.question ? structuredClone(template.question) : null,
+                  messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
+                  messageContent: template?.messageContent ?? stepForm.messageContent,
+                })
+              }}
             >
               <option value="">-- 選択してください --</option>
               {templates.map((t) => (

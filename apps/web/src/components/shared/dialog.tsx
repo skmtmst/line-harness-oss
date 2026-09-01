@@ -20,9 +20,11 @@ export type DialogProps = {
   footer?: ReactNode
   /** 参照画像の固定比較やページ内プレビューで、背景を付けず面だけ表示する。 */
   modal?: boolean
+  /** 画面固有のPencil Node。未指定なら共通部品のNodeだけを持つ。 */
+  designNode?: string
 }
 
-/** Pencil V5 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
+/** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
 export default function Dialog({
   open,
   title,
@@ -37,6 +39,7 @@ export default function Dialog({
   children,
   footer,
   modal = true,
+  designNode,
 }: DialogProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -83,7 +86,7 @@ export default function Dialog({
 
   if (!modal) return panel
   const overlay = (
-    <div className={styles.overlay} role="presentation" onMouseDown={(event) => {
+    <div className={styles.overlay} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}
