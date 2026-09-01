@@ -80,6 +80,8 @@ export interface LineRichMenuClient {
   uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string): Promise<void>;
   deleteRichMenuAlias(aliasId: string): Promise<void>;
   createRichMenuAlias(aliasId: string, richMenuId: string): Promise<void>;
+  /** 既存 alias は切れ目なく更新し、存在しない場合だけ新規作成する。 */
+  upsertRichMenuAlias(aliasId: string, richMenuId: string): Promise<void>;
   deleteRichMenu(richMenuId: string): Promise<void>;
   setDefaultRichMenu(richMenuId: string): Promise<void>;
   // LINE 側のアカウント全体デフォルトを解除する。冪等 — 設定がなくてもエラーにしない実装にする。
@@ -394,57 +396,102 @@ export async function publishRichMenuGroup(
   const dimensions = SIZE_DIMENSIONS[group.size];
   const results: { pageId: string; newRichMenuId: string }[] = [];
 
+  // LINE 側へ変更を加える前に、全ページの画像が読めることを確認する。
+  // 2ページ目の画像不備で1ページ目だけ公開される事故を防ぐ。
+  const imageBytes = new Map<string, Uint8Array>();
   for (const page of resolvedPages) {
     if (!page.imageR2Key || !page.imageContentType) {
       throw new Error(`page ${page.id} (${page.name}) has no image`);
     }
-
-    // 1. richmenu 作成
-    const created = await line.createRichMenu({
-      size: dimensions,
-      selected: false,
-      name: `${group.id.slice(0, 8)} - ${page.name}`,
-      chatBarText: group.chatBarText,
-      areas: page.areas.map((a) => ({
-        bounds: a.bounds,
-        action: toLineAction(a, group),
-      })),
-    });
-    const newRichMenuId = created.richMenuId;
-
-    // 2. 画像 upload
-    const bytes = await readR2Object(r2, page.imageR2Key);
-    await line.uploadRichMenuImage(newRichMenuId, bytes, page.imageContentType);
-
-    // 3. alias upsert (DELETE は 404 なら無視、CREATE は失敗時 throw)
-    const aliasId = buildAliasId(group.id, page.orderIndex);
-    try {
-      await line.deleteRichMenuAlias(aliasId);
-    } catch {
-      // 404 等は無視
-    }
-    await line.createRichMenuAlias(aliasId, newRichMenuId);
-
-    // 4. 旧 richmenu 削除 (alias 切替後にだけ。失敗しても致命的ではない)
-    if (page.lineRichMenuId) {
-      try {
-        await line.deleteRichMenu(page.lineRichMenuId);
-      } catch {
-        // 旧削除失敗は無視
-      }
-    }
-
-    results.push({ pageId: page.id, newRichMenuId });
+    imageBytes.set(page.id, await readR2Object(r2, page.imageR2Key));
   }
 
-  // 5. default 設定
+  const cleanupNewMenus = async (keepPageIds = new Set<string>()) => {
+    for (const result of results) {
+      // alias の復旧を確認できなかったページは、新メニューを消さない。
+      // LINE上の alias が新IDを指していた場合にリンク切れになるほうが危険なため。
+      if (keepPageIds.has(result.pageId)) continue;
+      try {
+        await line.deleteRichMenu(result.newRichMenuId);
+      } catch {
+        // 元の公開状態を守る処理なので、新規メニューの後片付け失敗は元のエラーを隠さない。
+      }
+    }
+  };
+
+  // 1. 全ページを作成し、全画像を upload する。ここが完走するまで alias は触らない。
+  try {
+    for (const page of resolvedPages) {
+      const created = await line.createRichMenu({
+        size: dimensions,
+        selected: false,
+        name: `${group.id.slice(0, 8)} - ${page.name}`,
+        chatBarText: group.chatBarText,
+        areas: page.areas.map((a) => ({
+          bounds: a.bounds,
+          action: toLineAction(a, group),
+        })),
+      });
+      results.push({ pageId: page.id, newRichMenuId: created.richMenuId });
+      await line.uploadRichMenuImage(
+        created.richMenuId,
+        imageBytes.get(page.id)!,
+        page.imageContentType!,
+      );
+    }
+  } catch (error) {
+    await cleanupNewMenus();
+    throw error;
+  }
+
+  // 2. alias を更新する。DELETE→CREATE の空白時間を作らない。
+  // 途中失敗時は切替済み alias を旧IDへ戻し、新規メニューを片付ける。
+  const switchedPages: PageInput[] = [];
+  const rollbackPublish = async () => {
+    const keepNewMenuFor = new Set<string>();
+    for (const page of [...switchedPages].reverse()) {
+      const aliasId = buildAliasId(group.id, page.orderIndex);
+      try {
+        if (page.lineRichMenuId) {
+          await line.upsertRichMenuAlias(aliasId, page.lineRichMenuId);
+        } else {
+          await line.deleteRichMenuAlias(aliasId);
+        }
+      } catch {
+        // alias が新IDを指している可能性があるため、このページの新メニューは消さない。
+        keepNewMenuFor.add(page.id);
+      }
+    }
+    await cleanupNewMenus(keepNewMenuFor);
+  };
+
+  try {
+    for (let index = 0; index < resolvedPages.length; index++) {
+      const page = resolvedPages[index];
+      const result = results[index];
+      // 通信結果が不明な失敗でも旧IDへ戻せるよう、試行前にロールバック対象へ入れる。
+      switchedPages.push(page);
+      await line.upsertRichMenuAlias(
+        buildAliasId(group.id, page.orderIndex),
+        result.newRichMenuId,
+      );
+    }
+
+    // 3. default 設定。失敗時は alias も元へ戻す。
+    if (group.isDefaultForAll && results.length > 0) {
+      await line.setDefaultRichMenu(results[0].newRichMenuId);
+    }
+  } catch (error) {
+    await rollbackPublish();
+    throw error;
+  }
+
+  // 4. default 解除
   // 有効化時は order_index=0 ページの richMenuId を default に設定。
   // 無効化 (false) 時は **この group の richMenu が現在 LINE の default に設定されている
   // 場合のみ** 解除する。同一 account に別の isDefaultForAll=true group がある状態で
   // 無条件に DELETE すると、その別 group の default まで壊してしまうため。
-  if (group.isDefaultForAll && results.length > 0) {
-    await line.setDefaultRichMenu(results[0].newRichMenuId);
-  } else {
+  if (!group.isDefaultForAll) {
     // ベストエフォート: ここまで来た時点で新 richmenu はすでに live。LINE 側 default
     // 判定や解除に失敗しても publish 全体を失敗させない (D1 の status 更新が呼出側で
     // 走らず状態不整合になるため)。default 解除がスキップされた場合は次回 publish で
@@ -463,6 +510,16 @@ export async function publishRichMenuGroup(
       }
     } catch (e) {
       console.warn(`[publishRichMenuGroup] default lookup/clear failed (non-fatal):`, e);
+    }
+  }
+
+  // 5. 公開切替がすべて終わってから旧メニューを削除する。
+  for (const page of resolvedPages) {
+    if (!page.lineRichMenuId) continue;
+    try {
+      await line.deleteRichMenu(page.lineRichMenuId);
+    } catch {
+      // alias は新メニューへ切替済み。旧メニューの削除失敗は次回の清掃対象とする。
     }
   }
 
