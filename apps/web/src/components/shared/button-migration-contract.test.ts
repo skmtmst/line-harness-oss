@@ -55,8 +55,10 @@ describe('標準ボタンの第1段階移行', () => {
     //   - 取得失敗の状態に「再読み込み」を足した（2画面）: +2
     //   - 流入経路の「このフォルダにURLを発行」を直書きから共通Buttonへ: +1
     //     この1つが primary なので 14 → 15。
-    expect(openings).toHaveLength(37)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(15)
+    // 同日: 案件タブのCSV・再読み込み・空状態からの作成を統合し、
+    // 実際の7ルートを再計測して40個・主要16個へ締め直した。
+    expect(openings).toHaveLength(40)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -201,6 +203,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 1232→1231。**減ったので締め直す。**
     // 2026-09-01: #420 の友だち情報欄と最新 development を統合した木を
     // 再計測し、任意値は1224。片側の古い基準値は採用していない。
+    // 2026-09-02: 案件タブの検索欄を設計の460px、作成画面のV6版を
+    // 設計の余白18px・右カラム390pxへ合わせ、たまる決めごとをトークンへ
+    // 寄せた変更も含める。
     // 2026-09-02: #475 がログインユーザーの物理削除確認と入った記録の固定最小幅を外した。
     // 最新 development との統合後の木を再計測し、1222へ締め直した。
     // 同日: フォルダ作成を設計 `byqIW` の実測値へ合わせて1225。
@@ -210,7 +215,8 @@ describe('標準ボタンの第1段階移行', () => {
     // 同日: 統合ユーザーの指標カードを共通SummaryCardへ載せ替え、
     // 重複検出の再読み込みを共通Buttonにした。最新developmentとの統合後の
     // 木を再計測し、1225→1215へ締め直した。
-    expect(debt['arbitrary-value']).toBe(1215)
+    // #656の設計固有寸法も統合した木で再計測し、1218へ締め直した。
+    expect(debt['arbitrary-value']).toBe(1218)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

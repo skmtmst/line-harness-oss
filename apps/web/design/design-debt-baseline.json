@@ -6,11 +6,11 @@
     "unresolved-classname": 8
   },
   "app/affiliates/new/page.tsx": {
-    "unresolved-classname": 9,
+    "unresolved-classname": 6,
     "direct-secondary-button": 1
   },
   "app/affiliates/tabs.tsx": {
-    "arbitrary-value": 12,
+    "arbitrary-value": 13,
     "direct-th": 20
   },
   "app/analytics/page.tsx": {
@@ -234,9 +234,9 @@
     "unresolved-classname": 8
   },
   "app/mileage/page.tsx": {
-    "unresolved-classname": 2,
-    "arbitrary-value": 10,
-    "direct-th": 7
+    "arbitrary-value": 9,
+    "direct-th": 7,
+    "unresolved-classname": 1
   },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 37
@@ -744,9 +744,10 @@
     "unresolved-classname": 14
   },
   "components/shared/create-page.tsx": {
-    "unresolved-classname": 1,
     "direct-primary-button": 1,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 2,
+    "unresolved-classname": 1,
+    "arbitrary-value": 3
   },
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
