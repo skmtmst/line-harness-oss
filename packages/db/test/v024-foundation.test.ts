@@ -578,7 +578,7 @@ describe('サイトの記録', () => {
 
 describe('共通情報の日付切り替え', () => {
   test('時刻を過ぎた予約だけ反映する', async () => {
-    const v = await createCommonVar(db, { name: '営業時間', varKey: 'shop_hours', value: '10-19' });
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: '営業時間', varKey: 'shop_hours', value: '10-19' });
     await createCommonVarSchedule(db, {
       varId: v.id,
       effectiveFrom: '2026-08-01T00:00:00.000',
@@ -591,11 +591,11 @@ describe('共通情報の日付切り替え', () => {
     });
     const applied = await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000');
     expect(applied).toBe(1);
-    expect((await getCommonVarById(db, v.id))?.value).toBe('11-20');
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('11-20');
   });
 
   test('二度反映されない', async () => {
-    const v = await createCommonVar(db, { name: 'x', varKey: 'x', value: 'A' });
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: 'x', varKey: 'x', value: 'A' });
     await createCommonVarSchedule(db, {
       varId: v.id,
       effectiveFrom: '2026-08-01T00:00:00.000',
@@ -606,7 +606,7 @@ describe('共通情報の日付切り替え', () => {
   });
 
   test('溜まった予約は古い順に当て、最後のものが残る', async () => {
-    const v = await createCommonVar(db, { name: 'x', varKey: 'x', value: 'A' });
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: 'x', varKey: 'x', value: 'A' });
     await createCommonVarSchedule(db, {
       varId: v.id,
       effectiveFrom: '2026-08-10T00:00:00.000',
@@ -618,7 +618,7 @@ describe('共通情報の日付切り替え', () => {
       value: 'C',
     });
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(2);
-    expect((await getCommonVarById(db, v.id))?.value).toBe('C');
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('C');
   });
 });
 

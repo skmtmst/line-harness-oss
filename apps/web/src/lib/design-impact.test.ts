@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする49ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする64ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -21,14 +21,21 @@ describe('共通部品の影響範囲', () => {
       'app/common-actions/new/page.tsx',
       'app/common-actions/page.tsx',
       'app/common-actions/versions/page.tsx',
+      'app/contents/page.tsx',
+      'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
+      'app/ec-commerce/identity-candidates/page.tsx',
       'app/form-submissions/page.tsx',
+      'app/friend-add-settings/publish/page.tsx',
+      'app/friends/identity-candidates/page.tsx',
+      'app/friends/page.tsx',
       'app/hq/open/page.tsx',
       'app/hq/page.tsx',
       'app/hq/settings/hq-staff-section.tsx',
       'app/hq/settings/page.tsx',
       'app/inflow-links/page.tsx',
       'app/line-notifications/operator/new/page.tsx',
+      'app/line-notifications/page.tsx',
       'app/mileage/action-score-tab.tsx',
       'app/mileage/friends/detail/mileage-adjustment-dialog.tsx',
       'app/mileage/friends/detail/page.tsx',
@@ -39,6 +46,7 @@ describe('共通部品の影響範囲', () => {
       'app/page.tsx',
       'app/reminders/new/page.tsx',
       'app/reminders/page.tsx',
+      'app/rich-menus/connections/page.tsx',
       'app/scenarios/detail/scenario-detail-client.tsx',
       'app/scenarios/page.tsx',
       'app/scenarios/results/page.tsx',
@@ -48,6 +56,7 @@ describe('共通部品の影響範囲', () => {
       'app/tags/searches/edit/page.tsx',
       'app/templates/page.tsx',
       'app/templates/questions/new/page.tsx',
+      'app/webinars/edit/page.tsx',
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
       'components/friend-fields/field-list.tsx',
@@ -55,12 +64,18 @@ describe('共通部品の影響範囲', () => {
       'components/friend-fields/saved-search-list.tsx',
       'components/friend-fields/support-mark-editor.tsx',
       'components/friend-fields/tag-csv-import-dialog.tsx',
+      'components/friend-fields/tag-editor-v4.tsx',
       'components/friend-fields/tags-page-v4.tsx',
       'components/friends/advanced-search-dialog.tsx',
+      'components/friends/bulk-run-dialog.tsx',
       'components/hq/account-list.tsx',
+      'components/identity/identity-decision-dialog.tsx',
       'components/line-notifications/notification-run-list.tsx',
       'components/line-notifications/operator-notification-rules.tsx',
+      'components/merged-person/merged-delivery-dialog.tsx',
+      'components/merged-person/merged-person-detail.tsx',
       'components/store-selection-gate.tsx',
+      'components/users/user-row.tsx',
     ])
   })
 
@@ -69,7 +84,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする14ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする15ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
@@ -80,6 +95,7 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',
       'app/reminders/page.tsx',
+      'app/rich-menus/page.tsx',
       'app/tags/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',

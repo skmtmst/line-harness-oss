@@ -728,7 +728,7 @@ CREATE TABLE common_vars (
   value       TEXT NOT NULL DEFAULT '',
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE conversion_events (
   id                   TEXT PRIMARY KEY,
@@ -777,18 +777,35 @@ CREATE TABLE ec_events (
   source            TEXT NOT NULL,
   external_event_id TEXT NOT NULL,
   event_type        TEXT NOT NULL,
+  line_account_id   TEXT REFERENCES line_accounts(id),
   customer_id       TEXT,
-  line_user_id      TEXT NOT NULL,
+  line_user_id      TEXT,
   friend_id         TEXT,
   payload           TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'received'
-                    CHECK (status IN ('received', 'processing', 'processed', 'skipped', 'failed')),
+                    CHECK (status IN ('received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed')),
   error_message     TEXT,
   received_at       TEXT NOT NULL,
   processed_at      TEXT,
   updated_at        TEXT NOT NULL,
   UNIQUE (source, external_event_id),
   FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL
+);
+
+CREATE TABLE ec_identity_links (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  source_key TEXT NOT NULL,
+  shop_key TEXT NOT NULL,
+  external_customer_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  linked_by TEXT,
+  linked_at TEXT NOT NULL,
+  unlinked_by TEXT,
+  unlinked_at TEXT,
+  unlink_reason TEXT
 );
 
 CREATE TABLE ec_notification_settings (
@@ -1024,6 +1041,74 @@ CREATE TABLE friend_add_events (
   UNIQUE (line_account_id, webhook_event_id)
 );
 
+CREATE TABLE friend_add_routing_versions (
+  id                         TEXT PRIMARY KEY,
+  line_account_id            TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  version_number             INTEGER NOT NULL,
+  definition_snapshot        TEXT NOT NULL CHECK (json_valid(definition_snapshot)),
+  status                     TEXT NOT NULL CHECK (status IN ('draft', 'published', 'retired')),
+  last_test_status           TEXT CHECK (last_test_status IN ('succeeded', 'failed')),
+  last_tested_at             TEXT,
+  last_tested_by_staff_id    TEXT,
+  published_at               TEXT,
+  published_by_staff_id      TEXT,
+  publish_idempotency_key    TEXT,
+  created_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, version_number),
+  UNIQUE (line_account_id, publish_idempotency_key)
+);
+
+CREATE TABLE friend_bulk_run_items (
+  id                TEXT PRIMARY KEY,
+  run_id            TEXT NOT NULL REFERENCES friend_bulk_runs(id) ON DELETE CASCADE,
+  friend_id         TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  line_account_id   TEXT,
+  ordinal           INTEGER NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued','running','waiting','success','skipped','temporary_failure','permanent_failure')),
+  attempt_count     INTEGER NOT NULL DEFAULT 0,
+  idempotency_key   TEXT NOT NULL,
+  before_json       TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+  after_json        TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+  error_code        TEXT,
+  error_message     TEXT,
+  retry_at          TEXT,
+  lease_expires_at  TEXT,
+  started_at        TEXT,
+  completed_at      TEXT,
+  updated_at        TEXT NOT NULL,
+  UNIQUE (run_id, friend_id),
+  UNIQUE (idempotency_key)
+);
+
+CREATE TABLE friend_bulk_runs (
+  id                       TEXT PRIMARY KEY,
+  tenant_id                TEXT NOT NULL,
+  created_by               TEXT NOT NULL,
+  selection_json           TEXT NOT NULL CHECK (json_valid(selection_json)),
+  operation_json           TEXT NOT NULL CHECK (json_valid(operation_json)),
+  execution_plan_json      TEXT CHECK (execution_plan_json IS NULL OR json_valid(execution_plan_json)),
+  status                   TEXT NOT NULL DEFAULT 'preparing'
+                             CHECK (status IN ('preparing','queued','running','waiting','success','partial','failed','cancelled')),
+  target_count             INTEGER NOT NULL DEFAULT 0,
+  excluded_count           INTEGER NOT NULL DEFAULT 0,
+  success_count            INTEGER NOT NULL DEFAULT 0,
+  skipped_count            INTEGER NOT NULL DEFAULT 0,
+  temporary_failure_count  INTEGER NOT NULL DEFAULT 0,
+  permanent_failure_count  INTEGER NOT NULL DEFAULT 0,
+  reversible               INTEGER NOT NULL DEFAULT 0 CHECK (reversible IN (0,1)),
+  idempotency_key          TEXT NOT NULL,
+  scheduled_at             TEXT,
+  undo_of_run_id           TEXT REFERENCES friend_bulk_runs(id),
+  error_message            TEXT,
+  created_at               TEXT NOT NULL,
+  started_at               TEXT,
+  completed_at             TEXT,
+  updated_at               TEXT NOT NULL,
+  UNIQUE (tenant_id, created_by, idempotency_key)
+);
+
 CREATE TABLE friend_daily_snapshots (
   -- JST の日付（YYYY-MM-DD）。LINEアカウントごとに1行。
   date              TEXT NOT NULL,
@@ -1089,6 +1174,22 @@ CREATE TABLE friend_fields (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE friend_identity_links (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  link_method TEXT NOT NULL,
+  evidence_snapshot_json TEXT NOT NULL CHECK (json_valid(evidence_snapshot_json)),
+  confidence_score INTEGER NOT NULL CHECK (confidence_score BETWEEN 0 AND 100),
+  linked_by TEXT,
+  linked_at TEXT NOT NULL,
+  unlinked_by TEXT,
+  unlinked_at TEXT,
+  unlink_reason TEXT
 );
 
 CREATE TABLE friend_reminder_deliveries (
@@ -1191,6 +1292,85 @@ CREATE TABLE google_calendar_connections (
   last_error    TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE identity_candidate_decisions (
+  id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  candidate_version INTEGER NOT NULL CHECK (candidate_version >= 2),
+  from_status TEXT NOT NULL
+    CHECK (from_status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  to_status TEXT NOT NULL
+    CHECK (to_status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  actor_staff_id TEXT,
+  actor_name TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  evidence_fingerprint TEXT NOT NULL,
+  impact_snapshot_json TEXT NOT NULL CHECK (json_valid(impact_snapshot_json)),
+  reprocess_scope_json TEXT CHECK (reprocess_scope_json IS NULL OR json_valid(reprocess_scope_json)),
+  decided_at TEXT NOT NULL,
+  UNIQUE(candidate_id, candidate_version)
+);
+
+CREATE TABLE identity_candidates (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK (kind IN ('friend_duplicate', 'ec_member')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  confidence_score INTEGER NOT NULL CHECK (confidence_score BETWEEN 0 AND 100),
+  detector_version TEXT NOT NULL,
+  left_subject_kind TEXT NOT NULL CHECK (left_subject_kind IN ('friend', 'ec_event')),
+  left_subject_id TEXT NOT NULL,
+  left_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  left_shop_key TEXT,
+  left_snapshot_json TEXT NOT NULL CHECK (json_valid(left_snapshot_json)),
+  right_subject_kind TEXT NOT NULL CHECK (right_subject_kind = 'friend'),
+  right_subject_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  right_line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  right_shop_key TEXT,
+  right_snapshot_json TEXT NOT NULL CHECK (json_valid(right_snapshot_json)),
+  source_key TEXT,
+  external_customer_id TEXT,
+  evidence_fingerprint TEXT NOT NULL,
+  evidence_json TEXT NOT NULL CHECK (json_valid(evidence_json)),
+  impact_json TEXT NOT NULL CHECK (json_valid(impact_json)),
+  detected_at TEXT NOT NULL,
+  reviewed_by TEXT,
+  reviewed_at TEXT,
+  reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (
+    (kind = 'friend_duplicate' AND left_subject_kind = 'friend'
+      AND left_line_account_id IS NOT NULL AND left_subject_id < right_subject_id)
+    OR
+    (kind = 'ec_member' AND left_subject_kind = 'ec_event'
+      AND left_line_account_id = right_line_account_id
+      AND left_shop_key IS NOT NULL AND source_key IS NOT NULL
+      AND external_customer_id IS NOT NULL)
+  ),
+  UNIQUE (
+    tenant_id, kind, left_subject_kind, left_subject_id,
+    right_subject_kind, right_subject_id
+  )
+);
+
+CREATE TABLE identity_events (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
+  candidate_id TEXT REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  event_type TEXT NOT NULL
+    CHECK (event_type IN ('candidate', 'link', 'unlink', 'profile', 'priority', 'migration')),
+  summary TEXT NOT NULL,
+  before_json TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+  after_json TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+  actor_staff_id TEXT,
+  actor_name TEXT NOT NULL,
+  occurred_at TEXT NOT NULL,
+  correlation_id TEXT NOT NULL
 );
 
 CREATE TABLE inbox_conversation_events (
@@ -1315,7 +1495,7 @@ CREATE TABLE media (
   public_url  TEXT,
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE media_usages (
   media_id   TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
@@ -2501,7 +2681,7 @@ CREATE TABLE tenants (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, feature_packs TEXT NOT NULL DEFAULT '[]');
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -2541,6 +2721,46 @@ CREATE TABLE update_history (
   rollback_expires_at         INTEGER
 );
 
+CREATE TABLE user_delivery_priorities (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  purpose TEXT NOT NULL
+    CHECK (purpose IN ('broadcast', 'scenario', 'reminder', 'transactional', 'manual')),
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  priority INTEGER NOT NULL CHECK (priority >= 1),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  reason TEXT NOT NULL,
+  selected_by TEXT,
+  selected_at TEXT NOT NULL,
+  retired_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE user_profile_values (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  field_key TEXT NOT NULL,
+  field_label TEXT NOT NULL,
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)),
+  value_preview TEXT,
+  source_type TEXT NOT NULL
+    CHECK (source_type IN ('friend', 'friend_field', 'form', 'ec', 'manual')),
+  source_id TEXT,
+  source_label TEXT NOT NULL,
+  source_friend_id TEXT REFERENCES friends(id) ON DELETE RESTRICT,
+  verified_at TEXT,
+  selected_by TEXT,
+  selected_by_name TEXT NOT NULL,
+  selected_at TEXT NOT NULL,
+  update_mode TEXT NOT NULL CHECK (update_mode IN ('auto', 'fixed')),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE users (
   id           TEXT PRIMARY KEY,
   email        TEXT,
@@ -2549,7 +2769,8 @@ CREATE TABLE users (
   display_name TEXT,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, tenant_id TEXT REFERENCES tenants(id) ON DELETE RESTRICT, status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'review', 'archived')), primary_display_name TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1), created_by TEXT, archived_at TEXT);
 
 CREATE TABLE webinar_comments (
   id TEXT PRIMARY KEY,
@@ -2872,6 +3093,9 @@ CREATE INDEX idx_common_action_versions_action_status
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
+CREATE INDEX idx_common_vars_account_name
+  ON common_vars(line_account_id, name, id);
+
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
 CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
@@ -2886,14 +3110,23 @@ CREATE INDEX idx_cvs_pending
 CREATE INDEX idx_dashboard_preferences_account
   ON dashboard_preferences(line_account_id, updated_at DESC);
 
-CREATE INDEX idx_ec_events_customer
-  ON ec_events(customer_id, received_at DESC);
+CREATE INDEX idx_ec_events_account_received ON ec_events(line_account_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_friend
-  ON ec_events(friend_id, received_at DESC);
+CREATE INDEX idx_ec_events_customer ON ec_events(customer_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_status_received
-  ON ec_events(status, received_at);
+CREATE INDEX idx_ec_events_friend ON ec_events(friend_id, received_at DESC);
+
+CREATE INDEX idx_ec_events_identity_pending
+  ON ec_events(line_account_id, received_at DESC) WHERE status = 'identity_pending';
+
+CREATE INDEX idx_ec_events_status_received ON ec_events(status, received_at);
+
+CREATE UNIQUE INDEX idx_ec_identity_links_active_customer
+  ON ec_identity_links(tenant_id, source_key, shop_key, external_customer_id)
+  WHERE unlinked_at IS NULL;
+
+CREATE INDEX idx_ec_identity_links_friend
+  ON ec_identity_links(tenant_id, line_account_id, friend_id, linked_at DESC);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
@@ -2971,6 +3204,26 @@ CREATE INDEX idx_friend_add_events_account_time
 CREATE INDEX idx_friend_add_events_friend
   ON friend_add_events(line_account_id, friend_id, occurred_at DESC);
 
+CREATE UNIQUE INDEX idx_friend_add_routing_one_draft
+  ON friend_add_routing_versions (line_account_id)
+  WHERE status = 'draft';
+
+CREATE UNIQUE INDEX idx_friend_add_routing_one_published
+  ON friend_add_routing_versions (line_account_id)
+  WHERE status = 'published';
+
+CREATE INDEX idx_friend_add_routing_versions_status
+  ON friend_add_routing_versions (line_account_id, status, version_number DESC);
+
+CREATE INDEX idx_friend_bulk_run_items_work
+  ON friend_bulk_run_items(run_id, status, retry_at, lease_expires_at, ordinal);
+
+CREATE INDEX idx_friend_bulk_runs_actor
+  ON friend_bulk_runs(tenant_id, created_by, created_at DESC);
+
+CREATE INDEX idx_friend_bulk_runs_due
+  ON friend_bulk_runs(status, scheduled_at, updated_at);
+
 CREATE INDEX idx_friend_daily_snapshots_date
   ON friend_daily_snapshots (line_account_id, date);
 
@@ -2978,6 +3231,12 @@ CREATE INDEX idx_friend_field_scopes_account
   ON friend_field_scopes(tenant_id, line_account_id);
 
 CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
+
+CREATE UNIQUE INDEX idx_friend_identity_links_active_friend
+  ON friend_identity_links(friend_id) WHERE unlinked_at IS NULL;
+
+CREATE INDEX idx_friend_identity_links_user
+  ON friend_identity_links(tenant_id, user_id, linked_at DESC);
 
 CREATE INDEX idx_friend_reminders_friend ON friend_reminders (friend_id);
 
@@ -3022,6 +3281,24 @@ CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
 CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
 
+CREATE INDEX idx_identity_candidate_decisions_history
+  ON identity_candidate_decisions(candidate_id, decided_at DESC);
+
+CREATE INDEX idx_identity_candidates_left_account
+  ON identity_candidates(tenant_id, left_line_account_id, status);
+
+CREATE INDEX idx_identity_candidates_review_queue
+  ON identity_candidates(tenant_id, kind, status, detected_at DESC);
+
+CREATE INDEX idx_identity_candidates_right_account
+  ON identity_candidates(tenant_id, right_line_account_id, status);
+
+CREATE INDEX idx_identity_events_candidate_history
+  ON identity_events(tenant_id, candidate_id, occurred_at DESC);
+
+CREATE INDEX idx_identity_events_user_history
+  ON identity_events(tenant_id, user_id, occurred_at DESC);
+
 CREATE UNIQUE INDEX idx_inbox_conversation_events_correlation
   ON inbox_conversation_events (correlation_id, event_type);
 
@@ -3058,6 +3335,9 @@ CREATE INDEX idx_link_clicks_friend ON link_clicks (friend_id);
 CREATE INDEX idx_link_clicks_link ON link_clicks (tracked_link_id);
 
 CREATE INDEX idx_login_audit_user ON login_audit(admin_user_id, created_at);
+
+CREATE INDEX idx_media_account_created
+  ON media(line_account_id, created_at DESC, id);
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 
@@ -3354,11 +3634,31 @@ CREATE INDEX idx_tracked_links_template
 
 CREATE INDEX idx_update_history_started ON update_history(started_at DESC);
 
+CREATE UNIQUE INDEX idx_user_delivery_priorities_active_friend
+  ON user_delivery_priorities(tenant_id, user_id, purpose, friend_id)
+  WHERE retired_at IS NULL;
+
+CREATE UNIQUE INDEX idx_user_delivery_priorities_active_order
+  ON user_delivery_priorities(tenant_id, user_id, purpose, priority)
+  WHERE retired_at IS NULL;
+
+CREATE INDEX idx_user_delivery_priorities_lookup
+  ON user_delivery_priorities(tenant_id, user_id, purpose, priority);
+
+CREATE UNIQUE INDEX idx_user_profile_values_active_field
+  ON user_profile_values(tenant_id, user_id, field_key) WHERE is_active = 1;
+
+CREATE INDEX idx_user_profile_values_history
+  ON user_profile_values(tenant_id, user_id, field_key, selected_at DESC);
+
 CREATE INDEX idx_users_email ON users (email);
 
 CREATE INDEX idx_users_external_id ON users (external_id);
 
 CREATE INDEX idx_users_phone ON users (phone);
+
+CREATE INDEX idx_users_tenant_status
+  ON users(tenant_id, status, updated_at DESC);
 
 CREATE INDEX idx_webinar_comments_webinar
   ON webinar_comments (webinar_id, at_seconds);
@@ -3496,6 +3796,24 @@ CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
+
+CREATE TRIGGER trg_friend_add_routing_versions_immutable_delete
+BEFORE DELETE ON friend_add_routing_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published friend-add routing versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_friend_add_routing_versions_immutable_update
+BEFORE UPDATE OF line_account_id, version_number, definition_snapshot
+ON friend_add_routing_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published friend-add routing versions are immutable'); END;
+
+CREATE TRIGGER trg_friend_add_routing_versions_status_transition
+BEFORE UPDATE OF status ON friend_add_routing_versions
+WHEN OLD.status IN ('published', 'retired')
+ AND NEW.status <> OLD.status
+ AND NOT (OLD.status = 'published' AND NEW.status = 'retired')
+BEGIN SELECT RAISE(ABORT, 'published friend-add routing version status cannot move backwards'); END;
 
 CREATE TRIGGER trg_messages_log_queue_url_exposure
 AFTER INSERT ON messages_log

@@ -34,6 +34,27 @@ describe('友だち属性 V4 contract', () => {
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
+  it('タグ作成・編集は画面名をトップバーだけに置き、V6の操作を下部へまとめる', () => {
+    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    expect(editor).toContain("usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')")
+    expect(editor).toContain('<StickyBar')
+    expect(editor).not.toContain('text-[32px] font-bold tracking-tight')
+    expect(editor).not.toContain('友だちを分類するタグを作ります。タグが付いた瞬間の連動')
+    expect(editor).toContain('番目のアクションを複製')
+    expect(editor).toContain("action.type === 'タグ' || action.type === 'マイル'")
+    // マイル設定だけを根拠に、存在しない連動アクションを作って表示しない。
+    expect(editor).not.toContain("id: 'sample-1'")
+  })
+
+  it('タグの複製はリンクだけで終わらず、既存データを作成画面へ引き継ぐ', () => {
+    const page = read('components/friend-fields/new-tag-page-v4.tsx')
+    expect(page).toContain("const copyId = params.get('copy')")
+    expect(page).toContain('api.tags.list({ withCounts: true })')
+    expect(page).toContain('name: `${copySource.name} のコピー`')
+    expect(page).toContain('rewardMiles: copySource.mileageReward ?? 0')
+    expect(page).toContain('actions: []')
+  })
+
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
@@ -61,7 +82,7 @@ describe('友だち属性 V4 contract', () => {
     }
   })
 
-  it('友だち情報欄はV6の一覧・作成・移行dry-runを縦に通す', () => {
+  it('友だち情報欄はV6の一覧・作成・移行前の確認を縦に通す', () => {
     const list = read('components/friend-fields/field-list.tsx')
     const create = read('app/tags/fields/new/page.tsx')
     const migrate = read('app/tags/fields/migrate/page.tsx')
@@ -70,6 +91,8 @@ describe('友だち属性 V4 contract', () => {
     expect(migrate).toContain('data-design-node="KoT6c"')
     expect(list).toContain('/tags/fields/migrate?id=')
     expect(migrate).toContain('api.friendFields.migrationPreview(')
+    expect(migrate).toContain('事前確認する')
+    expect(migrate).not.toContain('dry-run')
     expect(migrate).toContain('友だちの値や既存の項目は変更しません')
     expect(migrate).not.toContain('migrationExecute')
     // 回答フォームはまだアカウント所属を持たない。全体件数を0件と偽らない。
@@ -89,6 +112,16 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('友だち情報欄を再読み込み</Button>')
     expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')
+  })
+
+  it('使用人数を取得できない項目を0人として削除しない', () => {
+    const source = read('components/friend-fields/field-list.tsx')
+    expect(source).toContain('function knownUsageCount(field: FriendField)')
+    expect(source).toContain('function fieldDeletionBlockedReason(field: FriendField)')
+    expect(source).toContain('使用人数を確認できないため削除できません。再読み込みしてください。')
+    expect(source).toContain('disabled={fieldDeletionBlockedReason(field) !== null}')
+    expect(source).toContain('const blockedReason = fieldDeletionBlockedReason(field)')
+    expect(source).not.toContain('disabled={(field.usageCount ?? 0) > 0}')
   })
 
   it('友だち属性ではブラウザ標準confirmを使わない', () => {
