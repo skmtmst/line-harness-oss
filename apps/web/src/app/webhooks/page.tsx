@@ -8,8 +8,11 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationsPage from '@/app/notifications/page'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 
 type Tab = 'incoming' | 'outgoing'
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 const MIN_SECRET_LENGTH = 32
 
@@ -45,8 +48,9 @@ function WebhooksPageInner() {
   const [tab, setTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
+  const [incomingStatus, setIncomingStatus] = useState<LoadStatus>('loading')
+  const [outgoingStatus, setOutgoingStatus] = useState<LoadStatus>('loading')
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
@@ -74,37 +78,40 @@ function WebhooksPageInner() {
     setLoadedAccountId(null)
     setError('')
     if (!requestAccountId) {
-      setLoading(false)
+      setIncomingStatus('ready')
+      setOutgoingStatus('ready')
       return
     }
-    setLoading(true)
+    setIncomingStatus('loading')
+    setOutgoingStatus('loading')
     setError('')
-    try {
-      const [inRes, outRes] = await Promise.all([
-        api.webhooks.incoming.list(requestAccountId),
-        api.webhooks.outgoing.list(requestAccountId),
-      ])
-      if (
-        loadGenerationRef.current !== requestGeneration
-        || selectedAccountIdRef.current !== requestAccountId
-      ) return
-      if (inRes.success) setIncoming(inRes.data)
-      else setError(inRes.error)
-      if (outRes.success) setOutgoing(outRes.data)
-      else setError(outRes.error)
-      setLoadedAccountId(requestAccountId)
-    } catch {
-      if (
-        loadGenerationRef.current !== requestGeneration
-        || selectedAccountIdRef.current !== requestAccountId
-      ) return
-      setError('データの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      if (
-        loadGenerationRef.current === requestGeneration
-        && selectedAccountIdRef.current === requestAccountId
-      ) setLoading(false)
+    const [incomingResult, outgoingResult] = await Promise.allSettled([
+      api.webhooks.incoming.list(requestAccountId),
+      api.webhooks.outgoing.list(requestAccountId),
+    ])
+    // アカウント切替後に、前のアカウントの遅い応答で一覧を上書きしない。
+    if (
+      loadGenerationRef.current !== requestGeneration
+      || selectedAccountIdRef.current !== requestAccountId
+    ) return
+
+    if (incomingResult.status === 'fulfilled' && incomingResult.value.success) {
+      setIncoming(incomingResult.value.data)
+      setIncomingStatus('ready')
+    } else {
+      // 前回の一覧を残すと、取得に失敗したあとも古い設定を現在値に見せてしまう。
+      setIncoming([])
+      setIncomingStatus('error')
     }
+
+    if (outgoingResult.status === 'fulfilled' && outgoingResult.value.success) {
+      setOutgoing(outgoingResult.value.data)
+      setOutgoingStatus('ready')
+    } else {
+      setOutgoing([])
+      setOutgoingStatus('error')
+    }
+    setLoadedAccountId(requestAccountId)
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -306,6 +313,8 @@ function WebhooksPageInner() {
 
   const endpointUrl = (id: string) =>
     `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/incoming/${id}/receive`
+  const activeStatus = tab === 'incoming' ? incomingStatus : outgoingStatus
+  const activeLabel = tab === 'incoming' ? '受信Webhook' : '送信Webhook'
 
   return (
     <div>
@@ -615,20 +624,15 @@ function WebhooksPageInner() {
         </form>
       )}
 
-      {/* Loading */}
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 flex items-center gap-4 animate-pulse">
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-gray-100 rounded w-32" />
-              </div>
-              <div className="h-5 bg-gray-100 rounded-full w-16" />
-              <div className="h-3 bg-gray-100 rounded w-24" />
-            </div>
-          ))}
-        </div>
+      {activeStatus === 'loading' ? (
+        <ListState kind="loading" title={`${activeLabel}を読み込んでいます`} />
+      ) : activeStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title={`${activeLabel}を表示できませんでした`}
+          description="登録内容は消えていません。再読み込みしても直らない場合はエラー報告へ。"
+          action={<Button variant="secondary" onClick={() => void load()}>{activeLabel}を再読み込み</Button>}
+        />
       ) : tab === 'incoming' ? (
         /* Incoming table */
         incoming.length === 0 && !showCreate ? (
