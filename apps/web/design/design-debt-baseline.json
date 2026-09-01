@@ -166,9 +166,9 @@
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
-    "direct-secondary-button": 4,
     "direct-primary-button": 3,
     "arbitrary-value": 5,
+    "direct-secondary-button": 3,
     "unresolved-classname": 1
   },
   "app/friends/detail/page.tsx": {
