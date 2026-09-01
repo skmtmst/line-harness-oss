@@ -48,7 +48,7 @@ describe('保存した検索の上部指標', () => {
     expect(LIST).toContain('title="該当者0人"')
     expect(LIST).toContain('title="今月の呼び出し"')
     expect(LIST).toContain('detail="呼び出し記録は未接続"')
-    expect(LIST).toContain('api.friendFields.list()')
+    expect(LIST).toContain('api.friendFields.list(accountId)')
     expect(LIST).not.toContain('value={84}')
   })
 })

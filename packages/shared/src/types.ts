@@ -218,6 +218,16 @@ export interface FriendField {
   updatedBy?: string | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
+  /** 選択中アカウント専用でなく、移行前からある共通項目。 */
+  isInherited?: boolean;
+}
+
+export interface FriendFieldListSummary {
+  total: number;
+  inUse: number;
+  registeredFriends: number;
+  formLinks: number | null;
+  updatedThisMonth: number;
 }
 
 /** 汎用フォルダ */

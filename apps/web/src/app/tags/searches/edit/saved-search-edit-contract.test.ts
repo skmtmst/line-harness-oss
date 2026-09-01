@@ -8,7 +8,7 @@ describe('保存した検索の条件編集', () => {
   it('対応マーク・シナリオ・友だち情報を既存APIから名前で選ぶ', () => {
     expect(PAGE).toContain('api.supportMarks.list(selectedAccountId)')
     expect(PAGE).toContain('api.scenarios.list({ accountId: selectedAccountId })')
-    expect(PAGE).toContain('api.friendFields.list()')
+    expect(PAGE).toContain('api.friendFields.list(selectedAccountId)')
     expect(PAGE).toContain('marks.map((mark) => ({ value: mark.id, label: mark.name }))')
     expect(PAGE).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
     expect(PAGE).toContain('fields.map((field) => ({ value: field.fieldKey, label: field.name }))')

@@ -273,7 +273,7 @@ function SavedSearchEditInner() {
       api.tags.list(),
       api.supportMarks.list(selectedAccountId).catch(() => null),
       api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
-      api.friendFields.list().catch(() => null),
+      api.friendFields.list(selectedAccountId).catch(() => null),
     ]).then(([searches, tagResult, markResult, scenarioResult, fieldResult]) => {
       if (cancelled) return
       if (tagResult.success) setTags(tagResult.data)

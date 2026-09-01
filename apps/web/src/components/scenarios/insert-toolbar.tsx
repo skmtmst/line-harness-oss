@@ -57,7 +57,10 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
       return
     }
     void (async () => {
-      const [fieldRes, varRes] = await Promise.all([api.friendFields.list(), api.commonVars.list(selectedAccountId)])
+      const [fieldRes, varRes] = await Promise.all([
+        api.friendFields.list(selectedAccountId),
+        api.commonVars.list(selectedAccountId),
+      ])
       if (fieldRes.success) {
         setFields(fieldRes.data.map((f) => ({ token: `{{field.${f.fieldKey}}}`, label: f.name })))
       }

@@ -47,7 +47,7 @@ export default function FriendAddSettingsPage() {
     setFields([])
     setOptionsError(false)
     if (!accountId) return () => { cancelled = true }
-    void Promise.all([api.supportMarks.list(accountId), api.friendFields.list()]).then(([m, f]) => {
+    void Promise.all([api.supportMarks.list(accountId), api.friendFields.list(accountId)]).then(([m, f]) => {
       if (cancelled) return
       if (m.success) setMarks(m.data.map(x => ({ id: x.id, name: x.name })))
       if (f.success) setFields(f.data.map(x => ({ id: x.id, name: x.name })))

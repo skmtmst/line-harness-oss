@@ -82,7 +82,6 @@
   "components/events/event-wizard.tsx": 2,
   "components/flex-preview.tsx": 2,
   "components/forms/options-dialog.tsx": 1,
-  "components/friend-fields/field-list.tsx": 1,
   "components/friend-fields/mark-list.tsx": 2,
   "components/friends/friend-table.tsx": 45,
   "components/inbox/inbox-filters.tsx": 5,

@@ -677,7 +677,7 @@ export default function TagsPageV4({
             まで同じ操作の中で進む。
           */
           <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
-        ) : undefined}
+        ) : tab === 'fields' ? <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button> : undefined}
       />
 
       {csvOpen ? (
@@ -895,7 +895,7 @@ export default function TagsPageV4({
             <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
           </div>
         ) : null}
-      </> : tab === 'fields' ? <FriendFieldList /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
+      </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
     </div>
   )

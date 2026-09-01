@@ -76,7 +76,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         api.tags.list(),
         api.supportMarks.list(accountId),
         api.scenarios.list({ accountId }),
-        api.friendFields.list(),
+        api.friendFields.list(accountId),
       ])
       if (sequence !== loadSequence.current) return
       if (savedSearches.status === 'rejected') throw savedSearches.reason
