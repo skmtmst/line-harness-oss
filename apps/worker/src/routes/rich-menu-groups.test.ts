@@ -6,6 +6,7 @@ const dbMocks = {
   getRichMenuGroups: vi.fn(),
   getRichMenuGroupById: vi.fn(),
   getRichMenuGroupWithPages: vi.fn(),
+  getRichMenuDeleteImpact: vi.fn(),
   createRichMenuGroup: vi.fn(),
   updateRichMenuGroupMeta: vi.fn(),
   replaceRichMenuPages: vi.fn(),
@@ -87,6 +88,19 @@ beforeEach(() => {
   accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   dbMocks.getRichMenuGroupById.mockResolvedValue({
     id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
+  });
+  dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
+    group: { id: 'g1', accountId: 'acc-1', name: 'メニュー', status: 'draft' },
+    currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+    nextDisplay: { guaranteedGroupId: null, reason: 'friend_specific_rules', candidates: [] },
+    incomingSwitches: [],
+    operationalReferences: [],
+    lineResources: {
+      pageCount: 1, pagesWithLineRichMenuId: 0, isDefaultForAll: false, publishing: false,
+    },
+    blockers: [],
+    canDelete: true,
+    recommendedAction: 'delete',
   });
 });
 
@@ -392,11 +406,53 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
   });
 });
 
+// ----- GET /api/rich-menu-groups/:groupId/delete-impact -----
+
+describe('GET /api/rich-menu-groups/:groupId/delete-impact', () => {
+  test('returns the impact contract without inventing an audience count', async () => {
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/delete-impact');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      success: boolean;
+      data: { currentAudience: { value: number | null }; canDelete: boolean };
+    };
+    expect(body).toMatchObject({
+      success: true,
+      data: { currentAudience: { value: null }, canDelete: true },
+    });
+  });
+
+  test('returns 404 without exposing another LINE account', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/delete-impact');
+    expect(res.status).toBe(404);
+  });
+
+  test('returns 404 when the group is missing', async () => {
+    dbMocks.getRichMenuDeleteImpact.mockResolvedValue(null);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/missing/delete-impact');
+    expect(res.status).toBe(404);
+  });
+
+  test('returns 503 instead of fake zeroes when impact lookup fails', async () => {
+    dbMocks.getRichMenuDeleteImpact.mockRejectedValue(new Error('db unavailable'));
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/delete-impact');
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: '削除したときの影響を確認できませんでした',
+    });
+  });
+});
+
 // ----- DELETE /api/rich-menu-groups/:groupId -----
 
 describe('DELETE /api/rich-menu-groups/:groupId', () => {
   test('returns 200 on success (draft group)', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1', status: 'draft' });
     dbMocks.deleteRichMenuGroup.mockResolvedValue(true);
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/g1', { method: 'DELETE' });
@@ -404,26 +460,44 @@ describe('DELETE /api/rich-menu-groups/:groupId', () => {
   });
 
   test('returns 404 when group missing', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue(null);
+    dbMocks.getRichMenuDeleteImpact.mockResolvedValue(null);
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/missing', { method: 'DELETE' });
     expect(res.status).toBe(404);
   });
 
   test('returns 409 for published group without force (unpublish first)', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1', status: 'published' });
+    dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
+      group: { id: 'g1', accountId: 'acc-1', name: '公開中', status: 'published' },
+      blockers: ['published'],
+      canDelete: false,
+      recommendedAction: 'unpublish',
+    });
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/g1', { method: 'DELETE' });
     expect(res.status).toBe(409);
     expect(dbMocks.deleteRichMenuGroup).not.toHaveBeenCalled();
   });
 
-  test('force=true skips published guard', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1', status: 'published' });
-    dbMocks.deleteRichMenuGroup.mockResolvedValue(true);
+  test('force=true cannot skip the impact guard', async () => {
+    dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
+      group: { id: 'g1', accountId: 'acc-1', name: '公開中', status: 'published' },
+      blockers: ['published'],
+      canDelete: false,
+      recommendedAction: 'unpublish',
+    });
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/g1?force=true', { method: 'DELETE' });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+    expect(dbMocks.deleteRichMenuGroup).not.toHaveBeenCalled();
+  });
+
+  test('returns 503 and does not delete when the fresh impact check fails', async () => {
+    dbMocks.getRichMenuDeleteImpact.mockRejectedValue(new Error('db unavailable'));
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', { method: 'DELETE' });
+    expect(res.status).toBe(503);
+    expect(dbMocks.deleteRichMenuGroup).not.toHaveBeenCalled();
   });
 });
 

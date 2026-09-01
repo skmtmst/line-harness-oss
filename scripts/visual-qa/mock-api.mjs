@@ -30,7 +30,9 @@ import {
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
+  LIST_STATS, OPERATORS,
+  RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
+  TAGS, TAG_GROUPS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -505,6 +507,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (richMenuDeleteImpact) {
+    const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT_EMPTY.group.id
+      ? RICH_MENU_DELETE_IMPACT_EMPTY
+      : RICH_MENU_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }

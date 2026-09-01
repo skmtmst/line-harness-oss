@@ -115,6 +115,67 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+/**
+ * リッチメニューを消したときの影響（`GET /api/rich-menu-groups/:id/delete-impact`）。
+ *
+ * LINEは友だちごとの現在表示を返さないため、currentAudience.value は取得できる
+ * 口ができるまで null。0人と読み替えてはいけない。
+ */
+export type RichMenuDeleteImpact = {
+  group: {
+    id: string
+    accountId: string
+    name: string
+    status: 'draft' | 'published'
+  }
+  currentAudience: {
+    value: number | null
+    reason: 'assignment_ledger_unavailable'
+  }
+  nextDisplay: {
+    guaranteedGroupId: null
+    reason: 'friend_specific_rules'
+    candidates: Array<{
+      groupId: string
+      name: string
+      targetingPriority: number
+      isTargetingEnabled: boolean
+      isDefaultForAll: boolean
+    }>
+  }
+  incomingSwitches: Array<{
+    sourceGroupId: string
+    sourceGroupName: string
+    sourcePageId: string
+    sourcePageName: string
+    areaId: string
+    areaLabel: string | null
+    targetPageId: string
+    targetPageName: string
+  }>
+  operationalReferences: Array<{
+    kind: 'automation' | 'common_action'
+    ownerId: string
+    ownerName: string
+  }>
+  lineResources: {
+    pageCount: number
+    pagesWithLineRichMenuId: number
+    isDefaultForAll: boolean
+    publishing: boolean
+  }
+  blockers: Array<
+    | 'published'
+    | 'publishing'
+    | 'default_for_all'
+    | 'line_resources'
+    | 'incoming_switches'
+    | 'operational_references'
+  >
+  canDelete: boolean
+  recommendedAction: 'delete' | 'unpublish' | 'review_references'
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -548,12 +609,15 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
+  /** 409などで画面を最新状態へ描き直すための機械データ。利用者へ直接表示しない。 */
+  readonly data: unknown
 
-  constructor(status: number, message?: string, code?: string) {
+  constructor(status: number, message?: string, code?: string, data?: unknown) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.data = data
   }
 }
 
@@ -596,14 +660,26 @@ export function extractApiErrorMessage(raw: string, status: number): string {
 export function extractApiErrorCode(raw: string): string | undefined {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { error?: unknown }
-    if (typeof body.error === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.error)) {
-      return body.error
+    const body = JSON.parse(raw) as { code?: unknown; error?: unknown }
+    const candidate = typeof body.code === 'string' ? body.code : body.error
+    if (typeof candidate === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(candidate)) {
+      return candidate
     }
   } catch {
     // JSONでなければ機械コードも無い。
   }
   return undefined
+}
+
+/** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
+export function extractApiErrorData(raw: string): unknown {
+  if (!raw) return undefined
+  try {
+    const body = JSON.parse(raw) as { data?: unknown }
+    return body && typeof body === 'object' ? body.data : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function reportServerFailure(path: string, status: number): void {
@@ -667,6 +743,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       res.status,
       extractApiErrorMessage(raw, res.status),
       extractApiErrorCode(raw),
+      extractApiErrorData(raw),
     )
   }
   if (res.status === 204) return undefined as T
@@ -4146,11 +4223,13 @@ export const api = {
       )
     },
 
-    delete: (groupId: string, opts?: { force?: boolean }) =>
-      fetchApi<ApiResponse<null>>(
-        `/api/rich-menu-groups/${groupId}${opts?.force ? '?force=true' : ''}`,
-        { method: 'DELETE' },
+    deleteImpact: (groupId: string) =>
+      fetchApi<ApiResponse<RichMenuDeleteImpact>>(
+        `/api/rich-menu-groups/${groupId}/delete-impact`,
       ),
+
+    delete: (groupId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/rich-menu-groups/${groupId}`, { method: 'DELETE' }),
 
     publish: (groupId: string) =>
       fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(

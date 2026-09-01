@@ -3,6 +3,7 @@ import {
   getRichMenuGroups,
   getRichMenuGroupById,
   getRichMenuGroupWithPages,
+  getRichMenuDeleteImpact,
   createRichMenuGroup,
   updateRichMenuGroupMeta,
   replaceRichMenuPages,
@@ -788,6 +789,29 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
   });
 });
 
+richMenuGroups.get(
+  '/api/rich-menu-groups/:groupId/delete-impact',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const impact = await getRichMenuDeleteImpact(c.env.DB, c.req.param('groupId'));
+      if (
+        !impact
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])
+      ) {
+        return c.json({ success: false, error: 'not found' }, 404);
+      }
+      return c.json({ success: true, data: impact });
+    } catch (error) {
+      console.error('GET /api/rich-menu-groups/:groupId/delete-impact error:', error);
+      return c.json(
+        { success: false, error: '削除したときの影響を確認できませんでした' },
+        503,
+      );
+    }
+  },
+);
+
 richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -842,19 +866,31 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
 
 richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
-  // 公開中の group をいきなり削除すると LINE 上に richmenu / alias / default が
-  // 残って復旧不能になる。デフォルトでは status='published' を 409 で reject し、
-  // ?force=true (確信を持って残骸を残してもよい) でだけ進める。
-  const force = c.req.query('force') === 'true';
-  const existing = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
+  let impact: Awaited<ReturnType<typeof getRichMenuDeleteImpact>>;
+  try {
+    impact = await getRichMenuDeleteImpact(c.env.DB, groupId);
+  } catch (error) {
+    console.error('DELETE /api/rich-menu-groups/:groupId impact error:', error);
+    return c.json(
+      { success: false, error: '削除したときの影響を確認できませんでした' },
+      503,
+    );
+  }
+  if (
+    !impact
+    || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])
+  ) {
     return c.json({ success: false, error: 'not found' }, 404);
   }
-  if (existing.status === 'published' && !force) {
+  // query に force=true が残っていても、影響確認を迂回させない。公開中、LINE上に
+  // 実体が残る、別設定から参照される、のどれかなら必ず止める。
+  if (!impact.canDelete) {
     return c.json(
       {
         success: false,
-        error: 'group is published. Unpublish (POST /unpublish) first, or pass ?force=true to delete D1 row anyway (LINE 側に残骸が残る点に注意)',
+        code: 'rich_menu_delete_blocked',
+        error: '削除する前に、公開状態と使われている場所を確認してください',
+        data: impact,
       },
       409,
     );
