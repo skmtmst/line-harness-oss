@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { NOT_AVAILABLE, NotConnected } from '@/components/shared/not-connected'
 import { conditionFromSegmentPreset } from './segment-preset'
 
 /**
@@ -22,15 +23,15 @@ import { conditionFromSegmentPreset } from './segment-preset'
 const PRESET_KPIS = [
   {
     label: 'いま当てはまる人数',
-    reason: 'まだ繋がっていません。保存した条件ごとに人数を数える口が接続されると表示されます。',
+    source: '保存した条件ごとに人数を数える口',
   },
   {
     label: 'この条件を使っている配信',
-    reason: 'まだ繋がっていません。条件の使い先を返す口が接続されると表示されます。',
+    source: '条件の使い先を返す口',
   },
   {
     label: '最後に使った日',
-    reason: 'まだ繋がっていません。条件を使った記録が接続されると表示されます。',
+    source: '条件を使った記録',
   },
 ] as const
 
@@ -290,8 +291,8 @@ export default function SegmentPresetControls({
             {PRESET_KPIS.map((kpi) => (
               <div key={kpi.label} className="bg-canvas p-3">
                 <dt className="text-ink-faint text-xs">{kpi.label}</dt>
-                <dd className="text-ink-faint mt-1 text-lg font-bold tabular-nums">—</dd>
-                <dd className="text-ink-faint mt-0.5 text-xs leading-relaxed">{kpi.reason}</dd>
+                <dd className="text-ink-faint mt-1 text-lg font-bold tabular-nums">{NOT_AVAILABLE}</dd>
+                <dd className="mt-0.5"><NotConnected source={kpi.source} /></dd>
               </div>
             ))}
           </dl>

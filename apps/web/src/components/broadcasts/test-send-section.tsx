@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 
 interface TestSendSectionProps {
   broadcastId: string
@@ -23,8 +24,26 @@ export default function TestSendSection({ broadcastId, accountId, disabled }: Te
   // 混ぜると、読み込みの一瞬だけ「未設定です」と嘘を出すことになる。
   const [recipientState, setRecipientState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [sending, setSending] = useState(false)
-  const [result, setResult] = useState<{ sent: number; failed: number; at: string; error?: boolean } | null>(null)
+  const [result, setResult] = useState<TestSendView | null>(null)
   const [cooldown, setCooldown] = useState(false)
+  const identityRef = useRef({ accountId, broadcastId })
+  const sendGenerationRef = useRef(0)
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  identityRef.current = { accountId, broadcastId }
+
+  useEffect(() => {
+    // 前のアカウント・配信の送信結果を、新しい画面へ持ち越さない。
+    sendGenerationRef.current += 1
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current)
+    cooldownTimerRef.current = null
+    setSending(false)
+    setResult(null)
+    setCooldown(false)
+    return () => {
+      sendGenerationRef.current += 1
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current)
+    }
+  }, [accountId, broadcastId])
 
   useEffect(() => {
     let cancelled = false
@@ -45,21 +64,40 @@ export default function TestSendSection({ broadcastId, accountId, disabled }: Te
   }, [accountId])
 
   const handleTestSend = async () => {
+    const request = {
+      accountId,
+      broadcastId,
+      generation: sendGenerationRef.current + 1,
+    }
+    sendGenerationRef.current = request.generation
+    const isCurrentRequest = () =>
+      identityRef.current.accountId === request.accountId
+      && identityRef.current.broadcastId === request.broadcastId
+      && sendGenerationRef.current === request.generation
     const at = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
     setSending(true)
+    setResult(null)
     try {
-      const res = await api.broadcasts.testSend(broadcastId)
+      const res = await api.broadcasts.testSend(request.broadcastId)
+      if (!isCurrentRequest()) return
       if (res.success) {
-        setResult({ sent: res.sent ?? 0, failed: res.failed ?? 0, at })
-        setCooldown(true)
-        setTimeout(() => setCooldown(false), 10000)
+        const view = testSendResult(res.sent ?? 0, res.failed ?? 0, at)
+        setResult(view)
+        if (view.kind !== 'error') {
+          setCooldown(true)
+          cooldownTimerRef.current = setTimeout(() => {
+            if (isCurrentRequest()) setCooldown(false)
+          }, 10000)
+        }
       } else {
         // 失敗の応答を黙って捨てると、押しても何も起きない画面になる。
-        setResult({ sent: 0, failed: 0, at, error: true })
+        setResult(testSendFailure(at))
       }
     } catch {
-      setResult({ sent: 0, failed: 0, at, error: true })
-    } finally { setSending(false) }
+      if (isCurrentRequest()) setResult(testSendFailure(at))
+    } finally {
+      if (isCurrentRequest()) setSending(false)
+    }
   }
 
   return (
@@ -90,10 +128,8 @@ export default function TestSendSection({ broadcastId, accountId, disabled }: Te
             {sending ? 'テスト送信中...' : cooldown ? '送信済み' : 'テスト送信する'}
           </button>
           {result && (
-            <p className={`mt-2 text-xs ${result.error ? 'text-danger' : 'text-success'}`}>
-              {result.error
-                ? `${result.at} テスト送信に失敗しました`
-                : `${result.at} テスト送信済み (${result.sent}名成功${result.failed > 0 ? `, ${result.failed}名失敗` : ''})`}
+            <p className={`mt-2 text-xs ${result.kind === 'success' ? 'text-success' : 'text-danger'}`}>
+              {result.message}
             </p>
           )}
         </>

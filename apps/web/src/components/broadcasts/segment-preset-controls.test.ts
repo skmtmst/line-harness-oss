@@ -77,17 +77,14 @@ describe('保存した対象条件のKPI（sqFXf）', () => {
     expect(controls).toContain('この条件を使っている配信')
     expect(controls).toContain('最後に使った日')
     // 数の代わりに出すのは「—」だけ。0件・0人・作った割合を置かない。
-    expect(controls).toContain(">—</dd>")
+    expect(controls).toContain('{NOT_AVAILABLE}</dd>')
     expect(controls).not.toMatch(/PRESET_KPIS[\s\S]*?value:\s*\d/)
   })
 
   it('「—」に理由を必ず添える', () => {
-    const reasons = controls.match(/reason: '[^']+'/g) ?? []
-    expect(reasons).toHaveLength(3)
-    for (const reason of reasons) {
-      expect(reason).toContain('まだ繋がっていません。')
-      expect(reason).toContain('接続されると表示されます。')
-    }
+    expect(controls).toContain("import { NOT_AVAILABLE, NotConnected } from '@/components/shared/not-connected'")
+    expect(controls.match(/source: '[^']+'/g) ?? []).toHaveLength(3)
+    expect(controls).toContain('<NotConnected source={kpi.source} />')
   })
 
   it('押せない理由を吹き出しだけに置かない', () => {

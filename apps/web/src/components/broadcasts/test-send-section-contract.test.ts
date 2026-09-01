@@ -53,7 +53,15 @@ describe('V6 テスト送信（h0kahp）', () => {
   it('送信の失敗応答を黙って捨てない', () => {
     // 成功だけ拾って else が無いと、押しても何も出ない画面になる。
     const body = section.slice(section.indexOf('const handleTestSend'), section.indexOf('} finally {'))
-    expect(body).toMatch(/if \(res\.success\) \{[\s\S]*?\} else \{[\s\S]*?error: true/)
-    expect(body.match(/error: true/g) ?? []).toHaveLength(2)
+    expect(body).toMatch(/if \(res\.success\) \{[\s\S]*?\} else \{[\s\S]*?testSendFailure/)
+    expect(body).toContain('testSendResult(')
+  })
+
+  it('アカウントや配信が変わったら前の結果を捨て、遅い返事を映さない', () => {
+    expect(section).toContain('identityRef.current.accountId === request.accountId')
+    expect(section).toContain('identityRef.current.broadcastId === request.broadcastId')
+    expect(section).toContain('sendGenerationRef.current === request.generation')
+    expect(section).toContain('setResult(null)')
+    expect(section).toContain('if (!isCurrentRequest()) return')
   })
 })
