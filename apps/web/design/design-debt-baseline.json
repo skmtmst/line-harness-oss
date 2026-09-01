@@ -98,9 +98,8 @@
     "direct-primary-button": 1
   },
   "app/contents/vars/edit/page.tsx": {
-    "direct-th": 3,
-    "direct-primary-button": 2,
-    "direct-secondary-button": 1
+    "unresolved-classname": 34,
+    "direct-th": 3
   },
   "app/contents/vars/new/page.tsx": {
     "direct-primary-button": 1

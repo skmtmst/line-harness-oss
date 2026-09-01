@@ -1,19 +1,39 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarSchedule, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import Breadcrumb from '@/components/shared/breadcrumb'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import SelectField from '@/components/shared/select-field'
+import StickyBar from '@/components/shared/sticky-bar'
+import { TextField } from '@/components/shared/text-field'
+import {
+  CSV_BLOCKED_REASON,
+  DELETE_MOVED_NOTE,
+  IMPACT_CARDS,
+  IMPACT_LIST_COUNT_TEXT,
+  IMPACT_LIST_REASON,
+  NOT_CONNECTED_VALUE,
+  saveBlockedReason,
+} from './change-impact'
+import styles from './common-var-edit-v6.module.css'
 
 /**
- * 共通情報の編集。
+ * 共通情報の編集（設計 `uNBlA` 14-1-B「変える前に影響を見る」）。
  *
- * Lステップの「共通情報編集」と同じ形。名前・フォルダ・値を直し、下に
- * 「更新スケジュール」の表を置く。種別は登録後に変えられないので、
- * 直せない印を付けて出すだけにする。
+ * **共通情報は1か所直すと、差し込んでいる配信すべてが同時に変わる。**
+ * だから設計は、保存の前に「影響の要約」と「影響の一覧」を置いている。
+ * その中身を取る口はまだ無いので、節だけ置いて `—` と理由を出す
+ * （`change-impact.ts` に理由と、要る口を書いた）。
+ *
+ * 保存・戻るは下部追従バーにだけ置く（V6 §1-6）。**削除はここに置かない。**
+ * 使用先を確かめる削除確認は一覧側（設計 `yPkWe`）にある。
  */
 
 /** 「いま」より前は予約できない。入れた瞬間に当たって、予約に見えない。 */
@@ -22,18 +42,20 @@ function jstNowLocalInput(): { date: string; time: string } {
   return { date: jst.slice(0, 10), time: jst.slice(11, 16) }
 }
 
+/** 画面ぜんたいの状態。**読込中・取得失敗・権限不足・見つからないを混ぜない。** */
+type Phase = 'loading' | 'ready' | 'missing' | 'error' | 'forbidden'
+
 function EditCommonVarInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
-  const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
   const [item, setItem] = useState<CommonVar | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [schedules, setSchedules] = useState<CommonVarSchedule[]>([])
-  const [loading, setLoading] = useState(true)
+  const [phase, setPhase] = useState<Phase>('loading')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
@@ -45,20 +67,21 @@ function EditCommonVarInner() {
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
 
+  usePageTitle('共通情報を編集')
+
   const load = useCallback(async () => {
     if (!id) {
-      setLoading(false)
-      setError('共通情報が指定されていません')
+      setPhase('missing')
       return
     }
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
       setItem(null)
-      setLoading(false)
-      setError(accountLoading ? '' : 'LINEアカウントを選択してください')
+      // アカウントを読んでいる最中と、選べていない状態を混ぜない。
+      setPhase(accountLoading ? 'loading' : 'forbidden')
       return
     }
-    setLoading(true)
+    setPhase('loading')
     setError('')
     try {
       const [vars, folderList, scheduleList] = await Promise.all([
@@ -71,23 +94,26 @@ function EditCommonVarInner() {
       if (scheduleList.success) setSchedules(scheduleList.data)
       const found = vars.success ? vars.data.find((v) => v.id === id) : undefined
       if (!found) {
-        setError('この共通情報は見つかりませんでした')
+        setPhase('missing')
         return
       }
       setItem(found)
       setName(found.name)
       setFolderId(found.folderId ?? '')
       setValue(found.value)
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
-    } finally {
-      if (accountAtRequest === latestAccountRef.current) setLoading(false)
+      setPhase('ready')
+    } catch (e) {
+      if (accountAtRequest !== latestAccountRef.current) return
+      // 権限不足を「読み込めませんでした」に混ぜると、直しようが無い。
+      setPhase(e instanceof ApiError && e.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountLoading, id, selectedAccountId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const saveBlocked = saveBlockedReason({ item, accountId: selectedAccountId, name, saving })
 
   const save = async () => {
     if (!item || saving || !selectedAccountId) return
@@ -112,28 +138,14 @@ function EditCommonVarInner() {
       }
       setSaved(true)
       void load()
-    } catch {
-      setError('保存に失敗しました')
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.status === 403
+          ? '操作する権限がありません'
+          : '保存に失敗しました',
+      )
     } finally {
       setSaving(false)
-    }
-  }
-
-  const remove = async () => {
-    if (!item || !selectedAccountId) return
-    if (
-      !confirm(
-        `「${item.name}」を削除しますか？\n` +
-          `テンプレートに {{var.${item.varKey}}} が残っていると、その部分が空になります。`,
-      )
-    )
-      return
-    setError('')
-    try {
-      await api.commonVars.delete(item.id, selectedAccountId)
-      router.push('/contents/vars')
-    } catch {
-      setError('削除に失敗しました')
     }
   }
 
@@ -166,113 +178,152 @@ function EditCommonVarInner() {
     try {
       await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
       void load()
-    } catch {
-      setError('予約の削除に失敗しました')
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.status === 403
+          ? '操作する権限がありません'
+          : '予約の削除に失敗しました',
+      )
     }
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-3 text-xs">
-        <Link href="/contents/vars" className="text-info hover:underline">
-          共通情報一覧
-        </Link>
-        <span className="mx-1.5">›</span>
-        <span>共通情報編集</span>
-      </nav>
+    <div className={styles.screen} data-design-node="uNBlA">
+      <div className={styles.crumbRow}>
+        <Breadcrumb
+          items={[{ label: '共通情報一覧', href: '/contents/vars' }, { label: '共通情報を編集' }]}
+        />
+        {/*
+          設計の「CSVで書き出す」。書き出す中身は下の「変わる場所」そのもので、
+          その口がまだ無い。**押せる形で置かない。**
+        */}
+        <button type="button" className={styles.csvButton} disabled aria-describedby="cv-csv-reason">
+          CSVで書き出す
+        </button>
+      </div>
+      <p id="cv-csv-reason" className={styles.sectionReason}>
+        {CSV_BLOCKED_REASON}
+      </p>
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 max-w-3xl rounded-lg border p-4 text-sm">
+        <div
+          className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-4 text-sm"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint max-w-3xl border p-8 text-center text-sm">
-          読み込み中...
-        </div>
-      ) : !item ? (
-        <p className="text-ink-secondary text-sm">
-          <Link href="/contents/vars" className="text-info hover:underline">
-            共通情報一覧へ戻る
-          </Link>
-        </p>
+      {phase === 'loading' ? (
+        <ListState kind="loading" title="読み込んでいます" />
+      ) : phase === 'forbidden' ? (
+        <ListState
+          kind="forbidden"
+          title="見る権限がありません"
+          description="この共通情報を扱えるLINEアカウントへ切り替えるか、オーナーか管理者に権限の追加を依頼してください。"
+        />
+      ) : phase === 'error' ? (
+        <ListState
+          kind="error"
+          title="読み込めませんでした"
+          description="通信が途切れたか、応答がありませんでした。"
+          action={
+            <Button onClick={() => void load()} variant="secondary">
+              再読み込み
+            </Button>
+          }
+        />
+      ) : phase === 'missing' || !item ? (
+        <ListState
+          kind="empty"
+          title="この共通情報は見つかりませんでした"
+          description="すでに削除されたか、別のLINEアカウントのものかもしれません。"
+          action={
+            <Button href="/contents/vars" variant="secondary">
+              共通情報一覧へ戻る
+            </Button>
+          }
+        />
       ) : (
         <>
-          <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+          {/* 影響の要約（設計 `uNBlA`）。 */}
+          <section className={styles.section} aria-labelledby="cv-impact-summary">
+            <div className={styles.sectionHead}>
+              <h2 id="cv-impact-summary" className={styles.sectionTitle}>
+                変えるとどこに効くか
+              </h2>
+            </div>
+            <div className={styles.summaryGrid}>
+              {IMPACT_CARDS.map((card) => (
+                <div key={card.key} className={styles.summaryCard} data-impact-card={card.key}>
+                  <p className={styles.summaryLabel}>{card.title}</p>
+                  <p className={styles.summaryValue}>{NOT_CONNECTED_VALUE}</p>
+                  <p className={styles.summaryNote}>{card.note}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 編集本体。設計 r10 / padding18。 */}
+          <div className={styles.editCard}>
+            <div className={styles.fieldGrid}>
               <div>
-                <label
-                  htmlFor="cv-name"
-                  className="text-ink-secondary mb-1 block text-sm font-medium"
-                >
+                <label htmlFor="cv-name" className={styles.fieldLabel}>
                   共通情報名 <span className="text-danger">*</span>
                 </label>
-                <input
+                <TextField
                   id="cv-name"
-                  type="text"
                   maxLength={200}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                 />
               </div>
               <div>
-                <label
-                  htmlFor="cv-folder"
-                  className="text-ink-secondary mb-1 block text-sm font-medium"
-                >
+                <label htmlFor="cv-folder" className={styles.fieldLabel}>
                   フォルダ
                 </label>
-                <select
+                <SelectField
                   id="cv-folder"
+                  className="w-full"
                   value={folderId}
                   onChange={(e) => setFolderId(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  <option value="">未分類</option>
-                  {folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: '未分類' },
+                    ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                  ]}
+                />
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={styles.fieldGrid}>
               <div>
-                <p className="text-ink-secondary mb-1 text-sm font-medium">差し込み名</p>
-                <code className="bg-canvas-sunken text-ink block rounded px-2 py-2 text-sm">{`{{var.${item.varKey}}}`}</code>
-                <p className="text-ink-faint mt-1 text-xs">
+                <p className={styles.fieldLabel}>差し込み名</p>
+                <code className={styles.keyChip}>{`{{var.${item.varKey}}}`}</code>
+                <p className={styles.fieldNote}>
                   あとから変えられません。変えるとテンプレートの差し込みが空になります。
                 </p>
               </div>
               <div>
-                <p className="text-ink-secondary mb-1 text-sm font-medium">
-                  種別{' '}
-                  <span className="text-ink-faint text-xs font-normal">※変更できません。</span>
-                </p>
-                <span className="bg-canvas-sunken text-ink-secondary rounded-pill inline-block px-3 py-1 text-sm">
-                  {VAR_TYPE_LABELS[item.type] ?? item.type}
-                </span>
+                <p className={styles.fieldLabel}>種別</p>
+                <span className={styles.typeChip}>{VAR_TYPE_LABELS[item.type] ?? item.type}</span>
+                <p className={styles.fieldNote}>登録したあとは変えられません。</p>
               </div>
             </div>
 
             <div>
-              <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
+              <label htmlFor="cv-value" className={styles.fieldLabel}>
                 値
               </label>
-              <input
+              <TextField
                 id="cv-value"
                 type={item.type === 'number' ? 'number' : 'text'}
+                className="max-w-md"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
               />
             </div>
 
-            {/* 更新スケジュール。Lステップと同じく、値の下に表で置く。 */}
+            {/* 更新スケジュール。設計 `uNBlA` には無いが、口があり動いている。 */}
             <section>
               <p className="text-ink text-sm font-semibold">
                 更新スケジュール{' '}
@@ -297,7 +348,7 @@ function EditCommonVarInner() {
                     {schedules.length === 0 ? (
                       <tr>
                         <td colSpan={3} className="text-ink-faint px-3 py-6 text-center text-sm">
-                          スケジュールが設定されていません
+                          0件（更新の予定はありません）
                         </td>
                       </tr>
                     ) : (
@@ -342,34 +393,40 @@ function EditCommonVarInner() {
                 過去の日時は指定できません。指定した時刻を過ぎると、自動で値が入れ替わります。
               </p>
             </section>
-
-            {saved && <p className="text-success text-sm">保存しました。</p>}
           </div>
 
-          <div className="border-hairline mt-4 flex max-w-3xl items-center justify-between gap-3 border-t pt-4">
-            <div className="flex items-center gap-4">
-              <Link href="/contents/vars" className="text-info text-sm hover:underline">
-                共通情報一覧へ戻る
-              </Link>
-              <button
-                onClick={() => void remove()}
-                className="text-danger hover:bg-danger-bg rounded-control px-3 py-2 text-sm"
-              >
-                削除
-              </button>
+          {/* 影響の一覧（設計 `uNBlA`）。1件ずつ、いまの文と変わったあとの文を並べる節。 */}
+          <section className={styles.section} aria-labelledby="cv-impact-list">
+            <div className={styles.sectionHead}>
+              <h2 id="cv-impact-list" className={styles.sectionTitle}>
+                変わる場所
+              </h2>
+              <span className={styles.sectionCount}>{IMPACT_LIST_COUNT_TEXT}</span>
             </div>
-            <button
-              onClick={() => void save()}
-              disabled={saving}
-              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </div>
+            <p className={styles.impactList}>{IMPACT_LIST_REASON}</p>
+          </section>
+
+          <StickyBar
+            status={
+              <span className={styles.barNote}>
+                {saved ? '保存しました。' : (saveBlocked ?? DELETE_MOVED_NOTE)}
+              </span>
+            }
+            actions={
+              <div className={styles.barActions}>
+                <Button href="/contents/vars" variant="secondary">
+                  戻る
+                </Button>
+                <Button onClick={() => void save()} disabled={saveBlocked !== null} variant="primary">
+                  {saving ? '保存中...' : '保存'}
+                </Button>
+              </div>
+            }
+          />
         </>
       )}
 
-      {draft && (
+      {draft && item && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4"
           role="dialog"
@@ -383,7 +440,7 @@ function EditCommonVarInner() {
             <p className="text-ink text-sm font-semibold">スケジュール設定</p>
             <div className="flex flex-wrap gap-3">
               <div>
-                <label htmlFor="sc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
+                <label htmlFor="sc-date" className={styles.fieldLabel}>
                   開始日
                 </label>
                 <input
@@ -396,7 +453,7 @@ function EditCommonVarInner() {
                 />
               </div>
               <div>
-                <label htmlFor="sc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
+                <label htmlFor="sc-time" className={styles.fieldLabel}>
                   開始時刻
                 </label>
                 <input
@@ -409,30 +466,23 @@ function EditCommonVarInner() {
               </div>
             </div>
             <div>
-              <label htmlFor="sc-value" className="text-ink-secondary mb-1 block text-xs font-medium">
+              <label htmlFor="sc-value" className={styles.fieldLabel}>
                 更新後の値
               </label>
-              <input
+              <TextField
                 id="sc-value"
-                type={item?.type === 'number' ? 'number' : 'text'}
+                type={item.type === 'number' ? 'number' : 'text'}
                 value={draft.value}
                 onChange={(e) => setDraft({ ...draft, value: e.target.value })}
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
               />
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDraft(null)}
-                className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm"
-              >
+              <Button onClick={() => setDraft(null)} variant="secondary">
                 キャンセル
-              </button>
-              <button
-                onClick={() => void addSchedule()}
-                className="bg-accent text-on-accent rounded-control px-6 py-2 text-sm font-medium"
-              >
+              </Button>
+              <Button onClick={() => void addSchedule()} variant="primary">
                 登録
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -444,7 +494,7 @@ function EditCommonVarInner() {
 export default function EditCommonVarPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<ListState kind="loading" title="読み込んでいます" />}>
       <EditCommonVarInner />
     </Suspense>
   )

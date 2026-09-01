@@ -49,7 +49,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
     // 両方を統合した現在の7ルートを基準に締め直す。
-    expect(openings).toHaveLength(33)
+    // 2026-09-02: テンプレート一覧の取得失敗に「再読み込み」を足した。
+    // 押せない一覧を黙って出さないための操作なので、数へ入れる。
+    expect(openings).toHaveLength(34)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(14)
   })
 
@@ -111,7 +113,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 最新 development と統合した木を再計測して135へ締め直す。
     // 2026-09-01: #462 が予約メニュー一覧の作成操作を共通Buttonへ寄せたため、
     // 最新 development と統合した木を再計測して134へ締め直す。
-    expect(debt['direct-primary-button']).toBe(134)
+    // 2026-09-02: 共通情報の編集（設計 `uNBlA`）を下部追従バーへ寄せ、
+    // 自前の保存・登録2つが共通Buttonになったため132へ締め直す。
+    expect(debt['direct-primary-button']).toBe(132)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
     //
@@ -160,7 +164,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 最新 development と統合した木を再計測して247へ締め直す。
     // 2026-09-01: #462 が同じ画面の受付枠・CSV操作を共通Buttonへ寄せ、
     // 中身のないマニュアル操作を外したため、統合後の木を再計測して244へ締め直す。
-    expect(debt['direct-secondary-button']).toBe(244)
+    // 2026-09-02: 共通情報の編集（設計 `uNBlA`）の自前キャンセル1つが
+    // 共通Buttonになったため243へ締め直す。
+    expect(debt['direct-secondary-button']).toBe(243)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
