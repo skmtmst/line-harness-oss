@@ -7,7 +7,9 @@ import { api, ApiError } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import SummaryCard from '@/components/shared/summary-card'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
+import { savedSearchKpiValues } from './saved-search-kpis'
 
 function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
   if (!item || typeof item !== 'object') return false
@@ -69,15 +71,17 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     setConditionLabels({})
     try {
       if (!accountId) return
-      const [savedSearches, tagResult, markResult, scenarioResult] = await Promise.allSettled([
+      const [savedSearches, tagResult, markResult, scenarioResult, fieldResult] = await Promise.allSettled([
         api.savedSearches.list(accountId),
         api.tags.list(),
         api.supportMarks.list(accountId),
         api.scenarios.list({ accountId }),
+        api.friendFields.list(accountId),
       ])
       if (sequence !== loadSequence.current) return
       if (savedSearches.status === 'rejected') throw savedSearches.reason
-      if (savedSearches.value.success) setItems(savedSearches.value.data)
+      if (!savedSearches.value.success) throw new Error('保存した検索を読み込めませんでした')
+      setItems(savedSearches.value.data)
       if (tagResult.status === 'fulfilled' && tagResult.value.success) setTags(tagResult.value.data)
       setConditionLabels({
         marks: markResult.status === 'fulfilled' && markResult.value.success
@@ -85,6 +89,9 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           : {},
         scenarios: scenarioResult.status === 'fulfilled' && scenarioResult.value.success
           ? Object.fromEntries(scenarioResult.value.data.map((scenario) => [scenario.id, scenario.name]))
+          : {},
+        fields: fieldResult.status === 'fulfilled' && fieldResult.value.success
+          ? Object.fromEntries(fieldResult.value.data.map((field) => [field.fieldKey, field.name]))
           : {},
       })
     } catch (reason) {
@@ -115,9 +122,18 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     }
   }
 
+  const kpis = savedSearchKpiValues(items, Boolean(accountId) && !loading && !loadError)
+
   return (
-    <div>
-      <p className="text-ink-secondary mb-4 text-sm">
+    <div data-design-node="QKx8Q">
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <SummaryCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
+        <SummaryCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
+        <SummaryCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
+        <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail="呼び出し記録は未接続" loading={loading} variant="v6" />
+      </div>
+
+      <p className="border-hairline text-ink-secondary mb-4 rounded-control border bg-canvas px-3 py-2 text-sm">
         友だち一覧で組んだ絞り込みを保存したものです。ここでは名前の確認と削除ができます。
         新しく保存するときは、友だち一覧の絞り込みから「この条件を保存」を押してください。
       </p>

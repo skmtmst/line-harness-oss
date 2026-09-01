@@ -34,6 +34,27 @@ describe('友だち属性 V4 contract', () => {
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
+  it('タグ作成・編集は画面名をトップバーだけに置き、V6の操作を下部へまとめる', () => {
+    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    expect(editor).toContain("usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')")
+    expect(editor).toContain('<StickyBar')
+    expect(editor).not.toContain('text-[32px] font-bold tracking-tight')
+    expect(editor).not.toContain('友だちを分類するタグを作ります。タグが付いた瞬間の連動')
+    expect(editor).toContain('番目のアクションを複製')
+    expect(editor).toContain("action.type === 'タグ' || action.type === 'マイル'")
+    // マイル設定だけを根拠に、存在しない連動アクションを作って表示しない。
+    expect(editor).not.toContain("id: 'sample-1'")
+  })
+
+  it('タグの複製はリンクだけで終わらず、既存データを作成画面へ引き継ぐ', () => {
+    const page = read('components/friend-fields/new-tag-page-v4.tsx')
+    expect(page).toContain("const copyId = params.get('copy')")
+    expect(page).toContain('api.tags.list({ withCounts: true })')
+    expect(page).toContain('name: `${copySource.name} のコピー`')
+    expect(page).toContain('rewardMiles: copySource.mileageReward ?? 0')
+    expect(page).toContain('actions: []')
+  })
+
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)

@@ -21,7 +21,12 @@ export const ROUTES = [
   { name: 'settings-features', path: '/settings/features', type: 'L' },
   { name: 'staff', path: '/staff', type: 'L' },
   // S ダッシュボード（カードを並べる画面）
-  { name: 'dashboard', path: '/', type: 'S' },
+  /*
+    ダッシュボードは「6日前」のような**今日から数える表示**を持つ。
+    時計を止めないと、日をまたぐたびに絵が変わって毎朝赤くなる。
+    実際に一度そうなった（6日前→7日前）。
+  */
+  { name: 'dashboard', path: '/', type: 'S', clock: '2026-08-19T12:00:00.000Z' },
   // A 分析
   { name: 'analytics', path: '/analytics', type: 'A' },
   // 残りの一覧

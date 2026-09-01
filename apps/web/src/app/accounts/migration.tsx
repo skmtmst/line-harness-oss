@@ -63,7 +63,7 @@ export default function AccountMigration() {
           api.autoReplies.list(),
           api.forms.list(selectedAccountId),
           api.reminders.list(),
-          api.commonVars.list(),
+          api.commonVars.list(selectedAccountId),
           api.supportMarks.list(selectedAccountId),
         ])
       if (cancelled) return
