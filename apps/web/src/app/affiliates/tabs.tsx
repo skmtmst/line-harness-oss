@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { calculateAffiliateReward } from './affiliate-reward'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -39,6 +40,7 @@ interface AffiliateReportRow {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
+  confirmedReward: number
   linkCount: number
   friendAdds: number
 }
@@ -48,7 +50,7 @@ interface AffiliateListRow extends AffiliateItem {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
-  estimatedCommission: number
+  rewardAmount: number
   linkCount: number
   friendAdds: number
 }
@@ -190,7 +192,11 @@ export function AffiliatorsTab() {
           totalClicks: rep?.totalClicks ?? 0,
           totalConversions: rep?.totalConversions ?? 0,
           totalRevenue: rep?.totalRevenue ?? 0,
-          estimatedCommission: ((rep?.totalRevenue ?? 0) * a.commissionRate) / 100,
+          rewardAmount: calculateAffiliateReward({
+            commissionRate: a.commissionRate,
+            totalRevenue: rep?.totalRevenue ?? 0,
+            confirmedFixedReward: rep?.confirmedReward ?? 0,
+          }),
           linkCount: rep?.linkCount ?? 0,
           friendAdds: rep?.friendAdds ?? 0,
         }
@@ -278,14 +284,14 @@ export function AffiliatorsTab() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div data-design-node="PouPn" data-affiliate-design="v6">
       <div className="mb-4 flex justify-end">
-        <button
+        <Button
+          variant="primary"
           onClick={() => setCreateOpen(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
         >
-          + 新規作成
-        </button>
+          アフィリエイターを追加
+        </Button>
       </div>
 
       {createOpen && (
@@ -295,20 +301,22 @@ export function AffiliatorsTab() {
         />
       )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
+      {error ? (
+        <ListState
+          kind="error"
+          title="紹介者を表示できませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button onClick={() => void loadList()}>紹介者を再読み込み</Button>}
+        />
+      ) : loading ? (
+        <ListState kind="loading" title="紹介者を読み込んでいます" />
       ) : rows.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          アフィリエイターがまだ登録されていません
-        </div>
+        <ListState
+          kind="empty"
+          title="紹介者はまだ登録されていません"
+          description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
+          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
+        />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full min-w-[900px]">
@@ -322,8 +330,7 @@ export function AffiliatorsTab() {
                 <Th align="right">友だち追加</Th>
                 <Th align="right">CV</Th>
                 <Th align="right">売上</Th>
-                <Th align="right">参考報酬</Th>
-                <Th align="right">率</Th>
+                <Th align="right">報酬</Th>
                 <Th>状態</Th>
               </TableHeadRow>
             </thead>
@@ -350,8 +357,7 @@ export function AffiliatorsTab() {
                       <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">{row.friendAdds.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{row.totalConversions.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">{formatYen(row.totalRevenue)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.estimatedCommission)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-500">{row.commissionRate}%</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.rewardAmount)}</td>
                       <td className="px-4 py-3 text-sm">
                         {row.isActive
                           ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">有効</span>
@@ -363,7 +369,7 @@ export function AffiliatorsTab() {
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={11} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
+                        <td colSpan={10} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (

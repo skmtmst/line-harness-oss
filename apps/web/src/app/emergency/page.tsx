@@ -164,10 +164,14 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
       apiData(api.system.health()),
       apiData(api.ecCommerce.overview()),
     ])
-    const webhookRequest = Promise.all([
-      apiData(api.webhooks.incoming.list()),
-      apiData(api.webhooks.outgoing.list()),
-    ])
+    const webhookRequest = apiData(api.health.accounts()).then(async (accounts) => {
+      const visibleAccountIds = accounts.filter((account) => account.isActive).map((account) => account.id)
+      const rows = await Promise.all(visibleAccountIds.map(async (lineAccountId) => Promise.all([
+        apiData(api.webhooks.incoming.list(lineAccountId)),
+        apiData(api.webhooks.outgoing.list(lineAccountId)),
+      ])))
+      return [rows.flatMap(([incoming]) => incoming), rows.flatMap(([, outgoing]) => outgoing)] as const
+    })
     const deliveryRequest = apiData(api.broadcasts.list())
 
     const [dashboardResult, lineResult, apiResult, webhookResult, deliveryResult] =

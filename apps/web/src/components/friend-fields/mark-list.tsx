@@ -1,46 +1,81 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { GripVertical, LockKeyhole, Trash2 } from 'lucide-react'
 import type { SupportMark } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListKpis from '@/components/shared/list-kpis'
+import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
+import { Th } from '@/components/shared/table'
 
 type MarkRow = SupportMark & { friendCount: number }
+type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PRESET_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#94A3B8']
+function autoRuleLabel(mark: MarkRow): string {
+  return mark.autoOnInbound ? '受信時' : '—'
+}
+
+function usageLabel(mark: MarkRow): string {
+  const parts: string[] = []
+  if (mark.friendCount > 0) parts.push(`友だち${mark.friendCount}`)
+  if (mark.usedIn?.broadcasts) parts.push(`配信${mark.usedIn.broadcasts}`)
+  if (mark.usedIn?.scenarios) parts.push(`シナリオ${mark.usedIn.scenarios}`)
+  if (mark.usedIn?.autoReplies) parts.push(`自動応答${mark.usedIn.autoReplies}`)
+  if (mark.usedIn?.savedSearches) parts.push(`保存検索${mark.usedIn.savedSearches}`)
+  if (mark.usedIn?.automations) parts.push(`自動化${mark.usedIn.automations}`)
+  return parts.length ? parts.join('・') : 'なし'
+}
+
+function referenceCount(mark: MarkRow): number {
+  return (mark.usedIn?.broadcasts ?? 0)
+    + (mark.usedIn?.scenarios ?? 0)
+    + (mark.usedIn?.autoReplies ?? 0)
+    + (mark.usedIn?.savedSearches ?? 0)
+    + (mark.usedIn?.automations ?? 0)
+}
+
+function isUsed(mark: MarkRow): boolean {
+  return mark.friendCount > 0 || referenceCount(mark) > 0
+}
 
 /**
- * 対応マークの管理。
+ * ★V6 `rIhbN` 対応マーク一覧。
  *
- * 別画面にせず、この場で足して直せるようにしている。項目が3〜5個で
- * 済むものに作成画面を作ると、行き来の方が手間になる。
+ * 固定の対応状況（未対応・対応中・解決済）と、友だちに付ける対応マークは
+ * 別の概念。ここは後者の設定だけを扱い、人数のKPIは既存の受信箱集計から読む。
  */
 export default function SupportMarkList({ accountId }: { accountId: string | null }) {
   const [items, setItems] = useState<MarkRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
-  const [name, setName] = useState('')
-  const [color, setColor] = useState(PRESET_COLORS[0])
-  const [adding, setAdding] = useState(false)
+  const [query, setQuery] = useState('')
+  const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
+  const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
     if (!accountId) {
       setItems([])
-      setLoading(false)
+      setStatus('error')
+      setError('LINE公式アカウントを選んでください')
       return
     }
-    setLoading(true)
+    setStatus('loading')
     setError('')
     try {
       const res = await api.supportMarks.list(accountId)
-      if (res.success) setItems(res.data)
-    } catch {
-      setError('読み込みに失敗しました')
-    } finally {
-      setLoading(false)
+      if (!res.success) throw new Error(res.error)
+      setItems(res.data)
+      setStatus('ready')
+    } catch (reason) {
+      setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountId])
 
@@ -48,250 +83,183 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     void load()
   }, [load])
 
-  const add = async () => {
-    const trimmed = name.trim()
-    if (!trimmed || !accountId) return
-    setAdding(true)
-    setError('')
+  const visible = useMemo(() => items.filter((mark) => {
+    if (query && !mark.name.toLocaleLowerCase('ja').includes(query.toLocaleLowerCase('ja'))) return false
+    if (usage === 'used' && !isUsed(mark)) return false
+    if (usage === 'unused' && isUsed(mark)) return false
+    return true
+  }), [items, query, usage])
+
+  const move = async (targetId: string) => {
+    if (!accountId || !dragId || dragId === targetId) return setDragId(null)
+    const dragged = items.find((mark) => mark.id === dragId)
+    const target = items.find((mark) => mark.id === targetId)
+    if (dragged?.isInherited || target?.isInherited) {
+      setDragId(null)
+      setError('共有マークは、編集してこのアカウント専用にしてから並び替えてください')
+      return
+    }
+    const order = visible.map((mark) => mark.id)
+    const from = order.indexOf(dragId)
+    const to = order.indexOf(targetId)
+    setDragId(null)
+    if (from < 0 || to < 0) return
+    order.splice(to, 0, ...order.splice(from, 1))
+    const next = order.map((id) => items.find((mark) => mark.id === id)).filter(Boolean) as MarkRow[]
+    setItems(next)
     try {
-      await api.supportMarks.create(accountId, { name: trimmed, color, displayOrder: items.length })
-      setName('')
-      void load()
+      await Promise.all(
+        next.map((mark, index) =>
+          api.supportMarks.update(mark.id, accountId, { displayOrder: index }),
+        ),
+      )
+      await load()
     } catch {
-      setError('追加に失敗しました')
-    } finally {
-      setAdding(false)
+      setError('並び順を保存できませんでした')
+      await load()
     }
-  }
-
-  const patch = async (mark: MarkRow, data: Parameters<typeof api.supportMarks.update>[2]) => {
-    if (!accountId) return
-    setError('')
-    try {
-      const res = await api.supportMarks.update(mark.id, accountId, data)
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
-      void load()
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : '保存に失敗しました')
-    }
-  }
-
-  const remove = (mark: MarkRow) => {
-    setPendingDelete(mark)
   }
 
   const confirmRemove = async (mark: MarkRow) => {
-    if (!accountId) return
+    if (!accountId || !defaultMark || deleting || referenceCount(mark) > 0) return
     setError('')
+    setDeleteError('')
+    setDeleting(true)
     try {
-      const res = await api.supportMarks.delete(mark.id, accountId, { force: mark.friendCount > 0 })
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
-      void load()
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : '削除に失敗しました')
+      const res = await api.supportMarks.delete(mark.id, accountId, {
+        replacementMarkId: defaultMark.id,
+        expectedImpact: {
+          friendCount: mark.friendCount,
+          usedIn: {
+            broadcasts: mark.usedIn?.broadcasts ?? 0,
+            scenarios: mark.usedIn?.scenarios ?? 0,
+            autoReplies: mark.usedIn?.autoReplies ?? 0,
+            savedSearches: mark.usedIn?.savedSearches ?? 0,
+            automations: mark.usedIn?.automations ?? 0,
+          },
+        },
+      })
+      if (!res.success) throw new Error(res.error)
+      setPendingDelete(null)
+      await load()
+    } catch {
+      setDeleteError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
   return (
-    <div>
-      <p className="text-ink-secondary mb-4 text-sm">
-        友だち一人ひとりの対応状況を表す印です。受信箱のトークの状態とは別に、
-        友だちそのものに付きます。
-      </p>
+    <div data-design-node="rIhbN">
+      <ListKpis
+        key="support-marks"
+        variant="v6"
+        accountId={accountId}
+        titles={['マークの種類', '未対応', '対応中', '過去7日の変更']}
+        build={(stats) => [
+          { title: 'マークの種類', value: stats.marks.total, unit: '件', detail: `使用中 ${stats.marks.inUse}件` },
+          {
+            title: '未対応',
+            value: stats.marks.unanswered,
+            unit: '人',
+            detail: stats.tags.taggedFriends > 0
+              ? `全体の ${Math.round((stats.marks.unanswered / stats.tags.taggedFriends) * 1000) / 10}%`
+              : '全体の —',
+          },
+          { title: '対応中', value: stats.marks.inProgress, unit: '人', detail: '担当者あり' },
+          { title: '過去7日の変更', value: stats.marks.changedLast7, unit: '回', detail: '担当者別に記録' },
+        ]}
+      />
 
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
+      <NoteBar className="mb-4">
+        受信箱・友だち一覧・友だち詳細で共通利用し、メッセージ受信時の自動変更と初期値を同じ画面で設定します。
+      </NoteBar>
 
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
-        <table className="w-full table-fixed">
-          <thead>
-            <tr className="bg-canvas-sunken border-hairline border-b">
-              <th className="text-ink-faint w-[28%] px-4 py-3 text-left text-xs font-semibold uppercase">
-                マーク名
-              </th>
-              {/* 列の順は設計の絵どおり。初期値が名前のすぐ隣に来る。
-                  どのマークが新しい友だちに付くかは、人数より先に見る。 */}
-              <th className="text-ink-faint w-[18%] px-4 py-3 text-left text-xs font-semibold uppercase">
-                新規の初期値
-              </th>
-              <th className="text-ink-faint w-[18%] px-4 py-3 text-left text-xs font-semibold uppercase">
-                いまの人数
-              </th>
-              <th className="text-ink-faint w-[24%] px-4 py-3 text-left text-xs font-semibold uppercase">
-                自動で変わるとき
-              </th>
-              <th className="w-[12%] px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading ? (
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="マーク名で検索" aria-label="マーク名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
+        <select value={usage} onChange={(event) => setUsage(event.target.value as typeof usage)} className="v6-select h-9 w-[142px] rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink" aria-label="利用状態">
+          <option value="all">利用状態：すべて</option>
+          <option value="used">使用中</option>
+          <option value="unused">未使用</option>
+        </select>
+        <span className="flex-1" />
+        {status === 'forbidden' ? null : <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>}
+      </div>
+
+      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+
+      <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <div>
+          <table className="w-full table-fixed text-sm">
+            <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
               <tr>
-                <td colSpan={5} className="text-ink-faint px-4 py-8 text-center text-sm">
-                  読み込み中...
-                </td>
+                <Th className="w-12 px-3 py-3">順番</Th>
+                <Th className="w-[15%] px-3 py-3">マーク</Th>
+                <Th className="w-[8%] px-3 py-3">使用中</Th>
+                <Th className="w-[10%] px-3 py-3">初期値</Th>
+                <Th className="w-[16%] px-3 py-3">自動変更</Th>
+                <Th className="px-3 py-3">表示先</Th>
+                <Th className="w-16 px-3 py-3">操作</Th>
               </tr>
-            ) : (
-              items.map((mark) => (
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {status === 'loading' ? (
+                <tr><td colSpan={7} className="p-0"><ListState kind="loading" /></td></tr>
+              ) : status === 'forbidden' ? (
+                <tr><td colSpan={7} className="p-0"><ListState kind="forbidden" description="対応マークを見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
+              ) : status === 'error' ? (
+                <tr><td colSpan={7} className="p-0"><ListState kind="error" description="対応マークを読み込めませんでした。再読み込みしてください。" /></td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを追加」から最初のマークを作ってください。" /></td></tr>
+              ) : visible.length === 0 ? (
+                <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う対応マークはありません" description="検索語か利用状態を変えてください。" /></td></tr>
+              ) : visible.map((mark) => (
                 <tr key={mark.id} className="hover:bg-canvas-sunken">
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="inline-block h-3 w-3 rounded-full"
-                        style={{ backgroundColor: mark.color }}
-                      />
-                      <span className="text-ink truncate text-sm font-medium" title={mark.name}>{mark.name}</span>
-                    </span>
+                  <td draggable={!mark.isInherited} onDragStart={() => setDragId(mark.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(mark.id)} className={`${mark.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} aria-label={mark.isInherited ? `${mark.name}は編集後に並び替えできます` : `${mark.name}をドラッグして並び替え`} title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}>
+                    <GripVertical size={16} aria-hidden="true" />
                   </td>
-                  <td className="px-4 py-3">
-                    {/* 初期値は1つだけ。選ばれているものは札で出す。
-                        丸だけだと、どれが初期値かを目で追う必要がある。 */}
-                    {mark.isDefault ? (
-                      <span className="bg-info-bg text-info rounded-pill px-2 py-0.5 text-[11px] font-medium">
-                        初期値
-                      </span>
+                  <td className="px-3 py-3">
+                    <Link href={`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`} className="inline-flex max-w-full items-center rounded-pill px-2.5 py-1 text-xs font-bold hover:opacity-80" style={{ backgroundColor: `${mark.color}1A`, color: mark.color }} title={mark.name}>
+                      <span className="truncate">{mark.name}</span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-3 tabular-nums text-ink">{mark.friendCount}人</td>
+                  <td className="px-3 py-3 text-ink">{mark.isDefault ? '新着時の初期値' : '—'}</td>
+                  <td className="px-3 py-3 text-ink">{autoRuleLabel(mark)}</td>
+                  <td className="truncate px-3 py-3 text-ink" title={usageLabel(mark)}>{usageLabel(mark)}</td>
+                  <td className="px-3 py-3 text-center">
+                    {mark.isDefault || mark.isInherited ? (
+                      <span title={mark.isDefault ? '初期値のマークは保管できません' : '共有マークは編集後に保管できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため保管できません' : '共有マークのため保管できません'} /></span>
                     ) : (
-                      <label className="text-ink-faint inline-flex cursor-pointer items-center gap-1.5 text-xs">
-                        <input
-                          type="radio"
-                          name="default-mark"
-                          checked={false}
-                          onChange={() => patch(mark, { isDefault: true })}
-                          aria-label={`${mark.name}を初期値にする`}
-                          className="accent-accent"
-                        />
-                        —
-                      </label>
+                      <button type="button" onClick={() => { setDeleteError(''); setPendingDelete(mark) }} aria-label={`${mark.name}を保管`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
                     )}
                   </td>
-                  <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
-                    {mark.friendCount}
-                    <span className="text-ink-faint ml-0.5 text-xs">人</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={mark.autoOnInbound}
-                      onChange={(e) => patch(mark, { autoOnInbound: e.target.checked })}
-                      aria-label={`${mark.name}を受信時に自動で付ける`}
-                      className="rounded border-gray-300"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => remove(mark)}
-                      disabled={mark.isDefault}
-                      title={mark.isDefault ? '初期値のマークは削除できません' : undefined}
-                      className="hover:bg-danger-bg text-danger rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-30"
-                    >
-                      削除
-                    </button>
-                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-end gap-3 border p-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
-        <div>
-          <label htmlFor="mark-name" className="text-ink-faint mb-1 block text-xs font-semibold">
-            マークの名前
-          </label>
-          <input
-            id="mark-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void add()
-            }}
-            placeholder="例: 折り返し待ち"
-            className="border-hairline rounded-control w-48 border px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <span className="text-ink-faint mb-1 block text-xs font-semibold">色</span>
-          <div className="flex items-center gap-1.5">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                aria-label={`色 ${c}`}
-                className={`h-7 w-7 rounded-full transition-transform ${
-                  color === c ? 'ring-hairline scale-110 ring-2 ring-offset-2' : 'hover:scale-110'
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        </div>
-        <button
-          onClick={add}
-          disabled={adding || !name.trim()}
-          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-        >
-          {adding ? '追加中...' : 'マークを追加'}
-        </button>
-      </div>
-
-      <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-        初期値のマークは削除できません。先に別のマークを初期値にしてください。
-        初期値が1つも無いと、新しい友だちに何も付かなくなるためです。
-      </p>
-
-      {/*
-        どこで使われているか。マークを消す・増やす前に、どこに響くかが
-        分かるようにする。設計でもこの位置に置かれている。行き先を
-        持たせて、その場で見に行けるようにした。
-      */}
-      <section className="bg-canvas rounded-card border-hairline mt-4 border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
-        <p className="text-ink mb-3 text-sm font-semibold">どこで使われているか</p>
-        <ul className="divide-hairline divide-y">
-          {[
-            { label: '受信箱の絞り込み', href: '/chats' },
-            { label: '友だち一覧の列と絞り込み', href: '/friends' },
-            { label: 'ダッシュボードの対応状況', href: '/' },
-            { label: '配信の絞り込み条件', href: '/broadcasts' },
-            { label: 'オートメーションの動作', href: '/automations' },
-          ].map((row) => (
-            <li key={row.label}>
-              <Link
-                href={row.href}
-                className="text-ink-secondary hover:text-ink flex items-center justify-between gap-2 py-2.5 text-sm"
-              >
-                {row.label}
-                <span className="text-ink-faint shrink-0 text-xs">›</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <h2 className="text-sm font-bold text-ink">受信時自動変更・保管・初期値の安全確認</h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink-faint">「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
       </section>
+
       <ConfirmDialog
         open={pendingDelete !== null}
-        title={`対応マーク「${pendingDelete?.name ?? ''}」を削除しますか？`}
-        description={
-          (pendingDelete?.friendCount ?? 0) > 0
-            ? `${pendingDelete?.friendCount ?? 0} 人の対応マークは、削除後に「${defaultMark?.name ?? '初期値'}」へ変更されます。この操作は元に戻せません。`
-            : 'この対応マークを削除します。この操作は元に戻せません。'
-        }
-        confirmLabel="削除する"
+        title={`対応マーク「${pendingDelete?.name ?? ''}」を保管しますか？`}
+        description={pendingDelete && referenceCount(pendingDelete) > 0
+          ? `配信など${referenceCount(pendingDelete)}件で使われているため保管できません。先にすべての使用先から外してください。友だちのマークと設定は変更されません。`
+          : `${pendingDelete?.friendCount ?? 0}人の友だちは「${defaultMark?.name ?? '初期値'}」へ変更されます。マークは今後の選択肢から外れ、変更履歴は残ります。この操作は画面から元に戻せません。`}
+        confirmLabel="保管する"
         destructive
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          const target = pendingDelete
-          setPendingDelete(null)
-          if (target) void confirmRemove(target)
-        }}
+        busy={deleting}
+        error={deleteError}
+        onCancel={() => { if (!deleting) setPendingDelete(null) }}
+        onConfirm={defaultMark && pendingDelete && referenceCount(pendingDelete) === 0
+          ? () => { void confirmRemove(pendingDelete) }
+          : undefined}
       />
     </div>
   )
