@@ -63,6 +63,10 @@ V6が上回る条件:
 
 現行は環境変数`ECCUBE_WEBHOOK_SECRET`と`NEN_EC_BASE_URL`が全体で一つである。V6はconnector単位へ移行する。
 
+移行までの受信署名は `timestamp.lineAccountId.rawBody` をHMAC-SHA256で署名し、
+`x-line-account-id` を本文と同じく改ざん検知の対象にする。署名を確かめる前に、
+指定されたLINEアカウントの有無を応答へ出してはいけない。
+
 - organization/account/shop/provider/environmentを保持
 - secret/tokenは暗号化し、通常APIは末尾4文字と更新日だけ
 - inbound HMAC secretとoutbound API tokenを分離

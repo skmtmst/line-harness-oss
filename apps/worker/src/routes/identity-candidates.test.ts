@@ -27,8 +27,13 @@ const accessMocks = vi.hoisted(() => ({
   getVisibleLineAccountScope: vi.fn(),
 }));
 
+const detectorMocks = vi.hoisted(() => ({
+  detectFriendDuplicateCandidates: vi.fn(),
+}));
+
 vi.mock('../services/identity-candidates.js', () => identityMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
+vi.mock('../services/friend-duplicate-candidates.js', () => detectorMocks);
 
 const { identityCandidates } = await import('./identity-candidates.js');
 
@@ -78,9 +83,14 @@ beforeEach(() => {
   identityMocks.getIdentityCandidate.mockResolvedValue(candidate);
   identityMocks.candidateAccountIds.mockResolvedValue(['account-a', 'account-b']);
   identityMocks.listIdentityCandidates.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+  identityMocks.decideIdentityCandidate.mockResolvedValue(candidate);
+  identityMocks.undoIdentityCandidate.mockResolvedValue(candidate);
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   accessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-a', 'account-b'], canSeeUnassigned: false,
+  });
+  detectorMocks.detectFriendDuplicateCandidates.mockResolvedValue({
+    processed: 1, hasMore: false, nextCursor: null,
   });
 });
 
@@ -98,6 +108,42 @@ describe('identity candidate HTTP contract', () => {
     });
   });
 
+  it('lets an owner detect friend candidates only inside the visible account scope', async () => {
+    const response = await harness().request(
+      '/api/identity-candidates/detect?kind=friend_duplicate&limit=25',
+      { method: 'POST' },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true, data: { processed: 1, hasMore: false, nextCursor: null },
+    });
+    expect(detectorMocks.detectFriendDuplicateCandidates).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        tenantId: 'tenant-a',
+        allowedAccountIds: ['account-a', 'account-b'],
+        limit: 25,
+        after: null,
+      },
+    );
+  });
+
+  it('does not let staff run detection or accept another candidate kind', async () => {
+    const staffResponse = await harness({ role: 'staff', permissions: ['/friends'] }).request(
+      '/api/identity-candidates/detect?kind=friend_duplicate',
+      { method: 'POST' },
+    );
+    expect(staffResponse.status).toBe(403);
+
+    const wrongKind = await harness().request(
+      '/api/identity-candidates/detect?kind=ec_member',
+      { method: 'POST' },
+    );
+    expect(wrongKind.status).toBe(400);
+    expect(await wrongKind.json()).toMatchObject({ code: 'INVALID_DETECTION_KIND' });
+    expect(detectorMocks.detectFriendDuplicateCandidates).not.toHaveBeenCalled();
+  });
+
   it('does not let a friends-only staff member inspect EC candidates', async () => {
     const ec = { ...candidate, kind: 'ec_member' as const };
     identityMocks.getIdentityCandidate.mockResolvedValue(ec);
@@ -111,10 +157,26 @@ describe('identity candidate HTTP contract', () => {
   it('does not reveal candidate details outside the visible account scope', async () => {
     accessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
     const response = await harness().request('/api/identity-candidates/candidate-a');
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     const body = JSON.stringify(await response.json());
     expect(body).not.toContain('\u7530\u4e2d');
     expect(body).not.toContain('ta***@example.jp');
+  });
+
+  it('does not let staff mutate identity decisions', async () => {
+    const staff = harness({ role: 'staff', permissions: ['/friends'] });
+    const decided = await staff.request('/api/identity-candidates/candidate-a/decide', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, decision: 'linked', reason: '本人へ確認済みです' }),
+    });
+    const undone = await staff.request('/api/identity-candidates/candidate-a/undo', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, reason: '判定を見直します' }),
+    });
+    expect(decided.status).toBe(403);
+    expect(undone.status).toBe(403);
+    expect(identityMocks.decideIdentityCandidate).not.toHaveBeenCalled();
+    expect(identityMocks.undoIdentityCandidate).not.toHaveBeenCalled();
   });
 
   it('rejects malformed JSON before deciding', async () => {

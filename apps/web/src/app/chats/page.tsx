@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
+import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
+import SavedViewDialog from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -381,6 +384,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [unreadOnly, setUnreadOnly] = useState(false)
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
@@ -627,9 +633,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sort: 'newest',
   })
 
-  const createSavedView = async () => {
+  const createSavedView = async (nameOverride?: string) => {
     if (savingView) return
-    const name = savedViewName.trim()
+    // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
+    // 状態の更新を待つと、1回目の保存が空の名前で走る。
+    const name = (nameOverride ?? savedViewName).trim()
     if (!name) {
       setSavedViewError('名前を入力してください')
       return
@@ -1100,20 +1108,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
           </button>
         ))}
-        <details className="relative ml-auto">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
-            絞り込み
-          </summary>
-          <div className="absolute top-[calc(100%+6px)] right-0 z-30 w-52 rounded-lg border border-[#E5E7EB] bg-canvas p-3 shadow-lg">
-            <p className="text-[11px] font-semibold text-[#667085]">対応状態</p>
-            <div className="mt-2 grid gap-1">
-              {statusFilters.map((filter) => (
-                <button key={filter.key} type="button" onClick={() => setStatusFilter(filter.key)} className={`rounded-md px-2 py-1.5 text-left text-xs ${statusFilter === filter.key ? 'bg-[#EAFBF0] font-semibold text-[#057A37]' : 'text-[#667085] hover:bg-[#F7F8F6]'}`}>{filter.label}</button>
-              ))}
-            </div>
-          </div>
-        </details>
+        <span className="ml-auto" />
+        {/*
+          設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
+          右から420pxのパネルが出る（`bXyEA`）。
+
+          以前は `<details>` の小さな箱（208px）で、中身は対応状態だけだった。
+          設計は 対応マーク・担当者・受信経路・期限・メッセージ種別・未読だけ の
+          6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
+        */}
+        <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+          絞り込み
+        </Button>
         <div className="relative">
           <Button
             type="button"
@@ -1158,33 +1164,56 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 ))}
               </div>
+              {/*
+                前はここに名前の入力欄と保存ボタンが直接並んでいた。
+                **何を保存しようとしているのかが書いていない**ので、絞り込みを
+                変えたつもりで前の条件を保存してしまう。設計（`Ln4zS`）は
+                名前と「保存する条件」を並べて見せてから保存させる。
+              */}
               <div className="border-hairline mt-3 border-t pt-3">
-                <label htmlFor="saved-inbox-view-name" className="text-ink-faint text-xs font-semibold">
-                  現在の条件を保存
-                </label>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    id="saved-inbox-view-name"
-                    value={savedViewName}
-                    onChange={(event) => setSavedViewName(event.target.value)}
-                    maxLength={40}
-                    placeholder="例：自分の未対応"
-                    className="border-hairline focus:ring-accent min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none focus:border-accent focus:ring-2"
-                  />
-                  <Button
-                    variant="primary"
-                    type="button"
-                    onClick={() => void createSavedView()}
-                    disabled={savingView}
-                  >
-                    {savingView ? '保存中' : '保存'}
-                  </Button>
-                </div>
+                <Button variant="primary" type="button" onClick={() => setSaveDialogOpen(true)}>
+                  この条件を保存
+                </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
             </div>
           )}
         </div>
+        <SavedViewDialog
+          open={saveDialogOpen}
+          conditions={[
+            { label: '対応マーク', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
+            { label: '担当者', value: assigneeFilter === 'all' ? 'すべて' : assigneeFilter === 'unassigned' ? '未割り当て' : (operators.find((o) => o.id === assigneeFilter)?.name ?? 'すべて') },
+            { label: '受信経路', value: channel === 'all' ? 'LINE・MAIL' : channel === 'line' ? 'LINE' : 'MAIL' },
+          ]}
+          existingNames={savedViews.map((view) => view.name)}
+          saving={savingView}
+          onSave={async (name) => {
+            setSavedViewName(name)
+            await createSavedView(name)
+          }}
+          onClose={() => setSaveDialogOpen(false)}
+        />
+        <InboxFilterPanel
+          open={filterOpen}
+          value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
+          operators={operators}
+          onChange={(next) => {
+            setStatusFilter(next.status as StatusFilter)
+            setAssigneeFilter(next.assignee)
+            setUnreadOnly(next.unreadOnly)
+            if (next.channel !== channel) {
+              router.push(next.channel === 'all' ? '/chats' : `/chats?channel=${next.channel}`)
+            }
+          }}
+          onReset={() => {
+            setStatusFilter('all')
+            setAssigneeFilter('all')
+            setUnreadOnly(false)
+            router.push('/chats')
+          }}
+          onClose={() => setFilterOpen(false)}
+        />
       </section>
 
       <div
@@ -1217,18 +1246,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
             <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
               <span className="shrink-0">担当者</span>
-              <select
-                value={assigneeFilter}
-                onChange={(event) => setAssigneeFilter(event.target.value)}
-                aria-label="担当者で絞り込む"
-                className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-canvas px-2 py-1.5 text-[11px] font-medium text-[#344054] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
-              >
-                <option value="all">すべて</option>
-                <option value="unassigned">未割り当て</option>
-                {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>{operator.name}</option>
-                ))}
-              </select>
+              <span className="min-w-0 flex-1">
+                <OperatorDropdown
+                  value={assigneeFilter}
+                  operators={operators}
+                  onChange={setAssigneeFilter}
+                  label="担当者"
+                  ariaLabel="担当者で絞り込む"
+                />
+              </span>
             </label>
             <div className="mt-2 flex items-center gap-1">
               {CHANNELS.map((item) => (
@@ -1556,15 +1582,30 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  {chatDetail.friendPictureUrl && (
+                  {/*
+                    設計 `xGLVe` の見出しは、アバター・名前・「本名・種別・
+                    最終受信」の3点。**写真が無い人でも丸は出す。** 頭文字を
+                    入れておかないと、灰色の空丸が並んで誰の会話か目で追えない。
+                  */}
+                  {chatDetail.friendPictureUrl ? (
                     <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
+                  ) : (
+                    <span className="bg-accent-soft text-accent flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                      {(chatDetail.friendName || '?').charAt(0)}
+                    </span>
                   )}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink truncate">
                       {chatDetail.friendName}
                     </p>
                     <p className="text-ink-faint mt-0.5 text-xs">
-                      最終受信 {formatDatetime(chatDetail.lastMessageAt)} ・ LINE
+                      {/*
+                        設計はここに本名も置く（「河野 健太・LINE・最終受信…」）。
+                        **この部品は友だちの詳細を持っていない**ので、いまは
+                        出していない。右の顧客情報とは別の口が要る。
+                        取れていないものを空欄で出すと「本名が無い人」に見える。
+                      */}
+                      LINE ・ 最終受信 {formatDatetime(chatDetail.lastMessageAt)}
                     </p>
                   </div>
                 </div>
@@ -1577,34 +1618,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 */}
                 {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <span className="text-ink-faint">対応</span>
-                    <select
-                      value={chatDetail.status}
-                      onChange={(e) => void handleStatusUpdate(e.target.value as Chat['status'])}
-                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-                    >
-                      <option value="unread">未対応</option>
-                      <option value="in_progress">対応中</option>
-                      <option value="on_hold">保留</option>
-                      <option value="resolved">対応済</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <span className="text-ink-faint">担当</span>
-                    <select
-                      value={chatDetail.operatorId ?? ''}
-                      onChange={(e) => void handleOperatorUpdate(e.target.value || null)}
-                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-                    >
-                      <option value="">未割り当て</option>
-                      {operators.map((op) => (
-                        <option key={op.id} value={op.id}>
-                          {op.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {/*
+                    素の `<select>` から専用のプルダウンへ替えた。
+                    **開いた中身がブラウザ任せだと画像に写らない。** 設計の
+                    2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
+                    ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
+                  */}
+                  <StatusDropdown
+                    value={chatDetail.status as ChatStatus}
+                    onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
+                    ariaLabel="対応マークを変える"
+                  />
+                  <OperatorDropdown
+                    value={chatDetail.operatorId ?? 'unassigned'}
+                    operators={operators}
+                    onChange={(next) => void handleOperatorUpdate(next === 'unassigned' ? null : next)}
+                    label="担当"
+                    ariaLabel="担当者を変える"
+                  />
                   {!showFriendInfo && (
                     <button
                       type="button"

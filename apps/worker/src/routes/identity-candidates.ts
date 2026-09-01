@@ -16,6 +16,7 @@ import {
   listIdentityCandidates,
   undoIdentityCandidate,
 } from '../services/identity-candidates.js';
+import { detectFriendDuplicateCandidates } from '../services/friend-duplicate-candidates.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const KINDS = new Set<IdentityCandidateKind>(['friend_duplicate', 'ec_member']);
@@ -132,6 +133,32 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
   }
 });
 
+identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
+    if (kind !== 'friend_duplicate') {
+      return c.json({
+        success: false,
+        error: '検出する候補の種類が正しくありません',
+        code: 'INVALID_DETECTION_KIND',
+      }, 400);
+    }
+    if (!canUseKind(c, kind)) {
+      return c.json({ success: false, error: '候補を検出する権限がありません', code: 'FORBIDDEN' }, 403);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
+    const data = await detectFriendDuplicateCandidates(c.env.DB, {
+      tenantId: tenantId(c),
+      allowedAccountIds: scope.allowedAccountIds,
+      limit: positiveInt(c.req.query('limit'), 50, 100),
+      after: c.req.query('after') ?? null,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
 identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const data = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
@@ -140,7 +167,7 @@ identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'adm
     }
     const accountIds = await candidateAccountIds(c.env.DB, tenantId(c), data.id);
     if (!await canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds)) {
-      return c.json({ success: false, error: 'この候補を表示する権限がありません', code: 'FORBIDDEN' }, 403);
+      return c.json({ success: false, error: '候補が見つかりません', code: 'CANDIDATE_NOT_FOUND' }, 404);
     }
     return c.json({ success: true, data });
   } catch (error) {
@@ -148,7 +175,7 @@ identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'adm
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin', 'staff'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin'), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
@@ -171,7 +198,7 @@ identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owne
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin', 'staff'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin'), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {

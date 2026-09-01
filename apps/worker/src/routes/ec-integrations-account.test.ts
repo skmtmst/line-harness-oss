@@ -18,11 +18,13 @@ vi.mock('../services/nen-engagement.js', () => ({ enqueuePostShippingFollowUps: 
 
 const { ecIntegrations } = await import('./ec-integrations.js');
 
-async function signature(secret: string, timestamp: string, body: string) {
+async function signature(secret: string, timestamp: string, accountId: string, body: string) {
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );
-  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${body}`)));
+  const bytes = new Uint8Array(await crypto.subtle.sign(
+    'HMAC', key, new TextEncoder().encode(`${timestamp}.${accountId}.${body}`),
+  ));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
@@ -48,6 +50,7 @@ function harness() {
 
 async function signedRequest(
   app: Hono<any>, db: D1Database, event: Record<string, unknown>, accountId = 'account-a',
+  signedAccountId = accountId,
 ) {
   const secret = 'a'.repeat(32);
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -58,7 +61,7 @@ async function signedRequest(
       'content-type': 'application/json',
       'x-line-account-id': accountId,
       'x-nen-timestamp': timestamp,
-      'x-nen-signature': `sha256=${await signature(secret, timestamp, body)}`,
+      'x-nen-signature': `sha256=${await signature(secret, timestamp, signedAccountId, body)}`,
     },
     body,
   }, { DB: db, ECCUBE_WEBHOOK_SECRET: secret, LINE_CHANNEL_ACCESS_TOKEN: 'default-token' });
@@ -82,6 +85,13 @@ describe('EC-CUBE event account and identity boundary', () => {
       method: 'POST', body: JSON.stringify(baseEvent),
     }, { DB: db, ECCUBE_WEBHOOK_SECRET: 'a'.repeat(32) });
     expect(response.status).toBe(400);
+    expect(mocks.getAccount).not.toHaveBeenCalled();
+  });
+
+  it('binds the destination LINE account to the webhook signature', async () => {
+    const { app, db } = harness();
+    const response = await signedRequest(app, db, baseEvent, 'account-b', 'account-a');
+    expect(response.status).toBe(401);
     expect(mocks.getAccount).not.toHaveBeenCalled();
   });
 
