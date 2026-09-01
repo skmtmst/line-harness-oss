@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする72ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする73ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -82,6 +82,9 @@ describe('共通部品の影響範囲', () => {
       'components/line-notifications/operator-notification-rules.tsx',
       'components/merged-person/merged-delivery-dialog.tsx',
       'components/merged-person/merged-person-detail.tsx',
+      // 2026-09-02: 作成画面のV6版が、保存・キャンセルを下部追従バーへ
+      // 出すのに共通Buttonを使う。V5版の素のボタンはそのまま。
+      'components/shared/create-page.tsx',
       'components/store-selection-gate.tsx',
       'components/users/user-row.tsx',
     ])
@@ -92,10 +95,13 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする15ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする16ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
+      // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
+      // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
+      'app/affiliates/tabs.tsx',
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
       'app/form-submissions/page.tsx',

@@ -3,12 +3,26 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
+import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
 import { formatMileageDate } from './mileage-display'
+import {
+  RULE_FILTERS,
+  RULE_SORTS,
+  earningRulesCsv,
+  ruleLimitLabel,
+  selectRules,
+  type RuleFilter,
+  type RuleSort,
+} from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 
@@ -43,27 +57,6 @@ const EVENT_LABELS: Record<string, string> = {
   purchase_completed: '購入完了',
 }
 
-const EVENT_COLORS: Record<string, string> = {
-  message_received: 'bg-blue-50 text-blue-700 border-blue-100',
-  link_clicked: 'bg-violet-50 text-violet-700 border-violet-100',
-  form_submitted: 'bg-amber-50 text-amber-700 border-amber-100',
-  booking_created: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  webinar_watch_5m: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  webinar_watch_15m: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  webinar_completed: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  webinar_cta_clicked: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-  instagram_dm_received: 'bg-pink-50 text-pink-700 border-pink-100',
-  instagram_comment_created: 'bg-pink-50 text-pink-700 border-pink-100',
-  instagram_story_mentioned: 'bg-pink-50 text-pink-700 border-pink-100',
-  instagram_line_returned: 'bg-pink-50 text-pink-700 border-pink-100',
-  friend_registered: 'bg-lime-50 text-lime-700 border-lime-100',
-  friend_following_7d: 'bg-lime-50 text-lime-700 border-lime-100',
-  friend_following_30d: 'bg-lime-50 text-lime-700 border-lime-100',
-  friend_following_90d: 'bg-lime-50 text-lime-700 border-lime-100',
-  friend_following_180d: 'bg-lime-50 text-lime-700 border-lime-100',
-  friend_following_365d: 'bg-lime-50 text-lime-700 border-lime-100',
-  purchase_completed: 'bg-yellow-50 text-yellow-800 border-yellow-100',
-}
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ja-JP').format(value)
@@ -85,16 +78,6 @@ function isMileageAdminOverview(value: unknown): value is MileageAdminOverview {
     && typeof candidate.pagination.offset === 'number'
 }
 
-function ruleLimit(rule: MileageRule) {
-  if (rule.conditions.uniquePerReferredFriendPerSubject) return '紹介された人・対象ごとに1回'
-  if (rule.conditions.uniquePerReferredFriend) return '紹介された人1人につき1回'
-  if (rule.conditions.uniquePerSubject) return '対象ごとに1回'
-  if (rule.conditions.uniquePerSubjectPerDay && rule.conditions.dailyCapActions) {
-    return `同じリンクは1日1回・1日${rule.conditions.dailyCapActions}件まで`
-  }
-  if (rule.conditions.dailyCapActions) return `1日${rule.conditions.dailyCapActions}回まで`
-  return '行動ごとに付与'
-}
 
 function commitmentLabel(actions: number, miles: number) {
   if (actions >= 30 || miles >= 200) return { text: 'コミット強', style: 'bg-rose-50 text-rose-700' }
@@ -118,6 +101,8 @@ function MileagePageInner() {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
+  const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
+  const [ruleSort, setRuleSort] = useState<RuleSort>('newest')
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -198,6 +183,27 @@ function MileagePageInner() {
 
   const totalPages = Math.max(1, Math.ceil((overview?.pagination?.total ?? 0) / PAGE_SIZE))
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
+
+  const shownRules = useMemo(
+    () => selectRules(rules, { filters: ruleFilters, sort: ruleSort }),
+    [rules, ruleFilters, ruleSort],
+  )
+
+  const exportRulesCsv = () => {
+    const csv = earningRulesCsv(shownRules, {
+      event: (eventType) => EVENT_LABELS[eventType] || eventType,
+      date: formatMileageDate,
+    })
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
+    )
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const summary = overview?.summary
   const members = overview?.members ?? []
   const accountLabel = useMemo(() => {
@@ -285,25 +291,25 @@ function MileagePageInner() {
       </div>
       </>}
 
-      {tab === 'earning-rules' && <section className="mb-6 rounded-xl border border-gray-200 bg-white">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">マイル付与ルール</h2>
-          <p className="mt-1 text-xs text-gray-500">付与数を変更すると、変更後に発生した行動から新しい値が使われます。</p>
-        </div>
+      {tab === 'earning-rules' && <div className="mb-6">
+        {/* 設計 N46cQ に本文見出しは無い。画面名はタブが持っているので、
+            ここで見出しをもう一度書かない。 */}
+        <NoteBar>
+          どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
+        </NoteBar>
+
         {loading ? (
           <ListState
             kind="loading"
             title="たまる決めごとを読み込んでいます"
             description="このまま少しお待ちください。"
-            className="m-4"
           />
         ) : loadError ? (
           <ListState
             kind="error"
-            title="たまる決めごとを表示できませんでした"
+            title="たまる決めごとを読み込めませんでした"
             description="再読み込みしても直らない場合はエラー報告へ。"
             action={<Button onClick={() => void reloadAll()}>決めごとを再読み込み</Button>}
-            className="m-4"
           />
         ) : rules.length === 0 ? (
           <ListState
@@ -311,50 +317,112 @@ function MileagePageInner() {
             title="まだ決めごとがありません"
             description="どんなことをしたら何マイル付けるかを決めます。"
             action={<Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>}
-            className="m-4"
           />
         ) : (
-        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
-          {rules.map((rule) => (
-            <div key={rule.id} className={`rounded-xl border p-4 ${rule.isActive ? 'border-gray-200' : 'border-gray-100 bg-gray-50 opacity-70'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${EVENT_COLORS[rule.eventType] || 'bg-gray-50 text-gray-600 border-gray-100'}`}>
-                    {EVENT_LABELS[rule.eventType] || rule.eventType}
-                  </span>
-                  <p className="mt-2 text-sm font-semibold text-gray-900">{rule.name}</p>
-                </div>
-                <Button
-                  disabled={savingRuleId === rule.id}
-                  onClick={() => void updateRule(rule, { isActive: !rule.isActive })}
-                  aria-label={`${rule.name}を${rule.isActive ? '停止' : '再開'}する`}
-                >
-                  {savingRuleId === rule.id
-                    ? '反映しています'
-                    : rule.isActive ? '決めごとを停止' : '決めごとを再開'}
-                </Button>
-              </div>
-              <p className={`mt-3 text-xs font-semibold ${rule.isActive ? 'text-green-700' : 'text-gray-500'}`}>
-                {rule.isActive ? '動いています' : '止めています'}
-              </p>
-              <div className="mt-4 flex items-end gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  value={amounts[rule.id] ?? rule.amount}
-                  onChange={(event) => setAmounts((current) => ({ ...current, [rule.id]: event.target.value }))}
-                  onBlur={() => void saveAmount(rule)}
-                  onKeyDown={(event) => { if (event.key === 'Enter') void saveAmount(rule) }}
-                  className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-right text-lg font-bold text-gray-900 outline-none focus:border-indigo-400"
-                />
-                <span className="pb-2 text-xs text-gray-500">mile</span>
-              </div>
-              <p className="mt-2 text-[11px] text-gray-400">{ruleLimit(rule)}</p>
-            </div>
+        <>
+        <div
+          className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        >
+          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+          <Select
+            aria-label="並び順"
+            value={ruleSort}
+            options={RULE_SORTS.map((o) => ({ value: o.value, label: o.label }))}
+            onChange={(value) => setRuleSort(value as RuleSort)}
+          />
+          {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
+          <Button onClick={exportRulesCsv} disabled={shownRules.length === 0} className="ml-auto">
+            CSVで書き出す
+          </Button>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {RULE_FILTERS.map((f) => (
+            <FilterChip
+              key={f.key}
+              selected={ruleFilters.includes(f.key)}
+              onChange={(selected) => {
+                setRuleFilters((current) =>
+                  selected ? [...current, f.key] : current.filter((k) => k !== f.key),
+                )
+              }}
+            >
+              {f.label}
+            </FilterChip>
           ))}
         </div>
+
+        {shownRules.length === 0 ? (
+          <ListState
+            kind="empty"
+            title="絞り込みに合う決めごとがありません"
+            description="絞り込みの札を外すと表示されます。"
+          />
+        ) : (
+        <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+          <table className="w-full min-w-[880px]">
+            <thead>
+              <TableHeadRow>
+                <Th>決めごと</Th>
+                <Th>対象の行動</Th>
+                <Th align="right">付与マイル</Th>
+                <Th>上限</Th>
+                <Th align="center">状態</Th>
+                <Th align="center">操作</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody className="divide-hairline divide-y">
+              {shownRules.map((rule) => (
+                <tr key={rule.id} className="hover:bg-canvas-sunken">
+                  <td className="text-ink px-4 py-3 text-sm font-medium">{rule.name}</td>
+                  <td className="text-ink-secondary px-4 py-3 text-sm">
+                    {EVENT_LABELS[rule.eventType] || rule.eventType}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        aria-label={`${rule.name}の付与マイル`}
+                        value={amounts[rule.id] ?? rule.amount}
+                        onChange={(event) => setAmounts((current) => ({ ...current, [rule.id]: event.target.value }))}
+                        onBlur={() => void saveAmount(rule)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') void saveAmount(rule) }}
+                        className="border-hairline rounded-control text-ink focus:ring-accent w-24 border px-3 py-2 text-right text-sm font-semibold tabular-nums focus:ring-2 focus:outline-none"
+                      />
+                      <span className="text-ink-faint text-xs">mile</span>
+                    </div>
+                  </td>
+                  <td className="text-ink-secondary px-4 py-3 text-sm">{ruleLimitLabel(rule)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {rule.isActive ? <Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <Button
+                      disabled={savingRuleId === rule.id}
+                      onClick={() => void updateRule(rule, { isActive: !rule.isActive })}
+                      aria-label={`${rule.name}を${rule.isActive ? '停止' : '再開'}する`}
+                    >
+                      {savingRuleId === rule.id
+                        ? '反映しています'
+                        : rule.isActive ? '決めごとを停止' : '決めごとを再開'}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         )}
-      </section>}
+
+        <p className="text-ink-faint mt-3 text-xs font-semibold tabular-nums">
+          {shownRules.length === rules.length
+            ? `全 ${rules.length}件`
+            : `${shownRules.length}件 / 全 ${rules.length}件`}
+        </p>
+        </>
+        )}
+      </div>}
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 

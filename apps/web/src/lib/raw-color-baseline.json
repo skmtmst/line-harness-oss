@@ -1,6 +1,6 @@
 {
   "app/affiliate-offers/page.tsx": 1,
-  "app/affiliates/tabs.tsx": 257,
+  "app/affiliates/tabs.tsx": 230,
   "app/auto-replies/page.tsx": 17,
   "app/automations/page.tsx": 50,
   "app/booking/bookings/detail/page.tsx": 1,
@@ -28,7 +28,7 @@
   "app/inflow-links/_components/edit-route-modal.tsx": 31,
   "app/inflow-links/page.tsx": 49,
   "app/line-notifications/page.tsx": 6,
-  "app/mileage/page.tsx": 121,
+  "app/mileage/page.tsx": 45,
   "app/nen-campaigns/page.tsx": 196,
   "app/notifications/page.tsx": 6,
   "app/pools/page.tsx": 35,

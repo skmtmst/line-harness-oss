@@ -49,8 +49,11 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
     // 両方を統合した現在の7ルートを基準に締め直す。
-    expect(openings).toHaveLength(33)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(14)
+    // 2026-09-02: 案件タブに CSV書き出し・再読み込み・空状態の作成を足し、
+    // 一覧下の素の「更新」を外した。33→36。
+    expect(openings).toHaveLength(36)
+    // 空状態からも案件を作れるようにしたぶん、主要操作が1つ増えて15。
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(15)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -191,7 +194,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 1232→1231。**減ったので締め直す。**
     // 2026-09-01: #420 の友だち情報欄と最新 development を統合した木を
     // 再計測し、任意値は1224。片側の古い基準値は採用していない。
-    expect(debt['arbitrary-value']).toBe(1224)
+    // 2026-09-02: 案件タブの検索欄を設計の460px、作成画面のV6版を
+    // 設計の余白18px・右カラム390pxへ合わせ、たまる決めごとをトークンへ
+    // 寄せて1つ減らした。1224→1227。
+    expect(debt['arbitrary-value']).toBe(1227)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
