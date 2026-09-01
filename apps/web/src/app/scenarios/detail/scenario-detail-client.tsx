@@ -273,6 +273,9 @@ export default function ScenarioDetailClient({
   const [deleteStepTarget, setDeleteStepTarget] = useState<ScenarioStep | null>(null)
   const [deletingStepId, setDeletingStepId] = useState<string | null>(null)
   const [deleteStepError, setDeleteStepError] = useState('')
+  const [deleteScenarioOpen, setDeleteScenarioOpen] = useState(false)
+  const [deletingScenario, setDeletingScenario] = useState(false)
+  const [deleteScenarioError, setDeleteScenarioError] = useState('')
   const [showStepForm, setShowStepForm] = useState(false)
   /** 何通目のあとに差し込むか。末尾に足すときは null。 */
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
@@ -475,20 +478,18 @@ export default function ScenarioDetailClient({
   }
 
   const handleDeleteScenario = async () => {
-    if (!scenario) return
-    const count = stats?.activeNow ?? 0
-    const message =
-      count > 0
-        ? `「${scenario.name}」はいま ${count} 人が購読中です。\n削除すると配信が止まり、途中の人は続きを受け取れません。よろしいですか？`
-        : `「${scenario.name}」を削除しますか？`
-    if (!confirm(message)) return
-    setError('')
+    if (!scenario || deletingScenario) return
+    setDeletingScenario(true)
+    setDeleteScenarioError('')
     try {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
+      setDeleteScenarioOpen(false)
       router.push('/scenarios')
     } catch {
-      setError('削除に失敗しました')
+      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingScenario(false)
     }
   }
 
@@ -1813,7 +1814,11 @@ export default function ScenarioDetailClient({
         </Link>
         <button
           type="button"
-          onClick={() => void handleDeleteScenario()}
+          data-qa-open="dqFft-scenario"
+          onClick={() => {
+            setDeleteScenarioError('')
+            setDeleteScenarioOpen(true)
+          }}
           className="text-danger hover:underline text-sm font-medium"
         >
           このシナリオを削除
@@ -1841,6 +1846,31 @@ export default function ScenarioDetailClient({
           if (deletingStepId) return
           setDeleteStepTarget(null)
           setDeleteStepError('')
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteScenarioOpen && scenario !== null}
+        title={scenario ? `「${scenario.name}」を削除しますか？` : 'このシナリオを削除しますか？'}
+        description={[
+          stats?.activeNow === undefined
+            ? '購読中の人数は確認できません。'
+            : stats.activeNow === 0
+              ? '現在購読中の友だちは0人です。'
+              : `現在${stats.activeNow.toLocaleString('ja-JP')}人が購読中です。途中の人は続きを受け取れません。`,
+          'シナリオの設定と今後の配信が削除されます。',
+          'これまでの配信履歴は監査記録として残ります。',
+          'この操作は取り消せません。',
+        ].join(' ')}
+        confirmLabel="このシナリオを削除"
+        destructive
+        busy={deletingScenario}
+        error={deleteScenarioError}
+        onConfirm={() => void handleDeleteScenario()}
+        onCancel={() => {
+          if (deletingScenario) return
+          setDeleteScenarioOpen(false)
+          setDeleteScenarioError('')
         }}
       />
 
