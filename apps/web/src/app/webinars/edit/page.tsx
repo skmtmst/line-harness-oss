@@ -840,7 +840,7 @@ type TabKey = (typeof TABS)[number][0]
 
 function EditWebinarInner() {
   const id = useSearchParams().get('id')
-  const { accounts } = useAccount()
+  const { accounts, loading: accountsLoading } = useAccount()
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -889,7 +889,11 @@ function EditWebinarInner() {
     : null
   const previewUnavailableReason = webinar.status !== 'active'
     ? '公開すると、友だちが見るページを確認できます'
-    : 'このLINE公式アカウントにはLIFF IDが設定されていません'
+    : accountsLoading
+      ? 'LINE公式アカウントを確認しています'
+      : !webinar.accountId || !webinarAccount
+        ? 'このウェビナーのLINE公式アカウントを確認できません'
+        : 'このLINE公式アカウントにはLIFF IDが設定されていません'
 
   return (
     <>

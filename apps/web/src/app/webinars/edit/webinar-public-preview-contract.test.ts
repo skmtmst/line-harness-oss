@@ -28,6 +28,13 @@ describe('V6 ウェビナー公開ページ確認の契約', () => {
     expect(PAGE).toContain('<Button data-design-node="GB0NR" disabled')
   })
 
+  it('アカウント読込中や所属未取得をLIFF未設定と言い切らない', () => {
+    expect(PAGE).toContain('const { accounts, loading: accountsLoading } = useAccount()')
+    expect(PAGE).toContain("accountsLoading\n      ? 'LINE公式アカウントを確認しています'")
+    expect(PAGE).toContain('!webinar.accountId || !webinarAccount')
+    expect(PAGE).toContain('このウェビナーのLINE公式アカウントを確認できません')
+  })
+
   it('内部の管理APIやslugだけの相対URLを公開先にしない', () => {
     expect(PAGE).toContain('https://liff.line.me/')
     expect(PAGE).not.toContain('href={`/webinar/${webinar.slug}`')
