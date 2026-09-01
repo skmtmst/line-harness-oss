@@ -12,7 +12,7 @@
 export type AuditTargetKind = 'support_mark' | 'saved_search' | 'tag' | 'friend_field';
 
 /** 何をしたか。 */
-export type AuditAction = 'changed' | 'used' | 'created' | 'deleted';
+export type AuditAction = 'changed' | 'used' | 'created' | 'deleted' | 'archived';
 
 export interface RecordOperationInput {
   targetKind: AuditTargetKind;
