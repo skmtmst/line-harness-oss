@@ -211,9 +211,11 @@
     "202_nen_photo_review_decisions.sql",
     "203_saved_search_references.sql",
     "204_analytics_saved_results.sql",
+    "205_tenant_feature_packs.sql",
     "252_template_questions.sql",
+    "253_friend_bulk_runs.sql",
     "257_identity_candidates.sql",
     "258_merged_people_detail.sql"
   ],
-  "migrationCount": 214
+  "migrationCount": 216
 }

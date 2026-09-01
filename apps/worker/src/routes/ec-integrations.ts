@@ -290,10 +290,6 @@ export function ecTextMessage(event: EcEvent, options?: EcMessageOptions): Messa
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   const lineAccountId = c.req.header('x-line-account-id')?.trim();
   if (!lineAccountId) return c.json({ success: false, error: 'LINE account is required' }, 400);
-  const account = await getLineAccountById(c.env.DB, lineAccountId);
-  if (!account || account.is_active !== 1) {
-    return c.json({ success: false, error: 'Integration account is not configured' }, 404);
-  }
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) {
     console.error('[ec-event] ECCUBE_WEBHOOK_SECRET is missing or too short');
@@ -314,9 +310,14 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   if (!Number.isInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS) {
     return c.json({ success: false, error: 'Expired request' }, 401);
   }
-  const expected = await hmacHex(secret, `${timestamp}.${rawBody}`);
+  const expected = await hmacHex(secret, `${timestamp}.${lineAccountId}.${rawBody}`);
   if (!constantTimeHexEqual(signature.toLowerCase(), expected)) {
     return c.json({ success: false, error: 'Invalid signature' }, 401);
+  }
+
+  const account = await getLineAccountById(c.env.DB, lineAccountId);
+  if (!account || account.is_active !== 1) {
+    return c.json({ success: false, error: 'Integration account is not configured' }, 404);
   }
 
   let event: unknown;
