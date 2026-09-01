@@ -214,8 +214,9 @@
     "205_tenant_feature_packs.sql",
     "252_template_questions.sql",
     "253_friend_bulk_runs.sql",
+    "256_friend_add_routing_versions.sql",
     "257_identity_candidates.sql",
     "258_merged_people_detail.sql"
   ],
-  "migrationCount": 216
+  "migrationCount": 217
 }

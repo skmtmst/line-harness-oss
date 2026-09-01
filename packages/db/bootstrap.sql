@@ -1041,6 +1041,24 @@ CREATE TABLE friend_add_events (
   UNIQUE (line_account_id, webhook_event_id)
 );
 
+CREATE TABLE friend_add_routing_versions (
+  id                         TEXT PRIMARY KEY,
+  line_account_id            TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  version_number             INTEGER NOT NULL,
+  definition_snapshot        TEXT NOT NULL CHECK (json_valid(definition_snapshot)),
+  status                     TEXT NOT NULL CHECK (status IN ('draft', 'published', 'retired')),
+  last_test_status           TEXT CHECK (last_test_status IN ('succeeded', 'failed')),
+  last_tested_at             TEXT,
+  last_tested_by_staff_id    TEXT,
+  published_at               TEXT,
+  published_by_staff_id      TEXT,
+  publish_idempotency_key    TEXT,
+  created_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, version_number),
+  UNIQUE (line_account_id, publish_idempotency_key)
+);
+
 CREATE TABLE friend_bulk_run_items (
   id                TEXT PRIMARY KEY,
   run_id            TEXT NOT NULL REFERENCES friend_bulk_runs(id) ON DELETE CASCADE,
@@ -3176,6 +3194,17 @@ CREATE INDEX idx_friend_add_events_account_time
 CREATE INDEX idx_friend_add_events_friend
   ON friend_add_events(line_account_id, friend_id, occurred_at DESC);
 
+CREATE UNIQUE INDEX idx_friend_add_routing_one_draft
+  ON friend_add_routing_versions (line_account_id)
+  WHERE status = 'draft';
+
+CREATE UNIQUE INDEX idx_friend_add_routing_one_published
+  ON friend_add_routing_versions (line_account_id)
+  WHERE status = 'published';
+
+CREATE INDEX idx_friend_add_routing_versions_status
+  ON friend_add_routing_versions (line_account_id, status, version_number DESC);
+
 CREATE INDEX idx_friend_bulk_run_items_work
   ON friend_bulk_run_items(run_id, status, retry_at, lease_expires_at, ordinal);
 
@@ -3751,6 +3780,24 @@ CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
+
+CREATE TRIGGER trg_friend_add_routing_versions_immutable_delete
+BEFORE DELETE ON friend_add_routing_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published friend-add routing versions cannot be deleted'); END;
+
+CREATE TRIGGER trg_friend_add_routing_versions_immutable_update
+BEFORE UPDATE OF line_account_id, version_number, definition_snapshot
+ON friend_add_routing_versions
+WHEN OLD.status IN ('published', 'retired')
+BEGIN SELECT RAISE(ABORT, 'published friend-add routing versions are immutable'); END;
+
+CREATE TRIGGER trg_friend_add_routing_versions_status_transition
+BEFORE UPDATE OF status ON friend_add_routing_versions
+WHEN OLD.status IN ('published', 'retired')
+ AND NEW.status <> OLD.status
+ AND NOT (OLD.status = 'published' AND NEW.status = 'retired')
+BEGIN SELECT RAISE(ABORT, 'published friend-add routing version status cannot move backwards'); END;
 
 CREATE TRIGGER trg_messages_log_queue_url_exposure
 AFTER INSERT ON messages_log

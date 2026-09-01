@@ -9,7 +9,7 @@
  *
  * 守っていること
  * - ローカル専用。`NODE_ENV=production` では起動しない。127.0.0.1 にだけ開く
- * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない
+ * - **更新は原則失敗させる。** 画面確認専用の固定結果だけは返すが、保存も配信も起きない
  * - 実データ・秘密値を持たない。名前も固定の作り物
  * - 毎回まったく同じものを返す。乱数も時刻も使わない（画像が毎回同じになる）
  *
@@ -20,6 +20,10 @@
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  FRIEND_ADD_LIFECYCLE_DRAFT,
+  FRIEND_ADD_LIFECYCLE_PUBLISHED,
+  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
+  FRIEND_ADD_LIFECYCLE_VALIDATION,
   CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
@@ -318,6 +322,27 @@ const SHAPES = {
   '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
   '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
 
+  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
+  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
+  '/api/friend-add-routing/conflicts': { conflicts: [] },
+
+}
+
+/**
+ * 画面確認だけで完結する、保存を伴わない固定の返事。
+ * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
+ */
+function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
+    return FRIEND_ADD_LIFECYCLE_VALIDATION
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
+    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
+    return FRIEND_ADD_LIFECYCLE_PUBLISHED
+  }
+  return null
 }
 
 /** `success` の器に入れず、そのまま返すもの。 */
@@ -517,7 +542,7 @@ const server = createServer((req, res) => {
     'Access-Control-Allow-Headers',
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
   )
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
@@ -526,7 +551,8 @@ const server = createServer((req, res) => {
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-  // 更新は通さない。ここで通すと「保存できたつもり」の画像が撮れてしまい、
+  // 更新は原則通さない。固定結果を返す3口も保存・配信は一切行わない。
+  // それ以外を通すと「保存できたつもり」の画像が撮れてしまい、
   // 動いていない画面を動いていると読み違える。
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
@@ -534,6 +560,11 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    const fixedResult = visualQaWriteBody(method, url.pathname)
+    if (fixedResult) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: fixedResult }))
       return
     }
     // 対象確認は書き込みを起こさない。IAf7j の確認窓を通常データで撮るため、
@@ -583,5 +614,5 @@ process.on('uncaughtException', (error) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（GETのみ・更新は405）`)
+  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（固定の画面確認結果以外の更新は405）`)
 })
