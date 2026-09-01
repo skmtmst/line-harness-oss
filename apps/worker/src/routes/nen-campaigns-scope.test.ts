@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   getLineAccountById: vi.fn(),
   getNenCampaign: vi.fn(),
   queueColumnDelivery: vi.fn(),
+  saveNenCampaignAccountSetting: vi.fn(),
+  getNenBirthdayCouponSetting: vi.fn(),
+  saveNenBirthdayCouponSetting: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: mocks.canAccess }));
@@ -18,6 +21,9 @@ vi.mock('../services/nen-engagement.js', () => ({
   buildNenDeliveryMessages: vi.fn(),
   getNenCampaign: mocks.getNenCampaign,
   queueColumnDelivery: mocks.queueColumnDelivery,
+  saveNenCampaignAccountSetting: mocks.saveNenCampaignAccountSetting,
+  getNenBirthdayCouponSetting: mocks.getNenBirthdayCouponSetting,
+  saveNenBirthdayCouponSetting: mocks.saveNenBirthdayCouponSetting,
 }));
 vi.mock('../services/nen-tag-sync.js', () => ({ syncNenPetTags: vi.fn() }));
 
@@ -49,6 +55,34 @@ beforeEach(() => {
 });
 
 describe('NEN campaign tenant scope', () => {
+  test('requires an explicit LINE account for account-owned settings', async () => {
+    const missing = await app().request('/api/nen-campaigns/settings');
+    expect(missing.status).toBe(400);
+
+    mocks.canAccess.mockResolvedValue(false);
+    const denied = await app().request('/api/nen-campaigns/settings?lineAccountId=other-account');
+    expect(denied.status).toBe(403);
+    expect(mocks.getNenCampaign).not.toHaveBeenCalled();
+  });
+
+  test('stores campaign edits for the selected account instead of changing the shared default', async () => {
+    mocks.getNenCampaign.mockResolvedValue({
+      campaign_key: 'column', label: 'NENコラム', category: 'column', trigger_event: null,
+      delay_days: 0, delivery_time: '10:00', is_enabled: 1, title: '共通見出し', body_text: '共通本文',
+      button_label: null, button_url: null, image_url: null, updated_at: '2026-08-01 00:00:00',
+    });
+    const response = await app().request('/api/nen-campaigns/settings/column?lineAccountId=own-account', {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+        isEnabled: true, title: '自社アカウントの見出し', bodyText: '自社アカウントの本文',
+        delayDays: 0, deliveryTime: '10:00', buttonLabel: '', buttonUrl: '', imageUrl: '',
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.saveNenCampaignAccountSetting).toHaveBeenCalledWith(
+      expect.anything(), 'own-account', expect.objectContaining({ title: '自社アカウントの見出し' }),
+    );
+  });
+
   test('rejects another tenant test-send before account lookup or LINE work starts', async () => {
     mocks.canAccess.mockResolvedValue(false);
     const response = await app().request('/api/nen-campaigns/test-send', json({

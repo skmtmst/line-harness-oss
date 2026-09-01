@@ -61,7 +61,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
       setItems([])
       setStatus(forbidden ? 'forbidden' : 'error')
       setSummary(null)
-      setError(forbidden ? '' : reason instanceof ApiError ? reason.message : '友だち情報欄を読み込めませんでした')
+      setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')
     }
   }, [accountId])
 
