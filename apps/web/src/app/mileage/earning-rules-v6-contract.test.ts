@@ -8,6 +8,7 @@ import {
   earningRulesCsv,
   hasRuleLimit,
   ruleLimitLabel,
+  ruleEventLabel,
   selectRules,
 } from './earning-rule-view'
 
@@ -80,6 +81,11 @@ describe('V6 たまる決めごと（N46cQ）の見せ方', () => {
     expect(
       ruleLimitLabel(rule({ id: 'z', conditions: { uniquePerSubjectPerDay: true, dailyCapActions: 3 } })),
     ).toBe('同じリンクは1日1回・1日3件まで')
+  })
+
+  it('未知の行動は内部語を出さず、運用者の言葉にする', () => {
+    expect(ruleEventLabel('message_received', { message_received: 'メッセージ' })).toBe('メッセージ')
+    expect(ruleEventLabel('internal_new_event', {})).toBe('その他の行動')
   })
 
   it('CSVは画面に出ている決めごとだけを、設計の見出しで書き出す', () => {

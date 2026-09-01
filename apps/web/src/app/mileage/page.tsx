@@ -18,6 +18,7 @@ import {
   RULE_FILTERS,
   RULE_SORTS,
   earningRulesCsv,
+  ruleEventLabel,
   ruleLimitLabel,
   selectRules,
   type RuleFilter,
@@ -114,7 +115,7 @@ function MileagePageInner() {
 
   const loadRules = useCallback(async () => {
     const res = await api.mileage.rules()
-    if (!res.success) throw new Error(res.error)
+    if (!res.success || !Array.isArray(res.data)) throw new Error('invalid_mileage_rules')
     setRules(res.data)
     setAmounts(Object.fromEntries(res.data.map((rule) => [rule.id, String(rule.amount)])))
   }, [])
@@ -191,7 +192,7 @@ function MileagePageInner() {
 
   const exportRulesCsv = () => {
     const csv = earningRulesCsv(shownRules, {
-      event: (eventType) => EVENT_LABELS[eventType] || eventType,
+      event: (eventType) => ruleEventLabel(eventType, EVENT_LABELS),
       date: formatMileageDate,
     })
     const url = URL.createObjectURL(
@@ -376,7 +377,7 @@ function MileagePageInner() {
                 <tr key={rule.id} className="hover:bg-canvas-sunken">
                   <td className="text-ink px-4 py-3 text-sm font-medium">{rule.name}</td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
-                    {EVENT_LABELS[rule.eventType] || rule.eventType}
+                    {ruleEventLabel(rule.eventType, EVENT_LABELS)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">

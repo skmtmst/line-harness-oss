@@ -72,6 +72,11 @@ export function selectRules(
 
 export const RULE_CSV_HEADER = ['決めごと', '対象の行動', '付与マイル', '上限', '状態', '作成日']
 
+/** 未知のイベント名を内部語のまま運用者へ見せない。 */
+export function ruleEventLabel(eventType: string, labels: Record<string, string>): string {
+  return labels[eventType] ?? 'その他の行動'
+}
+
 /** 画面に出ている決めごとをそのまま書き出す。サーバに書き出しの口は無い。 */
 export function earningRulesCsv(
   rules: MileageRule[],

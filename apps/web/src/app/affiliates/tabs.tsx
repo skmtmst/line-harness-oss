@@ -129,7 +129,9 @@ interface JourneySummary {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 function formatYen(n: number): string {
@@ -1401,18 +1403,18 @@ function OffersList({
               </td>
               <td className="text-ink-secondary px-4 py-3 text-sm">
                 {offer.lineAccountId
-                  ? accountMap.get(offer.lineAccountId) ?? offer.lineAccountId
+                  ? accountMap.get(offer.lineAccountId) ?? '—（名前を確認できません）'
                   : '（なし）'}
               </td>
               <td className="text-ink-secondary px-4 py-3 text-sm">
                 {offer.tagId ? (
-                  <Chip tone="info">{tagMap.get(offer.tagId) ?? offer.tagId}</Chip>
+                  <Chip tone="info">{tagMap.get(offer.tagId) ?? '—（名前を確認できません）'}</Chip>
                 ) : (
                   '（なし）'
                 )}
               </td>
               <td className="text-ink-secondary px-4 py-3 text-sm">
-                {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? offer.scenarioId : '（なし）'}
+                {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? '—（名前を確認できません）' : '（なし）'}
               </td>
               <td className="px-4 py-3 text-center">
                 {/* 「有効 / 無効」だと何が有効なのか読めない。設計は
@@ -1461,13 +1463,15 @@ export function OffersTab() {
     setOffersError(null)
     try {
       const res = await api.affiliateOffers.list()
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setOffers(res.data)
       } else {
+        setOffers([])
         setOffersError('案件を読み込めませんでした')
       }
-    } catch (e) {
-      setOffersError(e instanceof Error ? e.message : '案件を読み込めませんでした')
+    } catch {
+      setOffers([])
+      setOffersError('案件を読み込めませんでした')
     } finally {
       setOffersLoading(false)
     }
@@ -1480,9 +1484,9 @@ export function OffersTab() {
         api.tags.list(),
         api.scenarios.list(),
       ])
-      if (accountsRes.success) setAccounts(accountsRes.data as unknown as LineAccount[])
-      if (tagsRes.success) setTags(tagsRes.data as unknown as Tag[])
-      if (scenariosRes.success) setScenarios(scenariosRes.data as unknown as (Scenario & { stepCount?: number })[])
+      if (accountsRes.success && Array.isArray(accountsRes.data)) setAccounts(accountsRes.data as unknown as LineAccount[])
+      if (tagsRes.success && Array.isArray(tagsRes.data)) setTags(tagsRes.data as unknown as Tag[])
+      if (scenariosRes.success && Array.isArray(scenariosRes.data)) setScenarios(scenariosRes.data as unknown as (Scenario & { stepCount?: number })[])
     } catch { /* silent */ }
   }, [])
 
@@ -1499,7 +1503,7 @@ export function OffersTab() {
     void api.conversionApprovals
       .list({ status: 'approved', limit: 200 })
       .then((res) => {
-        if (cancelled || !res.success) return
+        if (cancelled || !res.success || !Array.isArray(res.data)) return
         const month = new Date().toISOString().slice(0, 7)
         setApprovedThisMonth(res.data.filter((a) => a.createdAt.slice(0, 7) === month))
       })

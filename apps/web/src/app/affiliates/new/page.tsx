@@ -72,6 +72,9 @@ export default function NewAffiliatePage() {
   const [startTracking, setStartTracking] = useState(true)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [copied, setCopied] = useState(false)
+  // 作成後の追加情報保存だけが失敗した場合、再押下で同じ紹介者を増やさず
+  // 追加情報の保存だけをやり直す。
+  const [createdId, setCreatedId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -108,32 +111,66 @@ export default function NewAffiliatePage() {
         if (payoutKind === 'rate' && !commissionRate.trim()) {
           return '売上に対する割合を入力してください'
         }
+        if (payoutKind === 'rate') {
+          const rate = Number(commissionRate)
+          if (!Number.isFinite(rate) || rate <= 0 || rate > 100) {
+            return '売上に対する割合は0より大きく100以下で入力してください'
+          }
+        }
+        if (holdDays.trim()) {
+          const days = Number(holdDays)
+          if (!Number.isInteger(days) || days < 0 || days > 365) {
+            return '確定までの保留期間は0日から365日の整数で入力してください'
+          }
+        }
         return null
       }}
       onReset={() => {
         setName('')
         setEmail('')
         setCode('')
+        setPayoutKind('per_conversion')
+        setCommissionRate('')
+        setHoldDays('30')
+        setPayoutCycle('')
+        setNotifyOnConversion(true)
+        setStartTracking(true)
+        setCopied(false)
+        setCreatedId(null)
       }}
       onSave={async () => {
-        const res = await api.affiliates.create({
-          name: name.trim(),
-          code: code.trim() || undefined,
-          commissionRate:
-            payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
-          issueInitialLink: true,
-        })
-        if (!res.success) throw new Error(res.error)
+        let affiliateId = createdId
+        if (!affiliateId) {
+          try {
+            const res = await api.affiliates.create({
+              name: name.trim(),
+              code: code.trim() || undefined,
+              commissionRate:
+                payoutKind === 'rate' && commissionRate.trim() ? Number(commissionRate) : undefined,
+              issueInitialLink: true,
+            })
+            if (!res.success) throw new Error('create_failed')
+            affiliateId = res.data.id
+            setCreatedId(affiliateId)
+          } catch {
+            throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
+          }
+        }
         // 連絡先・保留期間・支払いサイクル・通知・計測の開始は作成のAPIが
         // 受けないので、続けて更新する。1つの操作として見えるようにまとめる。
-        await api.affiliates.update(res.data.id, {
-          email: email.trim() || null,
-          holdDays: holdDays.trim() ? Number(holdDays) : null,
-          payoutCycle: payoutCycle.trim() || null,
-          notifyOnConversion,
-          isActive: startTracking,
-        })
-        return res.data.id
+        try {
+          const update = await api.affiliates.update(affiliateId, {
+            email: email.trim() || null,
+            holdDays: holdDays.trim() ? Number(holdDays) : null,
+            payoutCycle: payoutCycle.trim() || null,
+            notifyOnConversion,
+            isActive: startTracking,
+          })
+          if (!update.success) throw new Error('update_failed')
+        } catch {
+          throw new Error('基本情報は登録済みですが、追加情報を保存できませんでした。もう一度押すと、追加情報だけを保存します。')
+        }
+        return affiliateId
       }}
       aside={
         <>

@@ -925,10 +925,6 @@
     },
     "/conversions": {
       "node": "PouPn GH8VL n5VVTb ZrpKn GUxsj",
-      "implementationGaps": {
-        "parts": ["CSVで書き出す"],
-        "reason": "CSVを作る口が無い。押せない操作を置くより、本文で「まだ繋がっていません」と言う。口ができたら操作を戻す。"
-      },
       "name": "V6 16 成果・アフィリエイト＋V6 19 コンバージョン",
       "sections": [
         "Bar",

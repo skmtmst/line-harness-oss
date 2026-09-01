@@ -98,8 +98,9 @@ export const OFFER_CSV_HEADER = [
  * 画面に出ている行をそのまま書き出す。
  *
  * サーバに書き出しの口は無い。一覧は全件を読み込んでいるので、絞り込んだ
- * 結果はここで作れる。名前が引けないIDはIDのまま出す（空欄にすると、
- * 消えたのか元から無いのかが読めない）。
+ * 結果はここで作れる。名前が引けない参照は内部IDを出さず、未取得と分かる
+ * 言葉にする。空欄では「元から指定なし」と区別できず、IDを出すと運用者に
+ * 仕組みの記号を見せてしまうため。
  */
 export function offersCsv(
   offers: AffiliateOffer[],
@@ -117,9 +118,9 @@ export function offersCsv(
       csvCell(offer.description ?? ''),
       csvCell(offer.rewardAmount ?? ''),
       csvCell(offer.rewardMiles),
-      csvCell(offer.lineAccountId ? names.account(offer.lineAccountId) ?? offer.lineAccountId : ''),
-      csvCell(offer.tagId ? names.tag(offer.tagId) ?? offer.tagId : ''),
-      csvCell(offer.scenarioId ? names.scenario(offer.scenarioId) ?? offer.scenarioId : ''),
+      csvCell(offer.lineAccountId ? names.account(offer.lineAccountId) ?? '—（名前を確認できません）' : ''),
+      csvCell(offer.tagId ? names.tag(offer.tagId) ?? '—（名前を確認できません）' : ''),
+      csvCell(offer.scenarioId ? names.scenario(offer.scenarioId) ?? '—（名前を確認できません）' : ''),
       csvCell(offer.isActive ? '公開中' : '下書き'),
       csvCell(names.date(offer.createdAt)),
     ].join(','))

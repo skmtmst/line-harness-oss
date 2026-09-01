@@ -122,14 +122,15 @@ describe('V6 案件一覧（GH8VL）の見せ方', () => {
     expect(csv).not.toContain('初回購入')
   })
 
-  it('名前が引けないIDは、空欄にせずIDのまま出す', () => {
+  it('名前が引けない参照は、内部IDを出さず未取得と分かる言葉にする', () => {
     const csv = offersCsv([offer({ id: 'x', name: 'X', tagId: 'tag_9' })], {
       account: () => undefined,
       tag: () => undefined,
       scenario: () => undefined,
       date: () => '2026-01-01',
     })
-    expect(csv).toContain('tag_9')
+    expect(csv).toContain('—（名前を確認できません）')
+    expect(csv).not.toContain('tag_9')
   })
 })
 
@@ -165,6 +166,13 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
     expect(TABS).toContain('title="案件を読み込めませんでした"')
     expect(TABS).toContain('title="案件はまだ登録されていません"')
     expect(TABS).toContain('title="絞り込みに合う案件がありません"')
+  })
+
+  it('参照名を引けなくても内部IDを画面へ出さない', () => {
+    expect(TABS).not.toContain('?? offer.lineAccountId')
+    expect(TABS).not.toContain('?? offer.tagId')
+    expect(TABS).not.toContain('?? offer.scenarioId')
+    expect(TABS).toContain("'—（名前を確認できません）'")
   })
 })
 
@@ -211,5 +219,18 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {
     expect(NEW_PAGE).toContain('{previewUrl && (')
     expect(NEW_PAGE).toContain('navigator.clipboard?.writeText(previewUrl)')
+  })
+
+  it('基本情報の作成後に追加情報だけ失敗しても、再押下で同じ人を増やさない', () => {
+    expect(NEW_PAGE).toContain('const [createdId, setCreatedId]')
+    expect(NEW_PAGE).toContain('let affiliateId = createdId')
+    expect(NEW_PAGE).toContain('if (!affiliateId) {')
+    expect(NEW_PAGE).toContain('if (!update.success)')
+    expect(NEW_PAGE).toContain('もう一度押すと、追加情報だけを保存します。')
+  })
+
+  it('割合と保留期間をWorkerが受ける範囲で止める', () => {
+    expect(NEW_PAGE).toContain('rate <= 0 || rate > 100')
+    expect(NEW_PAGE).toContain('!Number.isInteger(days) || days < 0 || days > 365')
   })
 })
