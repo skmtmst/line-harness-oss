@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, CircleAlert, CircleCheck, CornerUpLeft } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import type { RichMenuAreaResponse } from '@/lib/api'
@@ -24,28 +24,46 @@ type RichMenuGroup = {
 function ConnectionsContent() {
   const groupId = useSearchParams().get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const activeAccountIdRef = useRef(selectedAccountId)
+  const requestGenerationRef = useRef(0)
   const [group, setGroup] = useState<RichMenuGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   usePageTitle(group ? `${group.name}・切替のつながり` : '切替メニューのつながり')
 
+  activeAccountIdRef.current = selectedAccountId
+
   const load = useCallback(async () => {
     if (!groupId || !selectedAccountId) {
       setLoading(false)
       return
     }
+    const accountId = selectedAccountId
+    const requestGeneration = ++requestGenerationRef.current
     setLoading(true)
+    setGroup(null)
     setError('')
     try {
       const response = await api.richMenuGroups.get(groupId)
+      if (
+        activeAccountIdRef.current !== accountId
+        || requestGenerationRef.current !== requestGeneration
+      ) return
       if (!response.success) throw new Error(response.error)
       setGroup(response.data as RichMenuGroup)
     } catch {
+      if (
+        activeAccountIdRef.current !== accountId
+        || requestGenerationRef.current !== requestGeneration
+      ) return
       setGroup(null)
       setError('切替のつながりを表示できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (
+        activeAccountIdRef.current === accountId
+        && requestGenerationRef.current === requestGeneration
+      ) setLoading(false)
     }
   }, [groupId, selectedAccountId])
 

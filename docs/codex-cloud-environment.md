@@ -27,4 +27,22 @@ Codex クラウド環境に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` �
 bash scripts/codex/doctor.sh
 ```
 
+## 手元のPCで走らせるとき
+
+Cloudflare への到達検査は、**Codex クラウド環境の境界**を見るものです。
+手元のPCからは普通につながるので、そのまま走らせると必ず「要確認」になります。
+その場合だけ、外すことを明示して実行します。
+
+```bash
+DOCTOR_LOCAL=1 bash scripts/codex/doctor.sh
+```
+
+**既定は検査したままです。** 逆（クラウドのときだけ検査する）にすると、
+クラウド側で付け忘れたときに境界の検査が黙って飛びます。付け忘れても
+検査が残る側に倒しています。外したときは「判定なし」と必ず表示します。
+
+`CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` の検査は、
+**`DOCTOR_LOCAL=1` でも常に走ります。** GitHub と npm registry への到達検査も
+同じで、どちらかへ到達できないときは合格になりません。
+
 最終行が `合格` のときだけ作業を開始します。`要確認：〜` の場合は、表示された理由を報告し、環境の設定が修正されるまで作業を開始しません。
