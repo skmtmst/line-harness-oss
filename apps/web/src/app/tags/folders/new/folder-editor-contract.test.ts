@@ -62,6 +62,15 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('操作する権限がありません')
     // 保存は読み込めているときだけ通す。
     expect(source).toContain("if (!name.trim() || saving || loadState !== 'ready') return")
+    expect(source).toContain('isCurrentFolderRequest(activeRequestRef.current, request)')
+    expect(source).toContain("setName('')")
+  })
+
+  it('保存上限をWorkerと揃え、APIの生文を画面へ出さない', () => {
+    const source = read(FOLDER_EDITOR)
+    expect(source).toContain('maxLength={60}')
+    expect(source).toContain('folderSaveErrorMessage(')
+    expect(source).not.toContain('throw new Error(result.error)')
   })
 
   it('保存が押せないときは、理由を本文に出す', () => {
@@ -69,7 +78,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('const blockedReason =')
     expect(source).toContain('disabled={saving || blockedReason !== null}')
     // 押せない見た目だけにしない。
-    expect(source).toContain('{blockedReason && <p')
+    expect(source).toContain("{loadState === 'ready' && blockedReason && (")
   })
 })
 

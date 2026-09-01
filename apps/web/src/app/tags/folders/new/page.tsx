@@ -1,12 +1,17 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import {
+  folderSaveErrorMessage,
+  isCurrentFolderRequest,
+  type FolderRequestKey,
+} from './folder-editor-state'
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280']
 
@@ -19,6 +24,7 @@ function FolderEditor() {
   const [scope, setScope] = useState<'tag' | 'friend_field'>('tag')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const activeRequestRef = useRef<FolderRequestKey>({ editId, generation: 0 })
   /**
    * 編集で開いたときの読み込み。`ready` になるまで名前も色も本物ではない。
    * 失敗を黙って捨てると、空欄のまま保存して**元の名前を消す**ことになる。
@@ -32,11 +38,31 @@ function FolderEditor() {
   usePageTitle(editId ? 'フォルダを編集' : 'フォルダを追加')
 
   const loadFolder = () => {
-    if (!editId) return
+    const request = {
+      editId,
+      generation: activeRequestRef.current.generation + 1,
+    }
+    activeRequestRef.current = request
+    setError('')
+    setSaving(false)
+
+    // 同じページで ?id= が外れた場合も、前の編集内容を新規作成へ持ち越さない。
+    if (!editId) {
+      setName('')
+      setColor(COLORS[0])
+      setScope('tag')
+      setLoadState('ready')
+      return
+    }
+
+    // 別フォルダの名前を読込中の面へ残さない。
+    setName('')
+    setColor(COLORS[0])
     setLoadState('loading')
     void api.tagGroups
       .list()
       .then((result) => {
+        if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
         if (!result.success) {
           setLoadState('error')
           return
@@ -51,6 +77,7 @@ function FolderEditor() {
         setLoadState('ready')
       })
       .catch((reason: unknown) => {
+        if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
         const status = (reason as { status?: number } | null)?.status
         setLoadState(status === 403 ? 'forbidden' : 'error')
       })
@@ -60,22 +87,25 @@ function FolderEditor() {
 
   const save = async () => {
     if (!name.trim() || saving || loadState !== 'ready') return
+    const request = { ...activeRequestRef.current }
     setSaving(true); setError('')
     try {
       if (scope === 'tag') {
         const result = editId
           ? await api.tagGroups.update(editId, { name: name.trim(), color })
           : await api.tagGroups.create({ name: name.trim(), color })
-        if (!result.success) throw new Error(result.error)
+        if (!result.success) throw new Error('save_failed')
       } else {
         const result = await api.folders.create({ kind: 'friend_field', name: name.trim(), color })
-        if (!result.success) throw new Error(result.error)
+        if (!result.success) throw new Error('save_failed')
       }
+      if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
       router.push(scope === 'tag' ? '/tags' : '/tags?tab=fields')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました')
+      if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
+      setError(folderSaveErrorMessage(reason instanceof ApiError ? reason.status : undefined))
     } finally {
-      setSaving(false)
+      if (isCurrentFolderRequest(activeRequestRef.current, request)) setSaving(false)
     }
   }
 
@@ -127,6 +157,7 @@ function FolderEditor() {
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例: 購入"
+                maxLength={60}
                 disabled={loadState !== 'ready'}
                 className="rounded-control border-hairline text-label focus:border-accent focus:ring-accent/15 h-11 w-full border px-3 outline-none focus:ring-2 disabled:opacity-40"
               />
@@ -191,7 +222,10 @@ function FolderEditor() {
 
             {error && <p className="text-danger mt-4 text-sm">{error}</p>}
             {/* 止まっている理由は本文に出す。押せない見た目だけにしない。 */}
-            {blockedReason && <p className="text-ink-faint mt-4 text-xs">{blockedReason}</p>}
+            {/* 読込中・失敗・権限不足は直前の状態表示で説明済み。同じ文を二重に出さない。 */}
+            {loadState === 'ready' && blockedReason && (
+              <p className="text-ink-faint mt-4 text-xs">{blockedReason}</p>
+            )}
 
             <div className="mt-7 flex justify-end gap-2">
               <button type="button" onClick={() => router.back()} className="rounded-control border-hairline text-ink-secondary border px-5 py-2.5 text-sm font-medium">キャンセル</button>
