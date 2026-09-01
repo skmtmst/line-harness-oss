@@ -38,6 +38,7 @@ import {
   dashboardNotificationDestination,
   dashboardNotificationFilters,
   dashboardNotificationItems,
+  isDashboardNotificationData,
   markDashboardNotificationRead,
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
@@ -486,7 +487,7 @@ export default function DashboardPage() {
         limit,
       })
       if (requestId !== notificationRequestId.current) return
-      if (!response.success) throw new Error(response.error)
+      if (!response.success || !isDashboardNotificationData(response.data)) throw new Error(response.error)
       setNotificationData(response.data)
     } catch {
       if (requestId !== notificationRequestId.current) return

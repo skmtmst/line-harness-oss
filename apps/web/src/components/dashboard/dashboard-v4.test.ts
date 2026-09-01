@@ -12,6 +12,7 @@ import {
   dashboardNotificationDestination,
   dashboardNotificationFilters,
   dashboardNotificationItems,
+  isDashboardNotificationData,
   markDashboardNotificationRead,
 } from './notification-summary'
 import { formatTrendSources } from './friend-trend-table'
@@ -221,6 +222,15 @@ describe('ダッシュボード通知', () => {
       { id: 'update', label: 'アップデート', count: 1 },
     ])
     expect(dashboardNotificationFilters(null).map((filter) => filter.count)).toEqual([null, null, null])
+    expect(dashboardNotificationFilters({} as NotificationCenterData).map((filter) => filter.count)).toEqual([null, null, null])
+  })
+
+  it('不完全な返事は0件として扱わず、取得失敗へ分ける', () => {
+    expect(isDashboardNotificationData(data)).toBe(true)
+    expect(isDashboardNotificationData({})).toBe(false)
+    expect(isDashboardNotificationData({ ...data, counts: undefined })).toBe(false)
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('!isDashboardNotificationData(response.data)')
   })
 
   it('本文と日本時間を表示し、種類と未読状態を保つ', () => {

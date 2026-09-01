@@ -3,13 +3,26 @@ import type { NotificationFilter, NotificationItem } from '@/components/shared/n
 
 export type DashboardNotificationFilter = 'all' | 'error' | 'update'
 
+export function isDashboardNotificationData(value: unknown): value is NotificationCenterData {
+  if (!value || typeof value !== 'object') return false
+  const data = value as Partial<NotificationCenterData>
+  const counts = data.counts
+  return Array.isArray(data.items)
+    && Boolean(counts)
+    && Number.isFinite(counts?.all)
+    && Number.isFinite(counts?.error)
+    && Number.isFinite(counts?.update)
+    && Number.isFinite(counts?.unread)
+    && Number.isFinite(data.unreadCount)
+}
+
 export function dashboardNotificationFilters(
   data: NotificationCenterData | null,
 ): NotificationFilter[] {
   return [
-    { id: 'all', label: 'すべて', count: data?.counts.all ?? null },
-    { id: 'error', label: 'エラー', count: data?.counts.error ?? null },
-    { id: 'update', label: 'アップデート', count: data?.counts.update ?? null },
+    { id: 'all', label: 'すべて', count: data?.counts?.all ?? null },
+    { id: 'error', label: 'エラー', count: data?.counts?.error ?? null },
+    { id: 'update', label: 'アップデート', count: data?.counts?.update ?? null },
   ]
 }
 
