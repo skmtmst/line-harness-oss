@@ -413,7 +413,7 @@
     "direct-th": 13,
     "unresolved-classname": 8,
     "arbitrary-value": 23,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
     "direct-secondary-button": 4,
