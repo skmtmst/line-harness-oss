@@ -1,5 +1,6 @@
 'use client'
 
+import StepTrail from '@/components/shared/step-trail'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -227,17 +228,14 @@ function ScenarioModeContent() {
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
-      <ol
-        data-design="Steps"
-        aria-label="シナリオ作成の進み方"
-        className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-center gap-3 border px-4 py-3 text-xs"
-      >
-        <StepMark n={1} label="シナリオ情報" state="done" />
-        <StepLine />
-        <StepMark n={2} label="配信方式" state="current" />
-        <StepLine />
-        <StepMark n={3} label="1通目を設定" state="todo" />
-      </ol>
+      <StepTrail
+        label="シナリオ作成の進み方"
+        items={[
+          { label: 'シナリオ情報', state: 'done' },
+          { label: '配信方式', state: 'current' },
+          { label: '1通目を設定', state: 'todo' },
+        ]}
+      />
 
       <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
         <div className="grid max-w-3xl gap-4 md:grid-cols-2">
@@ -349,36 +347,6 @@ function ScenarioModeContent() {
 
 // ── 部品 ────────────────────────────────────────────────────────────────────
 
-function StepMark({
-  n,
-  label,
-  state,
-}: {
-  n: number
-  label: string
-  state: 'done' | 'current' | 'todo'
-}) {
-  return (
-    <li className="flex items-center gap-2" aria-current={state === 'current' ? 'step' : undefined}>
-      <span
-        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-bold ${
-          state === 'done'
-            ? 'bg-accent text-on-accent'
-            : state === 'current'
-              ? 'border-accent text-accent border-2'
-              : 'border-hairline text-ink-faint border'
-        }`}
-      >
-        {state === 'done' ? '✓' : n}
-      </span>
-      <span className={state === 'todo' ? 'text-ink-faint' : 'text-ink font-bold'}>{label}</span>
-    </li>
-  )
-}
-
-function StepLine() {
-  return <li aria-hidden className="border-hairline w-10 border-t" />
-}
 
 function scenarioSaveError(cause: unknown): string {
   if (cause instanceof ApiError) {

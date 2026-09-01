@@ -462,7 +462,7 @@ function TagsPageInner() {
             ここで作った項目が、<strong>回答フォームの登録先</strong>・
             <strong>友だち詳細のタブ</strong>・<strong>テンプレートの差し込み</strong>に使えます。
           </p>
-          <FriendFieldList />
+          <FriendFieldList accountId={selectedAccountId} />
         </>
       )}
       {tab === 'marks' && (

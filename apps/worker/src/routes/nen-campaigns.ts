@@ -14,6 +14,13 @@ import {
 } from '../services/nen-engagement.js';
 import { syncNenPetTags } from '../services/nen-tag-sync.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import {
+  buildNenColumnStorageFields,
+  isNenColumnSlugConflict,
+  normalizeHttpsUrl,
+  readBoundedJsonObject,
+  validateNenColumnCreateBody,
+} from '../services/nen-column-contract.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -32,8 +39,7 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
 }
 
 function isUrl(value: string): boolean {
-  if (!value) return true;
-  try { return new URL(value).protocol === 'https:'; } catch { return false; }
+  return !value || normalizeHttpsUrl(value, { allowCredentials: true }) !== null;
 }
 
 async function verifyEccubeSignature(secret: string, timestamp: string, signature: string, body: string): Promise<boolean> {
@@ -219,6 +225,47 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   })) });
 });
 
+nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+
+  const parsed = await readBoundedJsonObject(c.req.raw);
+  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status);
+  const validated = validateNenColumnCreateBody(parsed.value);
+  if (!validated.ok) return c.json({ success: false, error: validated.error }, 400);
+
+  const input = validated.value;
+  const existing = await c.env.DB.prepare(
+    `SELECT id FROM nen_columns WHERE slug = ?`,
+  ).bind(input.slug).first<{ id: string }>();
+  if (existing) return c.json({ success: false, error: 'column_already_exists' }, 409);
+
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const fields = buildNenColumnStorageFields(input);
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO nen_columns
+        (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url,
+         published_at, delivery_status, line_account_id, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+    ).bind(
+      id, input.slug, fields.title, fields.category, fields.excerpt, fields.introText,
+      fields.articleUrl, fields.imageUrl, fields.publishedAt, accountId, now, now,
+    ).run();
+  } catch (error) {
+    if (isNenColumnSlugConflict(error)) {
+      return c.json({ success: false, error: 'column_already_exists' }, 409);
+    }
+    console.error(JSON.stringify({
+      message: 'failed to create NEN column draft',
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return c.json({ success: false, error: 'column_create_failed' }, 500);
+  }
+  return c.json({ success: true, data: { id } }, 201);
+});
+
 nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
   if (!body?.accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
@@ -392,6 +439,14 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
     return c.json({ success: false, error: 'Column belongs to another LINE account' }, 409);
   }
   const id = existing?.id || crypto.randomUUID();
+  const fields = buildNenColumnStorageFields({
+    title: body.title,
+    category: typeof body.category === 'string' ? body.category : null,
+    excerpt: typeof body.excerpt === 'string' ? body.excerpt.slice(0, 500) : '',
+    articleUrl: body.article_url,
+    imageUrl: typeof body.image_url === 'string' ? body.image_url : null,
+    publishedAt: typeof body.published_at === 'string' ? body.published_at : null,
+  });
   await c.env.DB.prepare(
     `INSERT INTO nen_columns
       (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, line_account_id, created_at, updated_at)
@@ -401,12 +456,9 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
        image_url = excluded.image_url, published_at = excluded.published_at,
        line_account_id = COALESCE(excluded.line_account_id, nen_columns.line_account_id), updated_at = excluded.updated_at`,
   ).bind(
-    id, typeof body.external_id === 'string' ? body.external_id : body.slug, body.slug, body.title,
-    typeof body.category === 'string' ? body.category : null,
-    typeof body.excerpt === 'string' ? body.excerpt.slice(0, 500) : '',
-    buildDefaultColumnIntro(body.title, typeof body.excerpt === 'string' ? body.excerpt.slice(0, 500) : ''), body.article_url,
-    typeof body.image_url === 'string' ? body.image_url : null,
-    typeof body.published_at === 'string' ? body.published_at : null, lineAccountId, now, now,
+    id, typeof body.external_id === 'string' ? body.external_id : body.slug, body.slug, fields.title,
+    fields.category, fields.excerpt, fields.introText, fields.articleUrl, fields.imageUrl,
+    fields.publishedAt, lineAccountId, now, now,
   ).run();
   return c.json({ success: true, data: { id } });
 });

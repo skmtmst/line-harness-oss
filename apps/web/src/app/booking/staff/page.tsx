@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import ImageUploader from '@/components/shared/image-uploader'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
@@ -18,31 +20,42 @@ const EMPTY: Partial<BookingStaff> = {
   is_active: 1,
 }
 
+type LoadStatus = 'loading' | 'ready' | 'error'
+
 export default function BookingStaffPage() {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) return
-    setLoading(true)
-    setError(null)
+    const requestId = ++loadRequestRef.current
+    if (!selectedAccountId) {
+      setItems([])
+      setLoadStatus('ready')
+      return
+    }
+    setLoadStatus('loading')
     // アカウント切替時の stale state 防止（cross-account 表示/操作の事故防止）。
     setItems([])
     try {
       const r = await bookingApi.listStaff(selectedAccountId)
+      if (requestId !== loadRequestRef.current) return
       setItems(r.staff)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setItems([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
-    load()
+    void load()
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [load])
 
   async function save(s: Partial<BookingStaff>) {
@@ -71,7 +84,7 @@ export default function BookingStaffPage() {
         action={
           <button
             onClick={() => setEditing(EMPTY)}
-            disabled={!selectedAccountId}
+            disabled={!selectedAccountId || loadStatus !== 'ready'}
             className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             + 新規スタッフ
@@ -79,24 +92,19 @@ export default function BookingStaffPage() {
         }
       />
 
-      {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
-
       {!selectedAccountId ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          サイドバーでアカウントを選択してください
-        </div>
-      ) : loading ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          読み込み中…
-        </div>
+        <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
+      ) : loadStatus === 'loading' ? (
+        <ListState kind="loading" title="予約スタッフを読み込んでいます" />
+      ) : loadStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title="予約スタッフを表示できませんでした"
+          description="登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。"
+          action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
+        />
       ) : items.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          まだスタッフがいません。右上の「+ 新規スタッフ」から追加してください。
-        </div>
+        <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ 新規スタッフ」から最初のスタッフを追加してください。" />
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">

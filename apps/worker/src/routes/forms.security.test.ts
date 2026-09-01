@@ -4,6 +4,10 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   getFormById: vi.fn(),
+  getFormAccountIds: vi.fn(),
+  getFormDeleteImpact: vi.fn(),
+  archiveFormAtRevision: vi.fn(),
+  deleteFormAtRevision: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   createFormSubmission: vi.fn(),
   createForm: vi.fn(),
@@ -20,10 +24,13 @@ vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: vi.fn(),
   getFormById: mocks.getFormById,
+  getFormAccountIds: mocks.getFormAccountIds,
+  getFormDeleteImpact: mocks.getFormDeleteImpact,
   formBelongsToLineAccount: mocks.formBelongsToLineAccount,
   createForm: mocks.createForm,
   updateForm: vi.fn(),
-  deleteForm: vi.fn(),
+  archiveFormAtRevision: mocks.archiveFormAtRevision,
+  deleteFormAtRevision: mocks.deleteFormAtRevision,
   getFormSubmissions: mocks.getFormSubmissions,
   getFormSubmissionsPage: mocks.getFormSubmissionsPage,
   createFormSubmission: mocks.createFormSubmission,
@@ -33,6 +40,7 @@ vi.mock('@line-crm/db', () => ({
   getMessageTemplateById: vi.fn(),
   getLineAccountById: mocks.getLineAccountById,
   enrollFriendInScenario: vi.fn(),
+  applyMileageRulesForEvent: vi.fn(),
   jstNow: vi.fn(() => '2026-08-04T12:00:00+09:00'),
 }));
 
@@ -69,6 +77,9 @@ const baseForm = {
   on_submit_webhook_fail_message: '条件を満たしていません',
   save_to_metadata: 1,
   is_active: 1,
+  status: 'active',
+  archived_at: null,
+  revision: 4,
   submit_count: 10,
   og_title: null,
   og_description: null,
@@ -107,6 +118,29 @@ function app(asAdmin = false) {
 
 beforeEach(() => {
   mocks.getFormById.mockResolvedValue({ ...baseForm });
+  mocks.getFormAccountIds.mockResolvedValue(['account-a']);
+  mocks.getFormDeleteImpact.mockResolvedValue({
+    form: { id: 'form-1', name: '診断フォーム', isActive: true, status: 'active' },
+    submissionCount: 3,
+    openCount: 8,
+    references: [],
+    referenceCount: 0,
+    answerUrl: 'https://liff.line.me/liff-a/?page=form&id=form-1',
+    revision: 4,
+    checkedAt: '2026-08-31T12:00:00+09:00',
+    canDelete: false,
+    canArchive: true,
+    recommendedAction: 'archive',
+    blockers: ['published', 'has_submissions', 'has_opens'],
+  });
+  mocks.archiveFormAtRevision.mockResolvedValue({
+    ...baseForm,
+    is_active: 0,
+    status: 'archived',
+    archived_at: '2026-08-31T12:01:00+09:00',
+    revision: 5,
+  });
+  mocks.deleteFormAtRevision.mockResolvedValue(true);
   mocks.verifyCallerLineIdentity.mockResolvedValue(null);
   mocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
   mocks.formBelongsToLineAccount.mockResolvedValue(true);
@@ -238,6 +272,160 @@ describe('submission pagination compatibility', () => {
       { page: 2, limit: 20 },
     );
     expect(mocks.getFormSubmissions).not.toHaveBeenCalled();
+  });
+});
+
+describe('回答フォームの削除影響と保管', () => {
+  test('フォーム名・公開状態・回答数・利用先・開けなくなるURLを返す', async () => {
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/delete-impact?account_id=account-a',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        form: { name: '診断フォーム', isActive: true },
+        submissionCount: 3,
+        openCount: 8,
+        answerUrl: 'https://liff.line.me/liff-a/?page=form&id=form-1',
+        recommendedAction: 'archive',
+      },
+    });
+  });
+
+  test('影響を取得できないときは0件を作らず503', async () => {
+    mocks.getFormDeleteImpact.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/delete-impact?account_id=account-a',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(503);
+    expect(JSON.stringify(await res.json())).not.toContain('submissionCount');
+  });
+
+  test('所属する全アカウントを見られなければ影響を漏らさない', async () => {
+    mocks.getFormAccountIds.mockResolvedValueOnce(['account-a', 'account-secret']);
+    mocks.canAccessAllLineAccounts
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/delete-impact?account_id=account-a',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(await res.json())).not.toContain('診断フォーム');
+  });
+
+  test('影響確認後に版が変わったら409で最新の影響を返す', async () => {
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/archive?account_id=account-a',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: 3 }),
+      },
+      bindings,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: 'form_delete_changed',
+      data: { revision: 4, submissionCount: 3 },
+    });
+    expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+  });
+
+  test('保管は回答と利用先を残した件数を返す', async () => {
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/archive?account_id=account-a',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: 4 }),
+      },
+      bindings,
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.archiveFormAtRevision).toHaveBeenCalledWith(bindings.DB, 'form-1', 4);
+    expect(await res.json()).toMatchObject({
+      data: {
+        status: 'archived',
+        retainedSubmissionCount: 3,
+        retainedOpenCount: 8,
+        retainedReferenceCount: 0,
+        answerUrlUnavailable: true,
+      },
+    });
+  });
+
+  test('保管本文が16KiBを超えたら読む前後で413', async () => {
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/archive?account_id=account-a',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: 4, padding: 'x'.repeat(17 * 1024) }),
+      },
+      bindings,
+    );
+
+    expect(res.status).toBe(413);
+    expect(mocks.getFormDeleteImpact).not.toHaveBeenCalled();
+  });
+
+  test('公開・回答あり・利用中は物理削除せず保管を案内する', async () => {
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1?account_id=account-a&expected_revision=4',
+      { method: 'DELETE' },
+      bindings,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: 'form_archive_required',
+      data: { recommendedAction: 'archive' },
+    });
+    expect(mocks.deleteFormAtRevision).not.toHaveBeenCalled();
+  });
+
+  test('影響0件・非公開・同じ版だけを物理削除する', async () => {
+    mocks.getFormDeleteImpact.mockResolvedValueOnce({
+      form: { id: 'form-1', name: '空フォーム', isActive: false, status: 'active' },
+      submissionCount: 0,
+      openCount: 0,
+      references: [],
+      referenceCount: 0,
+      answerUrl: null,
+      revision: 4,
+      checkedAt: '2026-08-31T12:00:00+09:00',
+      canDelete: true,
+      canArchive: true,
+      recommendedAction: 'delete',
+      blockers: [],
+    });
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1?account_id=account-a&expected_revision=4',
+      { method: 'DELETE' },
+      bindings,
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.deleteFormAtRevision).toHaveBeenCalledWith(bindings.DB, 'form-1', 4);
   });
 });
 

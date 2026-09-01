@@ -1,12 +1,10 @@
 import { Hono, type Context } from 'hono';
 import {
-  getSupportMarks,
+  getSupportMarksWithUsage,
   getSupportMarkById,
   createSupportMark,
   updateSupportMark,
-  deleteSupportMark,
-  replaceAndDeleteSupportMark,
-  countFriendsWithMark,
+  replaceAndArchiveSupportMark,
   getDefaultSupportMark,
   setFriendSupportMark,
   setFriendSupportMarkBulk,
@@ -32,6 +30,7 @@ import {
   deleteFolder,
   isFolderKind,
   type SupportMark,
+  type SupportMarkWithUsage,
   type SupportMarkScope,
   type SavedSearch,
   type SavedSearchAccess,
@@ -68,6 +67,41 @@ function serializeMark(row: SupportMark) {
     createdAt: row.created_at,
     isInherited: Boolean(row.is_inherited),
   };
+}
+
+function serializeMarkImpact(row: SupportMarkWithUsage) {
+  return {
+    friendCount: Number(row.friend_count),
+    usedIn: {
+      broadcasts: Number(row.broadcasts),
+      scenarios: Number(row.scenarios),
+      autoReplies: Number(row.auto_replies),
+      savedSearches: Number(row.saved_searches),
+      automations: Number(row.automations),
+    },
+  };
+}
+
+function markReferenceCount(row: SupportMarkWithUsage): number {
+  return Number(row.broadcasts)
+    + Number(row.scenarios)
+    + Number(row.auto_replies)
+    + Number(row.saved_searches)
+    + Number(row.automations);
+}
+
+function sameMarkImpact(
+  expected: unknown,
+  current: ReturnType<typeof serializeMarkImpact>,
+): boolean {
+  if (!expected || typeof expected !== 'object') return false;
+  const value = expected as { friendCount?: unknown; usedIn?: Record<string, unknown> };
+  return Number(value.friendCount) === current.friendCount
+    && Number(value.usedIn?.broadcasts) === current.usedIn.broadcasts
+    && Number(value.usedIn?.scenarios) === current.usedIn.scenarios
+    && Number(value.usedIn?.autoReplies) === current.usedIn.autoReplies
+    && Number(value.usedIn?.savedSearches) === current.usedIn.savedSearches
+    && Number(value.usedIn?.automations) === current.usedIn.automations;
 }
 
 async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Response> {
@@ -201,15 +235,18 @@ friendAttributes.get('/api/support-marks', async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
-    const marks = await getSupportMarks(c.env.DB, scope);
-    // 何人に付いているかも返す。運用でどれが使われているか分かる。
-    const withCounts = [];
-    for (const mark of marks) {
-      withCounts.push({
+    const marks = await getSupportMarksWithUsage(c.env.DB, scope);
+    const withCounts = marks.map((mark) => ({
         ...serializeMark(mark),
-        friendCount: await countFriendsWithMark(c.env.DB, mark.id, scope),
-      });
-    }
+        friendCount: Number(mark.friend_count),
+        usedIn: {
+          broadcasts: Number(mark.broadcasts),
+          scenarios: Number(mark.scenarios),
+          autoReplies: Number(mark.auto_replies),
+          savedSearches: Number(mark.saved_searches),
+          automations: Number(mark.automations),
+        },
+      }));
     return c.json({ success: true, data: withCounts });
   } catch (err) {
     console.error('GET /api/support-marks error:', err);
@@ -265,6 +302,20 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
         409,
       );
     }
+    if (existing.is_inherited === 1) {
+      const current = (await getSupportMarksWithUsage(c.env.DB, scope))
+        .find((mark) => mark.id === id);
+      if (!current || markReferenceCount(current) > 0) {
+        return c.json(
+          {
+            success: false,
+            error: '使用先がある共有マークは直接編集できません。使用先を別のマークへ変更してから編集してください。',
+            code: 'INHERITED_MARK_IN_USE',
+          },
+          409,
+        );
+      }
+    }
     const mark = await updateSupportMark(c.env.DB, id, scope, {
       name: body.name === undefined ? undefined : String(body.name).trim(),
       color: body.color === undefined ? undefined : String(body.color),
@@ -315,29 +366,71 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
       );
     }
 
-    // 使用中なら、削除前に置換先と人数を確認させる。
-    const count = await countFriendsWithMark(c.env.DB, id, scope);
-    if (count > 0 && c.req.query('force') !== '1') {
+    const current = (await getSupportMarksWithUsage(c.env.DB, scope))
+      .find((mark) => mark.id === id);
+    if (!current) {
+      return c.json(
+        { success: false, error: '影響を確認できませんでした。状態を読み直してください。' },
+        409,
+      );
+    }
+    const impact = serializeMarkImpact(current);
+    if (markReferenceCount(current) > 0) {
       return c.json(
         {
           success: false,
-          error: `このマークは ${count} 人に付いています。削除すると「${defaultMark.name}」へ変更されます。`,
-          code: 'IN_USE',
-          friendCount: count,
+          error: 'このマークは配信などで使われています。先にすべての使用先から外してください。',
+          code: 'REFERENCED',
+          ...impact,
+        },
+        409,
+      );
+    }
+    const body: Record<string, unknown> = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => ({}));
+    const replacementMarkId = typeof body.replacementMarkId === 'string'
+      ? body.replacementMarkId
+      : '';
+    if (replacementMarkId !== defaultMark.id) {
+      return c.json(
+        {
+          success: false,
+          error: `置換先を「${defaultMark.name}」にして、もう一度影響を確認してください。`,
+          code: 'REPLACEMENT_REQUIRED',
+          ...impact,
           replacementMark: serializeMark(defaultMark),
         },
         409,
       );
     }
-    if (count > 0) {
-      const staff = c.get('staff');
-      await replaceAndDeleteSupportMark(c.env.DB, id, defaultMark.id, scope, staff.id);
-    } else {
-      await deleteSupportMark(c.env.DB, id, scope);
+    if (!sameMarkImpact(body.expectedImpact, impact)) {
+      return c.json(
+        {
+          success: false,
+          error: '確認後に使用状況が変わりました。最新の影響を確認してください。',
+          code: 'IMPACT_CHANGED',
+          ...impact,
+          replacementMark: serializeMark(defaultMark),
+        },
+        409,
+      );
     }
+    const staff = c.get('staff');
+    const replacedFriendCount = await replaceAndArchiveSupportMark(
+      c.env.DB,
+      id,
+      defaultMark.id,
+      scope,
+      staff.id,
+    );
     return c.json({
       success: true,
-      data: { replacedFriendCount: count, replacementMark: serializeMark(defaultMark) },
+      data: {
+        archived: true,
+        replacedFriendCount,
+        replacementMark: serializeMark(defaultMark),
+      },
     });
   } catch (err) {
     console.error('DELETE /api/support-marks/:id error:', err);

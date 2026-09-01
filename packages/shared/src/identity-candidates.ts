@@ -107,6 +107,13 @@ export interface IdentityCandidateList {
   offset: number;
 }
 
+export interface DetectIdentityCandidatesResult {
+  processed: number;
+  hasMore: boolean;
+  /** 次の検出へそのまま渡す不透明なカーソル。画面本文へは表示しない。 */
+  nextCursor: string | null;
+}
+
 export interface DecideIdentityCandidateRequest {
   expectedVersion: number;
   decision: IdentityCandidateDecision;
