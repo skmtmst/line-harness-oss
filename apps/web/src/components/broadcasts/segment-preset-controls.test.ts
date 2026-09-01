@@ -69,3 +69,29 @@ describe('一斉配信で保存した対象条件を再利用する', () => {
     expect(controls).toContain('アカウントが切り替わりました。保存した条件を読み直してください。')
   })
 })
+
+describe('保存した対象条件のKPI（sqFXf）', () => {
+  it('取れない数を0や作り値で埋めない', () => {
+    expect(controls).toContain('const PRESET_KPIS = [')
+    expect(controls).toContain('いま当てはまる人数')
+    expect(controls).toContain('この条件を使っている配信')
+    expect(controls).toContain('最後に使った日')
+    // 数の代わりに出すのは「—」だけ。0件・0人・作った割合を置かない。
+    expect(controls).toContain(">—</dd>")
+    expect(controls).not.toMatch(/PRESET_KPIS[\s\S]*?value:\s*\d/)
+  })
+
+  it('「—」に理由を必ず添える', () => {
+    const reasons = controls.match(/reason: '[^']+'/g) ?? []
+    expect(reasons).toHaveLength(3)
+    for (const reason of reasons) {
+      expect(reason).toContain('まだ繋がっていません。')
+      expect(reason).toContain('接続されると表示されます。')
+    }
+  })
+
+  it('押せない理由を吹き出しだけに置かない', () => {
+    expect(controls).toContain('先にLINEアカウントを選ぶと、この条件を保存できます。')
+    expect(controls).toContain('詳細条件を1つ以上入力すると、この条件を保存できます。')
+  })
+})

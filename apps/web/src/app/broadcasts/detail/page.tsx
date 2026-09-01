@@ -9,7 +9,7 @@ import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
-import { openInsightDetail } from './broadcast-insight-display'
+import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き',
@@ -29,6 +29,9 @@ function BroadcastDetailInner() {
     uniqueClick: number | null
     suppressedByAudienceSize: boolean
   } | null>(null)
+  // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
+  // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
+  const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
   const contentRef = useRef<HTMLElement>(null)
@@ -37,6 +40,7 @@ function BroadcastDetailInner() {
     let active = true
     setBroadcast(null)
     setInsight(null)
+    setInsightState('loading')
     setLoadState('loading')
     if (!id || accountLoading) {
       return
@@ -61,7 +65,8 @@ function BroadcastDetailInner() {
         // この配信自身の保存済みインサイトを読む。
         try {
           const stats = await api.broadcasts.getInsight(id)
-          if (active && stats.success && stats.data) {
+          if (!active) return
+          if (stats.success && stats.data) {
             setInsight({
               delivered: stats.data.delivered,
               uniqueImpression: stats.data.uniqueImpression,
@@ -71,9 +76,16 @@ function BroadcastDetailInner() {
                 && (stats.data.delivered ?? 0) > 0
                 && (stats.data.delivered ?? 0) < 20,
             })
+            setInsightState('ready')
+          } else if (stats.success) {
+            // 200 で data が null。まだLINEから集計が返っていない。
+            setInsightState('ready')
+          } else {
+            setInsightState('error')
           }
         } catch {
-          // 配信本体は読めている。集計だけ失敗したときは「—」で残す。
+          // 配信本体は読めている。集計だけ落ちたことを、未取得と分けて出す。
+          if (active) setInsightState('error')
         }
       } catch (error) {
         if (!active) return
@@ -198,30 +210,76 @@ function BroadcastDetailInner() {
           </section>
 
           <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="送信" value={total} unit="件" detail={broadcast.scheduledAt ? '予約どおり実行' : '即時配信'} />
+            {/* 送信の欄は「これから」と「終わったこと」を書き分ける。
+                予約しただけの配信に「予約どおり実行」と書くと、まだ起きて
+                いないことを済んだことにしてしまう。 */}
+            <Stat
+              label="送信"
+              value={total}
+              unit="件"
+              detail={
+                broadcast.status === 'sent'
+                  ? broadcast.scheduledAt
+                    ? '予約どおり実行'
+                    : '即時配信'
+                  : broadcast.status === 'sending'
+                    ? '送信中'
+                    : broadcast.scheduledAt
+                      ? '予約した時刻に実行します'
+                      : 'まだ送っていません'
+              }
+            />
+            {/*
+              失敗数は `totalCount - successCount` でしか出せない。送信中は
+              「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+              出すと、起きていない失敗を作ることになる。完了してから出す。
+            */}
             <Stat
               label="到達"
               value={success}
               unit="件"
-              detail={`${pct(success, total)} ・ 失敗 ${failed}`}
+              detail={
+                broadcast.status === 'sent'
+                  ? `${pct(success, total)} ・ 失敗 ${failed.toLocaleString('ja-JP')}件`
+                  : broadcast.status === 'sending'
+                    ? '送信中のため、失敗の数は終わってから確定します'
+                    : '送信前のため、到達はまだありません'
+              }
             />
             <Stat
               label="開封"
-              value={insight?.uniqueImpression ?? null}
+              value={insightState === 'ready' ? insight?.uniqueImpression ?? null : null}
               unit="件"
-              detail={openInsightDetail(insight)}
+              detail={
+                insightState === 'loading'
+                  ? '読み込んでいます'
+                  : insightState === 'error'
+                    ? '読み込めませんでした'
+                    : openInsightDetail(insight)
+              }
             />
             <Stat
               label="クリック"
-              value={insight?.uniqueClick ?? null}
+              value={insightState === 'ready' ? insight?.uniqueClick ?? null : null}
               unit="件"
               detail={
-                insight?.uniqueClick != null && insight.uniqueImpression
-                  ? `開封のうち ${pct(insight.uniqueClick, insight.uniqueImpression)}`
-                  : '—'
+                insightState === 'loading'
+                  ? '読み込んでいます'
+                  : insightState === 'error'
+                    ? '読み込めませんでした'
+                    : clickInsightDetail(insight)
               }
             />
           </div>
+
+          {insightState === 'error' ? (
+            <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center justify-between gap-3 border p-4">
+              <p className="text-ink-faint text-xs leading-relaxed">
+                開封・クリックを読み込めませんでした。送信の件数は上のとおりです。
+              </p>
+              <Button onClick={() => setReloadToken((value) => value + 1)}>集計を再読み込み</Button>
+            </div>
+          ) : null}
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">アカウント別の内訳</p>
@@ -243,6 +301,11 @@ function BroadcastDetailInner() {
                 同じ設定で作り直す
               </button>
             </div>
+            {/* 押せない理由は吹き出しだけでなく本文にも置く。触って初めて
+                分かる形にすると、押せないことしか伝わらない。 */}
+            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+              「複製して作る」「同じ設定で作り直す」は、既にある配信を種にして作り直す口がまだないため押せません。作成は空から始まります。
+            </p>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
               <Row
@@ -297,8 +360,10 @@ function BroadcastDetailInner() {
                 ・開封は LINE の集計値です。個人単位では取れないため「誰が読んだか」は分かりません
               </li>
               <li>・配信対象が20人未満のときは、LINE側の仕様で開封数・クリック数が表示されません</li>
+              {/* 上のクリックは LINE の集計値（`broadcast_insights.unique_click`）。
+                  短縮URLの実測は別の数で、この欄には出していない。 */}
               <li>
-                ・クリックは短縮URL経由の実測値です。LINE側の集計値とは数字がずれることがあります
+                ・クリックも LINE の集計値で、母数は開封ではなく到達です。短縮URL（/t/…）の実測とは数字がずれることがあります
               </li>
             </ul>
           </section>
