@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 242,
-  "unimplemented": 16,
+  "compared": 243,
+  "unimplemented": 15,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 59,
   "structureMatchDataPending": 18,
-  "needsFix": 165,
+  "needsFix": 166,
   "unjudged": 0,
   "remaining": 199,
   "features": [
@@ -152,14 +152,14 @@
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 9,
-      "unimplemented": 2,
+      "compared": 10,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 3,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
+      "needsFix": 7,
       "unjudged": 0,
       "remaining": 8,
       "capturedAt": [
@@ -233,6 +233,15 @@
             "bzDn6"
           ],
           "note": "**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本"
+        },
+        {
+          "pr": 645,
+          "head": "6e9ed4d6",
+          "on": "2026-09-01",
+          "screens": [
+            "IAf7j"
+          ],
+          "note": "Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した"
         }
       ]
     },
@@ -2281,13 +2290,6 @@
     }
   ],
   "gaps": [
-    {
-      "feature": 3,
-      "node": "IAf7j",
-      "name": "3-1-C 友だち（一括アクション）",
-      "gap": "api",
-      "gapNote": "複数人へまとめて タグ・シナリオ・担当者・対応マーク・リマインダ・メッセージ を反映する口が無い。画面も別ページとして作る必要がある"
-    },
     {
       "feature": 3,
       "node": "vtBCu",

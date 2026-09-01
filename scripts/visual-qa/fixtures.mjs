@@ -3160,6 +3160,61 @@ export const WEBINAR_OVERVIEW_FAILURE = {
   error: 'Internal server error',
 }
 
+/*
+  友だちの一括操作（設計 `IAf7j`）。**#606 の契約枝の固定データを写したもの。**
+  通常は選択4人・対象3人・対象外1人。結果は成功2人・一時失敗1人で、
+  **成功と一時失敗を混ぜずに描けるか**を見る。
+*/
+export const FRIEND_BULK_RUN = {
+  preview: {
+    selectedCount: 4,
+    targetCount: 3,
+    excludedCount: 1,
+    accountBreakdown: [{ lineAccountId: 'visual-qa-account', count: 3 }],
+    exclusions: [{ reason: 'LINEの友だちではないため対象外', count: 1 }],
+    sample: FRIENDS.slice(0, 3).map((item) => ({
+      friendId: item.id,
+      displayName: item.displayName,
+      pictureUrl: item.pictureUrl,
+      lineAccountId: item.lineAccountId,
+    })),
+    reversible: true,
+  },
+  detail: {
+    id: 'friend-bulk-run-1',
+    status: 'partial',
+    selection: { kind: 'explicit', friendIds: FRIENDS.slice(0, 4).map((item) => item.id) },
+    operation: { kind: 'add_tag', tagId: 'tag-0' },
+    targetCount: 3,
+    excludedCount: 1,
+    successCount: 2,
+    skippedCount: 0,
+    temporaryFailureCount: 1,
+    permanentFailureCount: 0,
+    reversible: true,
+    scheduledAt: null,
+    createdAt: '2026-08-31T01:00:00.000Z',
+    startedAt: '2026-08-31T01:00:01.000Z',
+    completedAt: '2026-08-31T01:00:03.000Z',
+    updatedAt: '2026-08-31T01:00:03.000Z',
+    page: 1,
+    limit: 50,
+    total: 3,
+    items: FRIENDS.slice(0, 3).map((item, index) => ({
+      id: `friend-bulk-item-${index + 1}`,
+      friendId: item.id,
+      displayName: item.displayName,
+      pictureUrl: item.pictureUrl,
+      lineAccountId: item.lineAccountId,
+      status: index === 2 ? 'temporary_failure' : 'success',
+      attemptCount: 1,
+      errorMessage: index === 2 ? '時間をおいて、もう一度お試しください' : null,
+      retryAt: null,
+      completedAt: '2026-08-31T01:00:03.000Z',
+    })),
+  },
+}
+
 export const SUPPORT_MARKS = [
   { id: 'mark-1', name: '未対応', color: '#dc2626', isDefault: true, autoOnInbound: true, displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 8 },
   { id: 'mark-2', name: '対応中', color: '#d97706', isDefault: false, autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z', friendCount: 5 },

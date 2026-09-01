@@ -186,7 +186,7 @@ import {
   WEBINAR_ANALYTICS,
   WEBINAR_NOTIFICATIONS,
   bookingAvailability,
-  testActionScoreRules, SUPPORT_MARK_AUTOMATION_RULES, WEBINAR_OVERVIEW} from './fixtures.mjs'
+  testActionScoreRules, SUPPORT_MARK_AUTOMATION_RULES, WEBINAR_OVERVIEW, FRIEND_BULK_RUN} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -217,6 +217,13 @@ const ACCOUNT = {
   id: 'visual-qa-account',
   channelId: '0000000000',
   name: '画面確認アカウント',
+  /*
+    担当者の役割。Workerは `role` を返す（`line-accounts.ts:86`）が、
+    ここに無かったので `null` になり、**権限で出し分ける画面が
+    すべて「権限なし」の側に倒れていた**（一括操作の押し口が出ない）。
+    型は `string | null`。撮影は既定でオーナーとして見る。
+  */
+  role: 'owner',
   channelAccessTokenConfigured: true,
   channelSecretConfigured: true,
   loginChannelId: null,
@@ -728,6 +735,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
   if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  if (/^\/api\/friends\/bulk-runs\/[^/]+$/.test(pathname)) {
+    return { success: true, data: FRIEND_BULK_RUN.detail }
+  }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/staff/me') return { success: true, data: STAFF_MEMBERS[0] }
@@ -1867,6 +1877,23 @@ const server = createServer((req, res) => {
   }
 
   if (method !== 'GET') {
+    /*
+      友だちの一括操作（`IAf7j`）。**押して確かめるために、
+      preview / 作成 / 再試行 / 取り消しだけ固定の返事を返す。**
+      DBは触らない。
+    */
+    if (url.pathname === '/api/friends/bulk-runs/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
+      return
+    }
+    if (url.pathname === '/api/friends/bulk-runs') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.detail }))
+      return
+    }
+    if (/^\/api\/friends\/bulk-runs\/[^/]+\/(retry|undo)$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { retriedCount: 1 } }))
+      return
+    }
     if ((READ_ONLY_POSTS.has(url.pathname) || AUTO_REPLY_READ_ONLY || AUTO_REPLY_PUBLISH
       || FRIEND_ADD_PUBLISH_FLOW) && method === 'POST') {
       send(bodyFor(url.pathname, url.searchParams) ?? { success: false, error: 'not found' })
