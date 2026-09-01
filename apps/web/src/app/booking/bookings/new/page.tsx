@@ -61,6 +61,10 @@ export default function NewProxyBookingPage() {
   const [error, setError] = useState('')
   const slotRequest = useRef(0)
 
+  const selectionKey = [selectedAccountId ?? '', friend?.id ?? '', menuId, staffId, date, time].join('\u001f')
+  const latestSelectionKey = useRef(selectionKey)
+  latestSelectionKey.current = selectionKey
+
   const menu = menus.find((item) => item.id === menuId) ?? null
   const selectedStaff = staff.find((item) => item.id === staffId) ?? null
 
@@ -73,6 +77,8 @@ export default function NewProxyBookingPage() {
     setDate('')
     setTime('')
     setResult(null)
+    setIdempotencyKey('')
+    setLoading(false)
     setError('')
   }, [selectedAccountId])
 
@@ -178,6 +184,7 @@ export default function NewProxyBookingPage() {
       return
     }
     if (!selectedAccountId || !menu || !selectedStaff || !date || !time) return
+    const requestKey = selectionKey
     setLoading(true)
     setError('')
     try {
@@ -189,6 +196,7 @@ export default function NewProxyBookingPage() {
         from: date,
         to: date,
       })
+      if (latestSelectionKey.current !== requestKey) return
       const available = latest.by_staff
         .find((item) => item.staff_id === selectedStaff.id)
         ?.slots.some((slot) => slot.date === date && slot.start === time)
@@ -200,14 +208,16 @@ export default function NewProxyBookingPage() {
       setIdempotencyKey(crypto.randomUUID())
       setStep('confirm')
     } catch {
+      if (latestSelectionKey.current !== requestKey) return
       setError('空き時間を再確認できませんでした。状態を読み直して、もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (latestSelectionKey.current === requestKey) setLoading(false)
     }
   }
 
   async function createBooking() {
     if (!selectedAccountId || !friend || !menu || !selectedStaff || !date || !time) return
+    const requestKey = selectionKey
     setLoading(true)
     setError('')
     try {
@@ -218,9 +228,11 @@ export default function NewProxyBookingPage() {
         starts_at: toUtcIso(date, time),
         customer_note: customerNote.trim() || undefined,
       }, idempotencyKey)
+      if (latestSelectionKey.current !== requestKey) return
       setResult(created)
       setStep('done')
     } catch (cause) {
+      if (latestSelectionKey.current !== requestKey) return
       if (
         cause instanceof ApiError
         && (cause.code === 'slot_conflict' || cause.code === 'slot_not_available')
@@ -231,7 +243,7 @@ export default function NewProxyBookingPage() {
         setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
     } finally {
-      setLoading(false)
+      if (latestSelectionKey.current === requestKey) setLoading(false)
     }
   }
 

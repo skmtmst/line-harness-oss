@@ -57,6 +57,15 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('空き時間を再確認できませんでした。状態を読み直して、もう一度お試しください。')
   })
 
+  test('アカウントや予約対象が変わったあとの古い返事を画面へ反映しない', () => {
+    expect(PAGE).toContain("const selectionKey = [selectedAccountId ?? '', friend?.id ?? '', menuId, staffId, date, time]")
+    expect(PAGE).toContain('latestSelectionKey.current = selectionKey')
+    expect(PAGE).toContain('const requestKey = selectionKey')
+    expect(PAGE).toContain('if (latestSelectionKey.current !== requestKey) return')
+    expect(PAGE).toContain('if (latestSelectionKey.current === requestKey) setLoading(false)')
+    expect(PAGE).toContain("setIdempotencyKey('')")
+  })
+
   test('完了画面は作り物の成果数ではなく、実際に追加した予約台帳の1件を説明する', () => {
     expect(PAGE).toContain('1件追加（電話で受けた予約も同じ台帳へ記録します）')
     expect(PAGE).not.toContain('成果地点「予約が入った」を1件')
