@@ -18,6 +18,8 @@ import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { emptyMessageOf } from './friend-list-empty'
+import BulkRunDialog from '@/components/friends/bulk-run-dialog'
+import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
@@ -48,7 +50,9 @@ function FriendsPageInner({
   onNotice: (notice: Notice) => void
   onExportReady: (exporter: (() => void) | null) => void
 }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
+  /* 一括操作はオーナーと管理者だけ。個別操作の権限を越えるため。 */
+  const [bulkOpen, setBulkOpen] = useState(false)
   const searchParams = useSearchParams()
   const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
   const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
@@ -342,9 +346,20 @@ function FriendsPageInner({
         <section className={`rounded-v6-card border border-v6-accent-border bg-v6-accent-soft p-3 shadow-v6-card`} data-design="V4BulkBar">
           <div className="flex flex-wrap items-center gap-2">
             <strong className="text-sm text-v6-ink">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-v6-ink-secondary">選択した友だちにまとめて操作します</span>
-            {selectedIds.size > 1 ? (
-              <button type="button" onClick={() => onNotice({ title: '一括アクション', message: '複数人への一括更新APIは未接続です。誤操作を防ぐため、送信や変更は実行していません。' })} className="ml-auto rounded-control bg-v6-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-v6-accent-hover">操作を選ぶ</button>
+            <span className="text-xs text-v6-ink-secondary">対象を確認してから操作を選んでください</span>
+            {selectedIds.size > 1 && canRunBulk(selectedAccount?.role) ? (
+              <Button
+                variant="primary"
+                className="ml-auto"
+                data-qa-open="IAf7j"
+                onClick={() => setBulkOpen(true)}
+              >
+                操作を選ぶ
+              </Button>
+            ) : null}
+            {selectedIds.size > 1 && !canRunBulk(selectedAccount?.role) ? (
+              /* 権限が無いときは押し口を出さない。理由だけ書く。 */
+              <span className="text-v6-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
             ) : null}
           </div>
           {selectedIds.size === 1 ? (
@@ -354,6 +369,15 @@ function FriendsPageInner({
           ) : null}
         </section>
       ) : null}
+
+      <BulkRunDialog
+        open={bulkOpen}
+        friendIds={[...selectedIds]}
+        tags={allTags}
+        accountId={selectedAccountId}
+        onClose={() => setBulkOpen(false)}
+        onDone={() => void loadFriends()}
+      />
 
       {loadStatus === 'loading' ? (
         <ListState kind="loading" title="友だちを読み込んでいます" />
