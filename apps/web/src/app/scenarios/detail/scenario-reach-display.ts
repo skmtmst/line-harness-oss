@@ -15,3 +15,7 @@ export function scenarioReachPercent(value: number | null | undefined): number |
 export function scenarioReachPercentLabel(value: number | null): string {
   return value === null ? '—' : `${value}%`
 }
+
+export function scenarioReachBarWidth(value: number | null): string | null {
+  return value === null ? null : `${Math.min(100, Math.max(0, value))}%`
+}
