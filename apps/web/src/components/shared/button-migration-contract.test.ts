@@ -145,7 +145,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 最新 development の256から2つ減る。統合後の実測へ合わせる。
     // 2026-09-01: #420 の友だち情報欄と最新 development を統合した木を
     // 再計測し、副次操作は253。片側の古い基準値は採用していない。
-    expect(debt['direct-secondary-button']).toBe(253)
+    // 2026-09-01: #412 の対応マーク画面を共通Buttonへ寄せたぶん、
+    // 最新 development と統合した木を再計測し252。古い257/253へ戻さない。
+    expect(debt['direct-secondary-button']).toBe(252)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

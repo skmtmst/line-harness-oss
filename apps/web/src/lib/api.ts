@@ -1839,11 +1839,21 @@ export const api = {
         body: JSON.stringify(data),
         },
       ),
-    /** 付いている人がいると 409。force で初期値マークへ置換して消す。 */
-    delete: (id: string, accountId: string, opts?: { force?: boolean }) =>
-      fetchApi<ApiResponse<{ replacedFriendCount: number; replacementMark: SupportMark }>>(
-        `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}${opts?.force ? '&force=1' : ''}`,
-        { method: 'DELETE' },
+    /** 影響が確認時から変わっていない場合だけ、友だちを置換してマークを保管する。 */
+    delete: (id: string, accountId: string, data: {
+      replacementMarkId: string
+      expectedImpact: {
+        friendCount: number
+        usedIn: NonNullable<SupportMark['usedIn']>
+      }
+    }) =>
+      fetchApi<ApiResponse<{
+        archived: true
+        replacedFriendCount: number
+        replacementMark: SupportMark
+      }>>(
+        `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE', body: JSON.stringify(data) },
       ),
     setForFriend: (friendId: string, accountId: string, markId: string | null) =>
       fetchApi<ApiResponse<null>>(
@@ -3410,7 +3420,9 @@ export const api = {
     get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),
   },
   listStats: {
-    get: () => fetchApi<ApiResponse<ListStats>>('/api/list-stats'),
+    get: (accountId?: string) => fetchApi<ApiResponse<ListStats>>(
+      `/api/list-stats${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
+    ),
   },
   broadcastStats: {
     get: () => fetchApi<ApiResponse<BroadcastStats>>('/api/broadcasts/stats'),

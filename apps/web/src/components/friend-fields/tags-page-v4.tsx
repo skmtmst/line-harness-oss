@@ -677,7 +677,11 @@ export default function TagsPageV4({
             まで同じ操作の中で進む。
           */
           <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
-        ) : tab === 'fields' ? <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button> : undefined}
+        ) : tab === 'marks' ? (
+          <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>
+        ) : tab === 'fields' ? (
+          <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button>
+        ) : undefined}
       />
 
       {csvOpen ? (

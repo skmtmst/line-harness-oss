@@ -2634,7 +2634,7 @@ CREATE TABLE support_marks (
   auto_on_inbound INTEGER NOT NULL DEFAULT 0,
   display_order   INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, archived_at TEXT);
 
 CREATE TABLE tag_groups (
   id         TEXT PRIMARY KEY,
@@ -3608,6 +3608,9 @@ CREATE INDEX idx_support_email_threads_status_last
 
 CREATE INDEX idx_support_mark_scopes_account
   ON support_mark_scopes(tenant_id, line_account_id);
+
+CREATE INDEX idx_support_marks_active
+  ON support_marks(archived_at, display_order, created_at);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 

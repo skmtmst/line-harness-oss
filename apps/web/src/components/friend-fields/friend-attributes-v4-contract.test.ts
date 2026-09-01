@@ -25,12 +25,13 @@ describe('友だち属性 V4 contract', () => {
     expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 
-  it('タグ編集と対応マーク削除はV6の結果を正しく案内する', () => {
+  it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
     const editor = read('components/friend-fields/tag-editor-v4.tsx')
     const markList = read('components/friend-fields/mark-list.tsx')
     expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
     expect(editor).toContain('取り消せない操作です')
-    expect(markList).toContain('削除後に「${defaultMark?.name')
+    expect(markList).toContain('友だちは「${defaultMark?.name')
+    expect(markList).toContain('変更履歴は残ります')
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 

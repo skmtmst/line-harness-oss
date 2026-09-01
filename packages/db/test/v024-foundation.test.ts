@@ -18,9 +18,10 @@ import {
   updateSupportMark,
   getDefaultSupportMark,
   getSupportMarks,
+  getSupportMarksWithUsage,
   setFriendSupportMarkBulk,
   applyInboundSupportMark,
-  replaceAndDeleteSupportMark,
+  replaceAndArchiveSupportMark,
 } from '../src/support-marks.js';
 import {
   validateSearchConditions,
@@ -364,7 +365,7 @@ describe('対応マーク', () => {
     await setFriendSupportMarkBulk(db, ['f-account-1'], account1Mark.id, SCOPE);
 
     expect(
-      await replaceAndDeleteSupportMark(db, account1Mark.id, account2Mark.id, SCOPE, 'staff-1'),
+      await replaceAndArchiveSupportMark(db, account1Mark.id, account2Mark.id, SCOPE, 'staff-1'),
     ).toBe(0);
     expect(
       sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-account-1'`).get(),
@@ -379,7 +380,22 @@ describe('対応マーク', () => {
     expect(n).toBe(2);
   });
 
-  test('使用中マークは初期値へ置換し、友だちごとの履歴を残してから削除する', async () => {
+  test('一覧の使用先を固定文言ではなく実参照から数える', async () => {
+    const working = (await getSupportMarks(db, SCOPE)).find((mark) => mark.name === '対応中')!;
+    insertFriend('f-1');
+    await setFriendSupportMarkBulk(db, ['f-1'], working.id, SCOPE);
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES ('search-mark', '対応中の人', 'friends', ?, 'staff-1', 'account-1', 1, 0, '2026-08-27')`,
+    ).run(JSON.stringify({ all: [{ type: 'support_mark', value: { markIds: [working.id] } }] }));
+
+    const mark = (await getSupportMarksWithUsage(db, SCOPE)).find((row) => row.id === working.id);
+    expect(mark).toMatchObject({ friend_count: 1, saved_searches: 1 });
+    expect(mark?.broadcasts).toBe(0);
+  });
+
+  test('設定参照が無いときだけ、友だちを置換して履歴を残して保管する', async () => {
     await getSupportMarks(db, SCOPE);
     insertFriend('f-1');
     insertFriend('f-2');
@@ -387,13 +403,25 @@ describe('対応マーク', () => {
     const replacementMark = await getDefaultSupportMark(db, SCOPE);
     expect(replacementMark).not.toBeNull();
     await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], accountMark.id, SCOPE);
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES ('search-archive', '保管対象', 'friends', ?, 'staff-1', 'account-1', 1, 0, '2026-08-27')`,
+    ).run(JSON.stringify({ all: [{ type: 'support_mark', value: { markIds: [accountMark.id] } }] }));
 
-    const replaced = await replaceAndDeleteSupportMark(
-      db,
-      accountMark.id,
-      replacementMark!.id,
-      SCOPE,
-      'staff-1',
+    await expect(replaceAndArchiveSupportMark(
+      db, accountMark.id, replacementMark!.id, SCOPE, 'staff-1',
+    )).rejects.toThrow('Referenced support mark cannot be archived');
+    expect(
+      sqlite.prepare(`SELECT archived_at FROM support_marks WHERE id = ?`).get(accountMark.id),
+    ).toEqual({ archived_at: null });
+    expect(
+      sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
+    ).toEqual([{ support_mark_id: accountMark.id }]);
+
+    sqlite.prepare(`DELETE FROM saved_searches WHERE id = 'search-archive'`).run();
+    const replaced = await replaceAndArchiveSupportMark(
+      db, accountMark.id, replacementMark!.id, SCOPE, 'staff-1',
     );
 
     expect(replaced).toBe(2);
@@ -401,8 +429,9 @@ describe('対応マーク', () => {
       sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
     ).toEqual([{ support_mark_id: replacementMark!.id }]);
     expect(
-      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = ?`).get(accountMark.id),
-    ).toEqual({ c: 0 });
+      sqlite.prepare(`SELECT archived_at IS NOT NULL AS archived FROM support_marks WHERE id = ?`).get(accountMark.id),
+    ).toEqual({ archived: 1 });
+    expect((await getSupportMarks(db, SCOPE)).some((mark) => mark.id === accountMark.id)).toBe(false);
     expect(
       sqlite
         .prepare(
@@ -428,6 +457,17 @@ describe('対応マーク', () => {
           `{"previousMarkId":"${accountMark.id}","replacementMarkId":"${replacementMark!.id}","reason":"deleted_mark_replacement"}`,
       },
     ]);
+    expect(
+      sqlite.prepare(
+        `SELECT action, target_id, actor_id, detail_json
+           FROM operation_audit WHERE action = 'archived'`,
+      ).get(),
+    ).toEqual({
+      action: 'archived',
+      target_id: accountMark.id,
+      actor_id: 'staff-1',
+      detail_json: `{"replacementMarkId":"${replacementMark!.id}","reason":"stop_new_use"}`,
+    });
   });
 
   test('空の配列ではクエリを投げない', async () => {
