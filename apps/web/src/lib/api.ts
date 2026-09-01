@@ -3193,6 +3193,7 @@ export const api = {
         totalClicks: number;
         totalConversions: number;
         totalRevenue: number;
+        confirmedReward: number;
         linkCount: number;
         friendAdds: number;
       }>>>('/api/affiliates-report?' + new URLSearchParams(params as Record<string, string>)),

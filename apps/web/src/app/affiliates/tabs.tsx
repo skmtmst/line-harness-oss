@@ -7,6 +7,7 @@ import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { calculateAffiliateReward } from './affiliate-reward'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -39,6 +40,7 @@ interface AffiliateReportRow {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
+  confirmedReward: number
   linkCount: number
   friendAdds: number
 }
@@ -48,7 +50,7 @@ interface AffiliateListRow extends AffiliateItem {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
-  estimatedCommission: number
+  rewardAmount: number
   linkCount: number
   friendAdds: number
 }
@@ -190,7 +192,11 @@ export function AffiliatorsTab() {
           totalClicks: rep?.totalClicks ?? 0,
           totalConversions: rep?.totalConversions ?? 0,
           totalRevenue: rep?.totalRevenue ?? 0,
-          estimatedCommission: ((rep?.totalRevenue ?? 0) * a.commissionRate) / 100,
+          rewardAmount: calculateAffiliateReward({
+            commissionRate: a.commissionRate,
+            totalRevenue: rep?.totalRevenue ?? 0,
+            confirmedFixedReward: rep?.confirmedReward ?? 0,
+          }),
           linkCount: rep?.linkCount ?? 0,
           friendAdds: rep?.friendAdds ?? 0,
         }
@@ -324,8 +330,7 @@ export function AffiliatorsTab() {
                 <Th align="right">友だち追加</Th>
                 <Th align="right">CV</Th>
                 <Th align="right">売上</Th>
-                <Th align="right">参考報酬</Th>
-                <Th align="right">率</Th>
+                <Th align="right">報酬</Th>
                 <Th>状態</Th>
               </TableHeadRow>
             </thead>
@@ -352,8 +357,7 @@ export function AffiliatorsTab() {
                       <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">{row.friendAdds.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{row.totalConversions.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">{formatYen(row.totalRevenue)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.estimatedCommission)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-500">{row.commissionRate}%</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.rewardAmount)}</td>
                       <td className="px-4 py-3 text-sm">
                         {row.isActive
                           ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">有効</span>
@@ -365,7 +369,7 @@ export function AffiliatorsTab() {
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={11} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
+                        <td colSpan={10} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (

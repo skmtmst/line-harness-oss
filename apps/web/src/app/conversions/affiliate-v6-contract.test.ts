@@ -30,4 +30,10 @@ describe('V6 成果・アフィリエイトの契約', () => {
   it('紹介者を物理削除するクライアントAPIを持たない', () => {
     expect(API).not.toContain("fetchApi<ApiResponse<null>>(`/api/affiliates/${id}`, { method: 'DELETE' })")
   })
+
+  it('一覧の報酬は案件別の確定額を受け取り、割合だけの参考値に固定しない', () => {
+    expect(TABS).toContain('confirmedFixedReward: rep?.confirmedReward ?? 0')
+    expect(TABS).toContain('<Th align="right">報酬</Th>')
+    expect(TABS).not.toContain('<Th align="right">参考報酬</Th>')
+  })
 })
