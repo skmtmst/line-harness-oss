@@ -1,4 +1,9 @@
-import { getLineAccounts, type LineAccount } from '@line-crm/db';
+import {
+  getLineAccounts,
+  getStaffAccountScopeIds,
+  getStaffById,
+  type LineAccount,
+} from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 
@@ -6,7 +11,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
  * 認証済みユーザーが閲覧できるLINE公式アカウントを返す。
  *
  * tenant_id が未設定の既存行は既定統括に属するものとして扱い、管理画面から
- * 行方不明にならないようにする。担当アカウントや親子階層は認可に使わない。
+ * 行方不明にならないようにする。親子階層は認可に使わない。
  */
 export function filterVisibleLineAccounts(
   accounts: LineAccount[] | undefined,
@@ -42,13 +47,32 @@ export async function getVisibleLineAccountScope(
   staff: AuthenticatedStaff | undefined,
 ): Promise<VisibleLineAccountScope> {
   const allAccounts = await getLineAccounts(db);
-  const accounts = filterVisibleLineAccounts(allAccounts, staff);
+  const tenantAccounts = filterVisibleLineAccounts(allAccounts, staff);
+  if (staff?.id === 'env-owner') {
+    const allowedAccountIds = tenantAccounts.map((account) => account.id);
+    return {
+      accounts: tenantAccounts,
+      allowedAccountIds,
+      canSeeUnassigned: true,
+      ids: allowedAccountIds,
+    };
+  }
+
+  const member = staff?.id ? await getStaffById(db, staff.id) : null;
+  const isAccountScoped = member?.account_scope === 'accounts';
+  const scopedIds = isAccountScoped
+    ? new Set(await getStaffAccountScopeIds(db, staff!.id))
+    : null;
+  // The tenant wall is applied first. An empty assigned scope deliberately stays empty.
+  const accounts = scopedIds
+    ? tenantAccounts.filter((account) => scopedIds.has(account.id))
+    : tenantAccounts;
   const allowedAccountIds = accounts.map((account) => account.id);
   const staffTenant = staff?.tenantId ?? DEFAULT_TENANT_ID;
   return {
     accounts,
     allowedAccountIds,
-    canSeeUnassigned: staffTenant === DEFAULT_TENANT_ID,
+    canSeeUnassigned: !isAccountScoped && staffTenant === DEFAULT_TENANT_ID,
     ids: allowedAccountIds,
   };
 }

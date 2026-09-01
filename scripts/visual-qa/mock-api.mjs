@@ -19,7 +19,15 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  TEMPLATES, TEMPLATE_FOLDERS,
+  FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
+  IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
+  IDENTITY_CANDIDATE_LISTS,
+  MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
+  LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -364,6 +372,38 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
   }
+  if (pathname === '/api/identity-candidates/detect') {
+    return {
+      success: true,
+      data: query.get('visualState') === 'empty'
+        ? IDENTITY_CANDIDATE_DETECTION.empty
+        : IDENTITY_CANDIDATE_DETECTION.normal,
+    }
+  }
+  if (pathname === '/api/identity-candidates') {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: IDENTITY_CANDIDATE_LISTS.empty }
+    }
+    const kind = query.get('kind') === 'ec_member' ? 'ec_member' : 'friend_duplicate'
+    return { success: true, data: IDENTITY_CANDIDATE_LISTS[kind] }
+  }
+  const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
+  if (identityCandidate) {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
+      ? IDENTITY_CANDIDATE_EC
+      : IDENTITY_CANDIDATE_FRIEND
+    return { success: true, data: candidate }
+  }
+  const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
+  if (mergedPerson) {
+    if (query.get('visualState') === 'error') return MERGED_PERSON_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: MERGED_PERSON_EMPTY }
+    }
+    return { success: true, data: MERGED_PERSON_DETAIL }
+  }
   if (pathname === '/api/dashboard/preferences') {
     /*
       設計 `vUXKb` の並び。**「友だちの状態」は既定では出ない**カードだが、
@@ -427,6 +467,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/friends/bulk-runs/friend-bulk-run-1') {
+    return { success: true, data: FRIEND_BULK_RUN.detail }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という
@@ -470,7 +513,10 @@ const server = createServer((req, res) => {
 
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
+  )
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
 
   if (method === 'OPTIONS') {
@@ -488,6 +534,12 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    // 対象確認は書き込みを起こさない。IAf7j の確認窓を通常データで撮るため、
+    // この1本だけ本物と同じPOSTの器で返す。実行・再試行・取り消しは405のまま。
+    if (method === 'POST' && url.pathname === '/api/friends/bulk-runs/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
       return
     }
     res.writeHead(405).end(

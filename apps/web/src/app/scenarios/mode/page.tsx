@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import StepTrail from '@/components/shared/step-trail'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { DeliveryMode, Scenario } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
+import { ApiError, api } from '@/lib/api'
 import Header from '@/components/layout/header'
 
 /**
@@ -30,32 +31,101 @@ function ScenarioModeContent() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const [scenario, setScenario] = useState<Scenario | null>(null)
+  const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderId, setFolderId] = useState('')
+  const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [detailsSaving, setDetailsSaving] = useState(false)
+  const detailsSavePromise = useRef<Promise<boolean> | null>(null)
 
-  /** 名前だけ先に保存する。方式を選ぶ前に閉じても、名前は残る。 */
-  const saveName = async () => {
+  /** 名前とフォルダを先に保存する。方式を選ぶ前に閉じても、分類は残る。 */
+  const saveDetails = (nextFolderId = folderId): Promise<boolean> => {
+    if (detailsSavePromise.current) return detailsSavePromise.current
     const trimmed = name.trim()
-    if (!id || !trimmed || trimmed === scenario?.name) return
-    const res = await api.scenarios.update(id, { name: trimmed })
-    if (!res.success) setError(res.error)
+    const nextFolder = nextFolderId || null
+    if (!id || !scenario || !trimmed) return Promise.resolve(false)
+    if (trimmed === scenario.name && nextFolder === (scenario.folderId ?? null)) {
+      return Promise.resolve(true)
+    }
+
+    const operation = (async () => {
+      setDetailsSaving(true)
+      setError('')
+      try {
+        const res = await api.scenarios.update(id, { name: trimmed, folderId: nextFolder })
+        if (!res.success) {
+          setError('シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。')
+          setFolderId(scenario.folderId ?? '')
+          return false
+        }
+        setScenario(res.data)
+        setName(res.data.name)
+        setFolderId(res.data.folderId ?? '')
+        return true
+      } catch (cause) {
+        setError(scenarioSaveError(cause))
+        setFolderId(scenario.folderId ?? '')
+        return false
+      } finally {
+        setDetailsSaving(false)
+      }
+    })()
+    detailsSavePromise.current = operation
+    void operation.finally(() => {
+      if (detailsSavePromise.current === operation) detailsSavePromise.current = null
+    })
+    return operation
   }
 
   useEffect(() => {
     if (!id) return
-    void api.scenarios.get(id).then(res => {
-      if (res.success) {
-        setScenario(res.data)
-        setName(res.data.name)
-      } else {
-        setError(res.error)
-      }
-    })
+    let active = true
+    setScenarioState('loading')
+    void api.scenarios.get(id)
+      .then((res) => {
+        if (!active) return
+        if (res.success) {
+          setScenario(res.data)
+          setName(res.data.name)
+          setFolderId(res.data.folderId ?? '')
+          setScenarioState('ready')
+        } else {
+          setError('シナリオを読み込めませんでした。時間をおいてもう一度お試しください。')
+          setScenarioState('error')
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError('シナリオを読み込めませんでした。時間をおいてもう一度お試しください。')
+          setScenarioState('error')
+        }
+      })
+    setFolderState('loading')
+    void api.folders.list('scenario')
+      .then((res) => {
+        if (!active) return
+        if (res.success) {
+          setFolders(res.data)
+          setFolderState('ready')
+        } else {
+          setFolderState('error')
+        }
+      })
+      .catch(() => {
+        if (active) setFolderState('error')
+      })
+    return () => { active = false }
   }, [id])
 
   const choose = async (mode: DeliveryMode) => {
-    if (!id || saving) return
+    if (!id || !scenario || saving) return
+    if (detailsSavePromise.current) {
+      const saved = await detailsSavePromise.current
+      if (!saved) return
+    }
     setSaving(mode)
     setError('')
     const trimmed = name.trim()
@@ -65,14 +135,29 @@ function ScenarioModeContent() {
       return
     }
     // 名前と方式は同じ受け口で一度に保存する。
-    const res = await api.scenarios.update(id, { name: trimmed, deliveryMode: mode })
-    if (!res.success) {
-      setError(res.error)
+    try {
+      const res = await api.scenarios.update(id, {
+        name: trimmed,
+        folderId: folderId || null,
+        deliveryMode: mode,
+      })
+      if (!res.success) {
+        setError('配信方式を保存できませんでした。時間をおいてもう一度お試しください。')
+        setSaving(null)
+        return
+      }
+      // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
+      router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
+    } catch (cause) {
+      setError(scenarioModeError(cause))
       setSaving(null)
-      return
     }
-    // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
-    router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
+  }
+
+  const continueAsDraft = async () => {
+    if (!scenario || saving || detailsSaving) return
+    const saved = await saveDetails()
+    if (saved) router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
   }
 
   if (!id) {
@@ -86,8 +171,16 @@ function ScenarioModeContent() {
     )
   }
 
+  const selectedFolderName = folderState === 'loading'
+    ? '読み込み中…'
+    : folderState === 'error'
+      ? '確認できません'
+      : folders.find((folder) => folder.id === folderId)?.name
+        ?? (folderId ? '名前を確認できません' : '未分類')
+  const selectedFolderMissing = Boolean(folderId && !folders.some((folder) => folder.id === folderId))
+
   return (
-    <div>
+    <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/scenarios" className="hover:underline">
           シナリオ配信
@@ -121,36 +214,78 @@ function ScenarioModeContent() {
       </div>
 
       <div data-design="Notice" className="space-y-2">
-        <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          シナリオ「{scenario?.name ?? '…'}」を作成しました。続けて配信方式を選んでください。
-          {/* シナリオにフォルダを持たせる列が無いので、いまは必ず未分類。 */}
-          <span className="text-ink-faint ml-3 text-xs">フォルダ：未分類</span>
-        </p>
+        {scenarioState === 'loading' && (
+          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+            シナリオを読み込んでいます。
+          </p>
+        )}
+        {scenarioState === 'ready' && scenario && (
+          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+            シナリオ「{scenario.name}」を作成しました。続けて配信方式を選んでください。
+            <span className="text-ink-faint ml-3 text-xs">フォルダ：{selectedFolderName}</span>
+          </p>
+        )}
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
-      {/*
-        3段の帯はやめた。段の名前を並べても、いまどこに居るかは
-        画面の見出しで分かる。空いた場所に、いちばん必要なもの
-        （シナリオの名前）を置く。
-      */}
+      <StepTrail
+        label="シナリオ作成の進み方"
+        items={[
+          { label: 'シナリオ情報', state: 'done' },
+          { label: '配信方式', state: 'current' },
+          { label: '1通目を設定', state: 'todo' },
+        ]}
+      />
+
       <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
-        <label className="block">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">
-            シナリオ名 <span className="text-danger">*</span>
-          </span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => void saveName()}
-            placeholder="例: 友だち追加ウェルカム"
-            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full max-w-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-          />
-          <span className="text-ink-faint mt-1 block text-xs">
-            一覧に出る名前です。あとから変えられます。
-          </span>
-        </label>
+        <div className="grid max-w-3xl gap-4 md:grid-cols-2">
+          <label className="block">
+            <span className="text-ink-secondary mb-1 block text-xs font-medium">
+              シナリオ名 <span className="text-danger">*</span>
+            </span>
+            <input
+              type="text"
+              value={name}
+              disabled={!scenario || detailsSaving || saving !== null}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => void saveDetails()}
+              placeholder="例: 友だち追加ウェルカム"
+              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <span className="text-ink-faint mt-1 block text-xs">
+              一覧に出る名前です。あとから変えられます。
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ</span>
+            <select
+              value={folderId}
+              disabled={!scenario || folderState !== 'ready' || detailsSaving || saving !== null}
+              onChange={(event) => {
+                const nextFolderId = event.target.value
+                setFolderId(nextFolderId)
+                void saveDetails(nextFolderId)
+              }}
+              className="v6-select border-hairline rounded-control bg-canvas text-ink focus:ring-accent disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            >
+              <option value="">未分類</option>
+              {selectedFolderMissing && <option value={folderId}>名前を確認できません</option>}
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>{folder.name}</option>
+              ))}
+            </select>
+            <span className="text-ink-faint mt-1 block text-xs">
+              {folderState === 'loading'
+                ? 'フォルダを読み込んでいます。'
+                : folderState === 'error'
+                  ? 'フォルダを確認できないため、いまは変更できません。'
+                  : detailsSaving
+                    ? 'フォルダを保存しています。'
+                    : '一覧で探しやすい分類を選べます。'}
+            </span>
+          </label>
+        </div>
       </div>
 
       <div data-design="Choices" className="grid gap-4 xl:grid-cols-2">
@@ -169,6 +304,7 @@ function ScenarioModeContent() {
           ]}
           heads={['当日 15:00', '翌日 20:00']}
           saving={saving}
+          disabled={!scenario || detailsSaving}
           onChoose={choose}
           cta="時刻で作成"
         />
@@ -185,6 +321,7 @@ function ScenarioModeContent() {
             { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 17:00', second: '4/2 22:00', gaps: ['+3時間', '+1日と8時間'] },
           ]}
           saving={saving}
+          disabled={!scenario || detailsSaving}
           onChoose={choose}
           cta="経過時間で作成"
         />
@@ -195,12 +332,14 @@ function ScenarioModeContent() {
           ⓘ どちらを選んでも、作成後にステップの追加・並べ替えができます。
           {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
         </p>
-        <Link
-          href={`/scenarios/first-step?id=${encodeURIComponent(id)}`}
-          className="text-accent ml-auto text-sm font-medium hover:underline"
+        <button
+          type="button"
+          disabled={!scenario || saving !== null || detailsSaving}
+          onClick={() => void continueAsDraft()}
+          className="text-accent ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >
           あとで決める（下書きとして保存）
-        </Link>
+        </button>
       </div>
     </div>
   )
@@ -208,35 +347,22 @@ function ScenarioModeContent() {
 
 // ── 部品 ────────────────────────────────────────────────────────────────────
 
-function StepMark({
-  n,
-  label,
-  state,
-}: {
-  n: number
-  label: string
-  state: 'done' | 'current' | 'todo'
-}) {
-  return (
-    <li className="flex items-center gap-2">
-      <span
-        className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-bold ${
-          state === 'done'
-            ? 'bg-accent text-on-accent'
-            : state === 'current'
-              ? 'border-accent text-accent border-2'
-              : 'border-hairline text-ink-faint border'
-        }`}
-      >
-        {state === 'done' ? '✓' : n}
-      </span>
-      <span className={state === 'todo' ? 'text-ink-faint' : 'text-ink font-bold'}>{label}</span>
-    </li>
-  )
+
+function scenarioSaveError(cause: unknown): string {
+  if (cause instanceof ApiError) {
+    if (cause.status === 403) return 'シナリオ情報を変更する権限がありません。'
+    if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
+  }
+  return 'シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。'
 }
 
-function StepLine() {
-  return <li aria-hidden className="border-hairline w-10 border-t" />
+function scenarioModeError(cause: unknown): string {
+  if (cause instanceof ApiError) {
+    if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
+    if (cause.status === 403) return '配信方式を変更する権限がありません。'
+    if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
+  }
+  return '配信方式を保存できませんでした。時間をおいてもう一度お試しください。'
 }
 
 function ModeCard({
@@ -252,6 +378,7 @@ function ModeCard({
   note,
   cta,
   saving,
+  disabled,
   onChoose,
 }: {
   mode: DeliveryMode
@@ -266,6 +393,7 @@ function ModeCard({
   note: string
   cta: string
   saving: DeliveryMode | null
+  disabled: boolean
   onChoose: (mode: DeliveryMode) => void
 }) {
   return (
@@ -347,7 +475,7 @@ function ModeCard({
       <button
         type="button"
         onClick={() => onChoose(mode)}
-        disabled={saving !== null}
+        disabled={disabled || saving !== null}
         className="bg-accent hover:bg-accent-hover text-on-accent rounded-control mt-auto w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
       >
         {saving === mode ? '作成中…' : `${cta} →`}

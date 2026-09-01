@@ -46,6 +46,7 @@ export interface SegmentRule {
     | 'form_answered'
     | 'last_reaction_at'
     | 'reaction_state'
+    | 'score_range'
   value: unknown
 }
 
@@ -447,6 +448,32 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
           return { sql: `NOT ${anyIncoming}`, bindings }
       }
       break
+    }
+
+    /*
+     * 行動スコア。friends.score は現在値の投影で、配信確定時にも同じ条件を
+     * 再評価する。min / max の片方だけでもよいが、空の条件は断る。
+     */
+    case 'score_range': {
+      const v = asRecord(rule.value, 'score_range')
+      const min = typeof v.min === 'number' && Number.isInteger(v.min) ? v.min : null
+      const max = typeof v.max === 'number' && Number.isInteger(v.max) ? v.max : null
+      if (min === null && max === null) {
+        throw new Error('score_range rule requires min or max')
+      }
+      if (min !== null && max !== null && min > max) {
+        throw new Error('score_range rule requires min <= max')
+      }
+      const clauses: string[] = []
+      if (min !== null) {
+        clauses.push('f.score >= ?')
+        bindings.push(min)
+      }
+      if (max !== null) {
+        clauses.push('f.score <= ?')
+        bindings.push(max)
+      }
+      return { sql: `(${clauses.join(' AND ')})`, bindings }
     }
 
     default: {

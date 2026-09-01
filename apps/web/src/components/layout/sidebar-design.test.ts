@@ -106,7 +106,7 @@ const ROUTES: Record<string, string> = {
   登録メディア一覧: '/contents',
   成果とアフィリエイト: '/conversions?tab=affiliates',
   回答フォーム: '/form-submissions',
-  マイル: '/scoring',
+  マイル: '/mileage',
   流入と計測: '/inflow-links',
   コンバージョン: '/conversions',
   分析: '/analytics',

@@ -293,18 +293,79 @@ export interface CommonVarSchedule {
   appliedAt: string | null;
 }
 
+export type SavedSearchConditionKind =
+  | "name"
+  | "tag"
+  | "field"
+  | "form"
+  | "purchase"
+  | "mark"
+  | "scenario"
+  | "chat_status"
+  | "following"
+  | "status_message"
+  | "created_at";
+
+/** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
+export interface SavedSearchCondition {
+  kind: SavedSearchConditionKind;
+  key?: string;
+  formId?: string;
+  op: string;
+  value?: unknown;
+}
+
+/**
+ * 保存した検索の中身。
+ *
+ * AND と OR は1段だけにする。入れ子を許すと編集画面と実行側で同じ条件を
+ * 再現できなくなる。説明と一覧表示も同じJSONに置き、DB列を増やさず既存
+ * データとの互換性を保つ。
+ */
+export interface SavedSearchConditions {
+  all?: SavedSearchCondition[];
+  any?: SavedSearchCondition[];
+  visibility?: "visible_only" | "hidden_only" | "all";
+  description?: string;
+  list?: {
+    columns?: string[];
+    sort?: "recent" | "oldest";
+    limit?: 10 | 20 | 30 | 40 | 50;
+  };
+}
+
 /** 保存した検索 */
 export interface SavedSearch {
   id: string;
   name: string;
   scope: "friends" | "chats" | "bookings";
   /** { all: [...], any: [...], visibility } の形 */
-  conditions: unknown;
+  conditions: SavedSearchConditions;
   createdBy: string | null;
   lineAccountId: string | null;
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
+  matchCount?: number | null;
+  /** matchCount が null のとき、黙って0件にせず理由を返す。 */
+  matchCountError?: string | null;
+  /** 配信・自動化など、保存検索をIDで参照している利用先。 */
+  usedIn?: SavedSearchUsage[];
+  /** 使用先が無いとサーバーで確認できたときだけ true。 */
+  canDelete?: boolean;
+}
+
+export type SavedSearchUsageKind = "broadcast" | "automation" | "scenario" | "other";
+export type SavedSearchReferenceMode = "live" | "fixed";
+
+/** 保存した検索を参照している実データ。固定値の説明には使わない。 */
+export interface SavedSearchUsage {
+  kind: SavedSearchUsageKind;
+  id: string;
+  name: string;
+  mode: SavedSearchReferenceMode;
+  lastUsedAt: string | null;
 }
 
 /**
@@ -1129,6 +1190,30 @@ export interface Notification {
   status: "pending" | "sent" | "failed";
   metadata: string | null;
   createdAt: string;
+}
+
+export type NotificationCenterCategory = "error" | "update" | "info";
+
+export interface NotificationCenterItem {
+  id: string;
+  eventType: string;
+  category: NotificationCenterCategory;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationCenterData {
+  items: NotificationCenterItem[];
+  counts: {
+    all: number;
+    error: number;
+    update: number;
+    unread: number;
+  };
+  unreadCount: number;
 }
 
 // -----------------------------------------------------------------------------

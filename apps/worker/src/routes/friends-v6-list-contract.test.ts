@@ -33,4 +33,12 @@ describe('V6友だち一覧API契約', () => {
       "chats.get('/api/operators', requireRole('owner', 'admin', 'staff')",
     )
   })
+
+  it('分析結果の対象者はアカウントと24時間期限を確認してSQLで絞る', () => {
+    expect(SOURCE).toContain("c.req.query('audienceId')")
+    expect(SOURCE).toContain('FROM analytics_result_audiences')
+    expect(SOURCE).toContain('analytics_result_audience_members arm')
+    expect(SOURCE).toContain('この分析結果の対象者は24時間を過ぎました')
+    expect(SOURCE).toContain("staff.role !== 'owner' && staff.role !== 'admin'")
+  })
 })
