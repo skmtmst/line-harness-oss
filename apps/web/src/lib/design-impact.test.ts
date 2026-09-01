@@ -21,6 +21,7 @@ describe('共通部品の影響範囲', () => {
       'app/booking/staff/page.tsx',
       'app/booking/staff/shifts/page.tsx',
       'app/broadcasts/detail/page.tsx',
+      'app/broadcasts/reserved/page.tsx',
       'app/chats/page.tsx',
       'app/common-actions/edit/page.tsx',
       'app/common-actions/new/page.tsx',
@@ -83,6 +84,7 @@ describe('共通部品の影響範囲', () => {
       'components/line-notifications/operator-notification-rules.tsx',
       'components/merged-person/merged-delivery-dialog.tsx',
       'components/merged-person/merged-person-detail.tsx',
+      'components/shared/not-connected.tsx',
       'components/store-selection-gate.tsx',
       'components/users/user-row.tsx',
     ])
