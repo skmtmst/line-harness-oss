@@ -10,3 +10,4 @@ export * from "./form-layout";
 export * from "./tenant";
 export * from "./friend-bulk-runs";
 export * from "./identity-candidates";
+export * from "./template-message";

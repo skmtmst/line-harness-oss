@@ -66,6 +66,7 @@ import type {
   IdentityCandidateKind,
   IdentityCandidateList,
   IdentityCandidateStatus,
+  DetectIdentityCandidatesResult,
   DecideIdentityCandidateRequest,
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
@@ -4417,6 +4418,15 @@ export const api = {
         `/api/identity-candidates/${encodeURIComponent(id)}/undo`,
         { method: 'POST', body: JSON.stringify(body) },
       ),
+    detectFriendDuplicates: (params?: { limit?: number; after?: string | null }) => {
+      const query = new URLSearchParams({ kind: 'friend_duplicate' })
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.after) query.set('after', params.after)
+      return fetchApi<ApiResponse<DetectIdentityCandidatesResult>>(
+        `/api/identity-candidates/detect?${query.toString()}`,
+        { method: 'POST' },
+      )
+    },
   },
   duplicates: {
     stats: (options?: { forceRefresh?: boolean }) =>

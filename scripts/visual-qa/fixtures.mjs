@@ -399,3 +399,8 @@ export const IDENTITY_CANDIDATE_LISTS = {
 export const IDENTITY_CANDIDATE_ERROR = {
   success: false, error: '本人照合の候補を読み込めませんでした', code: 'VISUAL_QA_ERROR',
 }
+
+export const IDENTITY_CANDIDATE_DETECTION = {
+  normal: { processed: 1, hasMore: false, nextCursor: null },
+  empty: { processed: 0, hasMore: false, nextCursor: null },
+}
