@@ -157,6 +157,76 @@ describe('タグの使用先集計', () => {
     });
   });
 
+  it('100件以上のタグがあっても一覧を返す', async () => {
+    const insert = sqlite.prepare(`
+      INSERT INTO tags (id, name, line_account_id, display_order)
+      VALUES (?, ?, 'account-1', ?)
+    `);
+    const insertMany = sqlite.transaction(() => {
+      for (let index = 0; index < 105; index += 1) {
+        insert.run(`bulk-tag-${index}`, `一括タグ${index}`, index + 100);
+      }
+    });
+    insertMany();
+
+    await expect(getTagsWithUsage(db)).resolves.toHaveLength(115);
+  });
+
+  it('分割後も各参照元を1件ずつ数える', async () => {
+    sqlite.exec(`
+      DELETE FROM broadcasts WHERE id != 'broadcast-1';
+      DELETE FROM forms WHERE id != 'form-1';
+      DELETE FROM scenarios WHERE id != 'scenario-1';
+      DELETE FROM scenario_steps;
+      DELETE FROM scenario_actions;
+      DELETE FROM auto_replies;
+      INSERT INTO auto_replies (id, keyword, response_content, actions_json)
+      VALUES ('auto-reply-only', '参照', '本文', '[{"tagId":"tag-main"}]');
+      DELETE FROM saved_searches;
+      INSERT INTO saved_searches (id, name, scope, conditions_json)
+      VALUES ('search-only', '参照', 'friends', '{"tagId":"tag-main"}');
+    `);
+
+    const tag = (await getTagsWithUsage(db)).find((row) => row.id === 'tag-main');
+    expect(tag).toMatchObject({
+      used_in_broadcasts: 1,
+      used_in_forms: 1,
+      used_in_scenarios: 1,
+      used_in_auto_replies: 1,
+      used_in_saved_searches: 1,
+    });
+  });
+
+  it('旧列と複数トリガーの同じシナリオを「他N」で1件にまとめる', async () => {
+    sqlite.exec(`
+      INSERT INTO scenario_triggers (id, scenario_id, kind, tag_id)
+      VALUES ('trigger-1', 'scenario-1', 'tag_added', 'tag-main');
+    `);
+
+    const tag = (await getTagsWithUsage(db)).find((row) => row.id === 'tag-main');
+    // シナリオ1件 + V6自動化2アクション + 旧自動化1アクション。
+    expect(tag?.other_action_count).toBe(4);
+  });
+
+  it('分割した取得元に同じシナリオがあっても使用先を二重に数えない', async () => {
+    sqlite.exec(`
+      DELETE FROM scenario_steps;
+      DELETE FROM scenario_actions;
+      DELETE FROM scenarios WHERE id != 'scenario-1';
+      INSERT INTO scenario_triggers (id, scenario_id, kind, tag_id)
+      VALUES ('duplicate-trigger', 'scenario-1', 'tag_added', 'tag-main');
+    `);
+
+    const tag = (await getTagsWithUsage(db)).find((row) => row.id === 'tag-main');
+    expect(tag?.used_in_scenarios).toBe(1);
+  });
+
+  it('タグが0件なら空配列を返す', async () => {
+    sqlite.exec('DELETE FROM tags');
+
+    await expect(getTagsWithUsage(db)).resolves.toEqual([]);
+  });
+
   it('使われていない一般タグの付与元を手動と推測しない', async () => {
     const rows = await getTagsWithUsage(db);
     expect(rows.find((row) => row.id === 'tag-unused')).toMatchObject({
@@ -183,8 +253,25 @@ describe('タグの使用先集計', () => {
     const queries = buildTagUsageBlockingReferenceQueries();
     expect(queries.length).toBeGreaterThan(1);
     for (const query of queries) {
-      expect(query.split(/\nUNION\n/u).length)
-        .toBeLessThanOrEqual(MAX_TAG_USAGE_COMPOUND_SELECT_TERMS);
+      expect(query.match(/\bUNION\b/gu)?.length ?? 0)
+        .toBeLessThanOrEqual(MAX_TAG_USAGE_COMPOUND_SELECT_TERMS - 1);
+    }
+  });
+
+  it('一覧集計でprepareする各SQLの複合SELECTを安全な項数以下にする', async () => {
+    const preparedSql: string[] = [];
+    const capturingDb = {
+      prepare(query: string) {
+        preparedSql.push(query);
+        return db.prepare(query);
+      },
+    } as unknown as D1Database;
+
+    await getTagsWithUsage(capturingDb);
+
+    for (const query of preparedSql) {
+      expect(query.match(/\bUNION\b/gu)?.length ?? 0)
+        .toBeLessThanOrEqual(MAX_TAG_USAGE_COMPOUND_SELECT_TERMS - 1);
     }
   });
 
@@ -193,8 +280,8 @@ describe('タグの使用先集計', () => {
     const selects = [...TAG_USAGE_BLOCKING_REFERENCE_SELECTS, addedReference];
     const queries = buildTagUsageBlockingReferenceQueries(selects);
 
-    expect(queries.every((query) => query.split(/\nUNION\n/u).length
-      <= MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)).toBe(true);
+    expect(queries.every((query) => (query.match(/\bUNION\b/gu)?.length ?? 0)
+      <= MAX_TAG_USAGE_COMPOUND_SELECT_TERMS - 1)).toBe(true);
     await expect(collectTagUsageBlockingTagIds(db, selects))
       .resolves.toContain('tag-unused');
   });

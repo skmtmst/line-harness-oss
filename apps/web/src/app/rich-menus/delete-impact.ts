@@ -12,6 +12,30 @@ import type { RichMenuDeleteImpact } from '@/lib/api'
 /** 取得元が無い値。実値の0とは別。 */
 export const NOT_AVAILABLE = '—（未取得）'
 
+export type DeleteImpactRequest = {
+  accountId: string
+  groupId: string
+  generation: number
+}
+
+/** 遅い応答が、いま開いている削除確認のものかを判定する。 */
+export function sameDeleteImpactRequest(
+  current: DeleteImpactRequest | null,
+  expected: DeleteImpactRequest,
+): boolean {
+  return current?.accountId === expected.accountId
+    && current.groupId === expected.groupId
+    && current.generation === expected.generation
+}
+
+/** Workerが返した影響が、要求したアカウントとメニューのものかを確かめる。 */
+export function impactMatchesRequest(
+  impact: RichMenuDeleteImpact,
+  request: DeleteImpactRequest,
+): boolean {
+  return impact.group.accountId === request.accountId && impact.group.id === request.groupId
+}
+
 /**
  * いま表示している人数。
  *

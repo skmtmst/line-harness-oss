@@ -24,6 +24,17 @@ describe('V6 リッチメニュー削除確認 szXsT', () => {
     expect(PAGE).toContain('LINE上の表示は変更していません。管理画面で編集できるようになりました。')
   })
 
+  it('前のアカウントから遅れて返った取り込み結果を現在の画面へ出さない', () => {
+    expect(PAGE).toContain('const importRequestGenerationRef = useRef(0)')
+    expect(PAGE).toContain('importRequestGenerationRef.current += 1')
+    expect(PAGE).toContain('const accountId = selectedAccount.id')
+    expect(PAGE).toContain('const requestGeneration = ++importRequestGenerationRef.current')
+    expect(PAGE).toContain('importRequestGenerationRef.current !== requestGeneration')
+    expect(PAGE).toContain('activeAccountRef.current !== accountId')
+    expect(PAGE).toContain('importRequestGenerationRef.current === requestGeneration')
+    expect(PAGE).toContain('activeAccountRef.current === accountId')
+  })
+
   it('公開中のメニューもブラウザ標準alertを使わず、取り下げの順番を窓で案内する', () => {
     expect(PAGE).toContain('setPublishedDeleteTarget(group)')
     expect(PAGE).toContain('data-qa-open={g.status === \'published\' ? \'szXsT-published\' : \'szXsT\'}')

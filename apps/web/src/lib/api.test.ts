@@ -6,10 +6,19 @@ let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
+let api: typeof import('./api').api
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, extractApiErrorData, eventsApi } = await import('./api'))
+  ;({
+    fetchApi,
+    ApiError,
+    extractApiErrorMessage,
+    extractApiErrorCode,
+    extractApiErrorData,
+    eventsApi,
+    api,
+  } = await import('./api'))
 })
 
 describe('eventsApi.createSlots', () => {
@@ -41,6 +50,71 @@ describe('eventsApi.createSlots', () => {
 
     await expect(eventsApi.createSlots('account', 'event', slots)).rejects.toThrow('400件まで追加されました')
     expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('api.friendAddRouting draft/test/publish contract', () => {
+  const routing = {
+    firstTime: { scenarioId: 'scenario-1', timing: 'immediate' as const, actions: [] },
+    returning: {
+      scenarioId: null,
+      mode: 'same' as const,
+      startPosition: 'beginning' as const,
+      actions: [],
+    },
+    criteria: { firstTime: 'unfollow_count_zero' as const },
+  }
+
+  it('下書き・確認・競合・テストを同じLINEアカウントに紐づける', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.friendAddRouting.getDraft('account 1')
+    await api.friendAddRouting.saveDraft('account 1', routing)
+    await api.friendAddRouting.validateDraft('account 1')
+    await api.friendAddRouting.conflicts('account 1')
+    await api.friendAddRouting.testDraft('account 1', 'friend-1')
+
+    expect(spy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/friend-add-routing/draft?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/draft?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/validate?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/conflicts?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/draft/test?account_id=account%201',
+    ])
+    expect(spy.mock.calls[1][1]).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify({ routing }),
+    })
+    expect(spy.mock.calls[4][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ friendId: 'friend-1' }),
+    })
+  })
+
+  it('公開要求に操作の識別キーを付ける', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.friendAddRouting.publish('account-1', 'publish-key-00000001')
+
+    expect(spy).toHaveBeenCalledWith(
+      'https://worker.example.com/api/friend-add-routing/publish?account_id=account-1',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': 'publish-key-00000001',
+        }),
+      }),
+    )
   })
 })
 
@@ -163,7 +237,7 @@ describe('fetchApi error response', () => {
     })
   })
 
-  it('409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+  it('409の最新状態は保持し、本文は利用者へ直接出さない', async () => {
     const impact = { canDelete: false, blockers: ['incoming_switches'] }
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({

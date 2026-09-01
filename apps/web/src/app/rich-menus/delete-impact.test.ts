@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   audienceReason,
   impactFromError,
+  impactMatchesRequest,
   audienceText,
   blockerTexts,
   canDelete,
@@ -9,6 +10,7 @@ import {
   NOT_AVAILABLE,
   recommendedActionText,
   referenceKindText,
+  sameDeleteImpactRequest,
 } from './delete-impact'
 
 describe('表示中の人数', () => {
@@ -116,5 +118,29 @@ describe('409に入っている最新の影響', () => {
     for (const bad of [null, undefined, 'x', 42, {}, { canDelete: true }, { ...valid, blockers: 'x' }]) {
       expect(impactFromError(bad)).toBeNull()
     }
+  })
+
+  it('アカウントとメニューの両方が合う影響だけを受け取る', () => {
+    const request = { accountId: 'a', groupId: 'g', generation: 4 }
+    expect(impactMatchesRequest(valid as never, request)).toBe(true)
+    expect(impactMatchesRequest({ ...valid, group: { ...valid.group, accountId: 'other' } } as never, request))
+      .toBe(false)
+    expect(impactMatchesRequest({ ...valid, group: { ...valid.group, id: 'other' } } as never, request))
+      .toBe(false)
+  })
+})
+
+describe('遅い応答の照合', () => {
+  const request = { accountId: 'account-1', groupId: 'group-1', generation: 3 }
+
+  it('同じ対象でも前の読み込み世代は捨てる', () => {
+    expect(sameDeleteImpactRequest(request, request)).toBe(true)
+    expect(sameDeleteImpactRequest({ ...request, generation: 2 }, request)).toBe(false)
+  })
+
+  it('別アカウントと別メニューの応答を捨てる', () => {
+    expect(sameDeleteImpactRequest({ ...request, accountId: 'account-2' }, request)).toBe(false)
+    expect(sameDeleteImpactRequest({ ...request, groupId: 'group-2' }, request)).toBe(false)
+    expect(sameDeleteImpactRequest(null, request)).toBe(false)
   })
 })

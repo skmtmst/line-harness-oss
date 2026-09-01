@@ -16,10 +16,13 @@ import {
   audienceText,
   blockerTexts,
   canDelete as canDeleteImpact,
+  impactMatchesRequest,
   impactFromError,
   nextDisplayText,
   recommendedActionText,
   referenceKindText,
+  sameDeleteImpactRequest,
+  type DeleteImpactRequest,
 } from './delete-impact'
 import {
   compareTargetingGroups,
@@ -129,6 +132,7 @@ type DeleteTarget =
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
+  const importRequestGenerationRef = useRef(0)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -156,8 +160,11 @@ export default function RichMenusListPage() {
   */
   const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  /** いま影響を読んでいる対象。遅れて返った別の結果を捨てるために持つ。 */
-  const impactRequestRef = useRef<string | null>(null)
+  /** アカウント・対象・開き直しの世代で、遅い応答を捨てる。 */
+  const impactRequestRef = useRef<DeleteImpactRequest | null>(null)
+  const impactRequestGenerationRef = useRef(0)
+  /** 同じ窓の読み直しで、前の読み込み結果が後から上書きしないための世代。 */
+  const impactLoadGenerationRef = useRef(0)
   const [publishedDeleteTarget, setPublishedDeleteTarget] =
     useState<RichMenuGroupListItem | null>(null)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
@@ -169,6 +176,7 @@ export default function RichMenusListPage() {
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
+    importRequestGenerationRef.current += 1
     setGroups([])
     setExternal(null)
     setTapStats(null)
@@ -183,6 +191,11 @@ export default function RichMenusListPage() {
     setImportedMenuName(null)
     setDeleteBusy(false)
     setDeleteError(null)
+    impactRequestGenerationRef.current += 1
+    impactLoadGenerationRef.current += 1
+    impactRequestRef.current = null
+    setImpact(null)
+    setImpactPhase('idle')
     setPage(1)
     if (!selectedAccount?.id) setLoading(false)
   }, [selectedAccount?.id])
@@ -279,24 +292,43 @@ export default function RichMenusListPage() {
     }
   }
 
-  async function loadImpact(groupId: string) {
+  function beginImpactRequest(accountId: string, groupId: string): DeleteImpactRequest {
+    const request = {
+      accountId,
+      groupId,
+      generation: impactRequestGenerationRef.current + 1,
+    }
+    impactRequestGenerationRef.current = request.generation
+    impactRequestRef.current = request
+    return request
+  }
+
+  async function loadImpact(request: DeleteImpactRequest) {
     /*
       **遅れて返った別のメニューの結果を映さない。** Aを読み込み中に窓を
       閉じてBを開くと、あとから返るAの結果がBの窓に出る。表示とボタンの
       可否が別のメニューのものになる（サーバは削除時に確かめ直すので
       誤って消しはしないが、読んでいるものと押せるものが食い違う）。
     */
-    impactRequestRef.current = groupId
+    const loadGeneration = impactLoadGenerationRef.current + 1
+    impactLoadGenerationRef.current = loadGeneration
     setImpactPhase('loading')
     setImpact(null)
     try {
-      const res = await api.richMenuGroups.deleteImpact(groupId)
-      if (impactRequestRef.current !== groupId) return
+      const res = await api.richMenuGroups.deleteImpact(request.groupId)
+      if (
+        !sameDeleteImpactRequest(impactRequestRef.current, request)
+        || impactLoadGenerationRef.current !== loadGeneration
+      ) return
       if (!res.success) throw new Error('impact_failed')
+      if (!impactMatchesRequest(res.data, request)) throw new Error('impact_scope_mismatch')
       setImpact(res.data)
       setImpactPhase('ready')
     } catch {
-      if (impactRequestRef.current !== groupId) return
+      if (
+        !sameDeleteImpactRequest(impactRequestRef.current, request)
+        || impactLoadGenerationRef.current !== loadGeneration
+      ) return
       /*
         影響が読めないときは**消させない**。何が起きるか分からないまま
         取り消せない操作をさせるより、読み直してもらうほうがよい。
@@ -312,17 +344,22 @@ export default function RichMenusListPage() {
     }
     setDeleteError(null)
     setDeleteTarget({ kind: 'managed', group })
-    void loadImpact(group.id)
+    if (!selectedAccount?.id) return
+    const request = beginImpactRequest(selectedAccount.id, group.id)
+    void loadImpact(request)
   }
 
   function handleDeleteExternal(menu: LineMenu) {
     if (!selectedAccount?.id) return
     setDeleteError(null)
+    beginImpactRequest(selectedAccount.id, `external:${menu.richMenuId}`)
     setDeleteTarget({ kind: 'external', menu })
   }
 
   async function confirmDelete() {
     if (!deleteTarget || deleteBusy) return
+    const request = impactRequestRef.current
+    if (!request) return
     const action: RichMenuAction = deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'
     setDeleteBusy(true)
     setDeleteError(null)
@@ -338,25 +375,27 @@ export default function RichMenusListPage() {
         )
         if (!res.success) throw new Error('delete_failed')
       }
+      if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
       setDeleteTarget(null)
       await reload()
     } catch (e) {
+      if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
       /*
         **409は「読んだあとに状態が変わった」。** Workerがその時点の影響を
         一緒に返すので、古い「消せます」を残さず描き直す。
       */
       if (e instanceof ApiError && e.status === 409) {
         const latest = impactFromError(e.data)
-        if (latest) {
+        if (latest && impactMatchesRequest(latest, request)) {
           setImpact(latest)
           setImpactPhase('ready')
         } else if (deleteTarget.kind === 'managed') {
-          void loadImpact(deleteTarget.group.id)
+          void loadImpact(request)
         }
       }
       setDeleteError(richMenuError(e, action))
     } finally {
-      setDeleteBusy(false)
+      if (sameDeleteImpactRequest(impactRequestRef.current, request)) setDeleteBusy(false)
     }
   }
 
@@ -369,18 +408,31 @@ export default function RichMenusListPage() {
   async function confirmImport() {
     if (!selectedAccount?.id || !importTarget || importBusy) return
     const menu = importTarget
+    const accountId = selectedAccount.id
+    const requestGeneration = ++importRequestGenerationRef.current
     setImportBusy(true)
     setImportError(null)
     try {
-      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, selectedAccount.id)
+      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, accountId)
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
       if (!res.success) throw new Error('import_failed')
       setImportTarget(null)
       setImportedMenuName(res.data?.name ?? menu.name)
       await reload()
     } catch (e) {
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
       setImportError(richMenuError(e, 'import'))
     } finally {
-      setImportBusy(false)
+      if (
+        importRequestGenerationRef.current === requestGeneration &&
+        activeAccountRef.current === accountId
+      ) setImportBusy(false)
     }
   }
 
@@ -939,6 +991,9 @@ export default function RichMenusListPage() {
         error={deleteError ?? undefined}
         onCancel={() => {
           if (deleteBusy) return
+          impactRequestGenerationRef.current += 1
+          impactLoadGenerationRef.current += 1
+          impactRequestRef.current = null
           setDeleteTarget(null)
           setDeleteError(null)
           setImpact(null)

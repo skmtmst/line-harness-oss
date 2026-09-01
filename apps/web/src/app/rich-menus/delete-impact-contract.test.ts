@@ -9,7 +9,8 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.ts
 describe('リッチメニューの削除確認', () => {
   it('窓を開けてから影響を読む', () => {
     // 一覧を出すたびに全件ぶん読むと、消さない人にも重い問い合わせが走る。
-    expect(PAGE).toContain('void loadImpact(group.id)')
+    expect(PAGE).toContain('const request = beginImpactRequest(selectedAccount.id, group.id)')
+    expect(PAGE).toContain('void loadImpact(request)')
     expect(PAGE).toContain('api.richMenuGroups.deleteImpact')
   })
 
@@ -65,7 +66,17 @@ describe('リッチメニューの削除確認', () => {
      * Aを読み込み中に窓を閉じてBを開くと、あとから返るAの結果がBの窓に
      * 出る。読んでいるものと押せるものが食い違う。
      */
-    expect(PAGE).toContain('impactRequestRef.current = groupId')
-    expect(PAGE).toContain('impactRequestRef.current !== groupId')
+    expect(PAGE).toContain('sameDeleteImpactRequest(impactRequestRef.current, request)')
+    expect(PAGE).toContain('impactMatchesRequest(res.data, request)')
+  })
+
+  it('同じメニューの読み直しとアカウント切替も世代で分ける', () => {
+    expect(PAGE).toContain('impactRequestGenerationRef.current + 1')
+    expect(PAGE).toContain('impactLoadGenerationRef.current + 1')
+    expect(PAGE).toContain('impactRequestRef.current = null')
+  })
+
+  it('409の影響もアカウントと対象を照合する', () => {
+    expect(PAGE).toContain('latest && impactMatchesRequest(latest, request)')
   })
 })
