@@ -1,4 +1,10 @@
 import { jstNow } from './utils.js';
+import type {
+  SavedSearchCondition as SearchCondition,
+  SavedSearchConditions as SearchConditions,
+} from '@line-crm/shared';
+
+export type { SavedSearchCondition as SearchCondition, SavedSearchConditions as SearchConditions } from '@line-crm/shared';
 
 /**
  * 保存した検索。
@@ -33,22 +39,21 @@ export interface SavedSearchAccess {
   canManageAll: boolean;
 }
 
-/** 条件1つ。kind ごとに op と value の意味が変わる。 */
-export interface SearchCondition {
-  kind: 'tag' | 'field' | 'form' | 'purchase' | 'mark' | 'scenario' | 'created_at';
-  key?: string;
-  formId?: string;
-  op: string;
-  value?: unknown;
-}
+export const SAVED_SEARCH_REFERENCE_KINDS = ['broadcast', 'automation', 'scenario', 'other'] as const;
+export type SavedSearchReferenceKind = (typeof SAVED_SEARCH_REFERENCE_KINDS)[number];
+export const SAVED_SEARCH_REFERENCE_MODES = ['live', 'fixed'] as const;
+export type SavedSearchReferenceMode = (typeof SAVED_SEARCH_REFERENCE_MODES)[number];
 
-export interface SearchConditions {
-  /** すべて満たす条件 */
-  all?: SearchCondition[];
-  /** どれか1つ満たせばよい条件 */
-  any?: SearchCondition[];
-  /** 'visible_only' | 'hidden_only' | 'all'。省略時は visible_only */
-  visibility?: 'visible_only' | 'hidden_only' | 'all';
+/** 保存した検索をIDで参照している実データ。 */
+export interface SavedSearchReference {
+  saved_search_id: string;
+  line_account_id: string;
+  reference_kind: SavedSearchReferenceKind;
+  reference_id: string;
+  reference_name: string;
+  reference_mode: SavedSearchReferenceMode;
+  last_used_at: string | null;
+  created_at: string;
 }
 
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
@@ -71,11 +76,15 @@ export interface InboxSavedViewConditions {
 
 const CONDITION_KINDS = new Set([
   'tag',
+  'name',
   'field',
   'form',
   'purchase',
   'mark',
   'scenario',
+  'chat_status',
+  'following',
+  'status_message',
   'created_at',
 ]);
 
@@ -125,6 +134,37 @@ export function validateSearchConditions(
       return { ok: false, error: '表示状態の指定が正しくありません' };
     }
     out.visibility = obj.visibility as SearchConditions['visibility'];
+  }
+
+  if (obj.description !== undefined) {
+    if (typeof obj.description !== 'string') {
+      return { ok: false, error: '説明は文字で指定してください' };
+    }
+    out.description = obj.description.trim().slice(0, 300);
+  }
+
+  if (obj.list !== undefined) {
+    if (typeof obj.list !== 'object' || obj.list === null || Array.isArray(obj.list)) {
+      return { ok: false, error: '一覧の表示設定が正しくありません' };
+    }
+    const list = obj.list as Record<string, unknown>;
+    const limit = list.limit === undefined ? undefined : Number(list.limit);
+    if (limit !== undefined && ![10, 20, 30, 40, 50].includes(limit)) {
+      return { ok: false, error: '表示件数が正しくありません' };
+    }
+    const sort = list.sort === undefined ? undefined : String(list.sort);
+    if (sort !== undefined && sort !== 'recent' && sort !== 'oldest') {
+      return { ok: false, error: '並び順が正しくありません' };
+    }
+    const columns = list.columns === undefined ? undefined : stringArray(list.columns);
+    if (list.columns !== undefined && !columns) {
+      return { ok: false, error: '表示列が正しくありません' };
+    }
+    out.list = {
+      ...(columns ? { columns } : {}),
+      ...(sort ? { sort: sort as 'recent' | 'oldest' } : {}),
+      ...(limit ? { limit: limit as 10 | 20 | 30 | 40 | 50 } : {}),
+    };
   }
 
   return { ok: true, value: out };
@@ -231,6 +271,79 @@ export async function countSavedSearches(
     .bind(input.scope, input.createdBy, input.lineAccountId)
     .first<{ c: number }>();
   return Number(row?.c ?? 0);
+}
+
+/**
+ * 保存検索の使用先をまとめて返す。
+ *
+ * 一覧で1件ずつ問い合わせると最大50回になるため、選択中アカウント内を
+ * 1回で読む。IDだけでなくline_account_idも絞り、別アカウントの利用先を
+ * 混ぜない。
+ */
+export async function getSavedSearchReferences(
+  db: D1Database,
+  savedSearchIds: string[],
+  lineAccountId: string,
+): Promise<SavedSearchReference[]> {
+  const ids = [...new Set(savedSearchIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  const result = await db
+    .prepare(
+      `SELECT saved_search_id, line_account_id, reference_kind, reference_id,
+              reference_name, reference_mode, last_used_at, created_at
+         FROM saved_search_references
+        WHERE line_account_id = ? AND saved_search_id IN (${placeholders})
+        ORDER BY reference_kind ASC, reference_name ASC, reference_id ASC`,
+    )
+    .bind(lineAccountId, ...ids)
+    .all<SavedSearchReference>();
+  return result.results;
+}
+
+/** 利用側が保存検索を参照し始めたときに同じ台帳へ登録する。 */
+export async function upsertSavedSearchReference(
+  db: D1Database,
+  input: {
+    savedSearchId: string;
+    lineAccountId: string;
+    kind: SavedSearchReferenceKind;
+    referenceId: string;
+    referenceName: string;
+    mode: SavedSearchReferenceMode;
+    lastUsedAt?: string | null;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO saved_search_references
+       (saved_search_id, line_account_id, reference_kind, reference_id,
+        reference_name, reference_mode, last_used_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(saved_search_id, reference_kind, reference_id) DO UPDATE SET
+       line_account_id = excluded.line_account_id,
+       reference_name = excluded.reference_name,
+       reference_mode = excluded.reference_mode,
+       last_used_at = excluded.last_used_at`,
+  ).bind(
+    input.savedSearchId,
+    input.lineAccountId,
+    input.kind,
+    input.referenceId,
+    input.referenceName,
+    input.mode,
+    input.lastUsedAt ?? null,
+    jstNow(),
+  ).run();
+}
+
+export async function removeSavedSearchReference(
+  db: D1Database,
+  input: { savedSearchId: string; kind: SavedSearchReferenceKind; referenceId: string },
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM saved_search_references
+      WHERE saved_search_id = ? AND reference_kind = ? AND reference_id = ?`,
+  ).bind(input.savedSearchId, input.kind, input.referenceId).run();
 }
 
 export async function createSavedSearch(

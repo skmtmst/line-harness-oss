@@ -26,10 +26,10 @@ function legacyDb(accounts: string[]): Database.Database {
 }
 
 function applyMigration(db: Database.Database): void {
-  db.exec(readFileSync(join(process.cwd(), 'migrations/200_media_account_scope.sql'), 'utf8'));
+  db.exec(readFileSync(join(process.cwd(), 'migrations/261_media_account_scope.sql'), 'utf8'));
 }
 
-describe('200 media account scope', () => {
+describe('261 media account scope', () => {
   it('assigns only a single proven usage account', () => {
     const db = legacyDb(['a1', 'a2']);
     db.exec(`
