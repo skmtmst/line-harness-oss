@@ -2,6 +2,7 @@ import type {
   FriendBulkOperation,
   FriendBulkPreview,
   FriendBulkRunDetail,
+  FriendBulkRunStatus,
   FriendBulkItemStatus,
 } from '@line-crm/shared'
 
@@ -107,13 +108,18 @@ export function itemStatusLabel(status: FriendBulkItemStatus): string {
 /** 再試行してよいか。**失敗した対象がいるときだけ。** */
 export function canRetry(detail: FriendBulkRunDetail | null): boolean {
   if (!detail) return false
-  return detail.temporaryFailureCount > 0
+  return isRunComplete(detail.status) && detail.temporaryFailureCount > 0
 }
 
 /** 取り消してよいか。**取り消せる操作で、成功した人がいるときだけ。** */
 export function canUndo(detail: FriendBulkRunDetail | null): boolean {
   if (!detail) return false
-  return detail.reversible && detail.successCount > 0
+  return isRunComplete(detail.status) && detail.reversible && detail.successCount > 0
+}
+
+/** 結果が確定した状態。queued/running/waiting の途中値を完了として扱わない。 */
+export function isRunComplete(status: FriendBulkRunStatus): boolean {
+  return status === 'success' || status === 'partial' || status === 'failed' || status === 'cancelled'
 }
 
 export type Failure = {
@@ -128,8 +134,32 @@ export type Failure = {
  * **409を一般の失敗と混ぜない。** 同じ鍵で中身が違う実行を送ったときに出る。
  * 「もう一度押す」ではなく「読み直す」が正しい次の行動になる。
  */
-export function failureOf(input: { status?: number }): Failure {
+export function failureOf(input: {
+  status?: number
+  action?: 'create' | 'retry' | 'undo' | 'detail'
+}): Failure {
+  if (input.action === 'detail' && input.status !== 409 && input.status !== 403 && input.status !== 404) {
+    return {
+      kind: 'failure',
+      message: '結果を読み込めませんでした。一括操作をもう一度作らず、結果だけを読み直してください。',
+      canReload: true,
+    }
+  }
   if (input.status === 409) {
+    if (input.action === 'retry') {
+      return {
+        kind: 'conflict',
+        message: 'やり直す対象が変わりました。最新の結果を読み直してください。',
+        canReload: true,
+      }
+    }
+    if (input.action === 'undo') {
+      return {
+        kind: 'conflict',
+        message: '取り消せる対象がないか、すでに処理されています。最新の結果を読み直してください。',
+        canReload: true,
+      }
+    }
     return {
       kind: 'conflict',
       message: '同じ操作がすでに記録されています。最新の状態を読み直してから、もう一度確かめてください。',
@@ -150,12 +180,4 @@ export function failureOf(input: { status?: number }): Failure {
     return { kind: 'input', message: '入力を確認してください。実行していません。', canReload: false }
   }
   return { kind: 'failure', message: '一括操作を実行できませんでした。時間をおいて、もう一度お試しください。', canReload: false }
-}
-
-/**
- * 冪等キー。**操作ごとに新しく作る。**
- * 使い回すと、別の内容を同じ鍵で送って409になる。
- */
-export function newIdempotencyKey(seed: string): string {
-  return `friend-bulk-${seed}`
 }

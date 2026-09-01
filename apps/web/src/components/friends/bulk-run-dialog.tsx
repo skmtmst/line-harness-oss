@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import type {
   FriendBulkOperation,
   FriendBulkPreview,
@@ -12,11 +13,20 @@ import type {
 } from '@line-crm/shared'
 import {
   ITEM_GROUPS, OPERATIONS, blockedReason, canExecute, canRetry, canUndo, countText,
-  failureOf, itemStatusLabel, newIdempotencyKey, operationLabel, type Failure,
+  failureOf, isRunComplete, itemStatusLabel, operationLabel, type Failure,
 } from './bulk-run-view'
 import styles from './bulk-run-dialog.module.css'
 
 type Phase = 'operation' | 'confirm' | 'result'
+type ResultState = 'idle' | 'loading' | 'ready' | 'error'
+type ResultAction = 'execute' | 'retry' | 'undo'
+
+const RESULT_POLL_INTERVAL_MS = 750
+const RESULT_POLL_LIMIT = 40
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 /**
  * 友だちの一括操作（設計 `IAf7j`）。
@@ -49,6 +59,9 @@ export default function BulkRunDialog({
   const [failure, setFailure] = useState<Failure | null>(null)
   const [busy, setBusy] = useState(false)
   const [irreversibleConfirmed, setIrreversibleConfirmed] = useState(false)
+  const [runId, setRunId] = useState<string | null>(null)
+  const [resultState, setResultState] = useState<ResultState>('idle')
+  const [resultAction, setResultAction] = useState<ResultAction>('execute')
 
   /*
     **遅い返事を別の対象へ映さない。**
@@ -57,8 +70,18 @@ export default function BulkRunDialog({
   const requestRef = useRef<{ accountId: string | null; targetKey: string; generation: number }>({
     accountId: null, targetKey: '', generation: 0,
   })
+  const resultRequestRef = useRef(0)
+  const createKeysRef = useRef(new IdempotencyKeyStore())
+  const undoKeysRef = useRef(new IdempotencyKeyStore())
+  const didChangeRef = useRef(false)
 
-  const selection: FriendBulkSelection = { kind: 'explicit', friendIds }
+  const targetKey = friendIds.join('\u001f')
+  const contextRef = useRef({ accountId, targetKey, open })
+  contextRef.current = { accountId, targetKey, open }
+  const selection = useMemo<FriendBulkSelection>(
+    () => ({ kind: 'explicit', friendIds: [...friendIds] }),
+    [friendIds],
+  )
   const chosen = OPERATIONS.find((o) => o.kind === operationKind)
   const reversible = preview?.reversible ?? chosen?.reversible ?? false
 
@@ -74,13 +97,14 @@ export default function BulkRunDialog({
     if (!op || friendIds.length === 0) return
     requestRef.current = {
       accountId,
-      targetKey: friendIds.join(','),
+      targetKey,
       generation: requestRef.current.generation + 1,
     }
     const at = { ...requestRef.current }
     const stillHere = () =>
-      requestRef.current.accountId === at.accountId
-      && requestRef.current.targetKey === at.targetKey
+      contextRef.current.open
+      && contextRef.current.accountId === at.accountId
+      && contextRef.current.targetKey === at.targetKey
       && requestRef.current.generation === at.generation
 
     setPreviewState('loading')
@@ -100,38 +124,104 @@ export default function BulkRunDialog({
       setPreviewState(status === 403 ? 'forbidden' : 'error')
       setPreview(null)
     }
-  }, [accountId, friendIds, operation, selection])
+  }, [accountId, friendIds, operation, selection, targetKey])
+
+  const pollRun = useCallback(async (id: string, action: ResultAction) => {
+    const generation = resultRequestRef.current + 1
+    resultRequestRef.current = generation
+    setRunId(id)
+    setResultAction(action)
+    setResultState('loading')
+    setFailure(null)
+
+    for (let attempt = 0; attempt < RESULT_POLL_LIMIT; attempt += 1) {
+      try {
+        const response = await api.friends.bulkGet(id)
+        if (resultRequestRef.current !== generation) return
+        if (!response.success) throw new Error('failed')
+        setDetail(response.data)
+        if (isRunComplete(response.data.status)) {
+          setResultState('ready')
+          return
+        }
+      } catch (error) {
+        if (resultRequestRef.current !== generation) return
+        setResultState('error')
+        setFailure(failureOf({
+          status: error instanceof ApiError ? error.status : undefined,
+          action: 'detail',
+        }))
+        return
+      }
+      await wait(RESULT_POLL_INTERVAL_MS)
+      if (resultRequestRef.current !== generation) return
+    }
+
+    if (resultRequestRef.current === generation) {
+      setResultState('error')
+      setFailure({
+        kind: 'failure',
+        message: '処理は受け付けていますが、まだ終わっていません。少し待ってから結果を読み直してください。',
+        canReload: true,
+      })
+    }
+  }, [])
 
   useEffect(() => {
-    /* 閉じたら持ち越さない。次に開いたとき前の結果が残っていると取り違える。 */
-    if (!open) {
-      setPhase('operation'); setPreview(null); setDetail(null)
-      setFailure(null); setIrreversibleConfirmed(false); setPreviewState('idle')
-      requestRef.current = { ...requestRef.current, generation: requestRef.current.generation + 1 }
+    /*
+      閉じたときだけでなく、アカウントや対象が変わった瞬間に古い返事を無効にする。
+      次のpreviewを押すまで世代を進めないと、切替前の遅い返事が新しい画面へ入る。
+    */
+    setPhase('operation'); setPreview(null); setDetail(null); setRunId(null)
+    setFailure(null); setIrreversibleConfirmed(false); setPreviewState('idle')
+    setResultState('idle'); setResultAction('execute'); setBusy(false)
+    requestRef.current = {
+      accountId,
+      targetKey,
+      generation: requestRef.current.generation + 1,
     }
-  }, [open])
+    resultRequestRef.current += 1
+    didChangeRef.current = false
+  }, [accountId, open, targetKey])
 
   if (!open) return null
 
   const execute = async () => {
     const op = operation()
     if (!op) return
+    const started = { accountId, targetKey }
+    const stillHere = () => contextRef.current.open
+      && contextRef.current.accountId === started.accountId
+      && contextRef.current.targetKey === started.targetKey
+    const signature = JSON.stringify({ selection, operation: op })
     setBusy(true)
     setFailure(null)
     try {
-      /* **操作ごとに新しい鍵。** 使い回すと別の内容を同じ鍵で送って409になる。 */
-      const key = newIdempotencyKey(`${operationKind}-${friendIds.length}-${Date.now()}`)
+      /*
+        Workerが受け付けるのはUUID。返事を受け取れなかった再試行では同じ鍵を使い、
+        同じ操作を二重に作らない。受付成功が分かってからだけ鍵を捨てる。
+      */
+      const key = createKeysRef.current.get(signature)
       const res = await api.friends.bulkCreate(selection, op, {
         idempotencyKey: key,
         ...(reversible ? {} : { confirmIrreversible: true }),
       })
       if (!res.success) throw new Error('failed')
-      const got = await api.friends.bulkGet(res.data.id)
-      if (got.success) setDetail(got.data)
+      createKeysRef.current.clear(signature)
+      if (!stillHere()) {
+        onDone()
+        return
+      }
+      didChangeRef.current = true
       setPhase('result')
-      onDone()
+      setDetail(null)
+      void pollRun(res.data.id, 'execute')
     } catch (err) {
-      setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined }))
+      if (!stillHere()) return
+      setFailure(failureOf({
+        status: err instanceof ApiError ? err.status : undefined,
+        action: 'create',
+      }))
     } finally {
       setBusy(false)
     }
@@ -139,33 +229,83 @@ export default function BulkRunDialog({
 
   const retry = async () => {
     if (!detail) return
+    const started = { accountId, targetKey }
+    const stillHere = () => contextRef.current.open
+      && contextRef.current.accountId === started.accountId
+      && contextRef.current.targetKey === started.targetKey
     setBusy(true); setFailure(null)
     try {
       /* **やり直すのは失敗した対象だけ。** 成功済みには触らない。 */
       const res = await api.friends.bulkRetry(detail.id)
       if (!res.success) throw new Error('failed')
-      const got = await api.friends.bulkGet(detail.id)
-      if (got.success) setDetail(got.data)
+      if (!stillHere()) {
+        onDone()
+        return
+      }
+      setDetail(null)
+      void pollRun(detail.id, 'retry')
     } catch (err) {
-      setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined }))
+      if (!stillHere()) return
+      setFailure(failureOf({
+        status: err instanceof ApiError ? err.status : undefined,
+        action: 'retry',
+      }))
     } finally { setBusy(false) }
   }
 
   const undo = async () => {
     if (!detail) return
+    const started = { accountId, targetKey }
+    const stillHere = () => contextRef.current.open
+      && contextRef.current.accountId === started.accountId
+      && contextRef.current.targetKey === started.targetKey
+    const signature = `undo:${detail.id}`
     setBusy(true); setFailure(null)
     try {
-      const res = await api.friends.bulkUndo(detail.id, newIdempotencyKey(`undo-${detail.id}-${Date.now()}`))
+      const res = await api.friends.bulkUndo(detail.id, undoKeysRef.current.get(signature))
       if (!res.success) throw new Error('failed')
-      const got = await api.friends.bulkGet(detail.id)
-      if (got.success) setDetail(got.data)
-      onDone()
+      undoKeysRef.current.clear(signature)
+      if (!stillHere()) {
+        onDone()
+        return
+      }
+      didChangeRef.current = true
+      setDetail(null)
+      /* 取り消しは別の実行。元のIDではなく、返された取消実行IDを追う。 */
+      void pollRun(res.data.id, 'undo')
     } catch (err) {
-      setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined }))
+      if (!stillHere()) return
+      setFailure(failureOf({
+        status: err instanceof ApiError ? err.status : undefined,
+        action: 'undo',
+      }))
     } finally { setBusy(false) }
   }
 
+  const close = () => {
+    requestRef.current = { ...requestRef.current, generation: requestRef.current.generation + 1 }
+    resultRequestRef.current += 1
+    if (didChangeRef.current) {
+      didChangeRef.current = false
+      onDone()
+    }
+    onClose()
+  }
+
+  const reloadFailure = () => {
+    if (phase === 'result' && runId) void pollRun(runId, resultAction)
+    else void loadPreview()
+  }
+
   const blocked = blockedReason({ preview, reversible, irreversibleConfirmed })
+  const resultTitle = resultAction === 'undo'
+    ? '取り消し'
+    : resultAction === 'retry'
+      ? 'やり直し'
+      : detail
+        ? operationLabel(detail.operation.kind)
+        : '一括操作'
+  const resultComplete = detail ? isRunComplete(detail.status) : false
 
   return (
     <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="友だちを一括操作">
@@ -178,7 +318,7 @@ export default function BulkRunDialog({
         {failure ? (
           <div className={failure.kind === 'forbidden' ? styles.notice : styles.warn} role="alert" data-failure-kind={failure.kind}>
             <p>{failure.message}</p>
-            {failure.canReload ? <Button onClick={() => void loadPreview()}>読み直す</Button> : null}
+            {failure.canReload ? <Button onClick={reloadFailure}>読み直す</Button> : null}
           </div>
         ) : null}
 
@@ -231,7 +371,7 @@ export default function BulkRunDialog({
             ) : null}
 
             <div className={styles.actions}>
-              <Button onClick={onClose}>キャンセル</Button>
+              <Button onClick={close}>キャンセル</Button>
               <Button variant="primary" disabled={!tagId || previewState === 'loading'} onClick={() => void loadPreview()}>
                 実行内容を確認
               </Button>
@@ -307,45 +447,57 @@ export default function BulkRunDialog({
           </div>
         ) : null}
 
-        {phase === 'result' && detail ? (
+        {phase === 'result' ? (
           <div className={styles.body}>
-            <dl className={styles.summary}>
-              {ITEM_GROUPS.map((group) => {
-                const value = group.key === 'success' ? detail.successCount
-                  : group.key === 'skipped' ? detail.skippedCount
-                    : group.key === 'temporary_failure' ? detail.temporaryFailureCount
-                      : detail.permanentFailureCount
-                return (
-                  <div key={group.key}>
-                    <dt>{group.label}</dt>
-                    <dd>{countText(value, '人')}</dd>
-                    <p className={styles.hint}>{group.note}</p>
-                  </div>
-                )
-              })}
-            </dl>
+            {resultState === 'loading' && !detail ? (
+              <ListState kind="loading" title={`${resultTitle}の結果を確認しています`} />
+            ) : null}
 
-            <p className={styles.note}>{operationLabel(detail.operation.kind)}を実行しました。</p>
+            {detail ? (
+              <>
+                <dl className={styles.summary}>
+                  {ITEM_GROUPS.map((group) => {
+                    const value = group.key === 'success' ? detail.successCount
+                      : group.key === 'skipped' ? detail.skippedCount
+                        : group.key === 'temporary_failure' ? detail.temporaryFailureCount
+                          : detail.permanentFailureCount
+                    return (
+                      <div key={group.key}>
+                        <dt>{group.label}</dt>
+                        <dd>{countText(value, '人')}</dd>
+                        <p className={styles.hint}>{group.note}</p>
+                      </div>
+                    )
+                  })}
+                </dl>
 
-            {detail.items.length > 0 ? (
-              <ul className={styles.list}>
-                {detail.items.map((item) => (
-                  <li key={item.id}>
-                    {item.displayName ?? '名前未登録'}
-                    <span className={styles.count}>{itemStatusLabel(item.status)}</span>
-                  </li>
-                ))}
-              </ul>
+                <p className={styles.note}>
+                  {resultComplete
+                    ? `${resultTitle}が終わりました。`
+                    : `${resultTitle}を処理しています。終わるまでこの結果を更新します。`}
+                </p>
+
+                {detail.items.length > 0 ? (
+                  <ul className={styles.list}>
+                    {detail.items.map((item) => (
+                      <li key={item.id}>
+                        {item.displayName ?? '名前未登録'}
+                        <span className={styles.count}>{itemStatusLabel(item.status)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
             ) : null}
 
             <div className={styles.actions}>
-              <Button onClick={onClose} disabled={busy}>閉じる</Button>
-              {canUndo(detail) ? (
+              <Button onClick={close} disabled={busy}>閉じる</Button>
+              {resultState === 'ready' && canUndo(detail) ? (
                 <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
               ) : null}
-              {canRetry(detail) ? (
+              {resultState === 'ready' && canRetry(detail) ? (
                 <Button variant="primary" onClick={() => void retry()} disabled={busy}>
-                  失敗した{countText(detail.temporaryFailureCount, '人')}だけやり直す
+                  失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
                 </Button>
               ) : null}
             </div>

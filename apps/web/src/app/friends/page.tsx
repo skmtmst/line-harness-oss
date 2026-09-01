@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
@@ -79,6 +79,7 @@ function FriendsPageInner({
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
   const loadRequestRef = useRef(0)
 
   /*
@@ -129,6 +130,7 @@ function FriendsPageInner({
     setLoadStatus('loading')
     setFriends([])
     setTotal(0)
+    setBulkOpen(false)
     setSelectedIds(new Set())
     try {
       const response = await api.friends.list({
@@ -372,7 +374,7 @@ function FriendsPageInner({
 
       <BulkRunDialog
         open={bulkOpen}
-        friendIds={[...selectedIds]}
+        friendIds={selectedFriendIds}
         tags={allTags}
         accountId={selectedAccountId}
         onClose={() => setBulkOpen(false)}

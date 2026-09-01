@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { FriendBulkPreview, FriendBulkRunDetail } from '@line-crm/shared'
 import {
   ITEM_GROUPS, NOT_AVAILABLE, OPERATIONS, blockedReason, canExecute, canRetry, canRunBulk,
-  canUndo, countText, failureOf, itemStatusLabel, newIdempotencyKey, operationLabel,
+  canUndo, countText, failureOf, isRunComplete, itemStatusLabel, operationLabel,
 } from './bulk-run-view'
 
 const preview = (over: Partial<FriendBulkPreview> = {}): FriendBulkPreview => ({
@@ -80,6 +80,17 @@ describe('結果の呼び分け', () => {
 })
 
 describe('やり直しと取り消し', () => {
+  it('途中の件数を確定結果として扱わない', () => {
+    for (const status of ['preparing', 'queued', 'running', 'waiting'] as const) {
+      expect(isRunComplete(status)).toBe(false)
+      expect(canRetry(detail({ status }))).toBe(false)
+      expect(canUndo(detail({ status }))).toBe(false)
+    }
+    for (const status of ['success', 'partial', 'failed', 'cancelled'] as const) {
+      expect(isRunComplete(status)).toBe(true)
+    }
+  })
+
   it('やり直しは失敗した対象がいるときだけ', () => {
     expect(canRetry(detail())).toBe(true)
     expect(canRetry(detail({ temporaryFailureCount: 0 }))).toBe(false)
@@ -105,6 +116,18 @@ describe('失敗の言い換え', () => {
     expect(f.message).toContain('読み直して')
   })
 
+  it('再試行と取り消しの409を冪等性競合と決めつけない', () => {
+    expect(failureOf({ status: 409, action: 'retry' }).message).toContain('やり直す対象')
+    expect(failureOf({ status: 409, action: 'undo' }).message).toContain('取り消せる対象')
+  })
+
+  it('結果の読込失敗を実行失敗と扱わず、結果だけを読み直せる', () => {
+    const failure = failureOf({ status: 500, action: 'detail' })
+    expect(failure.message).toContain('結果だけを読み直して')
+    expect(failure.message).not.toContain('実行できませんでした')
+    expect(failure.canReload).toBe(true)
+  })
+
   it('権限不足・入力・実行失敗を分ける', () => {
     expect(failureOf({ status: 403 }).kind).toBe('forbidden')
     expect(failureOf({ status: 400 }).kind).toBe('input')
@@ -121,12 +144,5 @@ describe('失敗の言い換え', () => {
       expect(m).not.toMatch(/[A-Z_]{6,}/)
       expect(m).not.toContain('API error')
     }
-  })
-})
-
-describe('冪等キー', () => {
-  it('操作ごとに違う鍵になる', () => {
-    // 使い回すと、別の内容を同じ鍵で送って409になる。
-    expect(newIdempotencyKey('a')).not.toBe(newIdempotencyKey('b'))
   })
 })
