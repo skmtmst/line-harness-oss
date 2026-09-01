@@ -17,10 +17,12 @@ describe('startChecklist', () => {
     ])
   })
 
-  test('確かめられない2項目は unknown のままで、確認済みにしない', () => {
+  test('一覧から確かめられない項目は unknown のままで、確認済みにしない', () => {
     const out = startChecklist(base())
+    expect(out[1].state).toBe('unknown')
     expect(out[2].state).toBe('unknown')
     expect(out[3].state).toBe('unknown')
+    expect(out[1].detail).toContain('各通の配信タイミングはこの一覧から確認できません')
     expect(out[2].detail).toContain('—（未取得）')
     expect(out[3].detail).toContain('—（未取得）')
   })
