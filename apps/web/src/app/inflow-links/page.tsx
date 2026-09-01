@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
@@ -51,6 +51,15 @@ interface RefSummaryData {
   totalFriends: number
   friendsWithRef: number
   friendsWithoutRef: number
+}
+
+function isRefSummaryData(value: unknown): value is RefSummaryData {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<RefSummaryData>
+  return Array.isArray(candidate.routes)
+    && Number.isFinite(candidate.totalFriends)
+    && Number.isFinite(candidate.friendsWithRef)
+    && Number.isFinite(candidate.friendsWithoutRef)
 }
 
 interface RefFriend {
@@ -112,6 +121,9 @@ const MERGED_TABS = [
 
 function InflowLinksPageInner() {
   const { selectedAccountId } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
+  const loadRequestRef = useRef(0)
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
@@ -120,6 +132,7 @@ function InflowLinksPageInner() {
   const [trackedLinks, setTrackedLinks] = useState<TrackedLinkRow[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [summary, setSummary] = useState<RefSummaryData | null>(null)
+  const [summaryAvailable, setSummaryAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
   // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
   const [loadFailed, setLoadFailed] = useState(false)
@@ -152,13 +165,17 @@ function InflowLinksPageInner() {
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
 
   const load = async () => {
+    const requestGeneration = ++loadRequestRef.current
+    const accountAtRequest = selectedAccountId
+    const isCurrent = () =>
+      requestGeneration === loadRequestRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setLoadFailed(false)
     // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
     // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
     try {
-      const summaryQuery = selectedAccountId ? `?lineAccountId=${selectedAccountId}` : ''
+      const summaryQuery = accountAtRequest ? `?lineAccountId=${accountAtRequest}` : ''
       const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
         api.entryRoutes.list(),
         // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
@@ -176,6 +193,7 @@ function InflowLinksPageInner() {
         ).catch(() => ({ success: false, data: null })),
         api.trackedLinks.list().catch(() => ({ success: false, data: null })),
       ])
+      if (!isCurrent()) return
       if (r.success) setRoutes(r.data)
       else setLoadFailed(true)
       if (genreRes.success) setGenres(genreRes.data)
@@ -183,7 +201,13 @@ function InflowLinksPageInner() {
       if (s.success) setScenarios(s.data)
       if (t.success) setTemplates(t.data)
       if (tagRes.success) setTags(tagRes.data)
-      if ('success' in sum && sum.success && sum.data) setSummary(sum.data)
+      if ('success' in sum && sum.success && isRefSummaryData(sum.data)) {
+        setSummary(sum.data)
+        setSummaryAvailable(true)
+      } else {
+        setSummary(null)
+        setSummaryAvailable(false)
+      }
       if (tl.success && tl.data) {
         setTrackedLinks(
           tl.data.map((row) => ({
@@ -209,17 +233,37 @@ function InflowLinksPageInner() {
             return [pool.id, ids] as const
           }),
         )
+        if (!isCurrent()) return
         setPoolMembers(Object.fromEntries(entries))
       }
     } catch {
+      if (!isCurrent()) return
       // 一覧そのものが引けない。空と言い分けるため、失敗として覚える。
       setLoadFailed(true)
+      setSummary(null)
+      setSummaryAvailable(false)
+    } finally {
+      if (isCurrent()) setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
-    load()
+    // アカウントを変えた瞬間に前の一覧・集計・開いた操作を捨てる。
+    // 新しい取得が失敗しても、前のアカウントの値を表示しない。
+    setRoutes([])
+    setGenres([])
+    setPools([])
+    setScenarios([])
+    setTemplates([])
+    setTrackedLinks([])
+    setTags([])
+    setSummary(null)
+    setSummaryAvailable(false)
+    setPoolMembers({})
+    setEditing(null)
+    setQrRoute(null)
+    setPage(1)
+    void load()
     // サイドバー側でアカウントを切り替えたら、開きっぱなしの「ref 詳細」も
     // 持ち越さない (アカ A の友だちリストがアカ B の同じ ref 行に残ってしまう
     // クロスアカウントの情報漏れ防止)。stale-response guard だけでは閉じる側を
@@ -227,6 +271,9 @@ function InflowLinksPageInner() {
     setExpandedRef(null)
     setRefDetail(null)
     setRefDetailLoading(false)
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [selectedAccountId])
 
   const onCopy = async (refCode: string, id: string) => {
@@ -278,7 +325,7 @@ function InflowLinksPageInner() {
 
   // Index summary stats by ref_code for cheap lookup per row.
   const statsByRef = new Map<string, RefRouteStats>()
-  summary?.routes.forEach((r) => statsByRef.set(r.refCode, r))
+  summary?.routes?.forEach((r) => statsByRef.set(r.refCode, r))
 
   // Merge entry_routes (CRUD 対象), tracked_links (modern path), と
   // summary.routes (実流入のあった refs)。優先順位 = worker の applyRefAttribution
@@ -465,7 +512,9 @@ function InflowLinksPageInner() {
   const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length
   const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
-  const addRate = totalClicks > 0 ? Math.round((totalFriends / totalClicks) * 100) : null
+  const addRate = summaryAvailable && totalClicks > 0
+    ? Math.round((totalFriends / totalClicks) * 100)
+    : null
 
   return (
     <div>
@@ -512,7 +561,12 @@ function InflowLinksPageInner() {
         />
         {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
         <KpiCard title="今月の追加" value={null} unit="人" detail="前月比は出せません" />
-        <KpiCard title="クリック" value={totalClicks} unit="回" detail="累計" />
+        <KpiCard
+          title="クリック"
+          value={summaryAvailable ? totalClicks : null}
+          unit="回"
+          detail={summaryAvailable ? '累計' : '取得できません'}
+        />
         <KpiCard
           title="平均の追加率"
           value={addRate}
@@ -845,13 +899,13 @@ function InflowLinksPageInner() {
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {r.stats?.friendCount ?? 0}
+                      {summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {r.stats?.clickCount ?? 0}
+                      {summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
-                      {formatDate(r.stats?.latestAt ?? null)}
+                      {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
                     </td>
                     <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2 whitespace-nowrap">

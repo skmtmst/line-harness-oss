@@ -35,6 +35,19 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
   })
 
+  it('集計を取得できないときは成果数を0件にしない', () => {
+    expect(PAGE).toContain('const [reportAvailable, setReportAvailable] = useState(false)')
+    expect(PAGE).toContain('setReportAvailable(false)')
+    expect(PAGE).toContain("reportAvailable ? (countByPoint.get(point.id) ?? 0) : '—'")
+  })
+
+  it('一覧でない返事を成功扱いせず、前のKPIも残さない', () => {
+    for (const reset of ['setPoints([])', 'setPending([])', 'setApproved([])', 'setOpenOffers(0)']) {
+      expect(PAGE).toContain(reset)
+    }
+    expect(PAGE.match(/Array\.isArray\(/g)?.length).toBeGreaterThanOrEqual(5)
+  })
+
   it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
     expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")

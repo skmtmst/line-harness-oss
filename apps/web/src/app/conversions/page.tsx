@@ -99,6 +99,7 @@ const PAGE_SIZE = 20
 function ConversionsPageInner() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
+  const [reportAvailable, setReportAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [pending, setPending] = useState<ConversionApprovalItem[]>([])
   const [approved, setApproved] = useState<ConversionApprovalItem[]>([])
@@ -113,6 +114,12 @@ function ConversionsPageInner() {
   const load = async () => {
     setLoading(true)
     setLoadFailed(false)
+    setPoints([])
+    setReport([])
+    setReportAvailable(false)
+    setPending([])
+    setApproved([])
+    setOpenOffers(0)
     try {
       // 上のKPIは成果地点だけでは出ない。承認の待ち・確定と、公開中の案件を
       // 一緒に引く。1つ落ちても他は出せるよう allSettled。
@@ -123,12 +130,21 @@ function ConversionsPageInner() {
         api.conversionApprovals.list({ status: 'approved', limit: 200 }),
         api.affiliateOffers.list({ activeOnly: true }),
       ])
-      if (pointsRes.status === 'fulfilled' && pointsRes.value.success) setPoints(pointsRes.value.data)
+      if (pointsRes.status === 'fulfilled' && pointsRes.value.success && Array.isArray(pointsRes.value.data)) {
+        setPoints(pointsRes.value.data)
+      }
       else setLoadFailed(true)
-      if (reportRes.status === 'fulfilled' && reportRes.value.success) setReport(reportRes.value.data)
-      if (pendingRes.status === 'fulfilled' && pendingRes.value.success) setPending(pendingRes.value.data)
-      if (approvedRes.status === 'fulfilled' && approvedRes.value.success) setApproved(approvedRes.value.data)
-      if (offersRes.status === 'fulfilled' && offersRes.value.success) {
+      if (reportRes.status === 'fulfilled' && reportRes.value.success && Array.isArray(reportRes.value.data)) {
+        setReport(reportRes.value.data)
+        setReportAvailable(true)
+      }
+      if (pendingRes.status === 'fulfilled' && pendingRes.value.success && Array.isArray(pendingRes.value.data)) {
+        setPending(pendingRes.value.data)
+      }
+      if (approvedRes.status === 'fulfilled' && approvedRes.value.success && Array.isArray(approvedRes.value.data)) {
+        setApproved(approvedRes.value.data)
+      }
+      if (offersRes.status === 'fulfilled' && offersRes.value.success && Array.isArray(offersRes.value.data)) {
         setOpenOffers(offersRes.value.data.length)
       }
     } catch {
@@ -168,9 +184,10 @@ function ConversionsPageInner() {
     return matched.toSorted((left, right) => {
       if (sort === 'name') return left.name.localeCompare(right.name, 'ja')
       if (sort === 'value-desc') return (right.value ?? 0) - (left.value ?? 0)
+      if (!reportAvailable) return 0
       return (countByPoint.get(right.id) ?? 0) - (countByPoint.get(left.id) ?? 0)
     })
-  }, [countByPoint, points, query, sort])
+  }, [countByPoint, points, query, reportAvailable, sort])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
   const current = useMemo(
@@ -336,7 +353,7 @@ function ConversionsPageInner() {
                     {point.value !== null ? `¥${point.value.toLocaleString()}` : '—'}
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                    {countByPoint.get(point.id) ?? 0}
+                    {reportAvailable ? (countByPoint.get(point.id) ?? 0) : '—'}
                   </td>
                   {/* 報酬は案件ごとの料率で決まる。成果地点と案件を結ぶ列が無いので出せない。 */}
                   <td className="text-ink-faint px-4 py-3 text-sm">—</td>

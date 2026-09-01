@@ -34,6 +34,23 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).not.toContain("setError('リファラルリンクの取得に失敗しました')")
   })
 
+  it('アカウント切替後の古い返事を捨て、集計未取得を0にしない', () => {
+    expect(PAGE).toContain('const loadRequestRef = useRef(0)')
+    expect(PAGE).toContain('requestGeneration === loadRequestRef.current')
+    expect(PAGE).toContain('accountAtRequest === latestAccountRef.current')
+    expect(PAGE).toContain('setRoutes([])')
+    expect(PAGE).toContain('const [summaryAvailable, setSummaryAvailable] = useState(false)')
+    expect(PAGE).toContain("summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'")
+    expect(PAGE).toContain("summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'")
+  })
+
+  it('一覧型の既定値を集計成功として扱わず、画面を落とさない', () => {
+    expect(PAGE).toContain('function isRefSummaryData(value: unknown): value is RefSummaryData')
+    expect(PAGE).toContain('Array.isArray(candidate.routes)')
+    expect(PAGE).toContain('isRefSummaryData(sum.data)')
+    expect(PAGE).toContain('summary?.routes?.forEach')
+  })
+
   it('検索・並び順・表示件数を共通部品にし、動く並び替えだけを載せる', () => {
     expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
