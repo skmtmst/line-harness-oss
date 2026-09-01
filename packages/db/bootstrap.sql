@@ -2366,7 +2366,8 @@ CREATE TABLE saved_searches (
   is_shared       INTEGER NOT NULL DEFAULT 1,
   display_order   INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, condition_format TEXT NOT NULL DEFAULT 'search_v1'
+  CHECK (condition_format IN ('search_v1','segment_v1')));
 
 CREATE TABLE scenario_action_fires (
   action_id TEXT NOT NULL REFERENCES scenario_actions (id) ON DELETE CASCADE,
@@ -3538,6 +3539,9 @@ CREATE INDEX idx_rt_tables_store ON rt_tables(store_id, is_active);
 
 CREATE INDEX idx_saved_search_references_account
   ON saved_search_references(line_account_id, saved_search_id, reference_kind);
+
+CREATE INDEX idx_saved_searches_account_format
+  ON saved_searches(line_account_id, scope, condition_format, created_by, display_order);
 
 CREATE INDEX idx_saved_searches_account_scope
   ON saved_searches(line_account_id, scope, created_by, display_order);

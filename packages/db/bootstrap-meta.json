@@ -214,6 +214,7 @@
     "203_saved_search_references.sql",
     "204_analytics_saved_results.sql",
     "205_tenant_feature_packs.sql",
+    "206_saved_search_condition_format.sql",
     "252_template_questions.sql",
     "253_friend_bulk_runs.sql",
     "256_friend_add_routing_versions.sql",
@@ -223,5 +224,5 @@
     "261_media_account_scope.sql",
     "262_support_mark_archive.sql"
   ],
-  "migrationCount": 222
+  "migrationCount": 223
 }

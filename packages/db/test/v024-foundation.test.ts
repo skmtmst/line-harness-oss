@@ -25,6 +25,7 @@ import {
 } from '../src/support-marks.js';
 import {
   validateSearchConditions,
+  validateSavedSegmentConditions,
   createSavedSearch,
   getSavedSearches,
   updateSavedSearch,
@@ -558,6 +559,65 @@ describe('保存した検索の条件', () => {
     expect(visible.map((item) => item.name).sort()).toEqual(['本人だけ', '旧検索'].sort());
     expect(await updateSavedSearch(db, otherPrivate.id, access, { name: '変更' })).toBeNull();
     expect(await deleteSavedSearch(db, otherPrivate.id, access)).toBe(false);
+  });
+});
+
+describe('保存した配信対象条件', () => {
+  const valid = {
+    version: 1,
+    condition: {
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: 'tag-1' }],
+      groups: [{ operator: 'OR', rules: [{ type: 'reaction_state', value: 'reply' }] }],
+    },
+  };
+
+  test('版つきの共通条件を保存できる', async () => {
+    const checked = validateSavedSegmentConditions(valid);
+    expect(checked.ok).toBe(true);
+    if (!checked.ok) return;
+    const saved = await createSavedSearch(db, {
+      name: '返信したVIP',
+      scope: 'friends',
+      conditionFormat: 'segment_v1',
+      lineAccountId: 'account-1',
+      conditions: checked.value,
+    });
+    expect(saved.scope).toBe('friends');
+    expect(saved.condition_format).toBe('segment_v1');
+    expect(JSON.parse(saved.conditions_json)).toEqual(checked.value);
+    const access = { lineAccountId: 'account-1', staffId: 'staff-1', canManageAll: true };
+    expect((await getSavedSearches(db, 'friends', access)).map((row) => row.id)).not.toContain(saved.id);
+    expect((await getSavedSearches(db, 'friends', access, 'segment_v1')).map((row) => row.id)).toContain(saved.id);
+  });
+
+  test('版なし・空・知らない種類は保存条件として通さない', () => {
+    expect(validateSavedSegmentConditions({ condition: valid.condition }).ok).toBe(false);
+    expect(validateSavedSegmentConditions({ version: 1, condition: { operator: 'AND', rules: [] } }).ok).toBe(false);
+    expect(validateSavedSegmentConditions({
+      version: 1,
+      condition: { operator: 'AND', rules: [{ type: 'horoscope', value: 'leo' }] },
+    }).ok).toBe(false);
+  });
+
+  test('深すぎる条件と51件の条件は通さない', () => {
+    expect(validateSavedSegmentConditions({
+      version: 1,
+      condition: {
+        operator: 'AND', rules: [{ type: 'is_following', value: true }], groups: [{
+          operator: 'AND', rules: [], groups: [{
+            operator: 'AND', rules: [], groups: [{ operator: 'AND', rules: [{ type: 'is_hidden', value: false }] }],
+          }],
+        }],
+      },
+    }).ok).toBe(false);
+    expect(validateSavedSegmentConditions({
+      version: 1,
+      condition: {
+        operator: 'AND',
+        rules: Array.from({ length: 51 }, () => ({ type: 'is_following', value: true })),
+      },
+    }).ok).toBe(false);
   });
 });
 

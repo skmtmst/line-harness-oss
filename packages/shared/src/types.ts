@@ -446,6 +446,50 @@ export interface SavedSearchConditions {
   };
 }
 
+/** 共通の配信対象条件1本。画面・人数確認・実送信で同じ形を使う。 */
+export interface SavedSegmentRule {
+  type:
+    | "tag_exists"
+    | "tag_not_exists"
+    | "tag_all"
+    | "tag_not_all"
+    | "metadata_equals"
+    | "metadata_not_equals"
+    | "ref_code"
+    | "is_following"
+    | "scenario_subscribed"
+    | "name"
+    | "private_memo"
+    | "status_message"
+    | "registered_at"
+    | "support_mark"
+    | "is_hidden"
+    | "friend_field"
+    | "scenario_state"
+    | "form_answered"
+    | "last_reaction_at"
+    | "reaction_state"
+    | "score_range";
+  value: unknown;
+}
+
+export interface SavedSegmentCondition {
+  operator: "AND" | "OR";
+  rules: SavedSegmentRule[];
+  groups?: SavedSegmentCondition[];
+}
+
+/**
+ * 配信対象として保存した条件。
+ *
+ * 旧い友だち検索の `{ all, any }` と見分けるため、版と本体を明示する。
+ * 条件本体だけを推測で判別すると、種類を増やした時に誤変換が起きる。
+ */
+export interface SavedSegmentConditions {
+  version: 1;
+  condition: SavedSegmentCondition;
+}
+
 /** 保存した検索 */
 export interface SavedSearch {
   id: string;
@@ -465,6 +509,28 @@ export interface SavedSearch {
   /** 配信・自動化など、保存検索をIDで参照している利用先。 */
   usedIn?: SavedSearchUsage[];
   /** 使用先が無いとサーバーで確認できたときだけ true。 */
+  canDelete?: boolean;
+}
+
+/** 共通の配信対象として保存した条件。友だち検索とJSONの形を混ぜない。 */
+export interface SavedSegmentPreset {
+  id: string;
+  name: string;
+  scope: "friends";
+  conditionFormat: "segment_v1";
+  conditions: SavedSegmentConditions;
+  createdBy: string | null;
+  lineAccountId: string | null;
+  isShared: boolean;
+  displayOrder: number;
+  createdAt: string;
+  usedIn?: Array<{
+    kind: "broadcast" | "automation" | "scenario" | "other";
+    id: string;
+    name: string;
+    mode: "live" | "fixed";
+    lastUsedAt: string | null;
+  }>;
   canDelete?: boolean;
 }
 

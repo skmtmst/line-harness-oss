@@ -18,6 +18,7 @@ const mocks = {
   deleteSavedSearch: vi.fn(),
   countSavedSearches: vi.fn(),
   validateSearchConditions: () => ({ ok: true as const, value: {} }),
+  validateSavedSegmentConditions: () => ({ ok: true as const, value: {} }),
   SAVED_SEARCH_LIMIT: 50,
   SAVED_SEARCH_SCOPES: ['friends', 'chats', 'bookings'],
   getLoginAudit: vi.fn(),
