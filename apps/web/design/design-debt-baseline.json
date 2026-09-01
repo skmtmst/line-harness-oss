@@ -363,8 +363,8 @@
     "direct-primary-button": 1
   },
   "app/tags/folders/new/page.tsx": {
-    "arbitrary-value": 4,
     "direct-secondary-button": 4,
+    "arbitrary-value": 7,
     "direct-primary-button": 1
   },
   "app/tags/new/page.tsx": {
