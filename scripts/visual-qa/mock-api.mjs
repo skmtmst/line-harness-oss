@@ -20,6 +20,9 @@
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  COMMON_VARS,
+  COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_DELETE_IMPACT_EMPTY,
   MEDIA_DELETE_IMPACT,
   MEDIA_DELETE_IMPACT_EMPTY,
   MEDIA_ITEMS,
@@ -511,6 +514,14 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
+  const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (commonVarDeleteImpact) {
+    const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
+      ? COMMON_VAR_DELETE_IMPACT_EMPTY
+      : COMMON_VAR_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
   if (mediaDeleteImpact) {

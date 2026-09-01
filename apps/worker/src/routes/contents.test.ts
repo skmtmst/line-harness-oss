@@ -106,6 +106,23 @@ const VAR = {
   updated_at: '2026-08-16',
 };
 
+const EMPTY_COMMON_VAR_IMPACT = {
+  total: 0,
+  blockingTotal: 0,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  byKind: {
+    template: 0,
+    broadcast: 0,
+    scenario: 0,
+    reminder: 0,
+    auto_reply: 0,
+    form: 0,
+    automation: 0,
+  },
+  items: [],
+};
+
 /** 1x1 の PNG。中身は問わないので短い base64 で足りる。 */
 const TINY_PNG = 'iVBORw0KGgo=';
 
@@ -126,18 +143,7 @@ beforeEach(() => {
   mocks.getCommonVarById.mockResolvedValue(VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
   mocks.updateCommonVar.mockResolvedValue(VAR);
-  mocks.getCommonVarUsageImpact.mockResolvedValue({
-    total: 0,
-    byKind: {
-      template: 0,
-      broadcast: 0,
-      scenario: 0,
-      reminder: 0,
-      auto_reply: 0,
-      form: 0,
-      automation: 0,
-    },
-  });
+  mocks.getCommonVarUsageImpact.mockResolvedValue(EMPTY_COMMON_VAR_IMPACT);
   mocks.createCommonVarSchedule.mockResolvedValue({
     id: 'sc-1',
     var_id: 'cv-1',
@@ -394,17 +400,118 @@ describe('共通情報', () => {
     expect(res.status).toBe(200);
   });
 
+  it('削除影響は運用者向けの名前と導線を返し、内部IDの専用項目を作らない', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 1 },
+      items: [{
+        kind: 'template',
+        source_id: 'template-1',
+        source_parent_id: null,
+        source_name: '来店後のご案内',
+        source_status: 'active',
+        source_content: '営業時間は{{var.shop_hours}}です',
+        is_historical: 0,
+      }],
+    });
+    const res = await req('/api/common-vars/cv-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Record<string, unknown> & { items: Record<string, unknown>[] } };
+    expect(body.data).toMatchObject({
+      variable: { id: 'cv-1', name: '営業時間', varKey: 'shop_hours' },
+      total: 1,
+      blockingTotal: 1,
+      canDelete: false,
+      recommendedAction: 'review_references',
+      items: [{
+        kindLabel: 'テンプレート',
+        name: '来店後のご案内',
+        href: '/templates/edit?id=template-1',
+        currentPreview: '営業時間は10-19です',
+      }],
+    });
+    expect(body.data.checkedAt).toEqual(expect.any(String));
+    expect(body.data.items[0]).not.toHaveProperty('sourceId');
+    expect(mocks.getCommonVarUsageImpact).toHaveBeenCalledWith(
+      env.DB,
+      'shop_hours',
+      'account-1',
+    );
+  });
+
+  it('共通情報を変更する操作は内部JSONを表示しない', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, friend_add: 1 },
+      items: [{
+        kind: 'friend_add',
+        source_id: 'friend-add-setting',
+        source_parent_id: null,
+        source_name: '友だち追加時の設定',
+        source_status: 'active',
+        source_content: '{"actionType":"common_var","config":{"varKey":"shop_hours"}}',
+        is_historical: 0,
+      }],
+    });
+
+    const res = await req('/api/common-vars/cv-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      kindLabel: '友だち追加時の配信',
+      href: '/friend-add-settings',
+      currentPreview: 'この設定の中で使われています',
+    });
+    expect(JSON.stringify(body.data.items[0])).not.toContain('varKey');
+    expect(JSON.stringify(body.data.items[0])).not.toContain('shop_hours');
+  });
+
+  it('所属不明の古いフォームは名前を返さず、件数だけで削除を止める', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      unscopedFormTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, form: 1 },
+    });
+    const res = await req('/api/common-vars/cv-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        canDelete: false,
+        items: [],
+        unavailableReferences: [{ kind: 'form', count: 1 }],
+      },
+    });
+  });
+
+  it('影響を取得できないときは0件を作らず503', async () => {
+    mocks.getCommonVarUsageImpact.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/common-vars/cv-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: '使用先を確認できないため削除できません',
+    });
+  });
+
   it('使用中の共通情報はAPIを直接呼んでも削除できない', async () => {
     mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
       total: 3,
-      byKind: { template: 2, broadcast: 1 },
+      blockingTotal: 3,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 2, broadcast: 1 },
     });
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
     expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
     expect(mocks.getCommonVarUsageImpact).toHaveBeenCalledWith(env.DB, 'shop_hours', 'account-1');
     expect(await res.json()).toMatchObject({
-      code: 'COMMON_VAR_IN_USE',
+      code: 'common_var_delete_blocked',
       data: { total: 3, canDelete: false },
     });
   });
@@ -420,6 +527,23 @@ describe('共通情報', () => {
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(200);
     expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1');
+  });
+
+  it('送信済み配信だけなら履歴を残したまま削除できる', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      historicalTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, broadcast: 1 },
+      items: [{
+        kind: 'broadcast', source_id: 'broadcast-1', source_parent_id: null,
+        source_name: '過去のお知らせ', source_status: 'sent',
+        source_content: '{{var.shop_hours}}でした', is_historical: 1,
+      }],
+    });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    expect(res.status).toBe(200);
+    expect(mocks.deleteCommonVar).toHaveBeenCalled();
   });
 });
 

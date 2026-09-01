@@ -469,6 +469,7 @@ function VarsPageInner() {
 
             <button
               onClick={() => void prepareRemoveSelected()}
+              data-qa-open="yPkWe"
               disabled={selected.size === 0}
               className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
             >
