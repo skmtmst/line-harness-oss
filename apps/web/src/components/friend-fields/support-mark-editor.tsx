@@ -141,7 +141,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
               {(editing ? currentUsages : ['作成後、受信箱や各機能の条件として選べます']).map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
             </ul>
           )}
-          <p className="mt-4 text-xs leading-relaxed text-ink-faint">使用中のマークを削除すると、付いている友だちは初期値のマークへ戻ります。</p>
+          <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは初期値へ移り、変更履歴は残ります。</p>
         </Card>
       </div>
 

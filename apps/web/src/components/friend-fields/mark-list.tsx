@@ -30,6 +30,18 @@ function usageLabel(mark: MarkRow): string {
   return parts.length ? parts.join('・') : 'なし'
 }
 
+function referenceCount(mark: MarkRow): number {
+  return (mark.usedIn?.broadcasts ?? 0)
+    + (mark.usedIn?.scenarios ?? 0)
+    + (mark.usedIn?.autoReplies ?? 0)
+    + (mark.usedIn?.savedSearches ?? 0)
+    + (mark.usedIn?.automations ?? 0)
+}
+
+function isUsed(mark: MarkRow): boolean {
+  return mark.friendCount > 0 || referenceCount(mark) > 0
+}
+
 /**
  * ★V6 `rIhbN` 対応マーク一覧。
  *
@@ -44,6 +56,8 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
@@ -71,8 +85,8 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
 
   const visible = useMemo(() => items.filter((mark) => {
     if (query && !mark.name.toLocaleLowerCase('ja').includes(query.toLocaleLowerCase('ja'))) return false
-    if (usage === 'used' && mark.friendCount === 0) return false
-    if (usage === 'unused' && mark.friendCount > 0) return false
+    if (usage === 'used' && !isUsed(mark)) return false
+    if (usage === 'unused' && isUsed(mark)) return false
     return true
   }), [items, query, usage])
 
@@ -107,14 +121,31 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   }
 
   const confirmRemove = async (mark: MarkRow) => {
-    if (!accountId) return
+    if (!accountId || !defaultMark || deleting || referenceCount(mark) > 0) return
     setError('')
+    setDeleteError('')
+    setDeleting(true)
     try {
-      const res = await api.supportMarks.delete(mark.id, accountId, { force: mark.friendCount > 0 })
+      const res = await api.supportMarks.delete(mark.id, accountId, {
+        replacementMarkId: defaultMark.id,
+        expectedImpact: {
+          friendCount: mark.friendCount,
+          usedIn: {
+            broadcasts: mark.usedIn?.broadcasts ?? 0,
+            scenarios: mark.usedIn?.scenarios ?? 0,
+            autoReplies: mark.usedIn?.autoReplies ?? 0,
+            savedSearches: mark.usedIn?.savedSearches ?? 0,
+            automations: mark.usedIn?.automations ?? 0,
+          },
+        },
+      })
       if (!res.success) throw new Error(res.error)
+      setPendingDelete(null)
       await load()
     } catch {
-      setError('対応マークを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      setDeleteError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -198,9 +229,9 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                   <td className="truncate px-3 py-3 text-ink" title={usageLabel(mark)}>{usageLabel(mark)}</td>
                   <td className="px-3 py-3 text-center">
                     {mark.isDefault || mark.isInherited ? (
-                      <span title={mark.isDefault ? '初期値のマークは削除できません' : '共有マークは編集後に削除できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため削除できません' : '共有マークのため削除できません'} /></span>
+                      <span title={mark.isDefault ? '初期値のマークは保管できません' : '共有マークは編集後に保管できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため保管できません' : '共有マークのため保管できません'} /></span>
                     ) : (
-                      <button type="button" onClick={() => setPendingDelete(mark)} aria-label={`${mark.name}を削除`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
+                      <button type="button" onClick={() => { setDeleteError(''); setPendingDelete(mark) }} aria-label={`${mark.name}を保管`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
                     )}
                   </td>
                 </tr>
@@ -211,11 +242,25 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
       </div>
 
       <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
-        <h2 className="text-sm font-bold text-ink">受信時自動変更・削除・初期値の安全確認</h2>
-        <p className="mt-1 text-xs leading-relaxed text-ink-faint">「受信時に変更」の設定は追加・編集画面で確認できます。削除時は影響人数と置き換え先を表示し、初期値は削除できません。</p>
+        <h2 className="text-sm font-bold text-ink">受信時自動変更・保管・初期値の安全確認</h2>
+        <p className="mt-1 text-xs leading-relaxed text-ink-faint">「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
       </section>
 
-      <ConfirmDialog open={pendingDelete !== null} title={`対応マーク「${pendingDelete?.name ?? ''}」を削除しますか？`} description={(pendingDelete?.friendCount ?? 0) > 0 ? `${pendingDelete?.friendCount ?? 0} 人の対応マークは、削除後に「${defaultMark?.name ?? '初期値'}」へ変更されます。この操作は元に戻せません。` : 'この対応マークを削除します。この操作は元に戻せません。'} confirmLabel="削除する" destructive onCancel={() => setPendingDelete(null)} onConfirm={() => { const target = pendingDelete; setPendingDelete(null); if (target) void confirmRemove(target) }} />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`対応マーク「${pendingDelete?.name ?? ''}」を保管しますか？`}
+        description={pendingDelete && referenceCount(pendingDelete) > 0
+          ? `配信など${referenceCount(pendingDelete)}件で使われているため保管できません。先にすべての使用先から外してください。友だちのマークと設定は変更されません。`
+          : `${pendingDelete?.friendCount ?? 0}人の友だちは「${defaultMark?.name ?? '初期値'}」へ変更されます。マークは今後の選択肢から外れ、変更履歴は残ります。この操作は画面から元に戻せません。`}
+        confirmLabel="保管する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onCancel={() => { if (!deleting) setPendingDelete(null) }}
+        onConfirm={defaultMark && pendingDelete && referenceCount(pendingDelete) === 0
+          ? () => { void confirmRemove(pendingDelete) }
+          : undefined}
+      />
     </div>
   )
 }

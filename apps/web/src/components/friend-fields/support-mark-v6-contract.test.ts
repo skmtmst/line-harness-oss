@@ -33,11 +33,22 @@ describe('V6 対応マーク', () => {
     expect(EDITOR).not.toContain('担当者割当・期限超過')
   })
 
-  it('保存と削除の失敗で内部のAPI文言をそのまま表示しない', () => {
+  it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {
     expect(EDITOR).toContain('対応マークを保存できませんでした。状態を読み直してから、もう一度お試しください。')
-    expect(LIST).toContain('対応マークを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    expect(LIST).toContain('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
     expect(EDITOR).not.toContain('reason instanceof ApiError ? reason.message')
     expect(LIST).not.toContain("reason instanceof ApiError ? reason.message : '削除できませんでした'")
+  })
+
+  it('友だち以外の使用先も使用中として扱い、確認後に物理削除しない', () => {
+    expect(LIST).toContain('function isUsed(mark: MarkRow)')
+    expect(LIST).toContain('referenceCount(mark) > 0')
+    expect(LIST).toContain('replacementMarkId: defaultMark.id')
+    expect(LIST).toContain('expectedImpact:')
+    expect(LIST).toContain('先にすべての使用先から外してください')
+    expect(LIST).toContain('referenceCount(pendingDelete) === 0')
+    expect(LIST).toContain('変更履歴は残ります')
+    expect(LIST).not.toContain('force: mark.friendCount > 0')
   })
 
   it('タブ行から追加画面へ進める', () => {

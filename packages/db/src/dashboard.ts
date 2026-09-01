@@ -956,7 +956,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
              (SELECT COUNT(DISTINCT sm.id)
                 FROM support_marks sm
                 LEFT JOIN support_mark_scopes sms ON sms.mark_id = sm.id
-               WHERE ${markScope.sql}) AS total,
+               WHERE sm.archived_at IS NULL AND ${markScope.sql}) AS total,
              (SELECT COUNT(DISTINCT f.support_mark_id) FROM friends f WHERE f.support_mark_id IS NOT NULL AND ${friendScope.sql}) AS in_use`,
         )
         .bind(...markScope.binds, ...friendScope.binds)
