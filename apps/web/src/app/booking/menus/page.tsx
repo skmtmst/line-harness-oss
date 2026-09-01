@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import {
   api,
+  ApiError,
   bookingApi,
   type BookingMenu,
   type BookingRequest,
@@ -30,6 +31,27 @@ const MERGED_TABS = [
   { key: 'menus', label: 'メニュー' },
   { key: 'staff', label: '担当スタッフ' },
 ]
+
+type SupportingLoadState = 'loading' | 'ready' | 'error'
+
+function bookingErrorMessage(error: unknown, action: '読み込み' | '保存'): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return `予約メニューを${action}する権限がありません。`
+    if (error.status === 409) return `ほかの変更と重なったため、予約メニューを${action}できませんでした。`
+  }
+  return `予約メニューを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
+}
+
+function supportingDetail(
+  hasAccount: boolean,
+  state: SupportingLoadState,
+  readyDetail: string,
+): string {
+  if (!hasAccount) return 'アカウントを選択'
+  if (state === 'loading') return '読み込み中'
+  if (state === 'error') return '取得できませんでした'
+  return readyDetail
+}
 
 /** JSTでの年月。今月の予約を数えるのに使う。 */
 function jstMonth(iso: string): string {
@@ -59,9 +81,11 @@ function MenusPageInner() {
   /** 担当を引けなかったスタッフの表示名。空でなければ「担当なし」は当てにならない。 */
   const [staffReadFailed, setStaffReadFailed] = useState<string[]>([])
   const [bookings, setBookings] = useState<BookingRequest[]>([])
+  const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'bookings' | 'order' | 'name'>('bookings')
   const [period, setPeriod] = useState<'current' | 'previous' | 'all'>('current')
+  const loadGenerationRef = useRef(0)
 
   const liffId = selectedAccount?.liffId ?? null
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -81,7 +105,13 @@ function MenusPageInner() {
   }
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) return
+    const requestGeneration = ++loadGenerationRef.current
+    if (!selectedAccountId) {
+      setItems([])
+      setLoading(false)
+      setError(null)
+      return
+    }
     setLoading(true)
     setError(null)
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
@@ -89,11 +119,13 @@ function MenusPageInner() {
     setItems([])
     try {
       const r = await bookingApi.listMenus(selectedAccountId)
+      if (loadGenerationRef.current !== requestGeneration) return
       setItems(r.menus)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (loadGenerationRef.current !== requestGeneration) return
+      setError(bookingErrorMessage(e, '読み込み'))
     } finally {
-      setLoading(false)
+      if (loadGenerationRef.current === requestGeneration) setLoading(false)
     }
   }, [selectedAccountId])
 
@@ -120,6 +152,11 @@ function MenusPageInner() {
   // 割り当てはスタッフ単位でしか引けないので、人数ぶん引いて裏返す。
   // 店のスタッフは数人なので、この回数で困ることはない。
   useEffect(() => {
+    setStaff([])
+    setBookings([])
+    setMenuStaff(new Map())
+    setStaffReadFailed([])
+    setSupportingLoadState('loading')
     if (!selectedAccountId) return
     let alive = true
     void (async () => {
@@ -153,9 +190,10 @@ function MenusPageInner() {
         if (alive) {
           setMenuStaff(map)
           setStaffReadFailed(failed)
+          setSupportingLoadState('ready')
         }
       } catch {
-        // 付随情報が無いだけ。メニューの登録と編集はできる。
+        if (alive) setSupportingLoadState('error')
       }
     })()
     return () => {
@@ -223,8 +261,8 @@ function MenusPageInner() {
       menu.duration_minutes,
       menu.buffer_after_minutes,
       menu.base_price,
-      (menuStaff.get(menu.id) ?? []).join('・'),
-      bookingCounts.get(menu.name) ?? 0,
+      supportingLoadState === 'ready' ? (menuStaff.get(menu.id) ?? []).join('・') : '—',
+      supportingLoadState === 'ready' ? bookingCounts.get(menu.name) ?? 0 : '—',
       menu.is_active ? '公開中' : '非公開',
     ])
     const csv = [
@@ -255,21 +293,37 @@ function MenusPageInner() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="メニュー"
-          value={String(items.length)}
+          value={!selectedAccountId || loading || error ? '—' : String(items.length)}
           unit="件"
-          detail={`公開中 ${items.filter((m) => m.is_active).length}`}
+          detail={
+            !selectedAccountId
+              ? 'アカウントを選択'
+              : loading
+                ? '読み込み中'
+                : error
+                  ? '取得できませんでした'
+                  : `公開中 ${items.filter((m) => m.is_active).length}`
+          }
         />
         <Kpi
           title="担当スタッフ"
-          value={String(staff.length)}
+          value={supportingLoadState === 'ready' ? String(staff.length) : '—'}
           unit="人"
-          detail={`稼働中 ${staff.filter((s) => s.is_active).length}`}
+          detail={supportingDetail(
+            Boolean(selectedAccountId),
+            supportingLoadState,
+            `稼働中 ${staff.filter((s) => s.is_active).length}`,
+          )}
         />
         <Kpi
           title="今月の予約"
-          value={String(kpi.inThis)}
+          value={supportingLoadState === 'ready' ? String(kpi.inThis) : '—'}
           unit="件"
-          detail={`前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+          detail={supportingDetail(
+            Boolean(selectedAccountId),
+            supportingLoadState,
+            `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`,
+          )}
         />
         {/* 枠の稼働率は「公開している枠のうち何割が埋まったか」。
             受付時間の総枠数を数える仕組みがまだ無いので出せない。 */}
@@ -376,7 +430,9 @@ function MenusPageInner() {
                     </td>
                     <td className="px-4 py-3 text-sm text-right tabular-nums">¥{m.base_price.toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {(menuStaff.get(m.id) ?? []).length === 0 ? (
+                      {supportingLoadState !== 'ready' ? (
+                        <span className="text-ink-faint text-xs">—（未取得）</span>
+                      ) : (menuStaff.get(m.id) ?? []).length === 0 ? (
                         // 担当が0人だと、公開していても予約フォームに枠が出ない。
                         // 「-」だと設定漏れなのか読み取れないので、はっきり書く。
                         <span className="text-warning text-xs">担当なし</span>
@@ -385,7 +441,7 @@ function MenusPageInner() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
-                      {bookingCounts.get(m.name) ?? 0} 件
+                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.name) ?? 0} 件` : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="inline-flex gap-2 text-xs">
@@ -445,12 +501,6 @@ function MenusPageInner() {
         </div>
       )}
 
-      <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
-        <p className="text-ink-secondary text-xs leading-5">
-          旧デザインでは「メニュー」と「スタッフ」が別ページに分かれていました。どちらも予約枠を決める設定なので、担当の割り当てを1画面で完結できるようにまとめています。
-        </p>
-      </div>
-
       <div className="mt-3">
         <span className="text-ink-faint text-xs">全 {shown.length} 件</span>
       </div>
@@ -508,7 +558,7 @@ function Modal({
     try {
       await onSave(form)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(bookingErrorMessage(e, '保存'))
     } finally {
       setSaving(false)
     }
