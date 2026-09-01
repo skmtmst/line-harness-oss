@@ -19,8 +19,17 @@ const REASON_OPTIONS = [
   { value: 'other', label: 'その他' },
 ]
 
-function messageOf(error: unknown): string {
-  return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました'
+export function mileageAdjustmentErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 400) return error.message
+    if (error.status === 403) return 'マイルを変更する権限がありません。'
+    if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
+    if (error.status === 405) return 'この環境ではマイル変更を実行できません。'
+    if (error.status === 409) return '同じ操作との競合を確認しました。画面を読み直してからやり直してください。'
+    if (error.status === 428) return '確認手順が完了していません。画面を閉じずに、もう一度内容を確認してください。'
+    return 'マイルを変更できませんでした。時間をおいてもう一度お試しください。'
+  }
+  return error instanceof Error ? '通信に失敗しました。接続を確認してもう一度お試しください。' : '通信に失敗しました。'
 }
 
 export default function MileageAdjustmentDialog({
@@ -77,7 +86,7 @@ export default function MileageAdjustmentDialog({
       .then((response) => {
         if (response.success) setPolicy(response.data)
       })
-      .catch((caught) => setError(messageOf(caught)))
+      .catch((caught) => setError(mileageAdjustmentErrorMessage(caught)))
       .finally(() => setPolicyLoading(false))
   }, [accountId, open])
 
@@ -116,7 +125,7 @@ export default function MileageAdjustmentDialog({
       await onCompleted()
       onCancel()
     } catch (caught) {
-      setError(messageOf(caught))
+      setError(mileageAdjustmentErrorMessage(caught))
     } finally {
       setBusy(false)
     }
@@ -134,7 +143,7 @@ export default function MileageAdjustmentDialog({
       const response = await api.mileage.setAdjustmentPolicy({ accountId, approvalThreshold: threshold })
       if (response.success) setPolicy(response.data)
     } catch (caught) {
-      setError(messageOf(caught))
+      setError(mileageAdjustmentErrorMessage(caught))
     } finally {
       setBusy(false)
     }
@@ -182,6 +191,11 @@ export default function MileageAdjustmentDialog({
                   />
                 ))}
               </div>
+              {direction === 'decrease' ? (
+                <p className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+                  残高より多くは減らせません。変更後の残高が0未満になる操作は実行しません。
+                </p>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="マイル数" htmlFor="mileage-adjustment-amount" required>
                   <TextInput id="mileage-adjustment-amount" inputMode="numeric" value={amountText} onChange={(event) => setAmountText(event.target.value.replace(/[^0-9]/g, ''))} />

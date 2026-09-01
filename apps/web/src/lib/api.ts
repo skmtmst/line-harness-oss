@@ -57,6 +57,18 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  FriendBulkSelection,
+  FriendBulkOperation,
+  FriendBulkPreview,
+  FriendBulkRunSummary,
+  FriendBulkRunDetail,
+  IdentityCandidateDetail,
+  IdentityCandidateKind,
+  IdentityCandidateList,
+  IdentityCandidateStatus,
+  DetectIdentityCandidatesResult,
+  DecideIdentityCandidateRequest,
+  UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
 /**
@@ -703,6 +715,9 @@ export type FriendListParams = {
   chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
   /** 表示設定。未指定は全部。 */
   visibility?: 'following' | 'blocked'
+  /** 行動スコアの現在値。片方だけでも指定できる。 */
+  scoreMin?: number
+  scoreMax?: number
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -865,6 +880,31 @@ export type MileageAdminHistory = {
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
 }
+export type ActionScoreBand = 'high' | 'normal' | 'low'
+export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
+export type ActionScoreSort = 'score_desc' | 'score_asc' | 'change_desc' | 'change_asc' | 'recent_desc'
+export type ActionScoreOverview = {
+  summary: {
+    scoredFriends: number
+    high: number
+    normal: number
+    low: number
+    decreased30d: number
+    highMin: number
+    normalMin: number
+  }
+  items: Array<{
+    friendId: string
+    displayName: string
+    pictureUrl: string | null
+    currentScore: number
+    band: ActionScoreBand
+    change30d: number
+    lastReason: string | null
+    lastChangedAt: string | null
+  }>
+  pagination: { total: number; limit: number; offset: number }
+}
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
@@ -904,6 +944,30 @@ export type ListStats = {
     sentThisWeek: number
   }
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+}
+
+/** 質問テンプレート。シナリオの質問と同じ契約を使う。 */
+export type TemplateQuestion = {
+  intro?: string
+  text: string
+  altText?: string
+  tapMode: 'single' | 'multiple'
+  choices: Array<{
+    label: string
+    behavior: 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
+    url?: string
+    tel?: string
+    email?: string
+    formId?: string
+    scenario?: { op: 'start' | 'stop'; scenarioId?: string | null; restart?: 'from_start' | 'from_read'; rememberPrevious?: boolean }
+    userMessage?: string
+    hideUserMessage?: boolean
+    reply?: string
+    repeatReply?: string
+    addTagIds?: string[]
+    removeTagIds?: string[]
+    field?: { fieldId: string; value: string }
+  }>
 }
 
 /* ---- リッチメニューのボタン（147） ---- */
@@ -1137,6 +1201,7 @@ export type DashboardPreferenceResponse = {
 export type EcCommerceOverview = {
   total: number
   processed: number
+  identityPending: number
   failed: number
   skipped: number
   last24h: number
@@ -1153,7 +1218,7 @@ export type EcCommerceEvent = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  status: 'received' | 'processing' | 'processed' | 'skipped' | 'failed'
+  status: 'received' | 'identity_pending' | 'processing' | 'processed' | 'skipped' | 'failed'
   errorMessage: string | null
   receivedAt: string
   processedAt: string | null
@@ -1390,6 +1455,8 @@ export const api = {
       if (params?.createdTo) query.createdTo = params.createdTo
       if (params?.chatStatus) query.chatStatus = params.chatStatus
       if (params?.visibility) query.visibility = params.visibility
+      if (params?.scoreMin !== undefined) query.scoreMin = String(params.scoreMin)
+      if (params?.scoreMax !== undefined) query.scoreMax = String(params.scoreMax)
       for (const [k, v] of Object.entries(params?.metadata ?? {})) {
         if (k && v) query[`metadata.${k}`] = v
       }
@@ -1433,6 +1500,40 @@ export const api = {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
     },
+    bulkPreview: (selection: FriendBulkSelection, operation: FriendBulkOperation) =>
+      fetchApi<ApiResponse<FriendBulkPreview>>('/api/friends/bulk-runs/preview', {
+        method: 'POST',
+        body: JSON.stringify({ selection, operation }),
+      }),
+    bulkCreate: (
+      selection: FriendBulkSelection,
+      operation: FriendBulkOperation,
+      options: { idempotencyKey: string; scheduledAt?: string; confirmIrreversible?: boolean },
+    ) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>('/api/friends/bulk-runs', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': options.idempotencyKey,
+          ...(options.confirmIrreversible ? { 'X-Confirm-Irreversible': 'friend-bulk-run' } : {}),
+        },
+        body: JSON.stringify({ selection, operation, scheduledAt: options.scheduledAt }),
+      }),
+    bulkGet: (id: string, options?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (options?.page) query.set('page', String(options.page))
+      if (options?.limit) query.set('limit', String(options.limit))
+      const tail = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<FriendBulkRunDetail>>(`/api/friends/bulk-runs/${id}${tail}`)
+    },
+    bulkRetry: (id: string) =>
+      fetchApi<ApiResponse<{ retriedCount: number }>>(`/api/friends/bulk-runs/${id}/retry`, {
+        method: 'POST',
+      }),
+    bulkUndo: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>(`/api/friends/bulk-runs/${id}/undo`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }),
     /**
      * 友だち情報（metadata）を書き換える。
      * 渡した項目だけ変わる。null を渡すとその項目を削除する。
@@ -2863,6 +2964,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
@@ -2878,6 +2981,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2898,6 +3003,8 @@ export const api = {
       category: string
       messageType: string
       messageContent: string
+      question?: TemplateQuestion | null
+      questionStatus?: 'draft' | 'published'
       /** 162: 選択肢を押したときの動き。 */
       carouselActions?: unknown | null
       /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2911,7 +3018,7 @@ export const api = {
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -3224,10 +3331,13 @@ export const api = {
     },
   },
   ecCommerce: {
-    overview: () =>
-      fetchApi<ApiResponse<EcCommerceOverview>>('/api/ec-commerce/overview'),
-    events: (params?: { eventType?: string; status?: string; limit?: number; offset?: number }) => {
+    overview: (lineAccountId?: string) =>
+      fetchApi<ApiResponse<EcCommerceOverview>>(lineAccountId
+        ? `/api/ec-commerce/overview?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : '/api/ec-commerce/overview'),
+    events: (params?: { lineAccountId?: string; eventType?: string; status?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
+      if (params?.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params?.eventType) query.set('eventType', params.eventType)
       if (params?.status) query.set('status', params.status)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
@@ -3660,6 +3770,24 @@ export const api = {
     }),
     deleteRule: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/mileage/rules/${id}`, { method: 'DELETE' }),
+  },
+  actionScores: {
+    friends: (params: {
+      accountId: string
+      search?: string
+      filter?: ActionScoreFilter
+      sort?: ActionScoreSort
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.filter) query.set('filter', params.filter)
+      if (params.sort) query.set('sort', params.sort)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<ActionScoreOverview>>(`/api/action-scores/friends?${query.toString()}`)
+    },
   },
   webhooks: {
     incoming: {
@@ -4255,6 +4383,50 @@ export const api = {
         `/api/conversions/events/${eventId}/approval`,
         { method: 'PATCH', body: JSON.stringify({ status: 'rejected' }) },
       ),
+  },
+  /**
+   * 本人照合の候補。3-2-A（友だち同士）と 23-1-A（ECの会員）が同じ口を読む。
+   *
+   * 判定と取り消しは、画面が読み込んだ版（`expectedVersion`）を必ず送る。
+   * 先に別の人が判定していれば Worker が 409 `STALE_CANDIDATE` を返すので、
+   * 画面は上書きせず読み直しを促す。
+   */
+  identityCandidates: {
+    list: (params: {
+      kind: IdentityCandidateKind
+      status?: IdentityCandidateStatus
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ kind: params.kind })
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
+    },
+    get: (id: string) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}`,
+      ),
+    decide: (id: string, body: DecideIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/decide`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    undo: (id: string, body: UndoIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/undo`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    detectFriendDuplicates: (params?: { limit?: number; after?: string | null }) => {
+      const query = new URLSearchParams({ kind: 'friend_duplicate' })
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.after) query.set('after', params.after)
+      return fetchApi<ApiResponse<DetectIdentityCandidatesResult>>(
+        `/api/identity-candidates/detect?${query.toString()}`,
+        { method: 'POST' },
+      )
+    },
   },
   duplicates: {
     stats: (options?: { forceRefresh?: boolean }) =>
