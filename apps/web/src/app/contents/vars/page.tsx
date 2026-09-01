@@ -46,6 +46,7 @@ function VarsPageInner() {
   const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const deleteRequestRef = useRef({ accountId: selectedAccountId, generation: 0 })
 
   /** 選んでいるフォルダ。URLに出して、戻るとブックマークを壊さない。 */
   const folderFilter = params.get('folder') ?? ''
@@ -86,6 +87,17 @@ function VarsPageInner() {
     if (accountLoading) return
     void load()
   }, [accountLoading, load])
+
+  useEffect(() => {
+    deleteRequestRef.current = {
+      accountId: selectedAccountId,
+      generation: deleteRequestRef.current.generation + 1,
+    }
+    setSelected(new Set())
+    setDeleteTargets([])
+    setDeleting(false)
+    setDeleteError('')
+  }, [selectedAccountId])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -134,16 +146,25 @@ function VarsPageInner() {
 
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
+    const request = {
+      accountId: selectedAccountId,
+      generation: deleteRequestRef.current.generation + 1,
+    }
+    deleteRequestRef.current = request
+    const isCurrentRequest = () =>
+      deleteRequestRef.current.accountId === request.accountId &&
+      deleteRequestRef.current.generation === request.generation
     setError('')
     setDeleteError('')
     try {
       const impacts = await Promise.all(
         [...selected].map(async (id) => {
-          const response = await api.commonVars.deleteImpact(id, selectedAccountId)
+          const response = await api.commonVars.deleteImpact(id, request.accountId)
           if (!response.success) throw new Error(response.error)
           return { id, impact: response.data }
         }),
       )
+      if (!isCurrentRequest()) return
       const blocked = impacts.filter(({ impact }) => !impact.canDelete)
       if (blocked.length > 0) {
         const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
@@ -151,10 +172,12 @@ function VarsPageInner() {
         return
       }
     } catch {
+      if (!isCurrentRequest()) return
       setError('使用先を確認できないため削除できません。もう一度お試しください。')
       return
     }
 
+    if (!isCurrentRequest()) return
     const targets = items.filter((item) => selected.has(item.id))
     if (targets.length !== selected.size) {
       setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -165,24 +188,35 @@ function VarsPageInner() {
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
+    const request = {
+      accountId: selectedAccountId,
+      generation: deleteRequestRef.current.generation + 1,
+    }
+    deleteRequestRef.current = request
+    const isCurrentRequest = () =>
+      deleteRequestRef.current.accountId === request.accountId &&
+      deleteRequestRef.current.generation === request.generation
+    const targets = [...deleteTargets]
     setDeleting(true)
     setDeleteError('')
     const failed: CommonVar[] = []
-    for (const target of deleteTargets) {
+    for (const target of targets) {
       try {
-        const result = await api.commonVars.delete(target.id, selectedAccountId)
+        const result = await api.commonVars.delete(target.id, request.accountId)
         if (!result.success) throw new Error(result.error)
       } catch {
         failed.push(target)
       }
+      if (!isCurrentRequest()) return
     }
 
     try {
+      if (!isCurrentRequest()) return
       if (failed.length > 0) {
         setDeleteTargets(failed)
         setSelected(new Set(failed.map((item) => item.id)))
         setDeleteError(
-          failed.length === deleteTargets.length
+          failed.length === targets.length
             ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
             : `${failed.length}件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
         )
@@ -194,7 +228,7 @@ function VarsPageInner() {
       setSelected(new Set())
       await load()
     } finally {
-      setDeleting(false)
+      if (isCurrentRequest()) setDeleting(false)
     }
   }
 
@@ -459,6 +493,10 @@ function VarsPageInner() {
         onConfirm={() => void removeSelected()}
         onCancel={() => {
           if (deleting) return
+          deleteRequestRef.current = {
+            accountId: selectedAccountId,
+            generation: deleteRequestRef.current.generation + 1,
+          }
           setDeleteError('')
           setDeleteTargets([])
         }}

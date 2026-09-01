@@ -92,11 +92,15 @@ describe('common variable usage impact', () => {
       INSERT INTO auto_replies
         (id, keyword, response_content, line_account_id, name, actions_json)
       VALUES
-        ('auto-global','受付','本文',NULL,'共通の自動応答',
+        ('auto-a1','受付','本文','a1','A1の自動応答',
+         '[{"kind":"row","actionType":"common_var","config":{"varKey":"shop_hours","op":"add","value":"1"}}]'),
+        ('auto-unscoped','受付2','本文',NULL,'所属不明の自動応答',
          '[{"kind":"row","actionType":"common_var","config":{"varKey":"shop_hours","op":"add","value":"1"}}]');
       INSERT INTO automations (id, name, event_type, actions, line_account_id)
       VALUES
-        ('automation-global','共通の旧自動化','friend_add',
+        ('automation-a1','A1の旧自動化','friend_add',
+         '[{"type":"common_var","varKey":"shop_hours"}]','a1'),
+        ('automation-unscoped','所属不明の旧自動化','friend_add',
          '[{"type":"common_var","varKey":"shop_hours"}]',NULL);
       INSERT INTO automation_definitions (id, line_account_id, name)
       VALUES ('automation-v6','a1','V6自動化');
@@ -146,12 +150,13 @@ describe('common variable usage impact', () => {
       'broadcast-bubbles',
       'step-question',
       'scenario-action',
-      'auto-global',
-      'automation-global',
+      'auto-a1',
+      'automation-a1',
       'automation-v6',
       'friend-add-setting',
       'common-action',
     ]);
+    expect(impact.items.some((item) => item.source_name.includes('所属不明'))).toBe(false);
     raw.close();
   });
 });
@@ -173,6 +178,21 @@ describe('common variable account scope', () => {
     await expect(getCommonVarMap(asD1(raw), 'a1')).resolves.toEqual({ hours: '10-18' });
     await expect(getCommonVarMap(asD1(raw), 'a2')).resolves.toEqual({ phone: '000' });
     await expect(getCommonVarMap(asD1(raw), null)).resolves.toEqual({});
+
+    raw.exec(`
+      INSERT INTO templates (id, line_account_id, name, category, message_type, message_content)
+      VALUES
+        ('t1','a1','A1の案内','general','text','{{var.hours}}'),
+        ('t2','a2','A2の案内','general','text','{{var.hours}}');
+    `);
+    await expect(getCommonVarUsageImpact(asD1(raw), 'hours', 'a1')).resolves.toMatchObject({
+      total: 1,
+      byKind: { template: 1 },
+    });
+    await expect(getCommonVarUsageImpact(asD1(raw), 'hours', 'a2')).resolves.toMatchObject({
+      total: 1,
+      byKind: { template: 1 },
+    });
     raw.close();
   });
 });

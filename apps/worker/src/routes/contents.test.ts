@@ -10,6 +10,8 @@ const mocks = {
   deleteMedia: vi.fn(),
   getMediaUsages: vi.fn(),
   countMediaUsages: vi.fn(),
+  getMediaDeleteImpact: vi.fn(),
+  jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
   getCommonVarById: vi.fn(),
   createCommonVar: vi.fn(),
@@ -19,7 +21,6 @@ const mocks = {
   getCommonVarSchedules: vi.fn(),
   createCommonVarSchedule: vi.fn(),
   deleteCommonVarSchedule: vi.fn(),
-  jstNow: () => '2026-08-31T10:00:00.000+09:00',
   COMMON_VAR_TYPES: ['text', 'url', 'image', 'number'],
   validateFieldKey: (key: unknown) =>
     typeof key === 'string' && /^[a-z][a-z0-9_]{0,31}$/.test(key) && key !== 'name'
@@ -29,6 +30,8 @@ const mocks = {
 vi.mock('@line-crm/db', () => mocks);
 const accessMocks = { canAccessAllLineAccounts: vi.fn(async () => true) };
 vi.mock('../services/account-access.js', () => accessMocks);
+const scanMocks = { scanSingleMediaUsage: vi.fn() };
+vi.mock('../services/media-usage-scan.js', () => scanMocks);
 
 const { contents } = await import('./contents.js');
 
@@ -65,6 +68,7 @@ function req(path: string, method: string, body?: unknown) {
 
 const MEDIA = {
   id: 'md-1',
+  line_account_id: 'account-1',
   folder_id: null,
   kind: 'image',
   filename: 'a.png',
@@ -77,6 +81,17 @@ const MEDIA = {
   public_url: null,
   uploaded_by: 'u-1',
   created_at: '2026-08-16',
+  usage_count: 3,
+};
+
+const DELETE_IMPACT = {
+  media: { id: 'md-1', filename: 'a.png', kind: 'image' },
+  usageCount: 0,
+  references: [],
+  checkedAt: '2026-08-31T10:00:00.000',
+  lastScannedAt: null,
+  canDelete: true,
+  recommendedAction: 'delete',
 };
 
 const VAR = {
@@ -116,12 +131,14 @@ beforeEach(() => {
   put.mockResolvedValue(undefined);
   del.mockResolvedValue(undefined);
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  scanMocks.scanSingleMediaUsage.mockResolvedValue({ scanned: 1, matched: 0, pruned: 0 });
   mocks.getMedia.mockResolvedValue([MEDIA]);
   mocks.getMediaById.mockResolvedValue(MEDIA);
   mocks.createMedia.mockResolvedValue(MEDIA);
   mocks.updateMedia.mockResolvedValue(MEDIA);
   mocks.countMediaUsages.mockResolvedValue(0);
   mocks.getMediaUsages.mockResolvedValue([]);
+  mocks.getMediaDeleteImpact.mockResolvedValue(DELETE_IMPACT);
   mocks.getCommonVars.mockResolvedValue([VAR]);
   mocks.getCommonVarById.mockResolvedValue(VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
@@ -137,8 +154,34 @@ beforeEach(() => {
 });
 
 describe('メディアのアップロード', () => {
+  it('一覧に使用先件数を含める', async () => {
+    const res = await req('/api/media?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ usageCount: number }> };
+    expect(body.data[0]?.usageCount).toBe(3);
+    expect(mocks.getMedia).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1',
+      kind: undefined,
+      folderId: undefined,
+    });
+  });
+
+  it('LINEアカウントを指定しない一覧取得は止める', async () => {
+    const res = await req('/api/media', 'GET');
+    expect(res.status).toBe(400);
+    expect(mocks.getMedia).not.toHaveBeenCalled();
+  });
+
+  it('権限のないLINEアカウントは存在も返さない', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await req('/api/media?accountId=other', 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getMedia).not.toHaveBeenCalled();
+  });
+
   it('形式と拡張子が揃っていれば通る', async () => {
     const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
       filename: 'a.png',
       mimeType: 'image/png',
       data: TINY_PNG,
@@ -149,6 +192,7 @@ describe('メディアのアップロード', () => {
 
   it('対応していない形式は弾く', async () => {
     const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
       filename: 'a.exe',
       mimeType: 'application/x-msdownload',
       data: TINY_PNG,
@@ -161,6 +205,7 @@ describe('メディアのアップロード', () => {
     // MIMEだけだと送る側が名乗った値をそのまま信じることになり、
     // 拡張子だけだと中身が違うものを .png と名付けるだけで通る。
     const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
       filename: 'a.txt',
       mimeType: 'image/png',
       data: TINY_PNG,
@@ -171,8 +216,21 @@ describe('メディアのアップロード', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  it('ブラウザがPNGと申告しても実ファイルが違えば弾く', async () => {
+    const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
+      filename: 'a.png',
+      mimeType: 'image/png',
+      data: btoa('not png'),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('実際の形式') });
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it('data: URL の種別を優先する', async () => {
     const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
       filename: 'a.png',
       data: `data:image/png;base64,${TINY_PNG}`,
     });
@@ -183,6 +241,7 @@ describe('メディアのアップロード', () => {
     // 11MB ぶんの base64。上限は画像 10MB。
     const big = 'A'.repeat(11 * 1024 * 1024 * 2);
     const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
       filename: 'a.png',
       mimeType: 'image/png',
       data: big,
@@ -192,33 +251,100 @@ describe('メディアのアップロード', () => {
   });
 
   it('ファイル名が無ければ弾く', async () => {
-    const res = await req('/api/media', 'POST', { mimeType: 'image/png', data: TINY_PNG });
+    const res = await req('/api/media', 'POST', { accountId: 'account-1', mimeType: 'image/png', data: TINY_PNG });
     expect(res.status).toBe(400);
+  });
+
+  it('R2保存後にDB登録が失敗したら孤児ファイルを消す', async () => {
+    mocks.createMedia.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/media', 'POST', {
+      accountId: 'account-1',
+      filename: 'a.png',
+      mimeType: 'image/png',
+      data: TINY_PNG,
+    });
+    expect(res.status).toBe(500);
+    expect(put).toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith(expect.stringMatching(/^media\/.+\.png$/));
   });
 });
 
 describe('メディアの削除', () => {
-  it('使われていれば件数を返して止める', async () => {
-    mocks.countMediaUsages.mockResolvedValue(5);
-    const res = await req('/api/media/md-1', 'DELETE');
+  it('影響確認は使用先の名前と導線を返す', async () => {
+    mocks.getMediaDeleteImpact.mockResolvedValue({
+      ...DELETE_IMPACT,
+      usageCount: 1,
+      canDelete: false,
+      recommendedAction: 'review_references',
+      lastScannedAt: '2026-08-31T10:00:00.000',
+      references: [{
+        kind: 'broadcast',
+        name: '来店後のご案内',
+        href: '/broadcasts/detail?id=broadcast-1',
+        state: 'available',
+        scannedAt: '2026-08-31T10:00:00.000',
+      }],
+    });
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        usageCount: 1,
+        references: [{ name: '来店後のご案内' }],
+        canDelete: false,
+      },
+    });
+  });
+
+  it('影響を取得できないときは0件を作らず503', async () => {
+    scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: '削除したときの影響を確認できませんでした',
+    });
+  });
+
+  it('使われていれば最新の影響を返して止める', async () => {
+    mocks.getMediaDeleteImpact.mockResolvedValue({
+      ...DELETE_IMPACT,
+      usageCount: 5,
+      canDelete: false,
+      recommendedAction: 'review_references',
+    });
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { usageCount: number };
-    expect(body.usageCount).toBe(5);
+    const body = (await res.json()) as { code: string; data: { usageCount: number } };
+    expect(body.code).toBe('media_delete_blocked');
+    expect(body.data.usageCount).toBe(5);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
-  it('force=1 なら消す', async () => {
-    mocks.countMediaUsages.mockResolvedValue(5);
-    const res = await req('/api/media/md-1?force=1', 'DELETE');
-    expect(res.status).toBe(200);
-    expect(mocks.deleteMedia).toHaveBeenCalled();
+  it('force=1 を付けても使用中は消さない', async () => {
+    mocks.getMediaDeleteImpact.mockResolvedValue({
+      ...DELETE_IMPACT,
+      usageCount: 5,
+      canDelete: false,
+      recommendedAction: 'review_references',
+    });
+    const res = await req('/api/media/md-1?accountId=account-1&force=1', 'DELETE');
+    expect(res.status).toBe(409);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it('削除時に影響を読み直せなければ削除しない', async () => {
+    scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
+    expect(res.status).toBe(503);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
   it('DBの行を先に消す', async () => {
     // 逆にすると「行はあるが実体が無い」状態になる。この順なら
     // 孤児のファイルが残るだけで、画面には出てこない。
-    await req('/api/media/md-1', 'DELETE');
-    expect(mocks.deleteMedia).toHaveBeenCalled();
+    await req('/api/media/md-1?accountId=account-1', 'DELETE');
+    expect(mocks.deleteMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
   });
 });
 
@@ -383,6 +509,7 @@ describe('共通情報', () => {
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
     expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
+    expect(mocks.getCommonVarUsageImpact).toHaveBeenCalledWith(env.DB, 'shop_hours', 'account-1');
     expect(await res.json()).toMatchObject({
       code: 'common_var_delete_blocked',
       data: { total: 3, canDelete: false },

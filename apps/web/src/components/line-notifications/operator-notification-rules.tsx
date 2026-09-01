@@ -82,6 +82,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
   const recipientCount = rules.filter((rule) => Boolean(conditionsOf(rule).recipientLabel)).length
   const missingRecipientCount = rules.length - recipientCount
+  const filterCountsAvailable = Boolean(lineAccountId) && state === 'ready'
 
   return (
     <section data-design-node="DpxOK" className="space-y-4">
@@ -116,9 +117,9 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
         </label>
         {([
-          ['all', `すべて ${rules.length}`],
-          ['draft', `下書き ${rules.filter((rule) => !rule.isActive).length}`],
-          ['missing', `受け取る人がいない ${missingRecipientCount}`],
+          ['all', `すべて ${filterCountsAvailable ? rules.length : '—'}`],
+          ['draft', `下書き ${filterCountsAvailable ? rules.filter((rule) => !rule.isActive).length : '—'}`],
+          ['missing', `受け取る人がいない ${filterCountsAvailable ? missingRecipientCount : '—'}`],
         ] as const).map(([value, label]) => (
           <label key={value}>
             <input className="peer sr-only" type="radio" name="operator-notification-filter" value={value} checked={filter === value} onChange={() => setFilter(value)} />

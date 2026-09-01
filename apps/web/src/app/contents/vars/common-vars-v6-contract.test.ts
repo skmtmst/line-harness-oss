@@ -36,7 +36,7 @@ describe('V6共通情報一覧', () => {
 
   it('削除前に使用先を確認し、API側も使用中の削除を止める', () => {
     expect(API).toContain('deleteImpact:')
-    expect(PAGE).toContain('api.commonVars.deleteImpact(id, selectedAccountId)')
+    expect(PAGE).toContain('api.commonVars.deleteImpact(id, request.accountId)')
     expect(WORKER).toContain("code: 'common_var_delete_blocked'")
     expect(WORKER).toContain('getCommonVarUsageImpact')
   })
