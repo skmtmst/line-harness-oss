@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react'
 import { ChevronRight, Settings } from 'lucide-react'
 import styles from './notification-panel.module.css'
 
-export type NotificationFilter = { id: string; label: string; count: number }
+export type NotificationFilter = { id: string; label: string; count: number | null }
 export type NotificationItem = {
   id: string
   title: string
@@ -74,7 +74,7 @@ export default function NotificationPanel({
         <button type="button" className={styles.linkButton} onClick={onMarkAllRead} disabled={unreadCount === 0}>すべて既読にする</button>
       </header>
       <div className={styles.tabs} role="tablist" aria-label="通知の種類">
-        {filters.map((filter) => <button key={filter.id} type="button" role="tab" aria-selected={activeFilter === filter.id} className={`${styles.tab} ${activeFilter === filter.id ? styles.selected : ''}`} onClick={() => onFilterChange(filter.id)}>{filter.label} <span className={styles.count}>{filter.count}</span></button>)}
+        {filters.map((filter) => <button key={filter.id} type="button" role="tab" aria-selected={activeFilter === filter.id} className={`${styles.tab} ${activeFilter === filter.id ? styles.selected : ''}`} onClick={() => onFilterChange(filter.id)}>{filter.label} <span className={styles.count}>{filter.count === null ? '—' : filter.count}</span></button>)}
       </div>
       {loading ? <p className={styles.state}>通知を読み込んでいます…</p> : error ? <p className={`${styles.state} ${styles.error}`} role="alert">{error}</p> : shown.length === 0 ? <p className={styles.state}>通知はありません</p> : (
         <ul className={styles.list}>{shown.map((item) => <li key={item.id}><button type="button" className={`${styles.item} ${styles.notificationItem} ${item.unread ? styles.unread : ''}`} onClick={item.onSelect}><span className={styles.dot} aria-label={item.unread ? '未読' : '既読'} /><span className={styles.body}><span className={styles.itemTitle}>{item.title}</span><span className={styles.meta}>{item.meta}</span></span><ChevronRight className={styles.chevron} aria-hidden="true" size={16} /></button></li>)}</ul>

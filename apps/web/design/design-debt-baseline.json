@@ -347,10 +347,9 @@
     "arbitrary-value": 2
   },
   "app/staff/page.tsx": {
-    "arbitrary-value": 19,
-    "direct-secondary-button": 6,
+    "arbitrary-value": 18,
     "direct-primary-button": 4,
-    "direct-th": 11
+    "direct-secondary-button": 4
   },
   "app/tags/edit/page.tsx": {
     "direct-secondary-button": 1,
@@ -760,6 +759,9 @@
     "direct-primary-button": 1,
     "direct-secondary-button": 2
   },
+  "components/shared/not-connected.tsx": {
+    "unresolved-classname": 3
+  },
   "components/shared/note-bar.tsx": {
     "unresolved-classname": 4
   },
@@ -789,10 +791,6 @@
   },
   "components/shared/top-bar.tsx": {
     "unresolved-classname": 21
-  },
-  "components/staff/login-audit.tsx": {
-    "arbitrary-value": 1,
-    "direct-th": 8
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 43

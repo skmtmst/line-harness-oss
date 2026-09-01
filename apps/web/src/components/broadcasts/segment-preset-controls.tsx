@@ -11,7 +11,29 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { NOT_AVAILABLE, NotConnected } from '@/components/shared/not-connected'
 import { conditionFromSegmentPreset } from './segment-preset'
+
+/**
+ * 保存した対象条件の数（設計 `sqFXf` のKPI3枚）。
+ *
+ * まだ繋がっていないので、数の代わりに理由を出す。文言は画面共通の
+ * 「未接続」の書き方にそろえる。
+ */
+const PRESET_KPIS = [
+  {
+    label: 'いま当てはまる人数',
+    source: '保存した条件ごとに人数を数える口',
+  },
+  {
+    label: 'この条件を使っている配信',
+    source: '条件の使い先を返す口',
+  },
+  {
+    label: '最後に使った日',
+    source: '条件を使った記録',
+  },
+] as const
 
 type SegmentPresetControlsProps = {
   accountId: string | null
@@ -188,6 +210,16 @@ export default function SegmentPresetControls({
         </Button>
       </div>
 
+      {/* 押せない理由は吹き出しに隠さない。触らないと分からない形にすると、
+          「壊れている」と読まれる。 */}
+      {accountMissing || !usableCondition ? (
+        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+          {accountMissing
+            ? '先にLINEアカウントを選ぶと、この条件を保存できます。'
+            : '詳細条件を1つ以上入力すると、この条件を保存できます。'}
+        </p>
+      ) : null}
+
       {notice ? (
         <Notice
           tone="success"
@@ -246,6 +278,24 @@ export default function SegmentPresetControls({
         )}
       >
         <div className="space-y-3" data-design-node="sqFXf">
+          {/*
+            設計はここに数を3つ出している（当てはまる人数・使われている配信・
+            最後に使った日）。どれも保存した条件の側では持っていない。
+            `api.segmentPresets.list` が返すのは名前・共有範囲・並び順だけで、
+            人数を数える口も、使った記録も無い。
+
+            **0や見た目だけの数を置かない。**「—」と、なぜ出ないかを書く。
+            口が付いたら数へ差し替える（引き継ぎは `docs/design-qa/`）。
+          */}
+          <dl className="border-hairline rounded-control grid grid-cols-1 gap-px overflow-hidden border bg-hairline sm:grid-cols-3">
+            {PRESET_KPIS.map((kpi) => (
+              <div key={kpi.label} className="bg-canvas p-3">
+                <dt className="text-ink-faint text-xs">{kpi.label}</dt>
+                <dd className="text-ink-faint mt-1 text-lg font-bold tabular-nums">{NOT_AVAILABLE}</dd>
+                <dd className="mt-0.5"><NotConnected source={kpi.source} /></dd>
+              </div>
+            ))}
+          </dl>
           {loading ? <ListState kind="loading" /> : null}
           {!loading && loadError ? (
             <ListState
