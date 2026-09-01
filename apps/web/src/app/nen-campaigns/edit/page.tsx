@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import CampaignEditor from './campaign-editor'
+import { useAccount } from '@/contexts/account-context'
 
 interface Column {
   id: string
@@ -25,6 +26,7 @@ interface Column {
 function NenColumnEditInner() {
   const params = useSearchParams()
   const campaignKey = params.get('key') ?? ''
+  const { selectedAccountId } = useAccount()
 
   const [columns, setColumns] = useState<Column[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
@@ -39,8 +41,14 @@ function NenColumnEditInner() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    if (!selectedAccountId) {
+      setColumns([])
+      setLoading(false)
+      setError('LINEアカウントを選んでください')
+      return
+    }
     try {
-      const res = await api.nenColumns.list()
+      const res = await api.nenColumns.list(selectedAccountId)
       if (res.success) {
         setColumns(res.data)
         const next: Record<string, string> = {}
@@ -52,18 +60,19 @@ function NenColumnEditInner() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void load()
   }, [load])
 
   const save = async (column: Column) => {
+    if (!selectedAccountId) return
     setSavingId(column.id)
     setError('')
     setNotice('')
     try {
-      const res = await api.nenColumns.updateMessage(column.id, drafts[column.id] ?? '')
+      const res = await api.nenColumns.updateMessage(selectedAccountId, column.id, drafts[column.id] ?? '')
       if (!res.success) {
         setError(res.error)
         return

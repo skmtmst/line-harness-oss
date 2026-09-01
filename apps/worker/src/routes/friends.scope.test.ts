@@ -27,6 +27,7 @@ const { friends } = await import('./friends.js');
 function createApp(
   prepared: Array<{ sql: string; binds: unknown[] }>,
   friendRows: Array<Record<string, unknown>> = [],
+  firstForSql?: (sql: string) => Record<string, unknown> | null | undefined,
   role: 'owner' | 'admin' | 'staff' = 'owner',
 ) {
   const app = new Hono<any>();
@@ -39,7 +40,7 @@ function createApp(
           prepared.push(entry);
           const statement = {
             bind(...binds: unknown[]) { entry.binds = binds; return statement; },
-            first: vi.fn(async () => ({ count: 0, total: 0, active: 0, blocked_by_them: 0, hidden_by_us: 0, unanswered: 0, resolved: 0 })),
+            first: vi.fn(async () => firstForSql?.(sql) ?? ({ count: 0, total: 0, active: 0, blocked_by_them: 0, hidden_by_us: 0, unanswered: 0, resolved: 0 })),
             all: vi.fn(async () => ({
               results: sql.includes('FROM friends f') && sql.includes('LIMIT ? OFFSET ?') ? friendRows : [],
             })),
@@ -152,7 +153,59 @@ describe('A-8 friends tenant scope', () => {
     expect(prepared.length).toBeLessThan(10);
   });
 
+  test('an explicit hidden LINE account cannot bypass the visible-account scope', async () => {
+    const response = await createApp([]).request('/api/friends?lineAccountId=other&includeTags=false');
+    expect(response.status).toBe(404);
+    expect(mocks.canAccess).toHaveBeenCalled();
+  });
+
+  test('score range is applied before count and pagination', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      '/api/friends?lineAccountId=own&scoreMin=30&scoreMax=69&includeTags=false',
+    );
+    expect(response.status).toBe(200);
+    expect(prepared.some(({ sql, binds }) =>
+      sql.includes('f.score >= ?') && sql.includes('f.score <= ?')
+      && binds.includes(30) && binds.includes(69))).toBe(true);
+  });
+
+  test('rejects malformed or reversed score ranges', async () => {
+    expect((await createApp([]).request('/api/friends?scoreMin=abc')).status).toBe(400);
+    expect((await createApp([]).request('/api/friends?scoreMin=70&scoreMax=30')).status).toBe(400);
+  });
+
+  test('分析対象者はアカウント指定がなければ検索しない', async () => {
+    const response = await createApp([]).request('/api/friends?audienceId=audience-a');
+    expect(response.status).toBe(400);
+  });
+
+  test('有効な分析対象者だけを友だち一覧のSQLへ渡す', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared, [], (sql) => sql.includes('analytics_result_audiences')
+      ? { id: 'audience-a', expires_at: '2999-01-01T00:00:00.000Z' }
+      : undefined).request('/api/friends?lineAccountId=own&audienceId=audience-a');
+    expect(response.status).toBe(200);
+    expect(prepared.some(({ sql, binds }) =>
+      sql.includes('analytics_result_audience_members arm') && binds.includes('audience-a'))).toBe(true);
+  });
+
+  test('権限外のLINEアカウントを一覧条件へ直指定できない', async () => {
+    const response = await createApp([]).request('/api/friends?lineAccountId=other');
+    expect(response.status).toBe(404);
+  });
+
+  test('担当者は分析結果の個人一覧を直接開けない', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const response = await createApp([], [], undefined, 'staff')
+      .request('/api/friends?lineAccountId=own&audienceId=audience-a');
+    expect(response.status).toBe(403);
+  });
+
   test('shared saved search applies its AND and OR conditions inside the selected account', async () => {
+    mocks.canAccess.mockResolvedValue(true);
     mocks.getSavedSearchById.mockResolvedValue({
       id: 'search-1',
       scope: 'friends',
@@ -175,6 +228,7 @@ describe('A-8 friends tenant scope', () => {
   });
 
   test('private saved search owned by another staff is hidden', async () => {
+    mocks.canAccess.mockResolvedValue(true);
     mocks.getSavedSearchById.mockResolvedValue({
       id: 'search-1',
       scope: 'friends',
@@ -183,7 +237,7 @@ describe('A-8 friends tenant scope', () => {
       is_shared: 0,
       conditions_json: JSON.stringify({ all: [{ kind: 'tag', op: 'includes', value: 'vip' }] }),
     });
-    const response = await createApp([], [], 'staff').request(
+    const response = await createApp([], [], undefined, 'staff').request(
       '/api/friends?includeTags=false&lineAccountId=own&savedSearchId=search-1',
     );
     expect(response.status).toBe(404);
