@@ -1213,7 +1213,7 @@ export default function ScenarioDetailClient({
             配信を開始しました。条件を満たした友だちから順に配信します。
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
-            開始履歴を確認
+            開始後の結果を見る
           </Link>
         </div>
       ) : null}
