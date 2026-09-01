@@ -19,13 +19,33 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('未取得の使用数を0件に見せない', () => {
-    expect(PAGE).toContain("item.usageCount === undefined ? '—'")
+    expect(PAGE).toContain("? '使用先を確認できません'")
+    expect(PAGE).toContain("item.usageCount === 0")
+    expect(PAGE).toContain("? 'どこでも使っていない'")
+    expect(PAGE).toContain('`${item.usageCount}か所で使用中`')
+  })
+
+  it('使っていないメディアだけを一覧で絞り込める', () => {
+    expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
+    expect(PAGE).toContain('selected={showUnusedOnly}')
+    expect(PAGE).toContain('!showUnusedOnly || item.usageCount === 0')
+    expect(PAGE).toContain('使っていない')
   })
 
   it('使用中メディアの強制削除口を持たない', () => {
     expect(PAGE).not.toContain('force: true')
     expect(PAGE).toContain('使用先から外すまで削除できません')
     expect(API).not.toContain("`/api/media/${id}${opts?.force ? '?force=1' : ''}`")
+  })
+
+  it('使用先を取得できないメディアを未使用として選択・削除しない', () => {
+    expect(PAGE).toContain('function isKnownUnused(item: MediaItem)')
+    expect(PAGE).toContain('return item.usageCount === 0')
+    expect(PAGE).toContain('const removable = filtered.filter(isKnownUnused)')
+    expect(PAGE).toContain('disabled={!isKnownUnused(item)}')
+    expect(PAGE).toContain('使用先を確認できないため選べません')
+    expect(PAGE).toContain('removableSelected.length !== selected.size')
+    expect(PAGE).not.toContain('item.usageCount === undefined || item.usageCount === 0')
   })
 
   it('選択中のLINEアカウントを一覧・登録・変更・使用先・削除へ渡す', () => {
