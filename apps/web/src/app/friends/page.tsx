@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
@@ -15,6 +15,11 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { emptyMessageOf } from './friend-list-empty'
+import BulkRunDialog from '@/components/friends/bulk-run-dialog'
+import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
@@ -23,6 +28,13 @@ const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-v6-control border bord
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
+type LoadStatus = 'loading' | 'ready' | 'error'
+
+function scoreBoundary(raw: string | null) {
+  if (raw === null || !/^-?\d+$/.test(raw)) return undefined
+  const value = Number(raw)
+  return Number.isSafeInteger(value) ? value : undefined
+}
 
 const MERGED_TABS = [
   { key: 'list', label: '友だち一覧' },
@@ -36,10 +48,16 @@ function FriendsPageInner({
   onExportReady,
 }: {
   onNotice: (notice: Notice) => void
-  onExportReady: (exporter: () => void) => void
+  onExportReady: (exporter: (() => void) | null) => void
 }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
+  /* 一括操作はオーナーと管理者だけ。個別操作の権限を越えるため。 */
+  const [bulkOpen, setBulkOpen] = useState(false)
   const searchParams = useSearchParams()
+  const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
+  const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
+  const hasScoreRange = scoreMin !== undefined || scoreMax !== undefined
+  const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
@@ -59,9 +77,27 @@ function FriendsPageInner({
   const [operatorId, setOperatorId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
+  const loadRequestRef = useRef(0)
+
+  /*
+    **URLから来る絞り込みも数える。** 行動スコアの「この帯の人を見る」は
+    `?scoreMin=` で開く。数え落とすと、その帯に誰もいないときに
+    「まだ友だちがいません」と出て、絞り込んだ結果だと分からなくなる。
+  */
+  const emptyMessage = emptyMessageOf({
+    search: searchSubmitted,
+    tagId: selectedTagId,
+    advanced: advanced !== null,
+    others: responseFilter !== 'all'
+      || operatorId !== ''
+      || scenarioId !== ''
+      || attentionOnly
+      || hasScoreRange
+      || audienceId !== '',
+  })
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -90,8 +126,12 @@ function FriendsPageInner({
   }, [selectedAccountId])
 
   const loadFriends = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    const requestId = ++loadRequestRef.current
+    setLoadStatus('loading')
+    setFriends([])
+    setTotal(0)
+    setBulkOpen(false)
+    setSelectedIds(new Set())
     try {
       const response = await api.friends.list({
         ...(advanced?.params ?? {}),
@@ -99,6 +139,7 @@ function FriendsPageInner({
         limit: pageSize,
         tagId: selectedTagId || undefined,
         accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
         search: searchSubmitted || undefined,
         includeChatStatus: true,
         sort: sortMode,
@@ -106,20 +147,27 @@ function FriendsPageInner({
         operatorId: operatorId || undefined,
         scenarioId: scenarioId || undefined,
         metadata: attentionOnly ? { __attention: '1' } : undefined,
+        scoreMin,
+        scoreMax,
       })
+      if (requestId !== loadRequestRef.current) return
       if (response.success) {
         setFriends(response.data.items)
         setTotal(response.data.total)
         setSelectedIds(new Set())
+        setLoadStatus('ready')
       } else {
-        setError(response.error)
+        setFriends([])
+        setTotal(0)
+        setLoadStatus('error')
       }
     } catch {
-      setError('友だちの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      setLoading(false)
+      if (requestId !== loadRequestRef.current) return
+      setFriends([])
+      setTotal(0)
+      setLoadStatus('error')
     }
-  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
@@ -131,7 +179,12 @@ function FriendsPageInner({
     })
     setPage(1)
   }, [directSavedSearchId])
-  useEffect(() => void loadFriends(), [loadFriends])
+  useEffect(() => {
+    void loadFriends()
+    return () => {
+      loadRequestRef.current += 1
+    }
+  }, [loadFriends])
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
@@ -167,7 +220,10 @@ function FriendsPageInner({
     URL.revokeObjectURL(url)
   }, [friends])
 
-  useEffect(() => onExportReady(exportCurrentPage), [exportCurrentPage, onExportReady])
+  useEffect(
+    () => onExportReady(loadStatus === 'ready' ? exportCurrentPage : null),
+    [exportCurrentPage, loadStatus, onExportReady],
+  )
 
   const toggleAttention = useCallback(async (friend: FriendListItem) => {
     const current = String(friend.metadata?.__attention ?? '') === '1'
@@ -182,6 +238,17 @@ function FriendsPageInner({
   return (
     <div data-friends-design="v6" className="space-y-3.5">
       <FriendKpis />
+
+      {hasScoreRange ? (
+        <div className="flex items-center justify-between rounded-v6-control border border-v6-accent-border bg-v6-accent-soft px-4 py-2.5 text-xs text-v6-ink-secondary">
+          <span>
+            行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
+            {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
+            {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+          </span>
+          <Link href="/friends" className="font-semibold text-v6-action hover:underline">この条件を外す</Link>
+        </div>
+      ) : null}
 
       <section className={`rounded-v6-card border border-hairline bg-canvas px-4 py-3.5 shadow-v6-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
         <form
@@ -273,7 +340,7 @@ function FriendsPageInner({
           <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-v6-warning-bg px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-v6-warning-strong/30' : ''} text-v6-warning`}>
             <Star aria-hidden="true" className="h-3.5 w-3.5" />注目のみ
           </button>
-          <span className="shrink-0 whitespace-nowrap text-xs text-v6-ink-faint">{loading ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
+          <span className="shrink-0 whitespace-nowrap text-xs text-v6-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </div>
       </section>
 
@@ -281,9 +348,20 @@ function FriendsPageInner({
         <section className={`rounded-v6-card border border-v6-accent-border bg-v6-accent-soft p-3 shadow-v6-card`} data-design="V4BulkBar">
           <div className="flex flex-wrap items-center gap-2">
             <strong className="text-sm text-v6-ink">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-v6-ink-secondary">選択した友だちにまとめて操作します</span>
-            {selectedIds.size > 1 ? (
-              <button type="button" onClick={() => onNotice({ title: '一括アクション', message: '複数人への一括更新APIは未接続です。誤操作を防ぐため、送信や変更は実行していません。' })} className="ml-auto rounded-control bg-v6-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-v6-accent-hover">操作を選ぶ</button>
+            <span className="text-xs text-v6-ink-secondary">対象を確認してから操作を選んでください</span>
+            {selectedIds.size > 1 && canRunBulk(selectedAccount?.role) ? (
+              <Button
+                variant="primary"
+                className="ml-auto"
+                data-qa-open="IAf7j"
+                onClick={() => setBulkOpen(true)}
+              >
+                操作を選ぶ
+              </Button>
+            ) : null}
+            {selectedIds.size > 1 && !canRunBulk(selectedAccount?.role) ? (
+              /* 権限が無いときは押し口を出さない。理由だけ書く。 */
+              <span className="text-v6-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
             ) : null}
           </div>
           {selectedIds.size === 1 ? (
@@ -294,12 +372,32 @@ function FriendsPageInner({
         </section>
       ) : null}
 
-      {error ? <div role="alert" className="rounded-tile border border-v6-danger-border bg-v6-danger-bg p-4 text-sm text-v6-danger-text">{error}</div> : null}
+      <BulkRunDialog
+        open={bulkOpen}
+        friendIds={selectedFriendIds}
+        tags={allTags}
+        accountId={selectedAccountId}
+        onClose={() => setBulkOpen(false)}
+        onDone={() => void loadFriends()}
+      />
 
-      {loading ? (
-        <div className={`overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card`}>
-          {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div key={index} className="h-16.5 animate-pulse border-b border-v6-divider bg-gradient-to-r from-canvas via-v6-surface-strong to-canvas" />)}
-        </div>
+      {loadStatus === 'loading' ? (
+        <ListState kind="loading" title="友だちを読み込んでいます" />
+      ) : loadStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title="友だちを表示できませんでした"
+          description="登録した友だちは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button variant="secondary" onClick={() => void loadFriends()}>友だちを再読み込み</Button>}
+        />
+      ) : friends.length === 0 ? (
+        /*
+          **絞り込んで0件と、そもそも1人もいないのは別のこと。**
+          以前はどちらも「検索条件を外すか」と言っていたので、まだ誰も
+          友だちになっていないアカウントで、外すべき条件が無いのに
+          条件を外せと言われた。共通部品を通して、状態を名前で言えるようにする。
+        */
+        <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
       ) : (
         <FriendListTable
           friends={friends}
@@ -441,7 +539,10 @@ function FriendsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const [notice, setNotice] = useState<Notice>(null)
   const [exportCurrentPage, setExportCurrentPage] = useState<(() => void) | null>(null)
-  const registerExporter = useCallback((exporter: () => void) => setExportCurrentPage(() => exporter), [])
+  const registerExporter = useCallback(
+    (exporter: (() => void) | null) => setExportCurrentPage(() => exporter),
+    [],
+  )
 
   return (
     <div data-friends-page="v6" data-design-node="PhxG6">

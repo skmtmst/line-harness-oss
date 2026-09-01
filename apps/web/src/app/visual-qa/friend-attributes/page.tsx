@@ -30,7 +30,7 @@ const EXISTING_TAG = {
 }
 
 const LINKED_ACTIONS = [
-  { id: 'qa-action-1', type: 'メッセージ', label: '会員登録のお礼を送信', timing: 'すぐに' },
+  { id: 'qa-action-1', type: 'テキスト送信', label: '会員登録のお礼を送信', timing: 'すぐに' },
   { id: 'qa-action-2', type: 'タグ', label: '定期購入者タグを追加', timing: 'すぐに' },
   { id: 'qa-action-3', type: 'シナリオ', label: '会員フォローを開始', timing: '24時間後' },
 ]
