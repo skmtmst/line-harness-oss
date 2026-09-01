@@ -978,7 +978,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
     const stepsResult = await c.env.DB
       .prepare(
         `SELECT id, step_order, delay_minutes, offset_days, offset_minutes, delivery_time,
-                template_id, message_type, message_content
+                template_id, message_type, message_content, question_json
          FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC`,
       )
       .bind(scenarioId)
@@ -992,6 +992,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         template_id: string | null;
         message_type: string;
         message_content: string;
+        question_json: string | null;
       }>();
     const steps = stepsResult.results;
 
@@ -1040,6 +1041,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         deliveryAtLabel: `Day ${day} ${hh}:${mm} (${wd})`,
         messageType: resolved.messageType,
         messageContent: resolved.messageContent,
+        question: parseQuestion(resolved.questionJson),
       };
     });
 
