@@ -20,7 +20,7 @@
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
-  FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS,
+  FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   LIST_STATS, OPERATORS, TAGS, TAG_GROUPS,
@@ -418,6 +418,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/friends/bulk-runs/friend-bulk-run-1') {
+    return { success: true, data: FRIEND_BULK_RUN.detail }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という
@@ -461,7 +464,10 @@ const server = createServer((req, res) => {
 
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
+  )
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
 
   if (method === 'OPTIONS') {
@@ -479,6 +485,12 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    // 対象確認は書き込みを起こさない。IAf7j の確認窓を通常データで撮るため、
+    // この1本だけ本物と同じPOSTの器で返す。実行・再試行・取り消しは405のまま。
+    if (method === 'POST' && url.pathname === '/api/friends/bulk-runs/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
       return
     }
     res.writeHead(405).end(

@@ -263,6 +263,59 @@ export const FRIENDS = [
   }),
 ]
 
+// V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
+// 0件と未取得を混ぜないため、通常・空・失敗は同じ配列の増減ではなく
+// API状態として切り替える。ここには「取得できた通常値」だけを置く。
+export const FRIEND_BULK_RUN = {
+  preview: {
+    selectedCount: 4,
+    targetCount: 3,
+    excludedCount: 1,
+    accountBreakdown: [{ lineAccountId: 'visual-qa-account', count: 3 }],
+    exclusions: [{ reason: 'LINEの友だちではないため対象外', count: 1 }],
+    sample: FRIENDS.slice(0, 3).map((item) => ({
+      friendId: item.id,
+      displayName: item.displayName,
+      pictureUrl: item.pictureUrl,
+      lineAccountId: item.lineAccountId,
+    })),
+    reversible: true,
+  },
+  detail: {
+    id: 'friend-bulk-run-1',
+    status: 'partial',
+    selection: { kind: 'explicit', friendIds: FRIENDS.slice(0, 4).map((item) => item.id) },
+    operation: { kind: 'add_tag', tagId: 'tag-0' },
+    targetCount: 3,
+    excludedCount: 1,
+    successCount: 2,
+    skippedCount: 0,
+    temporaryFailureCount: 1,
+    permanentFailureCount: 0,
+    reversible: true,
+    scheduledAt: null,
+    createdAt: '2026-08-31T01:00:00.000Z',
+    startedAt: '2026-08-31T01:00:01.000Z',
+    completedAt: '2026-08-31T01:00:03.000Z',
+    updatedAt: '2026-08-31T01:00:03.000Z',
+    page: 1,
+    limit: 50,
+    total: 3,
+    items: FRIENDS.slice(0, 3).map((item, index) => ({
+      id: `friend-bulk-item-${index + 1}`,
+      friendId: item.id,
+      displayName: item.displayName,
+      pictureUrl: item.pictureUrl,
+      lineAccountId: item.lineAccountId,
+      status: index === 2 ? 'temporary_failure' : 'success',
+      attemptCount: 1,
+      errorMessage: index === 2 ? '時間をおいて、もう一度お試しください' : null,
+      retryAt: null,
+      completedAt: '2026-08-31T01:00:03.000Z',
+    })),
+  },
+}
+
 /**
  * `InCDe`（友だち同士）と `ELayY`（EC会員と友だち）が共有する本人照合契約。
  * 値はすべて作り物で、メール・電話は必ずマスクする。
