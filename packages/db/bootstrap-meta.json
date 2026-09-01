@@ -213,7 +213,8 @@
     "204_analytics_saved_results.sql",
     "205_tenant_feature_packs.sql",
     "252_template_questions.sql",
+    "253_friend_bulk_runs.sql",
     "257_identity_candidates.sql"
   ],
-  "migrationCount": 214
+  "migrationCount": 215
 }
