@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationsPage from '@/app/notifications/page'
+import { useAccount } from '@/contexts/account-context'
 
 type Tab = 'incoming' | 'outgoing'
 
@@ -37,9 +38,14 @@ const MERGED_TABS = [
 ]
 
 function WebhooksPageInner() {
+  const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
+  const loadGenerationRef = useRef(0)
   const [tab, setTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -61,60 +67,120 @@ function WebhooksPageInner() {
   const [rotateSecretValue, setRotateSecretValue] = useState('')
 
   const load = useCallback(async () => {
+    const requestGeneration = ++loadGenerationRef.current
+    const requestAccountId = selectedAccountId
+    setIncoming([])
+    setOutgoing([])
+    setLoadedAccountId(null)
+    setError('')
+    if (!requestAccountId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const [inRes, outRes] = await Promise.all([
-        api.webhooks.incoming.list(),
-        api.webhooks.outgoing.list(),
+        api.webhooks.incoming.list(requestAccountId),
+        api.webhooks.outgoing.list(requestAccountId),
       ])
+      if (
+        loadGenerationRef.current !== requestGeneration
+        || selectedAccountIdRef.current !== requestAccountId
+      ) return
       if (inRes.success) setIncoming(inRes.data)
       else setError(inRes.error)
       if (outRes.success) setOutgoing(outRes.data)
       else setError(outRes.error)
+      setLoadedAccountId(requestAccountId)
     } catch {
+      if (
+        loadGenerationRef.current !== requestGeneration
+        || selectedAccountIdRef.current !== requestAccountId
+      ) return
       setError('データの読み込みに失敗しました。もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (
+        loadGenerationRef.current === requestGeneration
+        && selectedAccountIdRef.current === requestAccountId
+      ) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    loadGenerationRef.current += 1
+    setCreatedSecret(null)
+    setSecretCopied(false)
+    setRotateTarget(null)
+    setRotateSecretValue('')
+    setShowCreate(false)
+    setInForm({ name: '', sourceType: '', secret: '' })
+    setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
+    void load()
+  }, [load, selectedAccountId])
 
   const handleToggleIncoming = async (id: string, currentActive: boolean) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     try {
-      await api.webhooks.incoming.update(id, { isActive: !currentActive })
-      load()
+      const res = await api.webhooks.incoming.update(id, requestAccountId, { isActive: !currentActive })
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('更新に失敗しました')
     }
   }
 
   const handleToggleOutgoing = async (id: string, currentActive: boolean) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     try {
-      await api.webhooks.outgoing.update(id, { isActive: !currentActive })
-      load()
+      const res = await api.webhooks.outgoing.update(id, requestAccountId, { isActive: !currentActive })
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('更新に失敗しました')
     }
   }
 
   const handleDeleteIncoming = async (id: string) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     if (!confirm('この受信Webhookを削除しますか？')) return
     try {
-      await api.webhooks.incoming.delete(id)
-      load()
+      const res = await api.webhooks.incoming.delete(id, requestAccountId)
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('削除に失敗しました')
     }
   }
 
   const handleDeleteOutgoing = async (id: string) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     if (!confirm('この送信Webhookを削除しますか？')) return
     try {
-      await api.webhooks.outgoing.delete(id)
-      load()
+      const res = await api.webhooks.outgoing.delete(id, requestAccountId)
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('削除に失敗しました')
     }
   }
@@ -122,6 +188,8 @@ function WebhooksPageInner() {
   const handleCreateIncoming = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId) return setError('LINEアカウントを選択してください')
     if (!inForm.name) return
     if (inForm.secret.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
@@ -129,20 +197,24 @@ function WebhooksPageInner() {
     }
     try {
       const res = await api.webhooks.incoming.create({
+        lineAccountId: requestAccountId,
         name: inForm.name,
         sourceType: inForm.sourceType || undefined,
         secret: inForm.secret,
       })
       if (!res.success) {
+        if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
         return
       }
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
       setInForm({ name: '', sourceType: '', secret: '' })
       setShowCreate(false)
       load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました')
     }
   }
@@ -150,6 +222,8 @@ function WebhooksPageInner() {
   const handleCreateOutgoing = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId) return setError('LINEアカウントを選択してください')
     if (!outForm.name || !outForm.url) return
     if (!isHttpsUrl(outForm.url)) {
       setError('URLは https:// から始まる必要があります')
@@ -165,6 +239,7 @@ function WebhooksPageInner() {
         .map((s) => s.trim())
         .filter(Boolean)
       const res = await api.webhooks.outgoing.create({
+        lineAccountId: requestAccountId,
         name: outForm.name,
         url: outForm.url,
         eventTypes,
@@ -172,15 +247,18 @@ function WebhooksPageInner() {
         maxRetries: Number(outForm.maxRetries) || 0,
       })
       if (!res.success) {
+        if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
         return
       }
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
       setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
       setShowCreate(false)
       load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました')
     }
   }
@@ -197,6 +275,10 @@ function WebhooksPageInner() {
   const handleRotateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     if (!rotateTarget) return
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
@@ -206,8 +288,9 @@ function WebhooksPageInner() {
       const payload = { secret: rotateSecretValue, isActive: rotateTarget.activate || undefined }
       const res =
         rotateTarget.kind === 'incoming'
-          ? await api.webhooks.incoming.update(rotateTarget.id, payload)
-          : await api.webhooks.outgoing.update(rotateTarget.id, payload)
+          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload)
+          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload)
+      if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setError(res.error)
         return
@@ -216,6 +299,7 @@ function WebhooksPageInner() {
       setRotateSecretValue('')
       load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('シークレットの更新に失敗しました')
     }
   }

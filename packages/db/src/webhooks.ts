@@ -1,4 +1,3 @@
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 // Webhook IN/OUT クエリヘルパー
 
@@ -33,12 +32,13 @@ export interface OutgoingWebhookRow {
 
 // --- 受信Webhook ---
 
-export async function getIncomingWebhooks(db: D1Database, tenantId: string): Promise<IncomingWebhookRow[]> {
+export async function getIncomingWebhooks(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<IncomingWebhookRow[]> {
   const result = await db
-    .prepare(`SELECT * FROM incoming_webhooks webhook
-      WHERE ${lineAccountOwnedWebhookTenantPredicate('webhook')}
-      ORDER BY created_at DESC`)
-    .bind(...lineAccountOwnedWebhookTenantBindings(tenantId))
+    .prepare(`SELECT * FROM incoming_webhooks WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .bind(lineAccountId)
     .all<IncomingWebhookRow>();
   return result.results;
 }
@@ -46,34 +46,34 @@ export async function getIncomingWebhooks(db: D1Database, tenantId: string): Pro
 export async function getIncomingWebhookById(
   db: D1Database,
   id: string,
-  tenantId?: string,
+  lineAccountId?: string,
 ): Promise<IncomingWebhookRow | null> {
-  if (tenantId === undefined) {
+  if (lineAccountId === undefined) {
     return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ?`).bind(id).first<IncomingWebhookRow>();
   }
   return db
-    .prepare(`SELECT * FROM incoming_webhooks webhook
-      WHERE webhook.id = ? AND ${lineAccountOwnedWebhookTenantPredicate('webhook')}`)
-    .bind(id, ...lineAccountOwnedWebhookTenantBindings(tenantId))
+    .prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
     .first<IncomingWebhookRow>();
 }
 
 export async function createIncomingWebhook(
   db: D1Database,
-  input: { name: string; sourceType?: string; secret?: string; lineAccountId?: string },
+  input: { name: string; sourceType?: string; secret?: string; lineAccountId: string },
 ): Promise<IncomingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.sourceType ?? 'custom', input.secret ?? null, input.lineAccountId ?? null, now, now)
+    .bind(id, input.name, input.sourceType ?? 'custom', input.secret ?? null, input.lineAccountId, now, now)
     .run();
-  return (await getIncomingWebhookById(db, id))!;
+  return (await getIncomingWebhookById(db, id, input.lineAccountId))!;
 }
 
 export async function updateIncomingWebhook(
   db: D1Database,
   id: string,
+  lineAccountId: string,
   updates: Partial<{ name: string; sourceType: string; secret: string; isActive: boolean }>,
 ): Promise<void> {
   const sets: string[] = [];
@@ -86,37 +86,28 @@ export async function updateIncomingWebhook(
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
-  await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
+  values.push(lineAccountId);
+  await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+    .bind(...values).run();
 }
 
-export async function deleteIncomingWebhook(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM incoming_webhooks WHERE id = ?`).bind(id).run();
+export async function deleteIncomingWebhook(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<void> {
+  await db.prepare(`DELETE FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).run();
 }
 
 // --- 送信Webhook ---
-
-const lineAccountOwnedWebhookTenantPredicate = (webhookAlias: string): string => `(
-  (${webhookAlias}.line_account_id IS NULL AND ? = ?)
-  OR EXISTS (
-    SELECT 1 FROM line_accounts scope_account
-    WHERE scope_account.id = ${webhookAlias}.line_account_id
-      AND COALESCE(scope_account.tenant_id, ?) = ?
-  )
-)`;
-
-const lineAccountOwnedWebhookTenantBindings = (tenantId: string): string[] => [
-  tenantId,
-  DEFAULT_TENANT_ID,
-  DEFAULT_TENANT_ID,
-  tenantId,
-];
-
-export async function getOutgoingWebhooks(db: D1Database, tenantId: string): Promise<OutgoingWebhookRow[]> {
+export async function getOutgoingWebhooks(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<OutgoingWebhookRow[]> {
   const result = await db
-    .prepare(`SELECT * FROM outgoing_webhooks webhook
-      WHERE ${lineAccountOwnedWebhookTenantPredicate('webhook')}
-      ORDER BY created_at DESC`)
-    .bind(...lineAccountOwnedWebhookTenantBindings(tenantId))
+    .prepare(`SELECT * FROM outgoing_webhooks WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
   return result.results;
 }
@@ -124,34 +115,31 @@ export async function getOutgoingWebhooks(db: D1Database, tenantId: string): Pro
 export async function getOutgoingWebhookById(
   db: D1Database,
   id: string,
-  tenantId?: string,
+  lineAccountId: string,
 ): Promise<OutgoingWebhookRow | null> {
-  if (tenantId === undefined) {
-    return db.prepare(`SELECT * FROM outgoing_webhooks WHERE id = ?`).bind(id).first<OutgoingWebhookRow>();
-  }
   return db
-    .prepare(`SELECT * FROM outgoing_webhooks webhook
-      WHERE webhook.id = ? AND ${lineAccountOwnedWebhookTenantPredicate('webhook')}`)
-    .bind(id, ...lineAccountOwnedWebhookTenantBindings(tenantId))
+    .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
     .first<OutgoingWebhookRow>();
 }
 
 export async function createOutgoingWebhook(
   db: D1Database,
-  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId?: string },
+  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string },
 ): Promise<OutgoingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), input.secret ?? null, input.maxRetries ?? 0, input.lineAccountId ?? null, now, now)
+    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), input.secret ?? null, input.maxRetries ?? 0, input.lineAccountId, now, now)
     .run();
-  return (await getOutgoingWebhookById(db, id))!;
+  return (await getOutgoingWebhookById(db, id, input.lineAccountId))!;
 }
 
 export async function updateOutgoingWebhook(
   db: D1Database,
   id: string,
+  lineAccountId: string,
   updates: Partial<{
     name: string;
     url: string;
@@ -173,11 +161,18 @@ export async function updateOutgoingWebhook(
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
-  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
+  values.push(lineAccountId);
+  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+    .bind(...values).run();
 }
 
-export async function deleteOutgoingWebhook(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM outgoing_webhooks WHERE id = ?`).bind(id).run();
+export async function deleteOutgoingWebhook(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<void> {
+  await db.prepare(`DELETE FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).run();
 }
 
 /** 指定イベントタイプに一致するアクティブな送信Webhookを取得 */
@@ -186,32 +181,14 @@ export async function getActiveOutgoingWebhooksByEvent(
   eventType: string,
   lineAccountId?: string | null,
 ): Promise<OutgoingWebhookRow[]> {
+  if (!lineAccountId) return [];
   const all = await db
     .prepare(`
       SELECT *
       FROM outgoing_webhooks
-      WHERE is_active = 1
-        AND (
-          (? IS NULL AND line_account_id IS NULL)
-          OR line_account_id = ?
-          OR (
-            line_account_id IS NULL
-            AND EXISTS (
-              SELECT 1
-              FROM line_accounts la
-              WHERE la.id = ?
-                AND COALESCE(la.tenant_id, ?) = ?
-            )
-          )
-        )
+      WHERE is_active = 1 AND line_account_id = ?
     `)
-    .bind(
-      lineAccountId ?? null,
-      lineAccountId ?? null,
-      lineAccountId ?? null,
-      DEFAULT_TENANT_ID,
-      DEFAULT_TENANT_ID,
-    )
+    .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
   return all.results.filter((w) => {
     const types: string[] = JSON.parse(w.event_types);
