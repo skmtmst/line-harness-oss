@@ -3,13 +3,24 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { CommonVar, Folder } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
+import { api, ApiError } from '@/lib/api'
 import FolderPanel from '@/components/shared/folder-panel'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import {
+  blockedReason,
+  canDelete as canDeleteVar,
+  checkedAtText,
+  consequenceText,
+  placeholderText,
+  splitItems,
+  unavailableText,
+  usageText,
+} from './delete-impact'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
 
@@ -44,6 +55,16 @@ function VarsPageInner() {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
+  /** 1件ずつの削除確認（設計 `yPkWe`）。 */
+  const [singleTarget, setSingleTarget] = useState<CommonVar | null>(null)
+  const [singleImpact, setSingleImpact] = useState<CommonVarDeleteImpact | null>(null)
+  const [singlePhase, setSinglePhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [singleBusy, setSingleBusy] = useState(false)
+  const [singleError, setSingleError] = useState('')
+  /** 確認のために打ってもらう差し込みキー。 */
+  const [typedKey, setTypedKey] = useState('')
+  /** いま影響を読んでいるアカウント・対象・世代。遅れて返った別の結果を捨てるために持つ。 */
+  const singleRequestRef = useRef({ accountId: selectedAccountId, itemId: null as string | null, generation: 0 })
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const deleteRequestRef = useRef({ accountId: selectedAccountId, generation: 0 })
@@ -89,6 +110,17 @@ function VarsPageInner() {
   }, [accountLoading, load])
 
   useEffect(() => {
+    singleRequestRef.current = {
+      accountId: selectedAccountId,
+      itemId: null,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    setSingleTarget(null)
+    setSingleImpact(null)
+    setSinglePhase('idle')
+    setSingleBusy(false)
+    setSingleError('')
+    setTypedKey('')
     deleteRequestRef.current = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -142,6 +174,110 @@ function VarsPageInner() {
     } finally {
       setSavingFolder(false)
     }
+  }
+
+  /*
+    1件ずつの削除確認（設計 `yPkWe`）。**窓を開けてから読む。**
+    一覧を出すたびに全件ぶん読むと、消さない人にも8種類の走査が走る。
+  */
+  const openSingleDelete = async (item: CommonVar) => {
+    setSingleTarget(item)
+    setTypedKey('')
+    setSingleError('')
+    setSingleImpact(null)
+    setSinglePhase('loading')
+    if (!selectedAccountId) {
+      setSinglePhase('error')
+      return
+    }
+    /*
+      **遅れて返った別の共通情報の結果を映さない。** Aを読み込み中に窓を
+      閉じてBを開くと、あとから返るAの結果がBの窓に出る。読んでいるものと
+      押せるものが食い違う。
+    */
+    const request = {
+      accountId: selectedAccountId,
+      itemId: item.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    const isCurrentRequest = () =>
+      singleRequestRef.current.accountId === request.accountId &&
+      singleRequestRef.current.itemId === request.itemId &&
+      singleRequestRef.current.generation === request.generation
+    try {
+      const res = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+      if (!isCurrentRequest()) return
+      if (!res.success) throw new Error('impact_failed')
+      setSingleImpact(res.data)
+      setSinglePhase('ready')
+    } catch {
+      if (!isCurrentRequest()) return
+      /*
+        使用先が読めないときは**消させない**。「参照0件」と読み違えて
+        消すと、差し込んでいた文が空欄のまま送られ続ける。
+      */
+      setSinglePhase('error')
+    }
+  }
+
+  const confirmSingleDelete = async () => {
+    if (!singleTarget || !selectedAccountId || singleBusy) return
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    const isCurrentRequest = () =>
+      singleRequestRef.current.accountId === request.accountId &&
+      singleRequestRef.current.itemId === request.itemId &&
+      singleRequestRef.current.generation === request.generation
+    setSingleBusy(true)
+    setSingleError('')
+    try {
+      const res = await api.commonVars.delete(request.itemId, request.accountId)
+      if (!isCurrentRequest()) return
+      if (!res.success) throw new Error('delete_failed')
+      setSingleTarget(null)
+      setSingleImpact(null)
+      setSinglePhase('idle')
+      await load()
+    } catch (e) {
+      if (!isCurrentRequest()) return
+      if (e instanceof ApiError && e.status === 409) {
+        /*
+          **409は「読んだあとに使われ始めた」。** 消せない理由が変わって
+          いるので、影響を読み直してから見せる。
+        */
+        setSingleError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+        try {
+          const again = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+          if (!isCurrentRequest()) return
+          if (again.success) setSingleImpact(again.data)
+        } catch {
+          if (isCurrentRequest()) setSinglePhase('error')
+        }
+        return
+      }
+      setSingleError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      if (isCurrentRequest()) setSingleBusy(false)
+    }
+  }
+
+  const closeSingleDelete = () => {
+    if (singleBusy) return
+    singleRequestRef.current = {
+      accountId: selectedAccountId,
+      itemId: null,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    setSingleTarget(null)
+    setSingleImpact(null)
+    setSinglePhase('idle')
+    setSingleError('')
+    setTypedKey('')
   }
 
   const prepareRemoveSelected = async () => {
@@ -454,6 +590,15 @@ function VarsPageInner() {
                             >
                               編集
                             </Link>
+                            <Button
+                              type="button"
+                              onClick={() => void openSingleDelete(item)}
+                              data-qa-open="yPkWe"
+                              aria-label={`${item.name}を削除`}
+                              className="ml-2"
+                            >
+                              削除
+                            </Button>
                           </td>
                         </tr>
                       )
@@ -479,6 +624,118 @@ function VarsPageInner() {
           </div>
         </div>
       </div>
+
+      {/*
+        1件ずつの削除確認（設計 `yPkWe`）。**消すと差し込んでいた場所が
+        空欄のまま送られる**ので、何か所でそれが起きるのかを先に言う。
+      */}
+      <Dialog
+        open={singleTarget !== null}
+        tone="destructive"
+        title={singleTarget ? `共通情報「${singleTarget.name}」を削除しますか？` : ''}
+        description="この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。"
+        busy={singleBusy}
+        error={singleError || undefined}
+        onCancel={closeSingleDelete}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ink-faint text-micro">この操作は取り消せません</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={closeSingleDelete}
+                disabled={singleBusy}
+              >
+                キャンセル
+              </Button>
+              {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
+              {canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy }) ? (
+                <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
+                  {singleBusy ? '処理中…' : 'このまま削除する'}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        }
+      >
+        <div data-design-node="yPkWe">
+          {singlePhase === 'loading' ? (
+            <p className="text-ink-faint text-xs">使われている場所を確認しています…</p>
+          ) : singlePhase === 'error' ? (
+            <p className="text-danger text-xs font-semibold" role="alert">
+              使用先を確認できませんでした。読み直してから、もう一度お試しください。
+            </p>
+          ) : singleImpact ? (
+            <div className="space-y-3">
+              <p className={singleImpact.total > 0 ? 'text-danger text-sm font-semibold' : 'text-ink-secondary text-sm'}>
+                {usageText(singleImpact)}
+              </p>
+              {consequenceText(singleImpact) ? (
+                <p className="text-ink-secondary text-xs leading-5">{consequenceText(singleImpact)}</p>
+              ) : null}
+
+              {splitItems(singleImpact.items).blocking.length > 0 ? (
+                <div>
+                  <p className="text-ink text-xs font-bold">削除できない理由になっている場所</p>
+                  <ul className="mt-1.5 space-y-1.5">
+                    {splitItems(singleImpact.items).blocking.map((item) => (
+                      <li key={`${item.kind}-${item.href}`} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded-control border px-3 py-2 text-xs">
+                        <span className="min-w-0">
+                          <span className="text-ink font-semibold">{item.kindLabel}</span>
+                          <span className="text-ink-secondary">「{item.name}」・{item.status}</span>
+                        </span>
+                        <a href={item.href} className="text-action shrink-0 font-semibold">ここを開く</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/*
+                **送信済みは消せない理由に混ぜない。** もう送ったものなので
+                これから変わることが無い。混ぜると「なぜ消せないのか」が読めない。
+              */}
+              {splitItems(singleImpact.items).historical.length > 0 ? (
+                <p className="text-ink-faint text-micro leading-5">
+                  すでに送った{splitItems(singleImpact.items).historical.length}件は、これから変わりません（
+                  {splitItems(singleImpact.items).historical.map((item) => `${item.kindLabel}「${item.name}」`).join('／')}）。
+                </p>
+              ) : null}
+
+              {unavailableText(singleImpact) ? (
+                <p className="text-ink-faint text-micro leading-5">{unavailableText(singleImpact)}</p>
+              ) : null}
+
+              {/*
+                **差し込みキーを打ってもらう。** 空欄のまま送られる場所がある
+                操作を、ボタン1つで通さない。
+              */}
+              {singleImpact.canDelete ? (
+                <label className="block">
+                  <span className="text-ink-secondary text-xs font-semibold">
+                    削除する場合は、差し込みキーを入力してください
+                  </span>
+                  <input
+                    value={typedKey}
+                    onChange={(e) => setTypedKey(e.target.value)}
+                    placeholder={placeholderText(singleImpact.variable.varKey)}
+                    className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+                  />
+                </label>
+              ) : null}
+
+              {blockedReason({ impact: singleImpact, typedKey }) ? (
+                <p className="text-ink-faint text-micro">{blockedReason({ impact: singleImpact, typedKey })}</p>
+              ) : null}
+
+              <p className="text-ink-faint text-micro leading-5">
+                {checkedAtText(singleImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時の8種類を確認しました。
+                まとめて差し替える操作は、まだ用意していません。
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </Dialog>
 
       <ConfirmDialog
         open={deleteTargets.length > 0}
