@@ -218,6 +218,16 @@ export interface FriendField {
   updatedBy?: string | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
+  /** 選択中アカウント専用でなく、移行前からある共通項目。 */
+  isInherited?: boolean;
+}
+
+export interface FriendFieldListSummary {
+  total: number;
+  inUse: number;
+  registeredFriends: number;
+  formLinks: number | null;
+  updatedThisMonth: number;
 }
 
 /** 汎用フォルダ */
@@ -247,11 +257,22 @@ export interface SupportMark {
   autoOnInbound: boolean;
   displayOrder: number;
   createdAt: string;
+  /** 旧環境から共有されているマーク。編集時に選択中アカウントへ複製される。 */
+  isInherited?: boolean;
+  /** GET /api/support-marks の一覧で返る実参照数。省略は未取得、0は参照なし。 */
+  usedIn?: {
+    broadcasts: number;
+    scenarios: number;
+    autoReplies: number;
+    savedSearches: number;
+    automations: number;
+  };
 }
 
 /** メディアライブラリの1件 */
 export interface MediaItem {
   id: string;
+  lineAccountId: string | null;
   folderId: string | null;
   kind: "image" | "video" | "audio" | "file";
   filename: string;
@@ -263,6 +284,8 @@ export interface MediaItem {
   url: string;
   uploadedBy: string | null;
   createdAt: string;
+  /** 0は未使用。省略は旧APIなどでまだ取得できていない状態。 */
+  usageCount?: number;
 }
 
 /** メディアの使用箇所 */
@@ -272,9 +295,47 @@ export interface MediaUsage {
   scannedAt: string;
 }
 
+export type MediaDeleteImpactReferenceKind =
+  | "template"
+  | "broadcast"
+  | "rich_menu"
+  | "scenario_step"
+  | "nen_column"
+  | "event"
+  | "webinar";
+
+/** 登録メディアを消す前に、運用者が確認する現在の使用先。 */
+export interface MediaDeleteImpactReference {
+  kind: MediaDeleteImpactReferenceKind;
+  /** 権限内で現在の正本を引けたときだけ入る。内部IDは画面へ返さない。 */
+  name: string | null;
+  /** 同じLINEアカウントの使用先へ移動できるときだけ入る。 */
+  href: string | null;
+  /** 参照先が削除済み、または別アカウントで詳細を見せられない場合。 */
+  state: "available" | "unavailable";
+  scannedAt: string;
+}
+
+/** `GET /api/media/:id/delete-impact` の返り値。 */
+export interface MediaDeleteImpact {
+  media: {
+    id: string;
+    filename: string;
+    kind: MediaItem["kind"];
+  };
+  usageCount: number;
+  references: MediaDeleteImpactReference[];
+  /** 7種類すべてを削除直前に読み切った時刻。0件でも必ず入る。 */
+  checkedAt: string;
+  lastScannedAt: string | null;
+  canDelete: boolean;
+  recommendedAction: "delete" | "review_references";
+}
+
 /** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
 export interface CommonVar {
   id: string;
+  lineAccountId: string | null;
   folderId: string | null;
   name: string;
   varKey: string;
@@ -282,6 +343,11 @@ export interface CommonVar {
   value: string;
   createdAt: string;
   updatedAt: string;
+  nextSchedule?: {
+    effectiveFrom: string;
+    value: string;
+  } | null;
+  pendingScheduleCount?: number;
 }
 
 /** 共通情報の日付での切り替え予約 */
@@ -293,18 +359,191 @@ export interface CommonVarSchedule {
   appliedAt: string | null;
 }
 
+/** 共通情報を差し込んでいる設定の種類。 */
+export type CommonVarUsageKind =
+  | "template"
+  | "broadcast"
+  | "scenario"
+  | "reminder"
+  | "auto_reply"
+  | "form"
+  | "automation"
+  | "friend_add"
+  | "common_action";
+
+/** 共通情報を削除する前に、運用者へ見せる使用先。内部IDは専用項目で返さない。 */
+export interface CommonVarDeleteImpactItem {
+  kind: CommonVarUsageKind;
+  kindLabel: string;
+  name: string;
+  status: string;
+  href: string;
+  blocksDeletion: boolean;
+  currentPreview: string;
+}
+
+/** 所属を確定できず、名前や本文を安全に見せられない使用先。 */
+export interface CommonVarDeleteImpactUnavailableReference {
+  kind: CommonVarUsageKind;
+  kindLabel: string;
+  count: number;
+  reason: string;
+}
+
+/** 共通情報の削除前確認（GET /api/common-vars/:id/delete-impact）。 */
+export interface CommonVarDeleteImpact {
+  variable: { id: string; name: string; varKey: string };
+  total: number;
+  blockingTotal: number;
+  historicalTotal: number;
+  unscopedFormTotal: number;
+  canDelete: boolean;
+  byKind: Record<CommonVarUsageKind, number>;
+  items: CommonVarDeleteImpactItem[];
+  unavailableReferences: CommonVarDeleteImpactUnavailableReference[];
+  checkedAt: string;
+  recommendedAction: "delete" | "review_references";
+}
+
+export type SavedSearchConditionKind =
+  | "name"
+  | "tag"
+  | "field"
+  | "form"
+  | "purchase"
+  | "mark"
+  | "scenario"
+  | "chat_status"
+  | "following"
+  | "status_message"
+  | "created_at";
+
+/** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
+export interface SavedSearchCondition {
+  kind: SavedSearchConditionKind;
+  key?: string;
+  formId?: string;
+  op: string;
+  value?: unknown;
+}
+
+/**
+ * 保存した検索の中身。
+ *
+ * AND と OR は1段だけにする。入れ子を許すと編集画面と実行側で同じ条件を
+ * 再現できなくなる。説明と一覧表示も同じJSONに置き、DB列を増やさず既存
+ * データとの互換性を保つ。
+ */
+export interface SavedSearchConditions {
+  all?: SavedSearchCondition[];
+  any?: SavedSearchCondition[];
+  visibility?: "visible_only" | "hidden_only" | "all";
+  description?: string;
+  list?: {
+    columns?: string[];
+    sort?: "recent" | "oldest";
+    limit?: 10 | 20 | 30 | 40 | 50;
+  };
+}
+
+/** 共通の配信対象条件1本。画面・人数確認・実送信で同じ形を使う。 */
+export interface SavedSegmentRule {
+  type:
+    | "tag_exists"
+    | "tag_not_exists"
+    | "tag_all"
+    | "tag_not_all"
+    | "metadata_equals"
+    | "metadata_not_equals"
+    | "ref_code"
+    | "is_following"
+    | "scenario_subscribed"
+    | "name"
+    | "private_memo"
+    | "status_message"
+    | "registered_at"
+    | "support_mark"
+    | "is_hidden"
+    | "friend_field"
+    | "scenario_state"
+    | "form_answered"
+    | "last_reaction_at"
+    | "reaction_state"
+    | "score_range";
+  value: unknown;
+}
+
+export interface SavedSegmentCondition {
+  operator: "AND" | "OR";
+  rules: SavedSegmentRule[];
+  groups?: SavedSegmentCondition[];
+}
+
+/**
+ * 配信対象として保存した条件。
+ *
+ * 旧い友だち検索の `{ all, any }` と見分けるため、版と本体を明示する。
+ * 条件本体だけを推測で判別すると、種類を増やした時に誤変換が起きる。
+ */
+export interface SavedSegmentConditions {
+  version: 1;
+  condition: SavedSegmentCondition;
+}
+
 /** 保存した検索 */
 export interface SavedSearch {
   id: string;
   name: string;
   scope: "friends" | "chats" | "bookings";
   /** { all: [...], any: [...], visibility } の形 */
-  conditions: unknown;
+  conditions: SavedSearchConditions;
   createdBy: string | null;
   lineAccountId: string | null;
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
+  matchCount?: number | null;
+  /** matchCount が null のとき、黙って0件にせず理由を返す。 */
+  matchCountError?: string | null;
+  /** 配信・自動化など、保存検索をIDで参照している利用先。 */
+  usedIn?: SavedSearchUsage[];
+  /** 使用先が無いとサーバーで確認できたときだけ true。 */
+  canDelete?: boolean;
+}
+
+/** 共通の配信対象として保存した条件。友だち検索とJSONの形を混ぜない。 */
+export interface SavedSegmentPreset {
+  id: string;
+  name: string;
+  scope: "friends";
+  conditionFormat: "segment_v1";
+  conditions: SavedSegmentConditions;
+  createdBy: string | null;
+  lineAccountId: string | null;
+  isShared: boolean;
+  displayOrder: number;
+  createdAt: string;
+  usedIn?: Array<{
+    kind: "broadcast" | "automation" | "scenario" | "other";
+    id: string;
+    name: string;
+    mode: "live" | "fixed";
+    lastUsedAt: string | null;
+  }>;
+  canDelete?: boolean;
+}
+
+export type SavedSearchUsageKind = "broadcast" | "automation" | "scenario" | "other";
+export type SavedSearchReferenceMode = "live" | "fixed";
+
+/** 保存した検索を参照している実データ。固定値の説明には使わない。 */
+export interface SavedSearchUsage {
+  kind: SavedSearchUsageKind;
+  id: string;
+  name: string;
+  mode: SavedSearchReferenceMode;
+  lastUsedAt: string | null;
 }
 
 /**
@@ -1402,6 +1641,62 @@ export interface FriendAddRouting {
   };
   /** ③ 判定の基準 */
   criteria: { firstTime: FriendAddFirstTimeCriterion };
+}
+
+export type FriendAddRoutingVersionStatus = "draft" | "published" | "retired";
+export type FriendAddRoutingTestStatus = "succeeded" | "failed";
+
+/** 画面が下書き・試験・公開を同じ言葉で扱うための版情報。 */
+export interface FriendAddRoutingVersion {
+  accountId: string;
+  versionId: string;
+  versionNumber: number;
+  status: FriendAddRoutingVersionStatus;
+  routing: FriendAddRouting;
+  lastTestStatus: FriendAddRoutingTestStatus | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export interface FriendAddRoutingValidationCheck {
+  key: "first_time" | "returning" | "actions" | "duplicate_prevention";
+  label: string;
+  status: "passed" | "warning" | "failed";
+  detail: string;
+}
+
+export interface FriendAddRoutingValidation {
+  canPublish: boolean;
+  /** 公開前に確認できた、選択中LINEアカウントの現在の有効友だち数。 */
+  estimatedAudienceCount: number | null;
+  checks: FriendAddRoutingValidationCheck[];
+  /** 初回と再追加は同じ判定器の排他的な2分岐なので、重複候補は通常0件。 */
+  conflicts: Array<{ code: string; message: string }>;
+  lastTestStatus: FriendAddRoutingTestStatus | null;
+}
+
+export interface FriendAddRoutingDraftTestResult {
+  versionId: string;
+  displayName: string | null;
+  kind: "first_time" | "returning";
+  scenarioId: string | null;
+  scenarioName: string | null;
+  suppressed: boolean;
+  actionCount: number;
+  /** dry-runなので、登録・配信・タグ付け等の状態変更は常にfalse。 */
+  stateChanged: false;
+}
+
+export interface FriendAddRoutingPublishResult {
+  accountId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  estimatedAudienceCount: number | null;
+  duplicatePrevention: "webhook_event";
+  /** 実行結果画面が接続済みのときだけ導線を返す。未接続を404のリンクにしない。 */
+  monitoringPath: "/friend-add-settings/runs" | null;
+  monitoringUnavailableReason: string | null;
 }
 
 /**

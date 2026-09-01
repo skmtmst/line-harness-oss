@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import WebinarForm from '@/components/webinars/webinar-form'
+import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 import {
   fetchApi,
   webinarApi,
@@ -651,7 +653,7 @@ function parseMinSec(v: string): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
 }
 
-function CtasTab({ webinarId }: { webinarId: string }) {
+function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: string | null }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
   const [times, setTimes] = useState<string[]>([])
@@ -670,10 +672,16 @@ function CtasTab({ webinarId }: { webinarId: string }) {
         setLoaded(true)
       })
       .catch(() => setMessage('CTAカードの読み込みに失敗しました。リロードしてください。'))
-    fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>('/api/forms')
-      .then((res) => setForms(res.data.map((f) => ({ id: f.id, name: f.name }))))
-      .catch(() => undefined)
-  }, [webinarId])
+    if (accountId) {
+      fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
+        `/api/forms?account_id=${encodeURIComponent(accountId)}`,
+      )
+        .then((res) => setForms(res.data.map((f) => ({ id: f.id, name: f.name }))))
+        .catch(() => undefined)
+    } else {
+      setForms([])
+    }
+  }, [accountId, webinarId])
 
   const update = (i: number, patch: Partial<WebinarCtaCard>) =>
     setCtas((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
@@ -832,6 +840,7 @@ type TabKey = (typeof TABS)[number][0]
 
 function EditWebinarInner() {
   const id = useSearchParams().get('id')
+  const { accounts, loading: accountsLoading } = useAccount()
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -872,6 +881,20 @@ function EditWebinarInner() {
     )
   }
 
+  const webinarAccount = webinar.accountId
+    ? accounts.find((account) => account.id === webinar.accountId)
+    : null
+  const publicUrl = webinarAccount?.liffId
+    ? `https://liff.line.me/${encodeURIComponent(webinarAccount.liffId)}/webinar/${encodeURIComponent(webinar.slug)}`
+    : null
+  const previewUnavailableReason = webinar.status !== 'active'
+    ? '公開すると、友だちが見るページを確認できます'
+    : accountsLoading
+      ? 'LINE公式アカウントを確認しています'
+      : !webinar.accountId || !webinarAccount
+        ? 'このウェビナーのLINE公式アカウントを確認できません'
+        : 'このLINE公式アカウントにはLIFF IDが設定されていません'
+
   return (
     <>
       <nav data-design="Crumb" className="text-ink-faint mx-auto max-w-[1400px] px-3 pt-4 text-xs sm:px-6">
@@ -888,14 +911,20 @@ function EditWebinarInner() {
           description="動画セミナーの公開設定と、視聴中・視聴後の動きを決めます。"
           action={
             <div className="flex flex-wrap gap-2">
-              {/* 参加画面をそのまま開く導線が無い。slug は下に出している。 */}
-              <button
-                disabled
-                title="プレビューは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                プレビュー
-              </button>
+              {webinar.status === 'active' && publicUrl ? (
+                <Button
+                  data-design-node="GB0NR"
+                  href={publicUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  公開ページを見る
+                </Button>
+              ) : (
+                <Button data-design-node="GB0NR" disabled title={previewUnavailableReason}>
+                  公開ページを見る
+                </Button>
+              )}
               <Link
                 href="/webinars"
                 className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm font-medium"
@@ -940,7 +969,7 @@ function EditWebinarInner() {
           <div className="bg-slate-50/40 p-4 sm:p-6 xl:p-8">
             {tab === 'settings' && <WebinarForm initial={webinar} />}
             {tab === 'comments' && <CommentsTab webinarId={webinar.id} />}
-            {tab === 'ctas' && <CtasTab webinarId={webinar.id} />}
+            {tab === 'ctas' && <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />}
             {tab === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
           </div>
         </div>

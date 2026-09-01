@@ -22,9 +22,9 @@ describe('V6 外部連携の一覧状態', () => {
   })
 
   it('アカウント切替前の遅い応答で現在の一覧を上書きしない', () => {
-    expect(PAGE).toContain('const loadRequestRef = useRef(0)')
-    expect(PAGE).toContain('const requestId = ++loadRequestRef.current')
-    expect(PAGE).toContain('if (requestId !== loadRequestRef.current) return')
+    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
+    expect(PAGE).toContain('loadGenerationRef.current !== requestGeneration')
+    expect(PAGE).toContain('selectedAccountIdRef.current !== requestAccountId')
   })
 
   it('失敗を空状態や古い一覧として表示しない', () => {
