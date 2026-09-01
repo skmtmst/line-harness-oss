@@ -119,6 +119,7 @@ type DeleteTarget =
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
+  const importRequestGenerationRef = useRef(0)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -140,11 +141,18 @@ export default function RichMenusListPage() {
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [publishedDeleteTarget, setPublishedDeleteTarget] =
+    useState<RichMenuGroupListItem | null>(null)
+  const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
+    importRequestGenerationRef.current += 1
     setGroups([])
     setExternal(null)
     setTapStats(null)
@@ -152,6 +160,11 @@ export default function RichMenusListPage() {
     setExternalError(null)
     setApplyTo(null)
     setDeleteTarget(null)
+    setPublishedDeleteTarget(null)
+    setImportTarget(null)
+    setImportBusy(false)
+    setImportError(null)
+    setImportedMenuName(null)
     setDeleteBusy(false)
     setDeleteError(null)
     setPage(1)
@@ -252,10 +265,7 @@ export default function RichMenusListPage() {
 
   function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
-      alert(
-        `「${group.name}」は LINE に登録されています。\n\n` +
-          '編集画面の「危険な操作」から「LINE から取り下げ」を実行してから、改めて削除してください。',
-      )
+      setPublishedDeleteTarget(group)
       return
     }
     setDeleteError(null)
@@ -294,22 +304,40 @@ export default function RichMenusListPage() {
     }
   }
 
-  async function handleImport(menu: LineMenu) {
+  function handleImport(menu: LineMenu) {
     if (!selectedAccount?.id) return
-    if (
-      !confirm(
-        `「${menu.name}」を管理画面に取り込みます。\n\n` +
-          '取り込み後は「管理画面で作成・編集するメニュー」セクションに表示され、編集や友だちへの再適用が可能になります。\n\n続行しますか？',
-      )
-    )
-      return
+    setImportError(null)
+    setImportTarget(menu)
+  }
+
+  async function confirmImport() {
+    if (!selectedAccount?.id || !importTarget || importBusy) return
+    const menu = importTarget
+    const accountId = selectedAccount.id
+    const requestGeneration = ++importRequestGenerationRef.current
+    setImportBusy(true)
+    setImportError(null)
     try {
-      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, selectedAccount.id)
+      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, accountId)
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
       if (!res.success) throw new Error('import_failed')
-      alert(`取り込みました: ${res.data?.name ?? menu.name}`)
+      setImportTarget(null)
+      setImportedMenuName(res.data?.name ?? menu.name)
       await reload()
     } catch (e) {
-      alert(richMenuError(e, 'import'))
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
+      setImportError(richMenuError(e, 'import'))
+    } finally {
+      if (
+        importRequestGenerationRef.current === requestGeneration &&
+        activeAccountRef.current === accountId
+      ) setImportBusy(false)
     }
   }
 
@@ -738,6 +766,7 @@ export default function RichMenusListPage() {
                 </Link>
                 <button
                   onClick={() => handleDelete(g)}
+                  data-qa-open={g.status === 'published' ? 'szXsT-published' : 'szXsT'}
                   className="text-ink-faint hover:text-red-600 hover:underline"
                   title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
                 >
@@ -771,6 +800,82 @@ export default function RichMenusListPage() {
           onClose={() => setApplyTo(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={importTarget !== null}
+        designNode="TL7tp"
+        title={
+          importTarget
+            ? `「${importTarget.name}」を管理画面に取り込みますか？`
+            : 'LINE上のメニューを管理画面に取り込みますか？'
+        }
+        description="LINE公式アカウント上にある設定を読み取り、管理画面へ新しく追加します。"
+        confirmLabel="管理画面に取り込む"
+        busy={importBusy}
+        error={importError ?? undefined}
+        onCancel={() => {
+          if (importBusy) return
+          setImportTarget(null)
+          setImportError(null)
+        }}
+        onConfirm={() => void confirmImport()}
+      >
+        <ul className="space-y-2 text-sm text-ink-secondary">
+          <li>
+            <strong className="text-ink">管理画面に追加するもの：</strong>
+            名前・画像・ボタンの設定
+          </li>
+          <li>
+            <strong className="text-ink">上書きするもの：</strong>
+            ありません。すでに管理中のメニューは重ねて取り込みません。
+          </li>
+          <li>
+            <strong className="text-ink">LINE上に残るもの：</strong>
+            現在のメニューと、友だちに表示している状態
+          </li>
+        </ul>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={importedMenuName !== null}
+        designNode="TL7tp"
+        title={
+          importedMenuName
+            ? `「${importedMenuName}」を管理画面に取り込みました`
+            : '管理画面に取り込みました'
+        }
+        description="LINE上の表示は変更していません。管理画面で編集できるようになりました。"
+        cancelLabel="閉じる"
+        onCancel={() => setImportedMenuName(null)}
+      />
+
+      <ConfirmDialog
+        open={publishedDeleteTarget !== null}
+        designNode="szXsT"
+        title={
+          publishedDeleteTarget
+            ? `「${publishedDeleteTarget.name}」は先にLINEから取り下げてください`
+            : '先にLINEから取り下げてください'
+        }
+        description="LINEに登録中のリッチメニューは、管理画面だけから削除できません。いまは削除していません。"
+        cancelLabel="閉じる"
+        onCancel={() => setPublishedDeleteTarget(null)}
+      >
+        <ol className="space-y-2 text-sm text-ink-secondary">
+          <li>
+            <strong className="text-ink">次にすること：</strong>
+            「編集」→「危険な操作」→「LINEから取り下げ」の順に進んでください。
+          </li>
+          <li>
+            <strong className="text-ink">そのあと：</strong>
+            一覧へ戻り、改めて「削除」を選んでください。
+          </li>
+          <li>
+            <strong className="text-ink">いま残っているもの：</strong>
+            LINE上の表示、管理画面の設定、これまでのタップ記録は変更していません。
+          </li>
+        </ol>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -989,6 +1094,7 @@ function ExternalSection({
                       <div className="flex flex-col items-end gap-1">
                         <button
                           onClick={() => onImport(m)}
+                          data-qa-open="TL7tp"
                           className="text-accent text-xs font-medium hover:underline"
                           title="管理画面に取り込んで以後 UI で操作可能にする"
                         >
