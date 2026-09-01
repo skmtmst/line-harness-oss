@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作33個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作35個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -48,8 +48,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 紹介者一覧の空状態にも、共通Buttonの作成操作を追加した。
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
-    // 両方を統合した現在の7ルートを基準に締め直す。
-    expect(openings).toHaveLength(33)
+    // 2026-08-30: 「使われ方」から中身の確認・片づけへ進む2操作を追加した。
+    // 2026-09-02: 最新 development と統合した木を再計測し、
+    // 両側の変更を合わせた35個・主要14個へ締め直した。
+    expect(openings).toHaveLength(35)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(14)
   })
 
@@ -160,7 +162,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 最新 development と統合した木を再計測して247へ締め直す。
     // 2026-09-01: #462 が同じ画面の受付枠・CSV操作を共通Buttonへ寄せ、
     // 中身のないマニュアル操作を外したため、統合後の木を再計測して244へ締め直す。
-    expect(debt['direct-secondary-button']).toBe(244)
+    // 2026-09-02: #475 がログインユーザーの物理削除を廃止し、副次操作を2つ減らした。
+    // 最新 development との統合後の木を再計測し、242へ締め直す。
+    expect(debt['direct-secondary-button']).toBe(242)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -191,7 +195,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 1232→1231。**減ったので締め直す。**
     // 2026-09-01: #420 の友だち情報欄と最新 development を統合した木を
     // 再計測し、任意値は1224。片側の古い基準値は採用していない。
-    expect(debt['arbitrary-value']).toBe(1224)
+    // 2026-09-02: #475 がログインユーザーの物理削除確認と入った記録の固定最小幅を外した。
+    // 最新 development との統合後の木を再計測し、1222へ締め直す。
+    expect(debt['arbitrary-value']).toBe(1222)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

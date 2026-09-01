@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import {
   api,
+  type ApiBroadcast,
   type BroadcastBubble,
   type BroadcastBubbleType,
   type BroadcastMessageAsset,
@@ -39,7 +40,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 interface BroadcastFormProps {
   tags: Tag[]
-  onSuccess: () => void
+  /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
+  onSuccess: (broadcast: ApiBroadcast) => void
   onCancel: () => void
   openTemplatePickerInitially?: boolean
   initialTemplateId?: string | null
@@ -601,7 +603,7 @@ export default function BroadcastForm({
     const legacy = bubbleLegacyMessage(first)
     try {
       const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, folderId: folderId || null, measureOpens, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
-      if (res.success) { setConfirmOpen(false); onSuccess() } else setError(res.error)
+      if (res.success) { setConfirmOpen(false); onSuccess(res.data) } else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
 
