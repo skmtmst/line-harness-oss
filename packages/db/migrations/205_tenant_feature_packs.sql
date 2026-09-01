@@ -1,0 +1,1 @@
+ALTER TABLE tenants ADD COLUMN feature_packs TEXT NOT NULL DEFAULT '[]';

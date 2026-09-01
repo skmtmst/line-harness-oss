@@ -76,3 +76,4 @@ export * from './analytics-url-exposures';
 export * from './dashboard';
 export * from './dashboard-preferences';
 export * from './operation-audit';
+export * from './friend-bulk-runs';

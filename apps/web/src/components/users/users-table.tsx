@@ -24,6 +24,7 @@ interface Props {
   loading: boolean
   error: boolean
   onPageChange: (page: number) => void
+  onOpenMergedPerson?: (personId: string) => void
 }
 
 export default function UsersTable({
@@ -34,6 +35,7 @@ export default function UsersTable({
   loading,
   error,
   onPageChange,
+  onOpenMergedPerson,
 }: Props) {
   const accountColorMap = new Map<string, string>()
   for (const row of rows) {
@@ -98,7 +100,12 @@ export default function UsersTable({
             </tr>
           ) : (
             rows.map((row) => (
-              <UserRow key={row.identityKey} row={row} accountColorMap={accountColorMap} />
+              <UserRow
+                key={row.identityKey}
+                row={row}
+                accountColorMap={accountColorMap}
+                onOpenMergedPerson={onOpenMergedPerson}
+              />
             ))
           )}
         </tbody>
