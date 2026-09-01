@@ -41,7 +41,7 @@ export async function buildStepMessages(
   const friendWithMeta = { ...friend, metadata: meta } as Parameters<typeof expandVariables>[1]
   const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent)
 
-  const question = parseQuestion(step.question_json)
+  const question = parseQuestion(resolved.questionJson)
   if (question) {
     return buildQuestionMessages(
       {
