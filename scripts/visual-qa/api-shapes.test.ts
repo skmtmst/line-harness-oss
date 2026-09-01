@@ -23,6 +23,17 @@ describe('画面確認モックの口の形', () => {
     }
   });
 
+  it('交差型で書かれた一覧の口も拾う', () => {
+    /*
+      `fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: … }>` は
+      型の末尾が `}` なので `^ApiResponse<…>$` に当たらず、この1件だけ
+      黙って抜けていた。抜けると `{items:[],total:0}` が返り、`/ec-commerce`
+      が描画の途中で `events.map is not a function` を投げて、本文が丸ごと
+      「画面を表示できませんでした」に置き換わる。**撮ると空の絵になる。**
+    */
+    expect(paths.has('/api/ec-commerce/events'), '交差型の口を配列として拾えていない').toBe(true);
+  });
+
   it('1件だけ返す口を配列にしない', () => {
     // `/api/friends` は `PaginatedResponse`。配列にすると友だち一覧が落ちる。
     // `/api/friends/${id}/site-events` が `/api/friends` に化けて起きた。
