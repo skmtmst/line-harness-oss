@@ -5,6 +5,16 @@ import { summarizeFormDestinations } from './form-destination-summary'
 describe('summarizeFormDestinations', () => {
   it('フォームが書き換える情報欄とタグを重複なく数える', () => {
     const layout = emptyLayout()
+    layout.header = [
+      {
+        id: 'birthday',
+        kind: 'input',
+        type: 'date',
+        name: 'birthday',
+        label: '生年月日',
+        destinations: { friendFieldIds: ['field-birthday'] },
+      },
+    ]
     layout.sections[0].blocks = [
       {
         id: 'name',
@@ -43,9 +53,9 @@ describe('summarizeFormDestinations', () => {
     ]
 
     expect(summarizeFormDestinations(layout, 'tag-submit')).toEqual({
-      friendFieldCount: 3,
+      friendFieldCount: 4,
       tagCount: 3,
-      label: '友だち情報欄 3・タグ 3',
+      label: '友だち情報欄 4・タグ 3',
     })
   })
 

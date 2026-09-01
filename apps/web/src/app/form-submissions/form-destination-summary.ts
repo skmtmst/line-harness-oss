@@ -1,4 +1,4 @@
-import type { FormAction, FormInputBlock, FormLayout } from '@line-crm/shared'
+import { collectInputs, type FormAction, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 
 type FormDestinationSummary = {
   friendFieldCount: number
@@ -58,12 +58,8 @@ export function summarizeFormDestinations(
   const friendFields = new Set<string>()
   const tags = new Set<string>()
 
-  for (const section of layout.sections) {
-    for (const block of section.blocks) {
-      if (block.kind === 'input') {
-        collectInputDestinations(block, friendFields, tags)
-      }
-    }
+  for (const block of collectInputs(layout)) {
+    collectInputDestinations(block, friendFields, tags)
   }
   collectActionDestinations(layout.options.afterActions, friendFields, tags)
   if (onSubmitTagId) tags.add(onSubmitTagId)
