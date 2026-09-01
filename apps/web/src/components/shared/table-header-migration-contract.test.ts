@@ -19,12 +19,12 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し74セルを共通Thで維持する', () => {
+  it('6ルートのV6標準見出し73セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(74)
+    expect(migrated).toBe(73)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
@@ -56,8 +56,9 @@ describe('表見出しの第1段階移行', () => {
     // V6の7列へ増やしても直書きを残さなかった。
     // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
     // 共通の `Th` を通すため、この数へは戻さない。
-    // シナリオ一覧の見出し9個も共通の `Th` へ寄せ、両方を合わせて267まで減った。
-    expect(debt['direct-th']).toBe(267)
+    // シナリオ一覧と友だち情報欄に加え、対応マークの見出しも共通 `Th` へ寄せた。
+    // 実測値は同期後にこの契約へ固定する。
+    expect(debt['direct-th']).toBe(256)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

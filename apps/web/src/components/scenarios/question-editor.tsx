@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -90,24 +91,34 @@ export interface QuestionEditorProps {
   choiceColumns?: boolean
 }
 
-export default function QuestionEditor({ value, onChange, onOpenChoiceActions, choiceColumns = false }: QuestionEditorProps) {
+export default function QuestionEditor({
+  value,
+  onChange,
+  onOpenChoiceActions,
+  choiceColumns = false,
+}: QuestionEditorProps) {
+  const { selectedAccountId } = useAccount()
   const [tags, setTags] = useState<{ id: string; name: string }[]>([])
   const [fields, setFields] = useState<{ id: string; name: string }[]>([])
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [openChoice, setOpenChoice] = useState<number | null>(0)
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setFields([])
+      return
+    }
     void (async () => {
       const [tagRes, fieldRes, scenarioRes] = await Promise.all([
         api.tags.list(),
-        api.friendFields.list(),
+        api.friendFields.list(selectedAccountId),
         api.scenarios.list(),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
       if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
     })()
-  }, [])
+  }, [selectedAccountId])
 
   const setChoice = (index: number, patch: Partial<QuestionChoice>) => {
     const choices = [...value.choices]

@@ -7,6 +7,7 @@ function row(id: string, conditions: unknown): SavedSearch {
     id,
     name: id,
     scope: 'friends',
+    condition_format: 'search_v1',
     conditions_json: typeof conditions === 'string' ? conditions : JSON.stringify(conditions),
     created_by: 'staff-1',
     line_account_id: 'account-1',

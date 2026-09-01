@@ -34,10 +34,13 @@ describe('受信Webhookと流入経路の統括分離', () => {
     db = asD1(sqlite);
   });
 
-  it('一覧では別統括を除外し、NULLの既存行は既定統括だけに見せる', async () => {
-    expect((await getIncomingWebhooks(db, DEFAULT_TENANT_ID)).map((row) => row.id).sort())
-      .toEqual(['wh-default', 'wh-legacy']);
-    expect((await getIncomingWebhooks(db, 'tenant-b')).map((row) => row.id)).toEqual(['wh-b']);
+  it('受信WebhookはLINEアカウント単位で分離し、所属不明の旧行を管理一覧へ出さない', async () => {
+    expect((await getIncomingWebhooks(db, 'account-default')).map((row) => row.id))
+      .toEqual(['wh-default']);
+    expect((await getIncomingWebhooks(db, 'account-b')).map((row) => row.id)).toEqual(['wh-b']);
+    expect((await getIncomingWebhooks(db, 'missing-account')).map((row) => row.id)).toEqual([]);
+
+    // 流入経路は従来どおり統括単位であり、この変更の対象外。
     expect((await getEntryRoutes(db, DEFAULT_TENANT_ID)).map((row) => row.id).sort())
       .toEqual(['route-default', 'route-legacy']);
     expect((await getEntryRoutes(db, 'tenant-b')).map((row) => row.id)).toEqual(['route-b']);

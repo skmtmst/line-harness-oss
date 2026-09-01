@@ -20,6 +20,8 @@ interface ConfirmDialogProps {
    * （設計 `FpgxH`）。`Dialog` はもともと受け取れるので、素通しにする。
    */
   children?: ReactNode
+  /** この確認画面に対応するPencilの実Node。 */
+  designNode?: string
   /**
    * `undefined` を渡すと**確認のボタンそのものが出ない**（`Dialog` の作り）。
    * 数えられていない人数のまま送らせない、といった止め方に使う。
@@ -39,6 +41,7 @@ export default function ConfirmDialog({
   busy = false,
   error,
   children,
+  designNode,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -52,6 +55,7 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy}
       error={error}
+      designNode={designNode}
       onConfirm={onConfirm}
       onCancel={onCancel}
     >

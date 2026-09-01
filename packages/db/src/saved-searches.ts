@@ -2,6 +2,8 @@ import { jstNow } from './utils.js';
 import type {
   SavedSearchCondition as SearchCondition,
   SavedSearchConditions as SearchConditions,
+  SavedSegmentCondition,
+  SavedSegmentConditions,
 } from '@line-crm/shared';
 
 export type { SavedSearchCondition as SearchCondition, SavedSearchConditions as SearchConditions } from '@line-crm/shared';
@@ -16,6 +18,8 @@ export type { SavedSearchCondition as SearchCondition, SavedSearchConditions as 
 
 export const SAVED_SEARCH_SCOPES = ['friends', 'chats', 'bookings'] as const;
 export type SavedSearchScope = (typeof SAVED_SEARCH_SCOPES)[number];
+export const SAVED_SEARCH_CONDITION_FORMATS = ['search_v1', 'segment_v1'] as const;
+export type SavedSearchConditionFormat = (typeof SAVED_SEARCH_CONDITION_FORMATS)[number];
 
 /** 保存できる上限。これを超えると一覧から探す方が遅くなる。 */
 export const SAVED_SEARCH_LIMIT = 50;
@@ -24,6 +28,7 @@ export interface SavedSearch {
   id: string;
   name: string;
   scope: string;
+  condition_format: string;
   conditions_json: string;
   created_by: string | null;
   line_account_id: string | null;
@@ -170,6 +175,84 @@ export function validateSearchConditions(
   return { ok: true, value: out };
 }
 
+const SEGMENT_RULE_TYPES = new Set([
+  'tag_exists',
+  'tag_not_exists',
+  'tag_all',
+  'tag_not_all',
+  'metadata_equals',
+  'metadata_not_equals',
+  'ref_code',
+  'is_following',
+  'scenario_subscribed',
+  'name',
+  'private_memo',
+  'status_message',
+  'registered_at',
+  'support_mark',
+  'is_hidden',
+  'friend_field',
+  'scenario_state',
+  'form_answered',
+  'last_reaction_at',
+  'reaction_state',
+  'score_range',
+]);
+
+/** 画面で扱う上限。深い論理式や巨大なJSONを保存させない。 */
+const SEGMENT_MAX_DEPTH = 2;
+const SEGMENT_MAX_RULES = 50;
+
+function validateSegmentNode(
+  raw: unknown,
+  depth: number,
+  counter: { rules: number },
+): SavedSegmentCondition | null {
+  if (depth > SEGMENT_MAX_DEPTH || typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return null;
+  }
+  const input = raw as Record<string, unknown>;
+  if (input.operator !== 'AND' && input.operator !== 'OR') return null;
+  if (!Array.isArray(input.rules)) return null;
+  const rules: SavedSegmentCondition['rules'] = [];
+  for (const rawRule of input.rules) {
+    if (typeof rawRule !== 'object' || rawRule === null || Array.isArray(rawRule)) return null;
+    const rule = rawRule as Record<string, unknown>;
+    if (!SEGMENT_RULE_TYPES.has(String(rule.type))
+        || !Object.prototype.hasOwnProperty.call(rule, 'value')) return null;
+    counter.rules += 1;
+    if (counter.rules > SEGMENT_MAX_RULES) return null;
+    rules.push({ type: rule.type, value: rule.value } as SavedSegmentCondition['rules'][number]);
+  }
+  if (input.groups !== undefined && !Array.isArray(input.groups)) return null;
+  const groups: SavedSegmentCondition[] = [];
+  for (const rawGroup of input.groups ?? []) {
+    const group = validateSegmentNode(rawGroup, depth + 1, counter);
+    if (!group) return null;
+    groups.push(group);
+  }
+  return { operator: input.operator, rules, groups };
+}
+
+/**
+ * 保存する共通配信対象条件を、版・深さ・件数まで検査する。
+ * 値の意味はWorkerの同じ評価器でも検査し、画面と送信で判断を分けない。
+ */
+export function validateSavedSegmentConditions(
+  raw: unknown,
+): { ok: true; value: SavedSegmentConditions } | { ok: false; error: string } {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: '保存した対象条件の形が正しくありません' };
+  }
+  const input = raw as Record<string, unknown>;
+  if (input.version !== 1) return { ok: false, error: '対応していない対象条件の版です' };
+  const counter = { rules: 0 };
+  const condition = validateSegmentNode(input.condition, 0, counter);
+  if (!condition) return { ok: false, error: '保存した対象条件の形が正しくありません' };
+  if (counter.rules === 0) return { ok: false, error: '対象条件が1つもありません' };
+  return { ok: true, value: { version: 1, condition } };
+}
+
 function stringArray(value: unknown, allowed?: readonly string[]): string[] | null {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return null;
   const result = [...new Set(value as string[])];
@@ -226,11 +309,12 @@ export async function getSavedSearches(
   db: D1Database,
   scope: SavedSearchScope,
   access: SavedSearchAccess,
+  conditionFormat: SavedSearchConditionFormat = 'search_v1',
 ): Promise<SavedSearch[]> {
   const result = await db
     .prepare(
       `SELECT * FROM saved_searches
-       WHERE scope = ?
+       WHERE scope = ? AND condition_format = ?
          AND (
            (line_account_id = ? AND (is_shared = 1 OR created_by = ? OR ? = 1))
            OR (line_account_id IS NULL AND created_by = ?)
@@ -239,6 +323,7 @@ export async function getSavedSearches(
     )
     .bind(
       scope,
+      conditionFormat,
       access.lineAccountId,
       access.staffId,
       access.canManageAll ? 1 : 0,
@@ -261,14 +346,19 @@ export async function getSavedSearchById(
 
 export async function countSavedSearches(
   db: D1Database,
-  input: { scope: SavedSearchScope; createdBy: string; lineAccountId: string },
+  input: {
+    scope: SavedSearchScope;
+    conditionFormat?: SavedSearchConditionFormat;
+    createdBy: string;
+    lineAccountId: string;
+  },
 ): Promise<number> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS c FROM saved_searches
-       WHERE scope = ? AND created_by = ? AND line_account_id = ?`,
+       WHERE scope = ? AND condition_format = ? AND created_by = ? AND line_account_id = ?`,
     )
-    .bind(input.scope, input.createdBy, input.lineAccountId)
+    .bind(input.scope, input.conditionFormat ?? 'search_v1', input.createdBy, input.lineAccountId)
     .first<{ c: number }>();
   return Number(row?.c ?? 0);
 }
@@ -351,7 +441,8 @@ export async function createSavedSearch(
   input: {
     name: string;
     scope?: SavedSearchScope;
-    conditions: SearchConditions | InboxSavedViewConditions;
+    conditionFormat?: SavedSearchConditionFormat;
+    conditions: SearchConditions | InboxSavedViewConditions | SavedSegmentConditions;
     createdBy?: string | null;
     lineAccountId: string;
     isShared?: boolean;
@@ -362,13 +453,14 @@ export async function createSavedSearch(
   await db
     .prepare(
       `INSERT INTO saved_searches
-         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, scope, condition_format, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.name,
       input.scope ?? 'friends',
+      input.conditionFormat ?? 'search_v1',
       JSON.stringify(input.conditions),
       input.createdBy ?? null,
       input.lineAccountId,
@@ -386,7 +478,7 @@ export async function updateSavedSearch(
   access: SavedSearchAccess,
   input: {
     name?: string;
-    conditions?: SearchConditions | InboxSavedViewConditions;
+    conditions?: SearchConditions | InboxSavedViewConditions | SavedSegmentConditions;
     isShared?: boolean;
     displayOrder?: number;
   },
