@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -85,6 +85,7 @@ function MenusPageInner() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'bookings' | 'order' | 'name'>('bookings')
   const [period, setPeriod] = useState<'current' | 'previous' | 'all'>('current')
+  const loadGenerationRef = useRef(0)
 
   const liffId = selectedAccount?.liffId ?? null
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -104,6 +105,7 @@ function MenusPageInner() {
   }
 
   const load = useCallback(async () => {
+    const requestGeneration = ++loadGenerationRef.current
     if (!selectedAccountId) {
       setItems([])
       setLoading(false)
@@ -117,11 +119,13 @@ function MenusPageInner() {
     setItems([])
     try {
       const r = await bookingApi.listMenus(selectedAccountId)
+      if (loadGenerationRef.current !== requestGeneration) return
       setItems(r.menus)
     } catch (e) {
+      if (loadGenerationRef.current !== requestGeneration) return
       setError(bookingErrorMessage(e, '読み込み'))
     } finally {
-      setLoading(false)
+      if (loadGenerationRef.current === requestGeneration) setLoading(false)
     }
   }, [selectedAccountId])
 

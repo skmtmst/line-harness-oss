@@ -24,6 +24,12 @@ describe('V6 予約メニューの取得状態', () => {
     expect(PAGE).toContain('setItems([])')
   })
 
+  it('切替前のアカウントから遅れて届いた一覧を表示しない', () => {
+    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
+    expect(PAGE).toContain('if (loadGenerationRef.current !== requestGeneration) return')
+    expect(PAGE).toContain('if (loadGenerationRef.current === requestGeneration) setLoading(false)')
+  })
+
   it('作り替えの覚え書きを利用者へ出さない', () => {
     expect(PAGE).not.toContain('旧デザインでは')
   })
