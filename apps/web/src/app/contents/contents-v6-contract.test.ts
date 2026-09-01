@@ -32,6 +32,23 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('使っていない')
   })
 
+  it('既存の寸法・長さ・容量をカードへ出し、作り物の値で埋めない', () => {
+    expect(PAGE).toContain('item.width != null && item.height != null')
+    expect(PAGE).toContain('item.durationMs != null')
+    expect(PAGE).toContain('formatSize(item.sizeBytes)')
+    expect(PAGE).not.toContain("details.push('—')")
+  })
+
+  it('並び順と表示件数を選べる', () => {
+    expect(PAGE).toContain("const [sort, setSort] = useState<MediaSort>('newest')")
+    expect(PAGE).toContain('入れた日が新しい順')
+    expect(PAGE).toContain('使われている順')
+    expect(PAGE).toContain('right.usageCount == null')
+    expect(PAGE).toContain('const [pageSize, setPageSize] = useState(20)')
+    expect(PAGE).toContain('PAGE_SIZE_OPTIONS')
+    expect(PAGE).toContain('filtered.slice((page - 1) * pageSize, page * pageSize)')
+  })
+
   it('使用中メディアの強制削除口を持たない', () => {
     expect(PAGE).not.toContain('force: true')
     expect(PAGE).toContain('使用先から外すまで削除できません')
