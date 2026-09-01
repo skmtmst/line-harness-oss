@@ -13,6 +13,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { deleteReminderSelection } from './delete-reminder-selection'
 
 /**
  * リマインダの一覧。
@@ -211,18 +212,27 @@ export default function RemindersPage() {
 
   const handleDeleteSelected = async () => {
     if (selected.size === 0 || deleting) return
+    const targets = [...selected]
     setDeleting(true)
     setDeleteError('')
     try {
-      for (const id of selected) {
+      const failed = await deleteReminderSelection(targets, async (id) => {
         const res = await api.reminders.delete(id)
-        if (!res.success) throw new Error(res.error)
+        return res.success
+      })
+      if (failed.length > 0) {
+        setSelected(new Set(failed))
+        setDeleteError(
+          failed.length === targets.length
+            ? '選択したリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+            : `${failed.length}件のリマインダを削除できませんでした。削除できなかったものだけを残しています。`,
+        )
+        await loadReminders()
+        return
       }
       setConfirmOpen(false)
       setSelected(new Set())
-      void loadReminders()
-    } catch {
-      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      await loadReminders()
     } finally {
       setDeleting(false)
     }

@@ -78,11 +78,11 @@ describe('ブラウザのconfirmを使わない', () => {
     expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
     // 押している間に二度押しできない
     expect(src).toContain('selected.size === 0 || deleting')
-    // 失敗を握りつぶさない
-    // **削除の失敗を握りつぶさない。** 1件でも失敗したら止めて理由を出す。
-    // 消せていないのに「消えた」と見えるのがいちばん困る。
+    // 失敗を握りつぶさず、成功済みを再試行しない。
+    // 一部成功後に全件を選んだままにすると、成功済みの404で残りへ進めなくなる。
     const body = src.slice(src.indexOf('const handleDeleteSelected'), src.indexOf('const filtered'))
-    expect(body, '削除の返事を確かめていない').toMatch(/if \(!res\.success\)/)
-    expect(body, '削除の失敗で throw していない').toMatch(/throw new Error/)
+    expect(body, '削除の返事を確かめていない').toContain('return res.success')
+    expect(body, '失敗したものだけを選び直していない').toContain('setSelected(new Set(failed))')
+    expect(body, '一部失敗を運用者へ知らせていない').toContain('削除できなかったものだけを残しています')
   })
 })
