@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import EventWizard from '@/components/events/event-wizard'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import ListState from '@/components/shared/list-state'
 
 function NewEventPageInner() {
   const { selectedAccountId } = useAccount()
@@ -18,7 +20,7 @@ function NewEventPageInner() {
   if (!selectedAccountId) {
     return (
       <>
-        <Header title="イベントを作る" />
+
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
           サイドバーでアカウントを選択してください
         </div>
@@ -37,8 +39,9 @@ function NewEventPageInner() {
 }
 
 export default function NewEventPage() {
+  usePageTitle('イベントを作る')
   return (
-    <Suspense fallback={<Header title="イベントを作る" />}>
+    <Suspense fallback={<ListState kind="loading" />}>
       <NewEventPageInner />
     </Suspense>
   )
