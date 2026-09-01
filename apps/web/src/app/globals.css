@@ -132,9 +132,9 @@
   --radius-mini: 6px;
   --radius-tiny: 3px;
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
-     保存条件チップ。設計にあるのに実装へ無く、`rounded-full` で
-     代用されていた。 */
-  --radius-lg: 18px;
+     保存条件チップ用。Tailwind 既定の `rounded-lg` を上書きすると、
+     既存85ファイルの角丸まで8pxから18pxへ変わるため、V6専用名にする。 */
+  --radius-v6-large: 18px;
   --radius-pill: 9999px;
   /*
    * V6の4つ。**以前は 7 / 9 / 14 / 16 だったが、設計にその値は無い。**

@@ -50,8 +50,15 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-control')).toBe('0.5rem') // 8px
     expect(token('radius-tile')).toBe('10px')
     expect(token('radius-panel')).toBe('12px')
-    expect(token('radius-lg')).toBe('18px') // 以前は欠番でアバターが rounded-full だった
+    expect(token('radius-v6-large')).toBe('18px') // 既存の rounded-lg へ波及させない専用名
     expect(token('radius-pill')).toBe('9999px')
+  })
+
+  it('V6の18pxをTailwind既定の rounded-lg へ流し込まない', () => {
+    // `--radius-lg` をここで定義すると、V6専用の2箇所だけでなく
+    // 既存の `rounded-lg` 利用先85ファイルが8pxから18pxへ変わる。
+    expect(CSS).not.toMatch(/--radius-lg:\s*18px/)
+    expect(token('radius-v6-large')).toBe('18px')
   })
 
   /*
