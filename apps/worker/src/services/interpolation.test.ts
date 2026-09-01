@@ -73,7 +73,10 @@ describe('差し込みの値を引くかどうか', () => {
         queries.push(query);
         return {
           bind() {
-            return { async all() { return { results: [] }; } };
+            return {
+              async first() { return { line_account_id: 'account-1' }; },
+              async all() { return { results: [] }; },
+            };
           },
           async all() {
             return { results: [] };
@@ -109,6 +112,13 @@ describe('差し込みの値を引くかどうか', () => {
     await resolveInterpolationExtra(db, 'f-1', '{{var.shop_hours}}');
     expect(queries.some((q) => q.includes('common_vars'))).toBe(true);
     expect(queries.some((q) => q.includes('friend_fields'))).toBe(false);
+  });
+
+  it('共通情報は友だちのLINEアカウントを先に確定する', async () => {
+    const { db, queries } = makeDb();
+    await resolveInterpolationExtra(db, 'f-1', '{{var.shop_hours}}');
+    expect(queries.some((q) => q.includes('SELECT line_account_id FROM friends'))).toBe(true);
+    expect(queries.some((q) => q.includes('common_vars WHERE line_account_id = ?'))).toBe(true);
   });
 });
 

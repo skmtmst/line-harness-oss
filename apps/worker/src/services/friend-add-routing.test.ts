@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { applyFriendAddRouting, classifyFriend, normalizeRouting, saveFriendAddRouting } from './friend-add-routing.js';
+import {
+  applyFriendAddRouting,
+  classifyFriend,
+  normalizeRouting,
+  previewFriendAddRoutingDefinition,
+  saveFriendAddRouting,
+} from './friend-add-routing.js';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import { FRIEND_ADD_ROUTING_DEFAULT } from '@line-crm/shared';
 
@@ -32,6 +38,42 @@ describe('classifyFriend', () => {
     const filled = { id: 'f1', unfollow_count: 0, first_followed_at: '2026-01-01T00:00:00+09:00' };
     expect(classifyFriend(filled, 'first_followed_at_missing')).toBe('returning');
     expect(classifyFriend(filled, 'unfollow_count_zero')).toBe('first_time');
+  });
+});
+
+describe('previewFriendAddRoutingDefinition', () => {
+  test('本番と同じ初回判定で送信先と操作数だけを返す', () => {
+    const routing = normalizeRouting({
+      firstTime: {
+        scenarioId: 'scenario-first',
+        actions: [{ kind: 'mile', amount: 100 }],
+      },
+    });
+
+    expect(previewFriendAddRoutingDefinition(routing, { id: 'friend-1', unfollow_count: 0 }))
+      .toEqual({
+        kind: 'first_time',
+        scenarioId: 'scenario-first',
+        suppressed: false,
+        actionCount: 1,
+      });
+  });
+
+  test('再追加を配信しない設定は、配信だけを止めて操作数を残す', () => {
+    const routing = normalizeRouting({
+      returning: {
+        mode: 'none',
+        actions: [{ kind: 'mile', amount: 50 }],
+      },
+    });
+
+    expect(previewFriendAddRoutingDefinition(routing, { id: 'friend-2', unfollow_count: 1 }))
+      .toEqual({
+        kind: 'returning',
+        scenarioId: null,
+        suppressed: true,
+        actionCount: 1,
+      });
   });
 });
 
