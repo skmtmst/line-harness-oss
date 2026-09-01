@@ -57,6 +57,9 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  MergedPersonDetail,
+  UpdateMergedPersonRequest,
+  UpdateMergedPersonDeliveryPrioritiesRequest,
   FriendBulkSelection,
   FriendBulkOperation,
   FriendBulkPreview,
@@ -4427,6 +4430,33 @@ export const api = {
         { method: 'POST' },
       )
     },
+  },
+  /**
+   * 統合ユーザーの詳細（設計 `w8W4Eh` 3-3-A）。
+   *
+   * 更新は**読み込んだ `revision` を必ず送る**。先に別の人が変えていれば
+   * Worker が 409 `STALE_PERSON` を返すので、画面は上書きせず読み直す。
+   *
+   * 結び付け・解除の口はここに無い。#598 の候補判定・取り消しを使う。
+   */
+  mergedPeople: {
+    get: (id: string) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}`,
+      ),
+    update: (id: string, body: UpdateMergedPersonRequest) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    updateDeliveryPriorities: (
+      id: string,
+      body: UpdateMergedPersonDeliveryPrioritiesRequest,
+    ) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}/delivery-priorities`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
   },
   duplicates: {
     stats: (options?: { forceRefresh?: boolean }) =>
