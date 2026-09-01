@@ -197,6 +197,107 @@ export const FRIEND_SCENARIOS = [
   },
 ]
 
+/**
+ * 友だち追加時配信を公開する2画面（`ec9vg` / `quhg6`）の固定データ。
+ *
+ * 正本は `FriendAddRoutingVersion` / `FriendAddRoutingValidation` /
+ * `FriendAddRoutingDraftTestResult` / `FriendAddRoutingPublishResult`。
+ * **画面の都合で別名の項目を作らない。** 本物の契約と同じ形で、
+ * 通常・空・失敗を分けて撮れるようにする。
+ */
+export const FRIEND_ADD_LIFECYCLE_ROUTING = {
+  firstTime: {
+    scenarioId: 'scenario-paused',
+    timing: 'immediate',
+    actions: [{ kind: 'tag', tagId: 'tag-0' }],
+  },
+  returning: {
+    scenarioId: null,
+    mode: 'same',
+    startPosition: 'beginning',
+    actions: [],
+  },
+  criteria: { firstTime: 'unfollow_count_zero' },
+}
+
+export const FRIEND_ADD_LIFECYCLE_DRAFT = {
+  accountId: 'visual-qa-account',
+  versionId: 'friend-add-version-2',
+  versionNumber: 2,
+  status: 'draft',
+  routing: FRIEND_ADD_LIFECYCLE_ROUTING,
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-08-30T10:00:00.000Z',
+  publishedAt: null,
+}
+
+export const FRIEND_ADD_LIFECYCLE_VALIDATION = {
+  canPublish: true,
+  estimatedAudienceCount: 128,
+  checks: [
+    {
+      key: 'first_time',
+      label: 'はじめて友だち追加した人への配信',
+      status: 'passed',
+      detail: '配信するシナリオを確認できました。',
+    },
+    {
+      key: 'returning',
+      label: '以前からの友だち・ブロック解除後の配信',
+      status: 'passed',
+      detail: '配信方法を確認できました。',
+    },
+    {
+      key: 'actions',
+      label: '配信と一緒に行うこと',
+      status: 'passed',
+      detail: '1件の操作を、並べた順に実行します。',
+    },
+    {
+      key: 'duplicate_prevention',
+      label: '同じ友だち追加通知の二重実行防止',
+      status: 'passed',
+      detail: 'LINEアカウントとWebhookイベントの組み合わせで、同じ通知を1回だけ処理します。',
+    },
+  ],
+  conflicts: [],
+  lastTestStatus: 'succeeded',
+}
+
+export const FRIEND_ADD_LIFECYCLE_TEST_RESULT = {
+  versionId: 'friend-add-version-2',
+  displayName: '山田 花子',
+  kind: 'first_time',
+  scenarioId: 'scenario-paused',
+  scenarioName: '停止中',
+  suppressed: false,
+  actionCount: 1,
+  stateChanged: false,
+}
+
+export const FRIEND_ADD_LIFECYCLE_PUBLISHED = {
+  accountId: 'visual-qa-account',
+  versionId: 'friend-add-version-2',
+  versionNumber: 2,
+  publishedAt: '2026-08-30T10:30:00.000Z',
+  estimatedAudienceCount: 128,
+  duplicatePrevention: 'webhook_event',
+  monitoringPath: null,
+  monitoringUnavailableReason: '実行結果の画面はまだ接続されていません。',
+}
+
+/** 取得できて下書きが無い状態。失敗とは別に404で返す。 */
+export const FRIEND_ADD_LIFECYCLE_EMPTY = {
+  status: 404,
+  body: { success: false, error: '確認する下書きがありません' },
+}
+
+/** 読み口が失敗した状態。0件や「まだありません」に変換しない。 */
+export const FRIEND_ADD_LIFECYCLE_ERROR = {
+  status: 500,
+  body: { success: false, error: '下書きを読み込めませんでした' },
+}
+
 const FRIEND_TAGS = {
   subscription: { id: 'friend-tag-subscription', name: '定期便提案対象', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
   uncontracted: { id: 'friend-tag-uncontracted', name: '未契約', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
@@ -346,4 +447,424 @@ export const RICH_MENU_DELETE_IMPACT_EMPTY = {
 export const RICH_MENU_DELETE_IMPACT_ERROR = {
   success: false,
   error: '削除したときの影響を確認できませんでした',
+}
+
+/**
+ * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうち、LINEの3件。
+ *
+ * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
+ * `/api/support/inbox?channel=email`（メール）を別々に読んで混ぜる。
+ * メールをここへ入れると、MAILの札が付かずLINE扱いで描かれる。
+ *
+ * 空で返していたあいだ、受信箱は「チャットを選択してください」しか描けず、
+ * **一覧も吹き出しも顧客情報も出ないまま**だった。空の絵を設計と並べても
+ * 「差が無い」とは言えない。
+ *
+ * 画面が読むのは `Chat` に画面用の項目を足した形（`friendName`
+ * `lastMessageContent` `isUnread` など）。**型に無いからと省くと、
+ * 名前も本文も出ない行になる。**
+ */
+export const CHATS = [
+  // 名前, 状態, 担当, 本文, 最終受信, 未読
+  ['Kyohei Yamamoto', 'unread', 'operator-kenta', '本日8月19日のお知らせです。内容をご確認ください。', '2026-08-19T09:48:00.000Z', true],
+  ['Kenta Kawano (Obama)', 'in_progress', 'operator-kenta', 'テスト', '2026-08-18T10:20:00.000Z', false],
+  ['菅野 亮', 'resolved', 'operator-masato', '最新のやり取りを確認できます。', '2026-08-13T05:16:00.000Z', false],
+].map(([friendName, status, operatorId, lastMessageContent, lastMessageAt, isUnread], index) => ({
+  id: `chat-${index}`,
+  friendId: `friend-${index}`,
+  friendName: String(friendName),
+  friendPictureUrl: null,
+  operatorId,
+  status: String(status),
+  notes: null,
+  revision: 1,
+  isUnread: Boolean(isUnread),
+  lastMessageAt: String(lastMessageAt),
+  lastMessageContent: String(lastMessageContent),
+  lastMessageDirection: 'inbound',
+  lastMessageType: 'text',
+  sendMode: 'line',
+  createdAt: '2026-08-13T00:00:00.000Z',
+  updatedAt: String(lastMessageAt),
+}))
+
+/**
+ * 受信箱の上に出る数。設計 `xGLVe` の帯そのまま。
+ * 「要返信 1件・最長 1時間12分待ち」。
+ */
+export const INBOX_STATS = {
+  waiting: 1,
+  oldestWaitingMinutes: 72,
+  averageFirstReplyMinutes: null,
+  waitingOverAnHour: 1,
+  mine: 0,
+  todayInbound: 0,
+  todayByChannel: { line: 0, email: 0 },
+}
+
+/**
+ * 選んだ会話の吹き出し。設計 `xGLVe` のトーク欄そのまま。
+ *
+ * 空で返すとトーク欄が真っ白になり、**日付の区切り・シナリオの記録・
+ * 送った人の名前**という設計の3要素をどれも確かめられない。
+ *
+ * 向きは `incoming` / `outgoing`。**`inbound` / `outbound` ではない。**
+ * 違う言葉で書くと、画面はどれも受信側の吹き出しとして描く。
+ *
+ * 吹き出しは `/api/chats/:id` の `messages` から出る。
+ * `/api/friends/:id/messages` は別の口で、こちらには出ない。
+ */
+export const FRIEND_MESSAGES = {
+  'friend-1': [
+    {
+      id: 'msg-1', friendId: 'friend-1', direction: 'incoming', messageType: 'text',
+      content: '登録しました！', createdAt: '2026-08-13T05:16:00.000Z',
+      broadcastId: null, scenarioStepId: null,
+      source: 'line', scenarioName: null, sentByStaffName: null,
+    },
+    {
+      id: 'msg-2', friendId: 'friend-1', direction: 'outgoing', messageType: 'text',
+      content: 'シナリオ「友だち挨拶」を開始', createdAt: '2026-08-13T05:18:00.000Z',
+      broadcastId: null, scenarioStepId: 'step-1',
+      source: 'scenario', scenarioName: '友だち挨拶', sentByStaffName: null,
+    },
+    {
+      id: 'msg-3', friendId: 'friend-1', direction: 'outgoing', messageType: 'text',
+      content: 'テスト', createdAt: '2026-08-13T10:20:00.000Z',
+      broadcastId: null, scenarioStepId: null,
+      source: 'manual', scenarioName: null, sentByStaffName: '河野',
+    },
+  ],
+}
+
+/**
+ * 友だちのマイル。設計 `xGLVe` の右パネル「利用可能 2,450 mile」。
+ *
+ * **`summary` を返さないと画面ごと落ちる**（`summary.programName` を読む）。
+ * 空の一覧で返していたあいだ、会話を開くたびに「もう一度試す」だけの
+ * 画面になっていた。
+ */
+export const FRIEND_MILEAGE = {
+  summary: {
+    programId: 'mile-default',
+    programName: 'NENマイル',
+    available: 2450,
+    pending: 0,
+    lifetimeEarned: 2450,
+    spent: 0,
+  },
+  history: [],
+}
+
+/**
+ * 会話を開いたときの右パネル。設計 `xGLVe` の「顧客情報」そのまま。
+ *
+ * **`tags` と `formSubmissions` は必ず配列で返す。** 一覧の口が返す
+ * `{items,total,page,limit}` のままだと `friend.tags.length` で落ち、
+ * 会話を開くたびに「もう一度試す」だけの画面になっていた。
+ */
+export const FRIEND_DETAILS = {
+  'friend-1': {
+    id: 'friend-1',
+    displayName: 'Kenta Kawano (Obama)',
+    systemDisplayName: 'Kenta Kawano (Obama)',
+    realName: '河野 健太',
+    pictureUrl: null,
+    isFollowing: true,
+    createdAt: '2026-08-13T00:00:00.000Z',
+    metadata: {},
+    tags: [
+      { id: 'friend-tag-kubun', name: '顧客区分：既存顧客', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+      { id: 'friend-tag-store', name: '来店店舗：渋谷店', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+    ],
+    formSubmissions: [],
+  },
+}
+
+/**
+ * テンプレートの置き場。設計 `NWbuF`（2-6 全フォルダ展開）の件数そのまま。
+ * 未分類3・お問い合わせ8・予約5・EC4 で計20件。
+ */
+export const TEMPLATE_FOLDERS = [
+  ['tf-inquiry', 'お問い合わせ', 8],
+  ['tf-booking', '予約', 5],
+  ['tf-ec', 'EC', 4],
+].map(([id, name, count], index) => ({
+  id: String(id),
+  kind: 'template',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  color: null,
+  createdAt: '2026-01-13T00:00:00.000Z',
+  updatedAt: '2026-01-13T00:00:00.000Z',
+  templateCount: Number(count),
+}))
+
+/**
+ * テンプレート20件。**件数はフォルダの数に合わせる。**
+ * 合わないと、フォルダの脇に出る数と一覧の行数が食い違う。
+ */
+export const TEMPLATES = (() => {
+  const rows = []
+  const plan = [
+    [null, '未分類', 3],
+    ['tf-inquiry', 'お問い合わせ', 8],
+    ['tf-booking', '予約', 5],
+    ['tf-ec', 'EC', 4],
+  ]
+  let n = 0
+  for (const [folderId, label, count] of plan) {
+    for (let i = 0; i < count; i += 1) {
+      rows.push({
+        id: `template-${n}`,
+        name: `${label}のひな形 ${i + 1}`,
+        category: 'text',
+        messageType: 'text',
+        messageContent: `${label}のご連絡です。内容をご確認ください。`,
+        folderId,
+        createdAt: '2026-01-13T00:00:00.000Z',
+        updatedAt: '2026-01-13T00:00:00.000Z',
+      })
+      n += 1
+    }
+  }
+  return rows
+})()
+
+/**
+ * 受信箱の保存した検索。設計 `ASsb3`（2-13 保存した検索を開く）の並び。
+ *
+ * **空で返すと、同じ名前かどうかを確かめられない。** 2-17（重複エラー）は
+ * すでにある名前を打ったときの絵なので、既存が0件だと「保存しました」に
+ * なってしまう。実際そうなった。
+ */
+export const INBOX_SAVED_VIEWS = [
+  ['VIPかつ未契約', true],
+  ['未対応・担当なし', true],
+  ['自分の未対応', false],
+].map(([name, isShared], index) => ({
+  id: `inbox-view-${index}`,
+  name: String(name),
+  scope: 'chats',
+  conditions: { all: [], any: [] },
+  createdBy: 'Kenta',
+  lineAccountId: 'visual-qa-account',
+  isShared: Boolean(isShared),
+  displayOrder: index,
+  createdAt: '2026-08-17T03:00:00.000Z',
+}))
+
+// V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
+// 0件と未取得を混ぜないため、通常・空・失敗は同じ配列の増減ではなく
+// API状態として切り替える。ここには「取得できた通常値」だけを置く。
+export const FRIEND_BULK_RUN = {
+  preview: {
+    selectedCount: 4,
+    targetCount: 3,
+    excludedCount: 1,
+    accountBreakdown: [{ lineAccountId: 'visual-qa-account', count: 3 }],
+    exclusions: [{ reason: 'LINEの友だちではないため対象外', count: 1 }],
+    sample: FRIENDS.slice(0, 3).map((item) => ({
+      friendId: item.id,
+      displayName: item.displayName,
+      pictureUrl: item.pictureUrl,
+      lineAccountId: item.lineAccountId,
+    })),
+    reversible: true,
+  },
+  detail: {
+    id: 'friend-bulk-run-1',
+    status: 'partial',
+    selection: { kind: 'explicit', friendIds: FRIENDS.slice(0, 4).map((item) => item.id) },
+    operation: { kind: 'add_tag', tagId: 'tag-0' },
+    targetCount: 3,
+    excludedCount: 1,
+    successCount: 2,
+    skippedCount: 0,
+    temporaryFailureCount: 1,
+    permanentFailureCount: 0,
+    reversible: true,
+    scheduledAt: null,
+    createdAt: '2026-08-31T01:00:00.000Z',
+    startedAt: '2026-08-31T01:00:01.000Z',
+    completedAt: '2026-08-31T01:00:03.000Z',
+    updatedAt: '2026-08-31T01:00:03.000Z',
+    page: 1,
+    limit: 50,
+    total: 3,
+    items: FRIENDS.slice(0, 3).map((item, index) => ({
+      id: `friend-bulk-item-${index + 1}`,
+      friendId: item.id,
+      displayName: item.displayName,
+      pictureUrl: item.pictureUrl,
+      lineAccountId: item.lineAccountId,
+      status: index === 2 ? 'temporary_failure' : 'success',
+      attemptCount: 1,
+      errorMessage: index === 2 ? '時間をおいて、もう一度お試しください' : null,
+      retryAt: null,
+      completedAt: '2026-08-31T01:00:03.000Z',
+    })),
+  },
+}
+
+/**
+ * `InCDe`（友だち同士）と `ELayY`（EC会員と友だち）が共有する本人照合契約。
+ * 値はすべて作り物で、メール・電話は必ずマスクする。
+ */
+const IDENTITY_CONFIDENCE = { score: 92, label: 'very_high' }
+const IDENTITY_FRIEND_LEFT = {
+  kind: 'friend', id: 'friend-identity-left', label: '田中 はなこ', detail: '支店',
+  lineAccountId: 'visual-qa-account', lineAccountName: '画面確認アカウント', shopKey: null,
+  attributes: [
+    { label: 'メールアドレス', valuePreview: 'ta***@example.jp', verified: true },
+    { label: '電話番号', valuePreview: '090-****-0001', verified: true },
+  ],
+}
+const IDENTITY_FRIEND_RIGHT = {
+  kind: 'friend', id: 'friend-identity-right', label: '田中 花子', detail: '本店',
+  lineAccountId: 'visual-qa-account', lineAccountName: '画面確認アカウント', shopKey: null,
+  attributes: [
+    { label: 'メールアドレス', valuePreview: 'ta***@example.jp', verified: true },
+    { label: '電話番号', valuePreview: '090-****-0001', verified: true },
+  ],
+}
+const IDENTITY_EVIDENCE = [
+  {
+    key: 'verified_email', label: '確認済みのメールアドレスが同じ', strength: 'strong',
+    verified: true, valuePreview: 'ta***@example.jp',
+  },
+  {
+    key: 'similar_name', label: '表示名が似ている', strength: 'weak',
+    verified: false, valuePreview: null,
+  },
+]
+
+export const IDENTITY_CANDIDATE_FRIEND = {
+  id: 'identity-friend-1', kind: 'friend_duplicate', status: 'pending', version: 1,
+  confidence: IDENTITY_CONFIDENCE, left: IDENTITY_FRIEND_LEFT, right: IDENTITY_FRIEND_RIGHT,
+  evidence: IDENTITY_EVIDENCE,
+  impact: [
+    { key: 'duplicate_deliveries', label: '重複配信', value: 3, unit: '通', note: null },
+    { key: 'orders', label: '注文', value: null, unit: '件', note: '取得元を接続後に表示' },
+  ],
+  history: [], detectedAt: '2026-08-30T10:00:00.000Z', reviewedAt: null,
+  canDecide: true, canUndo: false, undoNote: '判定を取り消すと、根拠を確認する候補へ戻ります。',
+}
+
+export const IDENTITY_CANDIDATE_EC = {
+  ...IDENTITY_CANDIDATE_FRIEND,
+  id: 'identity-ec-1', kind: 'ec_member',
+  left: {
+    kind: 'ec_event', id: 'event-identity-1', label: '注文 NEN-1001', detail: '2026/08/30',
+    lineAccountId: 'visual-qa-account', lineAccountName: '画面確認アカウント', shopKey: 'shop-a',
+    attributes: [
+      { label: 'メールアドレス', valuePreview: 'ta***@example.jp', verified: true },
+      { label: '電話番号', valuePreview: '090-****-0001', verified: true },
+    ],
+  },
+  impact: [
+    { key: 'orders', label: '結び付く注文', value: 24, unit: '件', note: null },
+    { key: 'past_messages', label: '過去のLINE送信', value: 0, unit: '通', note: '再送しません' },
+  ],
+}
+
+function identityListItem(candidate) {
+  return {
+    id: candidate.id, kind: candidate.kind, status: candidate.status, version: candidate.version,
+    confidence: candidate.confidence, left: candidate.left, right: candidate.right,
+    evidenceSummary: candidate.evidence.map((item) => item.label),
+    detectedAt: candidate.detectedAt, reviewedAt: candidate.reviewedAt,
+  }
+}
+
+export const IDENTITY_CANDIDATE_LISTS = {
+  friend_duplicate: {
+    items: [identityListItem(IDENTITY_CANDIDATE_FRIEND)], total: 1, limit: 20, offset: 0,
+  },
+  ec_member: {
+    items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,
+  },
+  empty: { items: [], total: 0, limit: 20, offset: 0 },
+}
+
+export const IDENTITY_CANDIDATE_ERROR = {
+  success: false, error: '本人照合の候補を読み込めませんでした', code: 'VISUAL_QA_ERROR',
+}
+
+/** `w8W4Eh` 統合ユーザー詳細。平文のメール・電話は置かない。 */
+export const MERGED_PERSON_DETAIL = {
+  id: 'merged-person-1', status: 'active', revision: 4, primaryDisplayName: '田中 花子',
+  linkedFriends: [
+    {
+      friendId: 'friend-identity-right', displayName: '田中 花子',
+      lineAccountId: 'visual-qa-account', lineAccountName: '本店', isFollowing: true,
+      linkedAt: '2026-08-28T10:00:00.000Z', linkMethod: 'operator_review', confidence: 92,
+      candidateId: 'identity-friend-1', candidateVersion: 2,
+    },
+    {
+      friendId: 'friend-identity-left', displayName: '田中 はなこ',
+      lineAccountId: 'visual-qa-account-sub', lineAccountName: '支店', isFollowing: true,
+      linkedAt: '2026-08-28T10:00:00.000Z', linkMethod: 'operator_review', confidence: 92,
+      candidateId: 'identity-friend-1', candidateVersion: 2,
+    },
+  ],
+  profileValues: [
+    {
+      fieldKey: 'email', fieldLabel: 'メールアドレス', valuePreview: 'ta***@example.jp',
+      sourceType: 'form', sourceLabel: '来店アンケート', sourceFriendId: 'friend-identity-right',
+      verifiedAt: '2026-08-28T09:00:00.000Z', selectedByName: '画面確認',
+      selectedAt: '2026-08-28T10:10:00.000Z', updateMode: 'fixed',
+    },
+    {
+      fieldKey: 'phone', fieldLabel: '電話番号', valuePreview: '090-****-0001',
+      sourceType: 'friend_field', sourceLabel: '支店の友だち情報',
+      sourceFriendId: 'friend-identity-left', verifiedAt: null, selectedByName: '画面確認',
+      selectedAt: '2026-08-28T10:12:00.000Z', updateMode: 'auto',
+    },
+  ],
+  deliveryPriorities: [
+    {
+      purpose: 'broadcast', friendId: 'friend-identity-right',
+      lineAccountId: 'visual-qa-account', lineAccountName: '本店', priority: 1,
+      isActive: true, reason: '通常の配信は本店から送ります',
+    },
+    {
+      purpose: 'broadcast', friendId: 'friend-identity-left',
+      lineAccountId: 'visual-qa-account-sub', lineAccountName: '支店', priority: 2,
+      isActive: true, reason: '本店から送れないときの代替です',
+    },
+  ],
+  history: [
+    {
+      id: 'merged-event-2', eventType: 'profile',
+      summary: 'プロフィールの採用値を2件更新しました', actorName: '画面確認',
+      occurredAt: '2026-08-28T10:12:00.000Z',
+    },
+    {
+      id: 'merged-event-1', eventType: 'link', summary: '本人照合で友だちを結び付けました',
+      actorName: '画面確認', occurredAt: '2026-08-28T10:00:00.000Z',
+    },
+  ],
+  createdAt: '2026-08-28T10:00:00.000Z', updatedAt: '2026-08-28T10:12:00.000Z',
+  archivedAt: null,
+}
+
+/** 0件を未取得へ変えないため、器は通常時と同じまま空配列を返す。 */
+export const MERGED_PERSON_EMPTY = {
+  ...MERGED_PERSON_DETAIL,
+  revision: 1,
+  linkedFriends: [MERGED_PERSON_DETAIL.linkedFriends[0]],
+  profileValues: [],
+  deliveryPriorities: [],
+  history: [],
+}
+
+export const MERGED_PERSON_ERROR = {
+  success: false, error: '統合ユーザーを読み込めませんでした', code: 'VISUAL_QA_ERROR',
+}
+
+export const IDENTITY_CANDIDATE_DETECTION = {
+  normal: { processed: 1, hasMore: false, nextCursor: null },
+  empty: { processed: 0, hasMore: false, nextCursor: null },
 }

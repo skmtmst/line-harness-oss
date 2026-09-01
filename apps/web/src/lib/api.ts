@@ -3,6 +3,10 @@ import type { SegmentCondition } from './segment-condition'
 import type {
   Friend,
   FriendAddRouting,
+  FriendAddRoutingDraftTestResult,
+  FriendAddRoutingPublishResult,
+  FriendAddRoutingValidation,
+  FriendAddRoutingVersion,
   FriendAddEventList,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
@@ -57,6 +61,21 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  MergedPersonDetail,
+  UpdateMergedPersonRequest,
+  UpdateMergedPersonDeliveryPrioritiesRequest,
+  FriendBulkSelection,
+  FriendBulkOperation,
+  FriendBulkPreview,
+  FriendBulkRunSummary,
+  FriendBulkRunDetail,
+  IdentityCandidateDetail,
+  IdentityCandidateKind,
+  IdentityCandidateList,
+  IdentityCandidateStatus,
+  DetectIdentityCandidatesResult,
+  DecideIdentityCandidateRequest,
+  UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
 /**
@@ -1266,6 +1285,7 @@ export type DashboardPreferenceResponse = {
 export type EcCommerceOverview = {
   total: number
   processed: number
+  identityPending: number
   failed: number
   skipped: number
   last24h: number
@@ -1282,7 +1302,7 @@ export type EcCommerceEvent = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  status: 'received' | 'processing' | 'processed' | 'skipped' | 'failed'
+  status: 'received' | 'identity_pending' | 'processing' | 'processed' | 'skipped' | 'failed'
   errorMessage: string | null
   receivedAt: string
   processedAt: string | null
@@ -1564,6 +1584,40 @@ export const api = {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
     },
+    bulkPreview: (selection: FriendBulkSelection, operation: FriendBulkOperation) =>
+      fetchApi<ApiResponse<FriendBulkPreview>>('/api/friends/bulk-runs/preview', {
+        method: 'POST',
+        body: JSON.stringify({ selection, operation }),
+      }),
+    bulkCreate: (
+      selection: FriendBulkSelection,
+      operation: FriendBulkOperation,
+      options: { idempotencyKey: string; scheduledAt?: string; confirmIrreversible?: boolean },
+    ) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>('/api/friends/bulk-runs', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': options.idempotencyKey,
+          ...(options.confirmIrreversible ? { 'X-Confirm-Irreversible': 'friend-bulk-run' } : {}),
+        },
+        body: JSON.stringify({ selection, operation, scheduledAt: options.scheduledAt }),
+      }),
+    bulkGet: (id: string, options?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (options?.page) query.set('page', String(options.page))
+      if (options?.limit) query.set('limit', String(options.limit))
+      const tail = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<FriendBulkRunDetail>>(`/api/friends/bulk-runs/${id}${tail}`)
+    },
+    bulkRetry: (id: string) =>
+      fetchApi<ApiResponse<{ retriedCount: number }>>(`/api/friends/bulk-runs/${id}/retry`, {
+        method: 'POST',
+      }),
+    bulkUndo: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>(`/api/friends/bulk-runs/${id}/undo`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }),
     /**
      * 友だち情報（metadata）を書き換える。
      * 渡した項目だけ変わる。null を渡すとその項目を削除する。
@@ -3361,10 +3415,13 @@ export const api = {
     },
   },
   ecCommerce: {
-    overview: () =>
-      fetchApi<ApiResponse<EcCommerceOverview>>('/api/ec-commerce/overview'),
-    events: (params?: { eventType?: string; status?: string; limit?: number; offset?: number }) => {
+    overview: (lineAccountId?: string) =>
+      fetchApi<ApiResponse<EcCommerceOverview>>(lineAccountId
+        ? `/api/ec-commerce/overview?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : '/api/ec-commerce/overview'),
+    events: (params?: { lineAccountId?: string; eventType?: string; status?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
+      if (params?.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params?.eventType) query.set('eventType', params.eventType)
       if (params?.status) query.set('status', params.status)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
@@ -3418,6 +3475,34 @@ export const api = {
       fetchApi<ApiResponse<{ routing: FriendAddRouting }>>(
         `/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify({ routing }) },
+      ),
+    getDraft: (accountId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
+        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    saveDraft: (accountId: string, routing: FriendAddRouting) =>
+      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
+        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify({ routing }) },
+      ),
+    validateDraft: (accountId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingValidation>>(
+        `/api/friend-add-routing/validate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST' },
+      ),
+    conflicts: (accountId: string) =>
+      fetchApi<ApiResponse<{ conflicts: FriendAddRoutingValidation['conflicts'] }>>(
+        `/api/friend-add-routing/conflicts?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    testDraft: (accountId: string, friendId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingDraftTestResult>>(
+        `/api/friend-add-routing/draft/test?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ friendId }) },
+      ),
+    publish: (accountId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingPublishResult>>(
+        `/api/friend-add-routing/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),
     /** テスト実行。登録も配信もしない。振り分け先だけを返す。 */
     test: (accountId: string, friendId: string) =>
@@ -4411,6 +4496,77 @@ export const api = {
       fetchApi<{ success: boolean; data?: { id: string; approvalStatus: string }; error?: string }>(
         `/api/conversions/events/${eventId}/approval`,
         { method: 'PATCH', body: JSON.stringify({ status: 'rejected' }) },
+      ),
+  },
+  /**
+   * 本人照合の候補。3-2-A（友だち同士）と 23-1-A（ECの会員）が同じ口を読む。
+   *
+   * 判定と取り消しは、画面が読み込んだ版（`expectedVersion`）を必ず送る。
+   * 先に別の人が判定していれば Worker が 409 `STALE_CANDIDATE` を返すので、
+   * 画面は上書きせず読み直しを促す。
+   */
+  identityCandidates: {
+    list: (params: {
+      kind: IdentityCandidateKind
+      status?: IdentityCandidateStatus
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ kind: params.kind })
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
+    },
+    get: (id: string) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}`,
+      ),
+    decide: (id: string, body: DecideIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/decide`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    undo: (id: string, body: UndoIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/undo`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    detectFriendDuplicates: (params?: { limit?: number; after?: string | null }) => {
+      const query = new URLSearchParams({ kind: 'friend_duplicate' })
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.after) query.set('after', params.after)
+      return fetchApi<ApiResponse<DetectIdentityCandidatesResult>>(
+        `/api/identity-candidates/detect?${query.toString()}`,
+        { method: 'POST' },
+      )
+    },
+  },
+  /**
+   * 統合ユーザーの詳細（設計 `w8W4Eh` 3-3-A）。
+   *
+   * 更新は**読み込んだ `revision` を必ず送る**。先に別の人が変えていれば
+   * Worker が 409 `STALE_PERSON` を返すので、画面は上書きせず読み直す。
+   *
+   * 結び付け・解除の口はここに無い。#598 の候補判定・取り消しを使う。
+   */
+  mergedPeople: {
+    get: (id: string) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}`,
+      ),
+    update: (id: string, body: UpdateMergedPersonRequest) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    updateDeliveryPriorities: (
+      id: string,
+      body: UpdateMergedPersonDeliveryPrioritiesRequest,
+    ) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}/delivery-priorities`,
+        { method: 'PATCH', body: JSON.stringify(body) },
       ),
   },
   duplicates: {

@@ -6,6 +6,8 @@ import {
   type PerAccountStat,
   type PairwiseOverlap,
 } from '../services/duplicates-stats.js';
+import { identityCandidates } from './identity-candidates.js';
+import { mergedPeople } from './merged-people.js';
 
 interface PerAccountStatDTO {
   accountId: string;
@@ -66,6 +68,9 @@ function serializeDuplicatesStats(stats: DuplicatesStats): DuplicatesStatsDTO {
 }
 
 export const duplicates = new Hono<Env>();
+
+duplicates.route('/', identityCandidates);
+duplicates.route('/', mergedPeople);
 
 duplicates.get('/api/duplicates/stats', async (c) => {
   try {

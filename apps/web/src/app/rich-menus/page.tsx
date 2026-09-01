@@ -119,6 +119,7 @@ type DeleteTarget =
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
+  const importRequestGenerationRef = useRef(0)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -151,6 +152,7 @@ export default function RichMenusListPage() {
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
+    importRequestGenerationRef.current += 1
     setGroups([])
     setExternal(null)
     setTapStats(null)
@@ -311,18 +313,31 @@ export default function RichMenusListPage() {
   async function confirmImport() {
     if (!selectedAccount?.id || !importTarget || importBusy) return
     const menu = importTarget
+    const accountId = selectedAccount.id
+    const requestGeneration = ++importRequestGenerationRef.current
     setImportBusy(true)
     setImportError(null)
     try {
-      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, selectedAccount.id)
+      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, accountId)
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
       if (!res.success) throw new Error('import_failed')
       setImportTarget(null)
       setImportedMenuName(res.data?.name ?? menu.name)
       await reload()
     } catch (e) {
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
       setImportError(richMenuError(e, 'import'))
     } finally {
-      setImportBusy(false)
+      if (
+        importRequestGenerationRef.current === requestGeneration &&
+        activeAccountRef.current === accountId
+      ) setImportBusy(false)
     }
   }
 
