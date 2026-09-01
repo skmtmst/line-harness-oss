@@ -20,6 +20,11 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const accountAccessMocks = {
+  canAccessAllLineAccounts: vi.fn(),
+};
+vi.mock('../services/account-access.js', () => accountAccessMocks);
+
 // Re-import after mock so the module picks up mocked deps.
 const { richMenuGroups } = await import('./rich-menu-groups.js');
 
@@ -78,6 +83,11 @@ function setupApp(opts: { r2?: R2Bucket; db?: D1Database } = {}) {
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  accountAccessMocks.canAccessAllLineAccounts.mockReset();
+  accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  dbMocks.getRichMenuGroupById.mockResolvedValue({
+    id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
+  });
 });
 
 // ----- GET /api/rich-menu-groups -----
@@ -97,6 +107,15 @@ describe('GET /api/rich-menu-groups', () => {
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups');
     expect(res.status).toBe(400);
+  });
+
+  test('見えないLINEアカウントの一覧は404にする', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups?accountId=other-account');
+
+    expect(res.status).toBe(404);
+    expect(dbMocks.getRichMenuGroups).not.toHaveBeenCalled();
   });
 
   test('serializes snake_case rows to camelCase', async () => {
@@ -125,6 +144,15 @@ describe('GET /api/rich-menu-groups/:groupId', () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue(null);
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups/missing');
+    expect(res.status).toBe(404);
+  });
+
+  test('別LINEアカウントのグループは存在しないものとして返す', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'other-account', pages: [] });
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1');
+
     expect(res.status).toBe(404);
   });
 
@@ -171,6 +199,22 @@ describe('POST /api/rich-menu-groups', () => {
       body: JSON.stringify({ name: 'x', chatBarText: 'x', size: 'large', pages: [{ name: 'p', orderIndex: 0, areas: [] }] }),
     });
     expect(res.status).toBe(400);
+  });
+
+  test('見えないLINEアカウントには作成しない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'other-account', name: 'x', chatBarText: 'x', size: 'large',
+        pages: [{ name: 'p', orderIndex: 0, areas: [] }],
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(dbMocks.createRichMenuGroup).not.toHaveBeenCalled();
   });
 
   test('rejects invalid size enum', async () => {
@@ -403,6 +447,19 @@ describe('POST /api/rich-menu-groups/:groupId/pages/:pageId/image', () => {
     expect(res.status).toBe(400);
   });
 
+  test('別LINEアカウントの画像は本文を読む前に拒否する', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1/pages/p1/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/png' },
+      body: PNG_2500x1686,
+    });
+
+    expect(res.status).toBe(404);
+    expect(dbMocks.pageBelongsToGroup).not.toHaveBeenCalled();
+  });
+
   test('rejects when page does not belong to group', async () => {
     dbMocks.pageBelongsToGroup.mockResolvedValue(false);
     const app = setupApp();
@@ -455,6 +512,18 @@ describe('POST /api/rich-menu-groups/:groupId/pages/:pageId/image', () => {
     expect(dbMocks.setRichMenuPageImage).toHaveBeenCalledWith(
       expect.anything(), 'p1', body.data.imageR2Key, 'image/png',
     );
+  });
+});
+
+describe('GET /api/rich-menu-images/:key', () => {
+  test('別LINEアカウントのR2画像を返さない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const r2 = makeR2Stub();
+    await r2.put('rich-menus/other-account/g1/p1/image.png', PNG_2500x1686);
+    const app = setupApp({ r2 });
+    const res = await app.request('/api/rich-menu-images/rich-menus/other-account/g1/p1/image.png');
+
+    expect(res.status).toBe(404);
   });
 });
 

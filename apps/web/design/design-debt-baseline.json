@@ -302,8 +302,8 @@
   },
   "app/rich-menus/page.tsx": {
     "unresolved-classname": 1,
-    "direct-secondary-button": 6,
     "direct-primary-button": 2,
+    "direct-secondary-button": 5,
     "arbitrary-value": 11,
     "direct-th": 5
   },

@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
@@ -10,6 +9,7 @@ import type { RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import Pagination from '@/components/shared/pagination'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -76,6 +76,7 @@ type LineMenu = {
 
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
+  const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -93,21 +94,42 @@ export default function RichMenusListPage() {
   const [sortKey, setSortKey] = useState<SortKey>('taps')
   const [savedFilter, setSavedFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
 
+  useEffect(() => {
+    activeAccountRef.current = selectedAccount?.id ?? null
+    setGroups([])
+    setExternal(null)
+    setTapStats(null)
+    setError(null)
+    setExternalError(null)
+    setApplyTo(null)
+    setPage(1)
+    if (!selectedAccount?.id) setLoading(false)
+  }, [selectedAccount?.id])
+
   const reload = useCallback(async () => {
-    if (!selectedAccount?.id) return
+    if (!selectedAccount?.id) {
+      setLoading(false)
+      return
+    }
+    const accountId = selectedAccount.id
     setLoading(true)
+    setGroups([])
+    setExternal(null)
+    setTapStats(null)
     setError(null)
     setExternalError(null)
     try {
       // 並列に: D1 管理 group の一覧と、LINE 上の現状
       const [groupsRes, externalRes, tapRes] = await Promise.allSettled([
-        api.richMenuGroups.list(selectedAccount.id),
-        api.richMenuGroups.external(selectedAccount.id),
-        api.richMenuGroups.tapStats(selectedAccount.id),
+        api.richMenuGroups.list(accountId),
+        api.richMenuGroups.external(accountId),
+        api.richMenuGroups.tapStats(accountId),
       ])
+      if (activeAccountRef.current !== accountId) return
       // 数が取れなくても一覧は出す。集計は付随情報なので、落ちても本体は止めない。
       setTapStats(
         tapRes.status === 'fulfilled' && tapRes.value.success ? tapRes.value.data : null,
@@ -135,9 +157,11 @@ export default function RichMenusListPage() {
         setExternal(null)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (activeAccountRef.current === accountId) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
     } finally {
-      setLoading(false)
+      if (activeAccountRef.current === accountId) setLoading(false)
     }
   }, [selectedAccount?.id])
 
@@ -162,7 +186,10 @@ export default function RichMenusListPage() {
    * 動かさない。見えていないものが動くと、何が起きたか分からなくなる。
    */
   async function moveGroup(group: RichMenuGroupListItem, delta: number) {
-    const list = shownGroups
+    // ページ送りで隠れている行も含めた現在の絞り込み結果を基準にする。
+    // 表示中の20件だけで0から振り直すと、2ページ目以降が1ページ目と
+    // 同じ displayOrder になり、次回の並びが不定になる。
+    const list = sorted
     const index = list.findIndex((g) => g.id === group.id)
     const target = list[index + delta]
     if (!target) return
@@ -276,57 +303,16 @@ export default function RichMenusListPage() {
     }
   })
 
-  const shownGroups = sorted.slice(0, pageSize)
-  const hiddenCount = sorted.length - shownGroups.length
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const shownGroups = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setPage(1)
+  }, [folderFilter, pageSize, query, savedFilter, sortKey])
 
   return (
-    <main className="p-6 max-w-7xl mx-auto">
-      <div data-design="Head">
-        <Header
-          title="リッチメニュー"
-          description="トーク画面の下に表示されるメニューを作ります。友だちの状態ごとに出し分けでき、タップ数を計測できます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <button
-                onClick={() => {
-                  // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
-                  // 他の順で上下させても、次に開いたときその順で並ばない。
-                  setSortKey('manual')
-                  setReordering((v) => !v)
-                }}
-                aria-pressed={reordering}
-                className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
-                  reordering
-                    ? 'border-accent bg-accent-soft text-ink'
-                    : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                }`}
-              >
-                {reordering ? '並び替えを終える' : '並び替え'}
-              </button>
-              <button
-                onClick={() => setFolderDialogOpen(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
-              >
-                フォルダを追加
-              </button>
-              <Link
-                href="/rich-menus/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-              >
-                メニューを作成
-              </Link>
-            </div>
-          }
-        />
-      </div>
-
+    <main data-design-node="GO8RQ" className="p-6 max-w-7xl mx-auto">
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">メニュー</p>
@@ -380,6 +366,18 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
+        <Link
+          href="/rich-menus/new"
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+        >
+          メニューを作る
+        </Link>
+        <button
+          onClick={() => setFolderDialogOpen(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
+        >
+          フォルダを追加
+        </button>
         <input
           type="search"
           value={query}
@@ -413,6 +411,22 @@ export default function RichMenusListPage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => {
+            // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
+            // 他の順で上下させても、次に開いたときその順で並ばない。
+            setSortKey('manual')
+            setReordering((v) => !v)
+          }}
+          aria-pressed={reordering}
+          className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
+            reordering
+              ? 'border-accent bg-accent-soft text-ink'
+              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+          }`}
+        >
+          {reordering ? '並び替えを終える' : '出す順番を変える'}
+        </button>
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
@@ -449,7 +463,10 @@ export default function RichMenusListPage() {
 
       {selectedAccount && !loading && error && (
         <div className="bg-danger-bg border border-danger-bg text-danger text-sm p-3 rounded mb-4">
-          {error}
+          <p>{error}</p>
+          <button type="button" className="mt-2 underline" onClick={() => void reload()}>
+            もう一度読み込む
+          </button>
         </div>
       )}
 
@@ -638,10 +655,18 @@ export default function RichMenusListPage() {
         </div>
       )}
 
-      {hiddenCount > 0 && (
-        <p className="text-ink-faint mt-3 text-center text-xs">
-          ほかに {hiddenCount} 件あります。「表示」を増やすと出ます。
-        </p>
+      {selectedAccount && !loading && !error && sorted.length > 0 && (
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <p className="text-ink-faint text-xs">
+            {(currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, sorted.length)}件 / 全{sorted.length}件
+          </p>
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            ariaLabel="リッチメニューのページ送り"
+          />
+        </div>
       )}
 
       {applyTo && (
