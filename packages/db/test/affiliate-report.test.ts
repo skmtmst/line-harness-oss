@@ -693,4 +693,21 @@ describe('getAffiliateReport — CV via affiliate_id OR affiliate_code', () => {
     expect(rows[0].totalConversions).toBe(1);
     expect(rows[0].totalRevenue).toBe(1000);
   });
+
+  test('all-affiliates report includes approved offer-fixed rewards', async () => {
+    insertOffer(sqlite, { id: 'offer-fixed', name: 'Fixed reward', rewardAmount: 3000 });
+    sqlite.prepare(`UPDATE affiliate_links SET offer_id = 'offer-fixed' WHERE id = 'link-A1'`).run();
+    insertFriend(sqlite, 'friend-fixed', { createdAt: jstDaysAgo(10) });
+    insertConversion(sqlite, {
+      id: 'cv-fixed-approved', pointId: 'cp-1', friendId: 'friend-fixed',
+      affiliateId: 'aff-A', refCode: 'refA1', createdAt: jstDaysAgo(2), approvalStatus: 'approved',
+    });
+    insertConversion(sqlite, {
+      id: 'cv-fixed-pending', pointId: 'cp-1', friendId: 'friend-fixed',
+      affiliateId: 'aff-A', refCode: 'refA1', createdAt: jstDaysAgo(1), approvalStatus: 'pending',
+    });
+
+    const rows = await getAffiliateReport(db, 'aff-A');
+    expect(rows[0].confirmedReward).toBe(3000);
+  });
 });

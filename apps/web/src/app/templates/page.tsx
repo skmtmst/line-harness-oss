@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { api, type BroadcastAssetKind } from '@/lib/api'
+import Link from 'next/link'
+import { api, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
@@ -16,6 +17,8 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  question: TemplateQuestion | null
+  questionStatus: 'draft' | 'published'
   usageCount: number
   /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
   tapCount: number
@@ -29,6 +32,8 @@ interface TemplateDetail {
   category: string
   messageType: string
   messageContent: string
+  question: TemplateQuestion | null
+  questionStatus: 'draft' | 'published'
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
@@ -37,7 +42,7 @@ interface TemplateDetail {
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'unused'
+type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'question' | 'unused'
 
 const ASSET_KINDS: readonly BroadcastAssetKind[] = [
   'card_message',
@@ -51,6 +56,7 @@ const messageTypeLabels: Record<string, string> = {
   image: '画像',
   flex: 'Flex',
   carousel: 'Carousel',
+  question: '質問',
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -58,6 +64,7 @@ const typeBadgeColor: Record<string, string> = {
   flex: 'bg-purple-100 text-purple-700',
   image: 'bg-info-bg text-info',
   carousel: 'bg-amber-100 text-amber-700',
+  question: 'bg-accent-soft text-accent-deep',
 }
 
 function formatDate(iso: string): string {
@@ -174,6 +181,8 @@ export default function TemplatesPage() {
     if (selectedCategory !== 'all' && (t.category || '未分類') !== selectedCategory) return false
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
+    if (typeFilter === 'question') return Boolean(t.question)
+    if (typeFilter === 'text') return t.messageType === 'text' && t.question === null
     return t.messageType === typeFilter
   })
 
@@ -295,6 +304,12 @@ export default function TemplatesPage() {
             <Button onClick={() => setShowCreate(true)} variant="primary">
               テンプレートを作る
             </Button>
+            <Button
+              href="/templates/questions/new"
+              variant="secondary"
+            >
+              質問を作る
+            </Button>
           </div>
         </div>
       )}
@@ -361,6 +376,7 @@ export default function TemplatesPage() {
           { key: 'text', label: 'テキスト' },
           { key: 'flex', label: 'Flex' },
           { key: 'image', label: '画像' },
+          { key: 'question', label: '質問' },
           { key: 'unused', label: '未使用' },
         ] as const).map(({ key, label }) => (
           <button
@@ -521,8 +537,8 @@ export default function TemplatesPage() {
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeLabels[t.messageType] ?? t.messageType}
+                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                        {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
                       </span>
                       <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
                     </td>
@@ -606,8 +622,8 @@ export default function TemplatesPage() {
             ) : !drawerData ? null : (
               <div className="p-4 space-y-5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                    {messageTypeLabels[drawerData.messageType] ?? drawerData.messageType}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                    {messageTypeLabels[drawerData.question ? 'question' : drawerData.messageType] ?? drawerData.messageType}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
@@ -621,7 +637,17 @@ export default function TemplatesPage() {
                 <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
                   <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
-                    {drawerData.messageType === 'flex' ? (
+                    {drawerData.question ? (
+                      <div className="space-y-2">
+                        {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
+                        <p className="text-sm font-semibold whitespace-pre-wrap">{drawerData.question.text}</p>
+                        {drawerData.question.choices.map((choice, index) => (
+                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent">
+                            {choice.label}
+                          </div>
+                        ))}
+                      </div>
+                    ) : drawerData.messageType === 'flex' ? (
                       (() => {
                         try {
                           return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
@@ -645,7 +671,14 @@ export default function TemplatesPage() {
                 </div>
 
                 {/* Edit JSON / content */}
-                <div>
+                {drawerData.question ? (
+                  <Button
+                    href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
+                    variant="secondary"
+                  >
+                    質問を編集
+                  </Button>
+                ) : <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
@@ -653,7 +686,7 @@ export default function TemplatesPage() {
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                   />
-                </div>
+                </div>}
 
                 {(editContent !== null || editName !== null) && (
                   <div className="flex gap-2">

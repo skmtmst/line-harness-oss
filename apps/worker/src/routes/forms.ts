@@ -3,10 +3,15 @@ import {
   getForms,
   getFormsWithStats,
   getFormById,
+  getFormAccountIds,
+  getFormDeleteImpact,
+  formBelongsToLineAccount,
   createForm,
   updateForm,
-  deleteForm,
+  archiveFormAtRevision,
+  deleteFormAtRevision,
   getFormSubmissions,
+  getFormSubmissionsPage,
   getLatestFormSubmission,
   createFormSubmission,
   getFriendByLineUserIdForAccount,
@@ -28,6 +33,7 @@ import type {
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import {
@@ -55,6 +61,48 @@ const FORM_UPLOAD_TYPES: Record<string, string> = {
 };
 
 const FORM_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const FORM_ARCHIVE_BODY_MAX_BYTES = 16 * 1024;
+
+class FormArchiveBodyError extends Error {
+  constructor(readonly status: 400 | 413, message: string) {
+    super(message);
+  }
+}
+
+/** 小さい確認本文でも、宣言値と実際に読んだ量の両方へ上限を置く。 */
+async function readBoundedFormArchiveBody(request: Request): Promise<Record<string, unknown>> {
+  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
+  if (Number.isFinite(declared) && declared > FORM_ARCHIVE_BODY_MAX_BYTES) {
+    throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
+  }
+  const reader = request.body?.getReader();
+  if (!reader) return {};
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > FORM_ARCHIVE_BODY_MAX_BYTES) {
+      await reader.cancel();
+      throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new FormArchiveBodyError(400, '送信内容を読み取れませんでした');
+  }
+}
 
 /** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
 interface FormFieldDef {
@@ -105,7 +153,11 @@ async function resolveFriendAccessToken(
 
 function serializeForm(
   row: DbForm,
-  extra?: { lastSubmittedAt?: string | null; usedByAccounts?: FormUsedByAccount[] },
+  extra?: {
+    lastSubmittedAt?: string | null;
+    usedByAccounts?: FormUsedByAccount[];
+    accountScopeReviewRequired?: boolean;
+  },
 ) {
   return {
     id: row.id,
@@ -122,6 +174,9 @@ function serializeForm(
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
     saveToMetadata: Boolean(row.save_to_metadata),
     isActive: Boolean(row.is_active),
+    status: row.status,
+    archivedAt: row.archived_at,
+    revision: row.revision,
     submitCount: row.submit_count,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
@@ -130,7 +185,36 @@ function serializeForm(
     updatedAt: row.updated_at,
     lastSubmittedAt: extra?.lastSubmittedAt ?? null,
     usedByAccounts: extra?.usedByAccounts ?? [],
+    accountScopeReviewRequired: extra?.accountScopeReviewRequired ?? false,
   };
+}
+
+async function canUseFormFromAccount(
+  c: Context<Env>,
+  formId: string,
+  accountId: string | undefined,
+): Promise<boolean> {
+  if (!accountId) return false;
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return false;
+  return formBelongsToLineAccount(c.env.DB, formId, accountId);
+}
+
+/** 選択中だけでなく、フォームが所属する全アカウントを扱える人だけが実行する。 */
+async function authorizedDeleteImpact(
+  c: Context<Env>,
+  formId: string,
+  accountId: string,
+) {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return { kind: 'not_found' as const };
+  }
+  const impact = await getFormDeleteImpact(c.env.DB, formId, accountId);
+  if (!impact) return { kind: 'not_found' as const };
+  const allAccountIds = await getFormAccountIds(c.env.DB, formId);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), allAccountIds)) {
+    return { kind: 'forbidden' as const };
+  }
+  return { kind: 'ready' as const, impact };
 }
 
 function publicWebhookConfig(row: DbForm): {
@@ -199,15 +283,23 @@ function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } 
 }
 
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
-forms.get('/api/forms', async (c) => {
+forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await getFormsWithStats(c.env.DB);
+    const accountId = c.req.query('account_id');
+    if (!accountId) {
+      return c.json({ success: false, error: 'account_id is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId] });
     return c.json({
       success: true,
       data: items.map((row) =>
         serializeForm(row, {
           lastSubmittedAt: row.last_submitted_at,
           usedByAccounts: row.used_by_accounts,
+          accountScopeReviewRequired: row.account_scope_review_required,
         }),
       ),
     });
@@ -225,7 +317,11 @@ forms.get('/api/forms/:id', async (c) => {
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const data = c.get('staff') ? serializeForm(form) : serializePublicForm(form);
+    const staff = c.get('staff');
+    if (staff && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const data = staff ? serializeForm(form) : serializePublicForm(form);
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);
@@ -252,10 +348,17 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
       ogTitle?: string | null;
       ogDescription?: string | null;
       ogImageUrl?: string | null;
+      accountId?: string;
     }>();
 
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
+    }
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
     }
 
     const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
@@ -276,6 +379,7 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
       ogTitle: body.ogTitle ?? null,
       ogDescription: body.ogDescription ?? null,
       ogImageUrl: body.ogImageUrl ?? null,
+      lineAccountIds: [body.accountId],
     });
 
     return c.json({ success: true, data: serializeForm(form) }, 201);
@@ -285,10 +389,38 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
+// POST /api/forms/drafts — 公開されていない空の下書きを作り、編集画面へ進む。
+forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ name?: string; accountId?: string }>()
+      .catch(() => ({} as { name?: string; accountId?: string }));
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const form = await createForm(c.env.DB, {
+      name: body.name?.trim() || '名称未設定のフォーム',
+      fields: '[]',
+      layout: null,
+      isActive: false,
+      lineAccountIds: [body.accountId],
+    });
+    return c.json({ success: true, data: serializeForm(form) }, 201);
+  } catch (err) {
+    console.error('POST /api/forms/drafts error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // PUT /api/forms/:id — update form
 forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const body = await c.req.json<{
       name?: string;
       description?: string | null;
@@ -349,19 +481,138 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-// DELETE /api/forms/:id
+// GET /api/forms/:id/delete-impact — 回答・利用先・開けなくなるURLを同時に確認する。
+forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    return c.json({ success: true, data: authorized.impact });
+  } catch (error) {
+    console.error('GET /api/forms/:id/delete-impact error:', error);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
+  }
+});
+
+// POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
+forms.post('/api/forms/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const expectedRevision = typeof body.expectedRevision === 'number'
+      ? body.expectedRevision
+      : Number.NaN;
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
+
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!authorized.impact.canArchive) {
+      return c.json({
+        success: false,
+        error: 'form_already_archived',
+        message: 'この回答フォームはすでに保管されています。',
+        data: authorized.impact,
+      }, 409);
+    }
+
+    const archived = await archiveFormAtRevision(c.env.DB, c.req.param('id'), expectedRevision);
+    if (!archived) {
+      const latest = await getFormDeleteImpact(c.env.DB, c.req.param('id'), accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
+    return c.json({
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: archived.archived_at,
+        retainedSubmissionCount: authorized.impact.submissionCount,
+        retainedOpenCount: authorized.impact.openCount,
+        retainedReferenceCount: authorized.impact.referenceCount,
+        answerUrlUnavailable: true,
+      },
+    });
+  } catch (error) {
+    if (error instanceof FormArchiveBodyError) {
+      return c.json({ success: false, error: error.message }, error.status);
+    }
+    console.error('POST /api/forms/:id/archive error:', error);
+    return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
+  }
+});
+
+// DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
 forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const form = await getFormById(c.env.DB, id);
-    if (!form) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+    const accountId = c.req.query('account_id')?.trim();
+    const expectedRevision = Number(c.req.query('expected_revision'));
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
-    await deleteForm(c.env.DB, id);
+    const authorized = await authorizedDeleteImpact(c, id, accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!authorized.impact.canDelete) {
+      return c.json({
+        success: false,
+        error: 'form_archive_required',
+        message: '公開中、回答あり、または利用中のため、削除せず停止・保管してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!await deleteFormAtRevision(c.env.DB, id, expectedRevision)) {
+      const latest = await getFormDeleteImpact(c.env.DB, id, accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/forms/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
 
@@ -369,12 +620,31 @@ forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
 forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const form = await getFormById(c.env.DB, id);
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const submissions = await getFormSubmissions(c.env.DB, id);
-    return c.json({ success: true, data: submissions.map(serializeSubmission) });
+    const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
+    if (!hasPagination) {
+      // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
+      const submissions = await getFormSubmissions(c.env.DB, id);
+      return c.json({ success: true, data: submissions.map(serializeSubmission) });
+    }
+    const page = Number(c.req.query('page') ?? '1');
+    const limit = Number(c.req.query('limit') ?? '20');
+    const submissions = await getFormSubmissionsPage(c.env.DB, id, { page, limit });
+    return c.json({
+      success: true,
+      data: {
+        items: submissions.items.map(serializeSubmission),
+        total: submissions.total,
+        page: submissions.page,
+        limit: submissions.limit,
+      },
+    });
   } catch (err) {
     console.error('GET /api/forms/:id/submissions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -385,10 +655,19 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
 forms.post('/api/forms/:id/opened', async (c) => {
   try {
     const formId = c.req.param('id');
+    // 保管後のURLは開けない。回答だけでなく「開いた記録」も増やさない。
+    if (!await getFormById(c.env.DB, formId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     // Open analytics may remain anonymous, but a caller can only attribute an
     // open to the LINE identity proven by its ID token. Body-supplied customer
     // IDs are intentionally ignored.
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (identity && (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId))) {
+      // 関係のない公式アカウントから開いた記録を、このフォームへ混ぜない。
+      return c.json({ success: true });
+    }
     const friend = identity
       ? await getFriendByLineUserIdForAccount(
           c.env.DB,
@@ -422,6 +701,10 @@ forms.post('/api/forms/:id/partial', async (c) => {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, c.req.param('id'), identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
     }
 
     const friend = await getFriendByLineUserIdForAccount(
@@ -482,6 +765,10 @@ forms.post('/api/forms/:id/files', async (c) => {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
     }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
@@ -559,6 +846,10 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
       identity.lineUserId,
@@ -608,6 +899,10 @@ forms.post('/api/forms/:id/submit', async (c) => {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
     }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,

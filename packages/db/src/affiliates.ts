@@ -261,6 +261,12 @@ export interface AffiliateReport {
    */
   totalConversions: number;
   totalRevenue: number;
+  /**
+   * Approved conversions paid at the fixed amount configured on each offer.
+   * Percentage-based affiliates continue to calculate their reward in the web
+   * layer from totalRevenue and commissionRate.
+   */
+  confirmedReward: number;
   /** Number of affiliate_links (ref_codes) belonging to this affiliate. */
   linkCount: number;
   /** Friends whose add-time last-touch attribution is this affiliate. */
@@ -337,10 +343,12 @@ export async function getAffiliateReport(
   // supply them for each subquery occurrence (clicks, conversions, revenue),
   // followed by the friend_adds CTE and finally the outer WHERE clause.
   const dateBindsForRevenue = [...cvDateBinds]; // revenue subquery reuses cv date conditions
+  const dateBindsForConfirmedReward = [...cvDateBinds];
   const allBinds = [
     ...clickDateBinds,   // for total_clicks subquery
     ...cvDateBinds,      // for total_conversions subquery
     ...dateBindsForRevenue, // for total_revenue subquery
+    ...dateBindsForConfirmedReward, // for confirmed_reward subquery
     ...friendAddBinds,   // for the friend_adds CTE date window
     ...values,           // for the outer WHERE clause
   ];
@@ -362,6 +370,14 @@ export async function getAffiliateReport(
          (SELECT COALESCE(SUM(cp.value), 0) FROM conversion_events ce
           JOIN conversion_points cp ON cp.id = ce.conversion_point_id
           WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)${cvDateCond}) as total_revenue,
+         (SELECT COALESCE(SUM(off.reward_amount), 0)
+            FROM conversion_events ce
+            JOIN affiliate_links al
+              ON al.ref_code = ce.attributed_ref_code
+             AND al.affiliate_id = a.id
+            JOIN affiliate_offers off ON off.id = al.offer_id
+           WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
+             AND COALESCE(ce.approval_status, 'pending') = 'approved'${cvDateCond}) as confirmed_reward,
          (SELECT COUNT(*) FROM affiliate_links al WHERE al.affiliate_id = a.id) as link_count,
          COALESCE(fa.friend_adds, 0) as friend_adds
        FROM affiliates a
@@ -378,6 +394,7 @@ export async function getAffiliateReport(
       total_clicks: number;
       total_conversions: number;
       total_revenue: number;
+      confirmed_reward: number;
       link_count: number;
       friend_adds: number;
     }>();
@@ -390,6 +407,7 @@ export async function getAffiliateReport(
     totalClicks: r.total_clicks,
     totalConversions: r.total_conversions,
     totalRevenue: r.total_revenue,
+    confirmedReward: r.confirmed_reward,
     linkCount: r.link_count,
     friendAdds: r.friend_adds,
   }));
