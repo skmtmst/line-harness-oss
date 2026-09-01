@@ -651,7 +651,7 @@ function parseMinSec(v: string): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
 }
 
-function CtasTab({ webinarId }: { webinarId: string }) {
+function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: string | null }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
   const [times, setTimes] = useState<string[]>([])
@@ -670,10 +670,16 @@ function CtasTab({ webinarId }: { webinarId: string }) {
         setLoaded(true)
       })
       .catch(() => setMessage('CTAカードの読み込みに失敗しました。リロードしてください。'))
-    fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>('/api/forms')
-      .then((res) => setForms(res.data.map((f) => ({ id: f.id, name: f.name }))))
-      .catch(() => undefined)
-  }, [webinarId])
+    if (accountId) {
+      fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
+        `/api/forms?account_id=${encodeURIComponent(accountId)}`,
+      )
+        .then((res) => setForms(res.data.map((f) => ({ id: f.id, name: f.name }))))
+        .catch(() => undefined)
+    } else {
+      setForms([])
+    }
+  }, [accountId, webinarId])
 
   const update = (i: number, patch: Partial<WebinarCtaCard>) =>
     setCtas((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
@@ -940,7 +946,7 @@ function EditWebinarInner() {
           <div className="bg-slate-50/40 p-4 sm:p-6 xl:p-8">
             {tab === 'settings' && <WebinarForm initial={webinar} />}
             {tab === 'comments' && <CommentsTab webinarId={webinar.id} />}
-            {tab === 'ctas' && <CtasTab webinarId={webinar.id} />}
+            {tab === 'ctas' && <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />}
             {tab === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
           </div>
         </div>

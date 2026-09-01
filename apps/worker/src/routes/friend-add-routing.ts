@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { getTags, listFriendAddEvents } from '@line-crm/db';
+import { listFriendAddEvents } from '@line-crm/db';
 import type {
   FriendAddKind,
   FriendAddAttributionStatus,
@@ -84,14 +84,27 @@ friendAddRouting.get(
  * 設定・選べるシナリオ・選べるタグを1回で返す。画面が3回叩くと、
  * 途中で失敗したときに「シナリオ名だけ出ない」ような半端な状態になる。
  */
-friendAddRouting.get('/api/friend-add-routing', async (c) => {
+friendAddRouting.get('/api/friend-add-routing', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const accountId = getAccountId(c);
     if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
 
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.ids.includes(accountId)) {
+      return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    }
+
     const saved = await loadFriendAddRouting(c.env.DB, accountId);
     const scenarios = await listFriendAddScenarios(c.env.DB, accountId);
-    const tags = (await getTags(c.env.DB)).map((t) => ({ id: t.id, name: t.name }));
+    const tagRows = await c.env.DB
+      .prepare(
+        `SELECT id, name FROM tags
+          WHERE line_account_id = ?${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''}
+          ORDER BY name ASC`,
+      )
+      .bind(accountId)
+      .all<{ id: string; name: string }>();
+    const tags = tagRows.results ?? [];
 
     return c.json({
       success: true,
@@ -116,6 +129,11 @@ friendAddRouting.put(
     try {
       const accountId = getAccountId(c);
       if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.ids.includes(accountId)) {
+        return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+      }
 
       const body = await c.req.json<unknown>();
       const routing = normalizeRouting((body as { routing?: unknown })?.routing ?? body);
@@ -157,40 +175,50 @@ friendAddRouting.put(
  * 設計の「テスト実行」がこれ。実際に送ってしまうと、確かめるたびに
  * お客さまへメッセージが飛ぶ。
  */
-friendAddRouting.post('/api/friend-add-routing/test', async (c) => {
-  try {
-    const accountId = getAccountId(c);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+friendAddRouting.post(
+  '/api/friend-add-routing/test',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const accountId = getAccountId(c);
+      if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
 
-    const body = await c.req.json<{ friendId?: string }>();
-    if (!body.friendId) return c.json({ success: false, error: 'friendId が必要です' }, 400);
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.ids.includes(accountId)) {
+        return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+      }
 
-    const friend = await c.env.DB.prepare(
-      `SELECT id, unfollow_count, first_followed_at, display_name FROM friends WHERE id = ?`,
-    )
-      .bind(body.friendId)
-      .first<{
-        id: string;
-        unfollow_count: number | null;
-        first_followed_at: string | null;
-        display_name: string | null;
-      }>();
-    if (!friend) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+      const body = await c.req.json<{ friendId?: string }>();
+      if (!body.friendId) return c.json({ success: false, error: 'friendId が必要です' }, 400);
 
-    const result = await previewFriendAddRouting(c.env.DB, accountId, friend);
-    return c.json({
-      success: true,
-      data: {
-        ...result,
-        displayName: friend.display_name,
-        unfollowCount: friend.unfollow_count ?? 0,
-        firstFollowedAt: friend.first_followed_at,
-      },
-    });
-  } catch (err) {
-    console.error('POST /api/friend-add-routing/test error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
+      const friend = await c.env.DB.prepare(
+        `SELECT id, unfollow_count, first_followed_at, display_name
+           FROM friends WHERE id = ? AND line_account_id = ?`,
+      )
+        .bind(body.friendId, accountId)
+        .first<{
+          id: string;
+          unfollow_count: number | null;
+          first_followed_at: string | null;
+          display_name: string | null;
+        }>();
+      if (!friend) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+
+      const result = await previewFriendAddRouting(c.env.DB, accountId, friend);
+      return c.json({
+        success: true,
+        data: {
+          ...result,
+          displayName: friend.display_name,
+          unfollowCount: friend.unfollow_count ?? 0,
+          firstFollowedAt: friend.first_followed_at,
+        },
+      });
+    } catch (err) {
+      console.error('POST /api/friend-add-routing/test error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 export { friendAddRouting, classifyFriend };

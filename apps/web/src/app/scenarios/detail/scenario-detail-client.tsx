@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -44,6 +45,12 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import {
+  scenarioReachBarWidth,
+  scenarioReachCountLabel,
+  scenarioReachPercent,
+  scenarioReachPercentLabel,
+} from './scenario-reach-display'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -150,6 +157,7 @@ interface TemplateOpt {
   category: string
   messageType: string
   messageContent: string
+  question: ScenarioQuestion | null
 }
 
 interface TagOpt {
@@ -162,7 +170,11 @@ interface ScenarioStats {
   activeNow: number
   completed: number
   paused: number
-  steps: Array<{ stepOrder: number; reachedCount: number; reachRate: number }>
+  steps: Array<{
+    stepOrder: number
+    reachedCount: number
+    reachRate?: number | null
+  }>
 }
 
 function FlexPreview({ content }: { content: string }) {
@@ -224,7 +236,13 @@ function SettingCard({
   )
 }
 
-export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
+export default function ScenarioDetailClient({
+  scenarioId,
+  showStarted = false,
+}: {
+  scenarioId: string
+  showStarted?: boolean
+}) {
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -334,12 +352,15 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       if (cancelled) return
       if (statsRes && statsRes.success) setStats(statsRes.data)
       if (tplRes && tplRes.success) {
-        setTemplates(tplRes.data.map((t) => ({
+        setTemplates(tplRes.data
+          .filter((t) => !t.question || t.questionStatus === 'published')
+          .map((t) => ({
           id: t.id,
           name: t.name,
           category: t.category,
           messageType: t.messageType,
           messageContent: t.messageContent,
+          question: (t.question as ScenarioQuestion | null) ?? null,
         })))
       }
       if (tagRes && tagRes.success) {
@@ -596,8 +617,18 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   }
 
   const handleSaveStep = async () => {
+    if (stepForm.question) {
+      if (!stepForm.question.text.trim()) {
+        setStepError('質問文を入力してください')
+        return
+      }
+      if (stepForm.question.choices.length === 0 || stepForm.question.choices.some((choice) => !choice.label.trim())) {
+        setStepError('すべての選択肢に文字を入力してください')
+        return
+      }
+    }
     // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
-    if (stepForm.inputMode === 'direct') {
+    if (!stepForm.question && stepForm.inputMode === 'direct') {
       if (!stepForm.messageContent.trim()) {
         setStepError('メッセージ内容を入力してください')
         return
@@ -859,7 +890,17 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             <select
               className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               value={stepForm.templateId ?? ''}
-              onChange={(e) => setStepForm({ ...stepForm, templateId: e.target.value || null })}
+              onChange={(e) => {
+                const templateId = e.target.value || null
+                const template = templates.find((item) => item.id === templateId)
+                setStepForm({
+                  ...stepForm,
+                  templateId,
+                  question: template?.question ? structuredClone(template.question) : null,
+                  messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
+                  messageContent: template?.messageContent ?? stepForm.messageContent,
+                })
+              }}
             >
               <option value="">-- 選択してください --</option>
               {templates.map((t) => (
@@ -1111,6 +1152,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                一覧へ戻る導線は設計では最下部にあり、ここには置かない
                （下の「シナリオ一覧に戻る」がそれ）。 */
             <div className="flex flex-wrap items-center gap-2">
+              <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
               <button
                 disabled
                 title="マニュアルは準備中です"
@@ -1127,9 +1169,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 一括プレビュー
               </button>
               <button
-                disabled
-                title="一括テスト送信は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
+                disabled={sortedSteps.length === 0}
+                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
                 一括テスト送信
               </button>
@@ -1147,6 +1190,21 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           }
         />
       </div>
+
+      {showStarted ? (
+        <div
+          data-design-node="NrBkW"
+          className="border-success bg-success-bg text-success mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
+          role="status"
+        >
+          <p className="font-semibold">
+            配信を開始しました。条件を満たした友だちから順に配信します。
+          </p>
+          <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
+            開始後の結果を見る
+          </Link>
+        </div>
+      ) : null}
 
       {/*
         同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
@@ -1457,13 +1515,6 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             >
               分岐を追加
             </button>
-            <button
-              onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
-              disabled={sortedSteps.length === 0}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-            >
-              一括テスト送信
-            </button>
           </div>
         </div>
 
@@ -1507,7 +1558,8 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               <tbody>
                 {sortedSteps.map((step, idx) => {
                   const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
-                  const pct = stat ? Math.round(stat.reachRate * 100) : null
+                  const pct = scenarioReachPercent(stat?.reachRate)
+                  const reachBarWidth = scenarioReachBarWidth(pct)
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
@@ -1600,16 +1652,20 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
-                              <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
-                                <span
-                                  className="bg-accent block h-full rounded-full"
-                                  style={{ width: `${Math.min(100, pct ?? 0)}%` }}
-                                />
-                              </span>
+                              {reachBarWidth === null ? null : (
+                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                  <span
+                                    className="bg-accent block h-full rounded-full"
+                                    style={{ width: reachBarWidth }}
+                                  />
+                                </span>
+                              )}
                               <span className="text-ink text-sm tabular-nums">
-                                {stat.reachedCount}人
+                                {scenarioReachCountLabel(stat.reachedCount)}
                               </span>
-                              <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
+                              <span className="text-ink-faint text-xs tabular-nums">
+                                {scenarioReachPercentLabel(pct)}
+                              </span>
                             </span>
                           ) : (
                             <span className="text-ink-faint text-sm">—</span>
@@ -1815,6 +1871,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       {testSend && (
         <TestSendDialog
           scenarioId={id}
+          lineAccountId={scenario?.lineAccountId ?? null}
           stepId={testSend.stepId}
           stepLabel={testSend.label}
           onClose={() => setTestSend(null)}
