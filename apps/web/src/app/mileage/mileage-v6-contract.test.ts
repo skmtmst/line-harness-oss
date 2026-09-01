@@ -117,8 +117,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('手動増減の失敗でAPI番号や内部文をそのまま出さない', () => {
     expect(ADJUSTMENT).toContain('mileageAdjustmentErrorMessage')
     expect(ADJUSTMENT).toContain("error.status === 405")
-    expect(ADJUSTMENT).toContain('この環境ではマイルを手で変更できません。')
-    expect(ADJUSTMENT).toContain('状態を読み直してから、もう一度お試しください。')
+    expect(ADJUSTMENT).toContain('この環境ではマイル変更を実行できません。')
+    expect(ADJUSTMENT).toContain('画面を読み直してからやり直してください。')
+    expect(ADJUSTMENT).toContain("error.status === 428")
+    expect(ADJUSTMENT).toContain('確認手順が完了していません。')
     expect(ADJUSTMENT).not.toContain("error instanceof ApiError || error instanceof Error ? error.message")
   })
 })
