@@ -1,0 +1,74 @@
+/*
+ * 写真審査一覧（Pencil ★V6 `Qu6Vk`）の、この画面だけの寸法。
+ *
+ * 設計は本体と右カラム390pxの2列。共通部品には「390pxの列」を持つ受け皿が
+ * 無い（`side-cards.tsx` は列の中に置く1枚で、列そのものは画面が持つ）。
+ */
+
+.body {
+  display: grid;
+  align-items: start;
+  gap: 16px;
+}
+
+@media (min-width: 1280px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr) 390px; /* 設計 右カラム w390 */
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sideCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile); /* 設計 カード r10 */
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.sideTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+/* 未接続の枠。値の場所には `—` を置き、理由を続けて書く。 */
+.sideMissingValue {
+  margin-top: 8px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-display);
+  font-weight: 700;
+}
+
+.sideNote {
+  margin-top: 4px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.reasonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.reasonName {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.reasonCount {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

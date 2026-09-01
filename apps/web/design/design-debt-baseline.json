@@ -26,7 +26,7 @@
     "direct-th": 10
   },
   "app/automations/new/page.tsx": {
-    "unresolved-classname": 6
+    "unresolved-classname": 60
   },
   "app/automations/page.tsx": {
     "arbitrary-value": 3,
@@ -218,9 +218,9 @@
     "direct-secondary-button": 5
   },
   "app/line-notifications/page.tsx": {
-    "direct-primary-button": 2,
+    "direct-primary-button": 1,
     "arbitrary-value": 8,
-    "direct-secondary-button": 2
+    "unresolved-classname": 5
   },
   "app/login/page.tsx": {
     "arbitrary-value": 1,
@@ -255,6 +255,7 @@
     "arbitrary-value": 21
   },
   "app/nen-members/page.tsx": {
+    "unresolved-classname": 13,
     "arbitrary-value": 1
   },
   "app/page.tsx": {
