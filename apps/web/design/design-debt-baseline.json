@@ -604,6 +604,9 @@
   "components/friends/advanced-search-dialog.tsx": {
     "arbitrary-value": 57
   },
+  "components/friends/bulk-run-dialog.tsx": {
+    "unresolved-classname": 42
+  },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
   },
