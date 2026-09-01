@@ -1,5 +1,13 @@
 import { jstNow } from './utils.js';
 
+/** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
+const LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
+
+export interface FriendFieldScope {
+  tenantId: string;
+  lineAccountId: string;
+}
+
 /**
  * 友だち情報欄。
  *
@@ -40,12 +48,40 @@ export interface FriendField {
   updated_at: string;
 }
 
+export interface ScopedFriendField extends FriendField {
+  line_account_id: string | null;
+  tenant_id: string;
+  is_inherited: number;
+}
+
+export interface FriendFieldListSummary {
+  total: number;
+  inUse: number;
+  registeredFriends: number;
+  updatedThisMonth: number;
+  /** forms 自体にアカウント所属が無いため、誤った全体件数を返さない。 */
+  formLinks: null;
+}
+
+const SCOPED_FIELD_SELECT = `
+  SELECT ff.*,
+         ffs.line_account_id,
+         COALESCE(ffs.tenant_id, '${LEGACY_TENANT_ID}') AS tenant_id,
+         CASE WHEN ffs.field_id IS NULL OR ffs.line_account_id IS NULL THEN 1 ELSE 0 END AS is_inherited
+    FROM friend_fields ff
+    LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id`;
+
 export interface FriendFieldValue {
   friend_id: string;
   field_id: string;
   value: string | null;
   updated_by: string | null;
   updated_at: string;
+}
+
+export interface FriendFieldMigrationSourceValue {
+  friend_id: string;
+  value: string;
 }
 
 /**
@@ -104,6 +140,45 @@ export async function getFriendFields(
   return result.results;
 }
 
+/** 選択中のLINE公式アカウントから見える項目だけを返す。 */
+export async function getFriendFieldsForScope(
+  db: D1Database,
+  scope: FriendFieldScope,
+  opts: { folderId?: string } = {},
+): Promise<ScopedFriendField[]> {
+  const folder = opts.folderId ? ' AND ff.folder_id = ?' : '';
+  const binds: unknown[] = [LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId];
+  if (opts.folderId) binds.push(opts.folderId);
+  const result = await db
+    .prepare(
+      `${SCOPED_FIELD_SELECT}
+        WHERE COALESCE(ffs.tenant_id, ?) = ?
+          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)${folder}
+        ORDER BY CASE WHEN ffs.line_account_id = ? THEN 0 ELSE 1 END,
+                 ff.display_order ASC, ff.name ASC`,
+    )
+    .bind(...binds, scope.lineAccountId)
+    .all<ScopedFriendField>();
+  return result.results;
+}
+
+/** ID直指定でも、担当外アカウントの項目を返さない。 */
+export async function getFriendFieldByIdForScope(
+  db: D1Database,
+  id: string,
+  scope: FriendFieldScope,
+): Promise<ScopedFriendField | null> {
+  return db
+    .prepare(
+      `${SCOPED_FIELD_SELECT}
+        WHERE ff.id = ?
+          AND COALESCE(ffs.tenant_id, ?) = ?
+          AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
+    )
+    .bind(id, LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId)
+    .first<ScopedFriendField>();
+}
+
 export async function getFriendFieldById(
   db: D1Database,
   id: string,
@@ -159,6 +234,51 @@ export async function createFriendField(
     )
     .run();
   return (await getFriendFieldById(db, id))!;
+}
+
+/** 新規項目と所属を同じD1バッチで作る。 */
+export async function createFriendFieldForScope(
+  db: D1Database,
+  scope: FriendFieldScope,
+  input: CreateFriendFieldInput,
+): Promise<ScopedFriendField> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO friend_fields
+           (id, folder_id, name, field_key, type, options_json, default_value,
+            source, ec_field_path, ec_is_master, is_personal, is_starred,
+            display_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.folderId ?? null,
+        input.name,
+        input.fieldKey,
+        input.type,
+        input.optionsJson ?? null,
+        input.defaultValue ?? null,
+        input.source ?? 'manual',
+        input.ecFieldPath ?? null,
+        input.ecIsMaster ? 1 : 0,
+        input.isPersonal ? 1 : 0,
+        input.isStarred ? 1 : 0,
+        input.displayOrder ?? 0,
+        now,
+        now,
+      ),
+    db
+      .prepare(
+        `INSERT INTO friend_field_scopes
+           (field_id, tenant_id, line_account_id, created_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .bind(id, scope.tenantId, scope.lineAccountId, now),
+  ]);
+  return (await getFriendFieldByIdForScope(db, id, scope))!;
 }
 
 export interface UpdateFriendFieldInput {
@@ -221,6 +341,78 @@ export async function countFriendFieldValues(db: D1Database, fieldId: string): P
     .bind(fieldId)
     .first<{ c: number }>();
   return Number(row?.c ?? 0);
+}
+
+/** 選択中アカウントにいる友だちだけを数える。 */
+export async function countFriendFieldValuesForScope(
+  db: D1Database,
+  fieldId: string,
+  scope: FriendFieldScope,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS c
+         FROM friend_field_values v
+         JOIN friends f ON f.id = v.friend_id
+        WHERE v.field_id = ? AND f.line_account_id = ?
+          AND v.value IS NOT NULL AND v.value != ''`,
+    )
+    .bind(fieldId, scope.lineAccountId)
+    .first<{ c: number }>();
+  return Number(row?.c ?? 0);
+}
+
+/** dry-run用。選択中アカウントの値だけを読み、値そのものは変更しない。 */
+export async function getFriendFieldValuesForMigration(
+  db: D1Database,
+  fieldId: string,
+  scope: FriendFieldScope,
+): Promise<FriendFieldMigrationSourceValue[]> {
+  const result = await db
+    .prepare(
+      `SELECT v.friend_id, v.value
+         FROM friend_field_values v
+         JOIN friends f ON f.id = v.friend_id
+        WHERE v.field_id = ? AND f.line_account_id = ?
+          AND v.value IS NOT NULL AND v.value != ''
+        ORDER BY v.friend_id ASC`,
+    )
+    .bind(fieldId, scope.lineAccountId)
+    .all<FriendFieldMigrationSourceValue>();
+  return result.results;
+}
+
+/** V6 4-2 上部の4枚に使う、選択中アカウントだけの集計。 */
+export async function getFriendFieldListSummary(
+  db: D1Database,
+  scope: FriendFieldScope,
+): Promise<FriendFieldListSummary> {
+  const monthStart = `${jstNow().slice(0, 7)}-01`;
+  const fields = await getFriendFieldsForScope(db, scope);
+  if (fields.length === 0) {
+    return { total: 0, inUse: 0, registeredFriends: 0, updatedThisMonth: 0, formLinks: null };
+  }
+  const ids = fields.map((field) => field.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const row = await db
+    .prepare(
+      `SELECT
+         COUNT(DISTINCT CASE WHEN v.value IS NOT NULL AND v.value != '' THEN v.field_id END) AS in_use,
+         COUNT(DISTINCT CASE WHEN v.value IS NOT NULL AND v.value != '' THEN v.friend_id END) AS friends,
+         COUNT(CASE WHEN v.updated_at >= ? THEN 1 END) AS updated_this_month
+       FROM friend_field_values v
+       JOIN friends f ON f.id = v.friend_id
+      WHERE f.line_account_id = ? AND v.field_id IN (${placeholders})`,
+    )
+    .bind(monthStart, scope.lineAccountId, ...ids)
+    .first<{ in_use: number; friends: number; updated_this_month: number }>();
+  return {
+    total: fields.length,
+    inUse: Number(row?.in_use ?? 0),
+    registeredFriends: Number(row?.friends ?? 0),
+    updatedThisMonth: Number(row?.updated_this_month ?? 0),
+    formLinks: null,
+  };
 }
 
 export async function deleteFriendField(db: D1Database, id: string): Promise<void> {

@@ -6,7 +6,8 @@ describe('NEN配信の表示', () => {
     expect(formatCampaignTiming({
       campaignKey: 'birthday_coupon',
       delayDays: -3,
-      deliveryTime: '10:00',
+      // 保存済みの値に関係なく、実行処理は毎日10:00固定。
+      deliveryTime: '18:30',
     })).toBe('誕生日の3日前 10:00')
   })
 
