@@ -9,10 +9,17 @@ const page = readFileSync(join(here, 'page.tsx'), 'utf8')
 describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   it('Pencilの実Nodeと3段の進み方を表示する', () => {
     expect(page).toContain('data-design-node="cCB7r"')
-    expect(page).toContain('aria-label="シナリオ作成の進み方"')
-    expect(page).toContain('<StepMark n={1} label="シナリオ情報" state="done" />')
-    expect(page).toContain('<StepMark n={2} label="配信方式" state="current" />')
-    expect(page).toContain('<StepMark n={3} label="1通目を設定" state="todo" />')
+    /*
+      段の見た目は共通部品（`components/shared/step-trail`）へ移した。
+      **同じ形を2か所で別々に書かない**ため。`aria-label` と ✓ の出し方は
+      部品側の試験（`step-trail.test.tsx`）が見張る。ここでは
+      **この画面が3段を、正しい名前と状態で渡しているか**を見る。
+    */
+    expect(page).toContain("import StepTrail from '@/components/shared/step-trail'")
+    expect(page).toContain('label="シナリオ作成の進み方"')
+    expect(page).toContain("{ label: 'シナリオ情報', state: 'done' }")
+    expect(page).toContain("{ label: '配信方式', state: 'current' }")
+    expect(page).toContain("{ label: '1通目を設定', state: 'todo' }")
   })
 
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {

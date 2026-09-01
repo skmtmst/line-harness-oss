@@ -5,8 +5,7 @@
  * 「SQL が正しいか」を確かめられない。条件ビルダーやアクションのように
  * **SQL そのものが仕様**のものは、本物の SQLite に当てないと意味がない。
  *
- * 実装しているのは実際に使っている口だけ（prepare / bind / first / all / run）。
- * batch や exec は使っていないので置いていない。
+ * 実装しているのは実際に使っている口だけ（prepare / bind / first / all / run / batch）。
  */
 import Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'

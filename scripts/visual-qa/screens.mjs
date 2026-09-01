@@ -17,7 +17,7 @@
  *   mode      'page'     … ページ全体を撮る（`fullPage`）
  *             'viewport' … 見えている範囲だけ撮る
  *   height    'viewport' のときの高さ。**設計の高さに合わせる**
- *   steps     撮る前の操作。`{ click: 'ボタン名' }` `{ wait: 800 }`
+ *   steps     撮る前の操作。`{ click: 'ボタン名' }` `{ fill: '欄名', text: '…' }` `{ wait: 800 }`
  *   clock     時計を止める時刻。相対時刻（「6日前」）を出す画面では必須
  *   status    'unimplemented' … 実装が無い。**撮らない。合格にもしない**
  *   why       `status` の理由。空にしない
@@ -29,6 +29,18 @@
 
 /** ダッシュボードの「6日前」を止める時刻。設計の推移が8/19までなので、その日に置く。 */
 const DASHBOARD_CLOCK = '2026-08-19T12:00:00.000Z'
+
+/**
+ * 受信箱の時計。「1時間12分待ち」を出すため、設計の最終受信に合わせて止める。
+ * 止めないと待ち時間が伸び続け、日をまたぐたびに絵が変わる。
+ */
+const INBOX_CLOCK = '2026-08-19T11:00:00.000Z'
+
+/** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
+const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
+
+/** 会話を1本選んでから撮る。設計はどれも「Kenta Kawano (Obama)」を開いた状態。 */
+const OPEN_CHAT = [{ click: 'Kenta Kawano (Obama)', after: 1200 }]
 
 export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
@@ -55,6 +67,87 @@ export const SCREENS = [
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
+  },
+
+  // ── 機能2 受信箱 ────────────────────────────────────────
+  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT },
+  {
+    ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
+  },
+  {
+    ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
+    steps: [...OPEN_CHAT, { click: '顧客情報を閉じる' }],
+  },
+  {
+    ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
+    steps: [...OPEN_CHAT, { click: '表示項目' }],
+  },
+  // 未読の会話が並んだ状態。開かずにそのまま撮る。
+  { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読' },
+  {
+    ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
+  },
+  {
+    ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
+    steps: [...OPEN_CHAT, { click: '内部メモ' }],
+  },
+  /*
+    2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。素のセレクトのままだと
+    開いた中身がブラウザ任せで**画像に写らない**ので、専用の部品へ替えた
+    （`components/chats/inbox-dropdown.tsx`）。
+    2-8 は一覧の絞り込み、2-9 は会話の見出し、2-10 は対応マーク。
+  */
+  {
+    ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
+    steps: [{ click: '担当者で絞り込む' }],
+  },
+  {
+    ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
+    steps: [...OPEN_CHAT, { click: '担当者を変える' }],
+  },
+  {
+    ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
+    steps: [...OPEN_CHAT, { click: '対応マークを変える' }],
+  },
+  {
+    ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
+    // 「予約」だけだと**分類のチップ**に当たる。フォルダの行は
+    // `role="option"` で「フォルダ 予約」という名前なので、そちらを指す。
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: 'フォルダ 予約', role: 'option' }],
+  },
+  { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }] },
+  { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }] },
+  /*
+    2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
+    「この条件を保存」で `Ln4zS` のモーダルを開き、名前を入れて保存する。
+    エラーは空のとき・同じ名前のときで文を変える。
+  */
+  {
+    ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
+    steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
+  },
+  {
+    ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
+    steps: [
+      { click: '保存した検索' }, { click: 'この条件を保存' },
+      { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
+    ],
+  },
+  {
+    ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
+    steps: [
+      { click: '保存した検索' }, { click: 'この条件を保存' },
+      { click: 'この条件を保存', nth: 1 },
+    ],
+  },
+  {
+    ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
+    steps: [
+      { click: '保存した検索' }, { click: 'この条件を保存' },
+      { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
+    ],
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
@@ -115,6 +208,11 @@ export const SCREENS = [
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
 export const DESIGN_SIZE = {
+  xGLVe: [1920, 1840], NfgOs: [1920, 1840], H3lAOB: [1920, 1840], Xi4x9: [1920, 1840],
+  f0zn6: [1920, 1840], NWbuF: [1920, 1840], B7CER8: [1920, 1840], YZaDK: [1920, 1840],
+  L35UOV: [1920, 1840], IYjvu: [1920, 1840], TUveA: [1920, 1840], w72a2: [1920, 1840],
+  ASsb3: [1920, 1840], ANgda: [1920, 1840], tBlkL: [1920, 1840], AuSDY: [1920, 1840],
+  LHjwD: [1920, 1840],
   vUXKb: [1920, 1668], ZN0ov: [1920, 1754], JN6mQ: [1920, 1668],
   NjK9q: [1920, 1668], Alekb: [1920, 1668],
   l25rlp: [1920, 1080], tP0RW: [1920, 1320], LfrQs: [1920, 1320],
