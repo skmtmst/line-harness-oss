@@ -27,9 +27,15 @@ export async function resolveInterpolationExtra(
   const needsVars = VAR_PATTERN.test(content);
   if (!needsFields && !needsVars) return {};
 
+  const account = needsVars
+    ? await db.prepare(`SELECT line_account_id FROM friends WHERE id = ?`)
+      .bind(friendId)
+      .first<{ line_account_id: string | null }>()
+    : null;
+
   const [fields, vars] = await Promise.all([
     needsFields ? getFriendFieldMap(db, friendId) : Promise.resolve(undefined),
-    needsVars ? getCommonVarMap(db) : Promise.resolve(undefined),
+    needsVars ? getCommonVarMap(db, account?.line_account_id) : Promise.resolve(undefined),
   ]);
   return { fields, vars };
 }

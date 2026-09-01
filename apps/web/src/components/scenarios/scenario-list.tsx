@@ -233,6 +233,12 @@ export default function ScenarioList({
                 </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button
+                    /*
+                      **撮影の入口。**文言（「停止」「再開」）で探すと、言葉を
+                      変えたときに撮影が黙って空振りする。Node ID を付ける。
+                      止めているものだけが「再開」＝配信開始の確認へ進む。
+                    */
+                    data-qa-open={s.isActive ? undefined : 'RUxNf'}
                     onClick={() => {
                       onToggleActive(s.id, s.isActive)
                     }}

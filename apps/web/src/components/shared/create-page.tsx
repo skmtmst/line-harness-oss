@@ -34,6 +34,10 @@ export interface CreatePageProps {
   aside?: ReactNode
   /** 保存ボタンの文言。設計は画面ごとに「メニューを追加」などと書き分けている */
   saveLabel?: string
+  /** 共通トップバーだけに画面名を置くV6画面では、本文の重複見出しを出さない。 */
+  showHeader?: boolean
+  /** Pencilの実ノードと、作成フロー全体を結び付ける。 */
+  designNode?: string
   children: ReactNode
 }
 
@@ -46,6 +50,8 @@ export default function CreatePage({
   validate,
   aside,
   saveLabel,
+  showHeader = true,
+  designNode,
   children,
 }: CreatePageProps) {
   const router = useRouter()
@@ -84,7 +90,7 @@ export default function CreatePage({
   }
 
   return (
-    <div>
+    <div data-design-node={designNode}>
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href={parent[1]} className="hover:underline">
           {parent[0]}
@@ -93,9 +99,11 @@ export default function CreatePage({
         <span>{title}</span>
       </nav>
 
-      <div data-design="Head">
-        <Header title={title} description={description} />
-      </div>
+      {showHeader ? (
+        <div data-design="Head">
+          <Header title={title} description={description} />
+        </div>
+      ) : null}
 
       <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
         <div
