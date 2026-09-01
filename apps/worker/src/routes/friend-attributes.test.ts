@@ -3,13 +3,11 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const marks = {
-  getSupportMarks: vi.fn(),
+  getSupportMarksWithUsage: vi.fn(),
   getSupportMarkById: vi.fn(),
   createSupportMark: vi.fn(),
   updateSupportMark: vi.fn(),
-  deleteSupportMark: vi.fn(),
-  replaceAndDeleteSupportMark: vi.fn(),
-  countFriendsWithMark: vi.fn(),
+  replaceAndArchiveSupportMark: vi.fn(),
   getDefaultSupportMark: vi.fn(),
   setFriendSupportMark: vi.fn(),
   setFriendSupportMarkBulk: vi.fn(),
@@ -94,6 +92,7 @@ const MARK = {
   auto_on_inbound: 1,
   display_order: 0,
   created_at: '2026-08-16',
+  archived_at: null,
   tenant_id: 'tenant-1',
   line_account_id: 'account-1',
   is_inherited: 0,
@@ -123,13 +122,20 @@ const FOLDER = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  marks.getSupportMarks.mockResolvedValue([MARK]);
+  marks.getSupportMarksWithUsage.mockResolvedValue([{
+    ...MARK,
+    friend_count: 7,
+    broadcasts: 2,
+    scenarios: 1,
+    auto_replies: 0,
+    saved_searches: 3,
+    automations: 1,
+  }]);
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
   marks.updateSupportMark.mockResolvedValue(MARK);
   marks.getDefaultSupportMark.mockResolvedValue(MARK);
-  marks.replaceAndDeleteSupportMark.mockResolvedValue(0);
-  marks.countFriendsWithMark.mockResolvedValue(0);
+  marks.replaceAndArchiveSupportMark.mockResolvedValue(0);
   marks.setFriendSupportMark.mockResolvedValue(true);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
   searches.getSavedSearches.mockResolvedValue([SEARCH]);
@@ -159,13 +165,13 @@ describe('対応マーク', () => {
   it('LINE公式アカウント未選択なら一覧を返さない', async () => {
     const res = await req('/api/support-marks', 'GET');
     expect(res.status).toBe(400);
-    expect(marks.getSupportMarks).not.toHaveBeenCalled();
+    expect(marks.getSupportMarksWithUsage).not.toHaveBeenCalled();
   });
 
   it('見えないLINE公式アカウントは404にする', async () => {
     const res = await req('/api/support-marks?lineAccountId=account-other', 'GET');
     expect(res.status).toBe(404);
-    expect(marks.getSupportMarks).not.toHaveBeenCalled();
+    expect(marks.getSupportMarksWithUsage).not.toHaveBeenCalled();
   });
 
   it('所属テナントを確認できない利用者には返さない', async () => {
@@ -187,15 +193,15 @@ describe('対応マーク', () => {
     );
     expect(res.status).toBe(403);
     expect(accountAccess.getVisibleLineAccountScope).not.toHaveBeenCalled();
-    expect(marks.getSupportMarks).not.toHaveBeenCalled();
+    expect(marks.getSupportMarksWithUsage).not.toHaveBeenCalled();
   });
 
   it('一覧に付いている人数が入る', async () => {
-    marks.countFriendsWithMark.mockResolvedValue(7);
     const res = await req('/api/support-marks?lineAccountId=account-1', 'GET');
-    const body = (await res.json()) as { data: Array<{ friendCount: number }> };
+    const body = (await res.json()) as { data: Array<{ friendCount: number; usedIn: { broadcasts: number; savedSearches: number } }> };
     expect(body.data[0].friendCount).toBe(7);
-    expect(marks.getSupportMarks).toHaveBeenCalledWith(env.DB, {
+    expect(body.data[0].usedIn).toMatchObject({ broadcasts: 2, savedSearches: 3 });
+    expect(marks.getSupportMarksWithUsage).toHaveBeenCalledWith(env.DB, {
       tenantId: 'tenant-1',
       lineAccountId: 'account-1',
     });
@@ -223,52 +229,138 @@ describe('対応マーク', () => {
   it('既定のマークは削除できない', async () => {
     const res = await req('/api/support-marks/m-1?lineAccountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
-    expect(marks.deleteSupportMark).not.toHaveBeenCalled();
+    expect(marks.replaceAndArchiveSupportMark).not.toHaveBeenCalled();
   });
 
-  it('付いている人がいれば人数を返して止める', async () => {
-    marks.getSupportMarkById.mockResolvedValue({ ...MARK, is_default: 0 });
-    marks.countFriendsWithMark.mockResolvedValue(5);
-    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE');
+  it('設定参照があれば友だちと使用先の影響を返して止める', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
+    marks.getSupportMarksWithUsage.mockResolvedValue([{
+      ...MARK,
+      id: 'm-2',
+      is_default: 0,
+      friend_count: 5,
+      broadcasts: 2,
+      scenarios: 1,
+      auto_replies: 0,
+      saved_searches: 3,
+      automations: 1,
+    }]);
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE', {});
     expect(res.status).toBe(409);
     const body = (await res.json()) as {
       friendCount: number;
+      usedIn: { broadcasts: number; savedSearches: number };
       replacementMark: { id: string; name: string };
     };
     expect(body.friendCount).toBe(5);
-    expect(body.replacementMark).toMatchObject({ id: 'm-1', name: '未対応' });
+    expect(body.usedIn).toMatchObject({ broadcasts: 2, savedSearches: 3 });
+    expect(body).toMatchObject({ code: 'REFERENCED' });
+    expect(marks.replaceAndArchiveSupportMark).not.toHaveBeenCalled();
   });
 
-  it('force=1 なら初期値へ置換してから消す', async () => {
+  it('使用先が無くても置換先を明示しなければ保管しない', async () => {
     marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
-    marks.countFriendsWithMark.mockResolvedValue(5);
-    marks.replaceAndDeleteSupportMark.mockResolvedValue(5);
-    const res = await req('/api/support-marks/m-2?lineAccountId=account-1&force=1', 'DELETE');
+    marks.getSupportMarksWithUsage.mockResolvedValue([{
+      ...MARK,
+      id: 'm-2',
+      is_default: 0,
+      friend_count: 0,
+      broadcasts: 0,
+      scenarios: 0,
+      auto_replies: 0,
+      saved_searches: 0,
+      automations: 0,
+    }]);
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE', {});
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'REPLACEMENT_REQUIRED' });
+    expect(marks.replaceAndArchiveSupportMark).not.toHaveBeenCalled();
+  });
+
+  it('確認した影響が同じなら友だちを置換してマークを保管する', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
+    marks.getSupportMarksWithUsage.mockResolvedValue([{
+      ...MARK,
+      id: 'm-2',
+      is_default: 0,
+      friend_count: 5,
+      broadcasts: 0,
+      scenarios: 0,
+      auto_replies: 0,
+      saved_searches: 0,
+      automations: 0,
+    }]);
+    marks.replaceAndArchiveSupportMark.mockResolvedValue(5);
+    const expectedImpact = {
+      friendCount: 5,
+      usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
+    };
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE', {
+      replacementMarkId: 'm-1',
+      expectedImpact,
+    });
     expect(res.status).toBe(200);
-    expect(marks.replaceAndDeleteSupportMark).toHaveBeenCalledWith(
+    expect(marks.replaceAndArchiveSupportMark).toHaveBeenCalledWith(
       env.DB,
       'm-2',
       'm-1',
       { tenantId: 'tenant-1', lineAccountId: 'account-1' },
       'u-1',
     );
-    expect(marks.deleteSupportMark).not.toHaveBeenCalled();
     expect(await res.json()).toMatchObject({
-      data: { replacedFriendCount: 5, replacementMark: { id: 'm-1' } },
+      data: {
+        archived: true,
+        replacedFriendCount: 5,
+        replacementMark: { id: 'm-1' },
+      },
     });
   });
 
-  it('誰にも付いていないマークはそのまま消す', async () => {
+  it('確認後に影響が変われば保管せず読み直させる', async () => {
     marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
-    marks.countFriendsWithMark.mockResolvedValue(0);
-    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE');
-    expect(res.status).toBe(200);
-    expect(marks.deleteSupportMark).toHaveBeenCalledWith(
-      env.DB,
-      'm-2',
-      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
-    );
-    expect(marks.replaceAndDeleteSupportMark).not.toHaveBeenCalled();
+    marks.getSupportMarksWithUsage.mockResolvedValue([{
+      ...MARK,
+      id: 'm-2',
+      is_default: 0,
+      friend_count: 1,
+      broadcasts: 0,
+      scenarios: 0,
+      auto_replies: 0,
+      saved_searches: 0,
+      automations: 0,
+    }]);
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE', {
+      replacementMarkId: 'm-1',
+      expectedImpact: {
+        friendCount: 0,
+        usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
+      },
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'IMPACT_CHANGED', friendCount: 1 });
+    expect(marks.replaceAndArchiveSupportMark).not.toHaveBeenCalled();
+  });
+
+  it('使用先がある共有マークは編集せず止める', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-shared', is_default: 0, is_inherited: 1 });
+    marks.getSupportMarksWithUsage.mockResolvedValue([{
+      ...MARK,
+      id: 'm-shared',
+      is_default: 0,
+      is_inherited: 1,
+      friend_count: 2,
+      broadcasts: 1,
+      scenarios: 0,
+      auto_replies: 0,
+      saved_searches: 0,
+      automations: 0,
+    }]);
+    const res = await req('/api/support-marks/m-shared?lineAccountId=account-1', 'PATCH', {
+      name: '店舗専用',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'INHERITED_MARK_IN_USE' });
+    expect(marks.updateSupportMark).not.toHaveBeenCalled();
   });
 
   it('無いマークは付けられない', async () => {

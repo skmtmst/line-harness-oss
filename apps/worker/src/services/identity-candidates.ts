@@ -523,9 +523,11 @@ export async function decideIdentityCandidate(
     const displayName = right?.label || left?.label || '統合ユーザー';
     statements.push(
       db.prepare(
-        `INSERT OR IGNORE INTO users (id, display_name, created_at, updated_at)
-         VALUES (?, ?, ?, ?)`,
-      ).bind(userId, displayName, now, now),
+        `INSERT OR IGNORE INTO users (
+          id, tenant_id, status, display_name, primary_display_name, revision,
+          created_by, created_at, updated_at
+        ) VALUES (?, ?, 'active', ?, ?, 1, ?, ?, ?)`,
+      ).bind(userId, row.tenant_id, displayName, displayName, actor.id, now, now),
     );
     for (const friendId of [row.left_subject_id, row.right_subject_id]) {
       statements.push(

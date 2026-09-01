@@ -39,7 +39,7 @@ describe('一斉配信で保存した対象条件を再利用する', () => {
   })
 
   it('loads and saves only the segment_v1 API without the old search conversion', () => {
-    expect(controls).toContain('api.segmentPresets.list(accountId)')
+    expect(controls).toContain('api.segmentPresets.list(requestAccountId)')
     expect(controls).toContain('api.segmentPresets.create({')
     expect(controls).not.toContain('api.savedSearches')
     expect(controls).not.toContain('SearchConditions')
@@ -58,5 +58,14 @@ describe('一斉配信で保存した対象条件を再利用する', () => {
     expect(form).not.toContain('保存した条件は準備中です')
     expect(controls).toContain('data-design-node="cPk8A"')
     expect(controls).toContain('data-design-node="sqFXf"')
+  })
+
+  it('does not carry a stale preset list or save result across account switches', () => {
+    expect(controls).toContain('currentAccountIdRef.current !== requestAccountId')
+    expect(controls).toContain('loadGenerationRef.current !== generation')
+    expect(controls).toContain('saveGenerationRef.current !== generation')
+    expect(controls).toContain('presetsAccountId !== accountId')
+    expect(controls).toContain('preset.lineAccountId !== accountId')
+    expect(controls).toContain('アカウントが切り替わりました。保存した条件を読み直してください。')
   })
 })

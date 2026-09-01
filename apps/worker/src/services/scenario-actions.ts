@@ -328,7 +328,7 @@ async function executeAction(
     }
 
     case 'common_var': {
-      await applyCommonVar(db, config as CommonVarActionConfig)
+      await applyCommonVar(db, friendId, config as CommonVarActionConfig)
       return false
     }
 
@@ -525,11 +525,20 @@ export async function resumePreviousScenario(
 }
 
 /** 共通情報の加算・減算。在庫や残席のような、店ぜんたいで1つの数に使う。 */
-async function applyCommonVar(db: D1Database, c: CommonVarActionConfig): Promise<void> {
+async function applyCommonVar(
+  db: D1Database,
+  friendId: string,
+  c: CommonVarActionConfig,
+): Promise<void> {
   if (!c.varKey) throw new Error('common_var action requires varKey')
   const row = await db
-    .prepare(`SELECT value FROM common_vars WHERE var_key = ?`)
-    .bind(c.varKey)
+    .prepare(
+      `SELECT cv.value
+         FROM common_vars cv
+         JOIN friends f ON f.line_account_id = cv.line_account_id
+        WHERE f.id = ? AND cv.var_key = ?`,
+    )
+    .bind(friendId, c.varKey)
     .first<{ value: string | null }>()
   if (!row) throw new Error(`common_var not found: ${c.varKey}`)
   const base = Number(row.value ?? 0)
@@ -538,7 +547,11 @@ async function applyCommonVar(db: D1Database, c: CommonVarActionConfig): Promise
   const safeDelta = Number.isFinite(delta) ? delta : 0
   const next = c.op === 'add' ? safeBase + safeDelta : safeBase - safeDelta
   await db
-    .prepare(`UPDATE common_vars SET value = ?, updated_at = ? WHERE var_key = ?`)
-    .bind(String(next), jstNow(), c.varKey)
+    .prepare(
+      `UPDATE common_vars SET value = ?, updated_at = ?
+        WHERE var_key = ?
+          AND line_account_id = (SELECT line_account_id FROM friends WHERE id = ?)`,
+    )
+    .bind(String(next), jstNow(), c.varKey, friendId)
     .run()
 }

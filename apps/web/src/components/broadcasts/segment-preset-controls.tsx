@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SavedSegmentPreset } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import {
@@ -27,6 +27,7 @@ export default function SegmentPresetControls({
   const [chooserOpen, setChooserOpen] = useState(false)
   const [saveOpen, setSaveOpen] = useState(false)
   const [presets, setPresets] = useState<SavedSegmentPreset[]>([])
+  const [presetsAccountId, setPresetsAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [name, setName] = useState('')
@@ -34,9 +35,28 @@ export default function SegmentPresetControls({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [notice, setNotice] = useState('')
+  const currentAccountIdRef = useRef(accountId)
+  const loadGenerationRef = useRef(0)
+  const saveGenerationRef = useRef(0)
+  currentAccountIdRef.current = accountId
 
   const usableCondition = pruneCondition(value)
   const accountMissing = !accountId
+
+  useEffect(() => {
+    // 切替前の一覧・確認窓・完了表示を、新しいアカウントへ持ち越さない。
+    loadGenerationRef.current += 1
+    saveGenerationRef.current += 1
+    setChooserOpen(false)
+    setSaveOpen(false)
+    setPresets([])
+    setPresetsAccountId(null)
+    setLoading(false)
+    setLoadError('')
+    setSaving(false)
+    setSaveError('')
+    setNotice('')
+  }, [accountId])
 
   const loadPresets = useCallback(async () => {
     if (!accountId) {
@@ -44,21 +64,30 @@ export default function SegmentPresetControls({
       setPresets([])
       return
     }
+    const requestAccountId = accountId
+    const generation = ++loadGenerationRef.current
     setLoading(true)
     setLoadError('')
     try {
-      const result = await api.segmentPresets.list(accountId)
+      const result = await api.segmentPresets.list(requestAccountId)
+      if (currentAccountIdRef.current !== requestAccountId || loadGenerationRef.current !== generation) return
       if (result.success) {
         setPresets(result.data)
+        setPresetsAccountId(requestAccountId)
       } else {
         setPresets([])
+        setPresetsAccountId(null)
         setLoadError('保存した条件を表示できませんでした。')
       }
     } catch {
+      if (currentAccountIdRef.current !== requestAccountId || loadGenerationRef.current !== generation) return
       setPresets([])
+      setPresetsAccountId(null)
       setLoadError('保存した条件を表示できませんでした。')
     } finally {
-      setLoading(false)
+      if (currentAccountIdRef.current === requestAccountId && loadGenerationRef.current === generation) {
+        setLoading(false)
+      }
     }
   }, [accountId])
 
@@ -89,15 +118,18 @@ export default function SegmentPresetControls({
       setSaveError('条件の名前を入力してください。')
       return
     }
+    const requestAccountId = accountId
+    const generation = ++saveGenerationRef.current
     setSaving(true)
     setSaveError('')
     try {
       const result = await api.segmentPresets.create({
         name: nextName,
-        accountId,
+        accountId: requestAccountId,
         condition: nextCondition,
         isShared,
       })
+      if (currentAccountIdRef.current !== requestAccountId || saveGenerationRef.current !== generation) return
       if (!result.success) {
         setSaveError('条件を保存できませんでした。入力内容を確認して、もう一度お試しください。')
         return
@@ -106,13 +138,22 @@ export default function SegmentPresetControls({
       setSaveOpen(false)
       setNotice(`「${result.data.name}」として保存しました。`)
     } catch {
+      if (currentAccountIdRef.current !== requestAccountId || saveGenerationRef.current !== generation) return
       setSaveError('条件を保存できませんでした。入力内容を確認して、もう一度お試しください。')
     } finally {
-      setSaving(false)
+      if (currentAccountIdRef.current === requestAccountId && saveGenerationRef.current === generation) {
+        setSaving(false)
+      }
     }
   }
 
   const applyPreset = (preset: SavedSegmentPreset) => {
+    if (!accountId || presetsAccountId !== accountId || preset.lineAccountId !== accountId) {
+      setPresets([])
+      setPresetsAccountId(null)
+      setLoadError('アカウントが切り替わりました。保存した条件を読み直してください。')
+      return
+    }
     onApply(conditionFromSegmentPreset(preset))
     setChooserOpen(false)
     setNotice(`「${preset.name}」の条件を読み込みました。`)

@@ -405,15 +405,37 @@ export async function previewFriendAddRouting(
   accountId: string,
   friend: FriendAddSubject,
 ): Promise<{ configured: boolean; kind: FriendKind; scenarioId: string | null; suppressed: boolean }> {
-  const routing = (await loadFriendAddRouting(db, accountId)) ?? FRIEND_ADD_ROUTING_DEFAULT;
-  const configured = (await loadFriendAddRouting(db, accountId)) !== null;
+  const savedRouting = await loadFriendAddRouting(db, accountId);
+  const routing = savedRouting ?? FRIEND_ADD_ROUTING_DEFAULT;
+  const configured = savedRouting !== null;
+  return { configured, ...previewFriendAddRoutingDefinition(routing, friend) };
+}
+
+/**
+ * 下書きのdry-runと本番前確認が共有する判定器。
+ * DBへの登録・配信・タグ付けは行わず、実行時と同じ分岐だけを返す。
+ */
+export function previewFriendAddRoutingDefinition(
+  routing: FriendAddRouting,
+  friend: FriendAddSubject,
+): { kind: FriendKind; scenarioId: string | null; suppressed: boolean; actionCount: number } {
   const kind = classifyFriend(friend, routing.criteria.firstTime);
   if (kind === 'returning' && routing.returning.mode === 'none') {
-    return { configured, kind, scenarioId: null, suppressed: true };
+    return {
+      kind,
+      scenarioId: null,
+      suppressed: true,
+      actionCount: routing.returning.actions.length,
+    };
   }
   const useFirst = kind === 'first_time' || routing.returning.mode === 'same';
   const branch = useFirst ? routing.firstTime : routing.returning;
-  return { configured, kind, scenarioId: branch.scenarioId, suppressed: false };
+  return {
+    kind,
+    scenarioId: branch.scenarioId,
+    suppressed: false,
+    actionCount: branch.actions.length,
+  };
 }
 
 /** 画面が選択肢を出すための friend_add シナリオ一覧。 */
