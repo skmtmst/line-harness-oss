@@ -124,7 +124,7 @@ export default function NewRichMenuPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    <main data-design-node="XtfO3" className="mx-auto max-w-4xl p-6">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー

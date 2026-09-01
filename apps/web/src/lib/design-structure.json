@@ -59,15 +59,8 @@
       "name": "V4 ダッシュボード（編集・QRコードを含む）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": [
-          "hmBzC",
-          "kuTR2",
-          "QEThZ"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["hmBzC", "kuTR2", "QEThZ"],
+        "requiredViewports": [1440, 1920],
         "reason": "同じ状態・同じ横幅の設計画像と実装画像をPR証拠として再登録するまで未検証"
       },
       "sections": [
@@ -124,15 +117,8 @@
       "name": "V4 受信箱（テンプレート選択・顧客情報表示切替を含む）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": [
-          "hSLxG",
-          "eSOQd",
-          "yluhx"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["hSLxG", "eSOQd", "yluhx"],
+        "requiredViewports": [1440, 1920],
         "reason": "通常・テンプレート・顧客情報の全状態を同条件で比較した証拠が未登録"
       },
       "sections": [
@@ -167,13 +153,8 @@
       "name": "V6 3-1 友だち（1920）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": [
-          "PhxG6"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["PhxG6"],
+        "requiredViewports": [1440, 1920],
         "reason": "Pencilと実装を同寸法で目視比較済み。ただしシェルの例示データと現在地表示に意図した差があるため、完全一致とは扱わない",
         "referenceScreenshots": [
           "docs/design-reference/friends-v6/PhxG6-1920.png"
@@ -254,13 +235,8 @@
       "name": "V4 4-1 友だち属性・タグ（移行確認用V2）",
       "visualVerification": {
         "status": "verified",
-        "referenceNodeIds": [
-          "xn98K"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["xn98K"],
+        "requiredViewports": [1440, 1920],
         "referenceScreenshots": [
           "docs/design-reference/friend-attributes-v2/xn98K-1920.png/xn98K.png"
         ],
@@ -320,20 +296,8 @@
       "name": "V4 4-1 友だち属性（4タブ）",
       "visualVerification": {
         "status": "verified",
-        "referenceNodeIds": [
-          "xn98K",
-          "wdLjf",
-          "KYG39",
-          "X79IHW",
-          "t7Mhgl",
-          "lNGcs",
-          "NU4N2",
-          "FORVU"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["xn98K", "wdLjf", "KYG39", "X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "requiredViewports": [1440, 1920],
         "referenceScreenshots": [
           "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
           "docs/design-reference/friend-attributes-v4/02-create-initial.png/wdLjf.png",
@@ -2214,17 +2178,8 @@
       "name": "V4 4-1-A タグを作る",
       "visualVerification": {
         "status": "blocked",
-        "referenceNodeIds": [
-          "X79IHW",
-          "t7Mhgl",
-          "lNGcs",
-          "NU4N2",
-          "FORVU"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "requiredViewports": [1440, 1920],
         "blockingIssues": [
           "V4タグ作成の実ノードIDが未記録",
           "右側パネルと連動アクションを含む同条件比較が未完了"
@@ -2726,13 +2681,8 @@
       "name": "V4 3-1-D 友だち詳細（1920）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": [
-          "hsWaL"
-        ],
-        "requiredViewports": [
-          1440,
-          1920
-        ],
+        "referenceNodeIds": ["hsWaL"],
+        "requiredViewports": [1440, 1920],
         "reason": "詳細の全タブと空・読込中・エラー状態を同条件で比較した証拠が未登録"
       },
       "sections": [
