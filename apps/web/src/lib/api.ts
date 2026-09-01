@@ -3294,6 +3294,8 @@ export const api = {
         respondToAll: boolean;
         name: string | null;
         keywordMatchMode: string;
+        /** フォルダ。分けていなければ null。 */
+        folderId: string | null;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
