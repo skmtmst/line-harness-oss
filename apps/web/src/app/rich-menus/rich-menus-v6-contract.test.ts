@@ -33,6 +33,16 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('const list = sorted')
     expect(PAGE).not.toContain('「表示」を増やすと出ます')
   })
+
+  it('一覧を取得できないときはメニュー数と出し分け数を0件と断定しない', () => {
+    expect(PAGE).toContain("const groupKpiState = !selectedAccount?.id")
+    expect(PAGE).toContain("const groupKpiReady = groupKpiState === 'ready'")
+    expect(PAGE).toContain('data-group-kpi-state={groupKpiState}')
+    expect(PAGE).toContain("groupKpiReady ? groups.length : '—'")
+    expect(PAGE).toContain("groupKpiReady ? targetingCount : '—'")
+    expect(PAGE).toContain('公開中 —・${groupKpiUnavailableText}')
+    expect(PAGE).toContain("'一覧を取得できませんでした'")
+  })
 })
 
 describe('V6リッチメニューの公開安全契約', () => {
