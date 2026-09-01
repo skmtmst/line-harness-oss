@@ -20,6 +20,7 @@ describe('共通部品の影響範囲', () => {
       'app/booking/staff/page.tsx',
       'app/booking/staff/shifts/page.tsx',
       'app/broadcasts/detail/page.tsx',
+      'app/broadcasts/reserved/page.tsx',
       'app/chats/page.tsx',
       'app/common-actions/edit/page.tsx',
       'app/common-actions/new/page.tsx',
