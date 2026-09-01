@@ -22,6 +22,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
+import { shouldShowStartChecklist, startChecklist } from './start-checklist'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
@@ -299,7 +300,38 @@ export default function ScenariosPage() {
               setToggleTarget(null)
               setToggleError('')
             }}
-          />
+          >
+            {shouldShowStartChecklist(toggleTarget.isActive) ? (
+              <div className="space-y-2">
+                <p className="text-ink-secondary text-xs font-medium">配信前チェック</p>
+                <ul className="space-y-1.5 text-sm">
+                  {startChecklist(toggleTarget).map((item) => (
+                    <li key={item.label} className="flex items-start gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={
+                          item.state === 'ok'
+                            ? 'text-success'
+                            : item.state === 'warn'
+                              ? 'text-warning'
+                              : 'text-ink-faint'
+                        }
+                      >
+                        {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                      </span>
+                      <span>
+                        <span className="text-ink block">{item.label}</span>
+                        <span className="text-ink-faint block text-xs">{item.detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-ink-faint text-xs">
+                  「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。
+                </p>
+              </div>
+            ) : null}
+          </ConfirmDialog>
         </div>
       ) : null}
 

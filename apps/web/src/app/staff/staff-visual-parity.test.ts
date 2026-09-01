@@ -8,7 +8,21 @@ const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
 const newStaffSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8')
 const switchSource = readFileSync(join(directory, '../../components/ui/notification-switch.tsx'), 'utf8')
 
-describe('V2 10-2 ログインユーザーのPen表示', () => {
+describe('V6 30 ログインユーザーの画面契約', () => {
+  it('4つのV6実Nodeと共通タブを実URLへ接続する', () => {
+    expect(staffSource).toContain('data-design-node="e3jz3"')
+    expect(staffSource).toContain('data-design-node="EOTS4"')
+    expect(staffSource).toContain('data-design-node="jwVlo"')
+    expect(newStaffSource).toContain('data-design-node="I3ZSrU"')
+    expect(staffSource).toContain('<MergedTabs')
+    expect(staffSource).toContain("{ key: 'audit', label: '入った記録' }")
+  })
+
+  it('画面名は共通トップバーだけに置き、本文へ重ねない', () => {
+    expect(staffSource).not.toContain("import Header from '@/components/layout/header'")
+    expect(newStaffSource).toContain('showHeader={false}')
+  })
+
   it('集計カードをPenの105px高と文字階層に固定する', () => {
     expect(staffSource).toContain('h-[105px]')
     expect(staffSource).toContain('rounded-[18px]')
@@ -34,11 +48,16 @@ describe('V2 10-2 ログインユーザーのPen表示', () => {
     expect(newStaffSource).not.toContain('yamamoto@example.com')
   })
 
-  it('無効化を主操作にし、削除は警告と名前入力の確認を必須にする', () => {
+  it('利用停止を主操作にし、監査履歴を消す物理削除は出さない', () => {
     expect(staffSource).toContain('このユーザーを無効にする')
     expect(staffSource).toContain('このユーザーを有効にする')
-    expect(staffSource).toContain('このユーザーを完全に削除する')
-    expect(staffSource).toContain('削除すると元に戻せません。過去のログイン履歴・個人情報の閲覧記録が誰の操作か辿れなくなります。')
-    expect(staffSource).toContain('disabled={!canDelete}')
+    expect(staffSource).not.toContain('このユーザーを完全に削除する')
+    expect(staffSource).not.toContain('完全に削除する')
+  })
+
+  it('一覧は1440pxで横スクロールさせない7列の固定表にする', () => {
+    expect(staffSource).toContain('w-full table-fixed text-sm')
+    expect(staffSource).toContain('colSpan={7}')
+    expect(staffSource).not.toContain('min-w-[1180px]')
   })
 })

@@ -89,7 +89,7 @@ describe('/r/:ref — affiliate_links fallback', () => {
     expect(dbMocks.getTrafficPoolBySlug).not.toHaveBeenCalled();
   });
 
-  it('(a2) is_active=0 affiliate link still redirects (spec §8) and counts the click', async () => {
+  it('(a2) 停止中の紹介リンクは410で止まり、クリックを増やさない', async () => {
     dbMocks.getEntryRouteByRefCode.mockResolvedValue(null);
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue({
       id: 'link-2',
@@ -107,11 +107,10 @@ describe('/r/:ref — affiliate_links fallback', () => {
     });
 
     const res = await get('/r/paused1');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(410);
     const html = await res.text();
-    expect(dbMocks.incrementAffiliateLinkClick).toHaveBeenCalledWith(DB, 'paused1');
-    expect(html).toContain('liff.line.me/2000000000-BbCcDd');
-    expect(html).toContain('ref=paused1');
+    expect(dbMocks.incrementAffiliateLinkClick).not.toHaveBeenCalled();
+    expect(html).toContain('この紹介リンクは停止しています');
   });
 
   it('(a3) affiliate link with null line_account_id → default LIFF account', async () => {

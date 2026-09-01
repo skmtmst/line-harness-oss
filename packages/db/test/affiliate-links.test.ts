@@ -243,6 +243,20 @@ describe('affiliate-links CRUD', () => {
     expect(result).toBeNull();
   });
 
+  test('停止中の紹介者とリンクも停止理由を判定できる形で返す', async () => {
+    const link = await createAffiliateLink(db, { affiliateId: AFF_ID });
+    sqlite.prepare(`UPDATE affiliate_links SET is_active = 0 WHERE id = ?`).run(link.id);
+    const stoppedLink = await getAffiliateLinkByRefCode(db, link.ref_code);
+    expect(stoppedLink?.is_active).toBe(0);
+    expect(stoppedLink?.affiliate_is_active).toBe(1);
+
+    sqlite.prepare(`UPDATE affiliate_links SET is_active = 1 WHERE id = ?`).run(link.id);
+    sqlite.prepare(`UPDATE affiliates SET is_active = 0 WHERE id = ?`).run(AFF_ID);
+    const stoppedAffiliate = await getAffiliateLinkByRefCode(db, link.ref_code);
+    expect(stoppedAffiliate?.is_active).toBe(1);
+    expect(stoppedAffiliate?.affiliate_is_active).toBe(0);
+  });
+
   // ── listAffiliateLinks ───────────────────────────────────────────────────
 
   test('listAffiliateLinks returns links for the affiliate', async () => {
