@@ -13,6 +13,7 @@ import {
   type EventSlot,
   type EventWaitlistItem,
 } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * イベントの編集（設計 V2 8-3-1）。
@@ -112,7 +113,7 @@ function EditEventInner() {
   if (!id) {
     return (
       <div>
-        <Header title="イベントの編集" />
+
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           イベントが指定されていません。
           <Link href="/events" className="text-accent ml-1 hover:underline">
@@ -176,6 +177,7 @@ function EditEventInner() {
 }
 
 export default function EditEventPage() {
+  usePageTitle('イベントの編集')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
