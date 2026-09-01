@@ -20,6 +20,12 @@ const jobStatusLabel: Record<string, string> = {
   pending: '配信待ち', processing: '送信中', sent: '送信済み', skipped: '対象外',
   failed: '送信できませんでした', cancelled: '取り消し済み',
 }
+const columnDeliveryStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
+  draft: '下書き',
+  scheduled: '予約ずみ',
+  queued: '配信待ち',
+  sent: '出したもの',
+}
 
 function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled?: boolean; onChange: () => void; label: string }) {
   return (
@@ -295,12 +301,12 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
   }
 
-  if (loading) return <><Header title="フォロー配信" /><main className="p-6"><ListState kind="loading" /></main></>
+  if (loading) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="loading" /></main></>
 
   if (loadError) {
     return (
       <>
-        <Header title="フォロー配信" />
+        <Header title="NEN配信" />
         <main className="p-6">
           <ListState
             kind="error"
@@ -321,22 +327,8 @@ export default function NenCampaignsPage() {
       {/* Pen canonical: V2 9-1 NEN配信 / ケアフラグ連動 */}
       <div data-design="Head">
         <Header
-          title="フォロー配信"
+          title="NEN配信"
           description="購入後のご案内、NENコラム、お誕生日クーポンなど、お客様との関係を育てる配信を管理します。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  title="準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          }
         />
       </div>
 
@@ -453,7 +445,7 @@ export default function NenCampaignsPage() {
               <article key={column.id} className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[180px_1fr] sm:p-5">
                 {column.imageUrl ? <img src={column.imageUrl} alt="" className="aspect-[3/2] w-full rounded-xl object-cover" /> : <div className="aspect-[3/2] rounded-xl bg-gray-100" />}
                 <div>
-                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{column.deliveryStatus}</span></div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{columnDeliveryStatusLabel[column.deliveryStatus] ?? '—'}</span></div>
                   <h3 className="mt-2 text-lg font-bold text-gray-900">{column.title}</h3>
                   <p className="mt-1 text-sm leading-6 text-gray-600">{column.excerpt}</p>
                   <div className="mt-4 flex flex-wrap gap-2">

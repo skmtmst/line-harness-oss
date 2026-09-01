@@ -63,7 +63,8 @@ export default function NewReminderPage() {
       if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
     // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
-    void api.friendFields.list().then((res) => {
+    if (!selectedAccountId) return
+    void api.friendFields.list(selectedAccountId).then((res) => {
       if (res.success) {
         setDateFields(
           res.data
@@ -72,7 +73,7 @@ export default function NewReminderPage() {
         )
       }
     })
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     let active = true
