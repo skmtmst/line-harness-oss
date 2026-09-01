@@ -419,6 +419,15 @@ export default function FriendAddSettingsPage() {
               title="判定の基準"
               description="どちらに振り分けるかの判定方法です。通常は変更しません。"
             />
+            {/*
+              重なりの心配をここで打ち消す。実装（`classifyFriend`）は
+              「はじめて」か「以前から」のどちらか一方だけを返し、①と②が
+              同時に走ることはない。②で「はじめての人と同じもの」を選んだ
+              ときだけ、②に振り分けられた人へ①の内容が届く。
+            */}
+            <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
+              1人の友だちは①と②のどちらか一方にだけ振り分けられ、両方が動くことはありません（②で「はじめての人と同じもの」を選んだときだけ、②に振り分けられた人へ①の内容が届きます）。
+            </p>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="はじめての人の判定">
                 <Select
@@ -445,8 +454,8 @@ export default function FriendAddSettingsPage() {
             </div>
             {routing.criteria.firstTime === 'first_followed_at_missing' && (
               <p className="bg-warning-bg text-warning rounded-card mt-3 px-3 py-2 text-xs leading-relaxed">
-                この基準は、いまのデータでは使えません。マイグレーション 065
-                が既存の行すべてに初回フォロー日を埋めたため、未記録の人がもう居ません。
+                この基準は、いまのデータでは使えません。過去に追加された友だちにも
+                あとから初回フォロー日を記録したため、未記録の人がもう居ません。
                 このままだと全員が「以前から」に振り分けられます。
               </p>
             )}
@@ -466,10 +475,12 @@ export default function FriendAddSettingsPage() {
                     ? 'ブロックされたことがある？'
                     : '初回フォロー日は記録済み？'
                 }
+                /* 運用者はテーブル名も列名も知らない。画面には、何を見て
+                   決めているかを運用の言葉で書く。 */
                 note={
                   routing.criteria.firstTime === 'unfollow_count_zero'
-                    ? 'friends.unfollow_count を見る'
-                    : 'friends.first_followed_at を見る'
+                    ? 'これまでにブロックされた回数を見る'
+                    : '初回フォロー日の記録があるかを見る'
                 }
               />
               <FlowArrow />
@@ -528,10 +539,10 @@ export default function FriendAddSettingsPage() {
               <p className="text-ink text-xs font-bold">この1か月の実績</p>
               <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
                 {breakdownError
-                  ? '実績を取得できませんでした。画面を再読み込みしてください。'
+                  ? '実績を読み込めませんでした。画面を再読み込みしてください。'
                   : breakdown
                   ? `はじめて ${breakdown.firstTime}人 ・ 以前から ${breakdown.returning}人。うち${breakdown.unblocked}人はブロック解除でした。`
-                  : '読み込み中…'}
+                  : '読み込んでいます'}
               </p>
             </div>
           </div>

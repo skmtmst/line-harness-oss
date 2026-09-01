@@ -1,0 +1,16 @@
+/*
+ * 送るものの種別タブの実寸（設計 `V6 5 kk8dz`）。
+ *
+ * 外枠38・角丸8の帯に、高さ30・角丸6のタブが入る。9つあるので狭い画面では
+ * 折り返す。高さは `min-height` で持ち、1行に収まるときだけ設計どおり38pxになる。
+ */
+
+.rail {
+  min-height: 38px;
+  border-radius: 8px;
+}
+
+.tab {
+  height: 30px;
+  border-radius: 6px;
+}

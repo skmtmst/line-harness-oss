@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
+import { Bookmark, Circle, SlidersHorizontal, Star } from 'lucide-react'
 import type { SavedSearch, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
@@ -16,14 +16,22 @@ import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
-const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-medium text-v6-ink hover:bg-v6-surface-strong'
+/*
+  検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
+  （共通Buttonは設計と一致済みで、こちらへ寄せると他画面が動く）。
+  幅は設計の実寸：詳細条件110 / 保存した検索130 / 検索70。
+*/
+const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-v6-control border border-hairline bg-canvas text-label font-semibold text-v6-ink hover:bg-v6-surface-strong'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -258,82 +266,115 @@ function FriendsPageInner({
           }}
           className="flex min-w-0 items-center gap-2.5"
         >
-          <label className="relative block min-w-60 flex-1">
-            <span className="sr-only">友だち名で検索</span>
-            <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-v6-ink-faint" />
-            <input
-              type="search"
+          {/* 検索欄は共通 SearchField（設計 h42 / r8 / アイコン17 / 文字12）。 */}
+          <div className="min-w-60 flex-1">
+            <SearchField
+              className="w-full"
+              aria-label="友だち名で検索"
               value={searchInput}
-              onChange={(event) => {
-                const value = event.target.value
+              onChange={(value) => {
                 setSearchInput(value)
                 if (!value.trim() && searchSubmitted) resetPageWith(() => setSearchSubmitted(''))
               }}
+              onClear={() => {
+                setSearchInput('')
+                if (searchSubmitted) resetPageWith(() => setSearchSubmitted(''))
+              }}
               placeholder="名前・LINE名・タグ・メモで検索"
-              className="h-10.5 w-full rounded-v6-control border border-hairline bg-canvas pl-11 pr-3 text-sm text-v6-ink outline-none transition focus:border-v6-accent focus:ring-2 focus:ring-v6-accent/15"
             />
-          </label>
-          <button type="button" onClick={() => setAdvancedOpen(true)} className={`${SECONDARY_CONTROL} inline-flex items-center gap-2`}>
+          </div>
+          <button
+            type="button"
+            aria-pressed={advanced !== null}
+            onClick={() => setAdvancedOpen(true)}
+            className={`${SEARCH_ROW_SECONDARY} w-27.5 ${advanced ? 'border-v6-accent text-v6-accent-hover' : ''}`}
+          >
             <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
-            詳細条件{advanced ? '（設定中）' : ''}
+            詳細条件
           </button>
           <button
             type="button"
             onClick={() => setSavedOpen(true)}
-            className={`${SECONDARY_CONTROL} inline-flex items-center gap-2 text-v6-action`}
+            className={`${SEARCH_ROW_SECONDARY} w-32.5 text-v6-action`}
           >
             <Bookmark aria-hidden="true" className="h-4 w-4" />
             保存した検索
           </button>
-          <label className="relative min-w-52.5">
-            <span className="sr-only">並び順</span>
-            <ArrowDownWideNarrow aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v6-ink-secondary" />
-            <select value={sortMode} onChange={(event) => resetPageWith(() => setSortMode(event.target.value as SortMode))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas pl-9 text-sm font-semibold text-v6-ink">
-              <option value="recent">友だち追加の新しい順</option>
-              <option value="oldest">友だち追加の古い順</option>
-            </select>
-          </label>
-          <button type="submit" className="h-10.5 rounded-v6-control bg-v6-accent px-6 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">検索</button>
+          {/* 並び順は共通 Select。設計の幅は未実測のため現行210pxを保つ。 */}
+          <div className="w-52.5 shrink-0">
+            <Select
+              aria-label="並び順"
+              size="full"
+              value={sortMode}
+              onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
+              options={[
+                { value: 'recent', label: '友だち追加の新しい順' },
+                { value: 'oldest', label: '友だち追加の古い順' },
+              ]}
+            />
+          </div>
+          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-v6-control bg-v6-accent text-label font-bold text-on-accent hover:bg-v6-accent-hover">検索</button>
         </form>
 
         {advanced?.summary.length ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-v6-control bg-v6-accent-soft px-3 py-2">
             <span className="text-xs font-bold text-v6-accent-hover">絞り込み中</span>
-            {advanced.summary.map((summary) => <span key={summary} className="rounded-full bg-canvas px-2.5 py-1 text-xs text-v6-ink-secondary">{summary}</span>)}
+            {/* 保存条件の札は共通 Chip（設計の印：高さ17 / 文字10・700 / 丸）。 */}
+            {advanced.summary.map((summary) => <Chip key={summary} tone="neutral">{summary}</Chip>)}
             <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-v6-action hover:underline">条件を外す</button>
           </div>
         ) : null}
 
         <div className="mt-2.5 flex min-w-0 items-center gap-2.5">
           <span className="shrink-0 text-sm font-semibold text-v6-ink-secondary">絞り込み</span>
-          <label className="w-37.5 shrink-0">
-            <span className="sr-only">タグ</span>
-            <select value={selectedTagId} onChange={(event) => resetPageWith(() => setSelectedTagId(event.target.value))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
-              <option value="">タグ：すべて</option>
-              {allTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-            </select>
-          </label>
-          <label className="w-37.5 shrink-0">
-            <span className="sr-only">対応</span>
-            <select value={responseFilter} onChange={(event) => resetPageWith(() => setResponseFilter(event.target.value as ResponseFilter))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
-              <option value="all">対応：すべて</option>
-              <option value="unhandled">対応：未対応のみ</option>
-            </select>
-          </label>
-          <label className="w-40 shrink-0">
-            <span className="sr-only">担当者</span>
-            <select value={operatorId} onChange={(event) => resetPageWith(() => setOperatorId(event.target.value))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
-              <option value="">担当者：すべて</option>
-              {operators.map((operator) => <option key={operator.id} value={operator.id}>担当者：{operator.name}</option>)}
-            </select>
-          </label>
-          <label className="w-40 shrink-0">
-            <span className="sr-only">シナリオ</span>
-            <select value={scenarioId} onChange={(event) => resetPageWith(() => setScenarioId(event.target.value))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
-              <option value="">シナリオ：すべて</option>
-              {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>シナリオ：{scenario.name}</option>)}
-            </select>
-          </label>
+          {/*
+            絞り込み4つは共通 Select（設計 h42 / r8 / 文字13・600）。
+            幅は設計の実寸：タグ156 / 対応156 / 担当者176 / シナリオ184。
+            共通Selectの standard は176px固定なので、size="full" で外枠に幅を持たせる。
+          */}
+          <div className="w-39 shrink-0" data-filter="tag">
+            <Select
+              aria-label="タグで絞り込む"
+              size="full"
+              label="タグ"
+              value={selectedTagId}
+              onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
+              options={[{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+            />
+          </div>
+          <div className="w-39 shrink-0" data-filter="response">
+            <Select
+              aria-label="対応状況で絞り込む"
+              size="full"
+              label="対応"
+              value={responseFilter}
+              onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
+              options={[
+                { value: 'all', label: 'すべて' },
+                { value: 'unhandled', label: '未対応のみ' },
+              ]}
+            />
+          </div>
+          <div className="w-44 shrink-0" data-filter="operator">
+            <Select
+              aria-label="担当者で絞り込む"
+              size="full"
+              label="担当者"
+              value={operatorId}
+              onChange={(value) => resetPageWith(() => setOperatorId(value))}
+              options={[{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]}
+            />
+          </div>
+          <div className="w-46 shrink-0" data-filter="scenario">
+            <Select
+              aria-label="シナリオで絞り込む"
+              size="full"
+              label="シナリオ"
+              value={scenarioId}
+              onChange={(value) => resetPageWith(() => setScenarioId(value))}
+              options={[{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
+            />
+          </div>
           <button type="button" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold text-v6-danger ${responseFilter === 'unhandled' ? 'bg-v6-danger-selected ring-2 ring-v6-danger/30' : 'bg-v6-danger-bg'}`}>
             <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />未対応
           </button>
