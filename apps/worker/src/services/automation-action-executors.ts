@@ -291,13 +291,14 @@ async function sendMessageExecutor(
     const response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);
     const now = dependencies.now?.() ?? jstNow();
     const logId = crypto.randomUUID();
+    const source = context.inputEvent.source === 'friend_bulk_run' ? 'friend_bulk_run' : 'automation_v6';
     await context.db.batch([
       context.db.prepare(
         `INSERT INTO messages_log
            (id, friend_id, direction, message_type, content, broadcast_id,
             scenario_step_id, delivery_type, source, line_account_id, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'push', 'automation_v6', ?, ?)`,
-      ).bind(logId, friend.id, message.type, content, context.lineAccountId, now),
+         VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'push', ?, ?, ?)`,
+      ).bind(logId, friend.id, message.type, content, source, context.lineAccountId, now),
       completeOutboundSendStatement(context.db, {
         key: context.idempotencyKey,
         responseId: responseId(response, context.stepExecutionId),

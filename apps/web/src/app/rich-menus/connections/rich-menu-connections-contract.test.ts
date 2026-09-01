@@ -23,6 +23,12 @@ describe('V6 リッチメニューの切替つながり', () => {
     expect(PAGE).toContain('kind="forbidden"')
   })
 
+  it('アカウント切替後に届いた古い取得結果を表示しない', () => {
+    expect(PAGE).toContain('activeAccountIdRef.current !== accountId')
+    expect(PAGE).toContain('requestGenerationRef.current !== requestGeneration')
+    expect(PAGE).toContain('setGroup(null)')
+  })
+
   it('読込・空・失敗と実値0を混ぜない', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
