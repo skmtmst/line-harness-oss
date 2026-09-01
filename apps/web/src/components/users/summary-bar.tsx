@@ -41,12 +41,12 @@ export default function SummaryBar() {
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <Card label="友だち総数" value={fmt.format(stats.totalFollowing)} />
-      <Card label="ユニーク人数" value={fmt.format(stats.uniquePeople)} />
+      <Card label="統合ユーザー" value={`${fmt.format(stats.uniquePeople)}人`} />
+      <Card label="紐付く友だち" value={`${fmt.format(stats.totalFollowing)}件`} />
       {/* friendDups は行ベースの「余分な行数」(SUM(row_cnt - 1))。
           1人が3アカウントに居れば +2 とカウントされる。 */}
-      <Card label="余分な行数" value={fmt.format(stats.friendDups)} hint="重複ぶんの行" />
-      <Card label="余分率" value={`${dupRate.toFixed(1)}%`} hint="総行数のうち余分" />
+      <Card label="重複している行" value={`${fmt.format(stats.friendDups)}件`} hint="複数登録による余分" />
+      <Card label="重複率" value={`${dupRate.toFixed(1)}%`} hint="紐付く友だちのうち余分" />
     </div>
   )
 }
