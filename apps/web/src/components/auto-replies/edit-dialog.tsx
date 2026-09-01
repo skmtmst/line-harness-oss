@@ -68,9 +68,8 @@ export interface AutoReplyDraft {
  * URL から開いたほうは、曜日・アクション・キーワードの複数行・友だち条件を
  * 落としていた。**落ちた項目は、開いて保存した時点で消える。**
  *
- * `folderId` はここでは足さない。#430 が両方の呼び出し側と
- * フォルダ欄の読み込み状態をまとめて直している。**同じ行を2本のPRで
- * 触ると、あとから入れるほうが必ず競合する。**
+ * `folderId` もここで必ず残す。#430 でフォルダ編集が入った後に
+ * この変換で落とすと、開いて保存しただけで未分類へ移ってしまう。
  */
 export function toDraft(rule: {
   id: string
@@ -96,6 +95,7 @@ export function toDraft(rule: {
   respondToAll?: boolean
   name?: string | null
   keywordMatchMode?: string
+  folderId?: string | null
 }): AutoReplyDraft {
   return {
     id: rule.id,
@@ -121,6 +121,7 @@ export function toDraft(rule: {
     respondToAll: rule.respondToAll ?? false,
     name: rule.name ?? null,
     keywordMatchMode: rule.keywordMatchMode === 'all' ? 'all' : 'any',
+    folderId: rule.folderId ?? null,
   }
 }
 
