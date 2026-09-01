@@ -23,6 +23,12 @@ describe('V6回答フォーム一覧', () => {
     expect(PAGE).toContain('回答フォームを再読み込み')
   })
 
+  it('フォーム数と公開中は未取得を0件にせずダッシュで表示する', () => {
+    expect(PAGE).toContain('const formCountsAvailable = !accountLoading && Boolean(selectedAccountId) && !loading && !loadError')
+    expect(PAGE).toContain('value={formCountsAvailable ? forms.length : null}')
+    expect(PAGE).toContain('value={formCountsAvailable ? forms.filter((form) => form.isActive).length : null}')
+  })
+
   it('フォームを公開せず下書きで作って編集画面へ進む', () => {
     expect(API).toContain('createDraft:')
     expect(PAGE).toContain('api.forms.createDraft(selectedAccountId)')

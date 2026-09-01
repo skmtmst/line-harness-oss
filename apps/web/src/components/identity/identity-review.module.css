@@ -1,0 +1,344 @@
+/*
+ * 本人照合の候補（設計 `InCDe` 3-2-A ／ `ELayY` 23-1-A）。
+ *
+ * 2つの設計は見た目が違う（片方は候補1件の詳細、片方は一覧）が、
+ * **中で読む形は同じ**。候補2件・根拠・確信度・影響・履歴の並べ方だけを
+ * ここに置き、画面ごとの外枠は各 page.tsx が持つ。
+ */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 「元の記録を消さない」ことを先に言う帯（設計 `InCDe` 上部）。 */
+.assurance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-surface-pearl);
+  padding: 16px;
+}
+
+.assuranceTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.assuranceBody {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+/* 判定根拠と影響を横に並べる（設計は 1:2）。狭いときは縦に落とす。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .split,
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.sectionTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.rowLabel {
+  color: var(--color-ink-secondary);
+}
+
+.rowValue {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* 取得元が繋がっていない値。実値の 0 と同じ濃さで出さない。 */
+.rowValuePending {
+  color: var(--color-ink-faint);
+  font-weight: 400;
+}
+
+.evidenceItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evidenceHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.evidenceNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+}
+
+.tag {
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font-size: var(--text-nano);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.tagStrong {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.tagWeak {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.tagWarn {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
+/* 候補1件。左右で同じ高さに揃える。 */
+.subject {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.subjectSide {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.subjectLabel {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.subjectDetail {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+}
+
+.attributes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.attribute {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.attributeLabel {
+  min-width: 96px;
+  color: var(--color-ink-secondary);
+}
+
+.attributeValue {
+  color: var(--color-ink);
+  word-break: break-all;
+}
+
+/* 表のセルで2行に積む（設計 `ELayY` の「ECの注文・会員」列）。 */
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historyItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid var(--color-hairline);
+  padding-left: 12px;
+}
+
+.historyHead {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.historyMeta {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+}
+
+/* 一覧（設計 `ELayY`）。広い画面でも横スクロールを起こさない。 */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.footerNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+/* 判定窓の中身。 */
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.choiceOn {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.choiceText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choiceTitle {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.choiceNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: 1.4;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.reason {
+  min-height: 72px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 8px 10px;
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.confirmNote {
+  border-radius: var(--radius-mini);
+  background: var(--color-surface-pearl);
+  padding: 10px 12px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+}
