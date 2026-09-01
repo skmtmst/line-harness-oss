@@ -50,6 +50,10 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -77,6 +81,21 @@ const MERGED_TABS = [
 
 const DEFAULT_TAB = 'points'
 
+/**
+ * 並び順。**どれも読み込んだ行から数えられるものだけ**にしてある。
+ * 設計は「CV数が多い順」しか描いていないが、CV数はレポートから引けるので
+ * 実際に並べ替えられる。作れない並び（報酬順など）は足さない。
+ */
+type PointSort = 'cv-desc' | 'value-desc' | 'name'
+
+const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
+  { value: 'cv-desc', label: 'CV数が多い順' },
+  { value: 'value-desc', label: '成果単価が高い順' },
+  { value: 'name', label: '成果地点名順' },
+]
+
+const PAGE_SIZE = 20
+
 function ConversionsPageInner() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
@@ -85,9 +104,15 @@ function ConversionsPageInner() {
   const [approved, setApproved] = useState<ConversionApprovalItem[]>([])
   const [openOffers, setOpenOffers] = useState(0)
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<PointSort>('cv-desc')
+  const [page, setPage] = useState(1)
+  // 成果地点そのものが引けなかったときだけ「読み込めませんでした」を出す。
+  // KPI に使う承認・案件が落ちても、表は出せる。
+  const [loadFailed, setLoadFailed] = useState(false)
 
   const load = async () => {
     setLoading(true)
+    setLoadFailed(false)
     try {
       // 上のKPIは成果地点だけでは出ない。承認の待ち・確定と、公開中の案件を
       // 一緒に引く。1つ落ちても他は出せるよう allSettled。
@@ -99,13 +124,16 @@ function ConversionsPageInner() {
         api.affiliateOffers.list({ activeOnly: true }),
       ])
       if (pointsRes.status === 'fulfilled' && pointsRes.value.success) setPoints(pointsRes.value.data)
+      else setLoadFailed(true)
       if (reportRes.status === 'fulfilled' && reportRes.value.success) setReport(reportRes.value.data)
       if (pendingRes.status === 'fulfilled' && pendingRes.value.success) setPending(pendingRes.value.data)
       if (approvedRes.status === 'fulfilled' && approvedRes.value.success) setApproved(approvedRes.value.data)
       if (offersRes.status === 'fulfilled' && offersRes.value.success) {
         setOpenOffers(offersRes.value.data.length)
       }
-    } catch {}
+    } catch {
+      setLoadFailed(true)
+    }
     setLoading(false)
   }
 
@@ -136,8 +164,23 @@ function ConversionsPageInner() {
 
   const shown = useMemo(() => {
     const q = query.trim()
-    return q ? points.filter((p) => p.name.includes(q)) : points
-  }, [points, query])
+    const matched = q ? points.filter((p) => p.name.includes(q)) : points
+    return matched.toSorted((left, right) => {
+      if (sort === 'name') return left.name.localeCompare(right.name, 'ja')
+      if (sort === 'value-desc') return (right.value ?? 0) - (left.value ?? 0)
+      return (countByPoint.get(right.id) ?? 0) - (countByPoint.get(left.id) ?? 0)
+    })
+  }, [countByPoint, points, query, sort])
+
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const current = useMemo(
+    () => shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, shown],
+  )
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   return (
     <div data-conversion-points-design="v6">
@@ -181,48 +224,68 @@ function ConversionsPageInner() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
-        <input
-          type="search"
+        <SearchField
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(value) => {
+            setQuery(value)
+            setPage(1)
+          }}
+          onClear={() => {
+            setQuery('')
+            setPage(1)
+          }}
           placeholder="CV名で検索"
           aria-label="CV名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          className="min-w-64 flex-1"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>CV数が多い順</option>
-        </select>
-        <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
-        <select
-          disabled
-          title="期間の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>今月</option>
-        </select>
-        <Button
-          disabled
-          title="書き出しは準備中です"
-        >
-          CSVで書き出す
-        </Button>
+        <Select
+          aria-label="並び順"
+          label="並び順"
+          value={sort}
+          options={SORT_OPTIONS}
+          onChange={(value) => {
+            setSort(value as PointSort)
+            setPage(1)
+          }}
+        />
+        {/*
+          **期間と書き出しは押せる形にしない。**
+          成果地点の一覧も `/api/conversions/report` も期間を受け取らないので、
+          「今月」に絞った数は作れない。書き出しの口（CSV）も無い。
+          押せない札を置くより、無いことを言葉で出す。
+        */}
+        <p className="text-ink-faint text-caption">
+          <span className="text-ink-secondary font-medium">期間</span>{' '}
+          <span className="tabular-nums">—</span>{' '}
+          まだ繋がっていません。期間で絞る仕組みが接続されると表示されます。
+        </p>
       </div>
 
       {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。
           列ごと消すと、その考え方が無い画面に見えてしまう。 */}
       {loading ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm text-ink-faint">
-          読み込み中...
-        </div>
+        <ListState kind="loading" title="成果地点を読み込んでいます" />
+      ) : loadFailed ? (
+        <ListState
+          kind="error"
+          title="成果地点を読み込めませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={
+            <Button variant="secondary" onClick={() => void load()}>
+              成果地点を再読み込み
+            </Button>
+          }
+        />
       ) : shown.length === 0 ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm text-ink-faint">
-          {query ? '検索に合う成果地点はありません。' : 'まだ成果地点がありません。右上の「成果地点を追加」から登録してください。'}
-        </div>
+        <ListState
+          kind="empty"
+          title={query ? '条件に合う成果地点はありません' : 'まだ成果地点がありません'}
+          description={
+            query
+              ? '検索の言葉を変えてください。'
+              : '右上の「成果地点を追加」から登録すると、ここに出ます。'
+          }
+        />
       ) : (
         <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[880px]">
@@ -239,7 +302,7 @@ function ConversionsPageInner() {
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
-              {shown.map((point) => (
+              {current.map((point) => (
                 <tr key={point.id} className="hover:bg-canvas-sunken">
                   <td className="text-ink px-4 py-3 text-sm font-medium">
                     {point.name}
@@ -299,15 +362,12 @@ function ConversionsPageInner() {
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs">
           成果が出たあとの承認は「成果承認」タブで行います。旧デザインではCV計測とアフィリエイトが別ページに分かれていて、定義と承認の間で画面を往復する必要がありました。
+          <br />
+          書き出しはまだ繋がっていません。CSVを作る口が接続されると、この場所に操作が出ます。
         </p>
         <div className="flex items-center gap-2 text-xs">
           <span className="text-ink-faint tabular-nums">全 {shown.length} 件</span>
-          <button disabled title="ページの切り替えは準備中です" className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50">
-            前へ
-          </button>
-          <button disabled title="ページの切り替えは準備中です" className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50">
-            次へ
-          </button>
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
     </div>
@@ -401,10 +461,23 @@ function ReportTab() {
 
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
+  /**
+   * タブごとのV6実Node。5タブすべてを埋める。
+   *
+   * `points` と `report` が抜けていて `data-design-node={undefined}` が
+   * そのまま出ていた。設計側の並びは `design-structure.json` の
+   * `/conversions` に "PouPn GH8VL n5VVTb ZrpKn GUxsj" として記録がある。
+   *
+   * **`d8d3Mz` は「19-1-C 成果地点の削除確認」の重ね画面**であって、
+   * 一覧のNodeではない（`docs/v6-requirements/v6-19-conversion-requirements-draft.md`）。
+   * 一覧に付けると、削除確認の画面とNodeが二重になる。
+   */
   const nodeByTab: Record<string, string | undefined> = {
     affiliates: 'PouPn',
     offers: 'GH8VL',
     approvals: 'n5VVTb',
+    points: 'ZrpKn',
+    report: 'GUxsj',
   }
   return (
     <div data-design-node={nodeByTab[tab]}>
