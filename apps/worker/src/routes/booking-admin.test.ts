@@ -183,9 +183,27 @@ describe('POST /api/booking/admin/bookings', () => {
       ],
       ['FROM staff_shifts', { first: { start_time: '10:00', end_time: '19:00' } }],
       ['SELECT starts_at, block_ends_at FROM bookings', { all: { results: [] } }],
+      ['INSERT INTO booking_idempotency_keys', { run: { meta: { changes: 1 } } }],
+      ['UPDATE booking_idempotency_keys', { run: { meta: { changes: 1 } } }],
       ['INSERT INTO bookings', { run: { meta: { changes: insertChanges } } }],
     ]);
   }
+
+  test('400 without Idempotency-Key', async () => {
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      env,
+      execCtx,
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'missing_idempotency_key' });
+  });
 
   test('400 without account_id', async () => {
     const { app, env } = makeApp(emptyDb);
@@ -194,7 +212,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-1' },
       },
       env,
       execCtx,
@@ -210,7 +228,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-2' },
       },
       env,
       execCtx,
@@ -227,7 +245,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-3' },
       },
       env,
       execCtx,
@@ -242,6 +260,33 @@ describe('POST /api/booking/admin/bookings', () => {
     expect(reminders.length).toBeGreaterThan(0);
   });
 
+  test('同じキーの再送は保存済みの予約を返し、予約を追加しない', async () => {
+    const db = scriptedDb([
+      ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
+      ['FROM booking_idempotency_keys', {
+        first: {
+          response_status: 201,
+          response_body: JSON.stringify({ booking_id: 'existing', status: 'confirmed', calendar_sync: 'synced' }),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+      }],
+    ]);
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'same-booking' },
+      },
+      env,
+      execCtx,
+    );
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toMatchObject({ booking_id: 'existing' });
+    expect(db.calls.some((call) => call.sql.includes('INSERT INTO bookings'))).toBe(false);
+  });
+
   test('409 on slot conflict (atomic insert 0 rows)', async () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
     const db = happyDb(0);
@@ -251,7 +296,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-4' },
       },
       env,
       execCtx,
@@ -268,7 +313,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-5' },
       },
       env,
       execCtx,
@@ -289,7 +334,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-6' },
       },
       env,
       execCtx,
@@ -316,7 +361,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify({ ...validBody, starts_at: `${sepYear}-09-10T02:00:00.000Z` }),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-7' },
       },
       env,
       execCtx,

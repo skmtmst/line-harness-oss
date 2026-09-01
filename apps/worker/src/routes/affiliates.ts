@@ -7,7 +7,6 @@ import {
   createAffiliateWithRandomCode,
   createAffiliateLink,
   updateAffiliate,
-  deleteAffiliate,
   recordAffiliateClick,
   getAffiliateReport,
   getAffiliateReportV2,
@@ -295,17 +294,17 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
   }
 });
 
-// DELETE /api/affiliates/:id - delete
-affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
-  auditLog(c, 'affiliate.delete', { kind: 'affiliate', id: c.req.param('id') });
-  try {
-    await deleteAffiliate(c.env.DB, c.req.param('id'));
-    return c.json({ success: true, data: null });
-  } catch (err) {
-    console.error('DELETE /api/affiliates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
+// 紹介者は成果・承認・支払いの監査元になるため物理削除しない。
+// 停止は PUT { isActive: false } で行い、過去記録を残す。
+affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), (c) =>
+  c.json(
+    {
+      success: false,
+      code: 'PHYSICAL_DELETE_DISABLED',
+      error: '紹介者は削除できません。紹介を止める操作を使ってください。過去の成果と支払い記録は残ります。',
+    },
+    405,
+  ));
 
 // GET /api/affiliates/:id/report - affiliate performance report (v2)
 // Extends the legacy report with ref_tracking-based clicks, add-time friendAdds,
@@ -396,7 +395,7 @@ affiliates.post('/api/affiliates/click', async (c) => {
     }
 
     const affiliate = await getAffiliateByCode(c.env.DB, body.code);
-    if (!affiliate) {
+    if (!affiliate || affiliate.is_active !== 1) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
 
