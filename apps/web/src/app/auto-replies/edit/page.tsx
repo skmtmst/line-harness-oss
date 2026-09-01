@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
-import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import EditDialog, { toDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 
 /**
  * 自動応答の編集を、URL で開けるようにする。
@@ -42,26 +42,7 @@ function AutoReplyEditInner() {
         if (id) {
           const res = await api.autoReplies.get(id)
           if (res.success) {
-            setDraft({
-              id: res.data.id,
-              keyword: res.data.keyword,
-              matchType: res.data.matchType,
-              responseType: res.data.responseType,
-              responseContent: res.data.responseContent,
-              templateId: res.data.templateId,
-              lineAccountId: res.data.lineAccountId,
-              isActive: res.data.isActive,
-              activeFrom: res.data.activeFrom,
-              activeUntil: res.data.activeUntil,
-              cooldownMinutes: res.data.cooldownMinutes,
-              skipWhenOperatorActive: res.data.skipWhenOperatorActive,
-              priority: res.data.priority,
-              messageKinds: res.data.messageKinds,
-              respondToAll: res.data.respondToAll,
-              name: res.data.name,
-              keywordMatchMode: res.data.keywordMatchMode === 'all' ? 'all' : 'any',
-              folderId: res.data.folderId,
-            })
+            setDraft(toDraft(res.data))
           } else {
             setError(res.error)
           }
@@ -76,7 +57,6 @@ function AutoReplyEditInner() {
             isActive: true,
             priority: 0,
             messageKinds: null,
-            folderId: null,
           })
         }
       } catch {

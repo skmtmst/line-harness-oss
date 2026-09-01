@@ -2,21 +2,40 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { TagGroup } from '@line-crm/shared'
+import type { Tag, TagGroup } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import TagEditorV4, { type TagEditorValues } from './tag-editor-v4'
 
 export default function NewTagPageV4() {
+  usePageTitle('タグを作る')
   const router = useRouter()
   const params = useSearchParams()
+  const copyId = params.get('copy') ?? ''
   const [groups, setGroups] = useState<TagGroup[]>([])
+  const [copySource, setCopySource] = useState<Tag | null>(null)
+  const [loading, setLoading] = useState(Boolean(copyId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
-    void api.tagGroups.list().then((res) => res.success && setGroups(res.data))
-  }, [])
+    let cancelled = false
+    setLoading(Boolean(copyId))
+    void Promise.all([
+      api.tagGroups.list(),
+      copyId ? api.tags.list({ withCounts: true }) : Promise.resolve(null),
+    ]).then(([folders, tags]) => {
+      if (cancelled) return
+      if (folders.success) setGroups(folders.data)
+      if (tags?.success) setCopySource(tags.data.find((item) => item.id === copyId) ?? null)
+    }).catch(() => {
+      if (!cancelled) setError('複製元のタグを読み込めませんでした')
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [copyId])
 
   const save = async (values: TagEditorValues, andAnother: boolean) => {
     if (saving) return
@@ -54,12 +73,26 @@ export default function NewTagPageV4() {
     }
   }
 
+  if (loading) return <p className="p-6 text-sm text-ink-faint">複製元を読み込んでいます…</p>
+
   return (
     <TagEditorV4
-      key={params.get('copy') ?? 'new'}
+      key={copyId || 'new'}
       mode="create"
       groups={groups}
-      initialLinked={params.get('linked') === '1'}
+      initialLinked={params.get('linked') === '1' || Boolean(copySource?.mileageReward || copySource?.referralMileageReward || copySource?.mileageMultiplierBps)}
+      initialValues={copySource ? {
+        name: `${copySource.name} のコピー`,
+        groupId: copySource.groupId ?? '',
+        isStarred: copySource.isStarred ?? false,
+        linked: Boolean(copySource.mileageReward || copySource.referralMileageReward || copySource.mileageMultiplierBps),
+        rewardMiles: copySource.mileageReward ?? 0,
+        referralRewardMiles: copySource.referralMileageReward ?? 0,
+        multiplierBps: copySource.mileageMultiplierBps ?? null,
+        multiplierPriority: copySource.mileageMultiplierPriority ?? 0,
+        applyToExisting: false,
+        actions: [],
+      } : undefined}
       saving={saving}
       error={error}
       notice={notice}

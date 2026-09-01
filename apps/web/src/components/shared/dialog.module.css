@@ -47,6 +47,26 @@
   font-size: var(--text-body);
 }
 
+/* 見出しの左に絵を置くとき（危険な操作の確認）だけ使う行。 */
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.titleIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--color-ink);
+  line-height: 0;
+  padding-top: 2px;
+}
+
+.callout .titleIcon {
+  color: var(--color-status-danger);
+}
+
 .description {
   margin: 0;
   color: var(--color-ink-faint);
@@ -99,12 +119,20 @@
   min-height: 38px;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   border: 1px solid;
   border-radius: var(--radius-control);
   padding: 8px 12px;
   font-size: var(--text-caption);
   font-weight: 700;
   cursor: pointer;
+}
+
+.buttonIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  line-height: 0;
 }
 
 .designButton {

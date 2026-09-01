@@ -12,6 +12,7 @@ import {
   enrollFriendInReminder,
   getFriendReminders,
   cancelFriendReminder,
+  getFolderById,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -34,6 +35,18 @@ async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>
 const TRIGGER_TYPES = ['manual', 'booking', 'event', 'friend_field'] as const;
 const DELIVERY_MODES = ['time', 'countdown'] as const;
 type TriggerType = (typeof TRIGGER_TYPES)[number];
+
+async function validateReminderFolder(
+  db: D1Database,
+  folderId: unknown,
+): Promise<string | null> {
+  if (folderId === null || folderId === '' || folderId === undefined) return null;
+  if (typeof folderId !== 'string') return 'folderId must be a string';
+  const folder = await getFolderById(db, folderId);
+  if (!folder) return 'フォルダが見つかりません';
+  if (folder.kind !== 'reminder') return 'リマインダ用ではないフォルダは選べません';
+  return null;
+}
 
 /**
  * きっかけの設定を検証して取り出す。送られた項目だけを含める。
@@ -253,12 +266,16 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
       lineAccountId?: string | null;
     } & Record<string, unknown>>();
     if (!body.name) return c.json({ success: false, error: 'name is required' }, 400);
-    if (body.lineAccountId
-      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+    if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
+      return c.json({ success: false, error: 'LINEアカウントを選んでください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const trigger = readTriggerInput(body);
     if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
     const item = await createReminder(c.env.DB, { ...body, ...trigger.value });
     // Save line_account_id if provided
     if (body.lineAccountId) {
@@ -278,6 +295,8 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => 
     const body = await c.req.json<Record<string, unknown>>();
     const trigger = readTriggerInput(body);
     if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
     await updateReminder(c.env.DB, id, { ...body, ...trigger.value });
     const updated = await getReminderById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);

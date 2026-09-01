@@ -170,6 +170,21 @@ describe('A-6 account tenant scope', () => {
     expect(mocks.createAutoReply).not.toHaveBeenCalled();
   });
 
+  test('auto-reply rejects a folder that no longer exists', async () => {
+    mocks.getFolderById.mockResolvedValue(null);
+    const response = await app(autoReplies).request(
+      '/api/auto-replies',
+      request('POST', {
+        keyword: 'test',
+        responseContent: 'reply',
+        lineAccountId: 'own',
+        folderId: 'missing-folder',
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect(mocks.createAutoReply).not.toHaveBeenCalled();
+  });
+
   test('auto-reply accepts an auto-reply folder', async () => {
     mocks.getFolderById.mockResolvedValue({ id: 'folder', kind: 'auto_reply' });
     const response = await app(autoReplies).request(
