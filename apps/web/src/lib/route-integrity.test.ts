@@ -130,6 +130,7 @@ describe('画面の一覧', () => {
       '/tags',
       '/tags-v2',
       '/tags/fields/new',
+      '/tags/fields/migrate',
       '/scenarios',
       '/broadcasts',
       '/templates',

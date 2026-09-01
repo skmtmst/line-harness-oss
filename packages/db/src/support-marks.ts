@@ -25,15 +25,25 @@ export interface SupportMark {
   auto_on_inbound: number;
   display_order: number;
   created_at: string;
+  archived_at: string | null;
   /** NULL は移行前からあるテナント共通マーク。 */
   line_account_id: string | null;
   tenant_id: string;
   is_inherited: number;
 }
 
+export interface SupportMarkWithUsage extends SupportMark {
+  friend_count: number;
+  broadcasts: number;
+  scenarios: number;
+  auto_replies: number;
+  saved_searches: number;
+  automations: number;
+}
+
 const MARK_SELECT = `
   SELECT sm.id, sm.name, sm.color, sm.is_default, sm.auto_on_inbound,
-         sm.display_order, sm.created_at,
+         sm.display_order, sm.created_at, sm.archived_at,
          sms.line_account_id,
          COALESCE(sms.tenant_id, '${LEGACY_TENANT_ID}') AS tenant_id,
          CASE WHEN sms.mark_id IS NULL OR sms.line_account_id IS NULL THEN 1 ELSE 0 END AS is_inherited
@@ -54,7 +64,8 @@ export async function ensureDefaultSupportMarks(
   const visible = await db
     .prepare(
       `${MARK_SELECT}
-        WHERE COALESCE(sms.tenant_id, ?) = ?
+        WHERE sm.archived_at IS NULL
+          AND COALESCE(sms.tenant_id, ?) = ?
           AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)
         LIMIT 1`,
     )
@@ -99,13 +110,121 @@ export async function getSupportMarks(
   const result = await db
     .prepare(
       `${MARK_SELECT}
-        WHERE COALESCE(sms.tenant_id, ?) = ?
+        WHERE sm.archived_at IS NULL
+          AND COALESCE(sms.tenant_id, ?) = ?
           AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)
         ORDER BY CASE WHEN sms.line_account_id = ? THEN 0 ELSE 1 END,
                  sm.display_order ASC, sm.created_at ASC`,
     )
     .bind(LEGACY_TENANT_ID, scope.tenantId, scope.lineAccountId, scope.lineAccountId)
     .all<SupportMark>();
+  const hasAccountDefault = result.results.some(
+    (mark) => mark.line_account_id === scope.lineAccountId && mark.is_default === 1,
+  );
+  return result.results.map((mark) =>
+    hasAccountDefault && mark.line_account_id === null && mark.is_default === 1
+      ? { ...mark, is_default: 0 }
+      : mark,
+  );
+}
+
+/**
+ * 一覧用の対応マークと参照数を1回で読む。
+ *
+ * 画面で「配信・自動応答」と固定表示すると、実際には使っていないマークまで
+ * 使用中に見える。逆に1件ずつ数えるとN+1になるため、JSON条件も含めて
+ * 相関サブクエリでまとめて返す。実行履歴は現在の使用先ではないため数えない。
+ */
+export async function getSupportMarksWithUsage(
+  db: D1Database,
+  scope: SupportMarkScope,
+): Promise<SupportMarkWithUsage[]> {
+  await ensureDefaultSupportMarks(db, scope);
+  const result = await db.prepare(
+    `WITH visible_marks AS (
+       ${MARK_SELECT}
+        WHERE sm.archived_at IS NULL
+          AND COALESCE(sms.tenant_id, ?) = ?
+          AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)
+     )
+     SELECT sm.*,
+       (SELECT COUNT(*) FROM friends f
+         WHERE f.support_mark_id = sm.id AND f.line_account_id = ?) AS friend_count,
+       (SELECT COUNT(*) FROM broadcasts b WHERE b.line_account_id = ? AND EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(b.segment_conditions)
+                                       THEN b.segment_conditions ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        )) AS broadcasts,
+       (SELECT COUNT(DISTINCT a.scenario_id)
+          FROM scenario_actions a
+          JOIN scenarios sc ON sc.id = a.scenario_id
+         WHERE sc.line_account_id = ? AND (
+          (a.action_type = 'support_mark' AND EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(a.config_json)
+                                         THEN a.config_json ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          )) OR EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(a.condition_json)
+                                         THEN a.condition_json ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          )
+        )) AS scenarios,
+       (SELECT COUNT(*) FROM auto_replies a WHERE a.line_account_id = ? AND (EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions_json)
+                                       THEN a.actions_json ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        ) OR EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.friend_conditions_json)
+                                       THEN a.friend_conditions_json ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        ))) AS auto_replies,
+       (SELECT COUNT(*) FROM saved_searches s WHERE s.line_account_id = ? AND EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(s.conditions_json)
+                                       THEN s.conditions_json ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        )) AS saved_searches,
+       ((SELECT COUNT(*) FROM automations a WHERE a.line_account_id = ? AND (EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.conditions)
+                                       THEN a.conditions ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        ) OR EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions)
+                                       THEN a.actions ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        ))) +
+        (SELECT COUNT(DISTINCT v.automation_id)
+           FROM automation_versions v
+           JOIN automation_definitions d ON d.id = v.automation_id
+          WHERE v.status = 'published' AND d.line_account_id = ? AND (
+          EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(v.condition_config)
+                                         THEN v.condition_config ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          ) OR EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(v.action_config)
+                                         THEN v.action_config ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          )
+        ))) AS automations
+       FROM visible_marks sm
+      ORDER BY CASE WHEN sm.line_account_id = ? THEN 0 ELSE 1 END,
+               sm.display_order ASC, sm.created_at ASC`,
+  )
+    .bind(
+      LEGACY_TENANT_ID,
+      scope.tenantId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+      scope.lineAccountId,
+    )
+    .all<SupportMarkWithUsage>();
+
   const hasAccountDefault = result.results.some(
     (mark) => mark.line_account_id === scope.lineAccountId && mark.is_default === 1,
   );
@@ -125,6 +244,7 @@ export async function getSupportMarkById(
     .prepare(
       `${MARK_SELECT}
         WHERE sm.id = ?
+          AND sm.archived_at IS NULL
           AND COALESCE(sms.tenant_id, ?) = ?
           AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)`,
     )
@@ -147,6 +267,7 @@ export async function getDefaultSupportMark(
     .prepare(
       `${MARK_SELECT}
         WHERE sm.is_default = 1
+          AND sm.archived_at IS NULL
           AND COALESCE(sms.tenant_id, ?) = ?
           AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)
         ORDER BY CASE WHEN sms.line_account_id = ? THEN 0 ELSE 1 END,
@@ -282,35 +403,13 @@ export async function updateSupportMark(
   return getSupportMarkById(db, id, scope);
 }
 
-export async function deleteSupportMark(
-  db: D1Database,
-  id: string,
-  scope: SupportMarkScope,
-): Promise<boolean> {
-  const result = await db.batch([
-    db
-      .prepare(
-        `DELETE FROM support_mark_scopes
-          WHERE mark_id = ? AND tenant_id = ? AND line_account_id = ?`,
-      )
-      .bind(id, scope.tenantId, scope.lineAccountId),
-    db
-      .prepare(
-        `DELETE FROM support_marks WHERE id = ?
-          AND NOT EXISTS (SELECT 1 FROM support_mark_scopes WHERE mark_id = ?)`,
-      )
-      .bind(id, id),
-  ]);
-  return Number(result[1]?.meta?.changes ?? 0) > 0;
-}
-
 /**
- * 使用中の対応マークを初期値へ置き換えてから削除する。
+ * 対応マークを置換してから保管する。
  *
- * 先に削除すると外部キーの ON DELETE SET NULL で絞り込みから漏れるため、
- * 変更履歴・置換・削除を D1 の1バッチ（1トランザクション）にまとめる。
+ * 公開済みの配信条件などは古いマークIDを参照し続けるため、物理削除しない。
+ * 友だちの置換・友だちごとの履歴・保管記録を D1 の1バッチにまとめる。
  */
-export async function replaceAndDeleteSupportMark(
+export async function replaceAndArchiveSupportMark(
   db: D1Database,
   markId: string,
   replacementMarkId: string,
@@ -327,12 +426,24 @@ export async function replaceAndDeleteSupportMark(
   // 削除対象は選択中アカウント専用だけ。置換先も同じアカウントから
   // 見えるマークに限定し、別アカウントのIDを直接指定しても更新しない。
   if (!mark || mark.is_inherited === 1 || !replacement) return 0;
+  const usage = (await getSupportMarksWithUsage(db, scope)).find((row) => row.id === markId);
+  const referenceCount = usage
+    ? Number(usage.broadcasts)
+      + Number(usage.scenarios)
+      + Number(usage.auto_replies)
+      + Number(usage.saved_searches)
+      + Number(usage.automations)
+    : 0;
+  if (referenceCount > 0) {
+    throw new Error('Referenced support mark cannot be archived');
+  }
 
   const detail = JSON.stringify({
     previousMarkId: markId,
     replacementMarkId,
     reason: 'deleted_mark_replacement',
   });
+  const archivedAt = jstNow();
   const results = await db.batch([
     db
       .prepare(
@@ -351,11 +462,22 @@ export async function replaceAndDeleteSupportMark(
       .bind(replacementMarkId, markId, scope.lineAccountId),
     db
       .prepare(
-        `DELETE FROM support_mark_scopes
-          WHERE mark_id = ? AND tenant_id = ? AND line_account_id = ?`,
+        `UPDATE support_marks
+            SET archived_at = ?, is_default = 0, auto_on_inbound = 0
+          WHERE id = ? AND archived_at IS NULL`,
       )
-      .bind(markId, scope.tenantId, scope.lineAccountId),
-    db.prepare(`DELETE FROM support_marks WHERE id = ?`).bind(markId),
+      .bind(archivedAt, markId),
+    db
+      .prepare(
+        `INSERT INTO operation_audit
+           (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
+         VALUES (lower(hex(randomblob(16))), 'support_mark', ?, 'archived', ?, NULL, ?)`,
+      )
+      .bind(
+        markId,
+        actorId ?? null,
+        JSON.stringify({ replacementMarkId, reason: 'stop_new_use' }),
+      ),
   ]);
 
   return Number(results[1]?.meta?.changes ?? 0);
@@ -462,6 +584,7 @@ export async function applyInboundSupportMark(
     .prepare(
       `${MARK_SELECT}
         WHERE sm.auto_on_inbound = 1
+          AND sm.archived_at IS NULL
           AND COALESCE(sms.tenant_id, ?) = ?
           AND (sms.line_account_id = ? OR sms.line_account_id IS NULL)
         ORDER BY CASE WHEN sms.line_account_id = ? THEN 0 ELSE 1 END,
