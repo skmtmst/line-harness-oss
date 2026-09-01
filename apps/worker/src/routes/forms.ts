@@ -3,10 +3,13 @@ import {
   getForms,
   getFormsWithStats,
   getFormById,
+  getFormAccountIds,
+  getFormDeleteImpact,
   formBelongsToLineAccount,
   createForm,
   updateForm,
-  deleteForm,
+  archiveFormAtRevision,
+  deleteFormAtRevision,
   getFormSubmissions,
   getFormSubmissionsPage,
   getLatestFormSubmission,
@@ -58,6 +61,48 @@ const FORM_UPLOAD_TYPES: Record<string, string> = {
 };
 
 const FORM_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const FORM_ARCHIVE_BODY_MAX_BYTES = 16 * 1024;
+
+class FormArchiveBodyError extends Error {
+  constructor(readonly status: 400 | 413, message: string) {
+    super(message);
+  }
+}
+
+/** 小さい確認本文でも、宣言値と実際に読んだ量の両方へ上限を置く。 */
+async function readBoundedFormArchiveBody(request: Request): Promise<Record<string, unknown>> {
+  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
+  if (Number.isFinite(declared) && declared > FORM_ARCHIVE_BODY_MAX_BYTES) {
+    throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
+  }
+  const reader = request.body?.getReader();
+  if (!reader) return {};
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > FORM_ARCHIVE_BODY_MAX_BYTES) {
+      await reader.cancel();
+      throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new FormArchiveBodyError(400, '送信内容を読み取れませんでした');
+  }
+}
 
 /** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
 interface FormFieldDef {
@@ -129,6 +174,9 @@ function serializeForm(
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
     saveToMetadata: Boolean(row.save_to_metadata),
     isActive: Boolean(row.is_active),
+    status: row.status,
+    archivedAt: row.archived_at,
+    revision: row.revision,
     submitCount: row.submit_count,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
@@ -149,6 +197,24 @@ async function canUseFormFromAccount(
   if (!accountId) return false;
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return false;
   return formBelongsToLineAccount(c.env.DB, formId, accountId);
+}
+
+/** 選択中だけでなく、フォームが所属する全アカウントを扱える人だけが実行する。 */
+async function authorizedDeleteImpact(
+  c: Context<Env>,
+  formId: string,
+  accountId: string,
+) {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return { kind: 'not_found' as const };
+  }
+  const impact = await getFormDeleteImpact(c.env.DB, formId, accountId);
+  if (!impact) return { kind: 'not_found' as const };
+  const allAccountIds = await getFormAccountIds(c.env.DB, formId);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), allAccountIds)) {
+    return { kind: 'forbidden' as const };
+  }
+  return { kind: 'ready' as const, impact };
 }
 
 function publicWebhookConfig(row: DbForm): {
@@ -415,22 +481,138 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-// DELETE /api/forms/:id
+// GET /api/forms/:id/delete-impact — 回答・利用先・開けなくなるURLを同時に確認する。
+forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    return c.json({ success: true, data: authorized.impact });
+  } catch (error) {
+    console.error('GET /api/forms/:id/delete-impact error:', error);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
+  }
+});
+
+// POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
+forms.post('/api/forms/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const expectedRevision = typeof body.expectedRevision === 'number'
+      ? body.expectedRevision
+      : Number.NaN;
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
+
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!authorized.impact.canArchive) {
+      return c.json({
+        success: false,
+        error: 'form_already_archived',
+        message: 'この回答フォームはすでに保管されています。',
+        data: authorized.impact,
+      }, 409);
+    }
+
+    const archived = await archiveFormAtRevision(c.env.DB, c.req.param('id'), expectedRevision);
+    if (!archived) {
+      const latest = await getFormDeleteImpact(c.env.DB, c.req.param('id'), accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
+    return c.json({
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: archived.archived_at,
+        retainedSubmissionCount: authorized.impact.submissionCount,
+        retainedOpenCount: authorized.impact.openCount,
+        retainedReferenceCount: authorized.impact.referenceCount,
+        answerUrlUnavailable: true,
+      },
+    });
+  } catch (error) {
+    if (error instanceof FormArchiveBodyError) {
+      return c.json({ success: false, error: error.message }, error.status);
+    }
+    console.error('POST /api/forms/:id/archive error:', error);
+    return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
+  }
+});
+
+// DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
 forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+    const accountId = c.req.query('account_id')?.trim();
+    const expectedRevision = Number(c.req.query('expected_revision'));
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
-    const form = await getFormById(c.env.DB, id);
-    if (!form) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+    const authorized = await authorizedDeleteImpact(c, id, accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
     }
-    await deleteForm(c.env.DB, id);
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!authorized.impact.canDelete) {
+      return c.json({
+        success: false,
+        error: 'form_archive_required',
+        message: '公開中、回答あり、または利用中のため、削除せず停止・保管してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!await deleteFormAtRevision(c.env.DB, id, expectedRevision)) {
+      const latest = await getFormDeleteImpact(c.env.DB, id, accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/forms/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
 
@@ -473,6 +655,10 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
 forms.post('/api/forms/:id/opened', async (c) => {
   try {
     const formId = c.req.param('id');
+    // 保管後のURLは開けない。回答だけでなく「開いた記録」も増やさない。
+    if (!await getFormById(c.env.DB, formId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     // Open analytics may remain anonymous, but a caller can only attribute an
     // open to the LINE identity proven by its ID token. Body-supplied customer
     // IDs are intentionally ignored.

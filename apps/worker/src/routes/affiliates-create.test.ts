@@ -68,6 +68,15 @@ function post(path: string, body: unknown) {
   );
 }
 
+function remove(path: string) {
+  const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
+  return worker.fetch(
+    new Request(`https://worker.example.com${path}`, { method: 'DELETE', headers }),
+    env,
+    { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
+  );
+}
+
 const UNIQUE_CODE_ERR = new Error('D1_ERROR: UNIQUE constraint failed: affiliates.code');
 const UNIQUE_FRIEND_ERR = new Error(
   'D1_ERROR: UNIQUE constraint failed: affiliates.friend_id',
@@ -288,5 +297,31 @@ describe('GET /api/affiliates/:id/links — offer_name enrichment', () => {
     expect(body.data).toHaveLength(2);
     expect(body.data[0].offer_name).toBe('Summer Campaign');
     expect(body.data[1].offer_name).toBeNull();
+  });
+});
+
+describe('紹介者の停止と履歴保持', () => {
+  it('DELETEでは物理削除せず、停止操作を案内する', async () => {
+    const res = await remove('/api/affiliates/aff-1');
+    expect(res.status).toBe(405);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe('PHYSICAL_DELETE_DISABLED');
+    expect(body.error).toContain('紹介を止める操作');
+    expect(dbMocks.deleteAffiliate).not.toHaveBeenCalled();
+  });
+
+  it('停止中の紹介コードでは新しいクリックを記録しない', async () => {
+    dbMocks.getAffiliateByCode.mockResolvedValue({
+      id: 'aff-paused',
+      name: 'Stopped',
+      code: 'stopped1',
+      commission_rate: 10,
+      is_active: 0,
+      created_at: '2026-07-07T00:00:00.000+09:00',
+      friend_id: null,
+    });
+    const res = await post('/api/affiliates/click', { code: 'stopped1' });
+    expect(res.status).toBe(404);
+    expect(dbMocks.recordAffiliateClick).not.toHaveBeenCalled();
   });
 });
