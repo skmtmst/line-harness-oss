@@ -30,6 +30,7 @@ describe('共通部品の影響範囲', () => {
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
+      'app/duplicates/page.tsx',
       'app/ec-commerce/identity-candidates/page.tsx',
       'app/form-submissions/page.tsx',
       'app/friend-add-settings/publish/page.tsx',

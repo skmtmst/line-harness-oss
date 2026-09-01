@@ -110,7 +110,6 @@
   "components/update/progress-modal.tsx": 12,
   "components/update/update-banner.tsx": 6,
   "components/update/update-button.tsx": 3,
-  "components/users/summary-bar.tsx": 2,
   "components/users/user-row.tsx": 12,
   "components/users/users-filters.tsx": 2,
   "components/users/users-table.tsx": 12,

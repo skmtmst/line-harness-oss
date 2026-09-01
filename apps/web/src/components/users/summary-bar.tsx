@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import SummaryCard from '@/components/shared/summary-card'
 import { api } from '@/lib/api'
-
-const fmt = new Intl.NumberFormat('ja-JP')
+import { createLatestRequestGuard } from './summary-request-guard'
 
 interface Stats {
   totalFollowing: number
@@ -11,82 +11,110 @@ interface Stats {
   friendDups: number
 }
 
-type SummaryState = 'loading' | 'ready' | 'error'
+type LoadStatus = 'loading' | 'ready' | 'error'
 
-const CARD_LABELS = ['統合ユーザー', '紐付く友だち', '重複している行', '重複率'] as const
-
+/**
+ * 統合ユーザー（設計 `r7eSi`）の指標カード。
+ *
+ * 面・角丸・文字は共通 SummaryCard に任せる。ここで手書きしていたときは
+ * 値が24pxになっていて、設計の22pxと1画面ぶんずれていた。
+ */
 export default function SummaryBar() {
   const [stats, setStats] = useState<Stats | null>(null)
-  const [state, setState] = useState<SummaryState>('loading')
+  const [status, setStatus] = useState<LoadStatus>('loading')
+  const [requestGuard] = useState(createLatestRequestGuard)
+
+  const load = useCallback(async () => {
+    const requestGeneration = requestGuard.begin()
+    setStats(null)
+    setStatus('loading')
+
+    try {
+      const res = await api.duplicates.stats()
+      if (!requestGuard.isCurrent(requestGeneration)) return
+
+      if (!res.success) {
+        setStatus('error')
+        return
+      }
+
+      setStats({
+        totalFollowing: res.data.totalFollowing,
+        uniquePeople: res.data.uniquePeople,
+        friendDups: res.data.friendDups,
+      })
+      setStatus('ready')
+    } catch {
+      if (requestGuard.isCurrent(requestGeneration)) setStatus('error')
+    }
+  }, [requestGuard])
 
   useEffect(() => {
-    let cancelled = false
+    void load()
+    return () => requestGuard.invalidate()
+  }, [load, requestGuard])
 
-    void (async () => {
-      try {
-        const res = await api.duplicates.stats()
-        if (cancelled) return
-        if (!res.success) {
-          setState('error')
-          return
-        }
-        setStats({
-          totalFollowing: res.data.totalFollowing,
-          uniquePeople: res.data.uniquePeople,
-          friendDups: res.data.friendDups,
-        })
-        setState('ready')
-      } catch {
-        if (!cancelled) setState('error')
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (state === 'loading') {
-    return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-summary-state="loading">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]" />
-        ))}
-      </div>
-    )
-  }
-
-  if (state === 'error' || !stats) {
-    return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-summary-state="error">
-        {CARD_LABELS.map((label) => (
-          <Card key={label} label={label} value="—" hint="取得できませんでした" />
-        ))}
-      </div>
-    )
-  }
-
+  const loading = status === 'loading'
+  const failure = status === 'error'
+  const detailOf = (ready: string) =>
+    loading ? '読み込んでいます' : failure ? <FailureDetail onRetry={load} /> : ready
   const dupRate =
-    stats.totalFollowing > 0 ? (stats.friendDups / stats.totalFollowing) * 100 : 0
+    stats && stats.totalFollowing > 0 ? (stats.friendDups / stats.totalFollowing) * 100 : stats ? 0 : null
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-summary-state="ready">
-      <Card label="統合ユーザー" value={`${fmt.format(stats.uniquePeople)}人`} />
-      <Card label="紐付く友だち" value={`${fmt.format(stats.totalFollowing)}件`} />
-      {/* friendDups は行ベースの「余分な行数」(SUM(row_cnt - 1))。
-          1人が3アカウントに居れば +2 とカウントされる。 */}
-      <Card label="重複している行" value={`${fmt.format(stats.friendDups)}件`} hint="複数登録による余分" />
-      <Card label="重複率" value={`${dupRate.toFixed(1)}%`} hint="紐付く友だちのうち余分" />
+    <div
+      className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+      data-design-node="r7eSi"
+      data-users-summary="v6"
+      data-summary-state={status}
+    >
+      <SummaryCard
+        title="統合ユーザー"
+        value={stats?.uniquePeople ?? null}
+        unit="人"
+        detail={detailOf('重複を1人にまとめた数')}
+        loading={loading}
+      />
+      <SummaryCard
+        title="紐付く友だち"
+        value={stats?.totalFollowing ?? null}
+        unit="件"
+        detail={detailOf('各アカウントの友だち登録')}
+        loading={loading}
+      />
+      {/*
+        friendDups は行ベースの「余分な登録行数」(SUM(row_cnt - 1))。
+        1人が3アカウントに居れば +2 と数える。通数でも金額でもない。
+      */}
+      <SummaryCard
+        title="重複している行"
+        value={stats?.friendDups ?? null}
+        unit="件"
+        detail={detailOf('複数登録による余分')}
+        loading={loading}
+      />
+      <SummaryCard
+        title="重複率"
+        value={dupRate === null ? null : Number(dupRate.toFixed(1))}
+        unit="%"
+        detail={detailOf('紐付く友だちのうち余分')}
+        loading={loading}
+      />
     </div>
   )
 }
 
-function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function FailureDetail({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-      <div className="text-xs font-medium text-[#565F59]">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-[#1D1D1F]">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-[#8B938D]">{hint}</div> : null}
-    </div>
+    <>
+      読み込めませんでした
+      <button
+        type="button"
+        onClick={onRetry}
+        className="ml-1.5 font-semibold text-v6-action underline hover:no-underline"
+      >
+        再読み込み
+      </button>
+    </>
   )
 }

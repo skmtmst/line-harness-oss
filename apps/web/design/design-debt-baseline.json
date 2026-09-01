@@ -119,7 +119,7 @@
     "direct-secondary-button": 2
   },
   "app/duplicates/page.tsx": {
-    "arbitrary-value": 43,
+    "arbitrary-value": 42,
     "direct-th": 6
   },
   "app/ec-commerce/identity-candidates/page.tsx": {
@@ -809,9 +809,6 @@
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,
     "direct-primary-button": 1
-  },
-  "components/users/summary-bar.tsx": {
-    "arbitrary-value": 9
   },
   "components/users/user-row.tsx": {
     "unresolved-classname": 1,
