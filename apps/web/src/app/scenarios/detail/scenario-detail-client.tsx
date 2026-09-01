@@ -45,6 +45,12 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import {
+  scenarioReachBarWidth,
+  scenarioReachCountLabel,
+  scenarioReachPercent,
+  scenarioReachPercentLabel,
+} from './scenario-reach-display'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -164,7 +170,11 @@ interface ScenarioStats {
   activeNow: number
   completed: number
   paused: number
-  steps: Array<{ stepOrder: number; reachedCount: number; reachRate: number }>
+  steps: Array<{
+    stepOrder: number
+    reachedCount: number
+    reachRate?: number | null
+  }>
 }
 
 function FlexPreview({ content }: { content: string }) {
@@ -1548,7 +1558,8 @@ export default function ScenarioDetailClient({
               <tbody>
                 {sortedSteps.map((step, idx) => {
                   const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
-                  const pct = stat ? Math.round(stat.reachRate * 100) : null
+                  const pct = scenarioReachPercent(stat?.reachRate)
+                  const reachBarWidth = scenarioReachBarWidth(pct)
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
@@ -1641,16 +1652,20 @@ export default function ScenarioDetailClient({
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
-                              <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
-                                <span
-                                  className="bg-accent block h-full rounded-full"
-                                  style={{ width: `${Math.min(100, pct ?? 0)}%` }}
-                                />
-                              </span>
+                              {reachBarWidth === null ? null : (
+                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                  <span
+                                    className="bg-accent block h-full rounded-full"
+                                    style={{ width: reachBarWidth }}
+                                  />
+                                </span>
+                              )}
                               <span className="text-ink text-sm tabular-nums">
-                                {stat.reachedCount}人
+                                {scenarioReachCountLabel(stat.reachedCount)}
                               </span>
-                              <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
+                              <span className="text-ink-faint text-xs tabular-nums">
+                                {scenarioReachPercentLabel(pct)}
+                              </span>
                             </span>
                           ) : (
                             <span className="text-ink-faint text-sm">—</span>
