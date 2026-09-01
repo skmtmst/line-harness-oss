@@ -278,6 +278,47 @@ CREATE TABLE analytics_result_audiences (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE analytics_saved_analyses (
+  id                     TEXT PRIMARY KEY,
+  line_account_id        TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  name                   TEXT NOT NULL,
+  kind                   TEXT NOT NULL CHECK (kind IN ('cross','funnel')),
+  current_version_number INTEGER NOT NULL DEFAULT 1 CHECK (current_version_number >= 1),
+  status                 TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+  created_by             TEXT,
+  created_by_name        TEXT NOT NULL,
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL
+);
+
+CREATE TABLE analytics_saved_analysis_snapshots (
+  id                    TEXT PRIMARY KEY,
+  saved_analysis_id     TEXT NOT NULL REFERENCES analytics_saved_analyses(id) ON DELETE CASCADE,
+  analysis_version_id   TEXT NOT NULL REFERENCES analytics_saved_analysis_versions(id) ON DELETE RESTRICT,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  source_kind           TEXT NOT NULL CHECK (source_kind IN ('cross','funnel')),
+  source_result_id      TEXT NOT NULL,
+  period_from           TEXT NOT NULL,
+  period_to             TEXT NOT NULL,
+  time_zone             TEXT NOT NULL,
+  data_cutoff_at        TEXT NOT NULL,
+  state                 TEXT NOT NULL CHECK (state IN ('available','partial','unavailable','failed')),
+  result_json           TEXT NOT NULL CHECK (json_valid(result_json)),
+  created_by            TEXT,
+  created_at            TEXT NOT NULL
+);
+
+CREATE TABLE analytics_saved_analysis_versions (
+  id                  TEXT PRIMARY KEY,
+  saved_analysis_id   TEXT NOT NULL REFERENCES analytics_saved_analyses(id) ON DELETE CASCADE,
+  line_account_id     TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  version_number      INTEGER NOT NULL CHECK (version_number >= 1),
+  definition_json     TEXT NOT NULL CHECK (json_valid(definition_json)),
+  created_by          TEXT,
+  created_at          TEXT NOT NULL,
+  UNIQUE (saved_analysis_id, version_number)
+);
+
 CREATE TABLE analytics_url_exposure_queue (
   message_id            TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -736,18 +777,35 @@ CREATE TABLE ec_events (
   source            TEXT NOT NULL,
   external_event_id TEXT NOT NULL,
   event_type        TEXT NOT NULL,
+  line_account_id   TEXT REFERENCES line_accounts(id),
   customer_id       TEXT,
-  line_user_id      TEXT NOT NULL,
+  line_user_id      TEXT,
   friend_id         TEXT,
   payload           TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'received'
-                    CHECK (status IN ('received', 'processing', 'processed', 'skipped', 'failed')),
+                    CHECK (status IN ('received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed')),
   error_message     TEXT,
   received_at       TEXT NOT NULL,
   processed_at      TEXT,
   updated_at        TEXT NOT NULL,
   UNIQUE (source, external_event_id),
   FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL
+);
+
+CREATE TABLE ec_identity_links (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  source_key TEXT NOT NULL,
+  shop_key TEXT NOT NULL,
+  external_customer_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  linked_by TEXT,
+  linked_at TEXT NOT NULL,
+  unlinked_by TEXT,
+  unlinked_at TEXT,
+  unlink_reason TEXT
 );
 
 CREATE TABLE ec_notification_settings (
@@ -910,6 +968,13 @@ CREATE TABLE "folders" (
   color         TEXT
 );
 
+CREATE TABLE form_accounts (
+  form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (form_id, line_account_id)
+);
+
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL,
@@ -976,6 +1041,56 @@ CREATE TABLE friend_add_events (
   UNIQUE (line_account_id, webhook_event_id)
 );
 
+CREATE TABLE friend_bulk_run_items (
+  id                TEXT PRIMARY KEY,
+  run_id            TEXT NOT NULL REFERENCES friend_bulk_runs(id) ON DELETE CASCADE,
+  friend_id         TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  line_account_id   TEXT,
+  ordinal           INTEGER NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'queued'
+                      CHECK (status IN ('queued','running','waiting','success','skipped','temporary_failure','permanent_failure')),
+  attempt_count     INTEGER NOT NULL DEFAULT 0,
+  idempotency_key   TEXT NOT NULL,
+  before_json       TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+  after_json        TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+  error_code        TEXT,
+  error_message     TEXT,
+  retry_at          TEXT,
+  lease_expires_at  TEXT,
+  started_at        TEXT,
+  completed_at      TEXT,
+  updated_at        TEXT NOT NULL,
+  UNIQUE (run_id, friend_id),
+  UNIQUE (idempotency_key)
+);
+
+CREATE TABLE friend_bulk_runs (
+  id                       TEXT PRIMARY KEY,
+  tenant_id                TEXT NOT NULL,
+  created_by               TEXT NOT NULL,
+  selection_json           TEXT NOT NULL CHECK (json_valid(selection_json)),
+  operation_json           TEXT NOT NULL CHECK (json_valid(operation_json)),
+  execution_plan_json      TEXT CHECK (execution_plan_json IS NULL OR json_valid(execution_plan_json)),
+  status                   TEXT NOT NULL DEFAULT 'preparing'
+                             CHECK (status IN ('preparing','queued','running','waiting','success','partial','failed','cancelled')),
+  target_count             INTEGER NOT NULL DEFAULT 0,
+  excluded_count           INTEGER NOT NULL DEFAULT 0,
+  success_count            INTEGER NOT NULL DEFAULT 0,
+  skipped_count            INTEGER NOT NULL DEFAULT 0,
+  temporary_failure_count  INTEGER NOT NULL DEFAULT 0,
+  permanent_failure_count  INTEGER NOT NULL DEFAULT 0,
+  reversible               INTEGER NOT NULL DEFAULT 0 CHECK (reversible IN (0,1)),
+  idempotency_key          TEXT NOT NULL,
+  scheduled_at             TEXT,
+  undo_of_run_id           TEXT REFERENCES friend_bulk_runs(id),
+  error_message            TEXT,
+  created_at               TEXT NOT NULL,
+  started_at               TEXT,
+  completed_at             TEXT,
+  updated_at               TEXT NOT NULL,
+  UNIQUE (tenant_id, created_by, idempotency_key)
+);
+
 CREATE TABLE friend_daily_snapshots (
   -- JST の日付（YYYY-MM-DD）。LINEアカウントごとに1行。
   date              TEXT NOT NULL,
@@ -1034,6 +1149,22 @@ CREATE TABLE friend_fields (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE friend_identity_links (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  link_method TEXT NOT NULL,
+  evidence_snapshot_json TEXT NOT NULL CHECK (json_valid(evidence_snapshot_json)),
+  confidence_score INTEGER NOT NULL CHECK (confidence_score BETWEEN 0 AND 100),
+  linked_by TEXT,
+  linked_at TEXT NOT NULL,
+  unlinked_by TEXT,
+  unlinked_at TEXT,
+  unlink_reason TEXT
 );
 
 CREATE TABLE friend_reminder_deliveries (
@@ -1136,6 +1267,69 @@ CREATE TABLE google_calendar_connections (
   last_error    TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE identity_candidate_decisions (
+  id TEXT PRIMARY KEY,
+  candidate_id TEXT NOT NULL REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  candidate_version INTEGER NOT NULL CHECK (candidate_version >= 2),
+  from_status TEXT NOT NULL
+    CHECK (from_status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  to_status TEXT NOT NULL
+    CHECK (to_status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  actor_staff_id TEXT,
+  actor_name TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  evidence_fingerprint TEXT NOT NULL,
+  impact_snapshot_json TEXT NOT NULL CHECK (json_valid(impact_snapshot_json)),
+  reprocess_scope_json TEXT CHECK (reprocess_scope_json IS NULL OR json_valid(reprocess_scope_json)),
+  decided_at TEXT NOT NULL,
+  UNIQUE(candidate_id, candidate_version)
+);
+
+CREATE TABLE identity_candidates (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK (kind IN ('friend_duplicate', 'ec_member')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'linked', 'different', 'deferred', 'invalidated')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  confidence_score INTEGER NOT NULL CHECK (confidence_score BETWEEN 0 AND 100),
+  detector_version TEXT NOT NULL,
+  left_subject_kind TEXT NOT NULL CHECK (left_subject_kind IN ('friend', 'ec_event')),
+  left_subject_id TEXT NOT NULL,
+  left_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  left_shop_key TEXT,
+  left_snapshot_json TEXT NOT NULL CHECK (json_valid(left_snapshot_json)),
+  right_subject_kind TEXT NOT NULL CHECK (right_subject_kind = 'friend'),
+  right_subject_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  right_line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  right_shop_key TEXT,
+  right_snapshot_json TEXT NOT NULL CHECK (json_valid(right_snapshot_json)),
+  source_key TEXT,
+  external_customer_id TEXT,
+  evidence_fingerprint TEXT NOT NULL,
+  evidence_json TEXT NOT NULL CHECK (json_valid(evidence_json)),
+  impact_json TEXT NOT NULL CHECK (json_valid(impact_json)),
+  detected_at TEXT NOT NULL,
+  reviewed_by TEXT,
+  reviewed_at TEXT,
+  reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (
+    (kind = 'friend_duplicate' AND left_subject_kind = 'friend'
+      AND left_line_account_id IS NOT NULL AND left_subject_id < right_subject_id)
+    OR
+    (kind = 'ec_member' AND left_subject_kind = 'ec_event'
+      AND left_line_account_id = right_line_account_id
+      AND left_shop_key IS NOT NULL AND source_key IS NOT NULL
+      AND external_customer_id IS NOT NULL)
+  ),
+  UNIQUE (
+    tenant_id, kind, left_subject_kind, left_subject_id,
+    right_subject_kind, right_subject_id
+  )
 );
 
 CREATE TABLE inbox_conversation_events (
@@ -1527,7 +1721,9 @@ CREATE TABLE nen_delivery_jobs (
   last_error TEXT,
   sent_at TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, campaign_snapshot TEXT CHECK (
+  campaign_snapshot IS NULL OR json_valid(campaign_snapshot)
+),
   UNIQUE (campaign_key, friend_id, source_key)
 );
 
@@ -1586,6 +1782,29 @@ CREATE TABLE nen_pet_profiles (
   updated_at TEXT NOT NULL
 , breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT);
 
+CREATE TABLE nen_photo_review_events (
+  id TEXT PRIMARY KEY,
+  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  from_status TEXT NOT NULL CHECK (from_status = 'pending'),
+  to_status TEXT NOT NULL CHECK (to_status IN ('adopted', 'rejected')),
+  reason_code TEXT CHECK (reason_code IS NULL OR reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')),
+  reason_note TEXT,
+  awarded_points INTEGER NOT NULL DEFAULT 0,
+  reviewed_by TEXT NOT NULL,
+  reviewed_by_name TEXT NOT NULL,
+  notification_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (notification_status IN ('pending', 'sent', 'failed')),
+  notification_error TEXT,
+  notification_attempt_count INTEGER NOT NULL DEFAULT 0
+    CHECK (notification_attempt_count >= 0),
+  notification_first_failed_at TEXT,
+  notification_sent_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(photo_id, from_status)
+);
+
 CREATE TABLE nen_photo_submissions (
   id TEXT PRIMARY KEY,
   friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
@@ -1600,7 +1819,10 @@ CREATE TABLE nen_photo_submissions (
   created_at TEXT NOT NULL,
   reviewed_at TEXT,
   updated_at TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id), publication_consent_version TEXT, publication_consent_at TEXT, publication_withdrawn_at TEXT, public_pet_name INTEGER NOT NULL DEFAULT 0
+  CHECK (public_pet_name IN (0, 1)), review_reason_code TEXT
+  CHECK (review_reason_code IS NULL OR review_reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')), review_reason_note TEXT, reviewed_by TEXT, reviewed_by_name TEXT, review_notification_status TEXT NOT NULL DEFAULT 'not_required'
+  CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')));
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -1630,6 +1852,7 @@ CREATE TABLE notification_rules (
   event_type   TEXT NOT NULL,
   conditions   TEXT NOT NULL DEFAULT '{}',
   channels     TEXT NOT NULL DEFAULT '["webhook"]',
+  line_account_id TEXT REFERENCES line_accounts(id),
   is_active    INTEGER NOT NULL DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -1644,6 +1867,8 @@ CREATE TABLE notifications (
   channel         TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   metadata        TEXT,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  category        TEXT NOT NULL DEFAULT 'info' CHECK (category IN ('error', 'update', 'info')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -2071,6 +2296,22 @@ CREATE TABLE rt_tables (
   UNIQUE(store_id, code)
 );
 
+CREATE TABLE saved_search_references (
+  saved_search_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  reference_kind TEXT NOT NULL
+    CHECK (reference_kind IN ('broadcast','automation','scenario','other')),
+  reference_id TEXT NOT NULL,
+  reference_name TEXT NOT NULL,
+  reference_mode TEXT NOT NULL DEFAULT 'live'
+    CHECK (reference_mode IN ('live','fixed')),
+  last_used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (saved_search_id, reference_kind, reference_id),
+  FOREIGN KEY (saved_search_id, line_account_id)
+    REFERENCES saved_searches(id, line_account_id) ON DELETE RESTRICT
+);
+
 CREATE TABLE saved_searches (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -2258,6 +2499,13 @@ CREATE TABLE staff_menus (
   FOREIGN KEY (menu_id) REFERENCES menus(id)
 );
 
+CREATE TABLE staff_notification_reads (
+  notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  staff_id        TEXT NOT NULL,
+  read_at         TEXT NOT NULL,
+  PRIMARY KEY (notification_id, staff_id)
+);
+
 CREATE TABLE staff_shifts (
   id          TEXT PRIMARY KEY,
   staff_id    TEXT NOT NULL,
@@ -2379,6 +2627,9 @@ CREATE TABLE templates (
   carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
   -- 162: 制限を超えたときに返すテキスト。空なら何も返さない。
   carousel_tap_limit_text TEXT,
+  -- 質問テンプレート。scenario_steps.question_json と同じ形。
+  question_json TEXT CHECK (question_json IS NULL OR json_valid(question_json)),
+  question_status TEXT NOT NULL DEFAULT 'published' CHECK (question_status IN ('draft', 'published')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id));
@@ -2389,7 +2640,7 @@ CREATE TABLE tenants (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, feature_packs TEXT NOT NULL DEFAULT '[]');
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -2646,6 +2897,15 @@ CREATE INDEX idx_analytics_reconciliation_account_time
 CREATE INDEX idx_analytics_result_audiences_expiry
   ON analytics_result_audiences(line_account_id, expires_at);
 
+CREATE INDEX idx_analytics_saved_analyses_account
+  ON analytics_saved_analyses(line_account_id, status, updated_at DESC, id DESC);
+
+CREATE INDEX idx_analytics_saved_snapshots_history
+  ON analytics_saved_analysis_snapshots(line_account_id, saved_analysis_id, created_at DESC, id DESC);
+
+CREATE INDEX idx_analytics_saved_versions_current
+  ON analytics_saved_analysis_versions(line_account_id, saved_analysis_id, version_number DESC);
+
 CREATE INDEX idx_analytics_url_exposure_queue_due
   ON analytics_url_exposure_queue(status, available_at, created_at)
   WHERE status IN ('pending','failed');
@@ -2765,14 +3025,23 @@ CREATE INDEX idx_cvs_pending
 CREATE INDEX idx_dashboard_preferences_account
   ON dashboard_preferences(line_account_id, updated_at DESC);
 
-CREATE INDEX idx_ec_events_customer
-  ON ec_events(customer_id, received_at DESC);
+CREATE INDEX idx_ec_events_account_received ON ec_events(line_account_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_friend
-  ON ec_events(friend_id, received_at DESC);
+CREATE INDEX idx_ec_events_customer ON ec_events(customer_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_status_received
-  ON ec_events(status, received_at);
+CREATE INDEX idx_ec_events_friend ON ec_events(friend_id, received_at DESC);
+
+CREATE INDEX idx_ec_events_identity_pending
+  ON ec_events(line_account_id, received_at DESC) WHERE status = 'identity_pending';
+
+CREATE INDEX idx_ec_events_status_received ON ec_events(status, received_at);
+
+CREATE UNIQUE INDEX idx_ec_identity_links_active_customer
+  ON ec_identity_links(tenant_id, source_key, shop_key, external_customer_id)
+  WHERE unlinked_at IS NULL;
+
+CREATE INDEX idx_ec_identity_links_friend
+  ON ec_identity_links(tenant_id, line_account_id, friend_id, linked_at DESC);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
@@ -2823,6 +3092,9 @@ CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
 
 CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
 
+CREATE INDEX idx_form_accounts_account
+  ON form_accounts(line_account_id, form_id);
+
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
@@ -2847,10 +3119,25 @@ CREATE INDEX idx_friend_add_events_account_time
 CREATE INDEX idx_friend_add_events_friend
   ON friend_add_events(line_account_id, friend_id, occurred_at DESC);
 
+CREATE INDEX idx_friend_bulk_run_items_work
+  ON friend_bulk_run_items(run_id, status, retry_at, lease_expires_at, ordinal);
+
+CREATE INDEX idx_friend_bulk_runs_actor
+  ON friend_bulk_runs(tenant_id, created_by, created_at DESC);
+
+CREATE INDEX idx_friend_bulk_runs_due
+  ON friend_bulk_runs(status, scheduled_at, updated_at);
+
 CREATE INDEX idx_friend_daily_snapshots_date
   ON friend_daily_snapshots (line_account_id, date);
 
 CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
+
+CREATE UNIQUE INDEX idx_friend_identity_links_active_friend
+  ON friend_identity_links(friend_id) WHERE unlinked_at IS NULL;
+
+CREATE INDEX idx_friend_identity_links_user
+  ON friend_identity_links(tenant_id, user_id, linked_at DESC);
 
 CREATE INDEX idx_friend_reminders_friend ON friend_reminders (friend_id);
 
@@ -2894,6 +3181,18 @@ CREATE INDEX idx_google_calendar_connections_staff
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
 CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
+
+CREATE INDEX idx_identity_candidate_decisions_history
+  ON identity_candidate_decisions(candidate_id, decided_at DESC);
+
+CREATE INDEX idx_identity_candidates_left_account
+  ON identity_candidates(tenant_id, left_line_account_id, status);
+
+CREATE INDEX idx_identity_candidates_review_queue
+  ON identity_candidates(tenant_id, kind, status, detected_at DESC);
+
+CREATE INDEX idx_identity_candidates_right_account
+  ON identity_candidates(tenant_id, right_line_account_id, status);
 
 CREATE UNIQUE INDEX idx_inbox_conversation_events_correlation
   ON inbox_conversation_events (correlation_id, event_type);
@@ -3012,6 +3311,20 @@ CREATE INDEX idx_nen_pet_profiles_birthday
 CREATE INDEX idx_nen_pet_profiles_customer
   ON nen_pet_profiles(customer_id);
 
+CREATE INDEX idx_nen_photo_review_events_account_created
+  ON nen_photo_review_events(line_account_id, created_at DESC);
+
+CREATE INDEX idx_nen_photo_review_events_notification
+  ON nen_photo_review_events(notification_status, created_at)
+  WHERE notification_status IN ('pending', 'failed');
+
+CREATE INDEX idx_nen_photos_account_status
+  ON nen_photo_submissions(line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_nen_photos_publication
+  ON nen_photo_submissions(line_account_id, publication_consent_at, reviewed_at DESC)
+  WHERE status = 'adopted' AND publication_withdrawn_at IS NULL;
+
 CREATE INDEX idx_nen_photos_status ON nen_photo_submissions(status, created_at DESC);
 
 CREATE INDEX idx_nen_point_ledger_friend_created
@@ -3019,6 +3332,10 @@ CREATE INDEX idx_nen_point_ledger_friend_created
 
 CREATE INDEX idx_nen_rich_menu_jobs_status
   ON nen_rich_menu_jobs(status, created_at);
+
+CREATE INDEX idx_notification_rules_account ON notification_rules(line_account_id, event_type, is_active);
+
+CREATE INDEX idx_notifications_center ON notifications(line_account_id, category, created_at DESC);
 
 CREATE INDEX idx_notifications_created ON notifications (created_at);
 
@@ -3106,8 +3423,14 @@ CREATE INDEX idx_rt_sync_events_recent ON rt_sync_events(store_id, received_at D
 
 CREATE INDEX idx_rt_tables_store ON rt_tables(store_id, is_active);
 
+CREATE INDEX idx_saved_search_references_account
+  ON saved_search_references(line_account_id, saved_search_id, reference_kind);
+
 CREATE INDEX idx_saved_searches_account_scope
   ON saved_searches(line_account_id, scope, created_by, display_order);
+
+CREATE UNIQUE INDEX idx_saved_searches_id_account
+  ON saved_searches(id, line_account_id);
 
 CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
 
@@ -3155,6 +3478,9 @@ CREATE INDEX idx_staff_members_role ON staff_members(role);
 
 CREATE INDEX idx_staff_members_tenant
   ON staff_members(tenant_id);
+
+CREATE INDEX idx_staff_notification_reads_staff
+  ON staff_notification_reads(staff_id, read_at DESC);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 
@@ -3280,6 +3606,40 @@ WHEN NEW.source_kind = 'funnel'
     WHERE r.id = NEW.source_result_id AND r.line_account_id = NEW.line_account_id
  )
 BEGIN SELECT RAISE(ABORT, 'analytics_result_source_not_found'); END;
+
+CREATE TRIGGER trg_analytics_saved_snapshots_no_update
+BEFORE UPDATE ON analytics_saved_analysis_snapshots
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_snapshot_immutable'); END;
+
+CREATE TRIGGER trg_analytics_saved_snapshots_same_parent
+BEFORE INSERT ON analytics_saved_analysis_snapshots
+WHEN NOT EXISTS (
+  SELECT 1
+    FROM analytics_saved_analyses a
+    JOIN analytics_saved_analysis_versions v
+      ON v.id = NEW.analysis_version_id
+     AND v.saved_analysis_id = a.id
+     AND v.line_account_id = a.line_account_id
+   WHERE a.id = NEW.saved_analysis_id
+     AND a.line_account_id = NEW.line_account_id
+)
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
+
+CREATE TRIGGER trg_analytics_saved_versions_no_delete
+BEFORE DELETE ON analytics_saved_analysis_versions
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_version_immutable'); END;
+
+CREATE TRIGGER trg_analytics_saved_versions_no_update
+BEFORE UPDATE ON analytics_saved_analysis_versions
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_version_immutable'); END;
+
+CREATE TRIGGER trg_analytics_saved_versions_same_account
+BEFORE INSERT ON analytics_saved_analysis_versions
+WHEN NOT EXISTS (
+  SELECT 1 FROM analytics_saved_analyses a
+   WHERE a.id = NEW.saved_analysis_id AND a.line_account_id = NEW.line_account_id
+)
+BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
 
 CREATE TRIGGER trg_automation_published_version_immutable
 BEFORE UPDATE ON automation_versions

@@ -1,15 +1,27 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import Header from '@/components/layout/header'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import NotificationRunList from '@/components/line-notifications/notification-run-list'
+import OperatorNotificationRules from '@/components/line-notifications/operator-notification-rules'
+import Button from '@/components/shared/button'
 import { api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
 
 const categories = [
   ['all', 'すべて'], ['order', '注文'], ['payment', '銀行振込'],
   ['shipping', '発送'], ['support', 'キャンセル・返金'], ['subscription', '定期便'],
 ] as const
 type Category = typeof categories[number][0]
+
+const TABS = [
+  { key: 'customer', label: '顧客へのお知らせ' },
+  { key: 'operator', label: '運用者へのお知らせ' },
+  { key: 'failures', label: '送れなかったもの' },
+  { key: 'history', label: '記録' },
+] as const
 
 function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
   return <button type="button" role="switch" aria-checked={setting.isEnabled} disabled={busy} onClick={onToggle}
@@ -42,7 +54,9 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
 }
 
 export default function LineNotificationsPage() {
+  const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [category, setCategory] = useState<Category>('all')
@@ -50,21 +64,47 @@ export default function LineNotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const loadGeneration = useRef(0)
 
   const load = useCallback(async () => {
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
+    if (tab !== 'customer') {
+      setLoading(false)
+      return
+    }
     setLoading(true)
+    // アカウント切替中に前のアカウントの件数を残さない。
+    setSettings([])
+    setOverview(null)
+    setNotice(null)
     try {
-      const [settingRes, overviewRes] = await Promise.all([api.ecCommerce.settings(), api.ecCommerce.overview()])
+      const [settingRes, overviewRes] = await Promise.all([
+        api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
+      ])
+      if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
       setSettings(settingRes.data)
       setOverview(overviewRes.data)
       setExpanded((current) => current ?? settingRes.data[0]?.eventType ?? null)
-    } catch { setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' }) }
-    finally { setLoading(false) }
-  }, [])
+    } catch {
+      if (generation === loadGeneration.current) {
+        setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
+      }
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false)
+    }
+  }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
   const visible = useMemo(() => category === 'all' ? settings : settings.filter((setting) => setting.category === category), [category, settings])
+  const kpis = customerNotificationKpis({
+    ready: !loading && overview !== null,
+    settingsCount: settings.length,
+    enabledCount: settings.filter((setting) => setting.isEnabled).length,
+    processed: overview?.processed ?? null,
+    failed: overview?.failed ?? null,
+  })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
@@ -97,14 +137,30 @@ export default function LineNotificationsPage() {
   }
 
   return <>
-    <div data-design="Head"><Header title="LINE通知" description="注文・入金・発送・返金・定期便の大切なお知らせを、然-NEN-らしいカードで届けます。" /></div>
+    <MergedTabs basePath="/line-notifications" tabs={TABS} active={tab} defaultKey="customer" />
+    {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
+    {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
+    {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
+    {tab === 'customer' ? <>
     <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {[
-        ['通知テンプレート', settings.length, '顧客向けの重要通知'],
-        ['通知ON', settings.filter((x) => x.isEnabled).length, '現在送信する設定'],
-        ['送信完了', overview?.processed ?? 0, 'EC連携からの累計'],
-        ['要確認', overview?.failed ?? 0, '送信に失敗した通知'],
-      ].map(([label, value, note]) => <div key={label} className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs">{label}</p><p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}<span className="text-ink-faint ml-1 text-xs font-normal">件</span></p><p className="text-ink-faint mt-0.5 text-xs">{note}</p></div>)}
+      {kpis.map((kpi) => {
+        const { label, value, note, href } = kpi
+        const body = <>
+          <p className="text-ink-faint text-xs">{label}</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {value === null ? '—' : value}
+            {value === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">件</span>}
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
+        </>
+        return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
+          {body}
+          {/* 0件のときは押し口を出さない。押しても何も無い。 */}
+          {canOpenCustomerNotificationKpi(kpi) && href
+            ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
+            : null}
+        </div>
+      })}
     </div>
     <main className="grid min-w-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="bg-canvas rounded-card border-hairline h-fit border p-2 lg:sticky lg:top-4">
@@ -134,5 +190,6 @@ export default function LineNotificationsPage() {
         </article>)}
       </section>
     </main>
+    </> : null}
   </>
 }

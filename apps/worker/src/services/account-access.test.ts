@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LineAccount } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import {
@@ -10,7 +10,12 @@ import {
 
 vi.mock('@line-crm/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@line-crm/db')>();
-  return { ...actual, getLineAccounts: vi.fn(async () => accounts) };
+  return {
+    ...actual,
+    getLineAccounts: vi.fn(async () => accounts),
+    getStaffById: vi.fn(async (_db: D1Database, id: string) => staffRows.get(id) ?? null),
+    getStaffAccountScopeIds: vi.fn(async (_db: D1Database, id: string) => scopeIds.get(id) ?? []),
+  };
 });
 
 function account(
@@ -36,6 +41,8 @@ const defaultAccounts = [
 ];
 const tenantBAccount = account('tenant-b-account', { tenantId: 'tenant-B' });
 let accounts = [...defaultAccounts, tenantBAccount];
+let staffRows = new Map<string, { account_scope: 'all' | 'accounts' | null }>();
+let scopeIds = new Map<string, string[]>();
 
 const staff = (tenantId: string | null = DEFAULT_TENANT_ID) => ({
   id: 's', name: 'S', role: 'admin' as const, readOnly: false,
@@ -43,6 +50,11 @@ const staff = (tenantId: string | null = DEFAULT_TENANT_ID) => ({
 });
 
 describe('filterVisibleLineAccounts', () => {
+  beforeEach(() => {
+    accounts = [...defaultAccounts, tenantBAccount];
+    staffRows = new Map([['s', { account_scope: 'all' }]]);
+    scopeIds = new Map();
+  });
   it('既定統括のスタッフには既定統括の3アカウントだけを返す', () => {
     expect(filterVisibleLineAccounts(accounts, staff()).map((item) => item.id))
       .toEqual(['parent', 'child', 'grandchild']);
@@ -91,11 +103,50 @@ describe('filterVisibleLineAccounts', () => {
     });
   });
 
-  it('保存用の店舗権限範囲はこの工程では閲覧範囲を変えない', async () => {
-    const limited = { ...staff(), accountScope: 'accounts', scopedLineAccountIds: ['parent'] };
-    await expect(getVisibleLineAccountScope({} as D1Database, limited)).resolves.toMatchObject({
+  it("account_scope='all'（NULLを含む）は従来どおり統括内の全店舗と未割当を見られる", async () => {
+    staffRows.set('s', { account_scope: null });
+    await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
       allowedAccountIds: ['parent', 'child', 'grandchild'],
-      ids: ['parent', 'child', 'grandchild'],
+      canSeeUnassigned: true,
+    });
+  });
+
+  it("account_scope='accounts' は紐付いた2店舗だけを見られ、未割当を見られない", async () => {
+    staffRows.set('s', { account_scope: 'accounts' });
+    scopeIds.set('s', ['parent', 'grandchild']);
+    await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
+      allowedAccountIds: ['parent', 'grandchild'],
+      ids: ['parent', 'grandchild'],
+      canSeeUnassigned: false,
+    });
+  });
+
+  it("account_scope='accounts' で紐付けが0件なら空のままにする", async () => {
+    staffRows.set('s', { account_scope: 'accounts' });
+    await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
+      accounts: [],
+      allowedAccountIds: [],
+      ids: [],
+      canSeeUnassigned: false,
+    });
+  });
+
+  it('別統括の店舗が紐付けに混ざっていても除外する', async () => {
+    staffRows.set('s', { account_scope: 'accounts' });
+    scopeIds.set('s', ['parent', 'tenant-b-account']);
+    await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
+      allowedAccountIds: ['parent'],
+      ids: ['parent'],
+      canSeeUnassigned: false,
+    });
+  });
+
+  it('env-ownerはDBの担当範囲にかかわらず従来どおり全部見られる', async () => {
+    staffRows.set('env-owner', { account_scope: 'accounts' });
+    const owner = { ...staff(), id: 'env-owner' };
+    await expect(getVisibleLineAccountScope({} as D1Database, owner)).resolves.toMatchObject({
+      allowedAccountIds: ['parent', 'child', 'grandchild'],
+      canSeeUnassigned: true,
     });
   });
 });

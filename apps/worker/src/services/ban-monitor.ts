@@ -8,6 +8,8 @@
 import {
   getLineAccounts,
   createAccountHealthLog,
+  createNotification,
+  getLatestRiskLevel,
 } from '@line-crm/db';
 
 export async function checkAccountHealth(
@@ -41,9 +43,9 @@ async function checkSingleAccount(
   const sentMessages = await db
     .prepare(
       `SELECT COUNT(*) as count FROM messages_log
-       WHERE direction = 'outgoing' AND created_at >= ?`,
+       WHERE direction = 'outgoing' AND created_at >= ? AND line_account_id = ?`,
     )
-    .bind(oneHourAgo)
+    .bind(oneHourAgo, account.id)
     .first<{ count: number }>();
 
   const totalSent = sentMessages?.count ?? 0;
@@ -76,13 +78,50 @@ async function checkSingleAccount(
     riskLevel = 'warning'; // 大量送信の警告
   }
 
-  await createAccountHealthLog(db, {
+  const previousRiskLevel = await getLatestRiskLevel(db, account.id);
+  const healthLog = await createAccountHealthLog(db, {
     lineAccountId: account.id,
     errorCode: errorCode ?? undefined,
     errorCount,
     checkPeriod,
     riskLevel,
   });
+
+  // 定期確認のたびに同じ通知を増やさず、状態が変わった時だけ知らせる。
+  if (riskLevel !== previousRiskLevel) {
+    if (riskLevel === 'warning' || riskLevel === 'danger') {
+      await createNotification(db, {
+        eventType: `account_health_${riskLevel}`,
+        title: riskLevel === 'danger'
+          ? 'LINE公式アカウントの接続を確認してください'
+          : 'LINE公式アカウントの送信状況を確認してください',
+        body: riskLevel === 'danger'
+          ? 'LINEとの接続に問題が見つかりました。運用状態から確認してください。'
+          : '送信量またはLINEの応答に注意が必要です。運用状態から確認してください。',
+        channel: 'dashboard',
+        lineAccountId: account.id,
+        category: 'error',
+        metadata: JSON.stringify({
+          healthLogId: healthLog.id,
+          riskLevel,
+          errorCode,
+        }),
+      });
+    } else if (riskLevel === 'normal' && (previousRiskLevel === 'warning' || previousRiskLevel === 'danger')) {
+      await createNotification(db, {
+        eventType: 'account_health_recovered',
+        title: 'LINE公式アカウントの接続が正常に戻りました',
+        body: '接続と送信状況が正常に戻りました。',
+        channel: 'dashboard',
+        lineAccountId: account.id,
+        category: 'update',
+        metadata: JSON.stringify({
+          healthLogId: healthLog.id,
+          previousRiskLevel,
+        }),
+      });
+    }
+  }
 
   if (riskLevel === 'danger') {
     console.error(`⚠️ BAN検知: アカウント ${account.id} で403エラー発生。即座に確認が必要。`);

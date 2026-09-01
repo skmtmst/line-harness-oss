@@ -12,6 +12,8 @@ vi.mock('@line-crm/db', () => ({
   getChatByFriendId: vi.fn(),
   createChat: vi.fn(),
   updateChat: vi.fn(),
+  getStaffById: vi.fn(async () => ({ account_scope: 'all' })),
+  getStaffAccountScopeIds: vi.fn(async () => []),
   jstNow: vi.fn(() => '2026-08-02T12:00:00.000'),
 }));
 
@@ -43,6 +45,8 @@ import {
   getChatByFriendId,
   createChat,
   updateChat,
+  getStaffById,
+  getStaffAccountScopeIds,
 } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
 import { lineProxy } from './line-proxy.js';
@@ -219,7 +223,7 @@ describe('auth', () => {
     expect(res.status).toBe(401);
   });
 
-  test('staff key can operate another LINE account in the same organization', async () => {
+  test("account_scope='all' staff can operate another LINE account in the same organization", async () => {
     vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT, ACCOUNT_2] as never);
     vi.mocked(authenticateApiToken).mockResolvedValue({
       id: 'staff-1', name: 'Restricted', role: 'staff', readOnly: false,
@@ -232,6 +236,23 @@ describe('auth', () => {
     );
     expect(res.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("account_scope='accounts' staff is rejected for an unassigned LINE account", async () => {
+    vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT, ACCOUNT_2] as never);
+    vi.mocked(getStaffById).mockResolvedValueOnce({ account_scope: 'accounts' } as never);
+    vi.mocked(getStaffAccountScopeIds).mockResolvedValueOnce(['acc-1']);
+    vi.mocked(authenticateApiToken).mockResolvedValue({
+      id: 'staff-1', name: 'Restricted', role: 'staff', readOnly: false,
+      permissionKeys: ['/chats'], assignedLineAccountId: 'acc-1',
+      canAccessDescendantAccounts: false,
+    });
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('staff-key', undefined, { 'X-Line-Account-Id': 'acc-2' }), {}, env(db),
+    );
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test('read-only staff key cannot send LINE messages', async () => {
