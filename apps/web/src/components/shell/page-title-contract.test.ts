@@ -50,7 +50,6 @@ const NOT_YET_MIGRATED = [
   'ec-commerce/page.tsx',
   'events/bookings/page.tsx',
   'events/edit/page.tsx',
-  'events/new/page.tsx',
   'events/page.tsx',
   'form-submissions/edit/page.tsx',
   'friends/detail/page.tsx',

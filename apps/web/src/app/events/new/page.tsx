@@ -31,7 +31,7 @@ function NewEventPageInner() {
   return (
     <>
       <div data-design="Head">
-        <Header title="イベントを作る" description="3つの段階に分けて登録します" />
+        <Header description="3つの段階に分けて登録します" />
       </div>
       <EventWizard accountId={selectedAccountId} eventId={eventId} step={step} />
     </>
