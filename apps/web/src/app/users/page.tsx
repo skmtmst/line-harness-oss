@@ -6,6 +6,7 @@ import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
+import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
 import { api } from '@/lib/api'
 import type { UserRowData } from '@/components/users/user-row'
 
@@ -36,6 +37,11 @@ export default function UsersPage() {
   // 次の load() で最新状態を取り直すフラグ。
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  /*
+   * 開いている統合ユーザー（設計 `w8W4Eh`）。
+   * 同じ画面を二重に作らないため、別のルートは足さず一覧の面を差し替える。
+   */
+  const [openedPersonId, setOpenedPersonId] = useState<string | null>(null)
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -114,6 +120,18 @@ export default function UsersPage() {
     [],
   )
 
+  if (openedPersonId) {
+    return (
+      <div className="space-y-4" data-users-design="v6">
+        {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
+        <MergedPersonDetailView
+          personId={openedPersonId}
+          onClose={() => setOpenedPersonId(null)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
       {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
@@ -162,6 +180,7 @@ export default function UsersPage() {
         loading={loading}
         error={Boolean(error)}
         onPageChange={setPage}
+        onOpenMergedPerson={setOpenedPersonId}
       />
     </div>
   )
