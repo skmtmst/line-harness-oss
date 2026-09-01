@@ -32,6 +32,7 @@ describe('共通部品の影響範囲', () => {
       'app/hq/settings/page.tsx',
       'app/inflow-links/page.tsx',
       'app/line-notifications/operator/new/page.tsx',
+      'app/line-notifications/page.tsx',
       'app/mileage/action-score-tab.tsx',
       'app/mileage/friends/detail/mileage-adjustment-dialog.tsx',
       'app/mileage/friends/detail/page.tsx',
