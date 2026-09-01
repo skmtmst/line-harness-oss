@@ -10,6 +10,7 @@ import { useAccount } from '@/contexts/account-context'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
 import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き',
@@ -100,7 +101,6 @@ function BroadcastDetailInner() {
   if (!id) {
     return (
       <div>
-        <Header title="配信の詳細" />
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           配信が指定されていません。
           <Link href="/broadcasts" className="text-accent ml-1 hover:underline">
@@ -413,6 +413,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function BroadcastDetailPage() {
+  usePageTitle('配信の詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
