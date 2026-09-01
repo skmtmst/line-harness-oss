@@ -487,7 +487,8 @@ export default function DashboardPage() {
         limit,
       })
       if (requestId !== notificationRequestId.current) return
-      if (!response.success || !isDashboardNotificationData(response.data)) throw new Error(response.error)
+      if (!response.success) throw new Error(response.error)
+      if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
       setNotificationData(response.data)
     } catch {
       if (requestId !== notificationRequestId.current) return
