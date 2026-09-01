@@ -78,7 +78,7 @@
     "direct-th": 3
   },
   "app/broadcasts/detail/page.tsx": {
-    "direct-secondary-button": 4
+    "direct-secondary-button": 3
   },
   "app/broadcasts/page.tsx": {
     "direct-secondary-button": 7,

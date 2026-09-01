@@ -241,6 +241,8 @@ export type ConversionApprovalItem = {
 /** Broadcast type from API (now camelCase after worker serialization) */
 export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   targetType: BroadcastTargetType;
+  /** Worker が返す配信元LINEアカウント。旧データは null。 */
+  lineAccountId: string | null;
   accountIds: string[] | null;
   dedupPriority: string[] | null;
   failedAccountIds: string[] | null;
