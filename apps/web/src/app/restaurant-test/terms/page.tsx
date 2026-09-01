@@ -2,12 +2,11 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import TermsDocumentContent from '@/components/legal/terms-document'
 import { TERMS_DOCUMENT, TERMS_IS_DRAFT } from '@/content/terms/musubo-terms'
-import { usePageTitle } from '@/components/shell/page-chrome'
 
 export default function RestaurantTermsPage() {
-  usePageTitle('利用規約')
   return <div>
     <Header
+      title="利用規約"
       description={`${TERMS_DOCUMENT.version} / ${TERMS_DOCUMENT.displayDate}`}
       action={<Link href="/restaurant-test/stores/new" className="text-sm font-semibold text-action">店舗追加へ戻る</Link>}
     />
