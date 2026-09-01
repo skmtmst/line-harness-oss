@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 
@@ -61,7 +61,11 @@ function directionLabel(direction: WebhookInteraction['direction']): string {
 
 export default function WebhookInteractions() {
   const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
+  const loadGenerationRef = useRef(0)
   const [data, setData] = useState<WebhookInteractionList>(EMPTY)
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [search, setSearch] = useState('')
@@ -82,7 +86,15 @@ export default function WebhookInteractions() {
   }, [])
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) {
+    const requestAccountId = selectedAccountId
+    const requestGeneration = ++loadGenerationRef.current
+    setData(EMPTY)
+    setLoadedAccountId(null)
+    setSelected(null)
+    setNotice(null)
+    setRetrying(null)
+    setBulkRetrying(false)
+    if (!requestAccountId) {
       setData(EMPTY)
       setLoading(false)
       setError(false)
@@ -93,7 +105,7 @@ export default function WebhookInteractions() {
     setLoading(true)
     setError(false)
     try {
-      const response = await api.webhooks.interactions.list(selectedAccountId, {
+      const response = await api.webhooks.interactions.list(requestAccountId, {
         periodDays,
         direction: direction === 'all' ? undefined : direction,
         status: status === 'all' ? undefined : status,
@@ -102,11 +114,25 @@ export default function WebhookInteractions() {
         limit,
       })
       if (!response.success) throw new Error(response.error)
+      if (
+        loadGenerationRef.current !== requestGeneration
+        || selectedAccountIdRef.current !== requestAccountId
+      ) return
       setData(response.data)
+      setLoadedAccountId(requestAccountId)
     } catch {
+      if (
+        loadGenerationRef.current !== requestGeneration
+        || selectedAccountIdRef.current !== requestAccountId
+      ) return
       setData(EMPTY)
+      setLoadedAccountId(requestAccountId)
       setError(true)
     } finally {
+      if (
+        loadGenerationRef.current !== requestGeneration
+        || selectedAccountIdRef.current !== requestAccountId
+      ) return
       setLoading(false)
     }
   }, [selectedAccountId, periodDays, direction, status, search, page, limit])
@@ -124,11 +150,13 @@ export default function WebhookInteractions() {
   }, [data])
 
   const retry = async (item: WebhookInteraction) => {
-    if (!selectedAccountId) return
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) return
     setRetrying(item.id)
     setNotice(null)
     try {
-      const response = await api.webhooks.interactions.retry(item.id, selectedAccountId)
+      const response = await api.webhooks.interactions.retry(item.id, requestAccountId)
+      if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
       setNotice({
         tone: response.data.status === 'succeeded' ? 'success' : 'error',
@@ -138,18 +166,21 @@ export default function WebhookInteractions() {
       })
       await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setNotice({ tone: 'error', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
     } finally {
-      setRetrying(null)
+      if (selectedAccountIdRef.current === requestAccountId) setRetrying(null)
     }
   }
 
   const retryFailed = async () => {
-    if (!selectedAccountId) return
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) return
     setBulkRetrying(true)
     setNotice(null)
     try {
-      const response = await api.webhooks.interactions.retryFailed(selectedAccountId)
+      const response = await api.webhooks.interactions.retryFailed(requestAccountId)
+      if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
       setNotice({
         tone: response.data.failed > 0 || response.data.skipped > 0 ? 'error' : 'success',
@@ -157,14 +188,19 @@ export default function WebhookInteractions() {
       })
       await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setNotice({ tone: 'error', message: 'まとめて送り直せませんでした。状態を読み直してからお試しください。' })
     } finally {
-      setBulkRetrying(false)
+      if (selectedAccountIdRef.current === requestAccountId) setBulkRetrying(false)
     }
   }
 
   if (!selectedAccountId) {
     return <ListState kind="empty" title="LINEアカウントを選択してください" description="やり取りはLINEアカウントごとに分けて記録します。" />
+  }
+
+  if (loadedAccountId !== selectedAccountId && !error) {
+    return <ListState kind="loading" title="やり取りの記録を読み込んでいます" />
   }
 
   return (

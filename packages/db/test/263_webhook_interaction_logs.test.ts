@@ -15,11 +15,11 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 const migration = readFileSync(
-  join(import.meta.dirname, '..', 'migrations', '202_webhook_interaction_logs.sql'),
+  join(import.meta.dirname, '..', 'migrations', '263_webhook_interaction_logs.sql'),
   'utf8',
 );
 
-describe('migration 202 Webhookやり取り記録', () => {
+describe('migration 263 Webhookやり取り記録', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

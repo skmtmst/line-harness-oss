@@ -36,6 +36,15 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain("canRetry && item.canRetry ? <Button")
   })
 
+  it('アカウント切替後に前の記録や送り直し結果を表示しない', () => {
+    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
+    expect(PAGE).toContain('loadGenerationRef.current !== requestGeneration')
+    expect(PAGE).toContain('selectedAccountIdRef.current !== requestAccountId')
+    expect(PAGE).toContain('loadedAccountId !== requestAccountId')
+    expect(PAGE).toContain('if (selectedAccountIdRef.current === requestAccountId) setRetrying(null)')
+    expect(PAGE).toContain('if (selectedAccountIdRef.current === requestAccountId) setBulkRetrying(false)')
+  })
+
   it('本文に画面タイトルや説明を重ねない', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
