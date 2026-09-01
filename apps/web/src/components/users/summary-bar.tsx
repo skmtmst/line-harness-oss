@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '@/lib/api'
 import SummaryCard from '@/components/shared/summary-card'
+import { api } from '@/lib/api'
+import { createLatestRequestGuard } from './summary-request-guard'
 
 interface Stats {
   totalFollowing: number
@@ -21,46 +22,52 @@ type LoadStatus = 'loading' | 'ready' | 'error'
 export default function SummaryBar() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  const [requestGuard] = useState(createLatestRequestGuard)
 
   const load = useCallback(async () => {
+    const requestGeneration = requestGuard.begin()
+    setStats(null)
     setStatus('loading')
+
     try {
       const res = await api.duplicates.stats()
-      if (res.success) {
-        setStats({
-          totalFollowing: res.data.totalFollowing,
-          uniquePeople: res.data.uniquePeople,
-          friendDups: res.data.friendDups,
-        })
-        setStatus('ready')
-      } else {
-        setStats(null)
+      if (!requestGuard.isCurrent(requestGeneration)) return
+
+      if (!res.success) {
         setStatus('error')
+        return
       }
+
+      setStats({
+        totalFollowing: res.data.totalFollowing,
+        uniquePeople: res.data.uniquePeople,
+        friendDups: res.data.friendDups,
+      })
+      setStatus('ready')
     } catch {
-      setStats(null)
-      setStatus('error')
+      if (requestGuard.isCurrent(requestGeneration)) setStatus('error')
     }
-  }, [])
+  }, [requestGuard])
 
   useEffect(() => {
     void load()
-  }, [load])
+    return () => requestGuard.invalidate()
+  }, [load, requestGuard])
 
   const loading = status === 'loading'
-  /*
-    取れなかったときは値を出さない。前の数字を残すと、いま見ている数が
-    いつのものか分からなくなる。「—」と理由と、やり直す口を出す。
-  */
   const failure = status === 'error'
   const detailOf = (ready: string) =>
     loading ? '読み込んでいます' : failure ? <FailureDetail onRetry={load} /> : ready
-
   const dupRate =
     stats && stats.totalFollowing > 0 ? (stats.friendDups / stats.totalFollowing) * 100 : stats ? 0 : null
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-design-node="r7eSi" data-users-summary="v6">
+    <div
+      className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+      data-design-node="r7eSi"
+      data-users-summary="v6"
+      data-summary-state={status}
+    >
       <SummaryCard
         title="統合ユーザー"
         value={stats?.uniquePeople ?? null}

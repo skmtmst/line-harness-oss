@@ -36,3 +36,28 @@ describe('V6 友だち追加時配信の契約', () => {
     expect(PAGE).toContain('setSaving(false)')
   })
 })
+
+describe('V6 友だち追加時配信の、運用者の言葉', () => {
+  it('画面にDBのカラム名を出さない', () => {
+    expect(PAGE).not.toContain('friends.unfollow_count を見る')
+    expect(PAGE).not.toContain('friends.first_followed_at を見る')
+    expect(PAGE).toContain('これまでにブロックされた回数を見る')
+    expect(PAGE).toContain('初回フォロー日の記録があるかを見る')
+  })
+
+  it('画面に内部のマイグレーション番号を出さない', () => {
+    expect(PAGE).not.toMatch(/マイグレーション\s*\d+/)
+    expect(PAGE).toContain('過去に追加された友だちにも')
+  })
+
+  it('①と②のどちらが効くかを本文で断る', () => {
+    expect(PAGE).toContain('1人の友だちは①と②のどちらか一方にだけ振り分けられ、両方が動くことはありません')
+    expect(PAGE).toContain('②で「はじめての人と同じもの」を選んだときだけ')
+  })
+
+  it('読込中と読込失敗の言い回しを画面共通にそろえる', () => {
+    expect(PAGE).toContain('読み込んでいます')
+    expect(PAGE).toContain('実績を読み込めませんでした')
+    expect(PAGE).not.toContain('実績を取得できませんでした')
+  })
+})

@@ -82,9 +82,9 @@ export default function FriendListRow({
         {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
         {friend.pictureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-v6-avatar bg-v6-avatar-bg object-cover" />
+          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-v6-large bg-v6-avatar-bg object-cover" />
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-v6-avatar text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-v6-large text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
             {friend.displayName?.charAt(0) ?? '?'}
           </div>
         )}

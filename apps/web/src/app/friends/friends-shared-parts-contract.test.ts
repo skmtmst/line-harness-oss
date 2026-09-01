@@ -59,8 +59,8 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
   })
 
   it('行のアバターは真円ではなく設計の40x40 r=18', () => {
-    expect(TOKENS).toContain('--radius-v6-avatar: 18px;')
-    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-v6-avatar bg-v6-avatar-bg object-cover')
+    expect(TOKENS).toContain('--radius-v6-large: 18px;')
+    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-v6-large bg-v6-avatar-bg object-cover')
     expect(ROW_BODY, 'アバターが真円のまま').not.toContain('h-10 w-10 shrink-0 rounded-full')
   })
 
@@ -87,6 +87,9 @@ describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替
     expect(SUMMARY_BODY).toContain('読み込めませんでした')
     expect(SUMMARY_BODY).toContain('再読み込み')
     expect(SUMMARY_BODY, '失敗しても前の数字を残している').toContain('setStats(null)')
+    expect(SUMMARY_BODY, '遅れて返った古い集計を照合していない').toContain(
+      'requestGuard.isCurrent(requestGeneration)',
+    )
   })
 })
 

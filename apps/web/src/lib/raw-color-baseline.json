@@ -1,7 +1,7 @@
 {
   "app/affiliate-offers/page.tsx": 1,
   "app/affiliates/tabs.tsx": 257,
-  "app/auto-replies/page.tsx": 17,
+  "app/auto-replies/page.tsx": 16,
   "app/automations/page.tsx": 50,
   "app/booking/bookings/detail/page.tsx": 1,
   "app/booking/bookings/page.tsx": 20,
@@ -72,7 +72,6 @@
   "components/broadcasts/progress-bar.tsx": 5,
   "components/broadcasts/segment-builder.tsx": 22,
   "components/broadcasts/send-confirm-dialog.tsx": 5,
-  "components/broadcasts/test-send-section.tsx": 9,
   "components/chats/friend-info-sidebar.tsx": 60,
   "components/dashboard/qr-dialog.tsx": 1,
   "components/dashboard/shipment-panel.tsx": 15,
