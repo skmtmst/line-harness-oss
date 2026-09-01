@@ -164,7 +164,9 @@ describe('標準ボタンの第1段階移行', () => {
     // development の1243から1つ減って1242。統合後の実測へ合わせる。
     // 2026-09-01: #424 と最新 development の統合後の木を再計測し1232。
     // #424 の古い1274、development 単独の1242のどちらも採用していない。
-    expect(debt['arbitrary-value']).toBe(1232)
+    // 同日: メディアの削除確認で `text-[11px]` を `text-micro` に寄せ、
+    // 1232→1231。**減ったので締め直す。**
+    expect(debt['arbitrary-value']).toBe(1231)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
