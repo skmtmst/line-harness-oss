@@ -16,6 +16,7 @@ import {
   listIdentityCandidates,
   undoIdentityCandidate,
 } from '../services/identity-candidates.js';
+import { detectFriendDuplicateCandidates } from '../services/friend-duplicate-candidates.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const KINDS = new Set<IdentityCandidateKind>(['friend_duplicate', 'ec_member']);
@@ -125,6 +126,32 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
       tenantId: tenantId(c), kind, status, allowedAccountIds: scope.allowedAccountIds,
       limit: Math.max(1, positiveInt(c.req.query('limit'), 20, 100)),
       offset: positiveInt(c.req.query('offset'), 0, 100_000),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
+    if (kind !== 'friend_duplicate') {
+      return c.json({
+        success: false,
+        error: '検出する候補の種類が正しくありません',
+        code: 'INVALID_DETECTION_KIND',
+      }, 400);
+    }
+    if (!canUseKind(c, kind)) {
+      return c.json({ success: false, error: '候補を検出する権限がありません', code: 'FORBIDDEN' }, 403);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
+    const data = await detectFriendDuplicateCandidates(c.env.DB, {
+      tenantId: tenantId(c),
+      allowedAccountIds: scope.allowedAccountIds,
+      limit: positiveInt(c.req.query('limit'), 50, 100),
+      after: c.req.query('after') ?? null,
     });
     return c.json({ success: true, data });
   } catch (error) {

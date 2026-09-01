@@ -45,7 +45,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 function within28Days(iso: string): boolean {
   return Date.now() - new Date(iso).getTime() <= 28 * 24 * 3600_000
 }
-import Header from '@/components/layout/header'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
@@ -141,34 +140,7 @@ function ConversionsPageInner() {
   }, [points, query])
 
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="成果とアフィリエイト"
-          description="何を成果として数えるか、誰の紹介か、いくら払うかを1か所でまとめて扱います。成果地点の定義と、出た成果の承認が同じ画面で完結します。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled
-                title="マニュアルは準備中です"
-              >
-                マニュアル
-              </Button>
-              <Button
-                href="/conversions?tab=affiliates"
-              >
-                アフィリエイターを追加
-              </Button>
-              <Button
-                href="/conversions/new"
-                variant="primary"
-              >
-                成果地点を追加
-              </Button>
-            </div>
-          }
-        />
-      </div>
+    <div data-conversion-points-design="v6">
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
@@ -429,14 +401,20 @@ function ReportTab() {
 
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
+  const nodeByTab: Record<string, string | undefined> = {
+    affiliates: 'PouPn',
+    offers: 'GH8VL',
+    approvals: 'n5VVTb',
+  }
   return (
-    <div>
+    <div data-design-node={nodeByTab[tab]}>
       <MergedTabs
         basePath="/conversions"
         paramName="tab"
         tabs={MERGED_TABS}
         active={tab}
         defaultKey={DEFAULT_TAB}
+        actions={tab === 'points' ? <Button href="/conversions/new" variant="primary">成果地点を追加</Button> : undefined}
       />
       {tab === 'points' && <ConversionsPageInner />}
       {tab === 'affiliates' && <AffiliatorsTab />}
