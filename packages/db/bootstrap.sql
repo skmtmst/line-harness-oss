@@ -1332,6 +1332,22 @@ CREATE TABLE identity_candidates (
   )
 );
 
+CREATE TABLE identity_events (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
+  candidate_id TEXT REFERENCES identity_candidates(id) ON DELETE RESTRICT,
+  event_type TEXT NOT NULL
+    CHECK (event_type IN ('candidate', 'link', 'unlink', 'profile', 'priority', 'migration')),
+  summary TEXT NOT NULL,
+  before_json TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+  after_json TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+  actor_staff_id TEXT,
+  actor_name TEXT NOT NULL,
+  occurred_at TEXT NOT NULL,
+  correlation_id TEXT NOT NULL
+);
+
 CREATE TABLE inbox_conversation_events (
   id              TEXT PRIMARY KEY,
   channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
@@ -2680,6 +2696,46 @@ CREATE TABLE update_history (
   rollback_expires_at         INTEGER
 );
 
+CREATE TABLE user_delivery_priorities (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  purpose TEXT NOT NULL
+    CHECK (purpose IN ('broadcast', 'scenario', 'reminder', 'transactional', 'manual')),
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  priority INTEGER NOT NULL CHECK (priority >= 1),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  reason TEXT NOT NULL,
+  selected_by TEXT,
+  selected_at TEXT NOT NULL,
+  retired_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE user_profile_values (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  field_key TEXT NOT NULL,
+  field_label TEXT NOT NULL,
+  value_json TEXT NOT NULL CHECK (json_valid(value_json)),
+  value_preview TEXT,
+  source_type TEXT NOT NULL
+    CHECK (source_type IN ('friend', 'friend_field', 'form', 'ec', 'manual')),
+  source_id TEXT,
+  source_label TEXT NOT NULL,
+  source_friend_id TEXT REFERENCES friends(id) ON DELETE RESTRICT,
+  verified_at TEXT,
+  selected_by TEXT,
+  selected_by_name TEXT NOT NULL,
+  selected_at TEXT NOT NULL,
+  update_mode TEXT NOT NULL CHECK (update_mode IN ('auto', 'fixed')),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE users (
   id           TEXT PRIMARY KEY,
   email        TEXT,
@@ -2688,7 +2744,8 @@ CREATE TABLE users (
   display_name TEXT,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, tenant_id TEXT REFERENCES tenants(id) ON DELETE RESTRICT, status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'review', 'archived')), primary_display_name TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1), created_by TEXT, archived_at TEXT);
 
 CREATE TABLE webinar_comments (
   id TEXT PRIMARY KEY,
@@ -3194,6 +3251,12 @@ CREATE INDEX idx_identity_candidates_review_queue
 CREATE INDEX idx_identity_candidates_right_account
   ON identity_candidates(tenant_id, right_line_account_id, status);
 
+CREATE INDEX idx_identity_events_candidate_history
+  ON identity_events(tenant_id, candidate_id, occurred_at DESC);
+
+CREATE INDEX idx_identity_events_user_history
+  ON identity_events(tenant_id, user_id, occurred_at DESC);
+
 CREATE UNIQUE INDEX idx_inbox_conversation_events_correlation
   ON inbox_conversation_events (correlation_id, event_type);
 
@@ -3526,11 +3589,31 @@ CREATE INDEX idx_tracked_links_template
 
 CREATE INDEX idx_update_history_started ON update_history(started_at DESC);
 
+CREATE UNIQUE INDEX idx_user_delivery_priorities_active_friend
+  ON user_delivery_priorities(tenant_id, user_id, purpose, friend_id)
+  WHERE retired_at IS NULL;
+
+CREATE UNIQUE INDEX idx_user_delivery_priorities_active_order
+  ON user_delivery_priorities(tenant_id, user_id, purpose, priority)
+  WHERE retired_at IS NULL;
+
+CREATE INDEX idx_user_delivery_priorities_lookup
+  ON user_delivery_priorities(tenant_id, user_id, purpose, priority);
+
+CREATE UNIQUE INDEX idx_user_profile_values_active_field
+  ON user_profile_values(tenant_id, user_id, field_key) WHERE is_active = 1;
+
+CREATE INDEX idx_user_profile_values_history
+  ON user_profile_values(tenant_id, user_id, field_key, selected_at DESC);
+
 CREATE INDEX idx_users_email ON users (email);
 
 CREATE INDEX idx_users_external_id ON users (external_id);
 
 CREATE INDEX idx_users_phone ON users (phone);
+
+CREATE INDEX idx_users_tenant_status
+  ON users(tenant_id, status, updated_at DESC);
 
 CREATE INDEX idx_webinar_comments_webinar
   ON webinar_comments (webinar_id, at_seconds);

@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 import { readArrayGetPaths } from './api-shapes.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND, IDENTITY_CANDIDATE_LISTS } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -61,6 +63,25 @@ describe('本人照合候補の画面確認データ', () => {
       IDENTITY_CANDIDATE_FRIEND,
       IDENTITY_CANDIDATE_EC,
     ]);
+    expect(serialized).not.toContain('tanaka@example.jp');
+    expect(serialized).not.toContain('090-1234-5678');
+    expect(serialized).toContain('***');
+  });
+});
+
+describe('統合ユーザー詳細の画面確認データ', () => {
+  it('通常・空・失敗を別の形で用意する', () => {
+    expect(MERGED_PERSON_DETAIL.linkedFriends).toHaveLength(2);
+    expect(MERGED_PERSON_DETAIL.profileValues).toHaveLength(2);
+    expect(MERGED_PERSON_EMPTY).toMatchObject({
+      profileValues: [], deliveryPriorities: [], history: [],
+    });
+    expect(MERGED_PERSON_ERROR).toMatchObject({ success: false, code: 'VISUAL_QA_ERROR' });
+  });
+
+  it('0件を未取得へ変えず、平文のメールと電話を置かない', () => {
+    expect(MERGED_PERSON_EMPTY.profileValues).toEqual([]);
+    const serialized = JSON.stringify([MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY]);
     expect(serialized).not.toContain('tanaka@example.jp');
     expect(serialized).not.toContain('090-1234-5678');
     expect(serialized).toContain('***');
