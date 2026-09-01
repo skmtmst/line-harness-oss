@@ -45,9 +45,9 @@ vi.mock('./step-delivery.js', () => ({
   buildMessage: vi.fn((type: string, content: string) => ({ type, text: content })),
   expandVariables: vi.fn((content: string) => content),
   resolveMetadata: vi.fn(async () => ({})),
-  messageToLogPayload: vi.fn((msg: { type: string; text: string }) => ({
+  messageToLogPayload: vi.fn((msg: { type: string; text?: string; altText?: string }) => ({
     messageType: msg.type,
-    content: msg.text,
+    content: msg.text ?? msg.altText ?? '',
   })),
 }));
 
@@ -129,6 +129,7 @@ beforeEach(() => {
     messageType: 'text',
     messageContent: 'welcome!',
     templateIdAtSend: null,
+    questionJson: null,
   });
   dbMocks.claimFriendScenarioForDelivery.mockResolvedValue(true);
   dbMocks.enrollFriendInScenario.mockResolvedValue({ id: 'fs-1', current_step_order: 0 });
@@ -155,6 +156,32 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
     expect(log!.args[5]).toBe(null);
     expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(db, 'fs-1', 1, expect.any(String));
     expect(dbMocks.completeFriendScenario).not.toHaveBeenCalled();
+  });
+
+  it('sends and logs every message in a question template used as the immediate first step', async () => {
+    dbMocks.resolveStepContent.mockResolvedValue({
+      messageType: 'text',
+      messageContent: '続けますか？',
+      templateIdAtSend: 'question-template-1',
+      questionJson: JSON.stringify({
+        intro: '{{name}}さんへ確認です',
+        text: '続けますか？',
+        tapMode: 'single',
+        choices: [{ label: 'はい', behavior: 'none' }],
+      }),
+    });
+    const { db, calls } = makeDb();
+    const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
+      enrollment: { id: 'fs-1', current_step_order: 0 },
+    });
+
+    expect(sent).toBe(true);
+    expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [
+      { type: 'text', text: '{{name}}さんへ確認です' },
+      expect.objectContaining({ type: 'flex', altText: '続けますか？' }),
+    ]);
+    expect(calls.filter((call) => call.sql.includes('INSERT INTO messages_log'))).toHaveLength(2);
+    expect(autoTrackMocks.decorateForFriendPush).not.toHaveBeenCalled();
   });
 
   it('backs off without pushing when the cron already claimed the enrollment', async () => {
