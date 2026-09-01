@@ -3,10 +3,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type {
+  FriendField,
   SavedSearch,
   SavedSearchCondition,
   SavedSearchConditionKind,
   SavedSearchConditions,
+  Scenario,
+  SupportMark,
   Tag,
 } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -18,6 +21,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import { optionsWithCurrent } from './reference-options'
 
 const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> = [
   { value: 'tag', label: 'タグ' },
@@ -74,18 +78,28 @@ function normalizeForEdit(search: SavedSearch): SavedSearchConditions {
 function ConditionEditor({
   condition,
   tags,
+  marks,
+  scenarios,
+  fields,
+  referenceErrors,
   onChange,
   onDelete,
 }: {
   condition: SavedSearchCondition
   tags: Tag[]
+  marks: SupportMark[]
+  scenarios: Scenario[]
+  fields: FriendField[]
+  referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean }
   onChange: (next: SavedSearchCondition) => void
   onDelete: () => void
 }) {
   const unsupported = UNSUPPORTED_KINDS.has(condition.kind)
   const changeKind = (kind: SavedSearchConditionKind) => {
     if (kind === 'tag') onChange({ kind, op: 'includes', value: tags[0]?.id ?? '' })
-    else if (kind === 'field') onChange({ kind, key: '', op: 'eq', value: '' })
+    else if (kind === 'field') onChange({ kind, key: fields[0]?.fieldKey ?? '', op: 'eq', value: '' })
+    else if (kind === 'mark') onChange({ kind, op: 'eq', value: marks[0]?.id ?? '' })
+    else if (kind === 'scenario') onChange({ kind, op: 'eq', value: scenarios[0]?.id ?? '' })
     else if (kind === 'following') onChange({ kind, op: 'eq', value: true })
     else if (kind === 'created_at') onChange({ kind, op: 'between', value: { from: '', to: '' } })
     else onChange({ kind, op: kind === 'name' || kind === 'status_message' ? 'contains' : 'eq', value: '' })
@@ -105,10 +119,50 @@ function ConditionEditor({
         </>
       ) : condition.kind === 'field' ? (
         <>
-          <TextInput value={condition.key ?? ''} onChange={(event) => onChange({ ...condition, key: event.target.value })} placeholder="項目名" className="w-40" />
+          <Select
+            aria-label="友だち情報の項目"
+            value={condition.key ?? ''}
+            disabled={referenceErrors.fields}
+            onChange={(key) => onChange({ ...condition, key })}
+            options={optionsWithCurrent(
+              fields.map((field) => ({ value: field.fieldKey, label: field.name })),
+              condition.key ?? '',
+              '選択済みの友だち情報',
+              referenceErrors.fields ? '友だち情報を取得できません' : fields.length ? '友だち情報を選ぶ' : '友だち情報がありません',
+            )}
+            className="min-w-44 flex-1"
+          />
           <Select aria-label="友だち情報の比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'eq', label: '等しい' }, { value: 'ne', label: '等しくない' }, { value: 'contains', label: '含む' }]} className="w-32" />
           <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className="min-w-40 flex-1" />
         </>
+      ) : condition.kind === 'mark' ? (
+        <Select
+          aria-label="対応マーク"
+          value={rawValue}
+          disabled={referenceErrors.marks}
+          onChange={(value) => onChange({ ...condition, value })}
+          options={optionsWithCurrent(
+            marks.map((mark) => ({ value: mark.id, label: mark.name })),
+            rawValue,
+            '選択済みの対応マーク',
+            referenceErrors.marks ? '対応マークを取得できません' : marks.length ? '対応マークを選ぶ' : '対応マークがありません',
+          )}
+          className="min-w-44 flex-1"
+        />
+      ) : condition.kind === 'scenario' ? (
+        <Select
+          aria-label="シナリオ"
+          value={rawValue}
+          disabled={referenceErrors.scenarios}
+          onChange={(value) => onChange({ ...condition, value })}
+          options={optionsWithCurrent(
+            scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
+            rawValue,
+            '選択済みのシナリオ',
+            referenceErrors.scenarios ? 'シナリオを取得できません' : scenarios.length ? 'シナリオを選ぶ' : 'シナリオがありません',
+          )}
+          className="min-w-44 flex-1"
+        />
       ) : condition.kind === 'following' ? (
         <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className="min-w-44 flex-1" />
       ) : condition.kind === 'chat_status' ? (
@@ -133,12 +187,20 @@ function ConditionGroup({
   operator,
   items,
   tags,
+  marks,
+  scenarios,
+  fields,
+  referenceErrors,
   onChange,
 }: {
   title: string
   operator: 'AND' | 'OR'
   items: SavedSearchCondition[]
   tags: Tag[]
+  marks: SupportMark[]
+  scenarios: Scenario[]
+  fields: FriendField[]
+  referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean }
   onChange: (next: SavedSearchCondition[]) => void
 }) {
   return (
@@ -151,6 +213,10 @@ function ConditionGroup({
             key={`${condition.kind}-${index}`}
             condition={condition}
             tags={tags}
+            marks={marks}
+            scenarios={scenarios}
+            fields={fields}
+            referenceErrors={referenceErrors}
             onChange={(next) => onChange(items.map((item, itemIndex) => itemIndex === index ? next : item))}
             onDelete={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}
           />
@@ -168,6 +234,10 @@ function SavedSearchEditInner() {
   const { selectedAccountId } = useAccount()
   const [original, setOriginal] = useState<SavedSearch | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
+  const [marks, setMarks] = useState<SupportMark[]>([])
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [fields, setFields] = useState<FriendField[]>([])
+  const [referenceErrors, setReferenceErrors] = useState({ marks: false, scenarios: false, fields: false })
   const [name, setName] = useState('')
   const [conditions, setConditions] = useState<SavedSearchConditions>({ all: [], any: [] })
   const [isShared, setIsShared] = useState(false)
@@ -198,9 +268,23 @@ function SavedSearchEditInner() {
       setLoading(false)
       return
     }
-    void Promise.all([api.savedSearches.list(selectedAccountId), api.tags.list()]).then(([searches, tagResult]) => {
+    void Promise.all([
+      api.savedSearches.list(selectedAccountId),
+      api.tags.list(),
+      api.supportMarks.list(selectedAccountId).catch(() => null),
+      api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
+      api.friendFields.list().catch(() => null),
+    ]).then(([searches, tagResult, markResult, scenarioResult, fieldResult]) => {
       if (cancelled) return
       if (tagResult.success) setTags(tagResult.data)
+      setMarks(markResult?.success ? markResult.data : [])
+      setScenarios(scenarioResult?.success ? scenarioResult.data : [])
+      setFields(fieldResult?.success ? fieldResult.data : [])
+      setReferenceErrors({
+        marks: markResult?.success !== true,
+        scenarios: scenarioResult?.success !== true,
+        fields: fieldResult?.success !== true,
+      })
       const found = searches.success ? searches.data.find((item) => item.id === id) ?? null : null
       if (!found) {
         setError('保存した検索が見つかりません')
@@ -316,8 +400,8 @@ function SavedSearchEditInner() {
             </fieldset>
           </section>
 
-          <ConditionGroup title="すべて満たす" operator="AND" items={conditions.all ?? []} tags={tags} onChange={(all) => patchConditions({ ...conditions, all })} />
-          <ConditionGroup title="いずれか1つ以上満たす" operator="OR" items={conditions.any ?? []} tags={tags} onChange={(any) => patchConditions({ ...conditions, any })} />
+          <ConditionGroup title="すべて満たす" operator="AND" items={conditions.all ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} referenceErrors={referenceErrors} onChange={(all) => patchConditions({ ...conditions, all })} />
+          <ConditionGroup title="いずれか1つ以上満たす" operator="OR" items={conditions.any ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} referenceErrors={referenceErrors} onChange={(any) => patchConditions({ ...conditions, any })} />
         </div>
 
         <aside className="space-y-4">

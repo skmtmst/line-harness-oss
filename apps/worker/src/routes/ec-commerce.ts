@@ -11,7 +11,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 
 const ecCommerce = new Hono<Env>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
-const STATUS_SET = new Set(['received', 'processing', 'processed', 'skipped', 'failed']);
+const STATUS_SET = new Set(['received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed']);
 const NOTIFICATION_EVENT_TYPES = EC_EVENT_TYPES.filter(
   (eventType) => eventType !== 'ec.customer.profile_updated',
 );
@@ -108,28 +108,42 @@ function testEvent(eventType: string): EcEvent {
 }
 
 ecCommerce.get('/api/ec-commerce/overview', async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const scope = lineAccountId ? null : await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const accountWhere = lineAccountId
+    ? 'line_account_id = ?'
+    : scope?.allowedAccountIds.length
+      ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      : scope?.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
+  const accountBindings = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
   const summary = await c.env.DB.prepare(
     `SELECT
        COUNT(*) AS total,
        SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) AS processed,
+       SUM(CASE WHEN status = 'identity_pending' THEN 1 ELSE 0 END) AS identity_pending,
        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
        SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) AS skipped,
        SUM(CASE WHEN datetime(received_at) >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS last_24h,
        MAX(received_at) AS last_received_at
-     FROM ec_events`,
-  ).first<{
-    total: number; processed: number; failed: number; skipped: number;
+     FROM ec_events WHERE ${accountWhere}`,
+  ).bind(...accountBindings).first<{
+    total: number; processed: number; identity_pending: number; failed: number; skipped: number;
     last_24h: number; last_received_at: string | null;
   }>();
   const types = await c.env.DB.prepare(
-    `SELECT event_type, COUNT(*) AS count FROM ec_events GROUP BY event_type ORDER BY count DESC`,
-  ).all<{ event_type: string; count: number }>();
+    `SELECT event_type, COUNT(*) AS count FROM ec_events
+      WHERE ${accountWhere} GROUP BY event_type ORDER BY count DESC`,
+  ).bind(...accountBindings).all<{ event_type: string; count: number }>();
 
   return c.json({
     success: true,
     data: {
       total: summary?.total ?? 0,
       processed: summary?.processed ?? 0,
+      identityPending: summary?.identity_pending ?? 0,
       failed: summary?.failed ?? 0,
       skipped: summary?.skipped ?? 0,
       last24h: summary?.last_24h ?? 0,
@@ -144,6 +158,16 @@ ecCommerce.get('/api/ec-commerce/overview', async (c) => {
 });
 
 ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const scope = lineAccountId ? null : await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const accountClause = lineAccountId
+    ? 'e.line_account_id = ?'
+    : scope?.allowedAccountIds.length
+      ? `(e.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
+      : scope?.canSeeUnassigned ? 'e.line_account_id IS NULL' : '1 = 0';
   const requestedLimit = Number(c.req.query('limit') || '30');
   const requestedOffset = Number(c.req.query('offset') || '0');
   const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 30;
@@ -153,11 +177,11 @@ ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff')
   if (eventType && !EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
   if (status && !STATUS_SET.has(status)) return c.json({ success: false, error: 'Invalid status' }, 400);
 
-  const clauses: string[] = [];
-  const bindings: Array<string | number> = [];
+  const clauses: string[] = [accountClause];
+  const bindings: Array<string | number> = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
   if (eventType) { clauses.push('e.event_type = ?'); bindings.push(eventType); }
   if (status) { clauses.push('e.status = ?'); bindings.push(status); }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const where = `WHERE ${clauses.join(' AND ')}`;
   const query = c.env.DB.prepare(
     `SELECT e.id, e.external_event_id, e.event_type, e.customer_id, e.friend_id,
             e.status, e.error_message, e.received_at, e.processed_at,
