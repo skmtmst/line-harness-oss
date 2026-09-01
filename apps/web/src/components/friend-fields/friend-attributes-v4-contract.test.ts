@@ -82,7 +82,7 @@ describe('友だち属性 V4 contract', () => {
     }
   })
 
-  it('友だち情報欄はV6の一覧・作成・移行dry-runを縦に通す', () => {
+  it('友だち情報欄はV6の一覧・作成・移行前の確認を縦に通す', () => {
     const list = read('components/friend-fields/field-list.tsx')
     const create = read('app/tags/fields/new/page.tsx')
     const migrate = read('app/tags/fields/migrate/page.tsx')
@@ -91,6 +91,8 @@ describe('友だち属性 V4 contract', () => {
     expect(migrate).toContain('data-design-node="KoT6c"')
     expect(list).toContain('/tags/fields/migrate?id=')
     expect(migrate).toContain('api.friendFields.migrationPreview(')
+    expect(migrate).toContain('事前確認する')
+    expect(migrate).not.toContain('dry-run')
     expect(migrate).toContain('友だちの値や既存の項目は変更しません')
     expect(migrate).not.toContain('migrationExecute')
     // 回答フォームはまだアカウント所属を持たない。全体件数を0件と偽らない。

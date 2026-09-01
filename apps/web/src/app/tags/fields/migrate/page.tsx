@@ -128,7 +128,7 @@ function MigrateFriendField() {
       <section data-design="Preview" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
-          <Button type="button" onClick={() => void runPreview()} disabled={checking}>{checking ? '確認しています…' : 'dry-runを実行'}</Button>
+          <Button type="button" onClick={() => void runPreview()} disabled={checking}>{checking ? '確認しています…' : '事前確認する'}</Button>
         </div>
         {preview ? (
           <div className="mt-5">
@@ -158,7 +158,7 @@ function MigrateFriendField() {
         <p className="mt-2 text-xs text-ink-faint">使用先の全件集計は未接続です。取れていない数を0件とは表示しません。</p>
       </section>
 
-      <StickyBar status={preview ? `事前確認済み：${preview.summary.total}人` : 'まだ事前確認していません'} actions={<><Button href="/tags?tab=fields">移行をやめる</Button><Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking}>{checking ? '確認しています…' : 'dry-runを実行'}</Button></>} />
+      <StickyBar status={preview ? `事前確認済み：${preview.summary.total}人` : 'まだ事前確認していません'} actions={<><Button href="/tags?tab=fields">移行をやめる</Button><Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking}>{checking ? '確認しています…' : '事前確認する'}</Button></>} />
     </div>
   )
 }

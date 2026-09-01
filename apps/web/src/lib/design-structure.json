@@ -2246,7 +2246,7 @@
         "status": "unverified",
         "referenceNodeIds": ["KoT6c"],
         "requiredViewports": [1440, 1920],
-        "reason": "安全なdry-runまで実装済み。Claudeの同条件画像比較待ち"
+        "reason": "データを変更しない事前確認まで実装済み。Claudeの同条件画像比較待ち"
       },
       "sections": [
         "Fields",
@@ -2259,7 +2259,7 @@
         "いま使っている項目",
         "新しく作る項目",
         "値を変換できるか事前確認",
-        "dry-runを実行",
+        "事前確認する",
         "切り替わる使用先",
         "移行をやめる"
       ]
