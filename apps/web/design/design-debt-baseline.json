@@ -88,7 +88,7 @@
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 121,
+    "arbitrary-value": 105,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -493,11 +493,27 @@
     "unresolved-classname": 11,
     "direct-secondary-button": 1
   },
+  "components/chats/inbox-dropdown.tsx": {
+    "unresolved-classname": 11,
+    "direct-secondary-button": 3,
+    "arbitrary-value": 1
+  },
+  "components/chats/inbox-filter-panel.tsx": {
+    "arbitrary-value": 4,
+    "unresolved-classname": 9,
+    "direct-secondary-button": 1,
+    "direct-primary-button": 1
+  },
   "components/chats/inbox-kpis.tsx": {
     "arbitrary-value": 27
   },
+  "components/chats/saved-view-dialog.tsx": {
+    "arbitrary-value": 4,
+    "direct-primary-button": 2,
+    "direct-secondary-button": 1
+  },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 64
+    "arbitrary-value": 61
   },
   "components/dashboard/dashboard-editor.tsx": {
     "arbitrary-value": 17,
