@@ -9,8 +9,10 @@
  * 文章が黙って途中で消える。数を赤くして、送る操作の側を押せなくする。
  */
 
-/** LINEのテキストメッセージの上限。 */
-export const LINE_TEXT_LIMIT = 5000
+import { TEMPLATE_TEXT_MAX_CHARACTERS } from '@line-crm/shared'
+
+/** LINEのテキストメッセージの上限。Workerと同じ正本を使う。 */
+export const LINE_TEXT_LIMIT = TEMPLATE_TEXT_MAX_CHARACTERS
 
 /**
  * 「52 / 5,000」の形にする。

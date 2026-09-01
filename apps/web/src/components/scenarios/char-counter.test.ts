@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { LINE_TEXT_LIMIT, formatCharCount, isOverCharLimit } from './char-counter'
+import { countTemplateTextCharacters } from '@line-crm/shared'
 
 describe('文字数の表示', () => {
   it('設計と同じ「52 / 5,000」の形になる', () => {
@@ -35,5 +36,11 @@ describe('上限の判定', () => {
 
   it('空でも超過にしない', () => {
     expect(isOverCharLimit(0)).toBe(false)
+  })
+
+  it('絵文字はUTF-16の2文字ではなく表示上の1文字として数える', () => {
+    const length = countTemplateTextCharacters('🌿'.repeat(LINE_TEXT_LIMIT))
+    expect(length).toBe(LINE_TEXT_LIMIT)
+    expect(isOverCharLimit(length)).toBe(false)
   })
 })

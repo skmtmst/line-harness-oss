@@ -3,7 +3,13 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { DeliveryMode, Scenario, Tag, Template } from '@line-crm/shared'
+import {
+  countTemplateTextCharacters,
+  type DeliveryMode,
+  type Scenario,
+  type Tag,
+  type Template,
+} from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -141,11 +147,14 @@ function FirstStepContent() {
    * 超えたまま保存を押せると、LINEに渡してから弾かれる。押せない形にして、
    * 理由を操作のそばに出す（`docs/v6-shell-contract.md` の言葉の決まり）。
    */
+  const bodyLength = countTemplateTextCharacters(body)
   const bodyOverLimit =
-    contentMode === 'compose' && kind === 'text' && isOverCharLimit(body.length, LINE_TEXT_LIMIT)
+    contentMode === 'compose' && kind === 'text' && isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)
 
   const submit = async () => {
-    if (saving) return
+    // ボタンの disabled だけに頼らない。別の呼び出し経路が増えても、
+    // 上限を超えた本文を保存処理へ渡さない。
+    if (saving || bodyOverLimit) return
     setSaving(true)
     setError('')
     if (targetMode === 'tag' && !targetTagId) {
@@ -451,7 +460,7 @@ function FirstStepContent() {
                       placeholder="はじめまして。友だち追加ありがとうございます。"
                       className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
                     />
-                    <CharCounter length={body.length} />
+                    <CharCounter length={bodyLength} />
                   </div>
                 )}
 

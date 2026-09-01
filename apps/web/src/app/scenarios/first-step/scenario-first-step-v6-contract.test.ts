@@ -81,13 +81,15 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('本文の文字数を出す', () => {
-    expect(PAGE).toContain('<CharCounter length={body.length} />')
+    expect(PAGE).toContain('const bodyLength = countTemplateTextCharacters(body)')
+    expect(PAGE).toContain('<CharCounter length={bodyLength} />')
   })
 
   it('上限を超えた本文では保存を押せなくし、理由を本文に出す', () => {
     expect(PAGE).toContain('const bodyOverLimit =')
-    expect(PAGE).toContain('isOverCharLimit(body.length, LINE_TEXT_LIMIT)')
+    expect(PAGE).toContain('isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)')
     expect(PAGE).toContain('disabled={saving || bodyOverLimit}')
+    expect(PAGE).toContain('if (saving || bodyOverLimit) return')
     expect(PAGE).toContain('LINEが受け付けないため、この状態では保存できません。')
   })
 })
