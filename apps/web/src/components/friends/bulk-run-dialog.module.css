@@ -7,7 +7,7 @@
 .panel {
   display: flex; flex-direction: column; gap: 12px;
   width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
-  border-radius: var(--radius-card); background: var(--color-canvas); padding: 20px;
+  border-radius: var(--radius-panel); background: var(--color-canvas); padding: 20px;
 }
 .head { display: flex; flex-direction: column; gap: 2px; }
 .title { color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }

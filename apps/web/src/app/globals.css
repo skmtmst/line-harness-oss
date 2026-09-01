@@ -123,7 +123,16 @@
    * 大きさで役割を分ける。カードは card、押せるものは control、
    * 丸いものは pill。すべて rounded-lg で済ませない。
    */
-  --radius-card: 0.75rem;
+  /*
+   * **カードは10px（Pencil `$radius-md`）。** 以前は 0.75rem(12px) で、
+   * 設計のモーダル枠（`$radius-panel` 12）と同じ値だった。1つの
+   * トークンがカードと窓の両方を指していたので、用途で分けた。
+   * 窓は `--radius-panel`(12) を使う。
+   *
+   * 測ったNode: `pRHvc` 検索と絞り込み(h=132) / `k4Hz0X` 友だち一覧カード
+   * / `eHPwj` 一括操作バー(h=56) — いずれも `$radius-md`。
+   */
+  --radius-card: 10px;
   --radius-control: 0.5rem;
   --radius-tile: 10px;
   --radius-panel: 12px;
