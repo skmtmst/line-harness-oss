@@ -55,6 +55,7 @@ export function savedSearchParams(id: string, conditions: SavedSearchConditions)
 export type SavedSearchConditionLabels = {
   marks?: Readonly<Record<string, string>>
   scenarios?: Readonly<Record<string, string>>
+  fields?: Readonly<Record<string, string>>
 }
 
 const CHAT_STATUS_LABELS: Readonly<Record<string, string>> = {
@@ -76,7 +77,12 @@ export function describeSavedCondition(
     : raw
   if (condition.kind === 'tag') return `タグ ${condition.op === 'excludes' ? 'を含まない' : 'を含む'}「${value || '未指定'}」`
   if (condition.kind === 'name') return `名前に「${value || '未指定'}」を含む`
-  if (condition.kind === 'field') return `${condition.key || '項目未指定'} ${condition.op === 'ne' ? 'が次と異なる' : 'が次と同じ'}「${value || '未指定'}」`
+  if (condition.kind === 'field') {
+    const fieldName = condition.key
+      ? labels.fields?.[condition.key] ?? '選択済みの友だち情報'
+      : '項目未指定'
+    return `${fieldName} ${condition.op === 'ne' ? 'が次と異なる' : 'が次と同じ'}「${value || '未指定'}」`
+  }
   if (condition.kind === 'status_message') return `ステータスメッセージに「${value || '未指定'}」を含む`
   if (condition.kind === 'mark') return `対応マークが「${labels.marks?.[raw] ?? (raw ? '選択済みの対応マーク' : '未指定')}」`
   if (condition.kind === 'scenario') return `シナリオが「${labels.scenarios?.[raw] ?? (raw ? '選択済みのシナリオ' : '未指定')}」`

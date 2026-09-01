@@ -4,11 +4,21 @@ let fetchApi: typeof import('./api').fetchApi
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
+let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
+let api: typeof import('./api').api
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage, extractApiErrorCode, eventsApi } = await import('./api'))
+  ;({
+    fetchApi,
+    ApiError,
+    extractApiErrorMessage,
+    extractApiErrorCode,
+    extractApiErrorData,
+    eventsApi,
+    api,
+  } = await import('./api'))
 })
 
 describe('eventsApi.createSlots', () => {
@@ -40,6 +50,71 @@ describe('eventsApi.createSlots', () => {
 
     await expect(eventsApi.createSlots('account', 'event', slots)).rejects.toThrow('400件まで追加されました')
     expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('api.friendAddRouting draft/test/publish contract', () => {
+  const routing = {
+    firstTime: { scenarioId: 'scenario-1', timing: 'immediate' as const, actions: [] },
+    returning: {
+      scenarioId: null,
+      mode: 'same' as const,
+      startPosition: 'beginning' as const,
+      actions: [],
+    },
+    criteria: { firstTime: 'unfollow_count_zero' as const },
+  }
+
+  it('下書き・確認・競合・テストを同じLINEアカウントに紐づける', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.friendAddRouting.getDraft('account 1')
+    await api.friendAddRouting.saveDraft('account 1', routing)
+    await api.friendAddRouting.validateDraft('account 1')
+    await api.friendAddRouting.conflicts('account 1')
+    await api.friendAddRouting.testDraft('account 1', 'friend-1')
+
+    expect(spy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/friend-add-routing/draft?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/draft?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/validate?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/conflicts?account_id=account%201',
+      'https://worker.example.com/api/friend-add-routing/draft/test?account_id=account%201',
+    ])
+    expect(spy.mock.calls[1][1]).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify({ routing }),
+    })
+    expect(spy.mock.calls[4][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ friendId: 'friend-1' }),
+    })
+  })
+
+  it('公開要求に操作の識別キーを付ける', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.friendAddRouting.publish('account-1', 'publish-key-00000001')
+
+    expect(spy).toHaveBeenCalledWith(
+      'https://worker.example.com/api/friend-add-routing/publish?account_id=account-1',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'Idempotency-Key': 'publish-key-00000001',
+        }),
+      }),
+    )
   })
 })
 
@@ -86,12 +161,32 @@ describe('extractApiErrorCode', () => {
   it('409や422でもsnake_caseの機械コードだけを取り出す', () => {
     expect(extractApiErrorCode(JSON.stringify({ error: 'slot_conflict' }))).toBe('slot_conflict')
     expect(extractApiErrorCode(JSON.stringify({ error: 'slot_not_available' }))).toBe('slot_not_available')
+    expect(extractApiErrorCode(JSON.stringify({
+      code: 'rich_menu_delete_blocked',
+      error: '削除する前に確認してください',
+    }))).toBe('rich_menu_delete_blocked')
+    expect(extractApiErrorCode(JSON.stringify({
+      code: 'media_delete_blocked',
+      error: '先に使用先から外してください',
+    }))).toBe('media_delete_blocked')
   })
 
   it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
     expect(extractApiErrorCode(JSON.stringify({ error: 'D1_ERROR: no such table' }))).toBeUndefined()
+    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_PERSON' }))).toBeUndefined()
+    expect(extractApiErrorCode(JSON.stringify({ code: 'D1_ERROR: no such table' }))).toBeUndefined()
     expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
     expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
+  })
+})
+
+describe('extractApiErrorData', () => {
+  it('409の最新状態を機械処理用に保持し、JSON以外は捨てる', () => {
+    const impact = { canDelete: false, blockers: ['incoming_switches'] }
+    expect(extractApiErrorData(JSON.stringify({ data: impact }))).toEqual(impact)
+    const mediaImpact = { usageCount: 2, canDelete: false }
+    expect(extractApiErrorData(JSON.stringify({ data: mediaImpact }))).toEqual(mediaImpact)
+    expect(extractApiErrorData('<html>proxy error</html>')).toBeUndefined()
   })
 })
 
@@ -127,6 +222,31 @@ describe('fetchApi error response', () => {
     expect(new ApiError(401).message).toBe('API error: 401')
   })
 
+  it('メディア削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+    const impact = {
+      usageCount: 2,
+      canDelete: false,
+      references: [{ name: '8月のお知らせ', state: 'available' }],
+    }
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        success: false,
+        code: 'media_delete_blocked',
+        error: 'このファイルは2か所で使われています。先に使用先から外してください。',
+        data: impact,
+      }), { status: 409 }),
+    ))
+
+    await expect(fetchApi('/api/media/media-1?accountId=account-1', { method: 'DELETE' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 409,
+        code: 'media_delete_blocked',
+        message: 'API error: 409',
+        data: impact,
+      })
+  })
+
   it('予期しない本文は表示せず status にフォールバックする', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response('<html>internal details</html>', { status: 502 }),
@@ -146,6 +266,27 @@ describe('fetchApi error response', () => {
       code: 'slot_conflict',
       message: 'API error: 409',
     })
+  })
+
+  it('409の最新状態は保持し、本文は利用者へ直接出さない', async () => {
+    const impact = { canDelete: false, blockers: ['incoming_switches'] }
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        success: false,
+        code: 'rich_menu_delete_blocked',
+        error: '削除する前に、公開状態と使われている場所を確認してください',
+        data: impact,
+      }), { status: 409 }),
+    ))
+
+    await expect(fetchApi('/api/rich-menu-groups/example', { method: 'DELETE' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 409,
+        code: 'rich_menu_delete_blocked',
+        message: 'API error: 409',
+        data: impact,
+      })
   })
 
   it('500 の本文は JSON でも表示せず status にフォールバックする', async () => {

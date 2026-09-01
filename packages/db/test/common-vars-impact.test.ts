@@ -18,7 +18,7 @@ describe('common variable usage impact', () => {
       })),
     } as unknown as D1Database;
 
-    const impact = await getCommonVarUsageImpact(db, 'shop_hours');
+    const impact = await getCommonVarUsageImpact(db, 'shop_hours', 'account-1');
 
     expect(impact.total).toBe(9);
     expect(impact.byKind).toMatchObject({
@@ -28,8 +28,9 @@ describe('common variable usage impact', () => {
       auto_reply: 1,
       form: 2,
     });
-    expect(binds.flat()).toHaveLength(12);
-    expect(binds.flat().every((value) => value === '{{var.shop_hours}}')).toBe(true);
+    expect(binds).toHaveLength(7);
+    expect(binds.every((values) => values.at(-1) === 'account-1')).toBe(true);
+    expect(binds.flat().filter((value) => value === '{{var.shop_hours}}')).toHaveLength(12);
   });
 
   it('does not hide a failed scan as zero usages', async () => {
@@ -39,7 +40,7 @@ describe('common variable usage impact', () => {
       })),
     } as unknown as D1Database;
 
-    await expect(getCommonVarUsageImpact(db, 'shop_hours')).rejects.toThrow('table unavailable');
+    await expect(getCommonVarUsageImpact(db, 'shop_hours', 'account-1')).rejects.toThrow('table unavailable');
   });
 });
 
@@ -60,6 +61,21 @@ describe('common variable account scope', () => {
     await expect(getCommonVarMap(asD1(raw), 'a1')).resolves.toEqual({ hours: '10-18' });
     await expect(getCommonVarMap(asD1(raw), 'a2')).resolves.toEqual({ phone: '000' });
     await expect(getCommonVarMap(asD1(raw), null)).resolves.toEqual({});
+
+    raw.exec(`
+      INSERT INTO templates (id, line_account_id, name, category, message_type, message_content)
+      VALUES
+        ('t1','a1','A1の案内','general','text','{{var.hours}}'),
+        ('t2','a2','A2の案内','general','text','{{var.hours}}');
+    `);
+    await expect(getCommonVarUsageImpact(asD1(raw), 'hours', 'a1')).resolves.toMatchObject({
+      total: 1,
+      byKind: { template: 1 },
+    });
+    await expect(getCommonVarUsageImpact(asD1(raw), 'hours', 'a2')).resolves.toMatchObject({
+      total: 1,
+      byKind: { template: 1 },
+    });
     raw.close();
   });
 });

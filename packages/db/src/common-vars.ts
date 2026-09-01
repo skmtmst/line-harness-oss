@@ -45,14 +45,30 @@ const COMMON_VAR_USAGE_SOURCES: Array<{
   kind: CommonVarUsageKind;
   table: string;
   columns: string[];
+  accountPredicate: string;
 }> = [
-  { kind: 'template', table: 'templates', columns: ['message_content'] },
-  { kind: 'broadcast', table: 'broadcasts', columns: ['message_content'] },
-  { kind: 'scenario', table: 'scenario_steps', columns: ['message_content', 'message_bubbles_json'] },
-  { kind: 'reminder', table: 'reminder_steps', columns: ['message_content'] },
-  { kind: 'auto_reply', table: 'auto_replies', columns: ['response_content', 'actions_json'] },
-  { kind: 'form', table: 'forms', columns: ['fields', 'layout', 'on_submit_message_content'] },
-  { kind: 'automation', table: 'automations', columns: ['conditions', 'actions'] },
+  { kind: 'template', table: 'templates', columns: ['message_content'], accountPredicate: 'templates.line_account_id = ?' },
+  { kind: 'broadcast', table: 'broadcasts', columns: ['message_content'], accountPredicate: 'broadcasts.line_account_id = ?' },
+  {
+    kind: 'scenario',
+    table: 'scenario_steps',
+    columns: ['message_content', 'message_bubbles_json'],
+    accountPredicate: 'EXISTS (SELECT 1 FROM scenarios s WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)',
+  },
+  {
+    kind: 'reminder',
+    table: 'reminder_steps',
+    columns: ['message_content'],
+    accountPredicate: 'EXISTS (SELECT 1 FROM reminders r WHERE r.id = reminder_steps.reminder_id AND r.line_account_id = ?)',
+  },
+  { kind: 'auto_reply', table: 'auto_replies', columns: ['response_content', 'actions_json'], accountPredicate: 'auto_replies.line_account_id = ?' },
+  {
+    kind: 'form',
+    table: 'forms',
+    columns: ['fields', 'layout', 'on_submit_message_content'],
+    accountPredicate: 'EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = forms.id AND fa.line_account_id = ?)',
+  },
+  { kind: 'automation', table: 'automations', columns: ['conditions', 'actions'], accountPredicate: 'automations.line_account_id = ?' },
 ];
 
 export interface CommonVarSchedule {
@@ -98,6 +114,7 @@ export async function getCommonVars(
 export async function getCommonVarUsageImpact(
   db: D1Database,
   varKey: string,
+  lineAccountId: string,
 ): Promise<CommonVarUsageImpact> {
   const token = `{{var.${varKey}}}`;
   const byKind = Object.fromEntries(
@@ -109,8 +126,11 @@ export async function getCommonVarUsageImpact(
       .map((column) => `instr(coalesce(${column}, ''), ?) > 0`)
       .join(' OR ');
     const row = await db
-      .prepare(`SELECT COUNT(*) AS total FROM ${source.table} WHERE ${predicate}`)
-      .bind(...source.columns.map(() => token))
+      .prepare(
+        `SELECT COUNT(*) AS total FROM ${source.table}
+         WHERE (${predicate}) AND ${source.accountPredicate}`,
+      )
+      .bind(...source.columns.map(() => token), lineAccountId)
       .first<{ total: number }>();
     byKind[source.kind] = Number(row?.total ?? 0);
   }

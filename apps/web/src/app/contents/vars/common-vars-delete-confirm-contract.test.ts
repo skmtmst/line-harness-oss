@@ -14,7 +14,7 @@ describe('共通情報の削除確認', () => {
   })
 
   it('使用先を確認できた未使用の共通情報だけを確認画面へ進める', () => {
-    expect(PAGE).toContain('api.commonVars.deleteImpact(id, selectedAccountId)')
+    expect(PAGE).toContain('api.commonVars.deleteImpact(id, request.accountId)')
     expect(PAGE).toContain('const blocked = impacts.filter(({ impact }) => !impact.canDelete)')
     expect(PAGE).toContain('setDeleteTargets(targets)')
   })
@@ -44,5 +44,19 @@ describe('共通情報の削除確認', () => {
     expect(PAGE).toContain('setDeleteTargets(failed)')
     expect(PAGE).toContain('削除できなかったものだけを残しています。')
     expect(PAGE).toContain('error={deleteError}')
+  })
+
+  it('LINEアカウントを切り替えたら前の確認と選択を捨てる', () => {
+    expect(PAGE).toContain('deleteRequestRef.current = {')
+    expect(PAGE).toContain('setSelected(new Set())')
+    expect(PAGE).toContain('setDeleteTargets([])')
+    expect(PAGE).toContain('}, [selectedAccountId])')
+  })
+
+  it('確認と削除の遅い返事をアカウントと世代の両方で照合する', () => {
+    expect(PAGE).toContain('deleteRequestRef.current.accountId === request.accountId')
+    expect(PAGE).toContain('deleteRequestRef.current.generation === request.generation')
+    expect(PAGE).toContain('api.commonVars.deleteImpact(id, request.accountId)')
+    expect(PAGE).toContain('api.commonVars.delete(target.id, request.accountId)')
   })
 })
