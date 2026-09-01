@@ -12,6 +12,17 @@ vi.mock('@line-crm/db', () => ({
   createOutgoingWebhook: vi.fn(),
   updateOutgoingWebhook: vi.fn(),
   deleteOutgoingWebhook: vi.fn(),
+  createWebhookInteraction: vi.fn(),
+  finishWebhookInteraction: vi.fn(),
+  getWebhookInteractionById: vi.fn(),
+  listFailedWebhookInteractionsForRetry: vi.fn(),
+  listWebhookInteractions: vi.fn(),
+}));
+
+vi.mock('../services/webhook-interactions.js', () => ({
+  retryWebhookInteraction: vi.fn(),
+  webhookFailureLabel: vi.fn((reason: string | null) => reason ? '安全な失敗理由' : null),
+  webhookResponseLabel: vi.fn((row: { status: string }) => row.status === 'failed' ? '処理できませんでした' : '届きました'),
 }));
 
 // Stub fireEvent to keep receive-endpoint tests focused on signature
@@ -35,7 +46,13 @@ import {
   createOutgoingWebhook,
   updateOutgoingWebhook,
   deleteOutgoingWebhook,
+  createWebhookInteraction,
+  finishWebhookInteraction,
+  getWebhookInteractionById,
+  listFailedWebhookInteractionsForRetry,
+  listWebhookInteractions,
 } from '@line-crm/db';
+import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
 import type { Env } from '../index.js';
@@ -43,6 +60,7 @@ import { webhooks } from './webhooks.js';
 
 const VALID_SECRET = 'a'.repeat(32);
 const SHORT_SECRET = 'a'.repeat(31);
+const ACCOUNT_ID = 'account-a';
 
 function setupApp(tenantId?: string) {
   const app = new Hono<Env>();
@@ -61,9 +79,25 @@ const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(canAccessAllLineAccounts).mockResolvedValue(true);
+  vi.mocked(createWebhookInteraction).mockResolvedValue({
+    id: 'interaction-1', line_account_id: ACCOUNT_ID, direction: 'incoming',
+    webhook_id: 'iwh-1', webhook_name: 'test', event_type: 'incoming_webhook.custom',
+    trigger_summary: 'testから受け取った', status: 'pending', request_body_json: null,
+    response_status: null, attempt_count: 0, duration_ms: null, failure_reason: null,
+    idempotency_key: 'delivery-1', retry_of_id: null,
+    started_at: '2026-05-08T00:00:00.000+09:00', completed_at: null,
+    created_at: '2026-05-08T00:00:00.000+09:00',
+  });
+  vi.mocked(finishWebhookInteraction).mockResolvedValue(undefined);
+  vi.mocked(listWebhookInteractions).mockResolvedValue({
+    items: [], total: 0, page: 1, limit: 20,
+    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, averageDurationMs: null },
+  });
+  vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
   vi.mocked(getIncomingWebhookById).mockResolvedValue({
     id: 'iwh-1', name: 'test', source_type: 'custom', secret: VALID_SECRET,
-    is_active: 1, line_account_id: null, created_at: '2026-05-08', updated_at: '2026-05-08',
+    is_active: 1, line_account_id: ACCOUNT_ID, created_at: '2026-05-08', updated_at: '2026-05-08',
   });
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
@@ -127,6 +161,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'http://example.com/hook',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          lineAccountId: ACCOUNT_ID,
         }),
       },
       baseEnv,
@@ -181,6 +216,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'https://example.com/hook',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          lineAccountId: ACCOUNT_ID,
         }),
       },
       baseEnv,
@@ -194,7 +230,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     expect(body.success).toBe(true);
     expect(body.data.secret).toBe(VALID_SECRET);
     expect(body.data.id).toBe('wh-1');
-    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: undefined }));
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }));
   });
 
   test('既定でない統括はLINEアカウントを省略できない', async () => {
@@ -203,7 +239,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
       body: JSON.stringify({ name: 'test', url: 'https://example.com/hook', secret: VALID_SECRET }),
     }, baseEnv);
     expect(res.status).toBe(400);
-    expect((await res.json()) as object).toMatchObject({ error: 'どのLINEアカウント向けか選んでください' });
+    expect((await res.json()) as object).toMatchObject({ error: 'LINEアカウントを選択してください' });
     expect(createOutgoingWebhook).not.toHaveBeenCalled();
   });
 
@@ -225,7 +261,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
 describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('見えない行は404で更新しない', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing/other', {
+    const res = await setupApp('tenant-b').request(`/api/webhooks/outgoing/other?lineAccountId=${ACCOUNT_ID}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: 'https://changed.example.com', secret: 'z'.repeat(32) }),
     }, baseEnv);
@@ -235,7 +271,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('rejects updating to http:// URL with 400', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-1',
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -250,7 +286,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('rejects updating secret to fewer than 32 chars with 400', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-1',
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -265,7 +301,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('rejects truthy non-boolean isActive with 400 (migration bypass)', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-legacy',
+      `/api/webhooks/outgoing/wh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -278,7 +314,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     expect(getOutgoingWebhookById).toHaveBeenCalledWith(
       baseEnv.DB,
       'wh-legacy',
-      '00000000-0000-4000-8000-000000000001',
+      ACCOUNT_ID,
     );
   });
 
@@ -299,7 +335,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-legacy',
+      `/api/webhooks/outgoing/wh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -328,7 +364,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-legacy-http',
+      `/api/webhooks/outgoing/wh-legacy-http?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -357,7 +393,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-1',
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -373,7 +409,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 describe('DELETE /api/webhooks/outgoing/:id — tenant scope', () => {
   test.each(['other-tenant', 'missing'])('%s は404で削除しない', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing/hidden', { method: 'DELETE' }, baseEnv);
+    const res = await setupApp('tenant-b').request(`/api/webhooks/outgoing/hidden?lineAccountId=${ACCOUNT_ID}`, { method: 'DELETE' }, baseEnv);
     expect(res.status).toBe(404);
     expect(deleteOutgoingWebhook).not.toHaveBeenCalled();
   });
@@ -402,7 +438,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     ]);
 
     const app = setupApp();
-    const res = await app.request('/api/webhooks/outgoing', { method: 'GET' }, baseEnv);
+    const res = await app.request(`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).not.toContain(VALID_SECRET);
@@ -430,7 +466,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     ]);
 
     const app = setupApp();
-    const res = await app.request('/api/webhooks/outgoing', { method: 'GET' }, baseEnv);
+    const res = await app.request(`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     const body = (await res.json()) as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty('secret');
     expect(body.data[0].hasSecret).toBe(false);
@@ -496,7 +532,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
       source_type: 'custom',
       secret: VALID_SECRET,
       is_active: 1,
-      line_account_id: null,
+      line_account_id: ACCOUNT_ID,
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -507,13 +543,13 @@ describe('POST /api/webhooks/incoming — validation', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'test', secret: VALID_SECRET }),
+        body: JSON.stringify({ name: 'test', secret: VALID_SECRET, lineAccountId: ACCOUNT_ID }),
       },
       baseEnv,
     );
     expect(res.status).toBe(201);
     expect(createIncomingWebhook).toHaveBeenCalledOnce();
-    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: undefined }));
+    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }));
     const body = (await res.json()) as { data: { id: string; secret: string } };
     expect(body.data.secret).toBe(VALID_SECRET);
   });
@@ -526,7 +562,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
 describe('PUT /api/webhooks/incoming/:id — validation', () => {
   test('returns 404 before changing a webhook outside the tenant', async () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/incoming/iwh-other', {
+    const res = await setupApp('tenant-b').request(`/api/webhooks/incoming/iwh-other?lineAccountId=${ACCOUNT_ID}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: VALID_SECRET }),
     }, baseEnv);
@@ -537,7 +573,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
   test('rejects updating secret to fewer than 32 chars with 400', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/incoming/iwh-1',
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -563,7 +599,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/incoming/iwh-legacy',
+      `/api/webhooks/incoming/iwh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -579,7 +615,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
 describe('DELETE /api/webhooks/incoming/:id — tenant scope', () => {
   test('returns 404 before deleting a webhook outside the tenant', async () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/incoming/iwh-other', { method: 'DELETE' }, baseEnv);
+    const res = await setupApp('tenant-b').request(`/api/webhooks/incoming/iwh-other?lineAccountId=${ACCOUNT_ID}`, { method: 'DELETE' }, baseEnv);
     expect(res.status).toBe(404);
     expect(deleteIncomingWebhook).not.toHaveBeenCalled();
   });
@@ -598,14 +634,14 @@ describe('GET /api/webhooks/incoming — secret exposure', () => {
         source_type: 'custom',
         secret: VALID_SECRET,
         is_active: 1,
-        line_account_id: null,
+        line_account_id: ACCOUNT_ID,
         created_at: '2026-05-08T00:00:00.000+09:00',
         updated_at: '2026-05-08T00:00:00.000+09:00',
       },
     ]);
 
     const app = setupApp();
-    const res = await app.request('/api/webhooks/incoming', { method: 'GET' }, baseEnv);
+    const res = await app.request(`/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     const text = await res.text();
     expect(text).not.toContain(VALID_SECRET);
     const body = JSON.parse(text) as { data: Array<Record<string, unknown>> };
@@ -719,5 +755,74 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       undefined,
       'account-a',
     );
+    expect(createWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      lineAccountId: 'account-a',
+      direction: 'incoming',
+      requestBodyJson: null,
+    }));
+    expect(finishWebhookInteraction).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'interaction-1',
+      'account-a',
+      expect.objectContaining({ status: 'succeeded', responseStatus: 200 }),
+    );
+  });
+});
+
+describe('Webhookやり取り記録', () => {
+  const failedRow = {
+    id: 'run-a', line_account_id: ACCOUNT_ID, direction: 'outgoing' as const,
+    webhook_id: 'wh-1', webhook_name: '顧客管理', event_type: 'friend.added',
+    trigger_summary: '友だちが追加されたとき', status: 'failed' as const,
+    request_body_json: '{"private":"本文"}', response_status: 500,
+    attempt_count: 2, duration_ms: 820, failure_reason: 'response_5xx' as const,
+    idempotency_key: 'delivery-a', retry_of_id: null,
+    started_at: '2026-08-29T10:00:00.000+09:00', completed_at: '2026-08-29T10:00:00.820+09:00',
+    created_at: '2026-08-29T10:00:00.000+09:00',
+  };
+
+  test('一覧はアカウントを検査し、本文・配送ID・Webhook IDを返さない', async () => {
+    vi.mocked(listWebhookInteractions).mockResolvedValue({
+      items: [failedRow], total: 1, page: 1, limit: 20,
+      summary: { total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1, averageDurationMs: 820 },
+    });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(canAccessAllLineAccounts).toHaveBeenCalledWith(baseEnv.DB, expect.anything(), [ACCOUNT_ID]);
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      id: 'run-a', webhookName: '顧客管理', responseLabel: '処理できませんでした', canRetry: true,
+    });
+    expect(body.data.items[0]).not.toHaveProperty('request_body_json');
+    expect(body.data.items[0]).not.toHaveProperty('idempotency_key');
+    expect(body.data.items[0]).not.toHaveProperty('webhook_id');
+  });
+
+  test('権限外のアカウントは一覧を読めない', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
+    const res = await setupApp().request(
+      '/api/webhooks/interactions?lineAccountId=account-b',
+      { method: 'GET' },
+      baseEnv,
+    );
+    expect(res.status).toBe(403);
+    expect(listWebhookInteractions).not.toHaveBeenCalled();
+  });
+
+  test('失敗した送信だけを同じアカウントの中でやり直す', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
+    vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, id: 'retry-a', status: 'succeeded' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(getWebhookInteractionById).toHaveBeenCalledWith(baseEnv.DB, 'run-a', ACCOUNT_ID);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow);
   });
 });

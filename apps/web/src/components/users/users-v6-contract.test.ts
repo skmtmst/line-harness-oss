@@ -60,6 +60,16 @@ describe('統合ユーザーV6の画面契約', () => {
     expect(SUMMARY).not.toContain('label="余分率"')
   })
 
+  it('KPIの読み込み中・取得失敗・取得成功を分け、失敗を0件にしない', () => {
+    expect(SUMMARY).toContain("type SummaryState = 'loading' | 'ready' | 'error'")
+    expect(SUMMARY).toContain('data-summary-state="loading"')
+    expect(SUMMARY).toContain('data-summary-state="error"')
+    expect(SUMMARY).toContain('data-summary-state="ready"')
+    expect(SUMMARY).toContain('value="—"')
+    expect(SUMMARY).toContain('hint="取得できませんでした"')
+    expect(SUMMARY).toContain("if (!cancelled) setState('error')")
+  })
+
   it('共通ページ送りを使い横スクロールへ逃がさない', () => {
     expect(TABLE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(TABLE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")

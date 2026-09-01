@@ -211,13 +211,13 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   } | null>(null)
 
   useEffect(() => {
-    void api.friendFields.list().then((res) => {
+    void api.friendFields.list(accountId).then((res) => {
       if (res.success) {
         setFields(res.data)
         if (res.data.length > 0) setFieldId(res.data[0].id)
       }
     })
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     setCrossResult(null)

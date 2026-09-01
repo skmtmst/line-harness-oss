@@ -788,14 +788,18 @@ function Editor({
                 )}
 
                 <label className="block">
-                  <span className="text-ink-secondary text-xs font-medium">順番</span>
+                  <span className="text-ink-secondary text-xs font-medium">出す順番</span>
                   <span className="text-ink-faint block text-[11px]">
-                    複数のメニューの条件に当てはまったとき、数が小さいほうが先に出ます。
+                    一覧で上にあるメニューが優先されます。現在は
+                    {targetingPriority + 1}番目です。
                   </span>
                   <input
                     type="number"
-                    value={targetingPriority}
-                    onChange={(e) => setTargetingPriority(parseInt(e.target.value, 10) || 0)}
+                    min={1}
+                    value={targetingPriority + 1}
+                    onChange={(e) =>
+                      setTargetingPriority(Math.max(0, (parseInt(e.target.value, 10) || 1) - 1))
+                    }
                     className="border-hairline rounded-control focus:ring-accent mt-1 block w-24 border px-2 py-1 text-sm focus:ring-2 focus:outline-none"
                   />
                 </label>

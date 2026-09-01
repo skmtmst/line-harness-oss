@@ -11,26 +11,56 @@ interface Stats {
   friendDups: number
 }
 
+type SummaryState = 'loading' | 'ready' | 'error'
+
+const CARD_LABELS = ['統合ユーザー', '紐付く友だち', '重複している行', '重複率'] as const
+
 export default function SummaryBar() {
   const [stats, setStats] = useState<Stats | null>(null)
+  const [state, setState] = useState<SummaryState>('loading')
 
   useEffect(() => {
-    api.duplicates.stats().then((res) => {
-      if (res.success) {
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const res = await api.duplicates.stats()
+        if (cancelled) return
+        if (!res.success) {
+          setState('error')
+          return
+        }
         setStats({
           totalFollowing: res.data.totalFollowing,
           uniquePeople: res.data.uniquePeople,
           friendDups: res.data.friendDups,
         })
+        setState('ready')
+      } catch {
+        if (!cancelled) setState('error')
       }
-    })
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  if (!stats) {
+  if (state === 'loading') {
     return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-summary-state="loading">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-20 rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]" />
+        ))}
+      </div>
+    )
+  }
+
+  if (state === 'error' || !stats) {
+    return (
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-summary-state="error">
+        {CARD_LABELS.map((label) => (
+          <Card key={label} label={label} value="—" hint="取得できませんでした" />
         ))}
       </div>
     )
@@ -40,7 +70,7 @@ export default function SummaryBar() {
     stats.totalFollowing > 0 ? (stats.friendDups / stats.totalFollowing) * 100 : 0
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" data-summary-state="ready">
       <Card label="統合ユーザー" value={`${fmt.format(stats.uniquePeople)}人`} />
       <Card label="紐付く友だち" value={`${fmt.format(stats.totalFollowing)}件`} />
       {/* friendDups は行ベースの「余分な行数」(SUM(row_cnt - 1))。

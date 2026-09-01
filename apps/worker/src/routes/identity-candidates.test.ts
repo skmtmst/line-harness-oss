@@ -27,8 +27,13 @@ const accessMocks = vi.hoisted(() => ({
   getVisibleLineAccountScope: vi.fn(),
 }));
 
+const detectorMocks = vi.hoisted(() => ({
+  detectFriendDuplicateCandidates: vi.fn(),
+}));
+
 vi.mock('../services/identity-candidates.js', () => identityMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
+vi.mock('../services/friend-duplicate-candidates.js', () => detectorMocks);
 
 const { identityCandidates } = await import('./identity-candidates.js');
 
@@ -84,6 +89,9 @@ beforeEach(() => {
   accessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-a', 'account-b'], canSeeUnassigned: false,
   });
+  detectorMocks.detectFriendDuplicateCandidates.mockResolvedValue({
+    processed: 1, hasMore: false, nextCursor: null,
+  });
 });
 
 describe('identity candidate HTTP contract', () => {
@@ -98,6 +106,42 @@ describe('identity candidate HTTP contract', () => {
     expect(await empty.json()).toEqual({
       success: true, data: { items: [], total: 0, limit: 20, offset: 0 },
     });
+  });
+
+  it('lets an owner detect friend candidates only inside the visible account scope', async () => {
+    const response = await harness().request(
+      '/api/identity-candidates/detect?kind=friend_duplicate&limit=25',
+      { method: 'POST' },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true, data: { processed: 1, hasMore: false, nextCursor: null },
+    });
+    expect(detectorMocks.detectFriendDuplicateCandidates).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        tenantId: 'tenant-a',
+        allowedAccountIds: ['account-a', 'account-b'],
+        limit: 25,
+        after: null,
+      },
+    );
+  });
+
+  it('does not let staff run detection or accept another candidate kind', async () => {
+    const staffResponse = await harness({ role: 'staff', permissions: ['/friends'] }).request(
+      '/api/identity-candidates/detect?kind=friend_duplicate',
+      { method: 'POST' },
+    );
+    expect(staffResponse.status).toBe(403);
+
+    const wrongKind = await harness().request(
+      '/api/identity-candidates/detect?kind=ec_member',
+      { method: 'POST' },
+    );
+    expect(wrongKind.status).toBe(400);
+    expect(await wrongKind.json()).toMatchObject({ code: 'INVALID_DETECTION_KIND' });
+    expect(detectorMocks.detectFriendDuplicateCandidates).not.toHaveBeenCalled();
   });
 
   it('does not let a friends-only staff member inspect EC candidates', async () => {

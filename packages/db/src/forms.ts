@@ -19,6 +19,9 @@ export interface Form {
   on_submit_webhook_fail_message: string | null;
   save_to_metadata: number;
   is_active: number;
+  status: 'active' | 'archived';
+  archived_at: string | null;
+  revision: number;
   submit_count: number;
   og_title: string | null;
   og_description: string | null;
@@ -44,7 +47,7 @@ export interface FriendFormSubmission extends FormSubmission {
 
 export async function getForms(db: D1Database): Promise<Form[]> {
   const result = await db
-    .prepare(`SELECT * FROM forms ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM forms WHERE status = 'active' ORDER BY created_at DESC`)
     .all<Form>();
   return result.results;
 }
@@ -73,13 +76,14 @@ export async function getFormsWithStats(
   scope: FormAccountScope = {},
 ): Promise<FormWithStats[]> {
   const accountIds = [...new Set(scope.lineAccountIds ?? [])].filter(Boolean);
-  let scopeClause = '';
+  let scopeClause = `WHERE f.status = 'active'`;
   if (scope.lineAccountIds !== undefined && accountIds.length === 0) {
     scopeClause = scope.includeUnassigned
-      ? `WHERE NOT EXISTS (SELECT 1 FROM form_accounts visible WHERE visible.form_id = f.id)`
+      ? `WHERE f.status = 'active'
+           AND NOT EXISTS (SELECT 1 FROM form_accounts visible WHERE visible.form_id = f.id)`
       : 'WHERE 0';
   } else if (scope.lineAccountIds !== undefined) {
-    scopeClause = `WHERE (
+    scopeClause = `WHERE f.status = 'active' AND (
            EXISTS (
              SELECT 1 FROM form_accounts visible
              WHERE visible.form_id = f.id
@@ -184,11 +188,175 @@ export async function attachFormAccounts(
     .bind(formId, accountId)));
 }
 
-export async function getFormById(db: D1Database, id: string): Promise<Form | null> {
+export async function getFormById(
+  db: D1Database,
+  id: string,
+  options: { includeArchived?: boolean } = {},
+): Promise<Form | null> {
   return db
-    .prepare(`SELECT * FROM forms WHERE id = ?`)
+    .prepare(`SELECT * FROM forms WHERE id = ?${options.includeArchived ? '' : " AND status = 'active'"}`)
     .bind(id)
     .first<Form>();
+}
+
+export type FormDeleteReference = {
+  kind: 'webinar' | 'rich_menu';
+  name: string | null;
+  href: string | null;
+  state: 'available' | 'unavailable';
+};
+
+export type FormDeleteImpact = {
+  form: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    status: 'active' | 'archived';
+  };
+  submissionCount: number;
+  openCount: number;
+  references: FormDeleteReference[];
+  referenceCount: number;
+  answerUrl: string | null;
+  revision: number;
+  checkedAt: string;
+  canDelete: boolean;
+  canArchive: boolean;
+  recommendedAction: 'delete' | 'archive' | 'none';
+  blockers: Array<'published' | 'has_submissions' | 'has_opens' | 'in_use' | 'already_archived'>;
+};
+
+type FormImpactRow = Pick<Form, 'id' | 'name' | 'is_active' | 'status' | 'revision'>;
+type FormImpactReferenceRow = {
+  kind: FormDeleteReference['kind'];
+  name: string | null;
+  href: string | null;
+};
+
+/**
+ * 削除・保管の直前に読む影響。回答と利用先を**同じ時点の版**に結びつける。
+ * 名前を引けない参照も落とさず unavailable として返し、削除を止める。
+ */
+export async function getFormDeleteImpact(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  checkedAt: string = jstNow(),
+): Promise<FormDeleteImpact | null> {
+  const results = await db.batch([
+    db.prepare(
+      `SELECT f.id, f.name, f.is_active, f.status, f.revision
+         FROM forms f
+         JOIN form_accounts fa ON fa.form_id = f.id
+        WHERE f.id = ? AND fa.line_account_id = ?`,
+    ).bind(id, lineAccountId),
+    db.prepare(`SELECT COUNT(*) AS total FROM form_submissions WHERE form_id = ?`).bind(id),
+    db.prepare(`SELECT COUNT(*) AS total FROM form_opens WHERE form_id = ?`).bind(id),
+    db.prepare(
+      `SELECT 'webinar' AS kind,
+              w.title AS name,
+              CASE WHEN w.id IS NULL THEN NULL ELSE '/webinars/edit?id=' || w.id END AS href
+         FROM webinar_ctas c
+         LEFT JOIN webinars w ON w.id = c.webinar_id
+        WHERE c.form_id = ?
+        ORDER BY w.title, c.id`,
+    ).bind(id),
+    db.prepare(
+      `SELECT 'rich_menu' AS kind,
+              CASE
+                WHEN g.id IS NULL THEN NULL
+                WHEN p.name IS NULL OR p.name = '' THEN g.name
+                ELSE g.name || '・' || p.name
+              END AS name,
+              CASE WHEN g.id IS NULL THEN NULL ELSE '/rich-menus/edit?id=' || g.id END AS href
+         FROM rich_menu_areas a
+         LEFT JOIN rich_menu_pages p ON p.id = a.page_id
+         LEFT JOIN rich_menu_groups g ON g.id = p.group_id
+        WHERE a.form_id = ?
+        ORDER BY g.name, p.order_index, a.id`,
+    ).bind(id),
+    db.prepare(`SELECT liff_id FROM line_accounts WHERE id = ?`).bind(lineAccountId),
+  ]);
+
+  const row = results[0]?.results?.[0] as FormImpactRow | undefined;
+  if (!row) return null;
+  const submissionCount = Number((results[1]?.results?.[0] as { total?: number } | undefined)?.total ?? 0);
+  const openCount = Number((results[2]?.results?.[0] as { total?: number } | undefined)?.total ?? 0);
+  const referenceRows = [
+    ...(results[3]?.results ?? []),
+    ...(results[4]?.results ?? []),
+  ] as FormImpactReferenceRow[];
+  const references = referenceRows.map((reference): FormDeleteReference => ({
+    ...reference,
+    state: reference.name && reference.href ? 'available' : 'unavailable',
+  }));
+  const blockers: FormDeleteImpact['blockers'] = [];
+  if (row.status === 'archived') blockers.push('already_archived');
+  if (Boolean(row.is_active)) blockers.push('published');
+  if (submissionCount > 0) blockers.push('has_submissions');
+  if (openCount > 0) blockers.push('has_opens');
+  if (references.length > 0) blockers.push('in_use');
+  const canDelete = blockers.length === 0;
+  const canArchive = row.status === 'active';
+  const liffId = (results[5]?.results?.[0] as { liff_id?: string | null } | undefined)?.liff_id ?? null;
+
+  return {
+    form: {
+      id: row.id,
+      name: row.name,
+      isActive: Boolean(row.is_active),
+      status: row.status,
+    },
+    submissionCount,
+    openCount,
+    references,
+    referenceCount: references.length,
+    answerUrl: liffId
+      ? `https://liff.line.me/${liffId}/?page=form&id=${encodeURIComponent(row.id)}`
+      : null,
+    revision: row.revision,
+    checkedAt,
+    canDelete,
+    canArchive,
+    recommendedAction: canDelete ? 'delete' : canArchive ? 'archive' : 'none',
+    blockers,
+  };
+}
+
+/** 公開を止め、回答と利用先を残したまま一覧から保管へ移す。 */
+export async function archiveFormAtRevision(
+  db: D1Database,
+  id: string,
+  expectedRevision: number,
+): Promise<Form | null> {
+  const now = jstNow();
+  const result = await db.prepare(
+    `UPDATE forms
+        SET status = 'archived', is_active = 0, archived_at = ?, updated_at = ?, revision = revision + 1
+      WHERE id = ? AND status = 'active' AND revision = ?`,
+  ).bind(now, now, id, expectedRevision).run();
+  if ((result.meta?.changes ?? 0) !== 1) return null;
+  return getFormById(db, id, { includeArchived: true });
+}
+
+/** 回答・利用先が無く、非公開で、確認した版のままのときだけ物理削除する。 */
+export async function deleteFormAtRevision(
+  db: D1Database,
+  id: string,
+  expectedRevision: number,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `DELETE FROM forms
+      WHERE id = ?
+        AND status = 'active'
+        AND is_active = 0
+        AND revision = ?
+        AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE form_id = forms.id)
+        AND NOT EXISTS (SELECT 1 FROM form_opens WHERE form_id = forms.id)
+        AND NOT EXISTS (SELECT 1 FROM webinar_ctas WHERE form_id = forms.id)
+        AND NOT EXISTS (SELECT 1 FROM rich_menu_areas WHERE form_id = forms.id)`,
+  ).bind(id, expectedRevision).run();
+  return (result.meta?.changes ?? 0) === 1;
 }
 
 export interface CreateFormInput {
@@ -310,7 +478,8 @@ export async function updateForm(
            og_title = ?,
            og_description = ?,
            og_image_url = ?,
-           updated_at = ?
+           updated_at = ?,
+           revision = revision + 1
        WHERE id = ?`,
     )
     .bind(
@@ -350,16 +519,6 @@ export async function updateForm(
     .run();
 
   return getFormById(db, id);
-}
-
-export async function deleteForm(db: D1Database, id: string): Promise<void> {
-  // フォームを参照しているウェビナー CTA カードも同時に削除する。宙吊りの
-  // form_id が残ると、放置運用中のオートウェビナーでカードだけ出続けて
-  // 全タップがエラーになる (D1 は FK 未強制)。
-  await db.batch([
-    db.prepare(`DELETE FROM webinar_ctas WHERE form_id = ?`).bind(id),
-    db.prepare(`DELETE FROM forms WHERE id = ?`).bind(id),
-  ]);
 }
 
 // ── Submissions ───────────────────────────────────────────────────────────────

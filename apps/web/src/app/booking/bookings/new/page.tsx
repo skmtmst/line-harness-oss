@@ -14,6 +14,7 @@ import {
   type FriendListItem,
   type ProxyBookingResult,
 } from '@/lib/api'
+import { reminderScheduleLabels } from './proxy-booking-schedule'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
@@ -60,6 +61,10 @@ export default function NewProxyBookingPage() {
   const [error, setError] = useState('')
   const slotRequest = useRef(0)
 
+  const selectionKey = [selectedAccountId ?? '', friend?.id ?? '', menuId, staffId, date, time].join('\u001f')
+  const latestSelectionKey = useRef(selectionKey)
+  latestSelectionKey.current = selectionKey
+
   const menu = menus.find((item) => item.id === menuId) ?? null
   const selectedStaff = staff.find((item) => item.id === staffId) ?? null
 
@@ -72,6 +77,8 @@ export default function NewProxyBookingPage() {
     setDate('')
     setTime('')
     setResult(null)
+    setIdempotencyKey('')
+    setLoading(false)
     setError('')
   }, [selectedAccountId])
 
@@ -171,18 +178,46 @@ export default function NewProxyBookingPage() {
     return null
   }, [selectedAccountId, friend, menu, selectedStaff, date, time])
 
-  function review() {
+  async function review() {
     if (validation) {
       setError(validation)
       return
     }
+    if (!selectedAccountId || !menu || !selectedStaff || !date || !time) return
+    const requestKey = selectionKey
+    setLoading(true)
     setError('')
-    setIdempotencyKey(crypto.randomUUID())
-    setStep('confirm')
+    try {
+      // 入力時に見えた空き枠は、確認へ進むまでに別の予約で埋まることがある。
+      // 確認画面へ進む直前に同じ口を読み直し、古い空き枠を確定候補にしない。
+      const latest = await bookingApi.getAvailability(selectedAccountId, {
+        menuId: menu.id,
+        staffId: selectedStaff.id,
+        from: date,
+        to: date,
+      })
+      if (latestSelectionKey.current !== requestKey) return
+      const available = latest.by_staff
+        .find((item) => item.staff_id === selectedStaff.id)
+        ?.slots.some((slot) => slot.date === date && slot.start === time)
+      if (!available) {
+        setStep('conflict')
+        setError('選んだ時間は、ほかの予約で埋まりました')
+        return
+      }
+      setIdempotencyKey(crypto.randomUUID())
+      setStep('confirm')
+    } catch {
+      if (latestSelectionKey.current !== requestKey) return
+      setError('空き時間を再確認できませんでした。状態を読み直して、もう一度お試しください。')
+    } finally {
+      if (latestSelectionKey.current === requestKey) setLoading(false)
+    }
   }
 
   async function createBooking() {
     if (!selectedAccountId || !friend || !menu || !selectedStaff || !date || !time) return
+    const requestKey = selectionKey
     setLoading(true)
     setError('')
     try {
@@ -193,9 +228,11 @@ export default function NewProxyBookingPage() {
         starts_at: toUtcIso(date, time),
         customer_note: customerNote.trim() || undefined,
       }, idempotencyKey)
+      if (latestSelectionKey.current !== requestKey) return
       setResult(created)
       setStep('done')
     } catch (cause) {
+      if (latestSelectionKey.current !== requestKey) return
       if (
         cause instanceof ApiError
         && (cause.code === 'slot_conflict' || cause.code === 'slot_not_available')
@@ -206,7 +243,7 @@ export default function NewProxyBookingPage() {
         setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
     } finally {
-      setLoading(false)
+      if (latestSelectionKey.current === requestKey) setLoading(false)
     }
   }
 
@@ -333,6 +370,12 @@ export default function NewProxyBookingPage() {
               <Summary label="料金" value={yen(selectedStaff.price)} />
             </Card>
             <Card title="何を送るか"><Summary label="予約確認LINE" value="登録後に送信" /><Summary label="リマインダ" value="予約設定から計算" /></Card>
+            <p
+              data-booking-slot-check="available"
+              className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-sm"
+            >
+              この日時は、確認画面を開く直前に空きを再確認しました。
+            </p>
           </div>
           <div className="w-full xl:flex-none" style={{ maxWidth: 390 }}>
             <Card title="お客様に届く内容">
@@ -363,7 +406,11 @@ export default function NewProxyBookingPage() {
           </Card>
           <Card title="このあと自動で動くもの">
             <Summary label="予約確認LINE" value="送信処理を開始" />
-            <Summary label="リマインダの時刻" value="—（完了APIへの接続が必要）" />
+            <Summary
+              label="リマインダの時刻"
+              value={reminderScheduleLabels(date, time).join(' ／ ') || '今後の送信予定はありません'}
+            />
+            <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
           </Card>
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>予約の詳細を見る</Button>
@@ -376,9 +423,23 @@ export default function NewProxyBookingPage() {
         <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-30 flex items-center justify-center gap-2 border-t px-6 py-3">
           {step === 'confirm' && <Button onClick={() => setStep('input')}>予約入力に戻る</Button>}
           {step === 'input' ? (
-            <Button variant="primary" onClick={review}>予約内容を確認する</Button>
+            <Button
+              variant="primary"
+              disabled={loading}
+              data-qa-open="GFDqW"
+              onClick={() => void review()}
+            >
+              {loading ? '空きを再確認しています' : '予約内容を確認する'}
+            </Button>
           ) : (
-            <Button variant="primary" disabled={loading} onClick={() => void createBooking()}>{loading ? '登録中です' : 'この内容で予約を入れる'}</Button>
+            <Button
+              variant="primary"
+              disabled={loading}
+              data-qa-open="GfceK"
+              onClick={() => void createBooking()}
+            >
+              {loading ? '登録中です' : 'この内容で予約を入れる'}
+            </Button>
           )}
         </div>
       )}
