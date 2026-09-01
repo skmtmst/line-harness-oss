@@ -314,38 +314,18 @@ function WebhooksPageInner() {
   const endpointUrl = (id: string) =>
     `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/incoming/${id}/receive`
   const activeStatus = tab === 'incoming' ? incomingStatus : outgoingStatus
-  const activeLabel = tab === 'incoming' ? '受信Webhook' : '送信Webhook'
+  const activeLabel = tab === 'incoming' ? 'こちらで受け取る設定' : 'こちらから送る設定'
 
   return (
     <div>
       <div data-design="Head">
         <Header
           title="外部連携"
-          description="受信・送信のWebhookと、SlackやメールへのSlack通知をまとめて設定します。どれも「外部とやりとりする設定」です。"
+          description="外部サービスから受け取る情報と、外部サービスへ送る通知を設定します。"
           action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              {/* 通知先（Slack・メール）の設定はこの画面に無い。 */}
-              <button
-                disabled
-                title="通知先の追加は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                通知先を追加
-              </button>
-              <button
-                onClick={() => setShowCreate(!showCreate)}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {showCreate ? 'キャンセル' : 'Webhookを追加'}
-              </button>
-            </div>
+            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+              {showCreate ? 'キャンセル' : 'Webhookを追加'}
+            </Button>
           }
         />
       </div>
@@ -457,7 +437,7 @@ function WebhooksPageInner() {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          受信 (Incoming)
+          こちらで受け取る
         </button>
         <button
           onClick={() => { setTab('outgoing'); setShowCreate(false) }}
@@ -467,14 +447,14 @@ function WebhooksPageInner() {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          送信 (Outgoing)
+          こちらから送る
         </button>
       </div>
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
         <form onSubmit={handleCreateIncoming} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">受信Webhook作成</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
@@ -533,7 +513,7 @@ function WebhooksPageInner() {
 
       {showCreate && tab === 'outgoing' && (
         <form onSubmit={handleCreateOutgoing} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">送信Webhook作成</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">送る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
@@ -637,7 +617,7 @@ function WebhooksPageInner() {
         /* Incoming table */
         incoming.length === 0 && !showCreate ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">受信Webhookがありません。「新規Webhook」から作成してください。</p>
+            <p className="text-gray-500">こちらで受け取る設定はまだありません。「Webhookを追加」から作成してください。</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -725,7 +705,7 @@ function WebhooksPageInner() {
         /* Outgoing table */
         outgoing.length === 0 && !showCreate ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">送信Webhookがありません。「新規Webhook」から作成してください。</p>
+            <p className="text-gray-500">こちらから送る設定はまだありません。「Webhookを追加」から作成してください。</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

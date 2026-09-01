@@ -410,8 +410,6 @@
     "direct-secondary-button": 1
   },
   "app/webhooks/page.tsx": {
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1,
     "arbitrary-value": 6,
     "direct-th": 15
   },
