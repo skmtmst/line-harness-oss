@@ -112,6 +112,16 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('setItems([])')
   })
 
+  it('使用人数を取得できない項目を0人として削除しない', () => {
+    const source = read('components/friend-fields/field-list.tsx')
+    expect(source).toContain('function knownUsageCount(field: FriendField)')
+    expect(source).toContain('function fieldDeletionBlockedReason(field: FriendField)')
+    expect(source).toContain('使用人数を確認できないため削除できません。再読み込みしてください。')
+    expect(source).toContain('disabled={fieldDeletionBlockedReason(field) !== null}')
+    expect(source).toContain('const blockedReason = fieldDeletionBlockedReason(field)')
+    expect(source).not.toContain('disabled={(field.usageCount ?? 0) > 0}')
+  })
+
   it('友だち属性ではブラウザ標準confirmを使わない', () => {
     const sources = [
       read('components/friend-fields/tags-page-v4.tsx'),

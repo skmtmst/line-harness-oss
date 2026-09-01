@@ -33,6 +33,19 @@ function destinationLabel(field: FriendField): string {
   return places.join('・')
 }
 
+function knownUsageCount(field: FriendField): number | null {
+  return typeof field.usageCount === 'number' && Number.isFinite(field.usageCount) && field.usageCount >= 0
+    ? field.usageCount
+    : null
+}
+
+function fieldDeletionBlockedReason(field: FriendField): string | null {
+  const usageCount = knownUsageCount(field)
+  if (usageCount === null) return '使用人数を確認できないため削除できません。再読み込みしてください。'
+  if (usageCount > 0) return '値が入っているため、先に項目を移行してください'
+  return null
+}
+
 /** ★V6 `HBTk0` 友だち情報欄一覧。 */
 export default function FriendFieldList({ accountId }: { accountId: string | null }) {
   const [items, setItems] = useState<FriendField[]>([])
@@ -92,6 +105,11 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
 
   const remove = async (field: FriendField) => {
     if (!accountId) return
+    const blockedReason = fieldDeletionBlockedReason(field)
+    if (blockedReason) {
+      setError(blockedReason)
+      return
+    }
     setError('')
     try { await api.friendFields.delete(field.id, accountId); await load() }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : '削除できませんでした') }
@@ -136,12 +154,12 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                   <td draggable={!field.isInherited} onDragStart={() => setDragId(field.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(field.id)} className={`${field.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} title={field.isInherited ? '共通項目は移行後に並び替えできます' : 'ドラッグして並び替え'}><GripVertical size={16} aria-hidden="true" /></td>
                   <td className="px-3 py-3"><p className="truncate font-semibold text-accent" title={field.name}>{field.name}</p><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
                   <td className="px-3 py-3 text-ink">{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
-                  <td className="px-3 py-3 tabular-nums text-ink">{field.usageCount ?? '—'}{field.usageCount === undefined ? '' : '人'}</td>
+                  <td className="px-3 py-3 tabular-nums text-ink">{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
                   <td className="px-3 py-3 text-ink-faint" title="回答フォームにアカウント所属が付くまで件数は出しません">—</td>
                   <td className="truncate px-3 py-3 text-ink" title={destinationLabel(field)}>{destinationLabel(field)}</td>
                   <td className="px-3 py-3 text-center"><div className="flex items-center justify-center gap-2">
-                    {(field.usageCount ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
-                    {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={(field.usageCount ?? 0) > 0} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={(field.usageCount ?? 0) > 0 ? '値が入っているため、先に項目を移行してください' : '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
+                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
+                    {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={fieldDeletionBlockedReason(field) !== null} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={fieldDeletionBlockedReason(field) ?? '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
                   </div></td>
                 </tr>)}
           </tbody>
