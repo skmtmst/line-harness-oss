@@ -22,7 +22,7 @@ describe('V6 NEN配信の運用者向け文言契約', () => {
     expect(PAGE).toContain("scheduled: '予約ずみ'")
     expect(PAGE).toContain("queued: '配信待ち'")
     expect(PAGE).toContain("sent: '出したもの'")
-    expect(PAGE).toContain('{columnDeliveryStatusLabel[column.deliveryStatus]}')
+    expect(PAGE).toContain("{columnDeliveryStatusLabel[column.deliveryStatus] ?? '—'}")
     expect(PAGE).not.toContain('{column.deliveryStatus}</span>')
   })
 })

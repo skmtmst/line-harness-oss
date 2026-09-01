@@ -440,7 +440,7 @@ export default function NenCampaignsPage() {
               <article key={column.id} className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[180px_1fr] sm:p-5">
                 {column.imageUrl ? <img src={column.imageUrl} alt="" className="aspect-[3/2] w-full rounded-xl object-cover" /> : <div className="aspect-[3/2] rounded-xl bg-gray-100" />}
                 <div>
-                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{columnDeliveryStatusLabel[column.deliveryStatus]}</span></div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{columnDeliveryStatusLabel[column.deliveryStatus] ?? '—'}</span></div>
                   <h3 className="mt-2 text-lg font-bold text-gray-900">{column.title}</h3>
                   <p className="mt-1 text-sm leading-6 text-gray-600">{column.excerpt}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
