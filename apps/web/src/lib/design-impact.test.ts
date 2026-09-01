@@ -14,6 +14,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
+      'app/auto-replies/page.tsx',
       'app/automations/page.tsx',
       'app/booking/bookings/new/page.tsx',
       'app/booking/menus/page.tsx',

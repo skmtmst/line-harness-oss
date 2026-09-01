@@ -20,7 +20,7 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 /** 一覧の画面と、そこに出る「1件も無い」の文（の一部）。 */
 const PAGES = [
   { file: 'reminders/page.tsx', empty: 'リマインダがありません' },
-  { file: 'auto-replies/page.tsx', empty: '自動返信ルールがありません' },
+  { file: 'auto-replies/page.tsx', empty: '自動応答は0件です' },
   { file: 'broadcasts/page.tsx', empty: '配信がありません' },
 ];
 
