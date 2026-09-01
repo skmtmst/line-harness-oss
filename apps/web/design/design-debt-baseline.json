@@ -171,6 +171,9 @@
     "direct-secondary-button": 3,
     "unresolved-classname": 1
   },
+  "app/friend-add-settings/publish/page.tsx": {
+    "unresolved-classname": 45
+  },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 4,
     "arbitrary-value": 5,
