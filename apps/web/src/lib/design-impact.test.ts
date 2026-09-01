@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする74ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする75ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -68,6 +68,7 @@ describe('共通部品の影響範囲', () => {
       'app/webhooks/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webinars/edit/page.tsx',
+      'components/auto-replies/edit-dialog.tsx',
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
       'components/broadcasts/segment-preset-controls.tsx',
