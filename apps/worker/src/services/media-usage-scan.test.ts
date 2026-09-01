@@ -6,7 +6,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-const { scanMediaUsage } = await import('./media-usage-scan.js');
+const { scanMediaUsage, scanSingleMediaUsage } = await import('./media-usage-scan.js');
 
 /**
  * 走査のモック。
@@ -117,5 +117,36 @@ describe('使用箇所の走査', () => {
       '2026-08-16T00:00:00.000',
       [],
     );
+  });
+});
+
+describe('削除直前の厳密な走査', () => {
+  it('7種類を全部読めた後だけ記録と整理を行う', async () => {
+    const item = { id: 'md-1', r2_key: 'media/a.png' };
+    const db = makeDb([item], { templates: ['tpl-1'] });
+
+    const result = await scanSingleMediaUsage(db, '2026-08-16T00:00:00.000', item);
+
+    expect(result).toEqual({ scanned: 1, matched: 1, pruned: 0 });
+    expect(dbMocks.recordMediaUsage).toHaveBeenCalledWith(
+      db,
+      { mediaId: 'md-1', refKind: 'template', refId: 'tpl-1' },
+    );
+    expect(dbMocks.pruneStaleMediaUsages).toHaveBeenCalledWith(
+      db,
+      '2026-08-16T00:00:00.000',
+      ['md-1'],
+    );
+  });
+
+  it('1種類でも読めなければ0件にせず、記録も整理もしない', async () => {
+    const item = { id: 'md-1', r2_key: 'media/a.png' };
+    const db = makeDb([item], { templates: ['tpl-1'] }, ['webinars']);
+
+    await expect(
+      scanSingleMediaUsage(db, '2026-08-16T00:00:00.000', item),
+    ).rejects.toThrow('no such table: webinars');
+    expect(dbMocks.recordMediaUsage).not.toHaveBeenCalled();
+    expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
   });
 });

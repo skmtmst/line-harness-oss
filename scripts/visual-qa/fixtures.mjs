@@ -365,6 +365,65 @@ export const FRIENDS = [
 ]
 
 /**
+ * 機能15 `YfTfJ` の登録メディアと削除影響。
+ *
+ * 使用先の名前はすべて作り物。内部IDは画面に出さず、hrefの中だけで使う。
+ * 通常・0件・失敗を同じ契約から撮れるよう、形を分けて固定してある。
+ */
+export const MEDIA_ITEMS = [
+  {
+    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'image', filename: '来店後のご案内.png', mimeType: 'image/png',
+    sizeBytes: 245760, width: 1040, height: 1040, durationMs: null,
+    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23e7f7ef"/></svg>',
+    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-31T09:00:00.000Z', usageCount: 2,
+  },
+  {
+    id: 'media-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'image', filename: '未使用の案内.png', mimeType: 'image/png',
+    sizeBytes: 102400, width: 1040, height: 1040, durationMs: null,
+    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23f4f5f4"/></svg>',
+    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-30T09:00:00.000Z', usageCount: 0,
+  },
+]
+
+export const MEDIA_DELETE_IMPACT = {
+  media: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
+  usageCount: 2,
+  references: [
+    {
+      kind: 'broadcast', name: '8月のお知らせ',
+      href: '/broadcasts/detail?id=broadcast-visual', state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000Z',
+    },
+    {
+      kind: 'scenario_step', name: '来店後シナリオ・1通目',
+      href: '/scenarios/detail?id=scenario-visual', state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000Z',
+    },
+  ],
+  checkedAt: '2026-08-31T10:00:00.000Z',
+  lastScannedAt: '2026-08-31T10:00:00.000Z',
+  canDelete: false,
+  recommendedAction: 'review_references',
+}
+
+export const MEDIA_DELETE_IMPACT_EMPTY = {
+  media: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  usageCount: 0,
+  references: [],
+  checkedAt: '2026-08-31T10:00:00.000Z',
+  lastScannedAt: null,
+  canDelete: true,
+  recommendedAction: 'delete',
+}
+
+export const MEDIA_DELETE_IMPACT_ERROR = {
+  success: false,
+  error: '削除したときの影響を確認できませんでした',
+}
+
+/**
  * `GET /api/rich-menu-groups/:id/delete-impact` の正本形。
  *
  * Claude は szXsT の通常・0件・失敗を撮るとき、この3つをそのまま使う。

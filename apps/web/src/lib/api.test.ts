@@ -165,6 +165,10 @@ describe('extractApiErrorCode', () => {
       code: 'rich_menu_delete_blocked',
       error: '削除する前に確認してください',
     }))).toBe('rich_menu_delete_blocked')
+    expect(extractApiErrorCode(JSON.stringify({
+      code: 'media_delete_blocked',
+      error: '先に使用先から外してください',
+    }))).toBe('media_delete_blocked')
   })
 
   it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
@@ -180,6 +184,8 @@ describe('extractApiErrorData', () => {
   it('409の最新状態を機械処理用に保持し、JSON以外は捨てる', () => {
     const impact = { canDelete: false, blockers: ['incoming_switches'] }
     expect(extractApiErrorData(JSON.stringify({ data: impact }))).toEqual(impact)
+    const mediaImpact = { usageCount: 2, canDelete: false }
+    expect(extractApiErrorData(JSON.stringify({ data: mediaImpact }))).toEqual(mediaImpact)
     expect(extractApiErrorData('<html>proxy error</html>')).toBeUndefined()
   })
 })
@@ -214,6 +220,31 @@ describe('fetchApi error response', () => {
       status: 400,
     })
     expect(new ApiError(401).message).toBe('API error: 401')
+  })
+
+  it('メディア削除409の最新影響を保持しても本文は利用者向けメッセージにしない', async () => {
+    const impact = {
+      usageCount: 2,
+      canDelete: false,
+      references: [{ name: '8月のお知らせ', state: 'available' }],
+    }
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        success: false,
+        code: 'media_delete_blocked',
+        error: 'このファイルは2か所で使われています。先に使用先から外してください。',
+        data: impact,
+      }), { status: 409 }),
+    ))
+
+    await expect(fetchApi('/api/media/media-1?accountId=account-1', { method: 'DELETE' }))
+      .rejects.toMatchObject({
+        name: 'ApiError',
+        status: 409,
+        code: 'media_delete_blocked',
+        message: 'API error: 409',
+        data: impact,
+      })
   })
 
   it('予期しない本文は表示せず status にフォールバックする', async () => {

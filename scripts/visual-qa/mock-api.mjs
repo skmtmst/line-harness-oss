@@ -20,6 +20,9 @@
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  MEDIA_DELETE_IMPACT,
+  MEDIA_DELETE_IMPACT_EMPTY,
+  MEDIA_ITEMS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
@@ -296,6 +299,7 @@ const SHAPES = {
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
+  '/api/media': MEDIA_ITEMS,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },
@@ -507,6 +511,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (mediaDeleteImpact) {
+    const impact = mediaDeleteImpact[1] === MEDIA_DELETE_IMPACT_EMPTY.media.id
+      ? MEDIA_DELETE_IMPACT_EMPTY
+      : MEDIA_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)
   if (richMenuDeleteImpact) {

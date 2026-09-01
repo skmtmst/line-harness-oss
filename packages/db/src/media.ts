@@ -1,3 +1,8 @@
+import type {
+  MediaDeleteImpact,
+  MediaDeleteImpactReference,
+  MediaDeleteImpactReferenceKind,
+} from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
 const LOOKUP_CHUNK = 90;
@@ -181,6 +186,154 @@ export async function countMediaUsages(db: D1Database, mediaId: string): Promise
     .bind(mediaId)
     .first<{ c: number }>();
   return Number(row?.c ?? 0);
+}
+
+type NamedReference = {
+  name: string;
+  account_id: string | null;
+  account_ids?: string | null;
+  owner_id?: string | null;
+};
+
+function belongsToAccount(row: NamedReference, lineAccountId: string): boolean {
+  if (row.account_id === lineAccountId) return true;
+  if (!row.account_ids) return false;
+  try {
+    const ids = JSON.parse(row.account_ids) as unknown;
+    return Array.isArray(ids) && ids.includes(lineAccountId);
+  } catch {
+    // 壊れたJSONを「このアカウントのもの」と推測して見せない。
+    return false;
+  }
+}
+
+async function describeMediaUsage(
+  db: D1Database,
+  usage: MediaUsage,
+  lineAccountId: string,
+): Promise<MediaDeleteImpactReference> {
+  let row: NamedReference | null = null;
+  let href: string | null = null;
+
+  switch (usage.ref_kind as MediaDeleteImpactReferenceKind) {
+    case 'template':
+      row = await db.prepare(
+        `SELECT name, line_account_id AS account_id FROM templates WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) {
+        href = `/templates/edit?id=${encodeURIComponent(usage.ref_id)}`;
+      }
+      break;
+    case 'broadcast':
+      row = await db.prepare(
+        `SELECT title AS name, line_account_id AS account_id, account_ids
+           FROM broadcasts WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) {
+        href = `/broadcasts/detail?id=${encodeURIComponent(usage.ref_id)}`;
+      }
+      break;
+    case 'rich_menu':
+      row = await db.prepare(
+        `SELECT g.name || '・' || p.name AS name, g.account_id AS account_id,
+                g.id AS owner_id
+           FROM rich_menu_pages p
+           JOIN rich_menu_groups g ON g.id = p.group_id
+          WHERE p.id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && row.owner_id && belongsToAccount(row, lineAccountId)) {
+        href = `/rich-menus/edit?id=${encodeURIComponent(row.owner_id)}`;
+      }
+      break;
+    case 'scenario_step':
+      row = await db.prepare(
+        `SELECT s.name || '・' || (ss.step_order + 1) || '通目' AS name,
+                s.line_account_id AS account_id, s.id AS owner_id
+           FROM scenario_steps ss
+           JOIN scenarios s ON s.id = ss.scenario_id
+          WHERE ss.id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && row.owner_id && belongsToAccount(row, lineAccountId)) {
+        href = `/scenarios/detail?id=${encodeURIComponent(row.owner_id)}`;
+      }
+      break;
+    case 'nen_column':
+      row = await db.prepare(
+        `SELECT title AS name, line_account_id AS account_id FROM nen_columns WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) href = '/nen-campaigns?tab=columns';
+      break;
+    case 'event':
+      row = await db.prepare(
+        `SELECT name, line_account_id AS account_id, account_ids FROM events WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) {
+        href = `/events/edit?id=${encodeURIComponent(usage.ref_id)}`;
+      }
+      break;
+    case 'webinar':
+      row = await db.prepare(
+        `SELECT title AS name, account_id FROM webinars WHERE id = ?`,
+      ).bind(usage.ref_id).first<NamedReference>();
+      if (row && belongsToAccount(row, lineAccountId)) {
+        href = `/webinars/edit?id=${encodeURIComponent(usage.ref_id)}`;
+      }
+      break;
+    default:
+      // DBのCHECKに無い値も、詳細不明の参照として削除を止める。
+      break;
+  }
+
+  const available = row !== null && belongsToAccount(row, lineAccountId);
+  return {
+    kind: usage.ref_kind as MediaDeleteImpactReferenceKind,
+    name: available ? row?.name ?? null : null,
+    href: available ? href : null,
+    state: available ? 'available' : 'unavailable',
+    scannedAt: usage.scanned_at,
+  };
+}
+
+/**
+ * 登録メディアを消す直前の影響。
+ *
+ * `media_usages` を件数だけでなく現在の各台帳へ照合する。参照先が消えていたり
+ * 別アカウントだったりして名前を安全に返せない場合も、その参照自体は落とさず
+ * unavailable として削除を止める。
+ */
+export async function getMediaDeleteImpact(
+  db: D1Database,
+  mediaId: string,
+  lineAccountId: string,
+  checkedAt: string,
+): Promise<MediaDeleteImpact | null> {
+  const media = await getMediaById(db, mediaId, lineAccountId);
+  if (!media) return null;
+
+  const usages = await getMediaUsages(db, mediaId);
+  const references = await Promise.all(
+    usages.map((usage) => describeMediaUsage(db, usage, lineAccountId)),
+  );
+  const lastScannedAt = references.reduce<string | null>(
+    (latest, reference) => latest === null || reference.scannedAt > latest
+      ? reference.scannedAt
+      : latest,
+    null,
+  );
+
+  return {
+    media: {
+      id: media.id,
+      filename: media.filename,
+      kind: media.kind as MediaDeleteImpact['media']['kind'],
+    },
+    usageCount: references.length,
+    references,
+    checkedAt,
+    lastScannedAt,
+    canDelete: references.length === 0,
+    recommendedAction: references.length === 0 ? 'delete' : 'review_references',
+  };
 }
 
 export async function recordMediaUsage(
