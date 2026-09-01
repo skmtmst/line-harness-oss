@@ -315,6 +315,7 @@ export interface MediaDeleteImpact {
 /** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
 export interface CommonVar {
   id: string;
+  lineAccountId: string | null;
   folderId: string | null;
   name: string;
   varKey: string;
@@ -322,6 +323,11 @@ export interface CommonVar {
   value: string;
   createdAt: string;
   updatedAt: string;
+  nextSchedule?: {
+    effectiveFrom: string;
+    value: string;
+  } | null;
+  pendingScheduleCount?: number;
 }
 
 /** 共通情報の日付での切り替え予約 */

@@ -1,14 +1,16 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { CommonVar, CommonVarSchedule, Folder } from '@line-crm/shared'
+import type { CommonVar, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
 import FolderPanel from '@/components/shared/folder-panel'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 共通情報の一覧。
@@ -26,13 +28,14 @@ const UNGROUPED = '__ungrouped__'
 const PER_PAGE = 20
 
 function VarsPageInner() {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
   const router = useRouter()
   const params = useSearchParams()
 
   const [items, setItems] = useState<CommonVar[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
-  /** 変数ID → まだ反映されていない予約。列に出すためだけに持つ。 */
-  const [schedules, setSchedules] = useState<Record<string, CommonVarSchedule[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -52,25 +55,33 @@ function VarsPageInner() {
   const [savingFolder, setSavingFolder] = useState(false)
 
   const load = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setItems([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const [vars, folderList] = await Promise.all([
-        api.commonVars.list(),
+        api.commonVars.list(accountAtRequest),
         api.folders.list('common_var'),
       ])
+      if (accountAtRequest !== latestAccountRef.current) return
       if (vars.success) setItems(vars.data)
       if (folderList.success) setFolders(folderList.data)
     } catch {
-      setError('読み込みに失敗しました')
+      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
+    if (accountLoading) return
     void load()
-  }, [load])
+  }, [accountLoading, load])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -96,33 +107,6 @@ function VarsPageInner() {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
-  /*
-   * 予約は変数ごとに別のURLで取る（/api/common-vars/:id/schedules）。
-   * まとめて返す口が無いので、いま画面に出ている分だけ取りに行く。
-   * 全件ぶんを先に取ると、100件あるアカウントで100回叩くことになる。
-   */
-  useEffect(() => {
-    let alive = true
-    const missing = current.filter((item) => !(item.id in schedules))
-    if (missing.length === 0) return
-    void Promise.all(
-      missing.map(async (item) => {
-        try {
-          const res = await api.commonVars.schedules(item.id)
-          return [item.id, res.success ? res.data : []] as const
-        } catch {
-          return [item.id, [] as CommonVarSchedule[]] as const
-        }
-      }),
-    ).then((pairs) => {
-      if (!alive) return
-      setSchedules((prev) => ({ ...prev, ...Object.fromEntries(pairs) }))
-    })
-    return () => {
-      alive = false
-    }
-  }, [current, schedules])
-
   const addFolder = async () => {
     const name = folderName.trim()
     if (!name || savingFolder) return
@@ -145,17 +129,34 @@ function VarsPageInner() {
   }
 
   const removeSelected = async () => {
-    if (selected.size === 0) return
+    if (selected.size === 0 || !selectedAccountId) return
+    setError('')
+    try {
+      const impacts = await Promise.all(
+        [...selected].map(async (id) => {
+          const response = await api.commonVars.deleteImpact(id, selectedAccountId)
+          if (!response.success) throw new Error(response.error)
+          return { id, impact: response.data }
+        }),
+      )
+      const blocked = impacts.filter(({ impact }) => !impact.canDelete)
+      if (blocked.length > 0) {
+        const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
+        setError(`${blocked.length}件は、合計${references}か所で使用中のため削除できません。`)
+        return
+      }
+    } catch {
+      setError('使用先を確認できないため削除できません。もう一度お試しください。')
+      return
+    }
     if (
       !confirm(
-        `${selected.size}件の共通情報を削除しますか？\n` +
-          'テンプレートに差し込みが残っていると、その部分が空になります。',
+        `${selected.size}件の未使用の共通情報を削除しますか？\nこの操作は取り消せません。`,
       )
     )
       return
-    setError('')
     try {
-      for (const id of selected) await api.commonVars.delete(id)
+      for (const id of selected) await api.commonVars.delete(id, selectedAccountId)
       setSelected(new Set())
       void load()
     } catch {
@@ -174,23 +175,10 @@ function VarsPageInner() {
   const allOnPageSelected = current.length > 0 && current.every((item) => selected.has(item.id))
 
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="共通情報"
-          description="「会社名」「営業時間」といったアカウント内で共通に使う情報を登録します。テンプレートなどに差し込めるので、変えるときは1か所で済みます。"
-          action={
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-          }
-        />
-      </div>
-
+    <div data-design-node="WuKzU">
+      {!selectedAccountId && !accountLoading && (
+        <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
+      )}
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
@@ -269,22 +257,8 @@ function VarsPageInner() {
 
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <Link
-              href="/contents/vars/new"
-              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
-            >
-              ＋ 新しい共通情報
-            </Link>
+            <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
             <div className="flex flex-wrap items-center gap-2">
-              {/* 並べ替えの順番を保存する列が common_vars に無い。押せる形で
-                  出すと、並べても次に開いたときに戻る。 */}
-              <button
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-              >
-                ⇅ 並び替え
-              </button>
               <input
                 type="search"
                 value={query}
@@ -339,20 +313,29 @@ function VarsPageInner() {
                   {loading ? (
                     <tr>
                       <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
-                        読み込み中...
+                        <ListState kind="loading" title="共通情報を読み込んでいます" />
                       </td>
                     </tr>
                   ) : current.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
-                        {items.length === 0
-                          ? '共通情報が作成されていません'
-                          : 'この条件に合う共通情報はありません'}
+                        <ListState
+                          kind="empty"
+                          title={items.length === 0
+                            ? 'まだ共通情報がありません'
+                            : '条件に合う共通情報はありません'}
+                          description={items.length === 0
+                            ? '何度も使う営業時間や会社名を登録できます。'
+                            : '検索語やフォルダを変えてください。'}
+                          action={items.length === 0
+                            ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
+                            : undefined}
+                        />
                       </td>
                     </tr>
                   ) : (
                     current.map((item) => {
-                      const pending = (schedules[item.id] ?? []).filter((s) => !s.appliedAt)
+                      const pending = item.nextSchedule
                       return (
                         <tr key={item.id} className="hover:bg-canvas-sunken">
                           <td className="px-3 py-3">
@@ -384,14 +367,14 @@ function VarsPageInner() {
                             {item.value || <span className="text-ink-faint">（空）</span>}
                           </td>
                           <td className="text-ink-secondary px-4 py-3 text-xs">
-                            {pending.length === 0 ? (
+                            {!pending ? (
                               <span className="text-ink-faint">—</span>
                             ) : (
                               <>
-                                {formatStamp(pending[0].effectiveFrom)} から
-                                <span className="text-ink-faint"> → {pending[0].value || '（空）'}</span>
-                                {pending.length > 1 && (
-                                  <span className="text-ink-faint"> ほか{pending.length - 1}件</span>
+                                {formatStamp(pending.effectiveFrom)} から
+                                <span className="text-ink-faint"> → {pending.value || '（空）'}</span>
+                                {(item.pendingScheduleCount ?? 0) > 1 && (
+                                  <span className="text-ink-faint"> ほか{(item.pendingScheduleCount ?? 1) - 1}件</span>
                                 )}
                               </>
                             )}

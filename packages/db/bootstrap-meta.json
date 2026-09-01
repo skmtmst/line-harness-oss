@@ -205,6 +205,7 @@
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
     "198_form_account_scope.sql",
+    "199_common_var_account_scope.sql",
     "200_nen_delivery_snapshot_safety.sql",
     "201_nen_photo_publication_consent.sql",
     "202_ec_event_account_and_identity.sql",
@@ -219,5 +220,5 @@
     "258_merged_people_detail.sql",
     "261_media_account_scope.sql"
   ],
-  "migrationCount": 218
+  "migrationCount": 219
 }

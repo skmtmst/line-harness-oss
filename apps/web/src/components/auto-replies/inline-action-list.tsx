@@ -53,7 +53,7 @@ export function useActionOptions(): ActionOptions {
         api.friendFields.list(),
         api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
-        api.commonVars.list(),
+        api.commonVars.list(selectedAccountId),
       ])
       if (cancelled) return
       setOptions({

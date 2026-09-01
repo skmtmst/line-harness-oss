@@ -2384,26 +2384,33 @@
       ]
     },
     "/contents/vars": {
-      "node": "S20UY",
-      "name": "V2 5-2 共通情報",
-      "sections": [
-        "Head"
-      ],
+      "node": "WuKzU",
+      "name": "V6 14-1 共通情報",
+      "sections": [],
       "parts": [
-        "共通情報",
-        "「会社名」「営業時間」といったアカウント内で共通に使う情報を登録します。",
-        "マニュアル",
         "新しいフォルダ",
-        "新しい共通情報",
-        "並び替え",
+        "共通情報を作る",
         "フォルダ",
         "未分類",
         "共通情報名",
         "種別",
         "スケジュール",
-        "共通情報が作成されていません",
+        "まだ共通情報がありません",
+        "条件に合う共通情報はありません",
         "選択した共通情報を削除"
-      ]
+      ],
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "WuKzU",
+          "yPkWe"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Claudeの設計画像・実装画像比較待ち"
+      }
     },
     "/automations/new": {
       "node": "kwnUH",

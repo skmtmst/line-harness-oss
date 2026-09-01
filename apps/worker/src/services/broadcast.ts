@@ -86,7 +86,7 @@ async function broadcastWideContext(
   // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
   if (/\{\{\s*var\./.test(content)) {
     const { getCommonVarMap } = await import('@line-crm/db');
-    context.vars = await getCommonVarMap(db);
+    context.vars = await getCommonVarMap(db, accountId);
   }
   return context;
 }
