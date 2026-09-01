@@ -38,6 +38,14 @@ describe('V6 一斉配信の予約完了', () => {
     expect(PAGE).toContain('選択中のアカウントの配信ではありません')
   })
 
+  it('遲れて返った別の予約の結果で画面を上書きしない', () => {
+    expect(PAGE).toContain('const requestGeneration = useRef(0)')
+    expect(PAGE).toContain('requestGeneration.current === generation')
+    expect(PAGE).toContain('if (!isCurrent()) return')
+    expect(PAGE).toContain('requestGeneration.current += 1')
+    expect(PAGE).toContain('if (isCurrent()) setLoading(false)')
+  })
+
   it('送信時に再集計することを明記する', () => {
     expect(PAGE).toContain('送信を始める直前に同じ条件でもう一度数えます')
     expect(PAGE).toContain('現在の見込み')

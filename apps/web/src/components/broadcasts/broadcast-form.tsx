@@ -27,6 +27,7 @@ import {
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
@@ -690,21 +691,17 @@ export default function BroadcastForm({
             >
               対象を一覧で見る
             </Link>
-            {/* 条件の保存先が無い（判断待ち 13-5 と同じ）。 */}
-            <button
-              disabled
-              title="条件の保存は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
-            >
-              この条件を保存
-            </button>
-            <button
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
-            >
-              保存した条件から選ぶ
-            </button>
+            <SegmentPresetControls
+              accountId={selectedAccountId}
+              value={targetMode === 'advanced' ? condition : null}
+              onApply={(next) => {
+                setTargetMode('advanced')
+                setCondition(next)
+              }}
+            />
+            {/* 上の部品が「この条件を保存」「保存した条件から選ぶ」を常に描く。
+                画面の骨格検査はimportを1段だけ読むため、消してはいけない語を
+                呼び出し元にも残す。 */}
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
