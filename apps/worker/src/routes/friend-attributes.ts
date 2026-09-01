@@ -1,12 +1,10 @@
 import { Hono, type Context } from 'hono';
 import {
-  getSupportMarks,
+  getSupportMarksWithUsage,
   getSupportMarkById,
   createSupportMark,
   updateSupportMark,
-  deleteSupportMark,
-  replaceAndDeleteSupportMark,
-  countFriendsWithMark,
+  replaceAndArchiveSupportMark,
   getDefaultSupportMark,
   setFriendSupportMark,
   setFriendSupportMarkBulk,
@@ -16,6 +14,7 @@ import {
   updateSavedSearch,
   deleteSavedSearch,
   countSavedSearches,
+  getSavedSearchReferences,
   validateSearchConditions,
   SAVED_SEARCH_LIMIT,
   getLoginAudit,
@@ -30,15 +29,21 @@ import {
   deleteFolder,
   isFolderKind,
   type SupportMark,
+  type SupportMarkWithUsage,
   type SupportMarkScope,
   type SavedSearch,
   type SavedSearchAccess,
+  type SavedSearchReference,
   type Folder,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  getSavedSearchMatchInsights,
+  type SavedSearchMatchInsight,
+} from '../services/saved-search-insights.js';
 
 /**
  * 対応マーク・保存した検索・汎用フォルダ。
@@ -61,6 +66,41 @@ function serializeMark(row: SupportMark) {
   };
 }
 
+function serializeMarkImpact(row: SupportMarkWithUsage) {
+  return {
+    friendCount: Number(row.friend_count),
+    usedIn: {
+      broadcasts: Number(row.broadcasts),
+      scenarios: Number(row.scenarios),
+      autoReplies: Number(row.auto_replies),
+      savedSearches: Number(row.saved_searches),
+      automations: Number(row.automations),
+    },
+  };
+}
+
+function markReferenceCount(row: SupportMarkWithUsage): number {
+  return Number(row.broadcasts)
+    + Number(row.scenarios)
+    + Number(row.auto_replies)
+    + Number(row.saved_searches)
+    + Number(row.automations);
+}
+
+function sameMarkImpact(
+  expected: unknown,
+  current: ReturnType<typeof serializeMarkImpact>,
+): boolean {
+  if (!expected || typeof expected !== 'object') return false;
+  const value = expected as { friendCount?: unknown; usedIn?: Record<string, unknown> };
+  return Number(value.friendCount) === current.friendCount
+    && Number(value.usedIn?.broadcasts) === current.usedIn.broadcasts
+    && Number(value.usedIn?.scenarios) === current.usedIn.scenarios
+    && Number(value.usedIn?.autoReplies) === current.usedIn.autoReplies
+    && Number(value.usedIn?.savedSearches) === current.usedIn.savedSearches
+    && Number(value.usedIn?.automations) === current.usedIn.automations;
+}
+
 async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
@@ -78,7 +118,11 @@ async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Re
   return { tenantId: staff.tenantId, lineAccountId };
 }
 
-function serializeSearch(row: SavedSearch) {
+function serializeSearch(
+  row: SavedSearch,
+  insight: SavedSearchMatchInsight = { matchCount: null, matchCountError: null },
+  references: SavedSearchReference[] = [],
+) {
   return {
     id: row.id,
     name: row.name,
@@ -89,6 +133,16 @@ function serializeSearch(row: SavedSearch) {
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
     createdAt: row.created_at,
+    matchCount: insight.matchCount,
+    matchCountError: insight.matchCountError,
+    usedIn: references.map((reference) => ({
+      kind: reference.reference_kind,
+      id: reference.reference_id,
+      name: reference.reference_name,
+      mode: reference.reference_mode,
+      lastUsedAt: reference.last_used_at,
+    })),
+    canDelete: references.length === 0,
   };
 }
 
@@ -148,15 +202,18 @@ friendAttributes.get('/api/support-marks', async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
-    const marks = await getSupportMarks(c.env.DB, scope);
-    // 何人に付いているかも返す。運用でどれが使われているか分かる。
-    const withCounts = [];
-    for (const mark of marks) {
-      withCounts.push({
+    const marks = await getSupportMarksWithUsage(c.env.DB, scope);
+    const withCounts = marks.map((mark) => ({
         ...serializeMark(mark),
-        friendCount: await countFriendsWithMark(c.env.DB, mark.id, scope),
-      });
-    }
+        friendCount: Number(mark.friend_count),
+        usedIn: {
+          broadcasts: Number(mark.broadcasts),
+          scenarios: Number(mark.scenarios),
+          autoReplies: Number(mark.auto_replies),
+          savedSearches: Number(mark.saved_searches),
+          automations: Number(mark.automations),
+        },
+      }));
     return c.json({ success: true, data: withCounts });
   } catch (err) {
     console.error('GET /api/support-marks error:', err);
@@ -212,6 +269,20 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
         409,
       );
     }
+    if (existing.is_inherited === 1) {
+      const current = (await getSupportMarksWithUsage(c.env.DB, scope))
+        .find((mark) => mark.id === id);
+      if (!current || markReferenceCount(current) > 0) {
+        return c.json(
+          {
+            success: false,
+            error: '使用先がある共有マークは直接編集できません。使用先を別のマークへ変更してから編集してください。',
+            code: 'INHERITED_MARK_IN_USE',
+          },
+          409,
+        );
+      }
+    }
     const mark = await updateSupportMark(c.env.DB, id, scope, {
       name: body.name === undefined ? undefined : String(body.name).trim(),
       color: body.color === undefined ? undefined : String(body.color),
@@ -262,29 +333,71 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
       );
     }
 
-    // 使用中なら、削除前に置換先と人数を確認させる。
-    const count = await countFriendsWithMark(c.env.DB, id, scope);
-    if (count > 0 && c.req.query('force') !== '1') {
+    const current = (await getSupportMarksWithUsage(c.env.DB, scope))
+      .find((mark) => mark.id === id);
+    if (!current) {
+      return c.json(
+        { success: false, error: '影響を確認できませんでした。状態を読み直してください。' },
+        409,
+      );
+    }
+    const impact = serializeMarkImpact(current);
+    if (markReferenceCount(current) > 0) {
       return c.json(
         {
           success: false,
-          error: `このマークは ${count} 人に付いています。削除すると「${defaultMark.name}」へ変更されます。`,
-          code: 'IN_USE',
-          friendCount: count,
+          error: 'このマークは配信などで使われています。先にすべての使用先から外してください。',
+          code: 'REFERENCED',
+          ...impact,
+        },
+        409,
+      );
+    }
+    const body: Record<string, unknown> = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => ({}));
+    const replacementMarkId = typeof body.replacementMarkId === 'string'
+      ? body.replacementMarkId
+      : '';
+    if (replacementMarkId !== defaultMark.id) {
+      return c.json(
+        {
+          success: false,
+          error: `置換先を「${defaultMark.name}」にして、もう一度影響を確認してください。`,
+          code: 'REPLACEMENT_REQUIRED',
+          ...impact,
           replacementMark: serializeMark(defaultMark),
         },
         409,
       );
     }
-    if (count > 0) {
-      const staff = c.get('staff');
-      await replaceAndDeleteSupportMark(c.env.DB, id, defaultMark.id, scope, staff.id);
-    } else {
-      await deleteSupportMark(c.env.DB, id, scope);
+    if (!sameMarkImpact(body.expectedImpact, impact)) {
+      return c.json(
+        {
+          success: false,
+          error: '確認後に使用状況が変わりました。最新の影響を確認してください。',
+          code: 'IMPACT_CHANGED',
+          ...impact,
+          replacementMark: serializeMark(defaultMark),
+        },
+        409,
+      );
     }
+    const staff = c.get('staff');
+    const replacedFriendCount = await replaceAndArchiveSupportMark(
+      c.env.DB,
+      id,
+      defaultMark.id,
+      scope,
+      staff.id,
+    );
     return c.json({
       success: true,
-      data: { replacedFriendCount: count, replacementMark: serializeMark(defaultMark) },
+      data: {
+        archived: true,
+        replacedFriendCount,
+        replacementMark: serializeMark(defaultMark),
+      },
     });
   } catch (err) {
     console.error('DELETE /api/support-marks/:id error:', err);
@@ -371,7 +484,24 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
       && (row.line_account_id === access.lineAccountId
         ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
         : row.line_account_id === null && row.created_by === access.staffId));
-    return c.json({ success: true, data: visible.map(serializeSearch) });
+    const [insights, references] = await Promise.all([
+      getSavedSearchMatchInsights(c.env.DB, visible, access.lineAccountId),
+      getSavedSearchReferences(c.env.DB, visible.map((row) => row.id), access.lineAccountId),
+    ]);
+    const referencesBySearch = new Map<string, SavedSearchReference[]>();
+    for (const reference of references) {
+      const current = referencesBySearch.get(reference.saved_search_id) ?? [];
+      current.push(reference);
+      referencesBySearch.set(reference.saved_search_id, current);
+    }
+    return c.json({
+      success: true,
+      data: visible.map((row) => serializeSearch(
+        row,
+        insights.get(row.id),
+        referencesBySearch.get(row.id),
+      )),
+    });
   } catch (err) {
     console.error('GET /api/saved-searches error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -422,7 +552,11 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
       isShared: body.isShared === true,
       displayOrder: Number(body.displayOrder ?? 0),
     });
-    return c.json({ success: true, data: serializeSearch(saved) }, 201);
+    const insights = await getSavedSearchMatchInsights(c.env.DB, [saved], access.lineAccountId);
+    return c.json({
+      success: true,
+      data: serializeSearch(saved, insights.get(saved.id), []),
+    }, 201);
   } catch (err) {
     console.error('POST /api/saved-searches error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -465,7 +599,14 @@ friendAttributes.patch(
 
       const saved = await updateSavedSearch(c.env.DB, id, access, patch);
       if (!saved) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
-      return c.json({ success: true, data: serializeSearch(saved!) });
+      const [insights, references] = await Promise.all([
+        getSavedSearchMatchInsights(c.env.DB, [saved], access.lineAccountId),
+        getSavedSearchReferences(c.env.DB, [saved.id], access.lineAccountId),
+      ]);
+      return c.json({
+        success: true,
+        data: serializeSearch(saved, insights.get(saved.id), references),
+      });
     } catch (err) {
       console.error('PATCH /api/saved-searches/:id error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -486,10 +627,21 @@ friendAttributes.delete(
           || (existing.created_by !== access.staffId && !access.canManageAll)) {
         return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
       }
+      const references = await getSavedSearchReferences(c.env.DB, [id], access.lineAccountId);
+      if (references.length > 0) {
+        return c.json({
+          success: false,
+          error: `この検索は${references.length}件で使用中です。使用先を外してから削除してください。`,
+          data: { usedIn: serializeSearch(existing, undefined, references).usedIn },
+        }, 409);
+      }
       const deleted = await deleteSavedSearch(c.env.DB, id, access);
       if (!deleted) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
       return c.json({ success: true, data: null });
     } catch (err) {
+      if (err instanceof Error && /foreign key constraint/i.test(err.message)) {
+        return c.json({ success: false, error: 'この検索は使用中のため削除できません' }, 409);
+      }
       console.error('DELETE /api/saved-searches/:id error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
