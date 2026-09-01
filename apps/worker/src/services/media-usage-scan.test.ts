@@ -61,6 +61,19 @@ describe('使用箇所の走査', () => {
     );
   });
 
+  it('リッチメニューは実在するページ表のR2キーを走査する', async () => {
+    const db = makeDb(
+      [{ id: 'md-1', r2_key: 'media/menu.png' }],
+      { rich_menu_pages: ['page-1'] },
+    );
+    const result = await scanMediaUsage(db, '2026-08-16T00:00:00.000');
+    expect(result.matched).toBe(1);
+    expect(dbMocks.recordMediaUsage).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ mediaId: 'md-1', refKind: 'rich_menu', refId: 'page-1' }),
+    );
+  });
+
   it('どこにも無ければ記録しない', async () => {
     const db = makeDb([{ id: 'md-1', r2_key: 'media/a.png' }]);
     const result = await scanMediaUsage(db, '2026-08-16T00:00:00.000');

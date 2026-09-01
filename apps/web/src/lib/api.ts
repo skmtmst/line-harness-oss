@@ -2226,8 +2226,9 @@ export const api = {
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
-    list: (params?: { kind?: string; folderId?: string }) => {
+    list: (accountId: string, params?: { kind?: string; folderId?: string }) => {
       const q = new URLSearchParams()
+      q.set('accountId', accountId)
       if (params?.kind) q.set('kind', params.kind)
       if (params?.folderId) q.set('folderId', params.folderId)
       const query = q.toString()
@@ -2235,6 +2236,7 @@ export const api = {
     },
     /** data は base64。data: URL 形式でも受け付ける。 */
     upload: (data: {
+      accountId: string
       filename: string
       mimeType: string
       data: string
@@ -2244,15 +2246,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { filename?: string; folderId?: string | null }) =>
-      fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}`, {
+    update: (id: string, accountId: string, data: { filename?: string; folderId?: string | null }) =>
+      fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    usages: (id: string) => fetchApi<ApiResponse<MediaUsage[]>>(`/api/media/${id}/usages`),
-    /** 使用中は 409 で件数が返る。force で消せる。 */
-    delete: (id: string, opts?: { force?: boolean }) =>
-      fetchApi<ApiResponse<null>>(`/api/media/${id}${opts?.force ? '?force=1' : ''}`, {
+    usages: (id: string, accountId: string) => fetchApi<ApiResponse<MediaUsage[]>>(`/api/media/${id}/usages?accountId=${encodeURIComponent(accountId)}`),
+    /** 使用中は 409 で止まり、使用先から外すまで消せない。 */
+    delete: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'DELETE',
       }),
   },

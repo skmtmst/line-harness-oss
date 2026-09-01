@@ -216,7 +216,8 @@
     "253_friend_bulk_runs.sql",
     "256_friend_add_routing_versions.sql",
     "257_identity_candidates.sql",
-    "258_merged_people_detail.sql"
+    "258_merged_people_detail.sql",
+    "261_media_account_scope.sql"
   ],
-  "migrationCount": 217
+  "migrationCount": 218
 }

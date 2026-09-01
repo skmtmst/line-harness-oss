@@ -94,8 +94,8 @@
     "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
-    "direct-secondary-button": 5,
     "arbitrary-value": 10,
+    "direct-secondary-button": 4,
     "direct-primary-button": 1
   },
   "app/contents/vars/edit/page.tsx": {

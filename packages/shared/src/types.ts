@@ -252,6 +252,7 @@ export interface SupportMark {
 /** メディアライブラリの1件 */
 export interface MediaItem {
   id: string;
+  lineAccountId: string | null;
   folderId: string | null;
   kind: "image" | "video" | "audio" | "file";
   filename: string;
@@ -263,6 +264,8 @@ export interface MediaItem {
   url: string;
   uploadedBy: string | null;
   createdAt: string;
+  /** 0は未使用。省略は旧APIなどでまだ取得できていない状態。 */
+  usageCount?: number;
 }
 
 /** メディアの使用箇所 */

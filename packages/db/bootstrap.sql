@@ -1488,7 +1488,7 @@ CREATE TABLE media (
   public_url  TEXT,
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE media_usages (
   media_id   TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
@@ -3322,6 +3322,9 @@ CREATE INDEX idx_link_clicks_friend ON link_clicks (friend_id);
 CREATE INDEX idx_link_clicks_link ON link_clicks (tracked_link_id);
 
 CREATE INDEX idx_login_audit_user ON login_audit(admin_user_id, created_at);
+
+CREATE INDEX idx_media_account_created
+  ON media(line_account_id, created_at DESC, id);
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 

@@ -14,7 +14,8 @@ import { recordMediaUsage, pruneStaleMediaUsages, type MediaRefKind } from '@lin
 const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; columns: string[] }> = [
   { refKind: 'template', table: 'templates', idColumn: 'id', columns: ['message_content'] },
   { refKind: 'broadcast', table: 'broadcasts', idColumn: 'id', columns: ['message_content'] },
-  { refKind: 'rich_menu', table: 'rich_menus', idColumn: 'id', columns: ['image_url'] },
+  // 旧 rich_menus 表は存在しない。LINEへ送る実画像はページのR2キーで持つ。
+  { refKind: 'rich_menu', table: 'rich_menu_pages', idColumn: 'id', columns: ['image_r2_key'] },
   {
     refKind: 'scenario_step',
     table: 'scenario_steps',

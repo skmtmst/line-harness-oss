@@ -25,6 +25,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 /**
  * メディアライブラリと共通情報。
@@ -70,9 +71,38 @@ function extensionOf(filename: string): string {
   return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
 }
 
+/** ブラウザの申告ではなく、実際の先頭バイトが選んだ形式と一致するかを見る。 */
+function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
+  const ascii = (start: number, length: number) =>
+    String.fromCharCode(...bytes.slice(start, start + length));
+  switch (mimeType) {
+    case 'image/png':
+      return bytes.length >= 8
+        && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+          .every((value, index) => bytes[index] === value);
+    case 'image/jpeg':
+      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case 'image/gif':
+      return ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a';
+    case 'image/webp':
+      return ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP';
+    case 'video/mp4':
+    case 'audio/mp4':
+      return bytes.length >= 12 && ascii(4, 4) === 'ftyp';
+    case 'audio/mpeg':
+      return ascii(0, 3) === 'ID3'
+        || (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
+    case 'application/pdf':
+      return ascii(0, 5) === '%PDF-';
+    default:
+      return false;
+  }
+}
+
 function serializeMedia(row: Media, workerUrl: string) {
   return {
     id: row.id,
+    lineAccountId: row.line_account_id,
     folderId: row.folder_id,
     kind: row.kind,
     filename: row.filename,
@@ -84,16 +114,23 @@ function serializeMedia(row: Media, workerUrl: string) {
     url: row.public_url ?? `${workerUrl}/images/${row.r2_key}`,
     uploadedBy: row.uploaded_by,
     createdAt: row.created_at,
+    usageCount: row.usage_count === undefined ? undefined : Number(row.usage_count),
   };
 }
 
 contents.get('/api/media', async (c) => {
   try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const kindRaw = c.req.query('kind');
     const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
       ? (kindRaw as MediaKind)
       : undefined;
     const items = await getMedia(c.env.DB, {
+      lineAccountId: accountId,
       kind,
       folderId: c.req.query('folderId') || undefined,
     });
@@ -109,6 +146,7 @@ contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) =>
   try {
     const staff = c.get('staff');
     const body = await c.req.json<{
+      accountId?: string;
       data?: string;
       filename?: string;
       mimeType?: string;
@@ -117,6 +155,12 @@ contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) =>
       height?: number;
       durationMs?: number;
     }>();
+
+    const accountId = body.accountId?.trim() ?? '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
 
     const filename = (body.filename ?? '').trim();
     if (!filename) return c.json({ success: false, error: 'ファイル名がありません' }, 400);
@@ -168,6 +212,12 @@ contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) =>
         413,
       );
     }
+    if (!hasMediaSignature(bytes, mimeType)) {
+      return c.json(
+        { success: false, error: 'ファイルの実際の形式が、選択された形式と一致しません' },
+        400,
+      );
+    }
 
     const r2Key = `media/${crypto.randomUUID()}.${ext}`;
     await c.env.IMAGES.put(r2Key, bytes, {
@@ -175,18 +225,27 @@ contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) =>
       customMetadata: { originalFilename: filename },
     });
 
-    const media = await createMedia(c.env.DB, {
-      kind: spec.kind,
-      filename,
-      mimeType,
-      sizeBytes: bytes.byteLength,
-      r2Key,
-      folderId: body.folderId ?? null,
-      width: body.width ?? null,
-      height: body.height ?? null,
-      durationMs: body.durationMs ?? null,
-      uploadedBy: staff?.id ?? null,
-    });
+    let media: Media;
+    try {
+      media = await createMedia(c.env.DB, {
+        lineAccountId: accountId,
+        kind: spec.kind,
+        filename,
+        mimeType,
+        sizeBytes: bytes.byteLength,
+        r2Key,
+        folderId: body.folderId ?? null,
+        width: body.width ?? null,
+        height: body.height ?? null,
+        durationMs: body.durationMs ?? null,
+        uploadedBy: staff?.id ?? null,
+      });
+    } catch (error) {
+      // DBに行が無い実体は画面から消せない。登録失敗時に同じ場で片付ける。
+      await c.env.IMAGES.delete(r2Key).catch((cleanupError) =>
+        console.error('media orphan cleanup failed:', cleanupError));
+      throw error;
+    }
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json({ success: true, data: serializeMedia(media, workerUrl) }, 201);
   } catch (err) {
@@ -198,10 +257,15 @@ contents.post('/api/media', requireRole('owner', 'admin', 'staff'), async (c) =>
 contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const existing = await getMediaById(c.env.DB, id);
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ filename?: string; folderId?: string | null }>();
-    const media = await updateMedia(c.env.DB, id, {
+    const media = await updateMedia(c.env.DB, id, accountId, {
       filename: body.filename === undefined ? undefined : String(body.filename).trim(),
       ...(('folderId' in body) ? { folderId: body.folderId ?? null } : {}),
     });
@@ -215,6 +279,13 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
 
 contents.get('/api/media/:id/usages', async (c) => {
   try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const usages = await getMediaUsages(c.env.DB, c.req.param('id'));
     return c.json({
       success: true,
@@ -230,15 +301,20 @@ contents.get('/api/media/:id/usages', async (c) => {
 contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const existing = await getMediaById(c.env.DB, id);
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const usage = await countMediaUsages(c.env.DB, id);
-    if (usage > 0 && c.req.query('force') !== '1') {
+    if (usage > 0) {
       return c.json(
         {
           success: false,
-          error: `このファイルは ${usage} か所で使われています。削除すると、その箇所の表示が崩れます。`,
+          error: `このファイルは ${usage} か所で使われています。使用先から外すか、別のメディアへ差し替えてください。`,
           code: 'IN_USE',
           usageCount: usage,
         },
@@ -249,7 +325,7 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     // R2 の実体を先に消すと、DBの削除に失敗したときに「行はあるが実体が無い」
     // 状態になる。行を消してから実体を消す。逆なら孤児のファイルが残るだけで、
     // 画面には出てこない。
-    await deleteMedia(c.env.DB, id);
+    await deleteMedia(c.env.DB, id, accountId);
     const removal = c.env.IMAGES.delete(existing.r2_key).catch((err) =>
       console.error('R2 delete failed:', err),
     );
