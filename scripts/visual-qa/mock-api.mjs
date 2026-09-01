@@ -36,7 +36,7 @@ import {
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, OPERATORS,
+  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
 } from './fixtures.mjs'
@@ -591,6 +591,12 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    // `ymXJK` の下書き保存だけは、契約どおりの固定201を返す。
+    // DB更新はせず、ほかのPOSTは従来どおり405にする。
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
+      res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname)
