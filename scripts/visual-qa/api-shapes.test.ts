@@ -9,6 +9,8 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { readArrayGetPaths } from './api-shapes.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND, IDENTITY_CANDIDATE_LISTS } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -31,5 +33,36 @@ describe('画面確認モックの口の形', () => {
     // 静かに0件になると、全部の口が `{items:[],total:0}` に落ちて
     // 全画面が真っ白になる。原因はどこにも出ない。
     expect(() => readArrayGetPaths('// api.ts が読めなかった場合')).toThrow(/配列の口/);
+  });
+});
+
+describe('本人照合候補の画面確認データ', () => {
+  it('友だち同士とEC会員を同じ契約で返す', () => {
+    expect(Object.keys(IDENTITY_CANDIDATE_FRIEND).sort())
+      .toEqual(Object.keys(IDENTITY_CANDIDATE_EC).sort());
+    expect(IDENTITY_CANDIDATE_FRIEND.kind).toBe('friend_duplicate');
+    expect(IDENTITY_CANDIDATE_EC.kind).toBe('ec_member');
+  });
+
+  it('通常・空・失敗を別の形で用意する', () => {
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ total: 1, limit: 20, offset: 0 });
+    expect(IDENTITY_CANDIDATE_LISTS.empty).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
+    expect(IDENTITY_CANDIDATE_ERROR).toMatchObject({ success: false, code: 'VISUAL_QA_ERROR' });
+    expect(IDENTITY_CANDIDATE_DETECTION.normal).toEqual({
+      processed: 1, hasMore: false, nextCursor: null,
+    });
+    expect(IDENTITY_CANDIDATE_DETECTION.empty).toEqual({
+      processed: 0, hasMore: false, nextCursor: null,
+    });
+  });
+
+  it('メールと電話を平文で置かない', () => {
+    const serialized = JSON.stringify([
+      IDENTITY_CANDIDATE_FRIEND,
+      IDENTITY_CANDIDATE_EC,
+    ]);
+    expect(serialized).not.toContain('tanaka@example.jp');
+    expect(serialized).not.toContain('090-1234-5678');
+    expect(serialized).toContain('***');
   });
 });

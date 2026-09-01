@@ -123,6 +123,9 @@
     "arbitrary-value": 43,
     "direct-th": 6
   },
+  "app/ec-commerce/identity-candidates/page.tsx": {
+    "unresolved-classname": 11
+  },
   "app/ec-commerce/page.tsx": {
     "unresolved-classname": 2,
     "direct-secondary-button": 4,
@@ -173,6 +176,9 @@
     "arbitrary-value": 5,
     "direct-secondary-button": 4,
     "direct-primary-button": 2
+  },
+  "app/friends/identity-candidates/page.tsx": {
+    "unresolved-classname": 6
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 2,
@@ -584,10 +590,10 @@
     "unresolved-classname": 51
   },
   "components/friend-fields/tag-editor-v4.tsx": {
-    "direct-primary-button": 4,
-    "direct-secondary-button": 6,
+    "direct-primary-button": 3,
+    "direct-secondary-button": 3,
     "unresolved-classname": 17,
-    "arbitrary-value": 17
+    "arbitrary-value": 16
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 3,
@@ -613,6 +619,12 @@
     "direct-primary-button": 2,
     "direct-secondary-button": 2,
     "unresolved-classname": 8
+  },
+  "components/identity/identity-decision-dialog.tsx": {
+    "unresolved-classname": 15
+  },
+  "components/identity/identity-parts.tsx": {
+    "unresolved-classname": 38
   },
   "components/inbox/inbox-filters.tsx": {
     "arbitrary-value": 1

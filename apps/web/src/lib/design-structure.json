@@ -1922,7 +1922,8 @@
       "name": "V2 4-7-3 リッチメニューを作る",
       "sections": [
         "Crumb",
-        "Head"
+        "Head",
+        "Steps"
       ],
       "parts": [
         "リッチメニューを作る",
