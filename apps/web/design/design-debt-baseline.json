@@ -318,6 +318,7 @@
   "app/scenarios/first-step/page.tsx": {
     "direct-secondary-button": 3,
     "arbitrary-value": 1,
+    "unresolved-classname": 4,
     "direct-primary-button": 1
   },
   "app/scenarios/mode/page.tsx": {
@@ -680,10 +681,10 @@
     "unresolved-classname": 13
   },
   "components/scenarios/action-editor.tsx": {
+    "unresolved-classname": 13,
     "direct-secondary-button": 8,
     "arbitrary-value": 1,
-    "direct-primary-button": 1,
-    "unresolved-classname": 9
+    "direct-primary-button": 1
   },
   "components/scenarios/bulk-preview-modal.tsx": {
     "arbitrary-value": 1
@@ -700,6 +701,7 @@
     "direct-secondary-button": 1
   },
   "components/scenarios/message-type-tabs.tsx": {
+    "unresolved-classname": 2,
     "direct-secondary-button": 1
   },
   "components/scenarios/question-editor.tsx": {
@@ -719,6 +721,9 @@
   },
   "components/scenarios/step-editor.tsx": {
     "arbitrary-value": 3
+  },
+  "components/scenarios/step-preview.tsx": {
+    "unresolved-classname": 3
   },
   "components/scenarios/trigger-editor.tsx": {
     "direct-secondary-button": 3
