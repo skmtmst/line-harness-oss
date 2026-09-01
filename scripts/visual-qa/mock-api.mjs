@@ -20,6 +20,7 @@
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
   COMMON_VAR_DELETE_IMPACT,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
@@ -501,6 +502,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (formDeleteImpact) {
+    const data = formDeleteImpact[1] === 'form-empty'
+      ? FORM_DELETE_IMPACT_FIXTURES.delete
+      : FORM_DELETE_IMPACT_FIXTURES.archive
+    return { success: true, data }
+  }
   if (pathname === '/api/friends/bulk-runs/friend-bulk-run-1') {
     return { success: true, data: FRIEND_BULK_RUN.detail }
   }

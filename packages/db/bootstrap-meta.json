@@ -219,8 +219,9 @@
     "256_friend_add_routing_versions.sql",
     "257_identity_candidates.sql",
     "258_merged_people_detail.sql",
+    "259_form_archive_safety.sql",
     "261_media_account_scope.sql",
     "262_support_mark_archive.sql"
   ],
-  "migrationCount": 221
+  "migrationCount": 222
 }
