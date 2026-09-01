@@ -76,7 +76,20 @@ print_version "pnpm" "pnpm"
 if command -v curl >/dev/null 2>&1; then
   check_allowed_endpoint "GitHub API" "https://api.github.com"
   check_allowed_endpoint "npm registry" "https://registry.npmjs.org"
-  check_blocked_endpoint "Cloudflare API" "https://api.cloudflare.com/client/v4"
+  # Cloudflare への到達検査は **Codex クラウド環境の境界**を見るもの。
+  # 手元のPCからは普通につながるので、ローカルで走らせると必ず引っかかる。
+  #
+  # **既定は検査したまま。** 外すときだけ `DOCTOR_LOCAL=1` を明示する。
+  # 逆（クラウドのときだけ検査する）にすると、クラウド側で付け忘れたときに
+  # 境界の検査が黙って飛ぶ。付け忘れても検査が残る側に倒す。
+  #
+  # **外したことは必ず出す。** 黙って飛ばすと、検査したのかどうかが
+  # 最終行から読み取れなくなる。
+  if [[ "${DOCTOR_LOCAL:-}" == "1" ]]; then
+    printf 'Cloudflare API: 判定なし（DOCTOR_LOCAL=1。クラウド環境の検査項目です）\n'
+  else
+    check_blocked_endpoint "Cloudflare API" "https://api.cloudflare.com/client/v4"
+  fi
 else
   printf 'curl: 未インストール\n'
   record_issue "接続先を確認できない"

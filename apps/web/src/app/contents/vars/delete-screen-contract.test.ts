@@ -39,9 +39,17 @@ describe('共通情報の削除確認', () => {
     expect(PAGE).toContain('いま使われ始めたため')
   })
 
-  it('遅れて返った別の共通情報の結果を映さない', () => {
-    expect(PAGE).toContain('singleRequestRef.current = item.id')
-    expect(PAGE).toContain('singleRequestRef.current !== item.id')
+  it('遅れて返った別アカウント・別の共通情報・古い世代の結果を映さない', () => {
+    expect(PAGE).toContain('singleRequestRef.current.accountId === request.accountId')
+    expect(PAGE).toContain('singleRequestRef.current.itemId === request.itemId')
+    expect(PAGE).toContain('singleRequestRef.current.generation === request.generation')
+    expect(PAGE).toContain('if (!isCurrentRequest()) return')
+  })
+
+  it('アカウント切替と窓を閉じる操作で、進行中の単体削除を無効にする', () => {
+    expect(PAGE).toContain("setSinglePhase('idle')")
+    expect(PAGE).toContain('generation: singleRequestRef.current.generation + 1')
+    expect(PAGE).toContain('onCancel={closeSingleDelete}')
   })
 
   it('いつ時点で確かめたかを書く', () => {

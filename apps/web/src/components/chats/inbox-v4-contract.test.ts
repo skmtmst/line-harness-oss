@@ -37,7 +37,7 @@ describe('受信箱V4で既存機能を失わない', () => {
 
   it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
     expect(TEMPLATE_PICKER).toContain('入力欄へ挿入')
-    expect(TEMPLATE_PICKER).toContain('すべてのフォルダ')
+    expect(TEMPLATE_PICKER).toContain('FolderDropdown')
     expect(TEMPLATE_PICKER).toContain('送信内容のプレビュー')
     expect(PAGE).toContain('setMessageContent')
     expect(TEMPLATE_PICKER).toContain('createPortal')
@@ -119,7 +119,7 @@ describe('受信箱V4の画面契約', () => {
 
   it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
-    expect(PAGE).toContain('aria-label="担当者で絞り込む"')
+    expect(PAGE).toContain('ariaLabel="担当者で絞り込む"')
     expect(PAGE).toContain("assigneeFilter === 'unassigned'")
     expect(PAGE).toContain('item.assignedStaffId === assigneeFilter')
     expect(PAGE).toContain('chat.operatorId !== assigneeFilter')

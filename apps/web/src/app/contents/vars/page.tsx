@@ -63,10 +63,11 @@ function VarsPageInner() {
   const [singleError, setSingleError] = useState('')
   /** 確認のために打ってもらう差し込みキー。 */
   const [typedKey, setTypedKey] = useState('')
-  /** いま影響を読んでいる対象。遅れて返った別の結果を捨てるために持つ。 */
-  const singleRequestRef = useRef<string | null>(null)
+  /** いま影響を読んでいるアカウント・対象・世代。遅れて返った別の結果を捨てるために持つ。 */
+  const singleRequestRef = useRef({ accountId: selectedAccountId, itemId: null as string | null, generation: 0 })
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const deleteRequestRef = useRef({ accountId: selectedAccountId, generation: 0 })
 
   /** 選んでいるフォルダ。URLに出して、戻るとブックマークを壊さない。 */
   const folderFilter = params.get('folder') ?? ''
@@ -107,6 +108,28 @@ function VarsPageInner() {
     if (accountLoading) return
     void load()
   }, [accountLoading, load])
+
+  useEffect(() => {
+    singleRequestRef.current = {
+      accountId: selectedAccountId,
+      itemId: null,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    setSingleTarget(null)
+    setSingleImpact(null)
+    setSinglePhase('idle')
+    setSingleBusy(false)
+    setSingleError('')
+    setTypedKey('')
+    deleteRequestRef.current = {
+      accountId: selectedAccountId,
+      generation: deleteRequestRef.current.generation + 1,
+    }
+    setSelected(new Set())
+    setDeleteTargets([])
+    setDeleting(false)
+    setDeleteError('')
+  }, [selectedAccountId])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -172,15 +195,24 @@ function VarsPageInner() {
       閉じてBを開くと、あとから返るAの結果がBの窓に出る。読んでいるものと
       押せるものが食い違う。
     */
-    singleRequestRef.current = item.id
+    const request = {
+      accountId: selectedAccountId,
+      itemId: item.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    const isCurrentRequest = () =>
+      singleRequestRef.current.accountId === request.accountId &&
+      singleRequestRef.current.itemId === request.itemId &&
+      singleRequestRef.current.generation === request.generation
     try {
-      const res = await api.commonVars.deleteImpact(item.id, selectedAccountId)
-      if (singleRequestRef.current !== item.id) return
+      const res = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+      if (!isCurrentRequest()) return
       if (!res.success) throw new Error('impact_failed')
       setSingleImpact(res.data)
       setSinglePhase('ready')
     } catch {
-      if (singleRequestRef.current !== item.id) return
+      if (!isCurrentRequest()) return
       /*
         使用先が読めないときは**消させない**。「参照0件」と読み違えて
         消すと、差し込んでいた文が空欄のまま送られ続ける。
@@ -191,16 +223,28 @@ function VarsPageInner() {
 
   const confirmSingleDelete = async () => {
     if (!singleTarget || !selectedAccountId || singleBusy) return
+    const request = {
+      accountId: selectedAccountId,
+      itemId: singleTarget.id,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    singleRequestRef.current = request
+    const isCurrentRequest = () =>
+      singleRequestRef.current.accountId === request.accountId &&
+      singleRequestRef.current.itemId === request.itemId &&
+      singleRequestRef.current.generation === request.generation
     setSingleBusy(true)
     setSingleError('')
     try {
-      const res = await api.commonVars.delete(singleTarget.id, selectedAccountId)
+      const res = await api.commonVars.delete(request.itemId, request.accountId)
+      if (!isCurrentRequest()) return
       if (!res.success) throw new Error('delete_failed')
       setSingleTarget(null)
       setSingleImpact(null)
       setSinglePhase('idle')
       await load()
     } catch (e) {
+      if (!isCurrentRequest()) return
       if (e instanceof ApiError && e.status === 409) {
         /*
           **409は「読んだあとに使われ始めた」。** 消せない理由が変わって
@@ -208,31 +252,55 @@ function VarsPageInner() {
         */
         setSingleError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
         try {
-          const again = await api.commonVars.deleteImpact(singleTarget.id, selectedAccountId)
+          const again = await api.commonVars.deleteImpact(request.itemId, request.accountId)
+          if (!isCurrentRequest()) return
           if (again.success) setSingleImpact(again.data)
         } catch {
-          setSinglePhase('error')
+          if (isCurrentRequest()) setSinglePhase('error')
         }
         return
       }
       setSingleError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setSingleBusy(false)
+      if (isCurrentRequest()) setSingleBusy(false)
     }
+  }
+
+  const closeSingleDelete = () => {
+    if (singleBusy) return
+    singleRequestRef.current = {
+      accountId: selectedAccountId,
+      itemId: null,
+      generation: singleRequestRef.current.generation + 1,
+    }
+    setSingleTarget(null)
+    setSingleImpact(null)
+    setSinglePhase('idle')
+    setSingleError('')
+    setTypedKey('')
   }
 
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
+    const request = {
+      accountId: selectedAccountId,
+      generation: deleteRequestRef.current.generation + 1,
+    }
+    deleteRequestRef.current = request
+    const isCurrentRequest = () =>
+      deleteRequestRef.current.accountId === request.accountId &&
+      deleteRequestRef.current.generation === request.generation
     setError('')
     setDeleteError('')
     try {
       const impacts = await Promise.all(
         [...selected].map(async (id) => {
-          const response = await api.commonVars.deleteImpact(id, selectedAccountId)
+          const response = await api.commonVars.deleteImpact(id, request.accountId)
           if (!response.success) throw new Error(response.error)
           return { id, impact: response.data }
         }),
       )
+      if (!isCurrentRequest()) return
       const blocked = impacts.filter(({ impact }) => !impact.canDelete)
       if (blocked.length > 0) {
         const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
@@ -240,10 +308,12 @@ function VarsPageInner() {
         return
       }
     } catch {
+      if (!isCurrentRequest()) return
       setError('使用先を確認できないため削除できません。もう一度お試しください。')
       return
     }
 
+    if (!isCurrentRequest()) return
     const targets = items.filter((item) => selected.has(item.id))
     if (targets.length !== selected.size) {
       setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -254,24 +324,35 @@ function VarsPageInner() {
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
+    const request = {
+      accountId: selectedAccountId,
+      generation: deleteRequestRef.current.generation + 1,
+    }
+    deleteRequestRef.current = request
+    const isCurrentRequest = () =>
+      deleteRequestRef.current.accountId === request.accountId &&
+      deleteRequestRef.current.generation === request.generation
+    const targets = [...deleteTargets]
     setDeleting(true)
     setDeleteError('')
     const failed: CommonVar[] = []
-    for (const target of deleteTargets) {
+    for (const target of targets) {
       try {
-        const result = await api.commonVars.delete(target.id, selectedAccountId)
+        const result = await api.commonVars.delete(target.id, request.accountId)
         if (!result.success) throw new Error(result.error)
       } catch {
         failed.push(target)
       }
+      if (!isCurrentRequest()) return
     }
 
     try {
+      if (!isCurrentRequest()) return
       if (failed.length > 0) {
         setDeleteTargets(failed)
         setSelected(new Set(failed.map((item) => item.id)))
         setDeleteError(
-          failed.length === deleteTargets.length
+          failed.length === targets.length
             ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
             : `${failed.length}件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
         )
@@ -283,7 +364,7 @@ function VarsPageInner() {
       setSelected(new Set())
       await load()
     } finally {
-      setDeleting(false)
+      if (isCurrentRequest()) setDeleting(false)
     }
   }
 
@@ -555,21 +636,14 @@ function VarsPageInner() {
         description="この共通情報と、登録値・次回予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。"
         busy={singleBusy}
         error={singleError || undefined}
-        onCancel={() => {
-          if (singleBusy) return
-          setSingleTarget(null)
-          setSingleImpact(null)
-          setSinglePhase('idle')
-          setSingleError('')
-          setTypedKey('')
-        }}
+        onCancel={closeSingleDelete}
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-ink-faint text-micro">この操作は取り消せません</p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
-                onClick={() => { setSingleTarget(null); setSingleImpact(null); setSinglePhase('idle'); setSingleError(''); setTypedKey('') }}
+                onClick={closeSingleDelete}
                 disabled={singleBusy}
               >
                 キャンセル
@@ -676,6 +750,10 @@ function VarsPageInner() {
         onConfirm={() => void removeSelected()}
         onCancel={() => {
           if (deleting) return
+          deleteRequestRef.current = {
+            accountId: selectedAccountId,
+            generation: deleteRequestRef.current.generation + 1,
+          }
           setDeleteError('')
           setDeleteTargets([])
         }}

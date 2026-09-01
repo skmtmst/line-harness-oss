@@ -147,7 +147,7 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                       THEN ar.response_content ELSE coalesce(ar.actions_json, '') END AS source_content,
                  0 AS is_historical
             FROM auto_replies ar
-           WHERE (ar.line_account_id = ? OR ar.line_account_id IS NULL)
+           WHERE ar.line_account_id = ?
              AND (instr(coalesce(ar.response_content, ''), ?) > 0
                OR instr(coalesce(ar.actions_json, ''), ?) > 0
                OR EXISTS (
@@ -181,7 +181,7 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                       THEN a.conditions ELSE coalesce(a.actions, '') END AS source_content,
                  0 AS is_historical
             FROM automations a
-           WHERE (a.line_account_id = ? OR a.line_account_id IS NULL)
+           WHERE a.line_account_id = ?
              AND (instr(coalesce(a.conditions, ''), ?) > 0
                OR instr(coalesce(a.actions, ''), ?) > 0
                OR EXISTS (

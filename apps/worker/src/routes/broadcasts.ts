@@ -9,6 +9,17 @@ import {
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { processBroadcastSend, buildMessage, processQueuedBroadcasts } from '../services/broadcast.js';
+import {
+  MAX_BROADCAST_MESSAGES,
+  addTestLabel,
+  assertMessagePartsResolved,
+  autoTrackMessageParts,
+  buildMessages,
+  combinedMessageContent,
+  parseBroadcastMessageParts,
+  renderMessageParts,
+  unsupportedMessageVariables,
+} from '../services/broadcast-message-set.js';
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { processSegmentSend } from '../services/segment-send.js';
 import type { SegmentCondition } from '../services/segment-query.js';
@@ -491,8 +502,19 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
-    if (body.messageBubbles !== undefined && (!Array.isArray(body.messageBubbles) || body.messageBubbles.length < 1 || body.messageBubbles.length > 3)) {
-      return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
+    let messageParts;
+    try {
+      messageParts = parseBroadcastMessageParts({
+        messageType: body.messageType,
+        messageContent: body.messageContent,
+        messageBubbles: body.messageBubbles,
+        altText: body.altText,
+      });
+    } catch (messageError) {
+      return c.json({
+        success: false,
+        error: messageError instanceof Error ? messageError.message : `messageBubbles must contain 1 to ${MAX_BROADCAST_MESSAGES} items`,
+      }, 400);
     }
 
     // 配る時間の指定。長すぎると送りきる前に日をまたぐので上限を置く。
@@ -507,9 +529,12 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       body.stealthSpreadMinutes = n;
     }
 
-    const variableError = unsupportedVariablesError(body.messageContent);
-    if (variableError) {
-      return c.json({ success: false, error: variableError }, 400);
+    const unsupported = unsupportedMessageVariables(messageParts);
+    if (unsupported.length > 0) {
+      return c.json({
+        success: false,
+        error: `Unsupported broadcast variables: ${unsupported.map((v) => `{{${v}}}`).join(', ')}`,
+      }, 400);
     }
 
     if (body.targetType === 'tag' && !body.targetTagId) {
@@ -762,13 +787,26 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
-    if (existing.message_bubbles_json) {
-      return c.json({ success: false, error: '複数吹き出しの実配信は次フェーズです。現在は下書き保存のみ利用できます。' }, 400);
+    let existingParts;
+    try {
+      existingParts = parseBroadcastMessageParts({
+        messageType: existing.message_type,
+        messageContent: existing.message_content,
+        messageBubblesJson: existing.message_bubbles_json,
+        altText: existing.alt_text,
+      });
+    } catch (messageError) {
+      return c.json({
+        success: false,
+        error: messageError instanceof Error ? messageError.message : '配信内容を読み取れません',
+      }, 400);
     }
-
-    const variableError = unsupportedVariablesError(existing.message_content);
-    if (variableError) {
-      return c.json({ success: false, error: variableError }, 400);
+    const unsupported = unsupportedMessageVariables(existingParts);
+    if (unsupported.length > 0) {
+      return c.json({
+        success: false,
+        error: `Unsupported broadcast variables: ${unsupported.map((v) => `{{${v}}}`).join(', ')}`,
+      }, 400);
     }
 
     /*
@@ -1106,12 +1144,29 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'
       );
     }
 
-    const variableError = unsupportedVariablesError(existing.message_content);
-    if (variableError) {
-      return c.json({ success: false, error: variableError }, 400);
+    let segmentParts;
+    try {
+      segmentParts = parseBroadcastMessageParts({
+        messageType: existing.message_type,
+        messageContent: existing.message_content,
+        messageBubblesJson: existing.message_bubbles_json,
+        altText: existing.alt_text,
+      });
+    } catch (messageError) {
+      return c.json({
+        success: false,
+        error: messageError instanceof Error ? messageError.message : '配信内容を読み取れません',
+      }, 400);
+    }
+    const unsupported = unsupportedMessageVariables(segmentParts);
+    if (unsupported.length > 0) {
+      return c.json({
+        success: false,
+        error: `Unsupported broadcast variables: ${unsupported.map((v) => `{{${v}}}`).join(', ')}`,
+      }, 400);
     }
 
-    if (hasRecipientVariables(existing.message_content)) {
+    if (segmentParts.some((part) => hasRecipientVariables(part.messageContent))) {
       const { buildSegmentQuery } = await import('../services/segment-query.js');
       const { sql, bindings } = buildSegmentQuery(body.conditions);
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
@@ -1403,22 +1458,28 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 400);
     const lineClient = new LineClient(account.channel_access_token);
 
-    // Build message with test label
-    let messageContent = broadcast.message_content;
-    if (broadcast.message_type === 'text') {
-      messageContent = `【テスト配信】\n${messageContent}`;
+    let parts;
+    try {
+      parts = addTestLabel(parseBroadcastMessageParts({
+        messageType: broadcast.message_type,
+        messageContent: broadcast.message_content,
+        messageBubblesJson: broadcast.message_bubbles_json,
+        altText: raw.alt_text as string | null,
+      }));
+    } catch (messageError) {
+      return c.json({
+        success: false,
+        error: messageError instanceof Error ? messageError.message : '配信内容を読み取れません',
+      }, 400);
     }
+    parts = await autoTrackMessageParts(
+      c.env.DB,
+      parts,
+      c.env.WORKER_URL,
+      accountId,
+      broadcast.track_links !== 0,
+    );
 
-    // Auto-track URLs (track_links=0 なら本番送信と同様に短縮せず raw のまま)
-    let tracked = { messageType: broadcast.message_type as string, content: messageContent };
-    if (broadcast.track_links !== 0) {
-      const { autoTrackContent } = await import('../services/auto-track.js');
-      tracked = await autoTrackContent(c.env.DB, broadcast.message_type, messageContent, c.env.WORKER_URL, {
-        lineAccountId: accountId,
-      });
-    }
-
-    const { extractFlexAltText } = await import('../utils/flex-alt-text.js');
     const liffId = (account as unknown as { liff_id?: string | null }).liff_id ?? null;
     /*
      * 差し込みの値は、本番の配信と同じものを使う。
@@ -1429,7 +1490,10 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
      */
     const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
     const { getCommonVarMap } = await import('@line-crm/db');
-    const commonVars = /\{\{\s*var\./.test(tracked.content) ? await getCommonVarMap(c.env.DB, accountId) : undefined;
+    const allContent = combinedMessageContent(parts);
+    const commonVars = /\{\{\s*var\./.test(allContent)
+      ? await getCommonVarMap(c.env.DB, accountId)
+      : undefined;
     // 配信日の起点は「いま」。テスト送信は今すぐ届くので、今日の日付でよい。
     const testSendAt = new Date();
 
@@ -1439,24 +1503,21 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
 
     for (const friend of friends.results) {
       try {
-        const extra = await resolveInterpolationExtra(c.env.DB, friend.id, tracked.content);
-        const renderedContent = renderBroadcastMessageContent(tracked.messageType, tracked.content, {
+        const extra = await resolveInterpolationExtra(c.env.DB, friend.id, allContent);
+        const rendered = renderMessageParts(parts, {
           liffId,
           displayName: friend.display_name,
           fields: extra.fields,
           vars: commonVars,
           deliveredAt: testSendAt,
         });
-        assertNoUnresolvedBroadcastVariables(renderedContent);
-        const altText = raw.alt_text as string
-          || (tracked.messageType === 'flex' ? extractFlexAltText(renderedContent) : undefined);
-        const message = buildMessage(tracked.messageType, renderedContent, altText);
-        await lineClient.pushMessage(friend.line_user_id, [message]);
+        assertMessagePartsResolved(rendered);
+        await lineClient.pushMessage(friend.line_user_id, buildMessages(rendered));
         sent++;
-        await c.env.DB.prepare(
+        await c.env.DB.batch(rendered.map((part) => c.env.DB.prepare(
           `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, delivery_type, source, created_at)
            VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
-        ).bind(crypto.randomUUID(), friend.id, tracked.messageType, renderedContent, now).run();
+        ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, now)));
       } catch (err) {
         console.error(`Test send to ${friend.id} failed:`, err);
         failed++;
