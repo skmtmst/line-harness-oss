@@ -333,18 +333,79 @@ export interface CommonVarSchedule {
   appliedAt: string | null;
 }
 
+export type SavedSearchConditionKind =
+  | "name"
+  | "tag"
+  | "field"
+  | "form"
+  | "purchase"
+  | "mark"
+  | "scenario"
+  | "chat_status"
+  | "following"
+  | "status_message"
+  | "created_at";
+
+/** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
+export interface SavedSearchCondition {
+  kind: SavedSearchConditionKind;
+  key?: string;
+  formId?: string;
+  op: string;
+  value?: unknown;
+}
+
+/**
+ * 保存した検索の中身。
+ *
+ * AND と OR は1段だけにする。入れ子を許すと編集画面と実行側で同じ条件を
+ * 再現できなくなる。説明と一覧表示も同じJSONに置き、DB列を増やさず既存
+ * データとの互換性を保つ。
+ */
+export interface SavedSearchConditions {
+  all?: SavedSearchCondition[];
+  any?: SavedSearchCondition[];
+  visibility?: "visible_only" | "hidden_only" | "all";
+  description?: string;
+  list?: {
+    columns?: string[];
+    sort?: "recent" | "oldest";
+    limit?: 10 | 20 | 30 | 40 | 50;
+  };
+}
+
 /** 保存した検索 */
 export interface SavedSearch {
   id: string;
   name: string;
   scope: "friends" | "chats" | "bookings";
   /** { all: [...], any: [...], visibility } の形 */
-  conditions: unknown;
+  conditions: SavedSearchConditions;
   createdBy: string | null;
   lineAccountId: string | null;
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
+  matchCount?: number | null;
+  /** matchCount が null のとき、黙って0件にせず理由を返す。 */
+  matchCountError?: string | null;
+  /** 配信・自動化など、保存検索をIDで参照している利用先。 */
+  usedIn?: SavedSearchUsage[];
+  /** 使用先が無いとサーバーで確認できたときだけ true。 */
+  canDelete?: boolean;
+}
+
+export type SavedSearchUsageKind = "broadcast" | "automation" | "scenario" | "other";
+export type SavedSearchReferenceMode = "live" | "fixed";
+
+/** 保存した検索を参照している実データ。固定値の説明には使わない。 */
+export interface SavedSearchUsage {
+  kind: SavedSearchUsageKind;
+  id: string;
+  name: string;
+  mode: SavedSearchReferenceMode;
+  lastUsedAt: string | null;
 }
 
 /**
@@ -1442,6 +1503,62 @@ export interface FriendAddRouting {
   };
   /** ③ 判定の基準 */
   criteria: { firstTime: FriendAddFirstTimeCriterion };
+}
+
+export type FriendAddRoutingVersionStatus = "draft" | "published" | "retired";
+export type FriendAddRoutingTestStatus = "succeeded" | "failed";
+
+/** 画面が下書き・試験・公開を同じ言葉で扱うための版情報。 */
+export interface FriendAddRoutingVersion {
+  accountId: string;
+  versionId: string;
+  versionNumber: number;
+  status: FriendAddRoutingVersionStatus;
+  routing: FriendAddRouting;
+  lastTestStatus: FriendAddRoutingTestStatus | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export interface FriendAddRoutingValidationCheck {
+  key: "first_time" | "returning" | "actions" | "duplicate_prevention";
+  label: string;
+  status: "passed" | "warning" | "failed";
+  detail: string;
+}
+
+export interface FriendAddRoutingValidation {
+  canPublish: boolean;
+  /** 公開前に確認できた、選択中LINEアカウントの現在の有効友だち数。 */
+  estimatedAudienceCount: number | null;
+  checks: FriendAddRoutingValidationCheck[];
+  /** 初回と再追加は同じ判定器の排他的な2分岐なので、重複候補は通常0件。 */
+  conflicts: Array<{ code: string; message: string }>;
+  lastTestStatus: FriendAddRoutingTestStatus | null;
+}
+
+export interface FriendAddRoutingDraftTestResult {
+  versionId: string;
+  displayName: string | null;
+  kind: "first_time" | "returning";
+  scenarioId: string | null;
+  scenarioName: string | null;
+  suppressed: boolean;
+  actionCount: number;
+  /** dry-runなので、登録・配信・タグ付け等の状態変更は常にfalse。 */
+  stateChanged: false;
+}
+
+export interface FriendAddRoutingPublishResult {
+  accountId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  estimatedAudienceCount: number | null;
+  duplicatePrevention: "webhook_event";
+  /** 実行結果画面が接続済みのときだけ導線を返す。未接続を404のリンクにしない。 */
+  monitoringPath: "/friend-add-settings/runs" | null;
+  monitoringUnavailableReason: string | null;
 }
 
 /**

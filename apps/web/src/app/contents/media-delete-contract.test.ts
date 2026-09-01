@@ -74,4 +74,12 @@ describe('メディアの削除確認', () => {
     expect(PAGE).toContain('読み直しの返事も、同じ3つで照合してから映す')
     expect(PAGE).toContain('if (same && again.success) setImpact(again.data)')
   })
+
+  it('アカウント切替と窓の閉鎖で、前の読み込み・削除結果を無効にする', () => {
+    expect(PAGE).toContain('impactRequestRef.current.generation + 1')
+    expect(PAGE).toContain('deleteRequestRef.current += 1')
+    expect(PAGE).toContain('setDeleting(null)')
+    expect(PAGE).toContain('latestAccountRef.current === accountAtRequest')
+    expect(PAGE).toContain('if (!isCurrentDelete()) return')
+  })
 })

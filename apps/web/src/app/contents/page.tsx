@@ -157,6 +157,8 @@ export default function MediaLibraryPage() {
     mediaId: null,
     generation: 0,
   })
+  /** 削除要求そのものも、アカウント切替や窓の閉鎖後に結果を映さない。 */
+  const deleteRequestRef = useRef(0)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
@@ -166,6 +168,27 @@ export default function MediaLibraryPage() {
   const [preview, setPreview] = useState<MediaItem | null>(null)
 
   const fileInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    /*
+      アカウントを切り替えた瞬間に、前の窓と読み込み・削除要求を無効にする。
+      ref の accountId は要求開始時の値なので、世代も進めなければ前の返事が
+      そのまま「現在」と判定される。
+    */
+    impactRequestRef.current = {
+      accountId: selectedAccountId,
+      mediaId: null,
+      generation: impactRequestRef.current.generation + 1,
+    }
+    deleteRequestRef.current += 1
+    setDeleting(null)
+    setImpact(null)
+    setImpactPhase('idle')
+    setDeleteBusy(false)
+    setDeleteError('')
+    setBulkConfirm(null)
+    setBulkBusy(false)
+  }, [selectedAccountId])
 
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -316,6 +339,7 @@ export default function MediaLibraryPage() {
   }
 
   async function openDelete(item: MediaItem) {
+    deleteRequestRef.current += 1
     setDeleting(item)
     setDeleteError('')
     setImpact(null)
@@ -354,16 +378,29 @@ export default function MediaLibraryPage() {
 
   async function confirmDeleteOne() {
     if (!deleting || !selectedAccountId || deleteBusy) return
+    const accountAtRequest = selectedAccountId
+    const mediaIdAtRequest = deleting.id
+    const deleteGeneration = deleteRequestRef.current + 1
+    deleteRequestRef.current = deleteGeneration
+    const isCurrentDelete = () =>
+      deleteRequestRef.current === deleteGeneration
+      && latestAccountRef.current === accountAtRequest
+      && impactRequestRef.current.accountId === accountAtRequest
+      && impactRequestRef.current.mediaId === mediaIdAtRequest
     setDeleteBusy(true)
     setDeleteError('')
     try {
-      const res = await api.media.delete(deleting.id, selectedAccountId)
+      const res = await api.media.delete(mediaIdAtRequest, accountAtRequest)
+      if (!isCurrentDelete()) return
       if (!res.success) throw new Error('delete_failed')
       setDeleting(null)
       setImpact(null)
       setImpactPhase('idle')
+      setDeleteBusy(false)
+      deleteRequestRef.current += 1
       void load()
     } catch (e) {
+      if (!isCurrentDelete()) return
       if (e instanceof ApiError && e.status === 409) {
         /*
           **409 は「読んだあとに使われ始めた」。** 消せない理由が変わって
@@ -373,21 +410,37 @@ export default function MediaLibraryPage() {
         /* 読み直しの返事も、同じ3つで照合してから映す。 */
         const at = { ...impactRequestRef.current }
         try {
-          const again = await api.media.deleteImpact(deleting.id, at.accountId ?? selectedAccountId)
+          const again = await api.media.deleteImpact(mediaIdAtRequest, accountAtRequest)
           const same =
-            impactRequestRef.current.accountId === at.accountId
+            isCurrentDelete()
+            && latestAccountRef.current === accountAtRequest
+            && impactRequestRef.current.accountId === at.accountId
             && impactRequestRef.current.mediaId === at.mediaId
             && impactRequestRef.current.generation === at.generation
           if (same && again.success) setImpact(again.data)
         } catch {
-          setImpactPhase('error')
+          if (isCurrentDelete()) setImpactPhase('error')
         }
         return
       }
       setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleteBusy(false)
+      if (isCurrentDelete()) setDeleteBusy(false)
     }
+  }
+
+  function closeDeleteDialog() {
+    impactRequestRef.current = {
+      accountId: selectedAccountId,
+      mediaId: null,
+      generation: impactRequestRef.current.generation + 1,
+    }
+    deleteRequestRef.current += 1
+    setDeleting(null)
+    setImpact(null)
+    setImpactPhase('idle')
+    setDeleteBusy(false)
+    setDeleteError('')
   }
 
   const filtered = useMemo(() => {
@@ -754,10 +807,7 @@ export default function MediaLibraryPage() {
         error={deleteError || undefined}
         onCancel={() => {
           if (deleteBusy) return
-          setDeleting(null)
-          setImpact(null)
-          setImpactPhase('idle')
-          setDeleteError('')
+          closeDeleteDialog()
         }}
         footer={
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -765,7 +815,7 @@ export default function MediaLibraryPage() {
               {impact && !impact.canDelete ? '使用先から外すと削除できます' : ''}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" onClick={() => { setDeleting(null); setImpact(null); setImpactPhase('idle'); setDeleteError('') }} disabled={deleteBusy}>
+              <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 閉じる
               </Button>
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}

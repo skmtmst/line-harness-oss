@@ -3,6 +3,7 @@ import {
   type LockPayload,
   STALE_AFTER_MINUTES,
   describeLock,
+  evaluateLockForDeploy,
   evaluateRelease,
   formatLockPayload,
   isDeployEnv,
@@ -99,6 +100,32 @@ describe('evaluateRelease', () => {
     const stale = { ...lock, startedAt: '2026-08-13T00:00:00.000Z' };
     const result = evaluateRelease({ lock: stale, holder: 'skmtmst', force: false });
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('evaluateLockForDeploy', () => {
+  it('accepts the exact environment and commit', () => {
+    expect(evaluateLockForDeploy(lock, 'staging', lock.sha)).toEqual({ ok: true });
+  });
+
+  it('rejects a missing lock', () => {
+    expect(evaluateLockForDeploy(null, 'staging', lock.sha)).toEqual({
+      ok: false,
+      reason: 'missing',
+    });
+  });
+
+  it('rejects a lock for another environment', () => {
+    expect(
+      evaluateLockForDeploy({ ...lock, env: 'production' }, 'staging', lock.sha),
+    ).toEqual({ ok: false, reason: 'environment-mismatch' });
+  });
+
+  it('rejects a lock for another commit', () => {
+    expect(evaluateLockForDeploy(lock, 'staging', 'f'.repeat(40))).toEqual({
+      ok: false,
+      reason: 'sha-mismatch',
+    });
   });
 });
 
