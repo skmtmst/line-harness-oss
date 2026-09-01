@@ -83,6 +83,7 @@ describe('共通部品の影響範囲', () => {
       'components/line-notifications/operator-notification-rules.tsx',
       'components/merged-person/merged-delivery-dialog.tsx',
       'components/merged-person/merged-person-detail.tsx',
+      'components/shared/not-connected.tsx',
       'components/store-selection-gate.tsx',
       'components/users/user-row.tsx',
     ])
