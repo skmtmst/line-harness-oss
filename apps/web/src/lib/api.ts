@@ -3,6 +3,10 @@ import type { SegmentCondition } from './segment-condition'
 import type {
   Friend,
   FriendAddRouting,
+  FriendAddRoutingDraftTestResult,
+  FriendAddRoutingPublishResult,
+  FriendAddRoutingValidation,
+  FriendAddRoutingVersion,
   FriendAddEventList,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
@@ -58,6 +62,21 @@ import type {
   TrafficPool,
   PoolAccount,
   FormLayout,
+  MergedPersonDetail,
+  UpdateMergedPersonRequest,
+  UpdateMergedPersonDeliveryPrioritiesRequest,
+  FriendBulkSelection,
+  FriendBulkOperation,
+  FriendBulkPreview,
+  FriendBulkRunSummary,
+  FriendBulkRunDetail,
+  IdentityCandidateDetail,
+  IdentityCandidateKind,
+  IdentityCandidateList,
+  IdentityCandidateStatus,
+  DetectIdentityCandidatesResult,
+  DecideIdentityCandidateRequest,
+  UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
 /**
@@ -95,6 +114,67 @@ export type TagDeleteImpact = {
   references: TagDeleteImpactReferences
   blockingReferenceCount: number
   canDelete: boolean
+}
+
+/**
+ * リッチメニューを消したときの影響（`GET /api/rich-menu-groups/:id/delete-impact`）。
+ *
+ * LINEは友だちごとの現在表示を返さないため、currentAudience.value は取得できる
+ * 口ができるまで null。0人と読み替えてはいけない。
+ */
+export type RichMenuDeleteImpact = {
+  group: {
+    id: string
+    accountId: string
+    name: string
+    status: 'draft' | 'published'
+  }
+  currentAudience: {
+    value: number | null
+    reason: 'assignment_ledger_unavailable'
+  }
+  nextDisplay: {
+    guaranteedGroupId: null
+    reason: 'friend_specific_rules'
+    candidates: Array<{
+      groupId: string
+      name: string
+      targetingPriority: number
+      isTargetingEnabled: boolean
+      isDefaultForAll: boolean
+    }>
+  }
+  incomingSwitches: Array<{
+    sourceGroupId: string
+    sourceGroupName: string
+    sourcePageId: string
+    sourcePageName: string
+    areaId: string
+    areaLabel: string | null
+    targetPageId: string
+    targetPageName: string
+  }>
+  operationalReferences: Array<{
+    kind: 'automation' | 'common_action'
+    ownerId: string
+    ownerName: string
+  }>
+  lineResources: {
+    pageCount: number
+    pagesWithLineRichMenuId: number
+    isDefaultForAll: boolean
+    publishing: boolean
+  }
+  blockers: Array<
+    | 'published'
+    | 'publishing'
+    | 'default_for_all'
+    | 'line_resources'
+    | 'incoming_switches'
+    | 'operational_references'
+  >
+  canDelete: boolean
+  recommendedAction: 'delete' | 'unpublish' | 'review_references'
 }
 
 /** Affiliate offer (案件) as returned by the worker. */
@@ -181,6 +261,246 @@ export type CommonActionSummary = {
   oldVersionBindingCount: number;
   updatedAt: string;
 };
+
+export type AnalyticsMetricState =
+  | 'available'
+  | 'pending'
+  | 'unavailable'
+  | 'insufficient'
+  | 'partial'
+  | 'failed'
+
+export type AnalyticsMetric<T> = {
+  value: T | null
+  state: AnalyticsMetricState
+  reason: string | null
+}
+
+export type AnalyticsEnvelope<T> = {
+  lineAccountId: string
+  timeZone: string
+  period: { from: string; to: string }
+  dataCutoffAt: string
+  data: T
+}
+
+export type AnalyticsFriendsOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  metrics: {
+    added: AnalyticsMetric<number>
+    removed: AnalyticsMetric<number>
+    net: AnalyticsMetric<number>
+    currentFriends: AnalyticsMetric<number>
+    firstTime: AnalyticsMetric<number>
+    returning: AnalyticsMetric<number>
+  }
+  days: Array<{ date: string; added: number; removed: number; net: number }>
+  campaigns: Array<{
+    id: string
+    name: string
+    kind: 'broadcast' | 'scenario'
+    occurredAt: string
+    date: string
+  }>
+  historyAvailableFrom: string | null
+}>
+
+export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
+  metrics: {
+    sent: AnalyticsMetric<number>
+    delivered: AnalyticsMetric<number>
+    opened: AnalyticsMetric<number>
+    lineClicked: AnalyticsMetric<number>
+    trackedClicks: AnalyticsMetric<number>
+    unavailableCampaigns: AnalyticsMetric<number>
+  }
+  campaigns: Array<{
+    id: string
+    name: string
+    kind: 'broadcast' | 'scenario'
+    sentAt: string
+    targetPeople: AnalyticsMetric<number>
+    delivered: AnalyticsMetric<number>
+    opened: AnalyticsMetric<number>
+    lineClicked: AnalyticsMetric<number>
+    outcomes: AnalyticsMetric<number>
+    fetchedAt: string | null
+  }>
+  trackedClickHours: Array<{ hour: number; clicks: number }>
+  clickDefinition: string
+}>
+
+export type AnalyticsRoutesOverview = AnalyticsEnvelope<{
+  attributionModel: 'first_touch'
+  attributionLabel: string
+  routes: Array<{
+    id: string
+    refCode: string | null
+    name: string
+    clicks: AnalyticsMetric<number>
+    friendAdds: AnalyticsMetric<number>
+    currentFriends: AnalyticsMetric<number>
+    reactionPeople: AnalyticsMetric<number>
+    conversions: {
+      approved: AnalyticsMetric<number>
+      pending: AnalyticsMetric<number>
+      rejected: AnalyticsMetric<number>
+      revenue: AnalyticsMetric<number>
+    }
+    adCost: AnalyticsMetric<number>
+    costPerFriend: AnalyticsMetric<number>
+    costPerConversion: AnalyticsMetric<number>
+    profitAfterAdCost: AnalyticsMetric<number>
+  }>
+  searchConsoleHref: string
+}>
+
+export type AnalyticsUsageOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  checkedAt: string
+  automaticDeletion: false
+  categories: Array<{
+    key: string
+    label: string
+    href: string
+    created: AnalyticsMetric<number>
+    inUse: AnalyticsMetric<number>
+    unused: AnalyticsMetric<number>
+    brokenReferences: AnalyticsMetric<number>
+    lastUsedAt: AnalyticsMetric<string>
+  }>
+}>
+
+export type AnalyticsUrlClicksOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  exposureAvailableFrom: string | null
+  hasMore: boolean
+  clickRateDefinition: string
+  links: Array<{
+    trackedLinkId: string
+    name: string
+    originalUrl: string
+    shortCode: string | null
+    isActive: boolean
+    actions: { tagName: string | null; scenarioName: string | null }
+    clicks: AnalyticsMetric<number>
+    knownClickPeople: AnalyticsMetric<number>
+    deliveredPeople: AnalyticsMetric<number>
+    clickRate: AnalyticsMetric<number>
+    firstClickedAt: AnalyticsMetric<string>
+    lastClickedAt: AnalyticsMetric<string>
+    usageLocations: string[]
+  }>
+}>
+
+export type AnalyticsCrossAxis =
+  | { kind: 'route' }
+  | { kind: 'tag' }
+  | { kind: 'field_choice'; fieldId: string }
+  | { kind: 'score_band' }
+  | { kind: 'conversion_point' }
+  | { kind: 'booking_status' }
+  | { kind: 'purchase_status' }
+
+export type AnalyticsCrossResult = {
+  lineAccountId: string
+  timeZone: string
+  rowValues: Array<{ key: string; label: string }>
+  columnValues: Array<{ key: string; label: string }>
+  cells: Array<{
+    rowKey: string
+    rowLabel: string
+    columnKey: string
+    columnLabel: string
+    value: number
+    uniqueFriends: number
+    totalRatio: number | null
+    previousValue: number
+    difference: number
+  }>
+  totalValue: number
+  totalFriends: number
+  previousTotalValue: number
+  periodFrom: string
+  periodTo: string
+  previousPeriodFrom: string
+  previousPeriodTo: string
+  dataCutoffAt: string
+  state: 'available' | 'partial' | 'unavailable'
+  stateReason: string | null
+}
+
+export type AnalyticsFunnelStepResult = {
+  stepOrder: number
+  label: string
+  reached: number
+  conversionFromPrevious: number | null
+  droppedAfter: number
+  inProgressAfter: number
+  averageSecondsFromPrevious: number | null
+  medianSecondsFromPrevious: number | null
+}
+
+export type AnalyticsFunnelRunResult = {
+  runId: string | null
+  funnelId: string
+  versionId: string | null
+  versionNumber: number | null
+  lineAccountId: string
+  cohortFrom: string
+  cohortTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'available' | 'unavailable' | 'partial' | 'failed'
+  stateReason: string | null
+  groups: Array<{
+    key: string
+    label: string
+    entrants: number
+    completed: number
+    steps: AnalyticsFunnelStepResult[]
+  }>
+}
+
+export type SavedAnalyticsSummary = {
+  id: string
+  name: string
+  kind: 'cross' | 'funnel'
+  status: 'active' | 'archived'
+  currentVersionNumber: number
+  createdBy: string | null
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+  snapshotCount: number
+  latestSnapshot: {
+    id: string
+    state: 'available' | 'partial' | 'unavailable' | 'failed'
+    periodFrom: string
+    periodTo: string
+    dataCutoffAt: string
+    createdAt: string
+  } | null
+}
+
+export type SavedAnalyticsSnapshot = {
+  id: string
+  savedAnalysisId: string
+  analysisVersionId: string
+  sourceKind: 'cross' | 'funnel'
+  sourceResultId: string
+  periodFrom: string
+  periodTo: string
+  timeZone: string
+  dataCutoffAt: string
+  state: 'available' | 'partial' | 'unavailable' | 'failed'
+  result: unknown
+  createdBy: string | null
+  createdAt: string
+}
 
 export type CommonActionVersion = {
   id: string;
@@ -333,8 +653,10 @@ export function extractApiErrorMessage(raw: string, status: number): string {
 }
 
 /**
- * Workerが返す安全なsnake_caseの機械コードだけを取り出す。
- * 日本語や内部エラー文字列は分岐条件にも表示にも使わない。
+ * 画面分岐にだけ使う、Worker由来の機械コードを取り出す。
+ *
+ * 本文を利用者へ表示してよいかとは別の契約。英小文字と数字のsnake_caseだけに
+ * 絞り、SQL・外部API・HTMLなどの内部文言はコードとしても受け取らない。
  */
 export function extractApiErrorCode(raw: string): string | undefined {
   if (!raw) return undefined
@@ -434,6 +756,8 @@ export type FriendListParams = {
   limit?: string | number
   tagId?: string
   accountId?: string
+  /** 分析結果から作った24時間の対象者。友だちIDをURLへ並べない。 */
+  audienceId?: string
   search?: string
   /**
    * `false` でタグ enrich をスキップ。autocomplete 等で displayName/picture
@@ -453,6 +777,8 @@ export type FriendListParams = {
   operatorId?: string
   /** 現在配信中のシナリオ。 */
   scenarioId?: string
+  /** サーバーへ保存したAND/OR条件。選択中のLINEアカウントが必須。 */
+  savedSearchId?: string
 
   // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────
   // どれも足し算。指定が無ければ何も起きない。
@@ -474,6 +800,9 @@ export type FriendListParams = {
   chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
   /** 表示設定。未指定は全部。 */
   visibility?: 'following' | 'blocked'
+  /** 行動スコアの現在値。片方だけでも指定できる。 */
+  scoreMin?: number
+  scoreMax?: number
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -530,7 +859,34 @@ export type MileageHistoryItem = {
   reason: string
   source: string
   sourceEventId: string | null
+  sourceReferenceId: string | null
+  ruleName: string | null
+  mode: 'automatic' | 'manual'
+  executedByStaffName: string | null
   occurredAt: string
+}
+export type MileageSelfInsights = {
+  accountCount: number
+  rewardedActions: number
+  referralMiles: number
+  qualityReferralCount: number
+  lastEarnedAt: string | null
+}
+export type MileageConnectedAccount = {
+  accountId: string
+  accountName: string
+  friendId: string
+}
+export type MileageAdjustmentPolicy = {
+  configured: boolean
+  approvalThreshold: number | null
+}
+export type MileageAdjustmentResult = {
+  entryId: string
+  balanceBefore: number
+  amount: number
+  balanceAfter: number
+  replayed: boolean
 }
 export type MileageRule = {
   id: string
@@ -588,6 +944,52 @@ export type MileageAdminOverview = {
   members: MileageAdminMember[]
   pagination: { total: number; limit: number; offset: number }
 }
+export type MileageAdminHistoryItem = {
+  id: string
+  primaryFriendId: string
+  displayName: string
+  pictureUrl: string | null
+  entryType: MileageHistoryItem['entryType']
+  status: MileageHistoryItem['status']
+  amount: number
+  reason: string
+  source: string
+  hasSourceEvent: boolean
+  sourceReferenceId: string | null
+  ruleName: string | null
+  mode: 'automatic' | 'manual'
+  executedByStaffName: string | null
+  occurredAt: string
+}
+export type MileageAdminHistory = {
+  items: MileageAdminHistoryItem[]
+  pagination: { total: number; limit: number; offset: number }
+}
+export type ActionScoreBand = 'high' | 'normal' | 'low'
+export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
+export type ActionScoreSort = 'score_desc' | 'score_asc' | 'change_desc' | 'change_asc' | 'recent_desc'
+export type ActionScoreOverview = {
+  summary: {
+    scoredFriends: number
+    high: number
+    normal: number
+    low: number
+    decreased30d: number
+    highMin: number
+    normalMin: number
+  }
+  items: Array<{
+    friendId: string
+    displayName: string
+    pictureUrl: string | null
+    currentScore: number
+    band: ActionScoreBand
+    change30d: number
+    lastReason: string | null
+    lastChangedAt: string | null
+  }>
+  pagination: { total: number; limit: number; offset: number }
+}
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
@@ -627,6 +1029,30 @@ export type ListStats = {
     sentThisWeek: number
   }
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+}
+
+/** 質問テンプレート。シナリオの質問と同じ契約を使う。 */
+export type TemplateQuestion = {
+  intro?: string
+  text: string
+  altText?: string
+  tapMode: 'single' | 'multiple'
+  choices: Array<{
+    label: string
+    behavior: 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
+    url?: string
+    tel?: string
+    email?: string
+    formId?: string
+    scenario?: { op: 'start' | 'stop'; scenarioId?: string | null; restart?: 'from_start' | 'from_read'; rememberPrevious?: boolean }
+    userMessage?: string
+    hideUserMessage?: boolean
+    reply?: string
+    repeatReply?: string
+    addTagIds?: string[]
+    removeTagIds?: string[]
+    field?: { fieldId: string; value: string }
+  }>
 }
 
 /* ---- リッチメニューのボタン（147） ---- */
@@ -860,6 +1286,7 @@ export type DashboardPreferenceResponse = {
 export type EcCommerceOverview = {
   total: number
   processed: number
+  identityPending: number
   failed: number
   skipped: number
   last24h: number
@@ -876,10 +1303,43 @@ export type EcCommerceEvent = {
   friendId: string | null
   friendName: string | null
   orderNumber: string | null
-  status: 'received' | 'processing' | 'processed' | 'skipped' | 'failed'
+  status: 'received' | 'identity_pending' | 'processing' | 'processed' | 'skipped' | 'failed'
   errorMessage: string | null
   receivedAt: string
   processedAt: string | null
+}
+
+export type EcNotificationRun = {
+  id: string
+  recipientType: 'customer'
+  notificationName: string
+  source: 'EC連携'
+  sourceEventId: string
+  friendId: string
+  friendName: string | null
+  orderNumber: string | null
+  channel: 'line'
+  status: 'pending' | 'accepted' | 'excluded' | 'failed'
+  reason: string | null
+  receivedAt: string
+  acceptedAt: string | null
+  attemptCount: number | null
+  nextRetryAt: string | null
+  clickedAt: string | null
+  version: number | null
+  executionMode: 'automatic'
+  retryAvailable: false
+}
+
+export type EcNotificationRunList = {
+  items: EcNotificationRun[]
+  summary: { accepted: number; failed: number; excluded: number; pending: number }
+  coverage: {
+    source: 'current_ec_events'
+    unassignedHistoricalRowsExcluded: true
+    attemptHistoryAvailable: false
+    retryAvailable: false
+  }
 }
 
 export type EcShipment = {
@@ -1064,6 +1524,7 @@ export const api = {
       if (params?.limit) query.limit = String(params.limit)
       if (params?.tagId) query.tagId = params.tagId
       if (params?.accountId) query.lineAccountId = params.accountId
+      if (params?.audienceId) query.audienceId = params.audienceId
       if (params?.search) query.search = params.search
       if (params?.includeTags === false) query.includeTags = 'false'
       if (params?.includeChatStatus) query.includeChatStatus = 'true'
@@ -1071,6 +1532,7 @@ export const api = {
       if (params?.handled) query.handled = params.handled
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.scenarioId) query.scenarioId = params.scenarioId
+      if (params?.savedSearchId) query.savedSearchId = params.savedSearchId
       if (params?.tagIds?.length) query.tagIds = params.tagIds.join(',')
       if (params?.excludeTagIds?.length) query.excludeTagIds = params.excludeTagIds.join(',')
       if (params?.statusMessage) query.statusMessage = params.statusMessage
@@ -1078,6 +1540,8 @@ export const api = {
       if (params?.createdTo) query.createdTo = params.createdTo
       if (params?.chatStatus) query.chatStatus = params.chatStatus
       if (params?.visibility) query.visibility = params.visibility
+      if (params?.scoreMin !== undefined) query.scoreMin = String(params.scoreMin)
+      if (params?.scoreMax !== undefined) query.scoreMax = String(params.scoreMax)
       for (const [k, v] of Object.entries(params?.metadata ?? {})) {
         if (k && v) query[`metadata.${k}`] = v
       }
@@ -1090,10 +1554,20 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${id}`),
-    mileage: (id: string, limit = 10) =>
-      fetchApi<ApiResponse<{ summary: MileageSummary; history: MileageHistoryItem[] }>>(
-        `/api/friends/${id}/mileage?limit=${limit}`,
-      ),
+    mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
+      const query = new URLSearchParams()
+      const options = typeof params === 'number' ? { limit: params } : params
+      query.set('limit', String(options?.limit ?? 10))
+      if (options?.accountId) query.set('accountId', options.accountId)
+      return fetchApi<ApiResponse<{
+        summary: MileageSummary
+        history: MileageHistoryItem[]
+        insights: MileageSelfInsights
+        connections: MileageConnectedAccount[]
+      }>>(
+          `/api/friends/${id}/mileage?${query.toString()}`,
+        )
+    },
     /**
      * 友だち追加の内訳（設計 V2 4-6）。
      * returning は「以前からのお客さまに『はじめまして』が届いた数」でもある。
@@ -1111,6 +1585,40 @@ export const api = {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
     },
+    bulkPreview: (selection: FriendBulkSelection, operation: FriendBulkOperation) =>
+      fetchApi<ApiResponse<FriendBulkPreview>>('/api/friends/bulk-runs/preview', {
+        method: 'POST',
+        body: JSON.stringify({ selection, operation }),
+      }),
+    bulkCreate: (
+      selection: FriendBulkSelection,
+      operation: FriendBulkOperation,
+      options: { idempotencyKey: string; scheduledAt?: string; confirmIrreversible?: boolean },
+    ) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>('/api/friends/bulk-runs', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': options.idempotencyKey,
+          ...(options.confirmIrreversible ? { 'X-Confirm-Irreversible': 'friend-bulk-run' } : {}),
+        },
+        body: JSON.stringify({ selection, operation, scheduledAt: options.scheduledAt }),
+      }),
+    bulkGet: (id: string, options?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (options?.page) query.set('page', String(options.page))
+      if (options?.limit) query.set('limit', String(options.limit))
+      const tail = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<FriendBulkRunDetail>>(`/api/friends/bulk-runs/${id}${tail}`)
+    },
+    bulkRetry: (id: string) =>
+      fetchApi<ApiResponse<{ retriedCount: number }>>(`/api/friends/bulk-runs/${id}/retry`, {
+        method: 'POST',
+      }),
+    bulkUndo: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendBulkRunSummary>>(`/api/friends/bulk-runs/${id}/undo`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }),
     /**
      * 友だち情報（metadata）を書き換える。
      * 渡した項目だけ変わる。null を渡すとその項目を削除する。
@@ -1380,6 +1888,35 @@ export const api = {
    * 外部APIを叩かないので、ここが外の障害で落ちることはない。
    */
   analytics: {
+    friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsFriendsOverview>>(
+        `/api/analytics/friends${rangeQuery({ ...params, accountId })}`,
+      ),
+    reactionsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsReactionsOverview>>(
+        `/api/analytics/reactions${rangeQuery({ ...params, accountId })}`,
+      ),
+    routesOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsRoutesOverview>>(
+        `/api/analytics/routes${rangeQuery({ ...params, accountId })}`,
+      ),
+    usageOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsUsageOverview>>(
+        `/api/analytics/usage${rangeQuery({ ...params, accountId })}`,
+      ),
+    urlClicksOverview: (
+      accountId: string,
+      params?: { from?: string; to?: string; limit?: number },
+    ) => {
+      const query = new URLSearchParams()
+      query.set('account_id', accountId)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
+      if (params?.limit) query.set('limit', String(params.limit))
+      return fetchApi<ApiResponse<AnalyticsUrlClicksOverview>>(
+        `/api/analytics/url-clicks?${query.toString()}`,
+      )
+    },
     messages: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
@@ -1438,6 +1975,80 @@ export const api = {
       fetchApi<ApiResponse<Array<{ row: string; col: string; count: number }>>>(
         `/api/analytics/cross?account_id=${encodeURIComponent(accountId)}&fieldId=${encodeURIComponent(fieldId)}`,
       ),
+    runCross: (accountId: string, data: {
+      rowAxis: AnalyticsCrossAxis
+      columnAxis: AnalyticsCrossAxis
+      measure: { kind: 'unique_friends' }
+      filters: []
+      periodFrom: string
+      periodTo: string
+    }) => fetchApi<ApiResponse<{ id: string; state: 'pending' }>>(
+      `/api/analytics/cross/query?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    crossResult: (accountId: string, id: string) =>
+      fetchApi<ApiResponse<{
+        id: string
+        state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'
+        errorCode: string | null
+        result: AnalyticsCrossResult | null
+        createdAt: string
+      }>>(`/api/analytics/cross/results/${id}?account_id=${encodeURIComponent(accountId)}`),
+    createResultAudience: (accountId: string, resultId: string, data: {
+      sourceKind: 'cross' | 'funnel'
+      rowKey?: string
+      columnKey?: string
+      groupKey?: string
+      stepOrder?: number
+      selection?: 'reached' | 'stopped' | 'in_progress'
+    }) => fetchApi<ApiResponse<{ id: string; memberCount: number; expiresAt: string }>>(
+      `/api/analytics/results/${resultId}/audiences?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    v6Funnels: {
+      list: (accountId: string) => fetchApi<ApiResponse<Array<{
+        id: string
+        name: string
+        windowDays: number
+        createdAt: string
+        currentVersion: { id: string; versionNumber: number; createdAt: string } | null
+        migrationState: 'ready' | 'needs_migration'
+      }>>>(`/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`),
+      create: (accountId: string, data: {
+        name: string
+        windowDays: number
+        steps: Array<{ label: string; kind: string; match: Record<string, string> }>
+      }) => fetchApi<ApiResponse<{ funnelId: string; version: { id: string; versionNumber: number } }>>(
+        `/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      latestRun: (accountId: string, funnelId: string) =>
+        fetchApi<ApiResponse<AnalyticsFunnelRunResult>>(
+          `/api/analytics/funnels/${funnelId}/runs/latest?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      run: (accountId: string, funnelId: string, data: { cohortFrom: string; cohortTo: string }) =>
+        fetchApi<ApiResponse<AnalyticsFunnelRunResult>>(
+          `/api/analytics/funnels/${funnelId}/run?account_id=${encodeURIComponent(accountId)}`,
+          { method: 'POST', body: JSON.stringify(data) },
+        ),
+    },
+    saved: {
+      list: (accountId: string) => fetchApi<ApiResponse<SavedAnalyticsSummary[]>>(
+        `/api/analytics/saved?account_id=${encodeURIComponent(accountId)}`,
+      ),
+      create: (accountId: string, data: {
+        name: string
+        sourceKind: 'cross' | 'funnel'
+        sourceResultId: string
+      }) => fetchApi<ApiResponse<{ id: string; versionId: string; snapshotId: string }>>(
+        `/api/analytics/saved?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      snapshots: (accountId: string, id: string) =>
+        fetchApi<ApiResponse<SavedAnalyticsSnapshot[]>>(
+          `/api/analytics/saved/${id}/snapshots?account_id=${encodeURIComponent(accountId)}`,
+        ),
+    },
   },
   /**
    * ログイン履歴。オーナーと管理者だけが見られる。
@@ -1472,11 +2083,11 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null }>>>(
-        '/api/forms',
+        `/api/forms?account_id=${encodeURIComponent(accountId)}`,
       ),
-    get: (id: string) =>
+    get: (id: string, accountId: string) =>
       fetchApi<
         ApiResponse<{
           id: string
@@ -1491,14 +2102,23 @@ export const api = {
           isActive: boolean
           submitCount: number
         }>
-      >(`/api/forms/${id}`),
-    create: (data: { name: string; description?: string | null; layout?: FormLayout }) =>
+      >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
+    create: (
+      accountId: string,
+      data: { name: string; description?: string | null; layout?: FormLayout },
+    ) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/forms', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, accountId }),
+      }),
+    createDraft: (accountId: string, name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>('/api/forms/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ name, accountId }),
       }),
     update: (
       id: string,
+      accountId: string,
       data: {
         name?: string
         description?: string | null
@@ -1511,16 +2131,19 @@ export const api = {
         isActive?: boolean
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}`, {
+      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    remove: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/forms/${id}`, { method: 'DELETE' }),
+    remove: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
   },
   /** NENコラム。 */
   nenColumns: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1531,10 +2154,10 @@ export const api = {
             published_at: string | null
           }>
         >
-      >('/api/nen-campaigns/columns'),
+      >(`/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`),
     /** コラムに添える紹介文。本文そのものはEC側にある。 */
-    updateMessage: (id: string, introText: string) =>
-      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message`, {
+    updateMessage: (accountId: string, id: string, introText: string) =>
+      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT',
         body: JSON.stringify({ introText }),
       }),
@@ -2433,6 +3056,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
@@ -2448,6 +3073,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        question: TemplateQuestion | null;
+        questionStatus: 'draft' | 'published';
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2468,6 +3095,8 @@ export const api = {
       category: string
       messageType: string
       messageContent: string
+      question?: TemplateQuestion | null
+      questionStatus?: 'draft' | 'published'
       /** 162: 選択肢を押したときの動き。 */
       carouselActions?: unknown | null
       /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2481,7 +3110,7 @@ export const api = {
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -2794,10 +3423,13 @@ export const api = {
     },
   },
   ecCommerce: {
-    overview: () =>
-      fetchApi<ApiResponse<EcCommerceOverview>>('/api/ec-commerce/overview'),
-    events: (params?: { eventType?: string; status?: string; limit?: number; offset?: number }) => {
+    overview: (lineAccountId?: string) =>
+      fetchApi<ApiResponse<EcCommerceOverview>>(lineAccountId
+        ? `/api/ec-commerce/overview?lineAccountId=${encodeURIComponent(lineAccountId)}`
+        : '/api/ec-commerce/overview'),
+    events: (params?: { lineAccountId?: string; eventType?: string; status?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
+      if (params?.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params?.eventType) query.set('eventType', params.eventType)
       if (params?.status) query.set('status', params.status)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
@@ -2805,6 +3437,15 @@ export const api = {
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: { total: number; limit: number; offset: number } }>(
         `/api/ec-commerce/events${suffix}`,
+      )
+    },
+    notificationRuns: (params: { lineAccountId: string; view?: 'all' | 'failures'; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.view) query.set('view', params.view)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcNotificationRunList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/notification-runs?${query}`,
       )
     },
     settings: () =>
@@ -2843,6 +3484,34 @@ export const api = {
         `/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify({ routing }) },
       ),
+    getDraft: (accountId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
+        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    saveDraft: (accountId: string, routing: FriendAddRouting) =>
+      fetchApi<ApiResponse<FriendAddRoutingVersion>>(
+        `/api/friend-add-routing/draft?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify({ routing }) },
+      ),
+    validateDraft: (accountId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingValidation>>(
+        `/api/friend-add-routing/validate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST' },
+      ),
+    conflicts: (accountId: string) =>
+      fetchApi<ApiResponse<{ conflicts: FriendAddRoutingValidation['conflicts'] }>>(
+        `/api/friend-add-routing/conflicts?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    testDraft: (accountId: string, friendId: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingDraftTestResult>>(
+        `/api/friend-add-routing/draft/test?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ friendId }) },
+      ),
+    publish: (accountId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<FriendAddRoutingPublishResult>>(
+        `/api/friend-add-routing/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
     /** テスト実行。登録も配信もしない。振り分け先だけを返す。 */
     test: (accountId: string, friendId: string) =>
       fetchApi<ApiResponse<{
@@ -2875,54 +3544,78 @@ export const api = {
     },
   },
   nenCampaigns: {
-    overview: () => fetchApi<ApiResponse<{
+    overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
       jobs: { total: number; pending: number; sent: number; failed: number }
       columns: number
       pets: number
       coupons: number
-    }>>('/api/nen-campaigns/overview'),
-    settings: () => fetchApi<ApiResponse<NenCampaignSetting[]>>('/api/nen-campaigns/settings'),
-    updateSetting: (campaignKey: string, data: Pick<NenCampaignSetting,
+    }>>(`/api/nen-campaigns/overview?lineAccountId=${encodeURIComponent(accountId)}`),
+    settings: (accountId: string) => fetchApi<ApiResponse<NenCampaignSetting[]>>(
+      `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
+    updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
       'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'>) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}`, {
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
     testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
-    jobs: () => fetchApi<ApiResponse<Array<{
+    jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
       id: string; campaignKey: string; label: string; friendName: string | null
       scheduledAt: string; status: string; attempts: number; lastError: string | null; sentAt: string | null
-    }>>>('/api/nen-campaigns/jobs'),
-    columns: () => fetchApi<ApiResponse<NenColumn[]>>('/api/nen-campaigns/columns'),
+    }>>>(`/api/nen-campaigns/jobs?lineAccountId=${encodeURIComponent(accountId)}`),
+    columns: (accountId: string) => fetchApi<ApiResponse<NenColumn[]>>(
+      `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
     deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string }) =>
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateColumnMessage: (id: string, introText: string) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message`, {
+    updateColumnMessage: (accountId: string, id: string, introText: string) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify({ introText }),
       }),
-    pets: (search?: string) => fetchApi<ApiResponse<NenPetProfile[]>>(
-      `/api/nen-campaigns/pets${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+    pets: (accountId: string, search?: string) => {
+      const query = new URLSearchParams({ lineAccountId: accountId })
+      if (search) query.set('search', search)
+      return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
+    },
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
+      `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'DELETE' },
     ),
-    createPet: (data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
-      fetchApi<ApiResponse<{ id: string }>>('/api/nen-campaigns/pets', { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
-    deletePet: (id: string) => fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-    birthdayCoupon: () => fetchApi<ApiResponse<{
+    birthdayCoupon: (accountId: string) => fetchApi<ApiResponse<{
       isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number; updatedAt: string
-    }>>('/api/nen-campaigns/birthday-coupon'),
-    updateBirthdayCoupon: (data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
-      fetchApi<{ success: boolean }>('/api/nen-campaigns/birthday-coupon', { method: 'PUT', body: JSON.stringify(data) }),
+    }>>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`),
+    updateBirthdayCoupon: (accountId: string, data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   nenMembers: {
     overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
-    photos: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/photos'),
-    reviewPhoto: (id: string, data: { status: 'adopted' | 'rejected'; points: number }) => fetchApi<ApiResponse<{ awardedPoints: number; pointBalance: number | null; pointSync: string }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
+    photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    reviewPhoto: (id: string, data: {
+      accountId: string
+      status: 'adopted' | 'rejected'
+      reasonCode?: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
+      reasonNote?: string
+    }) => fetchApi<ApiResponse<{
+      awardedPoints: number
+      pointBalance: number | null
+      pointSync: string
+      notificationStatus: 'sent' | 'failed'
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
+    retryPhotoReviewNotification: (id: string, accountId: string) => fetchApi<ApiResponse<{
+      notificationStatus: 'sent'
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/notification/retry`, {
+      method: 'POST', body: JSON.stringify({ accountId }),
+    }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
     consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
@@ -3029,6 +3722,8 @@ export const api = {
     create: (data: {
       name: string
       description?: string | null
+      /** 新しいリマインダを動かすLINEアカウント。 */
+      lineAccountId: string
       triggerType?: ReminderTriggerType
       triggerOffsetMinutes?: number | null
       sendAtTime?: string | null
@@ -3125,6 +3820,53 @@ export const api = {
       const suffix = query.toString() ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<MileageAdminOverview>>(`/api/mileage/overview${suffix}`)
     },
+    history: (params: {
+      accountId: string
+      search?: string
+      entryType?: MileageHistoryItem['entryType']
+      status?: MileageHistoryItem['status']
+      mode?: 'automatic' | 'manual'
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.entryType) query.set('entryType', params.entryType)
+      if (params.status) query.set('status', params.status)
+      if (params.mode) query.set('mode', params.mode)
+      if (params.from) query.set('from', params.from)
+      if (params.to) query.set('to', params.to)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<MileageAdminHistory>>(`/api/mileage/history?${query.toString()}`)
+    },
+    adjustmentPolicy: (accountId: string) =>
+      fetchApi<ApiResponse<MileageAdjustmentPolicy>>(
+        `/api/mileage/adjustment-policy?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    setAdjustmentPolicy: (data: { accountId: string; approvalThreshold: number }) =>
+      fetchApi<ApiResponse<MileageAdjustmentPolicy>>('/api/mileage/adjustment-policy', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    adjust: (data: {
+      accountId: string
+      friendId: string
+      direction: 'increase' | 'decrease'
+      amount: number
+      reasonCategory: 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
+      reason: string
+      sourceReferenceId?: string
+    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult>>('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify(data),
+    }),
     rules: () => fetchApi<ApiResponse<MileageRule[]>>('/api/mileage/rules'),
     createRule: (data: {
       name: string
@@ -3148,6 +3890,24 @@ export const api = {
     }),
     deleteRule: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/mileage/rules/${id}`, { method: 'DELETE' }),
+  },
+  actionScores: {
+    friends: (params: {
+      accountId: string
+      search?: string
+      filter?: ActionScoreFilter
+      sort?: ActionScoreSort
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.filter) query.set('filter', params.filter)
+      if (params.sort) query.set('sort', params.sort)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<ActionScoreOverview>>(`/api/action-scores/friends?${query.toString()}`)
+    },
   },
   webhooks: {
     incoming: {
@@ -3206,26 +3966,33 @@ export const api = {
         }),
     },
     rules: {
-      list: () =>
-        fetchApi<ApiResponse<NotificationRule[]>>('/api/notifications/rules'),
-      get: (id: string) =>
-        fetchApi<ApiResponse<NotificationRule>>(`/api/notifications/rules/${id}`),
-      create: (data: { name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule[]>>(
+          `/api/notifications/rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      get: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/notifications/rules/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
         fetchApi<ApiResponse<NotificationRule>>('/api/notifications/rules', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: Partial<Pick<NotificationRule, 'name' | 'eventType' | 'conditions' | 'channels' | 'isActive'>>) =>
+      update: (id: string, lineAccountId: string, data: Partial<Pick<NotificationRule, 'name' | 'eventType' | 'conditions' | 'channels' | 'isActive'>>) =>
         fetchApi<ApiResponse<NotificationRule>>(`/api/notifications/rules/${id}`, {
           method: 'PUT',
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, lineAccountId }),
         }),
-      delete: (id: string) =>
-        fetchApi<ApiResponse<null>>(`/api/notifications/rules/${id}`, { method: 'DELETE' }),
+      delete: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<null>>(
+          `/api/notifications/rules/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'DELETE' },
+        ),
     },
-    list: (params?: { status?: string; limit?: string }) =>
+    list: (lineAccountId: string, params?: { status?: string; limit?: string }) =>
       fetchApi<ApiResponse<Notification[]>>(
-        '/api/notifications?' + new URLSearchParams(params as Record<string, string>),
+        '/api/notifications?' + new URLSearchParams({ lineAccountId, ...params }),
       ),
   },
   health: {
@@ -3464,11 +4231,13 @@ export const api = {
       )
     },
 
-    delete: (groupId: string, opts?: { force?: boolean }) =>
-      fetchApi<ApiResponse<null>>(
-        `/api/rich-menu-groups/${groupId}${opts?.force ? '?force=true' : ''}`,
-        { method: 'DELETE' },
+    deleteImpact: (groupId: string) =>
+      fetchApi<ApiResponse<RichMenuDeleteImpact>>(
+        `/api/rich-menu-groups/${groupId}/delete-impact`,
       ),
+
+    delete: (groupId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/rich-menu-groups/${groupId}`, { method: 'DELETE' }),
 
     publish: (groupId: string) =>
       fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(
@@ -3737,6 +4506,77 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify({ status: 'rejected' }) },
       ),
   },
+  /**
+   * 本人照合の候補。3-2-A（友だち同士）と 23-1-A（ECの会員）が同じ口を読む。
+   *
+   * 判定と取り消しは、画面が読み込んだ版（`expectedVersion`）を必ず送る。
+   * 先に別の人が判定していれば Worker が 409 `STALE_CANDIDATE` を返すので、
+   * 画面は上書きせず読み直しを促す。
+   */
+  identityCandidates: {
+    list: (params: {
+      kind: IdentityCandidateKind
+      status?: IdentityCandidateStatus
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ kind: params.kind })
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
+    },
+    get: (id: string) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}`,
+      ),
+    decide: (id: string, body: DecideIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/decide`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    undo: (id: string, body: UndoIdentityCandidateRequest) =>
+      fetchApi<ApiResponse<IdentityCandidateDetail>>(
+        `/api/identity-candidates/${encodeURIComponent(id)}/undo`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    detectFriendDuplicates: (params?: { limit?: number; after?: string | null }) => {
+      const query = new URLSearchParams({ kind: 'friend_duplicate' })
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.after) query.set('after', params.after)
+      return fetchApi<ApiResponse<DetectIdentityCandidatesResult>>(
+        `/api/identity-candidates/detect?${query.toString()}`,
+        { method: 'POST' },
+      )
+    },
+  },
+  /**
+   * 統合ユーザーの詳細（設計 `w8W4Eh` 3-3-A）。
+   *
+   * 更新は**読み込んだ `revision` を必ず送る**。先に別の人が変えていれば
+   * Worker が 409 `STALE_PERSON` を返すので、画面は上書きせず読み直す。
+   *
+   * 結び付け・解除の口はここに無い。#598 の候補判定・取り消しを使う。
+   */
+  mergedPeople: {
+    get: (id: string) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}`,
+      ),
+    update: (id: string, body: UpdateMergedPersonRequest) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+    updateDeliveryPriorities: (
+      id: string,
+      body: UpdateMergedPersonDeliveryPrioritiesRequest,
+    ) =>
+      fetchApi<ApiResponse<MergedPersonDetail>>(
+        `/api/friends/people/${encodeURIComponent(id)}/delivery-priorities`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      ),
+  },
   duplicates: {
     stats: (options?: { forceRefresh?: boolean }) =>
       fetchApi<ApiResponse<{
@@ -3825,6 +4665,17 @@ export interface BookingStaff {
   is_active: number;
 }
 
+export interface BookingMenuStaff {
+  id: string;
+  display_name: string;
+  role: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+  is_designation_optional: number;
+  price: number;
+  duration_minutes: number;
+}
+
 export interface BookingShift {
   id: string;
   work_date: string;
@@ -3877,6 +4728,27 @@ export interface BookingGoogleCalendarConnection {
   last_error: string | null;
 }
 
+export interface BookingAvailabilitySlot {
+  date: string;
+  start: string;
+  end: string;
+}
+
+export interface BookingAvailabilityResponse {
+  by_staff: Array<{
+    staff_id: string;
+    display_name: string;
+    slots: BookingAvailabilitySlot[];
+  }>;
+}
+
+export interface ProxyBookingResult {
+  booking_id: string;
+  status: string;
+  calendar_sync: 'not_configured' | 'synced' | 'failed' | 'pending';
+  replayed?: boolean;
+}
+
 function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
@@ -3885,6 +4757,39 @@ export const bookingApi = {
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
+  listMenuStaff: (accountId: string, menuId: string) =>
+    fetchApi<{ staff: BookingMenuStaff[] }>(
+      withAccount(`/api/booking/admin/menus/${menuId}/staff`, accountId),
+    ),
+  getAvailability: (
+    accountId: string,
+    params: { menuId: string; staffId?: string; from: string; to: string },
+  ) => {
+    const query = new URLSearchParams({
+      account_id: accountId,
+      menu_id: params.menuId,
+      from: params.from,
+      to: params.to,
+    });
+    if (params.staffId) query.set('staff_id', params.staffId);
+    return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
+  },
+  createProxyBooking: (
+    accountId: string,
+    body: {
+      friend_id: string;
+      menu_id: string;
+      staff_id: string;
+      starts_at: string;
+      customer_note?: string;
+    },
+    idempotencyKey: string,
+  ) =>
+    fetchApi<ProxyBookingResult>(withAccount('/api/booking/admin/bookings', accountId), {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(body),
+    }),
   createMenu: (accountId: string, body: Partial<BookingMenu>) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/menus', accountId), {
       method: 'POST',
