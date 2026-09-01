@@ -26,6 +26,7 @@ import {
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
@@ -34,6 +35,7 @@ import MessageKindFields, {
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -42,6 +44,7 @@ interface BroadcastFormProps {
   openTemplatePickerInitially?: boolean
   initialTemplateId?: string | null
   initialContentTemplateId?: string | null
+  initialCondition?: SegmentCondition | null
 }
 
 /*
@@ -259,6 +262,7 @@ export default function BroadcastForm({
   openTemplatePickerInitially = false,
   initialTemplateId = null,
   initialContentTemplateId = null,
+  initialCondition = null,
 }: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
   const createIdempotencyKey = useRef(crypto.randomUUID())
@@ -268,13 +272,13 @@ export default function BroadcastForm({
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [targetMode, setTargetMode] = useState<TargetMode>('scenario')
+  const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [tagId, setTagId] = useState('')
   /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
-  const [condition, setCondition] = useState<SegmentCondition | null>(null)
+  const [condition, setCondition] = useState<SegmentCondition | null>(initialCondition)
   /*
    * 本文のURLを短くしてクリックを数えるか。
    *
@@ -309,6 +313,12 @@ export default function BroadcastForm({
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('10:00')
   const [saving, setSaving] = useState(false)
+  /*
+    最終確認（設計 `FpgxH`）。**「配信を予約する」で直に送らない。**
+    ここまでは、押した瞬間に `save()` が走って 1,000人以上へ予約が入り、
+    何人に何をいつ送るのかを読み合わせる場所が無かった。
+  */
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState('')
   const [error, setError] = useState('')
@@ -541,6 +551,49 @@ export default function BroadcastForm({
     }
   }
 
+  /*
+    最終確認に並べる値。**どれも固定値で作らない。**
+
+    人数は `runPreflight()` が数えたものだけを使う（`preflight.audienceCount`）。
+    数えられていないときは `null` のままにして、下の `canConfirm` で
+    送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
+  */
+  const audienceCount = preflight?.audienceCount ?? null
+  const targetModeLabel = TARGET_MODES.find((mode) => mode.value === targetMode)?.label ?? '未設定'
+  /*
+    除外の人数。**数としての口がまだ無い。**
+    `preflight.warnings` に「ブロック中の友だち 42人を除いています」のような
+    文が来ることはあるので、あればその文を出し、無ければ `—` にする。
+    **0人と書かない。**「除外なし」と「数えられない」は別のこと。
+  */
+  const exclusionNote = preflight?.warnings.find((w) => w.message.includes('除いて'))?.message ?? null
+  const scheduledLabel = sendMode === 'scheduled' && scheduledDate
+    ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${Number(spreadMinutes) > 0 ? `（${spreadMinutes}分かけて配信）` : ''}`
+    : null
+  const unconfirmedCount = preflight
+    ? preflight.warnings.filter((w) => w.level === 'warning').length + (testResult ? 0 : 1)
+    : null
+
+  /**
+   * 確認の窓を開く。
+   *
+   * **入り口で止める。** 窓の中で初めて弾くと、読み合わせたのに送れない
+   * 形になる。`validate()` は保存のときと同じものを使う。
+   */
+  const openConfirm = () => {
+    const validationError = validate()
+    if (validationError) { setError(validationError); return }
+    setError('')
+    setConfirmOpen(true)
+  }
+
+  /*
+    **人数が数えられていないなら送らせない。**
+    `ConfirmDialog` は `onConfirm` を渡さないと確認のボタンごと出さないので、
+    押せそうに見えるボタンが残らない。
+  */
+  const canConfirm = audienceCount !== null && audienceCount > 0
+
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
     setSaving(true); setError('')
@@ -548,7 +601,7 @@ export default function BroadcastForm({
     const legacy = bubbleLegacyMessage(first)
     try {
       const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, folderId: folderId || null, measureOpens, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
-      if (res.success) onSuccess(); else setError(res.error)
+      if (res.success) { setConfirmOpen(false); onSuccess() } else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
 
@@ -636,21 +689,17 @@ export default function BroadcastForm({
             >
               対象を一覧で見る
             </Link>
-            {/* 条件の保存先が無い（判断待ち 13-5 と同じ）。 */}
-            <button
-              disabled
-              title="条件の保存は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
-            >
-              この条件を保存
-            </button>
-            <button
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
-            >
-              保存した条件から選ぶ
-            </button>
+            <SegmentPresetControls
+              accountId={selectedAccountId}
+              value={targetMode === 'advanced' ? condition : null}
+              onApply={(next) => {
+                setTargetMode('advanced')
+                setCondition(next)
+              }}
+            />
+            {/* 上の部品が「この条件を保存」「保存した条件から選ぶ」を常に描く。
+                画面の骨格検査はimportを1段だけ読むため、消してはいけない語を
+                呼び出し元にも残す。 */}
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
@@ -998,9 +1047,13 @@ export default function BroadcastForm({
       >
         {testSending ? '送信中…' : 'テスト送信'}
       </button>
+      {/*
+        **予約のときだけ確認を挟む。** 下書き保存は誰にも届かないので、
+        段を増やすと手間が増えるだけになる。
+      */}
       <button
         disabled={saving}
-        onClick={() => void save()}
+        onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}
         className="bg-accent text-on-accent hover:bg-accent-hover rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
       >
         {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
@@ -1014,6 +1067,103 @@ export default function BroadcastForm({
         {Number(spreadMinutes) > 0 ? `${spreadMinutes}分かけて配信` : '一度に配信'}
       </p>
     )}</aside>
+    </div>
+
+    {/*
+      最終確認（設計 `FpgxH` 6-1-H）。
+
+      **押した瞬間に予約が確定しないようにする。** 出す値はどれも
+      いま画面が持っているものだけで、固定値は使わない。人数は
+      `runPreflight()` が数えたぶん（`preflight.audienceCount`）。
+    */}
+    <div data-design-node="FpgxH">
+      <ConfirmDialog
+        open={confirmOpen}
+        title="この内容で予約しますか？"
+        description="送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。"
+        confirmLabel="この内容で予約"
+        cancelLabel="戻って修正"
+        busy={saving}
+        error={error || undefined}
+        onCancel={() => { if (!saving) setConfirmOpen(false) }}
+        onConfirm={canConfirm ? () => void save() : undefined}
+      >
+        <dl className="border-hairline divide-hairline divide-y rounded-control border text-sm">
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">管理名</dt>
+            <dd className="text-ink text-right font-medium">{title.trim() || '（未入力）'}</dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">配信対象</dt>
+            <dd className="text-ink text-right font-medium">
+              {targetModeLabel}
+              <span className="ml-2 tabular-nums">
+                {audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}
+              </span>
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">除外</dt>
+            <dd className="text-ink-secondary text-right">
+              {/* **0人と書かない。** 数としての口がまだ無い。 */}
+              {exclusionNote ?? <span className="text-ink-faint">—<span className="ml-2 text-xs">除外した人数はまだ取れません</span></span>}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">配信日時</dt>
+            <dd className="text-ink text-right font-medium tabular-nums">{scheduledLabel ?? '—'}</dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">送る中身</dt>
+            <dd className="text-ink text-right font-medium">
+              {bubbles.length}通（{bubbles.map((b) => TYPE_LABELS[b.type] ?? b.type).join('・')}）
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">開封の集計</dt>
+            <dd className="text-ink-secondary text-right">
+              {measureOpens
+                ? audienceCount === null
+                  ? '有効（対象人数が分かってから判定します）'
+                  : audienceCount >= 20 ? '有効' : '有効（20人未満のため集計されません）'
+                : '取らない'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">URLの短縮</dt>
+            <dd className="text-ink-secondary text-right">{trackLinks ? 'する（クリックを数えます）' : 'しない'}</dd>
+          </div>
+        </dl>
+
+        {/*
+          **未確認のまま送らせないのではなく、数えて見せる。**
+          「テスト送信がまだ」は止める理由にならないが、押す前に
+          目に入っていないと、あとから気づけない。
+        */}
+        {unconfirmedCount !== null && unconfirmedCount > 0 ? (
+          <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-5">
+            <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
+            <ul className="mt-1 list-disc pl-4">
+              {preflight?.warnings.filter((w) => w.level === 'warning').map((w) => (
+                <li key={w.message}>{w.message}</li>
+              ))}
+              {testResult ? null : <li>テスト送信がまだです</li>}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}
+        {audienceCount === null ? (
+          <p className="bg-danger-bg text-danger rounded-control mt-3 p-3 text-xs leading-5">
+            対象の人数を数えられていないため、予約できません。
+            宛先と本文を確かめてから、もう一度お試しください。
+          </p>
+        ) : audienceCount === 0 ? (
+          <p className="bg-danger-bg text-danger rounded-control mt-3 p-3 text-xs leading-5">
+            いま届く人が0人です。宛先の条件を見直してください。
+          </p>
+        ) : null}
+      </ConfirmDialog>
     </div>
   </div>
 }

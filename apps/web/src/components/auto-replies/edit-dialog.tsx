@@ -60,6 +60,71 @@ export interface AutoReplyDraft {
   folderId?: string | null
 }
 
+/**
+ * 保存してあるルールを、この窓が読む形にする。
+ *
+ * **1か所で作る。** 呼ぶ側がそれぞれ項目を並べ直していたので、
+ * 一覧からの「編集」と `/auto-replies/edit?id=` で**中身が食い違って**いた。
+ * URL から開いたほうは、曜日・アクション・キーワードの複数行・友だち条件を
+ * 落としていた。**落ちた項目は、開いて保存した時点で消える。**
+ *
+ * `folderId` もここで必ず残す。#430 でフォルダ編集が入った後に
+ * この変換で落とすと、開いて保存しただけで未分類へ移ってしまう。
+ */
+export function toDraft(rule: {
+  id: string
+  keyword: string
+  matchType: 'exact' | 'contains'
+  responseType: string
+  responseContent: string
+  templateId: string | null
+  lineAccountId: string | null
+  isActive: boolean
+  activeFrom?: string | null
+  activeUntil?: string | null
+  cooldownMinutes?: number | null
+  skipWhenOperatorActive?: boolean
+  priority: number
+  messageKinds?: string[] | null
+  actions?: unknown[] | null
+  responseWeekdays?: number[] | null
+  responseHolidayRule?: string | null
+  oncePerFriend?: boolean
+  keywords?: unknown[] | null
+  friendConditions?: unknown | null
+  respondToAll?: boolean
+  name?: string | null
+  keywordMatchMode?: string
+  folderId?: string | null
+}): AutoReplyDraft {
+  return {
+    id: rule.id,
+    keyword: rule.keyword,
+    matchType: rule.matchType,
+    responseType: rule.responseType,
+    responseContent: rule.responseContent,
+    templateId: rule.templateId,
+    lineAccountId: rule.lineAccountId,
+    isActive: rule.isActive,
+    activeFrom: rule.activeFrom ?? null,
+    activeUntil: rule.activeUntil ?? null,
+    cooldownMinutes: rule.cooldownMinutes ?? null,
+    skipWhenOperatorActive: rule.skipWhenOperatorActive ?? false,
+    priority: rule.priority,
+    messageKinds: rule.messageKinds ?? null,
+    actions: rule.actions ?? null,
+    responseWeekdays: rule.responseWeekdays ?? null,
+    responseHolidayRule: rule.responseHolidayRule ?? null,
+    oncePerFriend: rule.oncePerFriend ?? false,
+    keywords: rule.keywords ?? null,
+    friendConditions: rule.friendConditions ?? null,
+    respondToAll: rule.respondToAll ?? false,
+    name: rule.name ?? null,
+    keywordMatchMode: rule.keywordMatchMode === 'all' ? 'all' : 'any',
+    folderId: rule.folderId ?? null,
+  }
+}
+
 /** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
 const MESSAGE_KIND_LABELS: Array<{ key: string; label: string }> = [
   { key: 'text', label: 'テキスト' },
@@ -360,126 +425,6 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               ))}
             </div>
           </div>
-          <div>
-            <p className="text-ink mb-2 text-sm font-semibold">3. 何を返すか</p>
-            <label className="text-ink-secondary mb-1 block text-xs">返し方</label>
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'silent', label: '返信しない' },
-                { key: 'template', label: 'テンプレートから' },
-                { key: 'inline-text', label: 'この画面に直接書く' },
-                { key: 'inline-flex', label: 'Flex（JSONを直接書く）' },
-                { key: 'inline-image', label: '画像（JSONを直接書く）' },
-              ] as const).map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setMode(key)}
-                  className={`rounded-control px-3 py-1.5 text-xs ${mode === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {mode === 'template' && (
-            <div>
-              <label className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
-              <select
-                value={templateId ?? ''}
-                onChange={(e) => setTemplateId(e.target.value || null)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">-- 選択 --</option>
-                {flexTemplates.length > 0 && (
-                  <optgroup label="Flex">
-                    {flexTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {textTemplates.length > 0 && (
-                  <optgroup label="テキスト">
-                    {textTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {imageTemplates.length > 0 && (
-                  <optgroup label="画像">
-                    {imageTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-              {templates.length === 0 && (
-                <p className="text-[11px] text-amber-600 mt-1">
-                  テンプレートがありません。<a href="/templates" className="underline">/templates</a> で作成してください。
-                </p>
-              )}
-            </div>
-          )}
-          {(mode === 'inline-text' || mode === 'inline-flex') && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                {mode === 'inline-flex' ? 'Flex JSON' : 'テキスト'}
-              </label>
-              <textarea
-                rows={mode === 'inline-flex' ? 8 : 4}
-                value={responseContent}
-                onChange={(e) => setResponseContent(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-              />
-            </div>
-          )}
-          {mode === 'inline-image' && (
-            <ImageUploader
-              mode="line-image"
-              value={(() => {
-                try {
-                  const parsed = JSON.parse(responseContent) as { originalContentUrl?: string; previewImageUrl?: string }
-                  if (parsed.originalContentUrl) {
-                    return {
-                      mode: 'line-image' as const,
-                      originalContentUrl: parsed.originalContentUrl,
-                      previewImageUrl: parsed.previewImageUrl ?? parsed.originalContentUrl,
-                    }
-                  }
-                } catch { /* ignore */ }
-                return null
-              })()}
-              onChange={(v) => {
-                if (v?.mode === 'line-image') {
-                  setResponseContent(JSON.stringify({
-                    originalContentUrl: v.originalContentUrl,
-                    previewImageUrl: v.previewImageUrl,
-                  }))
-                } else {
-                  setResponseContent('')
-                }
-              }}
-              label="返信画像"
-            />
-          )}
-          <div>
-            <label htmlFor="ar-priority" className="text-ink-faint mb-1 block text-xs">
-              評価順
-            </label>
-            <input
-              id="ar-priority"
-              type="number"
-              min={-9999}
-              max={9999}
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
-            />
-            <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
-              小さいほど先に見ます。上から順に見て、最初に当てはまった1つだけが動きます。
-              間に挿し込めるよう、10・20・30 のように間を空けておくと後で楽です。
-            </p>
-          </div>
-
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">
             <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
@@ -688,6 +633,126 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               </p>
             </div>
           </div>
+          <div>
+            <p className="text-ink mb-2 text-sm font-semibold">3. 何を返すか</p>
+            <label className="text-ink-secondary mb-1 block text-xs">返し方</label>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { key: 'silent', label: '返信しない' },
+                { key: 'template', label: 'テンプレートから' },
+                { key: 'inline-text', label: 'この画面に直接書く' },
+                { key: 'inline-flex', label: 'Flex（JSONを直接書く）' },
+                { key: 'inline-image', label: '画像（JSONを直接書く）' },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setMode(key)}
+                  className={`rounded-control px-3 py-1.5 text-xs ${mode === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {mode === 'template' && (
+            <div>
+              <label className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
+              <select
+                value={templateId ?? ''}
+                onChange={(e) => setTemplateId(e.target.value || null)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">-- 選択 --</option>
+                {flexTemplates.length > 0 && (
+                  <optgroup label="Flex">
+                    {flexTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {textTemplates.length > 0 && (
+                  <optgroup label="テキスト">
+                    {textTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {imageTemplates.length > 0 && (
+                  <optgroup label="画像">
+                    {imageTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              {templates.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  テンプレートがありません。<a href="/templates" className="underline">/templates</a> で作成してください。
+                </p>
+              )}
+            </div>
+          )}
+          {(mode === 'inline-text' || mode === 'inline-flex') && (
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                {mode === 'inline-flex' ? 'Flex JSON' : 'テキスト'}
+              </label>
+              <textarea
+                rows={mode === 'inline-flex' ? 8 : 4}
+                value={responseContent}
+                onChange={(e) => setResponseContent(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+              />
+            </div>
+          )}
+          {mode === 'inline-image' && (
+            <ImageUploader
+              mode="line-image"
+              value={(() => {
+                try {
+                  const parsed = JSON.parse(responseContent) as { originalContentUrl?: string; previewImageUrl?: string }
+                  if (parsed.originalContentUrl) {
+                    return {
+                      mode: 'line-image' as const,
+                      originalContentUrl: parsed.originalContentUrl,
+                      previewImageUrl: parsed.previewImageUrl ?? parsed.originalContentUrl,
+                    }
+                  }
+                } catch { /* ignore */ }
+                return null
+              })()}
+              onChange={(v) => {
+                if (v?.mode === 'line-image') {
+                  setResponseContent(JSON.stringify({
+                    originalContentUrl: v.originalContentUrl,
+                    previewImageUrl: v.previewImageUrl,
+                  }))
+                } else {
+                  setResponseContent('')
+                }
+              }}
+              label="返信画像"
+            />
+          )}
+          <div>
+            <label htmlFor="ar-priority" className="text-ink-faint mb-1 block text-xs">
+              評価順
+            </label>
+            <input
+              id="ar-priority"
+              type="number"
+              min={-9999}
+              max={9999}
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
+            />
+            <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
+              小さいほど先に見ます。上から順に見て、最初に当てはまった1つだけが動きます。
+              間に挿し込めるよう、10・20・30 のように間を空けておくと後で楽です。
+            </p>
+          </div>
+
 
           {/* 応答したときに、あわせて行うこと */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">

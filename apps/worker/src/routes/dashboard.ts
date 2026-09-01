@@ -284,10 +284,17 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async 
 dashboard.get('/api/list-stats', async (c) => {
   try {
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    return c.json({ success: true as const, data: await getListStats(c.env.DB, {
-      allowedAccountIds: accountScope.allowedAccountIds,
-      includeUnassigned: accountScope.canSeeUnassigned,
-    }) });
+    const selectedAccountId = readAccountId(c);
+    if (selectedAccountId && !accountScope.allowedAccountIds.includes(selectedAccountId)) {
+      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+    }
+    const scope = selectedAccountId
+      ? { allowedAccountIds: [selectedAccountId], includeUnassigned: false }
+      : {
+          allowedAccountIds: accountScope.allowedAccountIds,
+          includeUnassigned: accountScope.canSeeUnassigned,
+        };
+    return c.json({ success: true as const, data: await getListStats(c.env.DB, scope) });
   } catch (err) {
     console.error('GET /api/list-stats error:', err);
     return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);

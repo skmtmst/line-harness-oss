@@ -63,6 +63,10 @@ V6が上回る条件:
 
 現行は環境変数`ECCUBE_WEBHOOK_SECRET`と`NEN_EC_BASE_URL`が全体で一つである。V6はconnector単位へ移行する。
 
+移行までの受信署名は `timestamp.lineAccountId.rawBody` をHMAC-SHA256で署名し、
+`x-line-account-id` を本文と同じく改ざん検知の対象にする。署名を確かめる前に、
+指定されたLINEアカウントの有無を応答へ出してはいけない。
+
 - organization/account/shop/provider/environmentを保持
 - secret/tokenは暗号化し、通常APIは末尾4文字と更新日だけ
 - inbound HMAC secretとoutbound API tokenを分離
@@ -272,3 +276,17 @@ V6の「ふつうは1分以内」はSLOとして定義し、例: 95%を5分以�
 5. LINE/成果/mileage/tag/分析のidempotent action
 6. retry、dead letter、reconciliation、SLO
 7. 定期便risk、V6画面、migration、E2E、画像比較
+
+## 18. 実装照合の進捗（2026-08-28）
+
+今回、既存のEC-CUBE webhook・HMAC・イベント台帳・会員snapshotを作り直さず、最優先のaccount境界と未照合受付を先に追加した。
+
+- webhookは対象LINEアカウントの指定を必須にする
+- eventをLINEアカウントへ固定し、同じ外部event IDでも別accountなら別件として保持する
+- friend照合は指定accountの中だけで行い、別accountの同じLINE userへ結ばない
+- 対象accountのLINE tokenが無ければ既定tokenへ逃がさない
+- LINE IDが無い・一致するfriendがいないeventも捨てず、`identity_pending`として残す
+- 管理画面の概要・event一覧を、選択中または権限内のaccountだけに限定する
+- V6で「会員の確認待ち」を0件と混同せず表示する
+
+まだ完了ではない。connector別secret、Queueとaction ledger、email/電話候補、注文・定期便の正規化、V6 4画面、画像比較は後続実装とする。本変更では本番DB更新・配備を行わない。

@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 共通情報の登録。
@@ -67,6 +67,9 @@ function suggestKey(name: string): string {
 }
 
 export default function NewCommonVarPage() {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
   const router = useRouter()
   const [folders, setFolders] = useState<Folder[]>([])
   const [name, setName] = useState('')
@@ -93,6 +96,11 @@ export default function NewCommonVarPage() {
 
   const save = async () => {
     if (saving) return
+    if (!selectedAccountId) {
+      setError('LINEアカウントを選択してください')
+      return
+    }
+    const accountAtRequest = selectedAccountId
     if (!name.trim()) {
       setError('共通情報名を入力してください')
       return
@@ -105,12 +113,14 @@ export default function NewCommonVarPage() {
     setError('')
     try {
       const res = await api.commonVars.create({
+        accountId: accountAtRequest,
         name: name.trim(),
         varKey: varKey.trim(),
         type,
         value,
         folderId: folderId || null,
       })
+      if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
         return
@@ -131,6 +141,11 @@ export default function NewCommonVarPage() {
 
   return (
     <div>
+      {!accountLoading && !selectedAccountId && (
+        <div className="bg-warning-bg text-warning mb-4 max-w-3xl rounded-card p-4 text-sm">
+          共通情報を登録するLINEアカウントを選択してください。
+        </div>
+      )}
       <nav className="text-ink-faint mb-3 text-xs">
         <Link href="/contents/vars" className="text-info hover:underline">
           共通情報一覧
@@ -138,8 +153,6 @@ export default function NewCommonVarPage() {
         <span className="mx-1.5">›</span>
         <span>共通情報登録</span>
       </nav>
-
-      <Header title="共通情報登録" />
 
       <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
         <div className="grid gap-4 sm:grid-cols-2">
