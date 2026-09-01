@@ -61,6 +61,15 @@ export default function EcCommercePage() {
         api.ecCommerce.settings(),
       ])
       if (!overviewRes.success || !eventRes.success || !settingRes.success) throw new Error('API error')
+      /*
+        **一覧の形を確かめてから state に入れる。**
+        `success` が真でも中身が配列とはかぎらない（口が想定と違う形を返すと
+        `{items:[],total:0}` のような物が入る）。そのまま入れると描画の途中で
+        `events.map is not a function` を投げ、エラー境界が本文を丸ごと
+        「画面を表示できませんでした」に置き換える。**1つの一覧が読めないだけで
+        画面が消える。** 読めなかったこととして扱い、理由を本文の帯に出す。
+      */
+      if (!Array.isArray(eventRes.data) || !Array.isArray(settingRes.data)) throw new Error('API error')
       setOverview(overviewRes.data)
       setEvents(eventRes.data)
       const subscriptionSettings = settingRes.data.filter((setting) =>

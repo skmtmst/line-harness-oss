@@ -7,6 +7,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { api, type DashboardOverview } from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
+import { apiCheckDetail } from './api-check-detail'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -241,7 +242,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         label: 'API・外部連携',
         icon: '↔',
         severity: 'normal',
-        detail: `管理APIとEC連携データを確認しました（24時間以内の受信${commerce.last24h.toLocaleString('ja-JP')}件）`,
+        detail: apiCheckDetail((commerce as { last24h?: unknown } | null)?.last24h),
       })
     } else {
       nextChecks.push({ id: 'api', label: 'API・外部連携', icon: '↔', severity: 'unknown', detail: '管理APIまたはEC連携データを取得できませんでした' })
