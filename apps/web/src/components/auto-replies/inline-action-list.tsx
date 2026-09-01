@@ -50,10 +50,10 @@ export function useActionOptions(): ActionOptions {
     void (async () => {
       const [tags, fields, marks, scenarios, vars] = await Promise.allSettled([
         api.tags.list(),
-        api.friendFields.list(),
+        api.friendFields.list(selectedAccountId),
         api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
-        api.commonVars.list(),
+        api.commonVars.list(selectedAccountId),
       ])
       if (cancelled) return
       setOptions({

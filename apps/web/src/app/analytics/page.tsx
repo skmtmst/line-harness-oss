@@ -3,20 +3,37 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
-import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import {
+  api,
+  type AnalyticsFriendsOverview,
+  type AnalyticsCrossAxis,
+  type AnalyticsCrossResult,
+  type AnalyticsFunnelRunResult,
+  type AnalyticsMetric,
+  type AnalyticsReactionsOverview,
+  type AnalyticsRoutesOverview,
+  type AnalyticsUsageOverview,
+  type AnalyticsUrlClicksOverview,
+  type SavedAnalyticsSnapshot,
+  type SavedAnalyticsSummary,
+} from '@/lib/api'
 import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import Chip, { type ChipTone } from '@/components/shared/chip'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
+import { formatAnalyticsDateTime } from './analytics-time'
 
 const TABS = [
-  { key: 'messages', label: '送信数' },
+  { key: 'friends', label: '友だちの増減' },
+  { key: 'reactions', label: '配信の反応' },
+  { key: 'routes', label: '経路と成果' },
+  { key: 'usage', label: '使われ方' },
+  { key: 'cross', label: 'クロス分析' },
   { key: 'funnel', label: 'ファネル' },
-  { key: 'cross', label: 'クロス集計' },
-  { key: 'clicks', label: 'URLクリック' },
-  // 表示名は利用者指定の「Google Analytics」。実体は既存Search Console画面。
-  { key: 'search', label: 'Google Analytics', href: '/search-console' },
+  { key: 'url-clicks', label: 'URLクリック' },
+  { key: 'saved', label: '保存した分析' },
 ]
 
 /** 期間の選択肢。日数で持つ。 */
@@ -50,6 +67,92 @@ function RangePicker({ days, onChange }: { days: number; onChange: (d: number) =
           {r.label}
         </button>
       ))}
+    </div>
+  )
+}
+
+function SaveAnalysisAction({
+  accountId,
+  sourceKind,
+  sourceResultId,
+  defaultName,
+}: {
+  accountId: string
+  sourceKind: 'cross' | 'funnel'
+  sourceResultId: string
+  defaultName: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState(defaultName)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setOpen(false)
+    setName(defaultName)
+    setSaved(false)
+    setError('')
+  }, [accountId, defaultName, sourceResultId])
+
+  const save = async () => {
+    if (!name.trim() || !sourceResultId) return
+    setSaving(true)
+    setError('')
+    try {
+      const response = await api.analytics.saved.create(accountId, {
+        name: name.trim(),
+        sourceKind,
+        sourceResultId,
+      })
+      if (!response.success) throw new Error(response.error)
+      setSaved(true)
+      setOpen(false)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '分析結果を保存できませんでした')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    return (
+      <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+        <span className="text-success">定義とこの時点の結果を保存しました</span>
+        <Link href="/analytics?tab=saved" className="text-accent font-medium hover:underline">
+          保存した分析を見る
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {open ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor={`saved-analysis-${sourceKind}`} className="sr-only">保存する分析名</label>
+          <input
+            id={`saved-analysis-${sourceKind}`}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={120}
+            className="border-hairline rounded-control min-w-64 flex-1 border px-3 py-2 text-sm"
+            placeholder="保存する分析名"
+          />
+          <Button onClick={() => void save()} disabled={saving || !name.trim()} variant="primary">
+            {saving ? '保存中' : 'この名前で保存'}
+          </Button>
+          <Button onClick={() => setOpen(false)} disabled={saving} variant="secondary">
+            やめる
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={() => setOpen(true)} variant="secondary">
+          この分析結果を保存
+        </Button>
+      )}
+      {error && <p className="text-danger text-xs">{error}</p>}
+      <p className="text-ink-faint text-xs">条件の定義と、いま表示している結果を別々に固定して残します。</p>
     </div>
   )
 }
@@ -88,587 +191,143 @@ function weekdayOf(date: string): string {
   return WEEKDAY_JP[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
 }
 
-function MessagesTab({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(28)
-  const [rows, setRows] = useState<
-    Array<{
-      date: string
-      outgoing: number
-      incoming: number
-      reply: number
-      push: number
-      fromBroadcast: number
-      fromScenario: number
-    }>
-  >([])
-  const [broadcasts, setBroadcasts] = useState<
-    Array<{
-      broadcastId: string
-      name: string
-      sentAt: string | null
-      delivered: number | null
-      uniqueImpression: number | null
-      uniqueClick: number | null
-      suppressedByAudienceSize: boolean
-    }>
-  >([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setRows([])
-    setBroadcasts([])
-    const range = rangeFor(days)
-    void Promise.all([
-      api.analytics.messages(accountId, range),
-      api.analytics.broadcasts(accountId, range),
-    ]).then(([msg, bc]) => {
-      if (!active) return
-      if (msg.success) setRows(msg.data)
-      if (bc.success) setBroadcasts(bc.data)
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
-    return () => {
-      active = false
-    }
-  }, [accountId, days])
-
-  const totals = useMemo(
-    () =>
-      rows.reduce(
-        (acc, r) => ({
-          outgoing: acc.outgoing + r.outgoing,
-          incoming: acc.incoming + r.incoming,
-          reply: acc.reply + r.reply,
-          push: acc.push + r.push,
-        }),
-        { outgoing: 0, incoming: 0, reply: 0, push: 0 },
-      ),
-    [rows],
-  )
-
-  // 開封・クリックは配信ごとにしか返らない。日ごとの表に出すため、送った日で
-  // まとめ直す。同じ日に複数の配信があれば足す。
-  const byDate = useMemo(() => {
-    const m = new Map<string, { delivered: number; impression: number; click: number }>()
-    for (const b of broadcasts) {
-      if (!b.sentAt) continue
-      const date = b.sentAt.slice(0, 10)
-      const cur = m.get(date) ?? { delivered: 0, impression: 0, click: 0 }
-      m.set(date, {
-        delivered: cur.delivered + (b.delivered ?? 0),
-        impression: cur.impression + (b.uniqueImpression ?? 0),
-        click: cur.click + (b.uniqueClick ?? 0),
-      })
-    }
-    return m
-  }, [broadcasts])
-
-  const rates = useMemo(() => {
-    const delivered = broadcasts.reduce((sum, b) => sum + (b.delivered ?? 0), 0)
-    if (delivered === 0) return { open: null as number | null, click: null as number | null }
-    const impression = broadcasts.reduce((sum, b) => sum + (b.uniqueImpression ?? 0), 0)
-    const click = broadcasts.reduce((sum, b) => sum + (b.uniqueClick ?? 0), 0)
-    return {
-      open: Math.round((impression / delivered) * 100),
-      click: Math.round((click / delivered) * 100),
-    }
-  }, [broadcasts])
-
-  // 設計は新しい日が上。API は古い順に返す。
-  const shown = useMemo(() => [...rows].reverse(), [rows])
-
-  return (
-    <div>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="今月の送信"
-          value={totals.outgoing}
-          unit="通"
-          detail={`リプライ${totals.reply} ・ プッシュ${totals.push}`}
-          loading={loading}
-        />
-        {/* 月の上限を持つ設定が無い。数字を置くと、実際の契約と食い違ったまま
-            «あと何通送れるか» を読まれてしまう。 */}
-        <KpiCard title="残枠" value={null} unit="通" detail="上限が未設定です" />
-        <KpiCard
-          title="平均開封率"
-          value={rates.open}
-          unit="%"
-          detail="配信のうち"
-          loading={loading}
-        />
-        <KpiCard
-          title="平均クリック率"
-          value={rates.click}
-          unit="%"
-          detail="短縮URL経由"
-          loading={loading}
-        />
-      </div>
-
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-      >
-        <input
-          type="date"
-          disabled
-          title="日付での絞り込みは準備中です"
-          aria-label="日付で絞り込み"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>日付が新しい順</option>
-        </select>
-        <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
-        <RangePicker days={days} onChange={setDays} />
-        <Button
-          disabled
-          title="書き出しは準備中です"
-        >
-          CSVで書き出す
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
-      ) : (
-        <>
-          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-            <table className="w-full min-w-[760px]">
-              <thead>
-                <tr className="bg-canvas-sunken border-hairline border-b">
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">日付</th>
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">曜日</th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">リプライ数</th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">プッシュ数</th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">合計</th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">開封</th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">クリック</th>
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">備考</th>
-                </tr>
-              </thead>
-              <tbody className="divide-hairline divide-y">
-                {shown.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-ink-faint px-4 py-8 text-center text-sm">
-                      この期間の記録はありません。
-                    </td>
-                  </tr>
-                ) : (
-                  shown.map((r) => {
-                    const b = byDate.get(r.date)
-                    const notes: string[] = []
-                    if (r.fromBroadcast > 0) notes.push('一斉配信')
-                    if (r.fromScenario > 0) notes.push('シナリオ')
-                    return (
-                      <tr key={r.date} className="hover:bg-canvas-sunken">
-                        <td className="text-ink px-4 py-3 text-sm tabular-nums">{r.date}</td>
-                        <td className="text-ink-secondary px-4 py-3 text-sm">{weekdayOf(r.date)}</td>
-                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                          {r.reply}
-                        </td>
-                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                          {r.push}
-                        </td>
-                        <td className="text-ink px-4 py-3 text-right text-sm font-medium tabular-nums">
-                          {r.outgoing}
-                        </td>
-                        {/* 配信が無い日は開封もクリックも取りようがない。0 と
-                            書くと「送ったのに誰も読んでいない」に見える。 */}
-                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                          {b && b.delivered > 0
-                            ? `${b.impression}（${Math.round((b.impression / b.delivered) * 1000) / 10}%）`
-                            : '—'}
-                        </td>
-                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                          {b && b.delivered > 0 ? b.click : '—'}
-                        </td>
-                        <td className="text-ink-faint px-4 py-3 text-sm">
-                          {notes.length > 0 ? notes.join(' ・ ') : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-ink-faint text-xs tabular-nums">
-              合計 リプライ {totals.reply} ・ プッシュ {totals.push} ・ {totals.outgoing} 通
-            </p>
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                disabled
-                title="ページの切り替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
-              >
-                前へ
-              </button>
-              <button
-                disabled
-                title="ページの切り替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
-              >
-                次へ
-              </button>
-            </div>
-          </div>
-
-          <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-            この集計は当システムが独自に数えたものです。LINEヤフー社から実際に課金される正確な送信数は
-            LINE Developers でご確認ください。
-          </p>
-          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-            リプライとプッシュを足しても合計に届かないことがあります。区分を記録する前に
-            送ったぶんと、テスト送信がどちらにも入らないためです。
-          </p>
-          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-            配信先が20人未満のときは、LINEから開封数・クリック数が返りません（「—」と表示します）。
-            0件という意味ではありません。
-          </p>
-        </>
-      )}
-    </div>
-  )
-}
-
-type ClickFilter = 'all' | 'active' | 'zero'
-
-function ClicksTab({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(28)
-  const [rows, setRows] = useState<
-    Array<{
-      trackedLinkId: string
-      name: string
-      originalUrl: string
-      shortCode: string | null
-      tagName: string | null
-      scenarioName: string | null
-      isActive: boolean
-      clicks: number
-      uniqueFriends: number
-    }>
-  >([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<ClickFilter>('all')
-  const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<string | null>(null)
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setPicked(null)
-    setRows([])
-    void api.analytics
-      .trackedLinks(accountId, rangeFor(days))
-      .then((res) => {
-        if (active && res.success) setRows(res.data)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [accountId, days])
-
-  const counts = useMemo(
-    () => ({
-      all: rows.length,
-      active: rows.filter((r) => r.isActive).length,
-      zero: rows.filter((r) => r.clicks === 0).length,
-    }),
-    [rows],
-  )
-
-  const totals = useMemo(
-    () => ({
-      clicks: rows.reduce((sum, r) => sum + r.clicks, 0),
-      friends: rows.reduce((sum, r) => sum + r.uniqueFriends, 0),
-      top: rows.reduce<(typeof rows)[number] | null>(
-        (best, r) => (best === null || r.clicks > best.clicks ? r : best),
-        null,
-      ),
-    }),
-    [rows],
-  )
-
-  const shown = useMemo(() => {
-    const q = query.trim()
-    return rows
-      .filter((r) => (filter === 'active' ? r.isActive : filter === 'zero' ? r.clicks === 0 : true))
-      .filter((r) => (q ? r.name.includes(q) || r.originalUrl.includes(q) : true))
-  }, [rows, filter, query])
-
-  const pickedRow = rows.find((r) => r.trackedLinkId === picked) ?? null
-  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-
-  return (
-    <div>
-      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-        配信に入れたリンクが何回押されたかを測ります。押した人が分かるので、押した人だけに次の案内を送るといった使い方ができます。
-      </p>
-
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          title="測定中のURL"
-          value={counts.all}
-          unit="件"
-          detail={`使用中 ${counts.active}`}
-          loading={loading}
-        />
-        <KpiCard
-          title="今月のクリック"
-          value={totals.clicks}
-          unit="回"
-          detail={`実人数 ${totals.friends}`}
-          loading={loading}
-        />
-        {/* クリック率には「そのURLを含む配信が届いた人数」が要る。配信と
-            リンクを結ぶ記録が無いので、リンク単位では出せない。 */}
-        <KpiCard title="平均クリック率" value={null} unit="%" detail="届いた数に対して" />
-        <KpiCard
-          title="いちばん押された"
-          value={totals.top?.clicks ?? null}
-          unit="回"
-          detail={totals.top?.name ?? '—'}
-          loading={loading}
-        />
-        {/* 作ったのに1回も押されていないURL。配信に入れ忘れているか、
-            入れても見られていないかを分けて考える手がかりになる。 */}
-        <KpiCard
-          title="0回のURL"
-          value={counts.zero}
-          unit="件"
-          detail="見直しを推奨"
-          loading={loading}
-        />
-      </div>
-
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-      >
-        {(
-          [
-            { key: 'all' as const, label: `すべて ${counts.all}` },
-            { key: 'active' as const, label: `使用中 ${counts.active}` },
-            { key: 'zero' as const, label: `0回 ${counts.zero}` },
-          ]
-        ).map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            aria-pressed={filter === f.key}
-            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-              filter === f.key
-                ? 'border-accent bg-accent-soft text-ink'
-                : 'border-hairline text-ink-faint hover:bg-canvas-sunken'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="URL名で検索"
-          aria-label="URL名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <RangePicker days={days} onChange={setDays} />
-        <Button
-          disabled
-          title="書き出しは準備中です"
-        >
-          CSVで書き出す
-        </Button>
-        {/* 短縮URLはテンプレートの編集で自動的に作られる。手で登録する
-            専用の画面はまだ無いので、押せる先が無い。 */}
-        <Button
-          disabled
-          title="URLの手動登録は準備中です。短縮URLはテンプレート編集で自動的に作られます"
-        >
-          URLを登録
-        </Button>
-      </div>
-
-      <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-        <table className="w-full min-w-[880px]">
-          <thead>
-            <tr className="bg-canvas-sunken border-hairline border-b">
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">URLの名前</th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">リンク先</th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">短縮URL</th>
-              <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">クリック</th>
-              <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">クリック率</th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">使われている配信</th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">押されたときの動作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-hairline divide-y">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
-                  読み込み中...
-                </td>
-              </tr>
-            ) : shown.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
-                  {query || filter !== 'all'
-                    ? '条件に合うURLはありません。'
-                    : 'まだ測定中のURLがありません。'}
-                </td>
-              </tr>
-            ) : (
-              shown.map((r) => {
-                const actions: string[] = []
-                if (r.tagName) actions.push('タグ付与')
-                if (r.scenarioName) actions.push('シナリオ開始')
-                return (
-                  <tr
-                    key={r.trackedLinkId}
-                    onClick={() => setPicked(r.clicks > 0 ? r.trackedLinkId : null)}
-                    className={`hover:bg-canvas-sunken ${r.clicks > 0 ? 'cursor-pointer' : ''} ${
-                      picked === r.trackedLinkId ? 'bg-accent-soft' : ''
-                    }`}
-                  >
-                    <td className="text-ink px-4 py-3 text-sm font-medium">
-                      {r.name}
-                      {!r.isActive && (
-                        <span className="bg-canvas-sunken text-ink-faint rounded-pill ml-2 px-2 py-0.5 text-[11px]">
-                          停止中
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-ink-secondary max-w-[16rem] truncate px-4 py-3 text-sm">
-                      {r.originalUrl}
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 font-mono text-xs">
-                      {r.shortCode ? `${workerBase}/t/${r.shortCode}` : '（未発行）'}
-                    </td>
-                    <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                      {r.clicks.toLocaleString('ja-JP')}
-                      {r.clicks > 0 && (
-                        <span className="text-ink-faint ml-1 text-xs">/ {r.uniqueFriends}人</span>
-                      )}
-                    </td>
-                    {/* 配信が届いた人数が分からないので割合を出せない。 */}
-                    <td className="text-ink-faint px-4 py-3 text-right text-sm">—</td>
-                    {/* どの配信に入っているかを辿る記録が無い（判断待ち 16-2 と同じ）。 */}
-                    <td className="text-ink-faint px-4 py-3 text-sm">—</td>
-                    <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {actions.length > 0 ? actions.join(' ・ ') : '—'}
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
-        {pickedRow ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-ink text-sm">
-              「{pickedRow.name}」を押した人 {pickedRow.uniqueFriends} 人
-            </p>
-            {/* 押した人を配信の宛先にする仕組みが無い。タグが付く設定なら
-                そのタグで絞れるが、付かないリンクでは辿れない。 */}
-            <button
-              disabled
-              title="押した人を宛先にする仕組みは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
-            >
-              この人たちに配信する
-            </button>
-          </div>
-        ) : (
-          <p className="text-ink-faint text-xs">
-            押した人／押していない人を、そのまま配信の絞り込み条件に使えます。「押したのに回答していない人」への追いかけにも使えます。
-          </p>
-        )}
-      </div>
-
-      <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-        クリック率は「そのURLを含む配信が届いた人数」に対する割合です。同じ人が複数回押しても、実人数は1として数えます。
-      </p>
-
-      <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
-        <h3 className="text-ink text-sm font-semibold">気をつけること</h3>
-        <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
-          <li>・短縮URLはテンプレート編集で自動的に作られます。手で登録することもできます</li>
-          <li>・LINEのプレビュー生成で1回カウントされることがあります。実人数のほうが正確です</li>
-          <li>・URLを変更すると、それまでのクリック数は前のリンク先の記録として残ります</li>
-          <li>
-            ・LINEの外から踏まれたクリックは、誰が踏んだか分かりません。「クリック」には数えますが実人数には入りません
-          </li>
-        </ul>
-      </section>
-    </div>
-  )
-}
-
-function CrossTab({ accountId }: { accountId: string }) {
+function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
   const [fieldId, setFieldId] = useState('')
-  const [cells, setCells] = useState<Array<{ row: string; col: string; count: number }>>([])
+  const [rowKind, setRowKind] = useState<'tag' | 'route' | 'score_band' | 'conversion_point' | 'booking_status' | 'purchase_status'>('tag')
+  const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
+  const [crossRunId, setCrossRunId] = useState('')
+  const [crossResultId, setCrossResultId] = useState('')
   const [loading, setLoading] = useState(false)
-  const [picked, setPicked] = useState<{ row: string; col: string; count: number } | null>(null)
+  const [error, setError] = useState('')
+  const [audience, setAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
+  const [picked, setPicked] = useState<{
+    row: string
+    col: string
+    rowKey: string
+    columnKey: string
+    count: number
+  } | null>(null)
 
   useEffect(() => {
-    void api.friendFields.list().then((res) => {
+    void api.friendFields.list(accountId).then((res) => {
       if (res.success) {
         setFields(res.data)
         if (res.data.length > 0) setFieldId(res.data[0].id)
       }
     })
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
-    if (!fieldId) return
-    let active = true
-    setLoading(true)
+    setCrossResult(null)
+    setCrossRunId('')
+    setCrossResultId('')
     setPicked(null)
-    setCells([])
-    void api.analytics
-      .cross(accountId, fieldId)
-      .then((res) => {
-        if (active && res.success) setCells(res.data)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+    setAudience(null)
+    setError('')
+  }, [accountId])
+
+  useEffect(() => {
+    if (!crossRunId) return
+    let active = true
+    const check = async () => {
+      try {
+        const response = await api.analytics.crossResult(accountId, crossRunId)
+        if (!active) return
+        if (!response.success) throw new Error(response.error)
+        if (response.data.result) {
+          setCrossResult(response.data.result)
+          setCrossRunId('')
+          setLoading(false)
+        } else if (response.data.state === 'failed') {
+          setError(response.data.errorCode || 'クロス分析に失敗しました')
+          setCrossRunId('')
+          setLoading(false)
+        }
+      } catch (caught) {
+        if (!active) return
+        setError(caught instanceof Error ? caught.message : 'クロス分析を確認できませんでした')
+        setCrossRunId('')
+        setLoading(false)
+      }
+    }
+    void check()
+    const timer = window.setInterval(() => void check(), 1500)
     return () => {
       active = false
+      window.clearInterval(timer)
     }
-  }, [accountId, fieldId])
+  }, [accountId, crossRunId])
 
-  const rows = useMemo(() => [...new Set(cells.map((c) => c.row))], [cells])
-  const cols = useMemo(() => [...new Set(cells.map((c) => c.col))], [cells])
+  const runCross = async () => {
+    if (!fieldId) return
+    setLoading(true)
+    setError('')
+    setPicked(null)
+    setAudience(null)
+    setCrossResult(null)
+    const now = new Date()
+    const from = new Date(now.getTime() - 30 * 24 * 3600_000)
+    const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
+    try {
+      const response = await api.analytics.runCross(accountId, {
+        rowAxis,
+        columnAxis: { kind: 'field_choice', fieldId },
+        measure: { kind: 'unique_friends' },
+        filters: [],
+        periodFrom: from.toISOString(),
+        periodTo: now.toISOString(),
+      })
+      if (!response.success) throw new Error(response.error)
+      setCrossResultId(response.data.id)
+      setCrossRunId(response.data.id)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'クロス分析を開始できませんでした')
+      setLoading(false)
+    }
+  }
+
+  const prepareCrossAudience = async () => {
+    if (!picked || !crossResultId) return
+    setError('')
+    try {
+      const response = await api.analytics.createResultAudience(accountId, crossResultId, {
+        sourceKind: 'cross',
+        rowKey: picked.rowKey,
+        columnKey: picked.columnKey,
+      })
+      if (!response.success) throw new Error(response.error)
+      setAudience(response.data)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした')
+    }
+  }
+
+  const cells = useMemo(() => (crossResult?.cells ?? []).map((cell) => ({
+    row: cell.rowLabel,
+    col: cell.columnLabel,
+    rowKey: cell.rowKey,
+    columnKey: cell.columnKey,
+    count: cell.value,
+  })), [crossResult])
+
+  const rows = crossResult?.rowValues ?? []
+  const cols = crossResult?.columnValues ?? []
   const lookup = useMemo(() => {
     const map = new Map<string, number>()
-    for (const c of cells) map.set(`${c.row} ${c.col}`, c.count)
+    for (const c of cells) map.set(`${c.rowKey}\u0000${c.columnKey}`, c.count)
     return map
   }, [cells])
 
   const fieldName = fields.find((f) => f.id === fieldId)?.name ?? '友だち情報'
+  const rowLabel = {
+    tag: 'タグ',
+    route: '流入経路',
+    score_band: 'スコア帯',
+    conversion_point: '成果地点',
+    booking_status: '予約状態',
+    purchase_status: '購入状態',
+  }[rowKind]
 
   const summary = useMemo(() => {
     if (cells.length === 0) return null
@@ -683,12 +342,12 @@ function CrossTab({ accountId }: { accountId: string }) {
   // 合計は延べ人数。1人が複数のタグを持つと、その人は行ごとに数えられる。
   const rowTotals = useMemo(() => {
     const m = new Map<string, number>()
-    for (const c of cells) m.set(c.row, (m.get(c.row) ?? 0) + c.count)
+    for (const c of cells) m.set(c.rowKey, (m.get(c.rowKey) ?? 0) + c.count)
     return m
   }, [cells])
   const colTotals = useMemo(() => {
     const m = new Map<string, number>()
-    for (const c of cells) m.set(c.col, (m.get(c.col) ?? 0) + c.count)
+    for (const c of cells) m.set(c.columnKey, (m.get(c.columnKey) ?? 0) + c.count)
     return m
   }, [cells])
   const grandTotal = useMemo(() => cells.reduce((sum, c) => sum + c.count, 0), [cells])
@@ -703,18 +362,18 @@ function CrossTab({ accountId }: { accountId: string }) {
   const readings = useMemo(() => {
     if (!summary || cells.length === 0) return []
     const out: string[] = []
-    const topRowTotal = rowTotals.get(summary.top.row) ?? 0
+    const topRowTotal = rowTotals.get(summary.top.rowKey) ?? 0
     if (topRowTotal > 0) {
       const pct = Math.round((summary.top.count / topRowTotal) * 100)
       out.push(`「${summary.top.row}」の ${pct}% が「${summary.top.col}」です`)
       // 同じ列で、ほかの行の割合と比べる。差があるほど、その掛け合わせに
       // 意味がある可能性が高い。
       const others = rows
-        .filter((r) => r !== summary.top.row)
+        .filter((r) => r.key !== summary.top.rowKey)
         .map((r) => {
-          const total = rowTotals.get(r) ?? 0
-          const n = lookup.get(`${r} ${summary.top.col}`) ?? 0
-          return { row: r, pct: total > 0 ? (n / total) * 100 : 0 }
+          const total = rowTotals.get(r.key) ?? 0
+          const n = lookup.get(`${r.key}\u0000${summary.top.columnKey}`) ?? 0
+          return { row: r.label, pct: total > 0 ? (n / total) * 100 : 0 }
         })
         .sort((a, b) => b.pct - a.pct)
       if (others.length > 0 && others[0].pct > 0) {
@@ -741,19 +400,27 @@ function CrossTab({ accountId }: { accountId: string }) {
   }
 
   return (
-    <div>
+    <div data-design-node="f5HsX">
       <p className="text-ink-faint mb-4 text-xs leading-relaxed">
         タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。
       </p>
 
       <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
         <h3 className="text-ink mb-3 text-sm font-semibold">何を掛け合わせるか</h3>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
-            {/* 行はタグ固定。集計のSQLが tags を起点にしている。 */}
-            <select disabled className="border-hairline rounded-control w-full border px-3 py-2 text-sm opacity-50">
-              <option>タグ</option>
+            <select
+              value={rowKind}
+              onChange={(event) => setRowKind(event.target.value as typeof rowKind)}
+              className="v6-select w-full"
+            >
+              <option value="tag">タグ</option>
+              <option value="route">流入経路</option>
+              <option value="score_band">スコア帯</option>
+              <option value="conversion_point">成果地点</option>
+              <option value="booking_status">予約状態</option>
+              <option value="purchase_status">購入状態</option>
             </select>
           </div>
           <div>
@@ -764,7 +431,7 @@ function CrossTab({ accountId }: { accountId: string }) {
               id="cross-field"
               value={fieldId}
               onChange={(e) => setFieldId(e.target.value)}
-              className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+              className="v6-select w-full"
             >
               {fields.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -773,16 +440,15 @@ function CrossTab({ accountId }: { accountId: string }) {
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-ink-secondary mb-1 block text-xs font-medium">さらに絞る</label>
-            <select disabled className="border-hairline rounded-control w-full border px-3 py-2 text-sm opacity-50">
-              <option>絞り込みは準備中です</option>
-            </select>
-          </div>
+          <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
+            {loading ? '集計中' : '直近30日を集計'}
+          </Button>
         </div>
         <p className="text-ink-faint mt-2 text-xs">
-          よこの軸を選ぶと、そのまま集計します。「集計する」を押す必要はありません。
+          集計結果はその時点のデータで固定します。期間や軸を変えた場合は、新しい結果として集計します。
         </p>
+        {error && <p className="text-danger mt-2 text-xs">{error}</p>}
+        {crossResult?.stateReason && <p className="text-warning mt-2 text-xs">{crossResult.stateReason}</p>}
       </section>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -808,11 +474,17 @@ function CrossTab({ accountId }: { accountId: string }) {
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
+          集計を受け付けました。終わるまでこの画面で確認しています。
+        </div>
+      ) : !crossResult ? (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          たて・よこの軸を選び、「直近30日を集計」を押してください。
         </div>
       ) : cells.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          この項目に値が入っている人がいません。
+          {crossResult.state === 'unavailable'
+            ? crossResult.stateReason || 'この分析に必要なデータを取得できません。'
+            : 'この条件に該当する人はいません。'}
         </div>
       ) : (
         <>
@@ -821,11 +493,11 @@ function CrossTab({ accountId }: { accountId: string }) {
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
                   <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                    タグ ＼ {fieldName}
+                    {rowLabel} ＼ {fieldName}
                   </th>
                   {cols.map((col) => (
-                    <th key={col} className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
-                      {col}
+                    <th key={col.key} className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
+                      {col.label}
                     </th>
                   ))}
                   <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">合計</th>
@@ -833,18 +505,28 @@ function CrossTab({ accountId }: { accountId: string }) {
               </thead>
               <tbody className="divide-hairline divide-y">
                 {rows.map((row) => (
-                  <tr key={row} className="hover:bg-canvas-sunken">
-                    <td className="text-ink px-4 py-3 text-sm font-medium">{row}</td>
+                  <tr key={row.key} className="hover:bg-canvas-sunken">
+                    <td className="text-ink px-4 py-3 text-sm font-medium">{row.label}</td>
                     {cols.map((col) => {
-                      const n = lookup.get(`${row} ${col}`) ?? 0
-                      const active = picked?.row === row && picked?.col === col
+                      const n = lookup.get(`${row.key}\u0000${col.key}`) ?? 0
+                      const active = picked?.rowKey === row.key && picked?.columnKey === col.key
                       // 濃さはその表の最大を基準にする。表ごとに数の桁が違うので、
                       // 絶対値で色を決めると、少ない表が全部薄くなる。
                       const strength = summary && summary.max > 0 ? n / summary.max : 0
                       return (
-                        <td key={col} className="p-0 text-right">
+                        <td key={col.key} className="p-0 text-right">
                           <button
-                            onClick={() => setPicked(n > 0 ? { row, col, count: n } : null)}
+                            onClick={() => {
+                              const source = cells.find((cell) => cell.rowKey === row.key && cell.columnKey === col.key)
+                              setAudience(null)
+                              setPicked(n > 0 && source ? {
+                                row: row.label,
+                                col: col.label,
+                                rowKey: source.rowKey,
+                                columnKey: source.columnKey,
+                                count: n,
+                              } : null)
+                            }}
                             disabled={n === 0}
                             className={`w-full px-4 py-3 text-right text-sm tabular-nums transition-colors ${
                               n === 0 ? 'text-ink-faint' : 'text-ink-secondary hover:bg-accent-soft'
@@ -861,15 +543,15 @@ function CrossTab({ accountId }: { accountId: string }) {
                       )
                     })}
                     <td className="text-ink px-4 py-3 text-right text-sm font-medium tabular-nums">
-                      {(rowTotals.get(row) ?? 0).toLocaleString('ja-JP')}
+                      {(rowTotals.get(row.key) ?? 0).toLocaleString('ja-JP')}
                     </td>
                   </tr>
                 ))}
                 <tr className="bg-canvas-sunken">
                   <td className="text-ink-secondary px-4 py-3 text-sm font-medium">合計</td>
                   {cols.map((col) => (
-                    <td key={col} className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                      {(colTotals.get(col) ?? 0).toLocaleString('ja-JP')}
+                    <td key={col.key} className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                      {(colTotals.get(col.key) ?? 0).toLocaleString('ja-JP')}
                     </td>
                   ))}
                   <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
@@ -880,29 +562,34 @@ function CrossTab({ accountId }: { accountId: string }) {
             </table>
           </div>
 
+          {canManage ? (
+            <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+              <SaveAnalysisAction
+                accountId={accountId}
+                sourceKind="cross"
+                sourceResultId={crossResultId}
+                defaultName={`クロス分析 ${rowLabel} × ${fieldName}`}
+              />
+            </div>
+          ) : (
+            <p className="text-ink-faint mt-3 text-xs">結果の保存と個人一覧への移動は、統括・管理者だけが行えます。</p>
+          )}
+
           <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
             {picked ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-ink text-sm">
-                  「{picked.row} × {picked.col}」の {picked.count}人 を選択中
-                </p>
-                <div className="flex gap-2">
-                  <Link
-                    href={`/friends?tag=${encodeURIComponent(picked.row)}`}
-                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
-                  >
-                    友だち一覧で見る
-                  </Link>
-                  {/* 掛け合わせた条件をそのまま配信の宛先にする口が無い。
-                      タグだけで送ると、選んだマスより広い相手に届く。 */}
-                  <button
-                    disabled
-                    title="この条件のまま配信する仕組みは準備中です"
-                    className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
-                  >
-                    この人たちに配信する
-                  </button>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-ink text-sm">
+                    「{picked.row} × {picked.col}」の {picked.count}人 を選択中
+                  </p>
+                  {canManage && <Button onClick={() => void prepareCrossAudience()} variant="secondary">友だち一覧で見る</Button>}
                 </div>
+                {audience && (
+                  <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
+                    <span className="text-success">{audience.memberCount}人を24時間の対象者として準備しました</span>
+                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-ink-faint text-xs">マスを押すと、その人たちを抽出できます</p>
@@ -913,13 +600,9 @@ function CrossTab({ accountId }: { accountId: string }) {
             <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-ink text-sm font-semibold">この表から読めること</h3>
-                <button
-                  disabled
-                  title="条件の保存は準備中です"
-                  className="border-hairline text-ink-faint rounded-control shrink-0 border px-2 py-1 text-xs opacity-50"
-                >
-                  この条件を保存
-                </button>
+                {crossResult && <span className="text-ink-faint shrink-0 text-xs">
+                  データ締切 {formatAnalyticsDateTime(crossResult.dataCutoffAt)}
+                </span>}
               </div>
               <ul className="text-ink-secondary mt-2 space-y-1.5 text-xs leading-relaxed">
                 {readings.map((r) => (
@@ -945,29 +628,37 @@ function CrossTab({ accountId }: { accountId: string }) {
   )
 }
 
-function FunnelTab({ accountId }: { accountId: string }) {
+function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [funnels, setFunnels] = useState<
-    Array<{ id: string; name: string; windowDays: number; createdAt: string }>
+    Array<{
+      id: string
+      name: string
+      windowDays: number
+      createdAt: string
+      currentVersion: { id: string; versionNumber: number; createdAt: string } | null
+      migrationState: 'ready' | 'needs_migration'
+    }>
   >([])
   const [selected, setSelected] = useState('')
-  const [result, setResult] = useState<Array<{
-    stepOrder: number
-    label: string
-    reached: number
-    conversionFromPrevious: number
-  }> | null>(null)
+  const [run, setRun] = useState<AnalyticsFunnelRunResult | null>(null)
+  const [groupKey, setGroupKey] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState('')
   const [creating, setCreating] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
+  const [funnelAudience, setFunnelAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
 
   useEffect(() => {
     let active = true
     setLoading(true)
     setFunnels([])
     setSelected('')
-    setResult(null)
+    setRun(null)
+    setGroupKey('all')
     setPicked(null)
-    void api.funnels
+    setFunnelAudience(null)
+    void api.analytics.v6Funnels
       .list(accountId)
       .then((res) => {
         if (active && res.success) {
@@ -987,14 +678,75 @@ function FunnelTab({ accountId }: { accountId: string }) {
     if (!selected) return
     let active = true
     setPicked(null)
-    setResult(null)
-    void api.funnels.result(accountId, selected).then((res) => {
-      if (active && res.success) setResult(res.data.steps)
+    setFunnelAudience(null)
+    setRun(null)
+    setRunError('')
+    void api.analytics.v6Funnels.latestRun(accountId, selected).then((res) => {
+      if (!active) return
+      if (res.success) {
+        setRun(res.data)
+        setGroupKey(res.data.groups[0]?.key ?? 'all')
+      }
+      else if (res.error !== 'Not found') setRunError(res.error)
     })
     return () => {
       active = false
     }
   }, [accountId, selected])
+
+  const runNow = async () => {
+    if (!selected) return
+    setRunning(true)
+    setRunError('')
+    const now = new Date()
+    const from = new Date(now.getTime() - 30 * 24 * 3600_000)
+    try {
+      const response = await api.analytics.v6Funnels.run(accountId, selected, {
+        cohortFrom: from.toISOString(),
+        cohortTo: now.toISOString(),
+      })
+      if (!response.success) throw new Error(response.error)
+      setRun(response.data)
+      setGroupKey(response.data.groups[0]?.key ?? 'all')
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : '再集計できませんでした')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const activeGroup = run?.groups.find((group) => group.key === groupKey) ?? run?.groups[0] ?? null
+  const result = activeGroup?.steps ?? null
+
+  const comparisonGap = useMemo(() => {
+    if (!run || run.groups.length < 2) return null
+    let largest = 0
+    for (let index = 0; index < run.groups[0].steps.length; index += 1) {
+      const rates = run.groups
+        .map((group) => group.steps[index]?.conversionFromPrevious)
+        .filter((value): value is number => value !== null && value !== undefined)
+      if (rates.length < 2) continue
+      largest = Math.max(largest, Math.max(...rates) - Math.min(...rates))
+    }
+    return Math.round(largest * 1000) / 10
+  }, [run])
+
+  const prepareFunnelAudience = async () => {
+    if (!run?.runId || picked === null || !result?.[picked - 1] || !activeGroup) return
+    setRunError('')
+    try {
+      const response = await api.analytics.createResultAudience(accountId, run.runId, {
+        sourceKind: 'funnel',
+        groupKey: activeGroup.key,
+        stepOrder: result[picked - 1].stepOrder,
+        selection: 'stopped',
+      })
+      if (!response.success) throw new Error(response.error)
+      setFunnelAudience(response.data)
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : '対象者を準備できませんでした')
+    }
+  }
 
   // いちばん落ちる段。人数の差ではなく、落ちた割合で選ぶ。母数の大きい段が
   // いつも1位になってしまうため。
@@ -1035,7 +787,7 @@ function FunnelTab({ accountId }: { accountId: string }) {
   const selectedFunnel = funnels.find((f) => f.id === selected) ?? null
 
   return (
-    <div>
+    <div data-design-node="C2I7ry">
       <p className="text-ink-faint mb-4 text-xs leading-relaxed">
         友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。
       </p>
@@ -1046,7 +798,7 @@ function FunnelTab({ accountId }: { accountId: string }) {
           onCancel={() => setCreating(false)}
           onCreated={(id) => {
             setCreating(false)
-            void api.funnels.list(accountId).then((res) => {
+            void api.analytics.v6Funnels.list(accountId).then((res) => {
               if (res.success) setFunnels(res.data)
             })
             setSelected(id)
@@ -1055,12 +807,16 @@ function FunnelTab({ accountId }: { accountId: string }) {
       ) : funnels.length === 0 ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
-          <button
-            onClick={() => setCreating(true)}
-            className="text-accent ml-1 hover:underline"
-          >
-            ＋ 段を足す
-          </button>
+          {canManage ? (
+            <button
+              onClick={() => setCreating(true)}
+              className="text-accent ml-1 hover:underline"
+            >
+              ＋ 段を足す
+            </button>
+          ) : (
+            <span className="ml-1">作成は統括・管理者へ依頼してください。</span>
+          )}
         </p>
       ) : (
         <>
@@ -1073,26 +829,17 @@ function FunnelTab({ accountId }: { accountId: string }) {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button
-                  disabled
-                  title="並べ替えは準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
-                >
-                  並べ方を変える
-                </button>
-                <button
-                  disabled
-                  title="分析の保存は準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
-                >
-                  この分析を保存
-                </button>
-                <button
-                  onClick={() => setCreating(true)}
-                  className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
-                >
-                  ＋ 段を足す
-                </button>
+                <Button onClick={() => void runNow()} disabled={running} variant="secondary">
+                  {running ? '再集計中' : '直近30日を再集計'}
+                </Button>
+                {canManage && (
+                  <button
+                    onClick={() => setCreating(true)}
+                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
+                  >
+                    ＋ 段を足す
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1115,6 +862,9 @@ function FunnelTab({ accountId }: { accountId: string }) {
               {selectedFunnel && (
                 <p className="text-ink-faint mt-1 text-xs">
                   {selectedFunnel.windowDays}日以内に通った人を数えます。
+                  {selectedFunnel.currentVersion
+                    ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}`
+                    : ' 現行定義の移行が必要です'}
                 </p>
               )}
             </div>
@@ -1134,9 +884,20 @@ function FunnelTab({ accountId }: { accountId: string }) {
 
             {/* 条件ごとに通過率を並べる仕組みが無い。ファネルの定義が1本の
                 段の列だけで、条件で分ける口を持っていない。 */}
-            <p className="text-ink-faint mt-2 text-xs">
-              比較（条件ごとの通過率を並べる）は準備中です。
-            </p>
+            {run && <p className="text-ink-faint mt-2 text-xs">
+              集計期間 {new Date(run.cohortFrom).toLocaleDateString('ja-JP')}〜{new Date(run.cohortTo).toLocaleDateString('ja-JP')}
+              ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
+            </p>}
+            {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
+            {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
+            {run && run.groups.length > 1 && (
+              <div className="mt-3 max-w-xs">
+                <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
+                <select id="funnel-group" value={groupKey} onChange={(event) => setGroupKey(event.target.value)} className="v6-select w-full">
+                  {run.groups.map((group) => <option key={group.key} value={group.key}>{group.label}（入口 {group.entrants}人）</option>)}
+                </select>
+              </div>
+            )}
           </section>
 
           <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -1165,7 +926,12 @@ function FunnelTab({ accountId }: { accountId: string }) {
             {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
                 だけを見ていて、いつ通ったかを残していない。 */}
             <KpiCard title="平均の到達日数" value={null} unit="日" detail="入口から最後まで" />
-            <KpiCard title="比較で差が大きい段" value={null} unit="pt" detail="比較は準備中です" />
+            <KpiCard
+              title="比較で差が大きい段"
+              value={comparisonGap}
+              unit="pt"
+              detail={run && run.groups.length > 1 ? `${run.groups.length}条件を比較` : '比較条件なし'}
+            />
           </div>
 
           {result && (
@@ -1189,13 +955,16 @@ function FunnelTab({ accountId }: { accountId: string }) {
                           {step.reached.toLocaleString('ja-JP')} 人
                           {i > 0 && (
                             <span className="text-ink-faint ml-2 text-xs">
-                              （{Math.round(step.conversionFromPrevious * 1000) / 10}%）
+                              （{step.conversionFromPrevious == null ? '—' : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`}）
                             </span>
                           )}
                         </p>
                       </div>
                       <button
-                        onClick={() => setPicked(lost > 0 ? i : null)}
+                        onClick={() => {
+                          setFunnelAudience(null)
+                          setPicked(lost > 0 ? i : null)
+                        }}
                         disabled={lost <= 0}
                         className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded text-left"
                         aria-label={`${step.label}の段`}
@@ -1227,31 +996,31 @@ function FunnelTab({ accountId }: { accountId: string }) {
                       「{result[picked - 1]?.label}まで進んで{result[picked].label}に至っていない{' '}
                       {(result[picked - 1].reached - result[picked].reached).toLocaleString('ja-JP')}人」を選択中
                     </p>
-                    <div className="flex gap-2">
-                      {/* 段の条件で友だちを絞る口が無い。ファネルの集計結果は
-                          人数しか返さず、誰が止まっているかを返さない。 */}
-                      <button
-                        disabled
-                        title="この段で止まっている人の抽出は準備中です"
-                        className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
-                      >
-                        友だち一覧で見る
-                      </button>
-                      <button
-                        disabled
-                        title="この段で止まっている人への配信は準備中です"
-                        className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
-                      >
-                        この人たちに配信する
-                      </button>
-                    </div>
+                    {canManage && <Button onClick={() => void prepareFunnelAudience()} variant="secondary">友だち一覧で見る</Button>}
                   </div>
                 ) : (
                   <p className="text-ink-faint text-xs">
                     段を押すと、そこで止まっている人を選べます。
                   </p>
                 )}
+                {funnelAudience && (
+                  <div className="bg-success-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control p-3 text-xs">
+                    <span className="text-success">{funnelAudience.memberCount}人を24時間の対象者として準備しました</span>
+                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
+                  </div>
+                )}
               </div>
+            </section>
+          )}
+
+          {run?.runId && canManage && (
+            <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+              <SaveAnalysisAction
+                accountId={accountId}
+                sourceKind="funnel"
+                sourceResultId={run.runId}
+                defaultName={selectedFunnel?.name ?? 'ファネル分析'}
+              />
             </section>
           )}
 
@@ -1260,8 +1029,8 @@ function FunnelTab({ accountId }: { accountId: string }) {
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
               <li>・段には タグ・友だち情報・フォーム回答・サイトの行動・購入 を置けます</li>
               <li>・順番どおりに通った人だけを数えます。飛ばした人は含みません</li>
-              <li>・「比較」を選ぶと、条件ごとの通過率を並べて見られます（準備中）</li>
-              <li>・段の並びは保存でき、ダッシュボードに出すこともできます（準備中）</li>
+              <li>・比較条件を定義版に含めると、最大3群の通過率を同じ結果で比べられます</li>
+              <li>・再集計すると新しい結果を作り、前の結果は書き換えません</li>
             </ul>
           </section>
         </>
@@ -1286,12 +1055,17 @@ function FunnelForm({
   onCreated: (id: string) => void
 }) {
   const KINDS = [
+    { key: 'friend_add', label: '友だち追加', hint: '' },
     { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
-    { key: 'field', label: '情報欄に値が入った', hint: '項目のID' },
+    { key: 'field', label: '情報欄に値が入った', hint: '項目のID（値は問いません）' },
     { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
-    { key: 'site_event', label: 'サイトのページを見た', hint: 'パス（例: /thanks）' },
+    { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例: thanks）' },
+    { key: 'purchase', label: '購入が確定した', hint: '' },
     { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
     { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },
+    { key: 'message', label: 'メッセージを受信した', hint: '' },
+    { key: 'booking', label: '予約が確定した', hint: '' },
+    { key: 'automation', label: 'オートメーションが動いた', hint: 'オートメーションのID' },
   ]
 
   const [name, setName] = useState('')
@@ -1303,13 +1077,20 @@ function FunnelForm({
   const [error, setError] = useState('')
 
   const matchFor = (kind: string, value: string): Record<string, string> => {
+    if (kind === 'friend_add') return {}
     if (kind === 'tag') return { tagId: value }
     if (kind === 'field') return { fieldId: value }
     if (kind === 'form') return { formId: value }
-    if (kind === 'site_event') return { eventType: 'page_view', path: value }
+    if (kind === 'site_event') return { eventType: 'page_view', pathGroup: value }
+    if (kind === 'purchase') return { status: 'confirmed' }
     if (kind === 'link_click') return { trackedLinkId: value }
-    return { conversionPointId: value }
+    if (kind === 'conversion') return { conversionPointId: value }
+    if (kind === 'message') return { direction: 'received' }
+    if (kind === 'booking') return { status: 'confirmed' }
+    return { automationId: value }
   }
+
+  const kindNeedsValue = (kind: string) => !['friend_add', 'purchase', 'message', 'booking'].includes(kind)
 
   const save = async () => {
     if (!name.trim()) {
@@ -1320,11 +1101,16 @@ function FunnelForm({
       setError('すべての段に名前を付けてください')
       return
     }
+    if (steps.some((s) => kindNeedsValue(s.kind) && !s.value.trim())) {
+      setError('選んだ行動に必要なIDまたは値を入力してください')
+      return
+    }
     setSaving(true)
     setError('')
     try {
-      const res = await api.funnels.create(accountId, {
+      const res = await api.analytics.v6Funnels.create(accountId, {
         name: name.trim(),
+        windowDays: 30,
         steps: steps.map((s) => ({
           label: s.label.trim(),
           kind: s.kind,
@@ -1335,7 +1121,7 @@ function FunnelForm({
         setError(res.error)
         return
       }
-      onCreated(res.data.id)
+      onCreated(res.data.funnelId)
     } catch {
       setError('保存に失敗しました')
     } finally {
@@ -1398,17 +1184,18 @@ function FunnelForm({
             </div>
             <div className="min-w-[10rem] flex-1">
               <label className="text-ink-faint mb-1 block text-xs">
-                {KINDS.find((k) => k.key === step.kind)?.hint}
+                {KINDS.find((k) => k.key === step.kind)?.hint || '追加の指定はありません'}
               </label>
               <input
                 type="text"
                 value={step.value}
+                disabled={!kindNeedsValue(step.kind)}
                 onChange={(e) =>
                   setSteps((prev) =>
                     prev.map((s, j) => (i === j ? { ...s, value: e.target.value } : s)),
                   )
                 }
-                className="border-hairline rounded-control w-full border px-2 py-1.5 text-sm"
+                className="border-hairline rounded-control w-full border px-2 py-1.5 text-sm disabled:bg-canvas-sunken disabled:text-ink-faint"
               />
             </div>
             {steps.length > 2 && (
@@ -1455,9 +1242,386 @@ function FunnelForm({
   )
 }
 
+type OverviewResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string }
+
+function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    setData(null)
+    void load()
+      .then((result) => {
+        if (!active) return
+        if (result.success) setData(result.data)
+        else setError(result.error || '分析を表示できませんでした')
+      })
+      .catch(() => {
+        if (active) setError('分析を表示できませんでした')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+    // loaderはkeyが表すアカウント・期間が変わった時だけ実行する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return { data, loading, error }
+}
+
+function metricText(
+  value: AnalyticsMetric<number | string>,
+  options?: { percent?: boolean; currency?: boolean },
+) {
+  if (value.value === null) return '—'
+  if (typeof value.value === 'string') return value.value
+  if (options?.percent) return `${Math.round(value.value * 1000) / 10}%`
+  if (options?.currency) return `${value.value.toLocaleString('ja-JP')}円`
+  return value.value.toLocaleString('ja-JP')
+}
+
+function MetricCell({ metric, percent, currency }: {
+  metric: AnalyticsMetric<number | string>
+  percent?: boolean
+  currency?: boolean
+}) {
+  return <span className={metric.value === null ? 'text-ink-faint' : 'text-ink'} title={metric.reason ?? undefined}>
+    {metricText(metric, { percent, currency })}
+  </span>
+}
+
+function DateTimeMetricCell({ metric }: { metric: AnalyticsMetric<string> }) {
+  return <span className={metric.value === null ? 'text-ink-faint' : 'text-ink'} title={metric.reason ?? undefined}>
+    {formatAnalyticsDateTime(metric.value)}
+  </span>
+}
+
+function OverviewState({ loading, error }: { loading: boolean; error: string }) {
+  if (loading) return <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-10 text-center text-sm">分析を読み込んでいます</div>
+  if (error) return <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm">{error}</div>
+  return null
+}
+
+function FriendsOverviewTab({ accountId }: { accountId: string }) {
+  const range = useMemo(() => rangeFor(29), [])
+  const state = useOverview<AnalyticsFriendsOverview>(
+    () => api.analytics.friendsOverview(accountId, range),
+    `${accountId}:${range.from}:${range.to}:friends`,
+  )
+  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  const overview = state.data.data
+  return <div data-design-node="Zxezb" className="space-y-4">
+    {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <KpiCard title="増えた友だち" value={overview.metrics.added.value} unit="人" detail={overview.metrics.added.reason ?? `初回 ${metricText(overview.metrics.firstTime)}人`} />
+      <KpiCard title="減った友だち" value={overview.metrics.removed.value} unit="人" detail={overview.metrics.removed.reason ?? 'ブロック・解除'} />
+      <KpiCard title="差し引き" value={overview.metrics.net.value} unit="人" detail="増加 − 減少" />
+      <KpiCard title="現在つながっている" value={overview.metrics.currentFriends.value} unit="人" detail={`再追加 ${metricText(overview.metrics.returning)}人`} />
+    </div>
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+      <div className="border-hairline flex items-center justify-between border-b px-4 py-3"><h2 className="text-sm font-semibold">日ごとの増減</h2><span className="text-ink-faint text-xs">{state.data.period.from}〜{state.data.period.to}</span></div>
+      <table className="w-full table-fixed">
+        <thead><TableHeadRow><Th>日付</Th><Th align="right">増加</Th><Th align="right">減少</Th><Th align="right">差し引き</Th><Th>同日の施策</Th></TableHeadRow></thead>
+        <tbody className="divide-hairline divide-y">{[...overview.days].reverse().map((day) => {
+          const campaigns = overview.campaigns.filter((item) => item.date === day.date)
+          const names = campaigns.map((item) => item.name).join('、')
+          return <tr key={day.date} className="text-sm"><td className="px-4 py-2 tabular-nums">{day.date}</td><td className="px-4 py-2 text-right tabular-nums">{day.added}</td><td className="px-4 py-2 text-right tabular-nums">{day.removed}</td><td className="px-4 py-2 text-right font-medium tabular-nums">{day.net > 0 ? '+' : ''}{day.net}</td><td className="text-ink-secondary truncate px-4 py-2" title={names || undefined}>{names || '—'}</td></tr>
+        })}</tbody>
+      </table>
+    </div>
+  </div>
+}
+
+function ReactionsOverviewTab({ accountId }: { accountId: string }) {
+  const range = useMemo(() => rangeFor(29), [])
+  const state = useOverview<AnalyticsReactionsOverview>(
+    () => api.analytics.reactionsOverview(accountId, range),
+    `${accountId}:${range.from}:${range.to}:reactions`,
+  )
+  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  const overview = state.data.data
+  return <div data-design-node="J6Inc" className="space-y-4">
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <KpiCard title="送信対象" value={overview.metrics.sent.value} unit="人" detail={overview.metrics.sent.reason ?? '配信ごとの対象'} />
+      <KpiCard title="到達" value={overview.metrics.delivered.value} unit="人" detail={overview.metrics.delivered.reason ?? 'LINE取得値'} />
+      <KpiCard title="開封" value={overview.metrics.opened.value} unit="人" detail={overview.metrics.opened.reason ?? '20人未満は取得対象外'} />
+      <KpiCard title="自社URLクリック" value={overview.metrics.trackedClicks.value} unit="回" detail={overview.clickDefinition} />
+    </div>
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
+    </table></div>
+  </div>
+}
+
+function RoutesOverviewTab({ accountId }: { accountId: string }) {
+  const range = useMemo(() => rangeFor(29), [])
+  const state = useOverview<AnalyticsRoutesOverview>(
+    () => api.analytics.routesOverview(accountId, range),
+    `${accountId}:${range.from}:${range.to}:routes`,
+  )
+  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  const overview = state.data.data
+  return <div data-design-node="YBGtm" className="space-y-4">
+    <div className="bg-info-bg border-info rounded-card flex items-center justify-between border px-4 py-3 text-sm"><span>帰属方式: {overview.attributionLabel}</span><Link href={overview.searchConsoleHref} className="text-accent font-medium hover:underline">Search Consoleを見る</Link></div>
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      <thead><TableHeadRow><Th>経路</Th><Th align="right">クリック</Th><Th align="right">友だち追加</Th><Th align="right">現在</Th><Th align="right">反応</Th><Th align="right">承認成果</Th><Th align="right">成果金額</Th><Th align="right">広告費</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={9} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="truncate px-3 py-3 font-medium" title={item.name}>{item.name}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.currentFriends} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
+    </table></div>
+  </div>
+}
+
+function UsageOverviewTab({ accountId }: { accountId: string }) {
+  const range = useMemo(() => rangeFor(29), [])
+  const state = useOverview<AnalyticsUsageOverview>(
+    () => api.analytics.usageOverview(accountId, range),
+    `${accountId}:${range.from}:${range.to}:usage`,
+  )
+  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  const overview = state.data.data
+  return <div data-design-node="QQ1SR" className="space-y-4">
+    {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th align="right">参照切れ</Th><Th>最終利用</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.categories.map((item) => <tr key={item.key} className="text-sm"><td className="px-4 py-3"><Link href={item.href} className="text-accent font-medium hover:underline">{item.label}</Link></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.brokenReferences} /></td><td className="text-ink-secondary truncate px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td></tr>)}</tbody>
+    </table></div>
+    <p className="text-ink-faint text-xs">未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。</p>
+  </div>
+}
+
+function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
+  const range = useMemo(() => rangeFor(29), [])
+  const state = useOverview<AnalyticsUrlClicksOverview>(
+    () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
+    `${accountId}:${range.from}:${range.to}:url-clicks`,
+  )
+  if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
+  const overview = state.data.data
+  return <div data-design-node="Fh2Qj" className="space-y-4">
+    {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      <thead><TableHeadRow><Th>URL名</Th><Th>リンク先</Th><Th align="right">クリック</Th><Th align="right">実人数</Th><Th align="right">届いた人数</Th><Th align="right">クリック率</Th><Th>使われた場所</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.links.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できるURLはありません</td></tr> : overview.links.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="truncate px-3 py-3 font-medium" title={item.name}>{item.name}{!item.isActive && <span className="text-ink-faint ml-1 text-xs">停止</span>}</td><td className="text-ink-secondary truncate px-3 py-3" title={item.originalUrl}>{item.originalUrl}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.deliveredPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.clickRate} percent /></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td></tr>)}</tbody>
+    </table></div>
+    <p className="text-ink-faint text-xs">{overview.clickRateDefinition}</p>
+  </div>
+}
+
+const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = {
+  available: '利用可能',
+  partial: '一部集計',
+  unavailable: '取得不可',
+  failed: '失敗',
+}
+
+const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
+  available: 'ok',
+  partial: 'warn',
+  unavailable: 'danger',
+  failed: 'danger',
+}
+
+function SavedAnalyticsTab({ accountId }: { accountId: string }) {
+  const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
+  const [selectedId, setSelectedId] = useState('')
+  const [snapshots, setSnapshots] = useState<SavedAnalyticsSnapshot[]>([])
+  const [loading, setLoading] = useState(true)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setItems([])
+    setSelectedId('')
+    setSnapshots([])
+    setError('')
+    void api.analytics.saved
+      .list(accountId)
+      .then((response) => {
+        if (!active) return
+        if (!response.success) throw new Error(response.error)
+        setItems(response.data)
+        setSelectedId(response.data[0]?.id ?? '')
+      })
+      .catch((caught: unknown) => {
+        if (active) setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [accountId])
+
+  useEffect(() => {
+    if (!selectedId) {
+      setSnapshots([])
+      return
+    }
+    let active = true
+    setSnapshotLoading(true)
+    setSnapshots([])
+    void api.analytics.saved
+      .snapshots(accountId, selectedId)
+      .then((response) => {
+        if (!active) return
+        if (!response.success) throw new Error(response.error)
+        setSnapshots(response.data)
+      })
+      .catch((caught: unknown) => {
+        if (active) setError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした')
+      })
+      .finally(() => {
+        if (active) setSnapshotLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [accountId, selectedId])
+
+  const selected = items.find((item) => item.id === selectedId) ?? null
+
+  return (
+    <div data-design-node="dfwD4" className="space-y-4">
+      <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
+        <p className="text-ink font-medium">条件の定義と集計結果を分けて保存しています</p>
+        <p className="text-ink-secondary mt-1 text-xs">
+          あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートは現在「なし」です。
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-10 text-center text-sm">
+          保存した分析を読み込んでいます
+        </div>
+      ) : error && items.length === 0 ? (
+        <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm">{error}</div>
+      ) : items.length === 0 ? (
+        <div className="bg-canvas rounded-card border-hairline border p-10 text-center">
+          <p className="text-ink font-medium">保存した分析はまだありません</p>
+          <p className="text-ink-faint mt-2 text-sm">クロス分析かファネルを集計し、その結果を保存してください。</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+            <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
+              <h2 className="text-sm font-semibold">保存した分析</h2>
+              <span className="text-ink-faint text-xs">{items.length}件</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] table-fixed">
+                <thead>
+                  <TableHeadRow>
+                    <Th>分析名</Th>
+                    <Th>種類</Th>
+                    <Th>作成者</Th>
+                    <Th>定義版</Th>
+                    <Th>最新の期間</Th>
+                    <Th>集計状態</Th>
+                    <Th align="right">結果</Th>
+                  </TableHeadRow>
+                </thead>
+                <tbody className="divide-hairline divide-y">
+                  {items.map((item) => {
+                    const active = selectedId === item.id
+                    return (
+                      <tr key={item.id} className={active ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}>
+                        <td className="p-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedId(item.id)}
+                            className="text-ink w-full truncate px-4 py-3 text-left text-sm font-medium"
+                            title={item.name}
+                            aria-pressed={active}
+                          >
+                            {item.name}
+                          </button>
+                        </td>
+                        <td className="text-ink-secondary px-3 py-3 text-sm">{item.kind === 'cross' ? 'クロス分析' : 'ファネル'}</td>
+                        <td className="text-ink-secondary truncate px-3 py-3 text-sm" title={item.createdByName}>{item.createdByName}</td>
+                        <td className="text-ink-secondary px-3 py-3 text-sm">第{item.currentVersionNumber}版</td>
+                        <td className="text-ink-secondary px-3 py-3 text-xs tabular-nums">
+                          {item.latestSnapshot
+                            ? `${item.latestSnapshot.periodFrom.slice(0, 10)}〜${item.latestSnapshot.periodTo.slice(0, 10)}`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-3 text-xs">
+                          {item.latestSnapshot ? (
+                            <Chip tone={SAVED_STATE_TONES[item.latestSnapshot.state]}>
+                              {SAVED_STATE_LABELS[item.latestSnapshot.state]}
+                            </Chip>
+                          ) : <span className="text-ink-faint">—</span>}
+                        </td>
+                        <td className="text-ink-secondary px-3 py-3 text-right text-sm">{item.snapshotCount}件</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside className="bg-canvas rounded-card border-hairline border p-4">
+            <h2 className="text-ink text-sm font-semibold">結果の履歴</h2>
+            {selected && (
+              <p className="text-ink-faint mt-1 truncate text-xs" title={selected.name}>
+                {selected.name} ／ 定期レポート なし
+              </p>
+            )}
+            {error && items.length > 0 && <p className="text-danger mt-3 text-xs">{error}</p>}
+            {snapshotLoading ? (
+              <p className="text-ink-faint mt-4 text-sm">結果を読み込んでいます</p>
+            ) : snapshots.length === 0 ? (
+              <p className="text-ink-faint mt-4 text-sm">保存された結果はありません</p>
+            ) : (
+              <ol className="mt-3 space-y-2">
+                {snapshots.map((snapshot) => (
+                  <li key={snapshot.id} className="border-hairline rounded-control border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-ink text-xs font-medium">
+                        {snapshot.sourceKind === 'cross' ? 'クロス分析' : 'ファネル'}
+                      </span>
+                      <span className="text-ink-faint text-xs">{SAVED_STATE_LABELS[snapshot.state]}</span>
+                    </div>
+                    <p className="text-ink-secondary mt-2 text-xs tabular-nums">
+                      {snapshot.periodFrom.slice(0, 10)}〜{snapshot.periodTo.slice(0, 10)}
+                    </p>
+                    <p className="text-ink-faint mt-1 text-xs tabular-nums">
+                      データ締切 {formatAnalyticsDateTime(snapshot.dataCutoffAt)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </aside>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AnalyticsInner() {
   const tab = useMergedTab(TABS)
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const [canManage, setCanManage] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active || !response.success) return
+      setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
+    })
+    return () => {
+      active = false
+    }
+  }, [])
   if (accountLoading) {
     return <div className="text-ink-faint p-8 text-center text-sm">分析を読み込んでいます</div>
   }
@@ -1465,54 +1629,16 @@ function AnalyticsInner() {
     return <div className="text-ink-faint p-8 text-center text-sm">LINE公式アカウントを選んでください</div>
   }
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="分析"
-          description="配信した数と、その反応をまとめて見ます。送信数はLINEの課金対象と直結するため、残枠と合わせて確認してください。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled
-                title="マニュアルは準備中です"
-              >
-                マニュアル
-              </Button>
-              <Button
-                disabled
-                title="レポートの保存は準備中です"
-              >
-                レポートを保存
-              </Button>
-              <Button
-                disabled
-                title="書き出しは準備中です"
-              >
-                CSVで書き出す
-              </Button>
-            </div>
-          }
-        />
-      </div>
+    <div data-analytics-design="v6">
       <MergedTabs basePath="/analytics" tabs={TABS} active={tab} />
-      {tab === 'messages' && <MessagesTab accountId={selectedAccountId} />}
-      {tab === 'clicks' && <ClicksTab accountId={selectedAccountId} />}
-      {tab === 'cross' && <CrossTab accountId={selectedAccountId} />}
-      {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} />}
-      {/* 表示名をGoogle Analyticsに統一した既存検索分析は /search-console にある。 */}
-      {tab === 'search' && (
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <p className="text-ink-secondary text-sm">
-            Google Analyticsは、別の画面で表示します。
-          </p>
-          <Link
-            href="/search-console"
-            className="text-accent mt-2 inline-block text-sm hover:underline"
-          >
-            Google Analyticsを開く
-          </Link>
-        </div>
-      )}
+      {tab === 'friends' && <FriendsOverviewTab accountId={selectedAccountId} />}
+      {tab === 'reactions' && <ReactionsOverviewTab accountId={selectedAccountId} />}
+      {tab === 'routes' && <RoutesOverviewTab accountId={selectedAccountId} />}
+      {tab === 'usage' && <UsageOverviewTab accountId={selectedAccountId} />}
+      {tab === 'cross' && <CrossTab accountId={selectedAccountId} canManage={canManage} />}
+      {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} canManage={canManage} />}
+      {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
+      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} />}
     </div>
   )
 }

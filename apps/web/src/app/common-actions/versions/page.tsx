@@ -1,5 +1,6 @@
 'use client'
 
+import { usageSummaryDetail } from '../usage-summary'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -136,7 +137,7 @@ function CommonActionVersionsInner() {
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SummaryCard variant="v6" title="現在の公開版" value={published?.versionNumber ?? null} unit="" detail={published ? `v${published.versionNumber}を利用できます` : 'まだ公開していません'} />
         <SummaryCard variant="v6" title="版の数" value={detail.versions.length} unit="" detail="下書きを含む" />
-        <SummaryCard variant="v6" title="使われている場所" value={detail.bindings.length} unit="" detail="版を固定した利用先" />
+        <SummaryCard variant="v6" title="使われている場所" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
         <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="確認して更新します" />
       </div>
 
