@@ -97,13 +97,16 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする15ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする18ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
+    // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
     expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
+      'app/conversions/page.tsx',
       'app/form-submissions/page.tsx',
+      'app/inflow-links/page.tsx',
       'app/mileage/action-score-tab.tsx',
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',

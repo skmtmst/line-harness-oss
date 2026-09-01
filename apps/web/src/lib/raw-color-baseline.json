@@ -26,7 +26,7 @@
   "app/health/page.tsx": 74,
   "app/inflow-links/_components/create-genre-modal.tsx": 13,
   "app/inflow-links/_components/edit-route-modal.tsx": 31,
-  "app/inflow-links/page.tsx": 49,
+  "app/inflow-links/page.tsx": 1,
   "app/line-notifications/page.tsx": 6,
   "app/mileage/page.tsx": 121,
   "app/nen-campaigns/page.tsx": 196,

@@ -7,6 +7,7 @@ import type {
   MediaItem,
   MediaUsage,
 } from '@line-crm/shared'
+import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -114,7 +115,11 @@ function isKnownUnused(item: MediaItem): boolean {
   return item.usageCount === 0
 }
 
+/** 格子と一覧。**中身は同じ。並べ方だけを切り替える。** */
+type MediaView = 'grid' | 'list'
+
 export default function MediaLibraryPage() {
+  const [view, setView] = useState<MediaView>('grid')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -516,9 +521,10 @@ export default function MediaLibraryPage() {
             className="hidden"
             id="media-upload"
           />
+          {/* 設計 `g89Tc` の「アップロード」: 高さ40・角丸8・左右14・13px/700。 */}
           <label
             htmlFor="media-upload"
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control cursor-pointer px-4 py-2 text-sm font-medium transition-colors"
+            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold transition-colors"
           >
             {uploading ? 'アップロード中...' : 'ファイルを選択する'}
           </label>
@@ -543,6 +549,20 @@ export default function MediaLibraryPage() {
         </dl>
       </div>
 
+      {/*
+        **容量バーは作らない。**
+        設計には使用量のバー（220×5）と実績（53×5）が描いてあるが、
+        いまの `/api/media` はアカウントごとの保存容量も上限も返さない。
+        作り物の帯を出すと、空いているように見えてしまう。
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-ink-secondary text-nano font-semibold">保存容量</span>
+        <span className="text-ink-faint text-caption font-bold tabular-nums">—</span>
+        <span className="text-ink-faint text-caption">
+          まだ繋がっていません。保存容量が接続されると表示されます。
+        </span>
+      </div>
+
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <SearchField
           value={query}
@@ -556,8 +576,33 @@ export default function MediaLibraryPage() {
           }}
           placeholder="ファイル名で検索"
           aria-label="ファイル名で検索"
-          className="min-w-64 flex-1"
+          className="min-w-64 max-w-[420px] flex-1"
         />
+        {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
+        <div
+          role="group"
+          aria-label="並べ方"
+          className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
+        >
+          {([
+            ['grid', '格子で並べる', LayoutGrid],
+            ['list', '一覧で並べる', ListIcon],
+          ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value)}
+              aria-pressed={view === value}
+              aria-label={label}
+              title={label}
+              className={`flex h-full w-11 items-center justify-center ${
+                view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
+              }`}
+            >
+              <Icon aria-hidden="true" size={16} />
+            </button>
+          ))}
+        </div>
         <Select
           aria-label="並び順"
           value={sort}
@@ -627,16 +672,26 @@ export default function MediaLibraryPage() {
           description={items.length === 0 ? '上の枠へファイルを入れると、配信や公開画面で使えます。' : '種類または検索条件を変えてください。'}
         />
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div
+          className={
+            view === 'grid'
+              ? 'grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+              : 'flex flex-col gap-2'
+          }
+        >
           {current.map((item) => (
             <div
               key={item.id}
-              className="bg-canvas rounded-card border-hairline flex flex-col overflow-hidden border"
+              className={`bg-canvas rounded-card border-hairline overflow-hidden border ${
+                view === 'grid' ? 'flex flex-col' : 'flex flex-row items-center gap-3'
+              }`}
             >
               <button
                 onClick={() => setPreview(item)}
                 title="プレビューを見る"
-                className="bg-canvas-sunken flex h-32 items-center justify-center overflow-hidden"
+                className={`bg-canvas-sunken flex items-center justify-center overflow-hidden ${
+                  view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'
+                }`}
               >
                 {item.kind === 'image' ? (
                   // 静的書き出しのため next/image の最適化は使えない。
@@ -649,7 +704,7 @@ export default function MediaLibraryPage() {
                 )}
               </button>
 
-              <div className="flex flex-1 flex-col gap-1 p-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1 p-2">
                 {renaming?.id === item.id ? (
                   <div className="space-y-2">
                     <input
@@ -707,15 +762,15 @@ export default function MediaLibraryPage() {
                       <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
-                      <span className="text-ink min-w-0 flex-1 truncate text-xs font-medium" title={item.filename}>
+                      <span className="text-ink min-w-0 flex-1 truncate text-caption font-bold" title={item.filename}>
                         {item.filename}
                       </span>
                     </label>
-                    <p className="text-ink-faint text-[11px] tabular-nums">
+                    <p className="text-ink-faint text-nano font-semibold tabular-nums">
                       {formatMediaDetails(item)}
                     </p>
                     <p
-                      className={`text-xs font-medium tabular-nums ${
+                      className={`text-nano font-bold tabular-nums ${
                         item.usageCount === undefined
                           ? 'text-ink-faint'
                           : item.usageCount === 0

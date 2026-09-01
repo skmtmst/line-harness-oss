@@ -925,6 +925,10 @@
     },
     "/conversions": {
       "node": "PouPn GH8VL n5VVTb ZrpKn GUxsj",
+      "implementationGaps": {
+        "parts": ["CSVで書き出す"],
+        "reason": "CSVを作る口が無い。押せない操作を置くより、本文で「まだ繋がっていません」と言う。口ができたら操作を戻す。"
+      },
       "name": "V6 16 成果・アフィリエイト＋V6 19 コンバージョン",
       "sections": [
         "Bar",
@@ -1149,6 +1153,10 @@
     },
     "/inflow-links": {
       "node": "tiKvb qb9Es Ioxcm",
+      "implementationGaps": {
+        "parts": ["追加率が高い", "計測停止中"],
+        "reason": "条件を保存する口が無い。作り物の札を押せない形で置くと「保存したのに効かない」と読めるので、札を作らず本文で「まだ繋がっていません」と言う。"
+      },
       "name": "V2 6-2 流入経路（6-6 サイトスクリプト・6-8 広告連携を含む）",
       "sections": [
         "Head",
