@@ -206,12 +206,20 @@
     "197_notification_center_scope.sql",
     "198_form_account_scope.sql",
     "198_friend_field_account_scope.sql",
+    "199_common_var_account_scope.sql",
     "200_nen_delivery_snapshot_safety.sql",
     "201_nen_photo_publication_consent.sql",
+    "202_ec_event_account_and_identity.sql",
     "202_nen_photo_review_decisions.sql",
     "203_saved_search_references.sql",
     "204_analytics_saved_results.sql",
-    "252_template_questions.sql"
+    "205_tenant_feature_packs.sql",
+    "252_template_questions.sql",
+    "253_friend_bulk_runs.sql",
+    "256_friend_add_routing_versions.sql",
+    "257_identity_candidates.sql",
+    "258_merged_people_detail.sql",
+    "261_media_account_scope.sql"
   ],
-  "migrationCount": 212
+  "migrationCount": 220
 }

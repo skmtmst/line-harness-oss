@@ -52,12 +52,15 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setVars([])
+      return
+    }
     void (async () => {
-      if (!selectedAccountId) {
-        setFields([])
-        return
-      }
-      const [fieldRes, varRes] = await Promise.all([api.friendFields.list(selectedAccountId), api.commonVars.list()])
+      const [fieldRes, varRes] = await Promise.all([
+        api.friendFields.list(selectedAccountId),
+        api.commonVars.list(selectedAccountId),
+      ])
       if (fieldRes.success) {
         setFields(fieldRes.data.map((f) => ({ token: `{{field.${f.fieldKey}}}`, label: f.name })))
       }
