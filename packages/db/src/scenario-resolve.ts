@@ -2,6 +2,7 @@ export interface StepLike {
   template_id: string | null;
   message_type: string;
   message_content: string;
+  question_json?: string | null;
 }
 
 export interface ResolvedContent {
@@ -9,6 +10,8 @@ export interface ResolvedContent {
   messageContent: string;
   /** 実際に配信時に使った template_id (null = step 直接値を使った) */
   templateIdAtSend: string | null;
+  /** 質問テンプレートなら、その時点の質問。通常テンプレートは step の控え。 */
+  questionJson: string | null;
 }
 
 /**
@@ -42,22 +45,25 @@ export async function resolveStepContent(
       messageType: step.message_type,
       messageContent: step.message_content,
       templateIdAtSend: null,
+      questionJson: step.question_json ?? null,
     };
   }
   const tpl = await db
-    .prepare('SELECT message_type, message_content FROM templates WHERE id = ?')
+    .prepare('SELECT message_type, message_content, question_json FROM templates WHERE id = ?')
     .bind(step.template_id)
-    .first<{ message_type: string; message_content: string }>();
+    .first<{ message_type: string; message_content: string; question_json: string | null }>();
   if (!tpl) {
     return {
       messageType: step.message_type,
       messageContent: step.message_content,
       templateIdAtSend: null,
+      questionJson: step.question_json ?? null,
     };
   }
   return {
     messageType: normalizeMessageType(tpl.message_type),
     messageContent: tpl.message_content,
     templateIdAtSend: step.template_id,
+    questionJson: tpl.question_json ?? step.question_json ?? null,
   };
 }
