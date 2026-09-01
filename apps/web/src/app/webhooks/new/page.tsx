@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import { useAccount } from '@/contexts/account-context'
 
 const MIN_SECRET_LENGTH = 32
 
@@ -14,6 +15,7 @@ function generateSecret(): string {
 }
 
 export default function NewWebhookPage() {
+  const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [eventTypes, setEventTypes] = useState('')
@@ -26,6 +28,7 @@ export default function NewWebhookPage() {
       description="このツールのできごとを外部へ知らせます（送り出す向きのみ）。"
       parent={['外部連携', '/webhooks']}
       validate={() => {
+        if (!selectedAccountId) return 'LINEアカウントを選択してください'
         if (!name.trim()) return '名前を入力してください'
         if (!/^https:\/\//.test(url.trim())) return 'URLは https:// で始めてください'
         if (secret.length < MIN_SECRET_LENGTH) {
@@ -34,7 +37,9 @@ export default function NewWebhookPage() {
         return null
       }}
       onSave={async () => {
+        if (!selectedAccountId) throw new Error('LINEアカウントを選択してください')
         const res = await api.webhooks.outgoing.create({
+          lineAccountId: selectedAccountId,
           name: name.trim(),
           url: url.trim(),
           eventTypes: eventTypes

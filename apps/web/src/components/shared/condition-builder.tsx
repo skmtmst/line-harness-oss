@@ -129,7 +129,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
         api.tags.list(),
-        api.friendFields.list(),
+        api.friendFields.list(selectedAccountId),
         api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
       ])

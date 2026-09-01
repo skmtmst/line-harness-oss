@@ -180,13 +180,13 @@
         "今月の追加",
         "CSVで書き出す",
         "UID移行",
-        "一括アクション",
+        "一括操作",
         "名前・LINE名・タグ・メモで検索",
         "詳細条件",
         "保存した検索",
         "友だち追加の新しい順",
         "注目のみ",
-        "選択した友だちにまとめて操作します",
+        "対象を確認してから操作を選んでください",
         "対応・担当",
         "シナリオ",
         "最新メッセージ",
@@ -292,34 +292,16 @@
       ]
     },
     "/tags": {
-      "node": "xn98K wdLjf KYG39 X79IHW t7Mhgl lNGcs NU4N2 FORVU",
-      "name": "V4 4-1 友だち属性（4タブ）",
+      "node": "hqrOv HBTk0 rIhbN QKx8Q",
+      "name": "V6 4 友だち属性（4タブ）",
       "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": ["xn98K", "wdLjf", "KYG39", "X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "status": "unverified",
+        "referenceNodeIds": ["hqrOv", "HBTk0", "rIhbN", "QKx8Q"],
         "requiredViewports": [1440, 1920],
-        "referenceScreenshots": [
-          "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
-          "docs/design-reference/friend-attributes-v4/02-create-initial.png/wdLjf.png",
-          "docs/design-reference/friend-attributes-v4/03-create-linked.png/KYG39.png",
-          "docs/design-reference/friend-attributes-v4/04-action-drawer.png/X79IHW.png",
-          "docs/design-reference/friend-attributes-v4/05-edit-existing.png/t7Mhgl.png",
-          "docs/design-reference/friend-attributes-v4/06-retroactive-dialog.png/lNGcs.png",
-          "docs/design-reference/friend-attributes-v4/07-delete-dialog.png/NU4N2.png",
-          "docs/design-reference/friend-attributes-v4/08-folder-dialog.png/FORVU.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/friend-attributes-v4/01-list.png",
-          "docs/design-qa/friend-attributes-v4/02-create-initial.png",
-          "docs/design-qa/friend-attributes-v4/03-create-linked.png",
-          "docs/design-qa/friend-attributes-v4/04-action-drawer.png",
-          "docs/design-qa/friend-attributes-v4/05-edit-existing.png",
-          "docs/design-qa/friend-attributes-v4/06-retroactive-dialog.png",
-          "docs/design-qa/friend-attributes-v4/07-delete-dialog.png",
-          "docs/design-qa/friend-attributes-v4/08-folder-dialog.png"
-        ],
-        "checkedAt": "2026-08-21T18:18:00+09:00",
-        "evidence": "docs/design-qa/friend-attributes-v4/design-qa.md"
+        "referenceScreenshots": [],
+        "implementationScreenshots": [],
+        "checkedAt": "2026-08-27T12:50:00+09:00",
+        "reason": "V6実装と1440px・1920pxの比較証拠はClaude側のVisual QAで作成中"
       },
       "sections": [
         "Body",
@@ -366,9 +348,9 @@
         "担当者あり",
         "過去7日",
         "マーク名",
-        "新規の初期値",
-        "いまの人数",
-        "自動で変わるとき",
+        "初期値",
+        "使用中",
+        "自動変更",
         "初期値",
         "編集",
         "有効",
@@ -1847,21 +1829,17 @@
       ]
     },
     "/rich-menus": {
-      "node": "I0BAA",
-      "name": "V2 4-7 リッチメニュー",
+      "node": "GO8RQ",
+      "name": "V6 12-1 リッチメニュー一覧",
       "sections": [
         "Bar",
-        "Head",
         "KPIs",
         "Saved"
       ],
       "parts": [
-        "リッチメニュー",
-        "トーク画面の下に表示されるメニューを作ります。友だちの状態ごとに出し分けでき、タップ数を計測できます。",
-        "マニュアル",
-        "並び替え",
+        "出す順番を変える",
         "フォルダを追加",
-        "メニューを作成",
+        "メニューを作る",
         "メニュー",
         "今月のタップ",
         "最多タップ",
@@ -1918,7 +1896,8 @@
       "name": "V2 4-7-3 リッチメニューを作る",
       "sections": [
         "Crumb",
-        "Head"
+        "Head",
+        "Steps"
       ],
       "parts": [
         "リッチメニューを作る",
@@ -2206,38 +2185,61 @@
       ]
     },
     "/tags/fields/new": {
-      "node": "nKQRg",
-      "name": "V2 3-2-1 項目を追加する（一部）",
+      "node": "A1ZYeP",
+      "name": "V6 4-2-A 友だち情報欄を追加",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["A1ZYeP"],
+        "requiredViewports": [1440, 1920],
+        "reason": "V6へ実装済み。Claudeの同条件画像比較待ち"
+      },
       "sections": [
-        "Head"
+        "Basic",
+        "Value",
+        "Immutable"
       ],
       "parts": [
         "友だち情報欄",
-        "項目を追加する",
-        "キャンセル",
         "項目を追加",
-        "どの項目か",
+        "基本情報",
         "項目名",
         "必須",
+        "差し込み名",
+        "種類",
         "フォルダ",
-        "入力の形式",
-        "短いテキスト",
-        "長い文章",
-        "選択",
-        "決まった選択肢から選ぶ",
-        "数値",
-        "体重など",
-        "日付",
-        "誕生日など",
-        "選択肢",
-        "なし",
-        "追加",
-        "複数選択",
-        "できる",
-        "どこで使うか",
-        "プレビュー",
-        "テンプレートの差し込み",
-        "気をつけること"
+        "値の扱い",
+        "既定値",
+        "友だち一覧に表示",
+        "個人情報として保護",
+        "EC側を正とする",
+        "作成後に変更できないもの",
+        "キャンセル",
+        "項目を作成"
+      ]
+    },
+    "/tags/fields/migrate": {
+      "node": "KoT6c",
+      "name": "V6 4-2-B 友だち情報欄を移行",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["KoT6c"],
+        "requiredViewports": [1440, 1920],
+        "reason": "データを変更しない事前確認まで実装済み。Claudeの同条件画像比較待ち"
+      },
+      "sections": [
+        "Fields",
+        "Preview",
+        "Usage"
+      ],
+      "parts": [
+        "友だち情報欄",
+        "項目を移行",
+        "いま使っている項目",
+        "新しく作る項目",
+        "値を変換できるか事前確認",
+        "事前確認する",
+        "切り替わる使用先",
+        "移行をやめる"
       ]
     },
     "/automations": {
@@ -2267,27 +2269,21 @@
       ]
     },
     "/webhooks": {
-      "node": "l8hjV",
-      "name": "V2 7-2 外部連携",
+      "node": "k3WxrO",
+      "name": "V6 26-1 外部連携",
       "sections": [
         "Head"
       ],
       "parts": [
         "外部連携",
-        "受信・送信のWebhookと、SlackやメールへのSlack通知をまとめて設定します。どれも「外部とやりとりする設定」です。",
-        "マニュアル",
+        "外部サービスから受け取る情報と、外部サービスへ送る通知を設定します。",
         "Webhookを追加",
-        "通知先を追加",
-        "通知先",
-        "受信Webhook",
-        "送信Webhook",
-        "種類",
-        "期間",
-        "状態",
-        "常に",
-        "オン",
-        "メール",
-        "オフ"
+        "こちらで受け取る",
+        "こちらから送る",
+        "受け取る設定を追加",
+        "送る設定を追加",
+        "登録内容は消えていません",
+        "未対応の通知"
       ]
     },
     "/nen-campaigns": {
@@ -2299,9 +2295,7 @@
       ],
       "parts": [
         "NEN配信",
-        "マニュアル",
         "並び替え",
-        "フォルダを追加",
         "配信ジョブ",
         "今月の配信",
         "通",
@@ -2329,8 +2323,8 @@
       ],
       "parts": [
         "未審査",
-        "承認済",
-        "見送り",
+        "通したもの",
+        "戻したもの",
         "投稿の合計"
       ]
     },
@@ -2359,52 +2353,59 @@
       ]
     },
     "/contents": {
-      "node": "AfRgY",
-      "name": "V2 5-1 登録メディア一覧",
-      "sections": [
-        "Head"
-      ],
+      "node": "g89Tc",
+      "name": "V6 15-1 登録メディア一覧",
+      "sections": [],
       "parts": [
-        "登録メディア一覧",
-        "配信やリッチメニューで使う画像・動画・PDFをここにまとめます。どこで使われているかも一緒に管理します。",
-        "マニュアル",
         "ここにファイルをドロップ",
         "ファイルを選択する",
         "画像",
         "音声",
         "動画",
         "PDF",
-        "メディア名を検索",
+        "ファイル名で検索",
+        "入れた日が新しい順",
+        "20件表示",
+        "使っていない",
         "使用箇所",
-        "登録：",
         "全てのメディアを選択",
         "選択したメディアを削除",
-        "ファイルがまだありません。",
+        "登録メディアはまだありません",
+        "メディアを読み込んでいます",
+        "メディアを表示できませんでした",
+        "使用先：",
         "中身の形式とファイル名の拡張子が食い違うものは保存できません",
         "公開リンクが作られるため、個人情報の取り扱いに注意してください"
       ]
     },
     "/contents/vars": {
-      "node": "S20UY",
-      "name": "V2 5-2 共通情報",
-      "sections": [
-        "Head"
-      ],
+      "node": "WuKzU",
+      "name": "V6 14-1 共通情報",
+      "sections": [],
       "parts": [
-        "共通情報",
-        "「会社名」「営業時間」といったアカウント内で共通に使う情報を登録します。",
-        "マニュアル",
         "新しいフォルダ",
-        "新しい共通情報",
-        "並び替え",
+        "共通情報を作る",
         "フォルダ",
         "未分類",
         "共通情報名",
         "種別",
         "スケジュール",
-        "共通情報が作成されていません",
+        "まだ共通情報がありません",
+        "条件に合う共通情報はありません",
         "選択した共通情報を削除"
-      ]
+      ],
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "WuKzU",
+          "yPkWe"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Claudeの設計画像・実装画像比較待ち"
+      }
     },
     "/automations/new": {
       "node": "kwnUH",
@@ -2791,7 +2792,13 @@
         "どう振り分けられるか",
         "友だち追加された",
         "この1か月の実績"
-      ]
+      ],
+      "implementationGaps": {
+        "parts": [
+          "マニュアル"
+        ],
+        "reason": "V6共通トップバーが画面名とマニュアルを表示するため、本文には重ねない"
+      }
     },
     "/scenarios/mode": {
       "node": "cCB7r",
