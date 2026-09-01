@@ -39,7 +39,10 @@ export interface Word {
 export function responseTypeWord(responseType: string): Word {
   switch (responseType) {
     case 'silent':
-      return { label: '返信しない', note: '返信内容が設定されていないため、何もしません' }
+      return {
+        label: '返信しない',
+        note: '返信は送りません。設定した後続処理がある場合は実行します',
+      }
     case 'text':
       return { label: 'テキスト', note: '文章を送ります' }
     case 'image':
@@ -73,6 +76,7 @@ export function matchTypeWord(matchType: 'exact' | 'contains'): string {
 export function templateWord(
   templateId: string | null,
   templateName: string | null | undefined,
+  templateListAvailable = true,
 ): Word & { linked: boolean } {
   if (!templateId) {
     return {
@@ -83,6 +87,13 @@ export function templateWord(
   }
   if (templateName) {
     return { label: templateName, note: 'テンプレートの本文を送ります', linked: true }
+  }
+  if (!templateListAvailable) {
+    return {
+      label: 'テンプレートを確認できません',
+      note: 'テンプレートの一覧を読み込めませんでした。再読み込みしてください',
+      linked: false,
+    }
   }
   return {
     label: 'テンプレートを表示できません',
@@ -115,7 +126,7 @@ export function effectiveAccountWord(
   }
   return {
     mark: '⚠',
-    note: 'このアカウントでは、当てはまっても返信しません。返信内容が設定されていないため、何もしません',
+    note: 'このアカウントでは返信しません。設定した後続処理がある場合は実行します',
   }
 }
 
@@ -144,7 +155,7 @@ export const EFFECTIVE_LEGEND: ReadonlyArray<{
   {
     status: 'silent',
     mark: '⚠',
-    text: 'このアカウントでは、当てはまっても返信しません。返信内容が設定されていないためです。',
+    text: 'このアカウントでは返信しません。設定した後続処理がある場合は実行します。',
   },
   {
     status: 'not_applicable',
@@ -221,4 +232,23 @@ export const NO_WRITE_PERMISSION: Word = {
  */
 export function metricWord(state: LoadState, value: number): string {
   return state === 'ready' ? String(value) : '—'
+}
+
+/** 遅れて返った別アカウント・前世代の取得結果を画面へ入れない。 */
+export function isCurrentAutoReplyLoad(
+  requestAccountId: string | null,
+  currentAccountId: string | null,
+  requestGeneration: number,
+  currentGeneration: number,
+): boolean {
+  return requestAccountId === currentAccountId && requestGeneration === currentGeneration
+}
+
+/** アカウント切替直後の1描画でも、前アカウントの一覧を見せない。 */
+export function visibleAutoReplyLoadState(
+  state: LoadState,
+  loadedAccountId: string | null | undefined,
+  selectedAccountId: string | null,
+): LoadState {
+  return loadedAccountId === selectedAccountId ? state : 'loading'
 }

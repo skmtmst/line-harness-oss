@@ -20,11 +20,13 @@ import {
   UNNAMED_ACCOUNT,
   actionWord,
   effectiveAccountWord,
+  isCurrentAutoReplyLoad,
   matchTypeWord,
   messageKindWord,
   metricWord,
   responseTypeWord,
   templateWord,
+  visibleAutoReplyLoadState,
   type LoadState,
 } from './auto-reply-words'
 
@@ -144,6 +146,7 @@ export default function AutoRepliesPage() {
   const [items, setItems] = useState<AutoReply[]>([])
   const [query, setQuery] = useState('')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
+  const [templateListAvailable, setTemplateListAvailable] = useState(true)
   /**
    * 読み込みの状態。**「まだ読んでいる」「読めなかった」「権限が無い」を
    * 混ぜない。** 混ぜると、登録したものが消えたように読める。
@@ -162,29 +165,51 @@ export default function AutoRepliesPage() {
   const [deleteError, setDeleteError] = useState('')
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
+  const loadGenerationRef = useRef(0)
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null | undefined>(undefined)
 
   const load = useCallback(async () => {
+    const requestAccountId = selectedAccountId
+    const requestGeneration = ++loadGenerationRef.current
     setLoadState('loading')
     try {
       const [arRes, tplRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
         api.templates.list(),
       ])
+      if (!isCurrentAutoReplyLoad(
+        requestAccountId,
+        selectedAccountIdRef.current,
+        requestGeneration,
+        loadGenerationRef.current,
+      )) return
       // 応答が返ってきても中身が無いことがある。そのときも成功にしない。
       if (!arRes.success) {
+        setLoadedAccountId(requestAccountId)
         setLoadState('error')
         return
       }
       setItems(arRes.data)
-      if (tplRes.success) setTemplates(tplRes.data.map((t) => ({
-        id: t.id,
-        name: t.name,
-        messageType: t.messageType,
-        messageContent: t.messageContent,
-      })))
+      setTemplateListAvailable(tplRes.success)
+      setTemplates(tplRes.success
+        ? tplRes.data.map((t) => ({
+            id: t.id,
+            name: t.name,
+            messageType: t.messageType,
+            messageContent: t.messageContent,
+          }))
+        : [])
+      setLoadedAccountId(requestAccountId)
       setLoadState('ready')
     } catch (reason) {
+      if (!isCurrentAutoReplyLoad(
+        requestAccountId,
+        selectedAccountIdRef.current,
+        requestGeneration,
+        loadGenerationRef.current,
+      )) return
       // 403 は通信の失敗ではない。読み直しても直らないので、そう書く。
+      setLoadedAccountId(requestAccountId)
       setLoadState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [selectedAccountId])
@@ -281,7 +306,11 @@ export default function AutoRepliesPage() {
   }
 
   const renderTemplateCell = (r: AutoReply) => {
-    const word = templateWord(r.templateId, templateById.get(r.templateId ?? '')?.name ?? null)
+    const word = templateWord(
+      r.templateId,
+      templateById.get(r.templateId ?? '')?.name ?? null,
+      templateListAvailable,
+    )
     // 開く先が無いものはリンクにしない。押しても何も起きない導線を置かない。
     if (!word.linked) {
       return <span className="text-[11px] text-ink-faint" title={word.note}>{word.label}</span>
@@ -332,7 +361,14 @@ export default function AutoRepliesPage() {
     (r) => r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0,
   ).length
   const neverHitCount = items.filter((r) => (r.hits?.total ?? 0) === 0).length
-  const ready = loadState === 'ready'
+  // アカウントが変わってから新しい取得が始まるまでの1描画でも、前の一覧を
+  // 見せない。取得側の照合と表示側の照合を両方持つ。
+  const visibleLoadState = visibleAutoReplyLoadState(
+    loadState,
+    loadedAccountId,
+    selectedAccountId,
+  )
+  const ready = visibleLoadState === 'ready'
 
   /**
    * 選んだあとにアカウントを切り替えられたら、**確認のボタンを出さない。**
@@ -437,47 +473,47 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(loadState, items.length)}
+            {metricWord(visibleLoadState, items.length)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
               ? `停止中 ${items.filter((r) => !r.isActive).length}件`
-              : LOAD_STATE_WORDS[loadState].label}
+              : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のヒット</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(loadState, monthlyHits)}
+            {metricWord(visibleLoadState, monthlyHits)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
               ? `累計 ${totalHits}回・ヒット数はルールごとに数えます`
-              : LOAD_STATE_WORDS[loadState].label}
+              : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">営業時間外の応答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(loadState, timeRestrictedCount)}
+            {metricWord(visibleLoadState, timeRestrictedCount)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {ready ? '曜日か時間帯を決めているルール' : LOAD_STATE_WORDS[loadState].label}
+            {ready ? '曜日か時間帯を決めているルール' : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">未ヒット</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(loadState, neverHitCount)}
+            {metricWord(visibleLoadState, neverHitCount)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
               ? '一度も当たっていないルール（30日以上の絞り込みは準備中）'
-              : LOAD_STATE_WORDS[loadState].label}
+              : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
       </div>
@@ -630,11 +666,11 @@ export default function AutoRepliesPage() {
               {!ready ? (
                 <tr><td colSpan={10} className="px-4 py-8">
                   <ListState
-                    kind={loadState}
-                    title={LOAD_STATE_WORDS[loadState].label}
-                    description={LOAD_STATE_WORDS[loadState].note}
+                    kind={visibleLoadState}
+                    title={LOAD_STATE_WORDS[visibleLoadState].label}
+                    description={LOAD_STATE_WORDS[visibleLoadState].note}
                     action={
-                      loadState === 'error'
+                      visibleLoadState === 'error'
                         ? <Button onClick={() => void load()}>再読み込み</Button>
                         : undefined
                     }

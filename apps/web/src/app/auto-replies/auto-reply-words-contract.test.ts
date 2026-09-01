@@ -10,11 +10,13 @@ import {
   UNNAMED_ACCOUNT,
   actionWord,
   effectiveAccountWord,
+  isCurrentAutoReplyLoad,
   matchTypeWord,
   messageKindWord,
   metricWord,
   responseTypeWord,
   templateWord,
+  visibleAutoReplyLoadState,
 } from './auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -59,7 +61,8 @@ function expectNoInternalWord(text: string) {
 describe('自動応答の一覧に出す言葉（内部語の置き換え表）', () => {
   it('返し方の内部コードを、運用者の言葉にする', () => {
     expect(responseTypeWord('silent').label).toBe('返信しない')
-    expect(responseTypeWord('silent').note).toBe('返信内容が設定されていないため、何もしません')
+    expect(responseTypeWord('silent').note).toContain('後続処理')
+    expect(responseTypeWord('silent').note).not.toContain('何もしません')
     expect(responseTypeWord('text').label).toBe('テキスト')
     expect(responseTypeWord('image').label).toBe('画像')
     expect(responseTypeWord('flex').label).toBe('カード')
@@ -112,6 +115,15 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
     expect(word.label).toBe('テンプレートを表示できません')
   })
 
+  it('テンプレート一覧の取得失敗を、削除や権限不足と決めつけない', () => {
+    const word = templateWord('tpl_0001', null, false)
+    expect(word.linked).toBe(false)
+    expect(word.label).toBe('テンプレートを確認できません')
+    expect(word.note).toContain('再読み込み')
+    expect(word.note).not.toContain('削除')
+    expect(word.note).not.toContain('権限')
+  })
+
   it('名前を引けないアカウントにも、IDの断片を出さない', () => {
     expect(UNNAMED_ACCOUNT.label).toBe('表示できないアカウント')
     expectNoInternalWord(UNNAMED_ACCOUNT.label)
@@ -121,7 +133,8 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
   it('適用アカウントの3状態を、何が起きるかで書く', () => {
     expect(effectiveAccountWord('reply', 'inline').note).toContain('このアカウントで返信します')
     expect(effectiveAccountWord('reply', 'automation').note).toContain('つないである別の設定')
-    expect(effectiveAccountWord('silent', null).note).toContain('返信内容が設定されていないため')
+    expect(effectiveAccountWord('silent', null).note).toContain('後続処理')
+    expect(effectiveAccountWord('silent', null).note).not.toContain('何もしません')
     expect(effectiveAccountWord('not_applicable', null).note).toContain('別のアカウント専用')
   })
 
@@ -190,6 +203,18 @@ describe('読み込みの状態を言い分ける', () => {
     expect(metricWord('error', 12)).toBe('—')
     expect(metricWord('forbidden', 12)).toBe('—')
   })
+
+  it('同じアカウントでも前世代、同じ世代でも別アカウントの返事を捨てる', () => {
+    expect(isCurrentAutoReplyLoad('account-a', 'account-a', 2, 2)).toBe(true)
+    expect(isCurrentAutoReplyLoad('account-a', 'account-a', 1, 2)).toBe(false)
+    expect(isCurrentAutoReplyLoad('account-a', 'account-b', 2, 2)).toBe(false)
+  })
+
+  it('選択中と読み込み済みのアカウントが違う間は読込中として描く', () => {
+    expect(visibleAutoReplyLoadState('ready', 'account-a', 'account-b')).toBe('loading')
+    expect(visibleAutoReplyLoadState('error', 'account-a', 'account-b')).toBe('loading')
+    expect(visibleAutoReplyLoadState('ready', 'account-b', 'account-b')).toBe('ready')
+  })
 })
 
 describe('一覧の画面が置き換え表を通す', () => {
@@ -221,7 +246,7 @@ describe('一覧の画面が置き換え表を通す', () => {
   })
 
   it('読み込みの言い方を画面でも混ぜない', () => {
-    expect(PAGE).toContain('LOAD_STATE_WORDS[loadState]')
+    expect(PAGE).toContain('LOAD_STATE_WORDS[visibleLoadState]')
     expect(PAGE).toContain('再読み込み')
     expect(PAGE).toContain("reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error'")
     expect(PAGE).not.toContain('読み込みに失敗しました')
@@ -230,10 +255,16 @@ describe('一覧の画面が置き換え表を通す', () => {
   })
 
   it('読めていないときに件数を 0 と出さない', () => {
-    expect(PAGE).toContain('metricWord(loadState, items.length)')
-    expect(PAGE).toContain('metricWord(loadState, monthlyHits)')
-    expect(PAGE).toContain('metricWord(loadState, timeRestrictedCount)')
-    expect(PAGE).toContain('metricWord(loadState, neverHitCount)')
+    expect(PAGE).toContain('metricWord(visibleLoadState, items.length)')
+    expect(PAGE).toContain('metricWord(visibleLoadState, monthlyHits)')
+    expect(PAGE).toContain('metricWord(visibleLoadState, timeRestrictedCount)')
+    expect(PAGE).toContain('metricWord(visibleLoadState, neverHitCount)')
+  })
+
+  it('アカウント切替時は、前の取得結果を状態にも画面にも出さない', () => {
+    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
+    expect(PAGE).toContain('isCurrentAutoReplyLoad(')
+    expect(PAGE).toContain('visibleAutoReplyLoadState(')
   })
 
   it('開く先が無いテンプレートをリンクにしない', () => {
