@@ -16,6 +16,7 @@ import {
   type WebinarAnalytics,
   type WebinarUserComment,
 } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 function fmtSec(sec: number): string {
   // 負 = 開始前 (待機ルーム) の相対時刻。-330 → -5:30
@@ -859,7 +860,7 @@ function EditWebinarInner() {
   if (!id) {
     return (
       <>
-        <Header title="ウェビナー編集" />
+
         <div className="p-6 text-red-700">id クエリが必要です</div>
       </>
     )
@@ -867,7 +868,7 @@ function EditWebinarInner() {
   if (loading) {
     return (
       <>
-        <Header title="ウェビナー編集" />
+
         <div className="p-6 text-gray-500">読み込み中...</div>
       </>
     )
@@ -875,7 +876,7 @@ function EditWebinarInner() {
   if (loadError || !webinar) {
     return (
       <>
-        <Header title="ウェビナー編集" />
+
         <div className="p-6 text-red-700">{loadError ?? '見つかりませんでした'}</div>
       </>
     )
@@ -979,11 +980,12 @@ function EditWebinarInner() {
 }
 
 export default function EditWebinarPage() {
+  usePageTitle('ウェビナー編集')
   return (
     <Suspense
       fallback={
         <>
-          <Header title="ウェビナー編集" />
+
           <div className="p-6 text-gray-500">読み込み中...</div>
         </>
       }

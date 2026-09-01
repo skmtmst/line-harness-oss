@@ -5,8 +5,10 @@ import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
 import HqStaffSection from './hq-staff-section'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 export default function HqSettingsPage() {
+  usePageTitle('統括設定')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,7 +58,7 @@ export default function HqSettingsPage() {
 
   return (
     <div>
-      <div data-design="Head"><Header title="統括設定" description="統括コンソールに表示する名前を管理します。" /></div>
+      <div data-design="Head"><Header description="統括コンソールに表示する名前を管理します。" /></div>
       <form data-design="Form" onSubmit={save} className="max-w-2xl rounded-card border border-hairline bg-canvas p-6 shadow-sm">
         <label htmlFor="tenant-name" className="block text-sm font-semibold text-ink">統括名</label>
         <p className="mt-1 text-xs text-ink-secondary">100文字以内で入力してください。</p>
