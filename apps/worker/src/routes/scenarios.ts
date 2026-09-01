@@ -978,7 +978,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
     const stepsResult = await c.env.DB
       .prepare(
         `SELECT id, step_order, delay_minutes, offset_days, offset_minutes, delivery_time,
-                template_id, message_type, message_content
+                template_id, message_type, message_content, question_json
          FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC`,
       )
       .bind(scenarioId)
@@ -992,6 +992,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         template_id: string | null;
         message_type: string;
         message_content: string;
+        question_json: string | null;
       }>();
     const steps = stepsResult.results;
 
@@ -1040,6 +1041,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         deliveryAtLabel: `Day ${day} ${hh}:${mm} (${wd})`,
         messageType: resolved.messageType,
         messageContent: resolved.messageContent,
+        question: parseQuestion(resolved.questionJson),
       };
     });
 
@@ -1412,6 +1414,20 @@ async function runTestSend(
     .bind(scenarioId)
     .first<{ id: string; line_account_id: string | null }>();
   if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
+
+  // テスト送信は本物のLINE送信。IDを直接渡されても、見えない友だちや
+  // 別アカウントの友だちへシナリオ側のトークンで送らない。
+  const friend = await getFriendById(c.env.DB, friendId);
+  const friendAccountId = (friend as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId])) {
+    return c.json({ success: false, error: '送り先の友だちが見つかりません。' }, 404);
+  }
+  if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
+    return c.json(
+      { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
+      422,
+    );
+  }
 
   const rows = stepId
     ? await c.env.DB.prepare(`SELECT * FROM scenario_steps WHERE id = ? AND scenario_id = ?`)

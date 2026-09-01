@@ -7,6 +7,7 @@ import ScenarioDetailClient from './scenario-detail-client'
 function ScenarioDetailPageContent() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id')
+  const showStarted = searchParams.get('started') === '1'
   if (!id) {
     return (
       <div className="p-8 text-center text-sm text-ink-faint">
@@ -14,7 +15,7 @@ function ScenarioDetailPageContent() {
       </div>
     )
   }
-  return <ScenarioDetailClient scenarioId={id} />
+  return <ScenarioDetailClient scenarioId={id} showStarted={showStarted} />
 }
 
 // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
