@@ -9,7 +9,7 @@
  *
  * 守っていること
  * - ローカル専用。`NODE_ENV=production` では起動しない。127.0.0.1 にだけ開く
- * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない
+ * - **更新は原則失敗させる。** 画面確認専用の固定結果だけは返すが、保存も配信も起きない
  * - 実データ・秘密値を持たない。名前も固定の作り物
  * - 毎回まったく同じものを返す。乱数も時刻も使わない（画像が毎回同じになる）
  *
@@ -19,7 +19,21 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FRIEND_ADD_LIFECYCLE_DRAFT,
+  FRIEND_ADD_LIFECYCLE_PUBLISHED,
+  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
+  FRIEND_ADD_LIFECYCLE_VALIDATION,
+  CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  TEMPLATES, TEMPLATE_FOLDERS,
+  FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
+  IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
+  IDENTITY_CANDIDATE_LISTS,
+  MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
+  LIST_STATS, OPERATORS,
+  RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
+  TAGS, TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -190,15 +204,29 @@ const SUPPORT_EMAIL_ITEMS = [
   {
     id: 'email:mail-1',
     threadId: 'mail-1',
-    customerName: 'テスト 太郎',
-    customerIdentifier: 'taro@example.com',
-    subject: 'ご注文について',
-    preview: 'テスト太郎 様 この度…',
+    customerName: '坂本 真人',
+    customerIdentifier: 'sakamoto@example.com',
+    subject: '発送について',
+    preview: 'ご注文ありがとうございます。発送状況をご案内します。',
     status: 'unread',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
-    lastIncomingAt: '2026-08-15T12:00:00.000Z',
+    lastIncomingAt: '2026-08-16T02:10:00.000Z',
+    isUnread: true,
+  },
+  {
+    id: 'email:mail-2',
+    threadId: 'mail-2',
+    customerName: 'テスト 太郎',
+    customerIdentifier: 'taro@example.com',
+    subject: 'ご注文について',
+    preview: 'ご注文ありがとうございます。内容を確認して対応します。',
+    status: 'unread',
+    revision: 1,
+    assignedStaffId: null,
+    assignedStaffName: null,
+    lastIncomingAt: '2026-08-16T01:30:00.000Z',
     isUnread: true,
   },
 ]
@@ -296,6 +324,27 @@ const SHAPES = {
   '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
   '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
 
+  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
+  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
+  '/api/friend-add-routing/conflicts': { conflicts: [] },
+
+}
+
+/**
+ * 画面確認だけで完結する、保存を伴わない固定の返事。
+ * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
+ */
+function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
+    return FRIEND_ADD_LIFECYCLE_VALIDATION
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
+    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
+    return FRIEND_ADD_LIFECYCLE_PUBLISHED
+  }
+  return null
 }
 
 /** `success` の器に入れず、そのまま返すもの。 */
@@ -350,6 +399,38 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
   }
+  if (pathname === '/api/identity-candidates/detect') {
+    return {
+      success: true,
+      data: query.get('visualState') === 'empty'
+        ? IDENTITY_CANDIDATE_DETECTION.empty
+        : IDENTITY_CANDIDATE_DETECTION.normal,
+    }
+  }
+  if (pathname === '/api/identity-candidates') {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: IDENTITY_CANDIDATE_LISTS.empty }
+    }
+    const kind = query.get('kind') === 'ec_member' ? 'ec_member' : 'friend_duplicate'
+    return { success: true, data: IDENTITY_CANDIDATE_LISTS[kind] }
+  }
+  const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
+  if (identityCandidate) {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
+      ? IDENTITY_CANDIDATE_EC
+      : IDENTITY_CANDIDATE_FRIEND
+    return { success: true, data: candidate }
+  }
+  const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
+  if (mergedPerson) {
+    if (query.get('visualState') === 'error') return MERGED_PERSON_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: MERGED_PERSON_EMPTY }
+    }
+    return { success: true, data: MERGED_PERSON_DETAIL }
+  }
   if (pathname === '/api/dashboard/preferences') {
     /*
       設計 `vUXKb` の並び。**「友だちの状態」は既定では出ない**カードだが、
@@ -361,6 +442,30 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
+  // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
+  const chat = pathname.match(/^\/api\/chats\/([^/]+)$/)
+  if (chat) {
+    // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
+    // `undefined` になり `friendName.charAt(0)` で落ちる。
+    const row = CHATS.find((c) => c.id === chat[1])
+    if (row) return { success: true, data: { ...row, messages: FRIEND_MESSAGES[row.friendId] ?? [] } }
+  }
+  const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
+  if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
+  if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
+  if (messages) {
+    // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
+    return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
+  }
+  // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
+  if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  if (pathname === '/api/folders' && query.get('kind') === 'template') {
+    return { success: true, data: TEMPLATE_FOLDERS }
+  }
+  if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
+  if (pathname === '/api/chats') return { success: true, data: CHATS }
+  if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**
@@ -389,6 +494,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/friends/bulk-runs/friend-bulk-run-1') {
+    return { success: true, data: FRIEND_BULK_RUN.detail }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という
@@ -399,6 +507,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (richMenuDeleteImpact) {
+    const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT_EMPTY.group.id
+      ? RICH_MENU_DELETE_IMPACT_EMPTY
+      : RICH_MENU_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
@@ -432,8 +547,11 @@ const server = createServer((req, res) => {
 
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
+  )
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
@@ -442,7 +560,8 @@ const server = createServer((req, res) => {
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-  // 更新は通さない。ここで通すと「保存できたつもり」の画像が撮れてしまい、
+  // 更新は原則通さない。固定結果を返す3口も保存・配信は一切行わない。
+  // それ以外を通すと「保存できたつもり」の画像が撮れてしまい、
   // 動いていない画面を動いていると読み違える。
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
@@ -450,6 +569,17 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    const fixedResult = visualQaWriteBody(method, url.pathname)
+    if (fixedResult) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: fixedResult }))
+      return
+    }
+    // 対象確認は書き込みを起こさない。IAf7j の確認窓を通常データで撮るため、
+    // この1本だけ本物と同じPOSTの器で返す。実行・再試行・取り消しは405のまま。
+    if (method === 'POST' && url.pathname === '/api/friends/bulk-runs/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
       return
     }
     res.writeHead(405).end(
@@ -493,5 +623,5 @@ process.on('uncaughtException', (error) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（GETのみ・更新は405）`)
+  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（固定の画面確認結果以外の更新は405）`)
 })

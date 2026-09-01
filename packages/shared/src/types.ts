@@ -1468,6 +1468,62 @@ export interface FriendAddRouting {
   criteria: { firstTime: FriendAddFirstTimeCriterion };
 }
 
+export type FriendAddRoutingVersionStatus = "draft" | "published" | "retired";
+export type FriendAddRoutingTestStatus = "succeeded" | "failed";
+
+/** 画面が下書き・試験・公開を同じ言葉で扱うための版情報。 */
+export interface FriendAddRoutingVersion {
+  accountId: string;
+  versionId: string;
+  versionNumber: number;
+  status: FriendAddRoutingVersionStatus;
+  routing: FriendAddRouting;
+  lastTestStatus: FriendAddRoutingTestStatus | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export interface FriendAddRoutingValidationCheck {
+  key: "first_time" | "returning" | "actions" | "duplicate_prevention";
+  label: string;
+  status: "passed" | "warning" | "failed";
+  detail: string;
+}
+
+export interface FriendAddRoutingValidation {
+  canPublish: boolean;
+  /** 公開前に確認できた、選択中LINEアカウントの現在の有効友だち数。 */
+  estimatedAudienceCount: number | null;
+  checks: FriendAddRoutingValidationCheck[];
+  /** 初回と再追加は同じ判定器の排他的な2分岐なので、重複候補は通常0件。 */
+  conflicts: Array<{ code: string; message: string }>;
+  lastTestStatus: FriendAddRoutingTestStatus | null;
+}
+
+export interface FriendAddRoutingDraftTestResult {
+  versionId: string;
+  displayName: string | null;
+  kind: "first_time" | "returning";
+  scenarioId: string | null;
+  scenarioName: string | null;
+  suppressed: boolean;
+  actionCount: number;
+  /** dry-runなので、登録・配信・タグ付け等の状態変更は常にfalse。 */
+  stateChanged: false;
+}
+
+export interface FriendAddRoutingPublishResult {
+  accountId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  estimatedAudienceCount: number | null;
+  duplicatePrevention: "webhook_event";
+  /** 実行結果画面が接続済みのときだけ導線を返す。未接続を404のリンクにしない。 */
+  monitoringPath: "/friend-add-settings/runs" | null;
+  monitoringUnavailableReason: string | null;
+}
+
 /**
  * 既定値。**設定が無いアカウントはここに落ちる。**
  *

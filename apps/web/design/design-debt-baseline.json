@@ -88,7 +88,7 @@
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 121,
+    "arbitrary-value": 105,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -122,6 +122,9 @@
   "app/duplicates/page.tsx": {
     "arbitrary-value": 43,
     "direct-th": 6
+  },
+  "app/ec-commerce/identity-candidates/page.tsx": {
+    "unresolved-classname": 11
   },
   "app/ec-commerce/page.tsx": {
     "unresolved-classname": 2,
@@ -163,16 +166,22 @@
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
-    "direct-secondary-button": 4,
     "direct-primary-button": 3,
     "arbitrary-value": 5,
+    "direct-secondary-button": 3,
     "unresolved-classname": 1
+  },
+  "app/friend-add-settings/publish/page.tsx": {
+    "unresolved-classname": 45
   },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 4,
     "arbitrary-value": 5,
     "direct-secondary-button": 4,
     "direct-primary-button": 2
+  },
+  "app/friends/identity-candidates/page.tsx": {
+    "unresolved-classname": 6
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 2,
@@ -241,8 +250,7 @@
     "direct-secondary-button": 1
   },
   "app/nen-campaigns/page.tsx": {
-    "arbitrary-value": 21,
-    "direct-secondary-button": 1
+    "arbitrary-value": 21
   },
   "app/nen-members/page.tsx": {
     "arbitrary-value": 1
@@ -294,8 +302,8 @@
   },
   "app/rich-menus/page.tsx": {
     "unresolved-classname": 1,
-    "direct-secondary-button": 6,
     "direct-primary-button": 2,
+    "direct-secondary-button": 5,
     "arbitrary-value": 11,
     "direct-th": 5
   },
@@ -408,7 +416,7 @@
     "direct-th": 13,
     "unresolved-classname": 8,
     "arbitrary-value": 23,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
     "direct-secondary-button": 4,
@@ -488,11 +496,27 @@
     "unresolved-classname": 11,
     "direct-secondary-button": 1
   },
+  "components/chats/inbox-dropdown.tsx": {
+    "unresolved-classname": 11,
+    "direct-secondary-button": 3,
+    "arbitrary-value": 1
+  },
+  "components/chats/inbox-filter-panel.tsx": {
+    "arbitrary-value": 4,
+    "unresolved-classname": 9,
+    "direct-secondary-button": 1,
+    "direct-primary-button": 1
+  },
   "components/chats/inbox-kpis.tsx": {
     "arbitrary-value": 27
   },
+  "components/chats/saved-view-dialog.tsx": {
+    "arbitrary-value": 4,
+    "direct-primary-button": 2,
+    "direct-secondary-button": 1
+  },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 64
+    "arbitrary-value": 61
   },
   "components/dashboard/dashboard-editor.tsx": {
     "arbitrary-value": 17,
@@ -584,10 +608,10 @@
     "unresolved-classname": 51
   },
   "components/friend-fields/tag-editor-v4.tsx": {
-    "direct-primary-button": 4,
-    "direct-secondary-button": 6,
+    "direct-primary-button": 3,
+    "direct-secondary-button": 3,
     "unresolved-classname": 17,
-    "arbitrary-value": 17
+    "arbitrary-value": 16
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 3,
@@ -597,6 +621,9 @@
   },
   "components/friends/advanced-search-dialog.tsx": {
     "arbitrary-value": 57
+  },
+  "components/friends/bulk-run-dialog.tsx": {
+    "unresolved-classname": 42
   },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
@@ -613,6 +640,12 @@
     "direct-primary-button": 2,
     "direct-secondary-button": 2,
     "unresolved-classname": 8
+  },
+  "components/identity/identity-decision-dialog.tsx": {
+    "unresolved-classname": 15
+  },
+  "components/identity/identity-parts.tsx": {
+    "unresolved-classname": 38
   },
   "components/inbox/inbox-filters.tsx": {
     "arbitrary-value": 1
@@ -631,6 +664,15 @@
   "components/legal/terms-document.tsx": {
     "arbitrary-value": 1,
     "direct-th": 1
+  },
+  "components/merged-person/merged-delivery-dialog.tsx": {
+    "unresolved-classname": 12
+  },
+  "components/merged-person/merged-person-detail.tsx": {
+    "unresolved-classname": 10
+  },
+  "components/merged-person/merged-person-sections.tsx": {
+    "unresolved-classname": 46
   },
   "components/prompt-modal.tsx": {
     "arbitrary-value": 6

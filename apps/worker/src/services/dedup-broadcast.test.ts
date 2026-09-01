@@ -458,6 +458,41 @@ describe('processMultiAccountDedupBroadcast', () => {
     expect(clients[1].calls).toHaveLength(1);
   });
 
+  it('sends every stored bubble while counting one logical recipient once', async () => {
+    const { db, batches } = makeSendDb({
+      selectedCounts: [{ line_account_id: 'acc1', cnt: 1 }],
+      rankedRows: [{ friend_id: 'f1', line_user_id: 'u1', line_account_id: 'acc1' }],
+      accountMeta: [{ id: 'acc1', name: 'A1', country: null }],
+    });
+    vi.mocked(getLineAccountById).mockResolvedValue({
+      id: 'acc1', channel_access_token: 'tok1', is_active: 1,
+    } as never);
+    const clients: MockLineClient[] = [];
+    const result = await processMultiAccountDedupBroadcast(
+      db,
+      {
+        id: 'b-multi',
+        account_ids: '["acc1"]',
+        dedup_priority: '["acc1"]',
+        message_type: 'text',
+        message_content: 'legacy',
+        message_bubbles_json: JSON.stringify([
+          { id: '1', type: 'text', content: { text: '一通目' } },
+          { id: '2', type: 'image', content: { originalContentUrl: 'https://e.test/a.jpg', previewImageUrl: 'https://e.test/p.jpg' } },
+        ]),
+      },
+      (token) => {
+        const client = new MockLineClient(token);
+        clients.push(client);
+        return client as unknown as LineClient;
+      },
+    );
+    expect(result).toMatchObject({ totalCount: 1, successCount: 1 });
+    expect((clients[0].calls[0].args[1] as unknown[])).toHaveLength(2);
+    // 2通の送信記録 + 受信者単位の進捗更新。
+    expect(batches[0]).toHaveLength(3);
+  });
+
   it('one account multicast throws: other succeeds, failedAccountIds = [thrower]', async () => {
     const { db, updates } = makeSendDb({
       selectedCounts: [
