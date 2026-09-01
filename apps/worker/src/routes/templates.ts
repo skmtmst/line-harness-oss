@@ -12,6 +12,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
+import { validateTemplateMessage } from '../services/template-message-validation.js';
 
 const templates = new Hono<Env>();
 
@@ -256,6 +257,11 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!body.name || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
+    const message = validateTemplateMessage(body.messageType, body.messageContent);
+    if (!message.ok) {
+      const { ok: _ok, ...failure } = message;
+      return c.json({ success: false, ...failure }, 422);
+    }
     const carousel = checkCarousel(body.messageType, body.messageContent);
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
@@ -286,6 +292,17 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     const body = await c.req.json<{ messageType?: string; messageContent?: string; question?: unknown; questionStatus?: 'draft' | 'published' }>();
     // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
     const existing = await getTemplateById(c.env.DB, id);
+    const changesMessage = body.messageType !== undefined || body.messageContent !== undefined;
+    const message = changesMessage
+      ? validateTemplateMessage(
+          body.messageType ?? existing?.message_type,
+          body.messageContent ?? existing?.message_content,
+        )
+      : { ok: true as const };
+    if (!message.ok) {
+      const { ok: _ok, ...failure } = message;
+      return c.json({ success: false, ...failure }, 422);
+    }
     const carousel = checkCarousel(
       body.messageType ?? existing?.message_type,
       body.messageContent ?? existing?.message_content,

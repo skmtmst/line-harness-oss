@@ -78,6 +78,12 @@
 検証環境は1組しかないため、共同開発中は**必ずデプロイロックを取得してから**反映します。
 手順とルールは `docs/DEPLOY-GATE.md` を参照してください。
 
+Cloudflareの資格情報をローカル端末へ置かない場合は、GitHub Actionsの
+`Deploy Cloudflare Staging` を使います。先にローカルで同じコミットのロックを
+取得し、`codex/development` を指定して起動してください。既定はdry-runで、
+`apply` のときだけWorkerと管理画面を反映します。D1マイグレーションは
+`Migrate D1` を先にdry-runし、別工程で適用します。
+
 ```bash
 cd line-harness-nen
 
