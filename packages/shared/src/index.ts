@@ -8,4 +8,7 @@ export * from "./anniversary";
 export * from "./shipping-schedule";
 export * from "./form-layout";
 export * from "./tenant";
+export * from "./friend-bulk-runs";
 export * from "./identity-candidates";
+export * from "./merged-people";
+export * from "./template-message";
