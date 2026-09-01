@@ -7,6 +7,8 @@ import Header from '@/components/layout/header'
 import { bookingApi, type BookingShift, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import { GRID_DAYS, gridHours, isOpenAt, specialCountByDay } from './shift-grid'
+import { Th } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -57,6 +59,9 @@ function StaffShiftsPageContent() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [loadError, setLoadError] = useState(false)
   const [savingRules, setSavingRules] = useState(false)
+  /* 格子は保存済みの内容ではなく、いま編集中の値から描く。 */
+  const hours = gridHours(template)
+  const specialCounts = specialCountByDay(shifts)
   const [savingCalendar, setSavingCalendar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -304,6 +309,51 @@ function StaffShiftsPageContent() {
                 </span>
               </div>
             </div>
+            {/*
+              設計は曜日×時間の格子で見せる。1行ずつだと
+              **「何曜の何時なら受け付けるか」を見比べられない。**
+              下の欄で直し、ここで見る。
+            */}
+            {hours.length > 0 ? (
+              <div className="border-hairline overflow-x-auto border-b p-5">
+                <table className="w-full min-w-lg table-fixed border-separate border-spacing-0.5">
+                  <thead>
+                    <tr>
+                      <Th className="w-12" aria-label="時間" />
+                      {GRID_DAYS.map((day) => (
+                        <Th key={day.key} align="center" className="px-1 pb-1">
+                          {day.label}
+                          {/* 休みか営業かは口が言っていない。件数だけ添える。 */}
+                          {specialCounts[day.key] > 0 ? (
+                            <span className="text-ink-faint block text-xs font-normal">特別{specialCounts[day.key]}</span>
+                          ) : null}
+                        </Th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hours.map((hour) => (
+                      <tr key={hour}>
+                        <Th align="right" scope="row" className="pr-2 tabular-nums">{hour}時</Th>
+                        {GRID_DAYS.map((day) => (
+                          <td
+                            key={day.key}
+                            aria-label={`${day.label}曜 ${hour}時 ${isOpenAt(template[day.key], hour) ? '受付' : '受付しない'}`}
+                            className={`h-5 rounded-sm ${isOpenAt(template[day.key], hour) ? 'bg-accent-soft' : 'bg-canvas-sunken'}`}
+                          />
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-ink-faint mt-3 text-xs">
+                  色の付いた時間だけ受け付けます。「特別」は下の
+                  <a href="#special" className="text-accent mx-1 underline">特別な休み・営業</a>
+                  にある日で、休みか営業かはその一覧で確かめてください。
+                </p>
+              </div>
+            ) : null}
+
             <div className="space-y-3 p-5">
               {DAYS.map((day) => {
                 const current = template[day.key]
