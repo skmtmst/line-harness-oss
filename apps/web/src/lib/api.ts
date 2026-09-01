@@ -395,6 +395,12 @@ export type AnalyticsUsageOverview = AnalyticsEnvelope<{
   stateReason: string | null
   checkedAt: string
   automaticDeletion: false
+  summary: {
+    unusedItems: AnalyticsMetric<number>
+    automaticRuns: AnalyticsMetric<number>
+    manualSends: AnalyticsMetric<number>
+    estimatedHoursSaved: AnalyticsMetric<number>
+  }
   categories: Array<{
     key: string
     label: string
