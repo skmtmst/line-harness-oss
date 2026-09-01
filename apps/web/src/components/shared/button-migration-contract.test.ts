@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作32個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作33個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,10 +45,12 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
+    // 紹介者一覧の空状態にも、共通Buttonの作成操作を追加した。
     // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
     // 未実装のCSV・定期レポート操作は数へ入れない。
-    expect(openings).toHaveLength(32)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
+    // 両方を統合した現在の7ルートを基準に締め直す。
+    expect(openings).toHaveLength(33)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(14)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -69,7 +71,6 @@ describe('標準ボタンの第1段階移行', () => {
       '/tags/fields/new',
       '/reminders/new',
       '/affiliate-offers/new',
-      '/conversions?tab=affiliates',
       '/conversions/new',
       '/inflow-links/new',
     ]) {

@@ -446,15 +446,22 @@ app.get('/r/:ref', async (c) => {
   // entry_route: entry_routes owns the ref namespace, so an existing route
   // (even one whose pool is paused) keeps its behavior unchanged. An affiliate
   // ref resolves its LINE account directly (no pool) and lands on that
-  // account's LIFF. is_active=0 links still redirect (spec §8) — pausing an
-  // affiliate link only stops NEW attribution, never breaks existing links.
+  // account's LIFF. Stopped links do not redirect or count a new click.
   // The click is counted here (the landing page hit), and `ref` still rides
   // through to LIFF state below so the existing ref_tracking flow attributes
   // the eventual friend-add via /auth/callback + /api/liff/link.
   let affiliateResolved = false;
   if (!route) {
     const affiliateLink = await getAffiliateLinkByRefCode(c.env.DB, ref);
-    if (affiliateLink) {
+    if (affiliateLink && (
+      affiliateLink.is_active !== 1 || affiliateLink.affiliate_is_active === 0
+    )) {
+      return c.html(
+        '<!doctype html><html lang="ja"><meta charset="utf-8"><title>この紹介リンクは停止しています</title><body><main><h1>この紹介リンクは停止しています</h1><p>紹介元の運用者へ、新しいリンクをご確認ください。</p></main></body></html>',
+        410,
+      );
+    }
+    if (affiliateLink?.is_active === 1) {
       await incrementAffiliateLinkClick(c.env.DB, ref);
       affiliateResolved = true;
       if (affiliateLink.line_account_id) {
