@@ -5,12 +5,25 @@ import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import type { RichMenuTapStats } from '@/lib/api'
+import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import {
+  audienceReason,
+  audienceText,
+  blockerTexts,
+  canDelete as canDeleteImpact,
+  impactMatchesRequest,
+  impactFromError,
+  nextDisplayText,
+  recommendedActionText,
+  referenceKindText,
+  sameDeleteImpactRequest,
+  type DeleteImpactRequest,
+} from './delete-impact'
 import {
   compareTargetingGroups,
   moveTargetingGroup,
@@ -141,6 +154,17 @@ export default function RichMenusListPage() {
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  /*
+    消したときの影響（契約 #608）。**窓を開けてから読む。**
+    一覧を出すたびに全件ぶん読むと、消さない人にも重い問い合わせが走る。
+  */
+  const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
+  const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /** アカウント・対象・開き直しの世代で、遅い応答を捨てる。 */
+  const impactRequestRef = useRef<DeleteImpactRequest | null>(null)
+  const impactRequestGenerationRef = useRef(0)
+  /** 同じ窓の読み直しで、前の読み込み結果が後から上書きしないための世代。 */
+  const impactLoadGenerationRef = useRef(0)
   const [publishedDeleteTarget, setPublishedDeleteTarget] =
     useState<RichMenuGroupListItem | null>(null)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
@@ -167,6 +191,11 @@ export default function RichMenusListPage() {
     setImportedMenuName(null)
     setDeleteBusy(false)
     setDeleteError(null)
+    impactRequestGenerationRef.current += 1
+    impactLoadGenerationRef.current += 1
+    impactRequestRef.current = null
+    setImpact(null)
+    setImpactPhase('idle')
     setPage(1)
     if (!selectedAccount?.id) setLoading(false)
   }, [selectedAccount?.id])
@@ -263,6 +292,51 @@ export default function RichMenusListPage() {
     }
   }
 
+  function beginImpactRequest(accountId: string, groupId: string): DeleteImpactRequest {
+    const request = {
+      accountId,
+      groupId,
+      generation: impactRequestGenerationRef.current + 1,
+    }
+    impactRequestGenerationRef.current = request.generation
+    impactRequestRef.current = request
+    return request
+  }
+
+  async function loadImpact(request: DeleteImpactRequest) {
+    /*
+      **遅れて返った別のメニューの結果を映さない。** Aを読み込み中に窓を
+      閉じてBを開くと、あとから返るAの結果がBの窓に出る。表示とボタンの
+      可否が別のメニューのものになる（サーバは削除時に確かめ直すので
+      誤って消しはしないが、読んでいるものと押せるものが食い違う）。
+    */
+    const loadGeneration = impactLoadGenerationRef.current + 1
+    impactLoadGenerationRef.current = loadGeneration
+    setImpactPhase('loading')
+    setImpact(null)
+    try {
+      const res = await api.richMenuGroups.deleteImpact(request.groupId)
+      if (
+        !sameDeleteImpactRequest(impactRequestRef.current, request)
+        || impactLoadGenerationRef.current !== loadGeneration
+      ) return
+      if (!res.success) throw new Error('impact_failed')
+      if (!impactMatchesRequest(res.data, request)) throw new Error('impact_scope_mismatch')
+      setImpact(res.data)
+      setImpactPhase('ready')
+    } catch {
+      if (
+        !sameDeleteImpactRequest(impactRequestRef.current, request)
+        || impactLoadGenerationRef.current !== loadGeneration
+      ) return
+      /*
+        影響が読めないときは**消させない**。何が起きるか分からないまま
+        取り消せない操作をさせるより、読み直してもらうほうがよい。
+      */
+      setImpactPhase('error')
+    }
+  }
+
   function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
       setPublishedDeleteTarget(group)
@@ -270,16 +344,22 @@ export default function RichMenusListPage() {
     }
     setDeleteError(null)
     setDeleteTarget({ kind: 'managed', group })
+    if (!selectedAccount?.id) return
+    const request = beginImpactRequest(selectedAccount.id, group.id)
+    void loadImpact(request)
   }
 
   function handleDeleteExternal(menu: LineMenu) {
     if (!selectedAccount?.id) return
     setDeleteError(null)
+    beginImpactRequest(selectedAccount.id, `external:${menu.richMenuId}`)
     setDeleteTarget({ kind: 'external', menu })
   }
 
   async function confirmDelete() {
     if (!deleteTarget || deleteBusy) return
+    const request = impactRequestRef.current
+    if (!request) return
     const action: RichMenuAction = deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'
     setDeleteBusy(true)
     setDeleteError(null)
@@ -295,12 +375,27 @@ export default function RichMenusListPage() {
         )
         if (!res.success) throw new Error('delete_failed')
       }
+      if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
       setDeleteTarget(null)
       await reload()
     } catch (e) {
+      if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      /*
+        **409は「読んだあとに状態が変わった」。** Workerがその時点の影響を
+        一緒に返すので、古い「消せます」を残さず描き直す。
+      */
+      if (e instanceof ApiError && e.status === 409) {
+        const latest = impactFromError(e.data)
+        if (latest && impactMatchesRequest(latest, request)) {
+          setImpact(latest)
+          setImpactPhase('ready')
+        } else if (deleteTarget.kind === 'managed') {
+          void loadImpact(request)
+        }
+      }
       setDeleteError(richMenuError(e, action))
     } finally {
-      setDeleteBusy(false)
+      if (sameDeleteImpactRequest(impactRequestRef.current, request)) setDeleteBusy(false)
     }
   }
 
@@ -896,25 +991,81 @@ export default function RichMenusListPage() {
         error={deleteError ?? undefined}
         onCancel={() => {
           if (deleteBusy) return
+          impactRequestGenerationRef.current += 1
+          impactLoadGenerationRef.current += 1
+          impactRequestRef.current = null
           setDeleteTarget(null)
           setDeleteError(null)
+          setImpact(null)
+          setImpactPhase('idle')
         }}
-        onConfirm={() => void confirmDelete()}
+        {...(deleteTarget?.kind === 'external' || canDeleteImpact({ impact, busy: deleteBusy })
+          ? { onConfirm: () => void confirmDelete() }
+          : {})}
       >
         {deleteTarget?.kind === 'managed' ? (
-          <ul className="space-y-2 text-sm text-ink-secondary">
-            <li>
-              <strong className="text-ink">消えるもの：</strong>
-              このリッチメニューの設定と画像
-            </li>
-            <li>
-              <strong className="text-ink">残るもの：</strong>
-              同じフォルダのほかのメニューと、これまでのタップ記録
-            </li>
-            <li>
-              <strong className="text-danger">元に戻せません。</strong>
-            </li>
-          </ul>
+          <>
+            <ul className="space-y-2 text-sm text-ink-secondary">
+              <li>
+                <strong className="text-ink">消えるもの：</strong>
+                このリッチメニューの設定と画像
+              </li>
+              <li>
+                <strong className="text-ink">残るもの：</strong>
+                同じフォルダのほかのメニューと、これまでのタップ記録
+              </li>
+              <li>
+                <strong className="text-danger">元に戻せません。</strong>
+              </li>
+            </ul>
+            {/*
+              消したあとに何が起きるか（契約 #608）。読込・失敗・通常を
+              分ける。**読めないときは消させない。**
+            */}
+            {impactPhase === 'loading' ? (
+              <p className="mt-3 text-xs text-ink-faint">消したときの影響を確認しています…</p>
+            ) : impactPhase === 'error' ? (
+              <p className="mt-3 text-xs font-semibold text-danger" role="alert">
+                消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。
+              </p>
+            ) : impact ? (
+              <div className="border-hairline mt-3 space-y-1.5 border-t pt-3 text-xs leading-5 text-ink-secondary">
+                <p>
+                  <strong className="text-ink">いま表示している人数：</strong>
+                  {audienceText(impact.currentAudience)}
+                  {audienceReason(impact.currentAudience)
+                    ? `（${audienceReason(impact.currentAudience)}）`
+                    : ''}
+                </p>
+                <p>
+                  <strong className="text-ink">次に出るメニュー：</strong>
+                  {nextDisplayText(impact.nextDisplay)}
+                </p>
+                <p>
+                  <strong className="text-ink">切替元：</strong>
+                  {impact.incomingSwitches.length === 0
+                    ? 'ありません'
+                    : impact.incomingSwitches
+                        .map((sw) => `${sw.sourceGroupName}の「${sw.areaLabel ?? sw.sourcePageName}」`)
+                        .join('・')}
+                </p>
+                <p>
+                  <strong className="text-ink">使っている自動処理：</strong>
+                  {impact.operationalReferences.length === 0
+                    ? 'ありません'
+                    : impact.operationalReferences
+                        .map((ref) => `${referenceKindText(ref.kind)}「${ref.ownerName}」`)
+                        .join('・')}
+                </p>
+                {blockerTexts(impact.blockers).map((text) => (
+                  <p key={text} className="font-semibold text-danger" role="alert">{text}</p>
+                ))}
+                {impact.blockers.length === 0 ? null : (
+                  <p className="text-ink-faint">{recommendedActionText(impact.recommendedAction)}</p>
+                )}
+              </div>
+            ) : null}
+          </>
         ) : (
           <ul className="space-y-2 text-sm text-ink-secondary">
             <li>
