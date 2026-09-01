@@ -1,5 +1,7 @@
 'use client'
 
+/* 契約試験が renderToStaticMarkup で描くので、明示的に React を読む。 */
+import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Circle, Star } from 'lucide-react'
@@ -77,11 +79,12 @@ export default function FriendListRow({
       </button>
 
       <div className="flex min-w-0 items-center gap-3">
+        {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
         {friend.pictureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-full bg-v6-avatar-bg object-cover" />
+          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-v6-avatar bg-v6-avatar-bg object-cover" />
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-v6-avatar text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
             {friend.displayName?.charAt(0) ?? '?'}
           </div>
         )}
@@ -100,7 +103,22 @@ export default function FriendListRow({
             <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark?.color ?? 'var(--color-v6-ink-disabled)' }} />
             {friend.supportMark?.name ?? 'マークなし'}
           </p>
-          <p className="mt-0.5 truncate text-nano text-v6-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
+          {/*
+            担当者は設計 `PhxG6` の丸アイコン付き（16x16 / r=8 / 頭文字 10px・800）。
+            未割り当ては頭文字が無いので全角ハイフンを置く。空欄にすると
+            「読み込み中で出ていない」と見分けが付かなくなる。
+          */}
+          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-nano text-v6-ink-secondary">
+            <span
+              aria-hidden="true"
+              data-operator-avatar={friend.operator ? 'assigned' : 'unassigned'}
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-nano font-extrabold ${friend.operator ? 'text-on-accent' : 'bg-v6-avatar-bg text-v6-ink-faint'}`}
+              style={friend.operator ? { backgroundColor: avatarTone(friend.operator.name) } : undefined}
+            >
+              {friend.operator ? (friend.operator.name.charAt(0) || '－') : '－'}
+            </span>
+            <span className="truncate">担当：{friend.operator?.name ?? '未割り当て'}</span>
+          </p>
         </div>
       ) : null}
 

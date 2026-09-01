@@ -135,6 +135,8 @@
   --radius-v6-option: 7px;
   --radius-v6-control: 9px;
   --radius-v6-card: 14px;
+  /* 友だち行のアバター。設計 `PhxG6` は 40x40 に r=18（真円ではない）。 */
+  --radius-v6-avatar: 18px;
   --radius-v6-dialog: 16px;
 
   /* --- 文字サイズ ---------------------------------------------------------
