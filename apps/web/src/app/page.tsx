@@ -345,10 +345,15 @@ export default function DashboardPage() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationFilter, setNotificationFilter] = useState<DashboardNotificationFilter>('all')
   const [notificationData, setNotificationData] = useState<NotificationCenterData | null>(null)
+  const [notificationAccountId, setNotificationAccountId] = useState<string | null>(null)
   const [notificationLoading, setNotificationLoading] = useState(false)
   const [notificationError, setNotificationError] = useState('')
   const loadRequestId = useRef(0)
   const notificationRequestId = useRef(0)
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  const notificationFilterRef = useRef(notificationFilter)
+  selectedAccountIdRef.current = selectedAccountId
+  notificationFilterRef.current = notificationFilter
   const visibleMain = preferences.main.filter((item) => item.visible)
   const visibleRight = preferences.right.filter((item) => item.visible)
   const visibleToday = preferences.today.filter((item) => item.visible)
@@ -459,6 +464,7 @@ export default function DashboardPage() {
     notificationRequestId.current += 1
     setNotificationsOpen(false)
     setNotificationData(null)
+    setNotificationAccountId(null)
     setNotificationError('')
   }, [selectedAccountId])
 
@@ -466,10 +472,12 @@ export default function DashboardPage() {
     const requestId = ++notificationRequestId.current
     if (!selectedAccountId) {
       setNotificationData(null)
+      setNotificationAccountId(null)
       setNotificationError('')
       setNotificationLoading(false)
       return
     }
+    setNotificationAccountId(selectedAccountId)
     setNotificationLoading(true)
     setNotificationError('')
     try {
@@ -493,12 +501,15 @@ export default function DashboardPage() {
 
   const openNotification = async (item: NotificationCenterItem) => {
     if (!selectedAccountId) return
+    const accountId = selectedAccountId
     if (!item.isRead) {
       try {
-        const response = await api.notifications.center.markRead(item.id, selectedAccountId)
+        const response = await api.notifications.center.markRead(item.id, accountId)
+        if (selectedAccountIdRef.current !== accountId) return
         if (!response.success) throw new Error(response.error)
         setNotificationData((current) => current ? markDashboardNotificationRead(current, item.id) : current)
       } catch {
+        if (selectedAccountIdRef.current !== accountId) return
         setNotificationError('通知を既読にできませんでした。')
         return
       }
@@ -511,14 +522,19 @@ export default function DashboardPage() {
   }
 
   const markAllNotificationsRead = async () => {
-    if (!selectedAccountId || !notificationData || notificationData.unreadCount === 0) return
+    const currentNotificationData = notificationAccountId === selectedAccountId ? notificationData : null
+    if (!selectedAccountId || !currentNotificationData || currentNotificationData.unreadCount === 0) return
+    const accountId = selectedAccountId
+    const filter = notificationFilter
     try {
-      const response = await api.notifications.center.markAllRead(selectedAccountId, notificationFilter)
+      const response = await api.notifications.center.markAllRead(accountId, filter)
+      if (selectedAccountIdRef.current !== accountId || notificationFilterRef.current !== filter) return
       if (!response.success) throw new Error(response.error)
       // updated は新規既読数ではなく対象総数。既読済みを
       // 重ねて引かないよう、未読数はサーバーから取り直す。
       await loadNotificationCenter()
     } catch {
+      if (selectedAccountIdRef.current !== accountId || notificationFilterRef.current !== filter) return
       setNotificationError('通知をまとめて既読にできませんでした。')
     }
   }
@@ -639,12 +655,13 @@ export default function DashboardPage() {
     return null
   }
 
+  const currentNotificationData = notificationAccountId === selectedAccountId ? notificationData : null
   const notificationItems = dashboardNotificationItems(
-    notificationData?.items ?? [],
+    currentNotificationData?.items ?? [],
     (item) => { void openNotification(item) },
   )
-  const notificationFilters = dashboardNotificationFilters(notificationData)
-  const unreadNotificationCount = notificationData?.unreadCount ?? 0
+  const notificationFilters = dashboardNotificationFilters(currentNotificationData)
+  const unreadNotificationCount = currentNotificationData?.unreadCount ?? 0
   const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
   const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
@@ -692,8 +709,8 @@ export default function DashboardPage() {
               filters={notificationFilters}
               activeFilter={notificationFilter}
               unreadCount={unreadNotificationCount}
-              loading={notificationLoading}
-              error={notificationError || undefined}
+              loading={notificationAccountId === selectedAccountId && notificationLoading}
+              error={notificationAccountId === selectedAccountId && notificationError ? notificationError : undefined}
               onFilterChange={(id) => {
                 if (id === 'all' || id === 'error' || id === 'update') setNotificationFilter(id)
               }}

@@ -69,9 +69,16 @@ describe('ダッシュボードV4の初期表示', () => {
   it('通知は選択中アカウントの取得・1件既読・全件既読へ接続する', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
     expect(source).toContain('api.notifications.center.list(selectedAccountId')
-    expect(source).toContain('api.notifications.center.markRead(item.id, selectedAccountId)')
-    expect(source).toContain('api.notifications.center.markAllRead(selectedAccountId, notificationFilter)')
+    expect(source).toContain('api.notifications.center.markRead(item.id, accountId)')
+    expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
     expect(source).toContain('通知を読み込めませんでした。もう一度お試しください。')
+  })
+
+  it('アカウントや絞り込みを切り替えた後は、遅れて届いた既読処理を反映しない', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('selectedAccountIdRef.current !== accountId')
+    expect(source).toContain('notificationFilterRef.current !== filter')
+    expect(source).toContain('notificationAccountId === selectedAccountId ? notificationData : null')
   })
 
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
@@ -239,7 +246,7 @@ describe('ダッシュボード通知', () => {
 
   it('まとめて既読にした後はAPIの総対象数を引かず、未読数を再取得する', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('api.notifications.center.markAllRead(selectedAccountId, notificationFilter)')
+    expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
     expect(source).toContain('await loadNotificationCenter()')
     expect(source).not.toContain('markDashboardNotificationsRead')
   })
