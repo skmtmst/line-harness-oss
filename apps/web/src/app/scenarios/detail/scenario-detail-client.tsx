@@ -52,6 +52,7 @@ import {
   scenarioReachPercent,
   scenarioReachPercentLabel,
 } from './scenario-reach-display'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -244,6 +245,7 @@ export default function ScenarioDetailClient({
   scenarioId: string
   showStarted?: boolean
 }) {
+  usePageTitle('シナリオ詳細')
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -1092,7 +1094,7 @@ export default function ScenarioDetailClient({
   if (loading) {
     return (
       <div>
-        <Header title="シナリオ詳細" />
+
         <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
           <div className="bg-canvas-sunken h-6 w-1/3 rounded" />
           <div className="h-4 bg-canvas-sunken rounded w-2/3" />
@@ -1105,7 +1107,7 @@ export default function ScenarioDetailClient({
   if (!scenario) {
     return (
       <div>
-        <Header title="シナリオ詳細" />
+
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
           <Link href="/scenarios" className="text-accent hover:text-accent-hover mt-4 inline-block text-sm">

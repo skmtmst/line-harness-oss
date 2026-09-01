@@ -54,6 +54,17 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('SAVED_STATE_LABELS[item.latestSnapshot.state]')
   })
 
+  it('使われ方から中身の確認と片づけへ進め、取れない時間を作らない', () => {
+    for (const text of [
+      '使っている機能', '作ったのに使っていない', '自動で動いた回数',
+      '手作業が減った時間', '気づいたこと', '中身を見る', '片づける',
+      '利用関係を最後に確認',
+    ]) expect(PAGE).toContain(text)
+    expect(PAGE).toContain('overview.summary.estimatedHoursSaved.value')
+    expect(PAGE).toContain('overview.summary.estimatedHoursSaved.reason')
+    expect(PAGE).toContain('canTidyUsage(item)')
+  })
+
   it('保存と個人一覧への移動は閲覧権限と分ける', () => {
     expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
     expect(PAGE).toContain('結果の保存と個人一覧への移動は、統括・管理者だけが行えます。')

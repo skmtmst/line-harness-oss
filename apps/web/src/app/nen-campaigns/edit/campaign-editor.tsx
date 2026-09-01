@@ -7,6 +7,7 @@ import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import { formatCampaignTiming } from '../campaign-display'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * NENコラムを編集する（設計 V2 9-1-1）。
@@ -41,6 +42,7 @@ function triggerLabel(setting: NenCampaignSetting): string {
 }
 
 export default function CampaignEditor({ campaignKey }: { campaignKey: string }) {
+  usePageTitle('NEN配信を編集する')
   const [setting, setSetting] = useState<NenCampaignSetting | null>(null)
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
   const [loading, setLoading] = useState(true)
@@ -179,7 +181,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   if (!setting) {
     return (
       <div>
-        <Header title="NEN配信を編集する" />
+
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           {error || 'この配信が見つかりませんでした。'}
           <Link href="/nen-campaigns" className="text-accent ml-1 hover:underline">

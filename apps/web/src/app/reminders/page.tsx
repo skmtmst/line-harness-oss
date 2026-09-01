@@ -12,6 +12,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { deleteReminderSelection } from './delete-reminder-selection'
 
 /**
  * リマインダの一覧。
@@ -197,17 +199,42 @@ export default function RemindersPage() {
     }
   }
 
+  /*
+   * **ブラウザの `confirm()` を使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓と違ううえ、画像比較にも写らない
+   * （`Y0Sn3` の失敗状態が撮れなかったのはこれが理由）。何が消えるかを
+   * 本文で読ませたいので、共通の `ConfirmDialog` へ移した。
+   */
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   const handleDeleteSelected = async () => {
-    if (selected.size === 0) return
-    if (!confirm(`${selected.size}件のリマインダを削除しますか？\n登録済みの配信予定も一緒に消えます。`))
-      return
-    setError('')
+    if (selected.size === 0 || deleting) return
+    const targets = [...selected]
+    setDeleting(true)
+    setDeleteError('')
     try {
-      for (const id of selected) await api.reminders.delete(id)
+      const failed = await deleteReminderSelection(targets, async (id) => {
+        const res = await api.reminders.delete(id)
+        return res.success
+      })
+      if (failed.length > 0) {
+        setSelected(new Set(failed))
+        setDeleteError(
+          failed.length === targets.length
+            ? '選択したリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+            : `${failed.length}件のリマインダを削除できませんでした。削除できなかったものだけを残しています。`,
+        )
+        await loadReminders()
+        return
+      }
+      setConfirmOpen(false)
       setSelected(new Set())
-      void loadReminders()
-    } catch {
-      setError('削除に失敗しました')
+      await loadReminders()
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -529,7 +556,7 @@ export default function RemindersPage() {
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
               <button
-                onClick={() => void handleDeleteSelected()}
+                onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
                 disabled={selected.size === 0}
                 className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
               >
@@ -540,6 +567,22 @@ export default function RemindersPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`${selected.size}件のリマインダを削除しますか？`}
+        description="登録済みの配信予定も一緒に消えます。すでに送ったぶんの記録は残ります。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void handleDeleteSelected()}
+        onCancel={() => {
+          if (deleting) return
+          setConfirmOpen(false)
+          setDeleteError('')
+        }}
+      />
     </div>
   )
 }

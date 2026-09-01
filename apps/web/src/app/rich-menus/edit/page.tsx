@@ -10,6 +10,7 @@ import { AreaProperties, intentOf } from '@/components/rich-menus/area-propertie
 import type { RichMenuAreaTapCount } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * 保存されている条件を読む。
@@ -65,6 +66,7 @@ const SIZE_LABEL: Record<Group['size'], string> = {
 }
 
 export default function RichMenuEditPage() {
+  usePageTitle('リッチメニュー編集')
   return (
     <Suspense
       fallback={
@@ -491,7 +493,6 @@ function Editor({
       </nav>
 
       <Header
-        title="リッチメニュー編集"
         description="トーク画面の下に出るメニューを作ります。エリアを選んで、押したときの動きを設定してください。"
         action={
           <div className="flex items-center gap-2">

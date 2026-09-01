@@ -27,3 +27,37 @@ describe('V6 一斉配信詳細の契約', () => {
     expect(PAGE).not.toContain('api.analytics.broadcasts(selectedAccountId)')
   })
 })
+
+describe('V6 一斉配信詳細の、取れない数の断り', () => {
+  it('クリック率を開封で割った作り値にしない', () => {
+    // 保存側は `unique_click / delivered`。画面だけ開封を母数にすると、
+    // どこにも保存されていない割合をその場で作ることになる。
+    expect(PAGE).not.toContain('開封のうち ')
+    expect(PAGE).toContain('clickInsightDetail(insight)')
+  })
+
+  it('集計は「未取得」と「読み込めなかった」を分ける', () => {
+    expect(PAGE).toContain("useState<'loading' | 'ready' | 'error'>('loading')")
+    expect(PAGE).toContain("setInsightState('error')")
+    expect(PAGE).toContain('読み込んでいます')
+    expect(PAGE).toContain('読み込めませんでした')
+    expect(PAGE).toContain('集計を再読み込み')
+  })
+
+  it('送信が終わるまで失敗の数を出さない', () => {
+    // total - success は、送信中だと「まだ送っていないぶん」を失敗に数える。
+    expect(PAGE).not.toContain('・ 失敗 ${failed}`')
+    expect(PAGE).toContain('送信中のため、失敗の数は終わってから確定します')
+    expect(PAGE).toContain('送信前のため、到達はまだありません')
+  })
+
+  it('予約しただけの配信を実行済みと書かない', () => {
+    expect(PAGE).not.toContain("detail={broadcast.scheduledAt ? '予約どおり実行' : '即時配信'}")
+    expect(PAGE).toContain('予約した時刻に実行します')
+    expect(PAGE).toContain('まだ送っていません')
+  })
+
+  it('押せない操作の理由を吹き出しだけに置かない', () => {
+    expect(PAGE).toContain('種にして作り直す口がまだないため押せません')
+  })
+})
