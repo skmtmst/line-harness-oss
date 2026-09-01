@@ -9,3 +9,4 @@ export * from "./shipping-schedule";
 export * from "./form-layout";
 export * from "./tenant";
 export * from "./identity-candidates";
+export * from "./template-message";
