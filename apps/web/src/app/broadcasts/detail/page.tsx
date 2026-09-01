@@ -7,7 +7,9 @@ import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
+import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
+import { openInsightDetail } from './broadcast-insight-display'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き',
@@ -207,13 +209,7 @@ function BroadcastDetailInner() {
               label="開封"
               value={insight?.uniqueImpression ?? null}
               unit="件"
-              detail={
-                insight?.suppressedByAudienceSize
-                  ? '配信先が20人未満のため取れません'
-                  : insight?.uniqueImpression != null && insight.delivered
-                    ? pct(insight.uniqueImpression, insight.delivered)
-                    : '—'
-              }
+              detail={openInsightDetail(insight)}
             />
             <Stat
               label="クリック"
@@ -253,7 +249,7 @@ function BroadcastDetailInner() {
                 label="対象人数"
                 value={`${total.toLocaleString('ja-JP')}人（ブロック中を自動で除外）`}
               />
-              <Row label="メッセージ" value={`1通（${broadcast.messageType}）`} />
+              <Row label="メッセージ" value={`1通（${messageTypeLabel(broadcast.messageType)}）`} />
               <Row
                 label="送信タイミング"
                 value={
