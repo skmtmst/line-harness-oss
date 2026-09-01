@@ -63,7 +63,13 @@ test.describe.configure({ mode: 'parallel' })
  * 認証後の店舗選択は毎回消される仕組みなので、消さない印を先に置く。
  * **product 側は一切変えない。**
  */
-async function signIn(page) {
+async function signIn(page, clock) {
+  /*
+    **今日から数える表示がある画面は、時計を止める。**
+    止めないと「6日前」が翌日には「7日前」になり、毎朝赤くなる。
+    実際に一度そうなった。
+  */
+  if (clock) await page.clock.setFixedTime(new Date(clock))
   await page.addInitScript(() => {
     try {
       window.sessionStorage.setItem('lh_auth_selection_cleared', '1')
@@ -90,7 +96,7 @@ for (const width of WIDTHS) {
     test(`${width}px ${route.name}（${route.path}）`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 })
 
-      await signIn(page)
+      await signIn(page, route.clock)
       await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' })
 
       // 1・2. そのページに居て、描けているか
