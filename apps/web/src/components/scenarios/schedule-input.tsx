@@ -119,7 +119,9 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
         />
         <span className="text-sm text-gray-700">に配信</span>
       </div>
-      <p className="text-xs text-gray-400">ⓘ cron が 5 分粒度のため最大 5 分遅れる場合があります</p>
+      <p className="text-xs text-gray-400">
+        ⓘ 配信時刻は5分単位で処理するため、指定時刻から最大5分遅れる場合があります
+      </p>
     </div>
   )
 }

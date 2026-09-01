@@ -284,7 +284,7 @@ describe('resolveAffiliateAttribution', () => {
     expect(attr).toEqual({ affiliateId: 'aff-other', refCode: 'refother' });
   });
 
-  test('(e) touch on an inactive (is_active=0) link is still attributed', async () => {
+  test('(e) 停止したリンクは新しい成果へ結び付けない', async () => {
     insertFriend(sqlite, 'friend-e');
     insertAffiliate(sqlite, 'aff-1');
     insertLink(sqlite, {
@@ -302,7 +302,22 @@ describe('resolveAffiliateAttribution', () => {
     });
 
     const attr = await resolveAffiliateAttribution(db, 'friend-e', NOW);
-    expect(attr).toEqual({ affiliateId: 'aff-1', refCode: 'refinactive' });
+    expect(attr).toBeNull();
+  });
+
+  test('停止した紹介者は新しい成果へ結び付けない', async () => {
+    insertFriend(sqlite, 'friend-paused-affiliate');
+    insertAffiliate(sqlite, 'aff-paused');
+    insertLink(sqlite, { id: 'link-paused-affiliate', affiliateId: 'aff-paused', refCode: 'refpaused' });
+    sqlite.prepare(`UPDATE affiliates SET is_active = 0 WHERE id = 'aff-paused'`).run();
+    insertTouch(sqlite, {
+      id: 'touch-paused-affiliate',
+      refCode: 'refpaused',
+      friendId: 'friend-paused-affiliate',
+      createdAt: jstDaysAgo(5),
+    });
+
+    await expect(resolveAffiliateAttribution(db, 'friend-paused-affiliate', NOW)).resolves.toBeNull();
   });
 
   test('no touches at all -> null', async () => {
