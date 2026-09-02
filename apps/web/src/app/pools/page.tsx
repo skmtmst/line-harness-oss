@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 export default function PoolsPage() {
   usePageTitle('プール管理')
@@ -103,12 +104,32 @@ function PoolCard({
       // clipboard requires secure context — silent fallback
     }
   }
+  /**
+   * 削除の確認。ブラウザの `confirm()` は「プール「x」を削除しますか?」と
+   * しか言えず、公開URLが止まることも、記録が残ることも読めない。失敗は
+   * `alert` で生のAPIエラーを出していた。共通の窓へ移した（設計 `H2S1T4`）。
+   */
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   const onDelete = async () => {
-    if (isMain) return
-    if (!confirm(`プール「${pool.name}」を削除しますか?`)) return
-    const res = await api.pools.delete(pool.id)
-    if (res.success) onChange()
-    else alert(res.error ?? '削除に失敗しました')
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (isMain || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await api.pools.delete(pool.id)
+      if (!res.success) throw new Error(res.error)
+      setConfirmOpen(false)
+      onChange()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このプールを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -134,7 +155,7 @@ function PoolCard({
           </button>
           {!isMain && (
             <button
-              onClick={onDelete}
+              onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
               className="text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded"
             >
               削除
@@ -143,6 +164,22 @@ function PoolCard({
         </div>
       </div>
       <PoolAccountList poolId={pool.id} accounts={accounts} onChange={onChange} />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`プール「${pool.name}」を削除しますか？`}
+        description={`公開URL ${publicUrl} は使えなくなり、これから来たお客様はどのアカウントにも振り分けられません。所属していたLINEアカウントと、これまでの流入の記録は残ります。この操作は取り消せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void onDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setConfirmOpen(false)
+          setDeleteError('')
+        }}
+      />
     </div>
   )
 }
@@ -157,6 +194,9 @@ function PoolAccountList({
   onChange: () => void
 }) {
   const [members, setMembers] = useState<PoolAccount[]>([])
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
 
   const reload = async () => {
     const res = await api.pools.accounts.list(poolId)
@@ -178,12 +218,26 @@ function PoolAccountList({
     }
   }
 
-  const onRemove = async (poolAccountId: string) => {
-    if (!confirm('このアカウントをプールから外しますか?')) return
-    const res = await api.pools.accounts.remove(poolId, poolAccountId)
-    if (res.success) {
+  /**
+   * 外す確認。あとから入れ直せるので `destructive` は付けない。
+   * 消えない操作まで赤くすると、本当に消える操作の赤が効かなくなる。
+   */
+  const onRemove = async () => {
+    // 押している間は受け付けない。
+    if (!removeTarget || removing) return
+    setRemoving(true)
+    setRemoveError('')
+    try {
+      const res = await api.pools.accounts.remove(poolId, removeTarget.id)
+      if (!res.success) throw new Error(res.error)
+      setRemoveTarget(null)
       await reload()
       onChange()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setRemoveError('このアカウントをプールから外せませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -199,7 +253,10 @@ function PoolAccountList({
             >
               <span>{acc?.name ?? m.lineAccountId}</span>
               <button
-                onClick={() => onRemove(m.id)}
+                onClick={() => {
+                  setRemoveError('')
+                  setRemoveTarget({ id: m.id, name: acc?.name ?? m.lineAccountId })
+                }}
                 className="text-xs text-red-600 hover:underline"
               >
                 外す
@@ -232,6 +289,21 @@ function PoolAccountList({
           </select>
         </div>
       )}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget?.name ?? ''}」をこのプールから外しますか？`}
+        description="これから来たお客様は、このアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。外したあとで、同じアカウントを入れ直せます。"
+        confirmLabel="外す"
+        busy={removing}
+        error={removeError}
+        onConfirm={() => void onRemove()}
+        onCancel={() => {
+          if (removing) return
+          setRemoveTarget(null)
+          setRemoveError('')
+        }}
+      />
     </div>
   )
 }

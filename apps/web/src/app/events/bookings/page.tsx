@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { eventsApi, type EventBookingItem, type EventDetail } from '@/lib/api'
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
@@ -49,6 +50,22 @@ function BookingsInner() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+   * **ブラウザの `confirm()` を使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
+   * 画像比較にも写らない。運営キャンセルは友だちへLINEが飛ぶ操作なので、
+   * 誰の予約なのか・何が起きるのかを本文で読ませたい。
+   *
+   * `accountId` は**押した時点で選んでいたLINEアカウント**。この画面は
+   * ヘッダーで切り替えられるので、切り替わったら実行させずに選び直させる。
+   */
+  const [cancelTarget, setCancelTarget] = useState<
+    { booking: EventBookingItem; accountId: string } | null
+  >(null)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const accountChanged = cancelTarget !== null && cancelTarget.accountId !== selectedAccountId
 
   const refresh = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
@@ -114,16 +131,34 @@ function BookingsInner() {
     }
   }
 
-  async function adminCancel(id: string) {
-    if (!selectedAccountId || !eventId) return
-    if (!confirm('運営側でキャンセルしますか？友だちにLINE通知が送られます。')) return
+  /**
+   * 運営側キャンセルを実際に投げる。
+   *
+   * 処理中は受け付けない（二度押しすると2回目は「その状態からは変えられない」
+   * で弾かれ、通知だけ済んでいるのに失敗に見える）。失敗は握りつぶさず、
+   * 窓の中に運用者の言葉で出す。生のAPIエラー（`invalid_state` など）は
+   * 運用者が次に何をすればよいか読み取れない。
+   */
+  async function runAdminCancel() {
+    if (!cancelTarget || !eventId || cancelling || accountChanged) return
+    setCancelling(true)
+    setCancelError('')
     setBusy(true)
     try {
-      await eventsApi.adminCancelBooking(selectedAccountId, eventId, id)
+      const res = await eventsApi.adminCancelBooking(
+        cancelTarget.accountId,
+        eventId,
+        cancelTarget.booking.id,
+      )
+      if (!res?.ok) throw new Error('cancel_not_applied')
+      setCancelTarget(null)
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setCancelError(
+        'この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。',
+      )
     } finally {
+      setCancelling(false)
       setBusy(false)
     }
   }
@@ -318,7 +353,11 @@ function BookingsInner() {
                               無断
                             </button>
                             <button
-                              onClick={() => adminCancel(b.id)}
+                              onClick={() => {
+                                if (!selectedAccountId) return
+                                setCancelError('')
+                                setCancelTarget({ booking: b, accountId: selectedAccountId })
+                              }}
                               disabled={busy}
                               className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium hover:bg-white disabled:opacity-50"
                             >
@@ -335,6 +374,42 @@ function BookingsInner() {
             </div>
           )}
         </div>
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        title="この予約を運営側でキャンセルしますか？"
+        description="予約は「キャンセル」になり、枠が空きます。友だちにはLINEでキャンセルのお知らせが届きます。送ったお知らせは取り消せません。この画面から元の「確定」に戻すことはできません。"
+        confirmLabel="キャンセルにする"
+        cancelLabel="やめる"
+        /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
+        destructive
+        busy={cancelling}
+        error={cancelError}
+        onConfirm={accountChanged ? undefined : () => void runAdminCancel()}
+        onCancel={() => {
+          if (cancelling) return
+          setCancelTarget(null)
+          setCancelError('')
+        }}
+      >
+        {cancelTarget && (
+          <div className="text-ink-secondary space-y-2 text-sm">
+            <p>
+              友だち：
+              {cancelTarget.booking.friend_display_name ?? cancelTarget.booking.friend_id.slice(0, 8)}
+            </p>
+            <p>予約枠：{formatJp(cancelTarget.booking.slot_starts_at)}</p>
+            <p className="text-ink-faint text-xs">
+              この予約に紐づくリマインダの送信予定も止まります。すでに送ったぶんは残ります。
+            </p>
+            {accountChanged && (
+              <p className="text-warning font-medium">
+                押したあとにLINEアカウントが切り替わりました。この窓を閉じて、いまのアカウントの一覧から選び直してください。
+              </p>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }
