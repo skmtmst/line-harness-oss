@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
-import { getFriendByLineUserId, getLineAccountById, getLineAccounts, jstNow } from '@line-crm/db';
+import { getFriendByLineUserIdForAccount, getLineAccountById, jstNow } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
-import { resolveLineToken } from '../services/line-token.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
@@ -36,7 +35,7 @@ export type EcEvent = {
   point_balance?: number | null;
   purchase_count?: number | null;
   purchase_amount?: number | null;
-  line_user_id: string;
+  line_user_id?: string | null;
   order?: {
     number?: string;
     total?: number;
@@ -136,7 +135,8 @@ function validateEvent(value: unknown): value is EcEvent {
   const event = value as Partial<EcEvent>;
   if (typeof event.event_id !== 'string' || event.event_id.length < 8 || event.event_id.length > 255) return false;
   if (typeof event.event_type !== 'string' || !EVENT_TYPES.has(event.event_type)) return false;
-  if (typeof event.line_user_id !== 'string' || !/^U[0-9a-f]{32}$/i.test(event.line_user_id)) return false;
+  if (event.line_user_id != null
+      && (typeof event.line_user_id !== 'string' || !/^U[0-9a-f]{32}$/i.test(event.line_user_id))) return false;
   if (typeof event.occurred_at !== 'string' || !Number.isFinite(Date.parse(event.occurred_at))) return false;
   if (event.order?.items && (!Array.isArray(event.order.items) || event.order.items.length > 50)) return false;
   if (event.order_history && (!Array.isArray(event.order_history) || event.order_history.length > 50)) return false;
@@ -288,6 +288,8 @@ export function ecTextMessage(event: EcEvent, options?: EcMessageOptions): Messa
 }
 
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
+  const lineAccountId = c.req.header('x-line-account-id')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE account is required' }, 400);
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) {
     console.error('[ec-event] ECCUBE_WEBHOOK_SECRET is missing or too short');
@@ -308,9 +310,14 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   if (!Number.isInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS) {
     return c.json({ success: false, error: 'Expired request' }, 401);
   }
-  const expected = await hmacHex(secret, `${timestamp}.${rawBody}`);
+  const expected = await hmacHex(secret, `${timestamp}.${lineAccountId}.${rawBody}`);
   if (!constantTimeHexEqual(signature.toLowerCase(), expected)) {
     return c.json({ success: false, error: 'Invalid signature' }, 401);
+  }
+
+  const account = await getLineAccountById(c.env.DB, lineAccountId);
+  if (!account || account.is_active !== 1) {
+    return c.json({ success: false, error: 'Integration account is not configured' }, 404);
   }
 
   let event: unknown;
@@ -319,16 +326,20 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
   const now = jstNow();
   const id = crypto.randomUUID();
+  const source = `eccube:${lineAccountId}`;
   const inserted = await c.env.DB.prepare(
     `INSERT OR IGNORE INTO ec_events
-      (id, source, external_event_id, event_type, customer_id, line_user_id, payload, status, received_at, updated_at)
-     VALUES (?, 'eccube', ?, ?, ?, ?, ?, 'received', ?, ?)`,
+      (id, source, external_event_id, event_type, line_account_id, customer_id,
+       line_user_id, payload, status, received_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?, ?)`,
   ).bind(
     id,
+    source,
     event.event_id,
     event.event_type,
+    lineAccountId,
     event.customer_id == null ? null : String(event.customer_id),
-    event.line_user_id,
+    event.line_user_id ?? null,
     rawBody,
     now,
     now,
@@ -337,11 +348,20 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   const row = inserted.meta.changes
     ? { id, status: 'received' }
     : await c.env.DB.prepare(
-        `SELECT id, status FROM ec_events WHERE source = 'eccube' AND external_event_id = ?`,
-      ).bind(event.event_id).first<{ id: string; status: string }>();
+        `SELECT id, status FROM ec_events WHERE source = ? AND external_event_id = ?`,
+      ).bind(source, event.event_id).first<{ id: string; status: string }>();
   if (!row) return c.json({ success: false, error: 'Event ledger failure' }, 500);
   if (row.status === 'processed' || row.status === 'skipped') {
     return c.json({ success: true, duplicate: true, status: row.status });
+  }
+
+  if (!event.line_user_id) {
+    await c.env.DB.prepare(
+      `UPDATE ec_events
+          SET status = 'identity_pending', error_message = 'line_identity_unmatched', updated_at = ?
+        WHERE id = ? AND status IN ('received', 'failed', 'identity_pending')`,
+    ).bind(now, row.id).run();
+    return c.json({ success: true, status: 'identity_pending' }, 202);
   }
 
   const claim = await c.env.DB.prepare(
@@ -351,23 +371,22 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   if (!claim.meta.changes) return c.json({ success: true, duplicate: true, status: 'processing' }, 202);
 
   try {
-    const friend = await getFriendByLineUserId(c.env.DB, event.line_user_id);
+    const friend = await getFriendByLineUserIdForAccount(c.env.DB, event.line_user_id, lineAccountId);
     if (!friend || !friend.is_following) {
       await c.env.DB.prepare(
-        `UPDATE ec_events SET status = 'skipped', error_message = ?, processed_at = ?, updated_at = ? WHERE id = ?`,
-      ).bind(friend ? 'friend_not_following' : 'friend_not_found', now, now, row.id).run();
-      return c.json({ success: true, status: 'skipped' }, 202);
+        `UPDATE ec_events SET status = ?, error_message = ?, processed_at = ?, updated_at = ? WHERE id = ?`,
+      ).bind(
+        friend ? 'skipped' : 'identity_pending',
+        friend ? 'friend_not_following' : 'line_identity_unmatched',
+        friend ? now : null,
+        now,
+        row.id,
+      ).run();
+      return c.json({ success: true, status: friend ? 'skipped' : 'identity_pending' }, 202);
     }
 
-    const account = friend.line_account_id
-      ? await getLineAccountById(c.env.DB, friend.line_account_id)
-      : (await getLineAccounts(c.env.DB)).find((candidate) => candidate.is_active === 1) ?? null;
-    const accessToken = resolveLineToken({
-      accountToken: account?.channel_access_token,
-      defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-      accountId: account?.id ?? friend.line_account_id,
-      context: 'ec-integrations.event-send',
-    });
+    if (friend.line_account_id !== lineAccountId) throw new Error('EC event account mismatch');
+    const accessToken = account.channel_access_token;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
     await syncMemberSnapshot(c.env.DB, friend.id, event, now);
@@ -380,7 +399,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
-      await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account?.id ?? friend.line_account_id ?? undefined);
+      await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account.id);
       return c.json({ success: true, status: 'processed' });
     }
 
@@ -395,7 +414,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
     if (event.event_type === 'ec.order.shipped') {
       await enqueuePostShippingFollowUps(
-        c.env.DB, event, friend.id, account?.id ?? friend.line_account_id ?? null,
+        c.env.DB, event, friend.id, account.id,
       );
     }
 
@@ -408,7 +427,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await fireEvent(c.env.DB, event.event_type, {
         friendId: friend.id,
         eventData: event,
-      }, accessToken, account?.id ?? friend.line_account_id ?? undefined);
+      }, accessToken, account.id);
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
@@ -428,7 +447,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       content: message.type === 'text' ? message.text : JSON.stringify(message),
       deliveryType: 'push',
       source: 'ec_transactional',
-      lineAccountId: account?.id ?? friend.line_account_id,
+      lineAccountId: account.id,
     });
 
     await c.env.DB.prepare(
@@ -438,7 +457,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     await fireEvent(c.env.DB, event.event_type, {
       friendId: friend.id,
       eventData: event,
-    }, accessToken, account?.id ?? friend.line_account_id ?? undefined);
+    }, accessToken, account.id);
 
     return c.json({ success: true, status: 'processed' });
   } catch (error) {

@@ -37,6 +37,7 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { validateTemplateMessage } from '../services/template-message-validation.js';
 
 const scenarios = new Hono<Env>();
 
@@ -593,11 +594,19 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       isDraft?: boolean;
     }>();
 
-    if (body.stepOrder === undefined || !body.messageType || !body.messageContent) {
+    if (body.stepOrder === undefined || !body.messageType || body.messageContent === undefined) {
       return c.json(
         { success: false, error: 'stepOrder, messageType, and messageContent are required' },
         400,
       );
+    }
+
+    // 画面の disabled だけでは、古い画面や直接APIを呼ぶ経路を止められない。
+    // テンプレートと同じ正本で数え、絵文字も表示上の1文字として扱う。
+    const message = validateTemplateMessage(body.messageType, body.messageContent);
+    if (!message.ok) {
+      const { ok: _ok, ...failure } = message;
+      return c.json({ success: false, ...failure }, 422);
     }
 
     const scenarioRow = await c.env.DB
@@ -657,6 +666,9 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
     if (!stepTarget.ok) return c.json({ success: false, error: stepTarget.error }, 400);
     const stepQuestion = validateQuestionForStorage(body.question);
     if (!stepQuestion.ok) return c.json({ success: false, error: stepQuestion.error }, 400);
+    if (body.messageType === 'text' && body.messageContent.trim() === '' && stepQuestion.json === null) {
+      return c.json({ success: false, error: '本文または質問を入力してください。' }, 400);
+    }
 
     const step = await createScenarioStep(c.env.DB, {
       scenarioId,
@@ -712,6 +724,16 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       question?: unknown;
       isDraft?: boolean;
     }>();
+
+    // 種別と本文がそろっている更新はDBを読む前に止める。部分更新と
+    // テンプレート参照は、下で現在値と合わせたあとにもう一度検査する。
+    if (body.messageType !== undefined && body.messageContent !== undefined) {
+      const message = validateTemplateMessage(body.messageType, body.messageContent);
+      if (!message.ok) {
+        const { ok: _ok, ...failure } = message;
+        return c.json({ success: false, ...failure }, 422);
+      }
+    }
 
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
     // どちらかが touched なときだけ走らせる。effective 値は、body に来た値を優先しつつ
@@ -825,12 +847,30 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
     // 同時に更新する。templates テーブルから取った値を優先することで、stale な
     // body 内容 (UI の templates state が古い等) が保存されるのを防ぐ。
     // templateId が指定されていない場合は body の値をそのまま使う (直接入力モード)。
-    const effectiveMessageType = templateSnapshot
+    let effectiveMessageType = templateSnapshot
       ? (templateSnapshot.message_type as MessageType)
       : body.messageType;
-    const effectiveMessageContent = templateSnapshot
+    let effectiveMessageContent = templateSnapshot
       ? templateSnapshot.message_content
       : body.messageContent;
+    if (
+      !templateSnapshot
+      && (body.messageType !== undefined || body.messageContent !== undefined)
+      && (effectiveMessageType === undefined || effectiveMessageContent === undefined)
+    ) {
+      const existingMessage = await c.env.DB
+        .prepare(`SELECT message_type, message_content FROM scenario_steps WHERE id = ? AND scenario_id = ?`)
+        .bind(stepId, scenarioId)
+        .first<{ message_type: MessageType; message_content: string }>();
+      if (!existingMessage) return c.json({ success: false, error: 'Step not found' }, 404);
+      effectiveMessageType ??= existingMessage.message_type;
+      effectiveMessageContent ??= existingMessage.message_content;
+    }
+    const message = validateTemplateMessage(effectiveMessageType, effectiveMessageContent);
+    if (!message.ok) {
+      const { ok: _ok, ...failure } = message;
+      return c.json({ success: false, ...failure }, 422);
+    }
 
     let targetJson: string | null | undefined;
     if (body.targetCondition !== undefined) {
@@ -978,7 +1018,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
     const stepsResult = await c.env.DB
       .prepare(
         `SELECT id, step_order, delay_minutes, offset_days, offset_minutes, delivery_time,
-                template_id, message_type, message_content
+                template_id, message_type, message_content, question_json
          FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC`,
       )
       .bind(scenarioId)
@@ -992,6 +1032,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         template_id: string | null;
         message_type: string;
         message_content: string;
+        question_json: string | null;
       }>();
     const steps = stepsResult.results;
 
@@ -1040,6 +1081,7 @@ scenarios.get('/api/scenarios/:id/preview', async (c) => {
         deliveryAtLabel: `Day ${day} ${hh}:${mm} (${wd})`,
         messageType: resolved.messageType,
         messageContent: resolved.messageContent,
+        question: parseQuestion(resolved.questionJson),
       };
     });
 

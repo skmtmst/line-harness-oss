@@ -66,6 +66,16 @@ export function isRuleComplete(rule: SegmentRule): boolean {
       return typeof v?.fieldId === 'string' && v.fieldId !== ''
     case 'scenario_state':
       return typeof v?.scenarioId === 'string' && v.scenarioId !== ''
+    case 'score_range': {
+      const minProvided = v?.min !== null && v?.min !== undefined && v.min !== ''
+      const maxProvided = v?.max !== null && v?.max !== undefined && v.max !== ''
+      if ((minProvided && !Number.isSafeInteger(v.min)) || (maxProvided && !Number.isSafeInteger(v.max))) {
+        return false
+      }
+      const min = Number.isSafeInteger(v?.min) ? v.min as number : null
+      const max = Number.isSafeInteger(v?.max) ? v.max as number : null
+      return (min !== null || max !== null) && (min === null || max === null || min <= max)
+    }
     default:
       // form_answered は空で「どれかに回答した人」、is_following /
       // is_hidden / reaction_state は常に値が入っている。

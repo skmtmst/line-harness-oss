@@ -11,6 +11,9 @@ const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'page.tsx'), 'u
 const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
 const FRIEND_DETAIL = readFileSync(join(HERE, 'friends', 'detail', 'page.tsx'), 'utf8')
 const ADJUSTMENT = readFileSync(join(HERE, 'friends', 'detail', 'mileage-adjustment-dialog.tsx'), 'utf8')
+const ACTION_SCORE = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
+const BROADCAST_NEW = readFileSync(join(HERE, '..', 'broadcasts', 'new', 'page.tsx'), 'utf8')
+const SEGMENT = readFileSync(join(HERE, '..', '..', 'lib', 'segment-condition.ts'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MENU = readFileSync(join(HERE, '..', '..', 'lib', 'menu.ts'), 'utf8')
 
@@ -21,11 +24,12 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(LEGACY_NEW).toContain("permanentRedirect('/mileage/earning-rules/new')")
   })
 
-  it('本文タイトルを重ねず、実装済み3タブだけを出す', () => {
+  it('本文タイトルを重ねず、実装済みの行動スコアをタブへ出す', () => {
     expect(PAGE).toContain('data-mileage-design="v6"')
     expect(PAGE).toContain("{ key: 'balances', label: '友だちの残高' }")
     expect(PAGE).toContain("{ key: 'earning-rules', label: 'たまる決めごと' }")
     expect(PAGE).toContain("{ key: 'history', label: '履歴' }")
+    expect(PAGE).toContain("{ key: 'score', label: '行動スコア' }")
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('準備中')
   })
@@ -60,7 +64,9 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('既存の更新APIから決めごとの停止と再開を操作できる', () => {
     expect(PAGE).toContain("updateRule(rule, { isActive: !rule.isActive })")
     expect(PAGE).toContain("rule.isActive ? '決めごとを停止' : '決めごとを再開'")
-    expect(PAGE).toContain("rule.isActive ? '動いています' : '止めています'")
+    // 2026-09-02: 一覧をカード格子から設計の表へ移し、状態を共通Chipで出す。
+    // 言い方は変えていない。
+    expect(PAGE).toContain('<Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>')
   })
 
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
@@ -88,5 +94,35 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('未接続の通知と失効を実行済みに見せない', () => {
     expect(ADJUSTMENT).toContain('送信・失効台帳が接続されるまで実行しません')
     expect(ADJUSTMENT).not.toContain('「マイルが付きました」と届きます')
+    expect(ADJUSTMENT).toContain('変更後の残高が0未満になる操作は実行しません')
+    expect(ADJUSTMENT).not.toContain('API error:')
+  })
+
+  it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
+    expect(ACTION_SCORE).toContain('data-design-node="z3PB2"')
+    expect(ACTION_SCORE).toContain('api.actionScores.friends')
+    expect(ACTION_SCORE).toContain('顧客の価値を表すものではありません')
+    expect(ACTION_SCORE).toContain('kind="loading"')
+    expect(ACTION_SCORE).toContain('kind="empty"')
+    expect(ACTION_SCORE).toContain('kind="error"')
+    expect(API).toContain('/api/action-scores/friends')
+  })
+
+  it('スコア層を友だち検索と配信の同じ共通条件へ渡す', () => {
+    expect(ACTION_SCORE).toContain('/friends?')
+    expect(ACTION_SCORE).toContain('/broadcasts/new?')
+    expect(SEGMENT).toContain("case 'score_range'")
+    expect(BROADCAST_NEW).toContain("type: 'score_range'")
+    expect(BROADCAST_NEW).toContain('initialCondition={initialCondition}')
+  })
+
+  it('手動増減の失敗でAPI番号や内部文をそのまま出さない', () => {
+    expect(ADJUSTMENT).toContain('mileageAdjustmentErrorMessage')
+    expect(ADJUSTMENT).toContain("error.status === 405")
+    expect(ADJUSTMENT).toContain('この環境ではマイル変更を実行できません。')
+    expect(ADJUSTMENT).toContain('画面を読み直してからやり直してください。')
+    expect(ADJUSTMENT).toContain("error.status === 428")
+    expect(ADJUSTMENT).toContain('確認手順が完了していません。')
+    expect(ADJUSTMENT).not.toContain("error instanceof ApiError || error instanceof Error ? error.message")
   })
 })

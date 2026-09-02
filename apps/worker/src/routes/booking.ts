@@ -38,8 +38,21 @@ import {
 } from '../services/booking-types.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const booking = new Hono<Env>();
+
+// 管理画面の予約APIはすべて account_id を受け取る。認証済みでも、URLだけを
+// 書き換えて担当外のLINEアカウントを読んだり更新したりできないよう、個別の
+// handlerへ入る前に共通で所属範囲を確認する。account_id 未指定の400は各
+// handlerが従来どおり返すため、ここでは指定された場合だけを検査する。
+booking.use('/api/booking/admin/*', async (c, next) => {
+  const accountId = c.req.query('account_id');
+  if (accountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ error: 'forbidden_account' }, 403);
+  }
+  return next();
+});
 
 function googleCredentials(env: Env['Bindings']) {
   return {

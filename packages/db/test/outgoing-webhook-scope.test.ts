@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 import {
   getActiveOutgoingWebhooksByEvent,
@@ -36,7 +35,7 @@ describe('送信Webhookのアカウント・統括分離', () => {
       );
 
       INSERT INTO line_accounts (id, tenant_id) VALUES
-        ('account-a', '${DEFAULT_TENANT_ID}'),
+        ('account-a', 'tenant-a'),
         ('account-b', 'tenant-b');
 
       INSERT INTO outgoing_webhooks
@@ -50,9 +49,9 @@ describe('送信Webhookのアカウント・統括分離', () => {
     db = asD1(sqlite);
   });
 
-  it('対象アカウントと既定統括の既存Webhookだけを返す', async () => {
+  it('対象アカウントに明示所属するWebhookだけを返す', async () => {
     const rows = await getActiveOutgoingWebhooksByEvent(db, 'message_received', 'account-a');
-    expect(rows.map((row) => row.id).sort()).toEqual(['webhook-a', 'webhook-legacy']);
+    expect(rows.map((row) => row.id)).toEqual(['webhook-a']);
   });
 
   it('別統括では自アカウントのWebhookだけを返し、ワイルドカードにも分離を適用する', async () => {
@@ -60,23 +59,23 @@ describe('送信Webhookのアカウント・統括分離', () => {
     expect(rows.map((row) => row.id).sort()).toEqual(['webhook-b', 'webhook-star-b']);
   });
 
-  it('アカウント不明のイベントは既存のNULL Webhookだけを返す', async () => {
+  it('アカウント不明のイベントは所属不明Webhookへ送らない', async () => {
     const rows = await getActiveOutgoingWebhooksByEvent(db, 'message_received');
-    expect(rows.map((row) => row.id)).toEqual(['webhook-legacy']);
+    expect(rows).toEqual([]);
   });
 
-  it('既定統括の管理一覧には自統括アカウントとNULLの既存行だけを返す', async () => {
-    const rows = await getOutgoingWebhooks(db, DEFAULT_TENANT_ID);
-    expect(rows.map((row) => row.id).sort()).toEqual(['webhook-a', 'webhook-legacy']);
+  it('管理一覧は選択アカウントだけを返す', async () => {
+    const rows = await getOutgoingWebhooks(db, 'account-a');
+    expect(rows.map((row) => row.id)).toEqual(['webhook-a']);
   });
 
-  it('既定でない統括の管理一覧には自統括アカウントだけを返す', async () => {
-    const rows = await getOutgoingWebhooks(db, 'tenant-b');
+  it('別アカウントの管理一覧にも選択アカウントだけを返す', async () => {
+    const rows = await getOutgoingWebhooks(db, 'account-b');
     expect(rows.map((row) => row.id).sort()).toEqual(['webhook-b', 'webhook-star-b']);
   });
 
-  it('別統括のIDと存在しないIDは管理用の単一取得で見つからない', async () => {
-    await expect(getOutgoingWebhookById(db, 'webhook-b', DEFAULT_TENANT_ID)).resolves.toBeNull();
-    await expect(getOutgoingWebhookById(db, 'missing', DEFAULT_TENANT_ID)).resolves.toBeNull();
+  it('別アカウントのIDと存在しないIDは管理用の単一取得で見つからない', async () => {
+    await expect(getOutgoingWebhookById(db, 'webhook-b', 'account-a')).resolves.toBeNull();
+    await expect(getOutgoingWebhookById(db, 'missing', 'account-a')).resolves.toBeNull();
   });
 });

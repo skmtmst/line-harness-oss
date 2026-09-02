@@ -1,3 +1,4 @@
+import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock, TriangleAlert } from 'lucide-react'
 import styles from './list-state.module.css'

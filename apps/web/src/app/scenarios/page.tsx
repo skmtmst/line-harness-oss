@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+
+function scenarioCompletionDetail(active: number, completed: number): string {
+  const enrolled = active + completed
+  if (enrolled === 0) return '—'
+  const rate = Math.round((completed / enrolled) * 100)
+  return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
+}
 import type { Folder } from '@line-crm/shared'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
@@ -15,6 +22,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
+import { shouldShowStartChecklist, startChecklist } from './start-checklist'
 
 type ScenarioWithCount = Scenario & {
   stepCount?: number
@@ -239,15 +247,15 @@ export default function ScenariosPage() {
         titles={['シナリオ', '購読中', '読了済', '今週の配信']}
         build={(s) => [
             { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
-            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '重複を含む' },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
             {
               title: '読了済',
               value: s.scenarios.completed,
               unit: '人',
-              detail:
-                s.scenarios.subscribers + s.scenarios.completed > 0
-                  ? `完了率 ${Math.round((s.scenarios.completed / (s.scenarios.subscribers + s.scenarios.completed)) * 100)}%`
-                  : '—',
+              detail: scenarioCompletionDetail(
+                s.scenarios.subscribers,
+                s.scenarios.completed,
+              ),
             },
             // 設計の4枚目。source='scenario'（028）で数えられる。
             { title: '今週の配信', value: s.scenarios.sentThisWeek, unit: '通', detail: '過去7日' },
@@ -292,7 +300,38 @@ export default function ScenariosPage() {
               setToggleTarget(null)
               setToggleError('')
             }}
-          />
+          >
+            {shouldShowStartChecklist(toggleTarget.isActive) ? (
+              <div className="space-y-2">
+                <p className="text-ink-secondary text-xs font-medium">配信前チェック</p>
+                <ul className="space-y-1.5 text-sm">
+                  {startChecklist(toggleTarget).map((item) => (
+                    <li key={item.label} className="flex items-start gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={
+                          item.state === 'ok'
+                            ? 'text-success'
+                            : item.state === 'warn'
+                              ? 'text-warning'
+                              : 'text-ink-faint'
+                        }
+                      >
+                        {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                      </span>
+                      <span>
+                        <span className="text-ink block">{item.label}</span>
+                        <span className="text-ink-faint block text-xs">{item.detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-ink-faint text-xs">
+                  「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。
+                </p>
+              </div>
+            ) : null}
+          </ConfirmDialog>
         </div>
       ) : null}
 

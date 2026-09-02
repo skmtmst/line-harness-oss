@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { countLoginAudit } from '../src/login-audit.js'
 import { DEFAULT_TENANT_ID } from '@line-crm/shared'
-import { createStaffMember, deleteStaffMember, getStaffByApiKey } from '../src/staff.js'
+import { createStaffMember, deleteStaffMember, getStaffByApiKey, revokeStaffAuthentication } from '../src/staff.js'
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (query: string, params: unknown[]) => ({
@@ -17,6 +17,9 @@ function asD1(sqlite: Database.Database): D1Database {
   return {
     prepare(query: string) {
       return { bind: (...params: unknown[]) => wrap(query, params), ...wrap(query, []) }
+    },
+    async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+      return Promise.all(statements.map((statement) => statement.run()))
     },
   } as unknown as D1Database
 }
@@ -44,6 +47,13 @@ describe('ログインユーザーの無効化と監査記録', () => {
       CREATE TABLE login_audit (
         id TEXT PRIMARY KEY, admin_user_id TEXT, action TEXT NOT NULL, screen TEXT,
         ip TEXT, user_agent TEXT, result TEXT NOT NULL DEFAULT 'ok', created_at TEXT NOT NULL
+      );
+      CREATE TABLE admin_sessions (
+        token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL, expires_at TEXT NOT NULL
+      );
+      CREATE TABLE admin_two_factor_challenges (
+        token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL, expires_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `)
     db = asD1(sqlite)
@@ -78,5 +88,17 @@ describe('ログインユーザーの無効化と監査記録', () => {
     expect(await countLoginAudit(db, { adminUserId: 'target', action: 'login' })).toBe(2)
     await deleteStaffMember(db, 'target')
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM login_audit WHERE admin_user_id = 'target'`).get()).toEqual({ count: 3 })
+  })
+
+  it('権限変更時は対象者のsessionと二段階認証challengeだけを失効する', async () => {
+    sqlite.prepare('INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('s-target', 'target', '2099-01-01')
+    sqlite.prepare('INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('s-other', 'other', '2099-01-01')
+    sqlite.prepare('INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('c-target', 'target', '2099-01-01')
+    sqlite.prepare('INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('c-other', 'other', '2099-01-01')
+
+    await revokeStaffAuthentication(db, 'target')
+
+    expect(sqlite.prepare('SELECT token_hash FROM admin_sessions ORDER BY token_hash').all()).toEqual([{ token_hash: 's-other' }])
+    expect(sqlite.prepare('SELECT token_hash FROM admin_two_factor_challenges ORDER BY token_hash').all()).toEqual([{ token_hash: 'c-other' }])
   })
 })
