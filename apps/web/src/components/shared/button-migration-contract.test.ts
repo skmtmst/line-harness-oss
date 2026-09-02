@@ -8,7 +8,11 @@ import { countDebt, totals } from '../../../scripts/design-debt.mjs'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const WEB = join(SRC, '..')
 const targets = [
-  'app/tags/page.tsx',
+  // 2026-09-02: /tags の正本は `app/tags/page.tsx` ではなく V4 の本体。
+  // 入口のpageに残っていた旧V5の枝は描かれておらず、そこを見張っても
+  // 実際の画面は守れない（#650 の設計QAは、その死んだ枝を見て
+  // 存在しない不具合を4件挙げた）。見張り先を実物へ移す。
+  'components/friend-fields/tags-page-v4.tsx',
   'app/reminders/page.tsx',
   'app/templates/page.tsx',
   'app/affiliates/tabs.tsx',
@@ -37,7 +41,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作37個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作39個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -57,7 +61,10 @@ describe('標準ボタンの第1段階移行', () => {
     //     この1つが primary なので 14 → 15。
     // 同日: 案件タブのCSV・再読み込み・空状態からの作成を統合し、
     // 実際の7ルートを再計測して40個・主要16個へ締め直した。
-    expect(openings).toHaveLength(40)
+    // 2026-09-02: /tags の見張り先を、描かれない旧V5の枝からV4本体へ移した。
+    // 旧枝の6個（うち主要3個）が消え、V4本体の5個（うち主要3個）が入って
+    // 40→39。主要は16のまま。**減ったので締め直す。**
+    expect(openings).toHaveLength(39)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
@@ -119,6 +126,8 @@ describe('標準ボタンの第1段階移行', () => {
     // 最新 development と統合した木を再計測して135へ締め直す。
     // 2026-09-01: #462 が予約メニュー一覧の作成操作を共通Buttonへ寄せたため、
     // 最新 development と統合した木を再計測して134へ締め直す。
+    // 2026-09-02: /tags の描かれない旧V5枝を消したが、あの枝に直書きの
+    // 主要操作は無かったため134のまま。
     expect(debt['direct-primary-button']).toBe(134)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
@@ -174,7 +183,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 両側を統合した木を再計測し、238へ締め直す。
     // 2026-09-02: #425 の注目操作は設計固有の星形トグルなので共通Buttonへ
     // 寄せず、統合後の木で1つ増える。担当・対応は最新の専用プルダウンを保つ。
-    expect(debt['direct-secondary-button']).toBe(239)
+    // 2026-09-02: /tags の描かれない旧V5枝ごと、直書きの副次操作3つ
+    // （並び替えの切り替え・フォルダ削除・タグ削除）が消えて236。
+    // **減ったので締め直す。**
+    expect(debt['direct-secondary-button']).toBe(236)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -218,7 +230,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 重複検出の再読み込みを共通Buttonにした。最新developmentとの統合後の
     // 木を再計測し、1225→1215へ締め直した。
     // #656の設計固有寸法も統合した木で再計測し、1218へ締め直した。
-    expect(debt['arbitrary-value']).toBe(1218)
+    // 2026-09-02: /tags の描かれない旧V5枝が持っていた任意値3か所も消えて1215。
+    // **減ったので締め直す。**
+    expect(debt['arbitrary-value']).toBe(1215)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
