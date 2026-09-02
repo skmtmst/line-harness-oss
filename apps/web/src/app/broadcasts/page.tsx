@@ -10,7 +10,7 @@ import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
-import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
+import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
@@ -24,9 +24,17 @@ const statusConfig: Record<
   sent: { label: '送信完了', className: 'bg-success-bg text-success' },
 }
 
+/**
+ * 配信日時。**JSTで書く。**
+ *
+ * `timeZone` を渡さないと、動かしている端末の時計で書き出す。開発機が
+ * UTC+7 だと 9時予約が 7時と出るし、日をまたぐと日付そのものがずれる。
+ * 予約の時刻は入力も保存も JST を前提にしているので、読む側もそろえる。
+ */
 function formatDatetime(iso: string | null): string {
-  if (!iso) return '-'
+  if (!iso) return '未設定'
   return new Date(iso).toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -443,78 +451,81 @@ function BroadcastList() {
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full min-w-[640px]">
+            {/*
+              列は設計 `q76C35`（V6 6-1 一斉配信）の6列。
+              タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作。
+
+              前は見出しが8つ、中身が7つで**1列ずれていた**。「開封（率）」の
+              下に状態バッジ、「状態」の下に削除ボタンが並んでいて、表として
+              読めていなかった。設計どおり6列にそろえ、見出しと中身の数を
+              合わせる。「配信数」と「開封（率）」は設計では1つの列
+              （配信・開封・クリック）にまとまっている。
+            */}
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  タイトル
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                  タイトル・内容
                 </th>
-                {/*
-                  列は設計 `V2 4-2 一斉配信` の並び。
-                  「予約日時」と「送信完了日時」を「配信日時」の1列にまとめている。
-                  予約中なら予約の時刻、送信済みなら送った時刻。どちらか一方しか
-                  意味を持たないので、2列に分けると常に片方が空になる。
-                */}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信日時
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信条件
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  内容
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信数
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  開封（率）
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
                   状態
                 </th>
-                <th className="px-4 py-3" />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                  配信条件
+                </th>
+                {/*
+                  予約中なら予約の時刻、送信済みなら送った時刻。
+                  2列に分けると、どちらか一方が常に空になる。
+                */}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                  配信日時
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                  配信・開封・クリック
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                  操作
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = statusConfig[broadcast.status]
-                const tagName = getTagName(broadcast.targetTagId)
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
+                const insight = insights[broadcast.id]
 
                 return (
                   <tr key={broadcast.id} className="hover:bg-canvas-sunken transition-colors">
-                    {/* Title */}
+                    {/*
+                      タイトル・内容。設計は「8月キャンペーンのお知らせ」の下に
+                      「キャンペーン告知／画像＋テキスト 2通」と出す。一覧から
+                      中身を思い出せないと、開いて確かめることになる。
+                    */}
                     <td className="px-4 py-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
-                            {broadcast.title}
-                          </a>
-                          {isDedup && (
-                            <span className="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
-                              複アカ
-                            </span>
-                          )}
-                        </div>
-                        {/*
-                          前は text / image 以外をすべて「Flex」と出していた。
-                          スタンプもカルーセルも位置情報も「Flex」に見えるので、
-                          一覧で中身を確かめられなかった。
-                        */}
-                        <p className="text-xs text-ink-faint mt-0.5">
-                          {messageTypeLabel(broadcast.messageType)}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
+                          {broadcast.title}
+                        </a>
+                        {isDedup && (
+                          <span className="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                            複アカ
+                          </span>
+                        )}
                       </div>
+                      {/*
+                        前は text / image 以外をすべて「Flex」と出していた。
+                        スタンプもカルーセルも位置情報も「Flex」に見えるので、
+                        一覧で中身を確かめられなかった。
+                      */}
+                      <p className="text-xs text-ink-faint mt-0.5 line-clamp-2 break-all">
+                        {rowExcerpt(broadcast.messageType, broadcast.messageContent)}
+                      </p>
                     </td>
 
-                    {/*
-                      配信日時。予約中なら予約の時刻、送信済みなら送った時刻。
-                      2列に分けると、どちらかが常に空になって読みにくい。
-                    */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {broadcast.status === 'sent'
-                        ? formatDatetime(broadcast.sentAt)
-                        : formatDatetime(broadcast.scheduledAt)}
+                    {/* 状態。設計では2列目。 */}
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                        {statusInfo.label}
+                      </span>
                     </td>
 
                     {/*
@@ -526,36 +537,41 @@ function BroadcastList() {
                       {audienceSummary(broadcast, getTagName)}
                     </td>
 
-                    {/* 内容。一覧から中身を思い出せるように、本文の頭を出す。 */}
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
-                      <span className="line-clamp-2 break-all">
-                        {contentExcerpt(broadcast.messageType, broadcast.messageContent) || '—'}
-                      </span>
+                    <td className="px-4 py-3 text-sm text-ink-faint tabular-nums">
+                      {broadcast.status === 'sent'
+                        ? formatDatetime(broadcast.sentAt)
+                        : formatDatetime(broadcast.scheduledAt)}
                     </td>
 
-                    {/* Stats & Insight */}
+                    {/*
+                      配信・開封・クリック。送信済みの配信だけ数がある。
+                      **まだ送っていない配信に 0件 とは書かない。** 0通届いた
+                      のではなく、届く前だから数が無い。
+                    */}
                     <td className="px-4 py-3 text-sm text-ink-faint">
-                      {broadcast.status === 'sent' ? (
+                      {broadcast.status !== 'sent' ? (
+                        <span className="text-ink-faint">—</span>
+                      ) : (
                         <div>
                           {broadcast.totalCount > 0 && (
                             <p>{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
                           )}
-                          {insights[broadcast.id] ? (
+                          {insight ? (
                             <div className="mt-1 space-y-0.5">
-                              {insights[broadcast.id].delivered != null && (
-                                <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insights[broadcast.id].delivered!.toLocaleString('ja-JP')}</span></p>
+                              {insight.delivered != null && (
+                                <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
                               )}
-                              {insights[broadcast.id].uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="font-medium text-info">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
-                                  {insights[broadcast.id].openRate != null && (
-                                    <span className="text-ink-faint"> ({(insights[broadcast.id].openRate! * 100).toFixed(1)}%)</span>
+                              {insight.uniqueImpression != null && (
+                                <p className="text-xs">開封: <span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
+                                  {insight.openRate != null && (
+                                    <span className="text-ink-faint"> ({(insight.openRate * 100).toFixed(1)}%)</span>
                                   )}
                                 </p>
                               )}
-                              {insights[broadcast.id].uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="font-medium text-success">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
-                                  {insights[broadcast.id].clickRate != null && (
-                                    <span className="text-ink-faint"> ({(insights[broadcast.id].clickRate! * 100).toFixed(1)}%)</span>
+                              {insight.uniqueClick != null && (
+                                <p className="text-xs">クリック: <span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
+                                  {insight.clickRate != null && (
+                                    <span className="text-ink-faint"> ({(insight.clickRate * 100).toFixed(1)}%)</span>
                                   )}
                                 </p>
                               )}
@@ -570,25 +586,16 @@ function BroadcastList() {
                             </button>
                           )}
                         </div>
-                      ) : (
-                        '-'
                       )}
                     </td>
 
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                        {statusInfo.label}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
+                    {/* 操作 */}
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
                             onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}
-                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
+                            className="px-3 py-1 min-h-[44px] whitespace-nowrap text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
                           >
                             削除
                           </button>

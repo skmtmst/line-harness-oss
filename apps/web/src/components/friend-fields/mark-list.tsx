@@ -19,14 +19,24 @@ function autoRuleLabel(mark: MarkRow): string {
   return mark.autoOnInbound ? '受信時' : '—'
 }
 
+/**
+ * どこから呼ばれているか（設計 `rIhbN` の右から2列目）。
+ *
+ * **友だちの人数はここに混ぜない。** 隣の「使用中」列と同じ数がもう一度出て、
+ * しかも `友だち8` と単位が落ちるため、8人なのか8件なのか読めなかった。
+ * この列は配信・シナリオなど**設定側からの参照だけ**を数える。
+ *
+ * `usedIn` が無いのは「参照0」ではなく**まだ取れていない**状態。0件と
+ * 言い切ると、消してよいマークだと読めてしまうので `—` を出す。
+ */
 function usageLabel(mark: MarkRow): string {
+  if (mark.usedIn === undefined) return '—'
   const parts: string[] = []
-  if (mark.friendCount > 0) parts.push(`友だち${mark.friendCount}`)
-  if (mark.usedIn?.broadcasts) parts.push(`配信${mark.usedIn.broadcasts}`)
-  if (mark.usedIn?.scenarios) parts.push(`シナリオ${mark.usedIn.scenarios}`)
-  if (mark.usedIn?.autoReplies) parts.push(`自動応答${mark.usedIn.autoReplies}`)
-  if (mark.usedIn?.savedSearches) parts.push(`保存検索${mark.usedIn.savedSearches}`)
-  if (mark.usedIn?.automations) parts.push(`自動化${mark.usedIn.automations}`)
+  if (mark.usedIn.broadcasts) parts.push(`配信${mark.usedIn.broadcasts}件`)
+  if (mark.usedIn.scenarios) parts.push(`シナリオ${mark.usedIn.scenarios}件`)
+  if (mark.usedIn.autoReplies) parts.push(`自動応答${mark.usedIn.autoReplies}件`)
+  if (mark.usedIn.savedSearches) parts.push(`保存検索${mark.usedIn.savedSearches}件`)
+  if (mark.usedIn.automations) parts.push(`自動化${mark.usedIn.automations}件`)
   return parts.length ? parts.join('・') : 'なし'
 }
 
@@ -149,6 +159,15 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     }
   }
 
+  // 帯の「マークの種類・使用中」は、この一覧そのものから数える。
+  const listReady = status === 'ready'
+  const inUseCount = items.filter(isUsed).length
+  const listStateDetail = status === 'forbidden'
+    ? '見る権限がありません'
+    : status === 'loading'
+      ? '読み込んでいます'
+      : '読み込めませんでした'
+
   return (
     <div data-design-node="rIhbN">
       <ListKpis
@@ -157,7 +176,18 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         accountId={accountId}
         titles={['マークの種類', '未対応', '対応中', '過去7日の変更']}
         build={(stats) => [
-          { title: 'マークの種類', value: stats.marks.total, unit: '件', detail: `使用中 ${stats.marks.inUse}件` },
+          {
+            title: 'マークの種類',
+            /*
+              **この2つは、いま下に並んでいる表そのものから数える。**
+              別の集計口から取ると、表に5行あるのに帯は「0件・使用中0件」と
+              出たまま、どちらが正しいのか画面から判断できなくなる。
+              同じ画面に2つの数え方を置かない。
+            */
+            value: listReady ? items.length : null,
+            unit: '件',
+            detail: listReady ? `使用中 ${inUseCount}件` : listStateDetail,
+          },
           {
             title: '未対応',
             value: stats.marks.unanswered,
@@ -198,7 +228,14 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                 <Th className="w-[8%] px-3 py-3">使用中</Th>
                 <Th className="w-[10%] px-3 py-3">初期値</Th>
                 <Th className="w-[16%] px-3 py-3">自動変更</Th>
-                <Th className="px-3 py-3">表示先</Th>
+                {/*
+                  設計 `rIhbN` の見出しは「表示先」（受信箱・友だち一覧…と、
+                  そのマークが**どの画面に出るか**）。それを返す口はまだ無い。
+                  ここに出しているのは配信・シナリオからの**参照**なので、
+                  見出しを中身に合わせて「使用先」と書く。
+                  「表示先」は口ができてから戻す（引き継ぎメモに記載）。
+                */}
+                <Th className="px-3 py-3">使用先</Th>
                 <Th className="w-16 px-3 py-3">操作</Th>
               </tr>
             </thead>
