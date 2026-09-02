@@ -144,7 +144,7 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-card border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -166,7 +166,7 @@ export default function QrDialog({
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex flex-col items-center">
-            <div className="bg-canvas-sunken rounded-card flex h-[240px] w-[240px] items-center justify-center">
+            <div className="bg-canvas-sunken rounded-panel flex h-[240px] w-[240px] items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
               <img
                 src={qrSrc}
