@@ -89,10 +89,12 @@ function WebhooksPageInner() {
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
-    const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
+  const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
   // 見本に無いものを選んだときだけ、自由入力に切り替える。
   const [sourceIsOther, setSourceIsOther] = useState(false)
-  const selectedPreset = SOURCE_PRESETS.find((preset) => preset.value === inForm.sourceType) ?? null
+  const selectedPreset = sourceIsOther
+    ? null
+    : SOURCE_PRESETS.find((preset) => preset.value === inForm.sourceType) ?? null
 
   const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
 
@@ -175,6 +177,7 @@ function WebhooksPageInner() {
     setRotateSecretValue('')
     setShowCreate(false)
     setInForm({ name: '', sourceType: '', secret: '' })
+    setSourceIsOther(false)
     setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
     void load()
   }, [load, selectedAccountId])
@@ -279,6 +282,7 @@ function WebhooksPageInner() {
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
       setInForm({ name: '', sourceType: '', secret: '' })
+      setSourceIsOther(false)
       setShowCreate(false)
       load()
     } catch {
@@ -547,13 +551,13 @@ function WebhooksPageInner() {
               </select>
               {/* 選んだものが何を受け取るのかを、選んだ直後に出す。 */}
               {selectedPreset ? (
-                <p className="mt-1 text-xs text-gray-500">{selectedPreset.hint}</p>
+                <p className="text-ink-faint mt-1 text-xs">{selectedPreset.hint}</p>
               ) : null}
               {sourceIsOther ? (
                 <input
                   value={inForm.sourceType}
                   onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
-                  className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm"
                   placeholder="送ってくるサービスの名前"
                   aria-label="どこから来るか（自分で書く）"
                 />

@@ -39,6 +39,12 @@ describe('外部連携の「どこから来るか」は、見本から選べる'
     expect(CODE).toContain('{sourceIsOther ?')
   })
 
+  it('自由入力中は見本の説明を混ぜず、保存後は見本選択へ戻す', () => {
+    expect(CODE).toContain('const selectedPreset = sourceIsOther')
+    expect(CODE).toContain('? null\n    : SOURCE_PRESETS.find')
+    expect(CODE).toMatch(/setInForm\(\{ name: '', sourceType: '', secret: '' \}\)\s+setSourceIsOther\(false\)\s+setShowCreate\(false\)/)
+  })
+
   it('内部の語を見出しに出さない', () => {
     expect(CODE, '「ソースタイプ」が残っている').not.toContain('ソースタイプ')
     expect(CODE).toContain('どこから来るか')
