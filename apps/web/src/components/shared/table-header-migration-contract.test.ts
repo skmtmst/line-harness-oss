@@ -6,8 +6,11 @@ import { countDebt, totals } from '../../../scripts/design-debt.mjs'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const WEB = join(SRC, '..')
+// 2026-09-02: /tags を外した。`app/tags/page.tsx` に残っていた旧V5の枝は
+// 描かれない死んだコードで、そこにあった共通Th 8セルも画面には出ていない。
+// 正本の `components/friend-fields/tags-page-v4.tsx` はまだ直書きの `<th>` で、
+// 共通Thへは寄せていないため、ここでは見張れない。
 const targets = [
-  'app/tags/page.tsx',
   'app/reminders/page.tsx',
   'app/templates/page.tsx',
   'app/conversions/page.tsx',
@@ -19,12 +22,14 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し73セルを共通Thで維持する', () => {
+  it('5ルートのV6標準見出し65セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(73)
+    // 2026-09-02: 描かれない /tags のV5枝を消し、8セル減って65。
+    // **減ったので締め直す。**
+    expect(migrated).toBe(65)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
