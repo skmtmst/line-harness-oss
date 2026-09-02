@@ -411,11 +411,13 @@ export default function AdvancedSearchDialog({
             */}
             <div className="mt-3 flex flex-wrap gap-3">
               {NOT_YET.filter((item) => ['対応マーク', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
-                <div key={item.label} className="flex max-w-[14rem] flex-col gap-1">
+                <div key={item.label} className="flex max-w-xs flex-col gap-1">
                   <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
                     ＋ {item.label === 'イベント予約' ? '予約' : item.label}
                   </button>
-                  <span className="text-[10px] leading-tight text-[#8B938D]">{item.why}</span>
+                  {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-v6-ink-faint`
+                      （#8b938d）が同じ値を既に持っている。design-debt を増やさずに済む。 */}
+                  <span className="text-v6-ink-faint text-nano leading-tight">{item.why}</span>
                 </div>
               ))}
             </div>
