@@ -33,7 +33,6 @@ function walk(dir: string, out: string[] = []): string[] {
  * 直したら一覧から消す。空にできたら `confirm(` を全面禁止にする。
  */
 const NOT_YET_MIGRATED = [
-  'app/automations/page.tsx',
   'app/booking/bookings/detail/page.tsx',
   'app/booking/bookings/page.tsx',
   'app/booking/menus/page.tsx',
@@ -41,14 +40,11 @@ const NOT_YET_MIGRATED = [
   'app/booking/staff/shifts/page.tsx',
   'app/broadcasts/page.tsx',
   'app/contents/vars/edit/page.tsx',
-  'app/conversions/page.tsx',
-  'app/events/bookings/page.tsx',
   'app/pools/page.tsx',
   'app/reminders/edit/page.tsx',
   'app/reminders/page.tsx',
   'app/restaurant-test/restaurant-console.tsx',
   'app/rich-menus/edit/page.tsx',
-  'app/staff/page.tsx',
   'app/templates/detail/page.tsx',
   'app/templates/page.tsx',
   'app/webhooks/page.tsx',
@@ -56,7 +52,6 @@ const NOT_YET_MIGRATED = [
   'components/events/event-form.tsx',
   'components/events/event-wizard.tsx',
   'components/rich-menus/apply-to-tag-modal.tsx',
-  'components/scenarios/scenario-list.tsx',
 ]
 
 describe('ブラウザのconfirmを使わない', () => {
