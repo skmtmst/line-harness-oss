@@ -390,7 +390,7 @@ export function TestSendDialog({
 
       {/* 送る内容。押す前に何通いくのかが読めないと、確かめようがない。 */}
       {steps.length > 0 && (
-        <div className="border-hairline rounded-card mb-4 border">
+        <div className="border-hairline rounded-panel mb-4 border">
           <div className="border-hairline flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-2.5">
             <p className="text-ink text-xs font-bold">送る内容</p>
             <p className="text-ink-faint text-xs tabular-nums">{steps.length}通</p>
