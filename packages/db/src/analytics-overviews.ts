@@ -789,7 +789,7 @@ export async function getAnalyticsUsageOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
 ) {
-  const [templates, scenarios, forms, richMenus, tagsFields, inflow, automations, mediaVars] = await Promise.all([
+  const [templates, scenarios, forms, richMenus, tagsFields, inflow, automations, mediaVars, activity] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS created,
               SUM(CASE WHEN EXISTS (SELECT 1 FROM messages_log m
@@ -872,6 +872,27 @@ export async function getAnalyticsUsageOverview(
     ).bind(...Array(6).fill(context.lineAccountId))
       .first<{ created: number; in_use: number; last_used_at: string | null }>(),
     Promise.resolve({ created: null, in_use: null, last_used_at: null }),
+    db.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM automation_runs
+           WHERE line_account_id = ? AND is_test = 0
+             AND status IN ('success', 'partial', 'failed')
+             AND datetime(COALESCE(started_at, created_at)) >= datetime(?)
+             AND datetime(COALESCE(started_at, created_at)) < datetime(?)) AS automatic_runs,
+         (SELECT COUNT(*) FROM messages_log
+           WHERE line_account_id = ? AND direction = 'outgoing'
+             AND source = 'manual'
+             AND COALESCE(delivery_type, 'push') <> 'test'
+             AND datetime(created_at) >= datetime(?)
+             AND datetime(created_at) < datetime(?)) AS manual_sends`,
+    ).bind(
+      context.lineAccountId,
+      context.from,
+      context.toExclusive,
+      context.lineAccountId,
+      context.from,
+      context.toExclusive,
+    ).first<{ automatic_runs: number; manual_sends: number }>(),
   ]);
   const categories = [
     usageCategory({ key: 'templates', label: 'テンプレート', href: '/templates', created: Number(templates?.created ?? 0), inUse: Number(templates?.in_use ?? 0), lastUsedAt: templates?.last_used_at ?? null }),
@@ -883,10 +904,31 @@ export async function getAnalyticsUsageOverview(
     usageCategory({ key: 'automations', label: 'オートメーション・共通アクション', href: '/automations', created: Number(automations?.created ?? 0), inUse: Number(automations?.in_use ?? 0), lastUsedAt: automations?.last_used_at ?? null }),
     usageCategory({ key: 'media_vars', label: '登録メディア・共通情報', href: '/contents', created: mediaVars.created, inUse: mediaVars.in_use, lastUsedAt: mediaVars.last_used_at, state: 'unavailable', reason: '旧データにLINEアカウント所属がないため、安全に分けられません' }),
   ];
+  const knownUnused = categories.filter((item) => item.unused.value !== null);
+  const unusedItems = knownUnused.reduce((sum, item) => sum + (item.unused.value ?? 0), 0);
+  const unusedIncomplete = knownUnused.length !== categories.length
+    || knownUnused.some((item) => item.unused.state !== 'available');
+  const automaticRuns = Number(activity?.automatic_runs ?? 0);
+  const manualSends = Number(activity?.manual_sends ?? 0);
+  const automaticReason = '現在はオートメーションの実行記録だけを数えています';
   return envelope(context, {
     state: categories.some((item) => item.created.state !== 'available') ? 'partial' : 'available',
     stateReason: '旧データの所属が分からない項目は合計へ混ぜていません',
     checkedAt: context.dataCutoffAt,
+    summary: {
+      unusedItems: metric(
+        unusedItems,
+        unusedIncomplete ? 'partial' : 'available',
+        unusedIncomplete ? '取得できた分類だけの合計です' : null,
+      ),
+      automaticRuns: metric(automaticRuns, 'partial', automaticReason),
+      manualSends: metric(manualSends),
+      estimatedHoursSaved: metric(
+        Math.round((automaticRuns * 30 / 3600) * 100) / 100,
+        'partial',
+        `${automaticReason}。1回30秒として試算しています`,
+      ),
+    },
     categories,
     automaticDeletion: false,
   });

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import { api } from '@/lib/api'
 
@@ -24,6 +25,7 @@ interface DuplicatesStatsData {
   uniquePeople: number
   friendDups: number
   duplicateGroups: number
+  // 送信実績ではなく friendDups × 単価の見積り。実績が繋がるまで画面には出さない。
   wastedPerBroadcastYen: number
   msgUnitYen: number
   perAccount: PerAccountStat[]
@@ -62,10 +64,10 @@ export default function DuplicatesPage() {
       if (res.success) {
         setData(res.data)
       } else {
-        setError('集計の取得に失敗しました')
+        setError('読み込めませんでした')
       }
     } catch {
-      setError('集計の取得に失敗しました')
+      setError('読み込めませんでした')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -96,11 +98,14 @@ export default function DuplicatesPage() {
 
       {loading && !data ? (
         <div className="rounded-[14px] border border-[#DADDE2] bg-white p-8 text-center text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-          読み込み中…
+          読み込んでいます
         </div>
       ) : !data ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error || '集計の取得に失敗しました'}
+          <p>読み込めませんでした</p>
+          <div className="mt-2">
+            <Button variant="secondary" onClick={() => load()}>再読み込み</Button>
+          </div>
         </div>
       ) : (
         <>
@@ -110,32 +115,31 @@ export default function DuplicatesPage() {
               showing slightly stale numbers with a warning. */}
           {error && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              再計算に失敗しました: {error}
+              再計算できませんでした。表示中の数字は前回の集計です。
             </div>
           )}
           <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatCard label="友だち総数" value={fmt.format(data.totalFollowing)} />
             <StatCard label="ユニーク人数" value={fmt.format(data.uniquePeople)} />
+            {/*
+              friendDups は「重複した登録の行数」。送った通数ではない。
+              以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
+              さらに設計にない「月10本配信なら」という前提まで作っていた。
+              配信実績が繋がるまでは、数えられる行数だけを行数として出す。
+            */}
             <StatCard
-              label="余分な配信回数"
+              label="重複している行"
               value={fmt.format(data.friendDups)}
-              hint="重複ぶんの送信"
+              hint="複数登録による余分"
             />
             <StatCard
-              label="1配信あたり浪費"
-              value={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
-              hint={`¥${data.msgUnitYen}/通 換算`}
+              label="重複による配信コスト"
+              value="—"
+              hint="まだ繋がっていません。配信実績が接続されると表示されます。"
             />
           </section>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
-            <p>
-              月10本配信なら約{' '}
-              <span className="font-semibold text-[#1D1D1F]">
-                ¥{fmt.format(data.wastedPerBroadcastYen * 10)}
-              </span>{' '}
-              の浪費です。
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-[#565F59]">
             <div className="flex items-center gap-3">
               {data.computedAt && (
                 <span className="text-xs text-[#8B938D]">

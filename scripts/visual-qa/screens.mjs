@@ -176,7 +176,10 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'IAf7j', name: '3-1-C 友だち（一括アクション）',
-    steps: [{ click: '表示中の友だちをすべて選ぶ', role: 'checkbox' }],
+    steps: [
+      { click: '表示中の友だちをすべて選ぶ', role: 'checkbox' },
+      { click: '操作を選ぶ' },
+    ],
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0' },
   {
@@ -187,14 +190,12 @@ export const SCREENS = [
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates' },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
-    route: '/friends?tab=duplicates', status: 'unimplemented',
-    why: '重複検出タブに「再計算」しか無く、**候補を1件ずつ開く導線が無い**。設計は統合前の確認まで見せる',
+    route: '/friends/identity-candidates',
   },
   { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged' },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
-    route: '/friends?tab=merged', status: 'unimplemented',
-    why: '統合ユーザーの行を開く導線が無い（再計算とページ送りだけ）',
+    route: '/friends?tab=merged', steps: [{ click: '統合ユーザーを開く' }],
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
@@ -228,21 +229,20 @@ export const SCREENS = [
     mode: 'viewport', height: 1080, steps: [{ click: '変更' }],
   },
   {
-    ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認', route: EDIT,
-    status: 'unimplemented',
-    why: '編集画面に「配信を開始」が無い。状態は一覧の再開／停止で変えるだけで、**開始前の確認が挟まらない**',
+    ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認', route: '/scenarios',
+    mode: 'viewport', height: 1080, steps: [{ click: '再開' }],
   },
   {
-    ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了', route: EDIT,
-    status: 'unimplemented', why: '5-1-I（開始の確認）が無いため、その先も無い',
+    ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了',
+    route: '/scenarios/detail?id=scenario-0&started=1',
   },
   {
     ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '一括テスト送信', nth: 1 }],
   },
   {
-    ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果', route: EDIT,
-    status: 'unimplemented', why: '配信結果を開く導線が未確認',
+    ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果',
+    route: '/scenarios/results?id=scenario-0',
   },
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
@@ -273,17 +273,14 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
-    status: 'unconfirmed',
-    why: '「配信前チェック」が見つからない。本文と送信設定を埋めてから出るのかもしれない。未確認',
+    mode: 'viewport', height: 1080, steps: [{ click: '日時を指定して予約' }],
   },
   {
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認', route: NEW_BC,
-    status: 'unconfirmed',
-    why: '「確認」が見つからない。6-1-G のあとに出るのかもしれない。未確認',
   },
   {
-    ...BROADCAST, node: 'bPF0s', name: '6-1-I 予約完了', route: NEW_BC,
-    status: 'unconfirmed', why: '6-1-H（最終確認）が出せてから確かめる',
+    ...BROADCAST, node: 'bPF0s', name: '6-1-I 予約完了',
+    route: '/broadcasts/reserved?id=broadcast-0',
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細', route: '/broadcasts/detail?id=broadcast-2' },
   {

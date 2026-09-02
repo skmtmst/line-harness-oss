@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
+import { useAccount } from '@/contexts/account-context'
 import {
   readInlineActions,
   toActionPayload,
@@ -53,6 +54,7 @@ function emptyPanel(): Panel {
 
 function CarouselEditorInner() {
   const router = useRouter()
+  const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
 
@@ -140,6 +142,10 @@ function CarouselEditorInner() {
   const textMax = anyImage ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
 
   const save = async () => {
+    if (!id && !selectedAccountId) {
+      setError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
     if (!name.trim()) {
       setError('名前を入力してください')
       return
@@ -208,6 +214,7 @@ function CarouselEditorInner() {
         }
       } else {
         const created = await api.templates.create({
+          accountId: selectedAccountId!,
           name: name.trim(),
           category: 'カルーセル',
           messageType: 'carousel',

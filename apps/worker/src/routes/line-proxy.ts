@@ -13,7 +13,7 @@ import {
 } from '@line-crm/db';
 import type { Friend, LineAccount } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
-import { canAccessLineAccount } from '../services/account-access.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { messageToLogPayload } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 
@@ -155,7 +155,7 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
     if (!account) {
       return c.json({ message: `Unknown X-Line-Account-Id: ${requestedId}` }, 400);
     }
-    if (!canAccessLineAccount(accounts, staff, account.id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [account.id])) {
       return c.json({ message: 'LINE account not found' }, 404);
     }
   } else if (active.length === 1) {
@@ -167,7 +167,7 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
     );
   }
 
-  if (account && !canAccessLineAccount(accounts, staff, account.id)) {
+  if (account && !await canAccessAllLineAccounts(c.env.DB, staff, [account.id])) {
     return c.json({ message: 'LINE account not found' }, 404);
   }
   if (account) {
