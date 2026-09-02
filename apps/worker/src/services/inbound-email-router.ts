@@ -1,4 +1,5 @@
 import type { Env } from '../index.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { isRestaurantIntakeRecipient, receiveRestaurantIntakeEmail } from './restaurant-email-intake.js';
 import { receiveSupportEmail } from './support-email.js';
 
@@ -19,6 +20,10 @@ export async function routeInboundEmail(
   handlers: InboundEmailHandlers = defaultHandlers,
 ): Promise<void> {
   if (isRestaurantIntakeRecipient(message.to)) {
+    if (!restaurantTestEnabled(env)) {
+      message.setReject('予約メール受信は現在利用できません');
+      return;
+    }
     try {
       await handlers.receiveRestaurantIntakeEmail(message, env);
     } catch (error) {
