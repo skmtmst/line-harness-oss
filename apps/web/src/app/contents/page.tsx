@@ -20,6 +20,7 @@ import {
   referenceNameText,
   usageText,
 } from './media-delete-impact'
+import { mediaUsageKindText } from './media-usage-display'
 import Pagination from '@/components/shared/pagination'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -80,17 +81,6 @@ const LIMITS: Array<{ label: string; note: string }> = [
   { label: '動画', note: '90MBまで、mp4動画のみ可' },
   { label: 'PDF', note: '20MBまで' },
 ]
-
-/** 使用箇所の種別を運用者の言葉にする。 */
-const REF_KIND_LABELS: Record<string, string> = {
-  template: 'テンプレート',
-  broadcast: '一斉配信',
-  rich_menu: 'リッチメニュー',
-  scenario_step: 'シナリオのステップ',
-  nen_column: 'NENコラム',
-  event: 'イベント',
-  webinar: 'ウェビナー',
-}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -836,7 +826,7 @@ export default function MediaLibraryPage() {
                       <ul className="space-y-0.5">
                         {usagesFor.items.map((u) => (
                           <li key={`${u.refKind}-${u.refId}`} className="text-ink-secondary text-[11px]">
-                            {REF_KIND_LABELS[u.refKind] ?? u.refKind}
+                            {mediaUsageKindText(u.refKind)}
                           </li>
                         ))}
                       </ul>

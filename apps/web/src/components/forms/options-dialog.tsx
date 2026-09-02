@@ -77,7 +77,7 @@ export default function OptionsDialog({
       aria-modal="true"
       aria-label="オプション設定"
     >
-      <div className="bg-canvas rounded-card my-8 w-full max-w-3xl shadow-lg">
+      <div className="bg-canvas rounded-panel my-8 w-full max-w-3xl shadow-lg">
         <div className="border-hairline flex items-center justify-between border-b px-5 py-3">
           <h2 className="text-ink text-base font-bold">オプション設定</h2>
           <button onClick={onClose} className="text-ink-faint hover:text-ink px-2 text-lg">

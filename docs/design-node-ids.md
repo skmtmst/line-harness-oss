@@ -154,7 +154,7 @@ V4の共通寸法は、1920pxフレーム、サイドバー256px、本体1664px�
 | V2 6-10 URLクリック測定 | `rPp6w` | `/analytics?tab=clicks` |
 | V2 6-11 検索からの流入 | `T0JpX1` | `/search-console` |
 | V2 7-1 オートメーション | `xg4cp` | `/automations` |
-| V2 7-1-1 ルールを作る | `kwnUH` | `/automations/new` |
+| V6 25-1-A ルールを作る | `Rv8Jv` | `/automations/new` |
 | V2 7-2 外部連携 | `l8hjV` | `/webhooks` |
 | V2 7-2-1 Webhookを追加する | `sPV84` | `/webhooks/new` |
 | V2 8-1 予約管理 | `EAYvf` | `/booking/bookings` |

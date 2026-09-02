@@ -9,7 +9,11 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
-import { savedSearchKpiValues } from './saved-search-kpis'
+import {
+  filterSavedSearches,
+  savedSearchKpiValues,
+  type SavedSearchUsageFilter,
+} from './saved-search-kpis'
 
 function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
   if (!item || typeof item !== 'object') return false
@@ -59,6 +63,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   const [tags, setTags] = useState<Tag[]>([])
   const [conditionLabels, setConditionLabels] = useState<SavedSearchConditionLabels>({})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
+  const [query, setQuery] = useState('')
+  const [usageFilter, setUsageFilter] = useState<SavedSearchUsageFilter>('all')
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -122,7 +128,9 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     }
   }
 
-  const kpis = savedSearchKpiValues(items, Boolean(accountId) && !loading && !loadError)
+  const ready = Boolean(accountId) && !loading && !loadError
+  const kpis = savedSearchKpiValues(items, ready)
+  const visible = filterSavedSearches(items, query, usageFilter)
 
   return (
     <div data-design-node="QKx8Q">
@@ -151,6 +159,39 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       )}
 
       {/*
+        設計 `QKx8Q` のツールバー。どちらも読み込んだ一覧の中だけで効く。
+        新しい口は要らないので、条件が増えたときに探せない状態を先に直す。
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="条件名で検索"
+          aria-label="条件名で検索"
+          className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent"
+        />
+        <select
+          value={usageFilter}
+          onChange={(event) => setUsageFilter(event.target.value as SavedSearchUsageFilter)}
+          aria-label="使用先"
+          className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
+        >
+          <option value="all">使用先：すべて</option>
+          <option value="used">使用中</option>
+          <option value="unused">未使用</option>
+        </select>
+        <span className="flex-1" />
+        {ready ? (
+          <span className="text-caption tabular-nums text-ink-faint">
+            {visible.length === items.length
+              ? `${items.length}件`
+              : `${visible.length} / ${items.length}件`}
+          </span>
+        ) : null}
+      </div>
+
+      {/*
         設計は1件ずつを札にして、「すべて満たす」と「いずれか1つ以上」を
         左右に並べる。表で「すべて満たす 2 件」とだけ出していた頃は、
         開かないと中身が読めなかった。条件は読めてこそ直せる。
@@ -171,9 +212,13 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             友だち一覧へ
           </Link>
         </p>
+      ) : visible.length === 0 ? (
+        <p className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          条件に合う保存した検索はありません。条件名か使用先を変えてください。
+        </p>
       ) : (
         <div className="space-y-3">
-          {items.map((search) => {
+          {visible.map((search) => {
             const { all, any, note } = splitConditions(search.conditions, tags, conditionLabels)
             const deleteDisabled = !search.lineAccountId || search.canDelete !== true
             const deleteTitle = !search.lineAccountId
@@ -302,8 +347,14 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         </div>
       )}
 
+      {/*
+        読めていないときに「0 / 50 件」と書かない。**まだ余裕がある**と
+        読めてしまう。数が言えるのは一覧を読めたときだけ。
+      */}
       <p className="text-ink-faint mt-3 text-xs">
-        保存できるのは 50 件までです。{items.length} / 50 件。
+        {ready
+          ? `保存できるのは 50 件までです。${items.length} / 50 件。`
+          : '保存できるのは 50 件までです。いまの件数は読み込めていません。'}
       </p>
       <ConfirmDialog
         open={pendingDelete !== null}

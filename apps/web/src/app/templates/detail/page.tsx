@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { templateDeleteDescription } from '../template-delete-message'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string }>
@@ -67,19 +68,28 @@ function TemplateDetailInner() {
       + usage.trackedLinks.length
     : 0
 
+  /**
+   * 削除の確認。ブラウザの `confirm()` では、何が止まり・何が残り・
+   * 戻せるのかを本文で読ませられず、画像比較にも写らなかった。
+   * 共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   */
   const remove = async () => {
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (deleting) return
+    // 使用中は消さない。使用先を差し替えてからにする。
     if (usageCount > 0 || !template) return
     setDeleting(true)
     setDeleteError('')
+    setError('')
     try {
-      const result = await api.templates.delete(id)
-      if (!result.success) {
-        setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
-        return
-      }
+      const res = await api.templates.delete(id)
+      if (!res.success) throw new Error(res.error)
+      setDeleteOpen(false)
       router.push('/templates')
     } catch {
-      setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }
@@ -214,10 +224,7 @@ function TemplateDetailInner() {
                   : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
               </p>
               <button
-                onClick={() => {
-                  setDeleteError('')
-                  setDeleteOpen(true)
-                }}
+                onClick={() => { setDeleteError(''); setDeleteOpen(true) }}
                 disabled={usageCount > 0}
                 title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
                 className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
@@ -264,22 +271,29 @@ function TemplateDetailInner() {
           </div>
         </div>
       )}
+
       <div data-design-node="M9cij">
         <ConfirmDialog
           open={deleteOpen && usageCount === 0}
-          title="テンプレートを削除しますか？"
-          description={`「${template?.name ?? ''}」を削除します。この操作は元に戻せません。`}
-          confirmLabel="テンプレートを削除"
+          title={`テンプレート「${template?.name ?? ''}」を削除しますか？`}
+          description={templateDeleteDescription(usageCount)}
+          confirmLabel="削除する"
           destructive
           busy={deleting}
-          error={deleteError || undefined}
+          error={deleteError}
+          onConfirm={() => void remove()}
           onCancel={() => {
             if (deleting) return
             setDeleteOpen(false)
             setDeleteError('')
           }}
-          onConfirm={() => void remove()}
-        />
+        >
+          {/* 使用箇所は自動応答とシナリオ配信しか数えられていない。
+              0か所と出ていても「どこからも使われていない」とは言い切れない。 */}
+          <p className="text-ink-faint text-xs leading-relaxed">
+            一斉配信・リマインダからの参照は、まだ数えられません。上の数に入っていません。
+          </p>
+        </ConfirmDialog>
       </div>
     </div>
   )

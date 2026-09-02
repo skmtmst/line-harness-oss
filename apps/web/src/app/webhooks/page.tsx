@@ -10,6 +10,7 @@ import NotificationsPage from '@/app/notifications/page'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import WebhookInteractions from './webhook-interactions'
 
 type Tab = 'incoming' | 'outgoing'
@@ -71,6 +72,20 @@ function WebhooksPageInner() {
     | null
   >(null)
   const [rotateSecretValue, setRotateSecretValue] = useState('')
+
+  /**
+   * 削除の確認。ブラウザの `confirm()` は「この受信Webhookを削除しますか？」
+   * としか言えず、URLが無効になることも、届いた記録が残ることも読めない。
+   * 画像比較にも写らないので、共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   *
+   * 押した時点のLINEアカウントを一緒に持つ。窓を開けたまま切り替えられると、
+   * 別アカウントのWebhookを消してしまう。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: 'incoming' | 'outgoing'; id: string; name: string; accountId: string } | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -160,37 +175,45 @@ function WebhooksPageInner() {
     }
   }
 
-  const handleDeleteIncoming = async (id: string) => {
+  /** 削除の窓を開ける。押した時点のLINEアカウントをここで固定する。 */
+  const askDelete = (kind: 'incoming' | 'outgoing', id: string, name: string) => {
     const requestAccountId = selectedAccountId
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
-    if (!confirm('この受信Webhookを削除しますか？')) return
-    try {
-      const res = await api.webhooks.incoming.delete(id, requestAccountId)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
-    } catch {
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('削除に失敗しました')
-    }
+    setDeleteError('')
+    setDeleteTarget({ kind, id, name, accountId: requestAccountId })
   }
 
-  const handleDeleteOutgoing = async (id: string) => {
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId || loadedAccountId !== requestAccountId) {
-      return setError('LINEアカウントの一覧を読み直してください')
+  const handleConfirmDelete = async () => {
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (!deleteTarget || deleting) return
+    const requestAccountId = deleteTarget.accountId
+    const kind = deleteTarget.kind
+    const label = kind === 'incoming' ? '受信Webhook' : '送信Webhook'
+    // 窓を開けたまま切り替えられていたら、消さずに選び直させる。
+    if (requestAccountId !== selectedAccountId || loadedAccountId !== requestAccountId) {
+      setDeleteError('LINEアカウントが切り替わりました。削除するWebhookを選び直してください。')
+      return
     }
-    if (!confirm('この送信Webhookを削除しますか？')) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      const res = await api.webhooks.outgoing.delete(id, requestAccountId)
+      const res =
+        kind === 'incoming'
+          ? await api.webhooks.incoming.delete(deleteTarget.id, requestAccountId)
+          : await api.webhooks.outgoing.delete(deleteTarget.id, requestAccountId)
+      if (!res.success) throw new Error(res.error)
       if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
+      setDeleteTarget(null)
+      await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('削除に失敗しました')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError(`この${label}を削除できませんでした。状態を読み直してから、もう一度お試しください。`)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -690,7 +713,7 @@ function WebhooksPageInner() {
                         {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
                       </button>
                       <button
-                        onClick={() => handleDeleteIncoming(wh.id)}
+                        onClick={() => askDelete('incoming', wh.id, wh.name)}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         削除
@@ -826,7 +849,7 @@ function WebhooksPageInner() {
                         {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
                       </button>
                       <button
-                        onClick={() => handleDeleteOutgoing(wh.id)}
+                        onClick={() => askDelete('outgoing', wh.id, wh.name)}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         削除
@@ -841,6 +864,26 @@ function WebhooksPageInner() {
           </div>
         )
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`${deleteTarget?.kind === 'outgoing' ? '送信' : '受信'}Webhook「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description={
+          deleteTarget?.kind === 'outgoing'
+            ? 'この宛先への送信が止まり、これから起きる出来事は通知されなくなります。すでに送った記録は残ります。この操作は取り消せません。'
+            : 'この受け口のURLは使えなくなり、これから届く通知は受け取れなくなります。すでに受け取った記録は残ります。この操作は取り消せません。'
+        }
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+      />
     </div>
   )
 }
