@@ -9,9 +9,9 @@ import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
 import type { RichMenuAreaTapCount } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 保存されている条件を読む。
@@ -141,21 +141,28 @@ function Editor({
   const [unpublishing, setUnpublishing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [imageVersion, setImageVersion] = useState(0)
+
   /*
-    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
-    LINEへの登録・取り下げは友だちのトーク画面に出るものを変える。
-    何が変わり何が残るかを本文で読ませられないと押し間違いを止められない。
-  */
-  const [confirmingPublish, setConfirmingPublish] = useState(false)
-  const [publishError, setPublishError] = useState('')
-  const [confirmingUnpublish, setConfirmingUnpublish] = useState(false)
-  const [unpublishError, setUnpublishError] = useState('')
-  /** ページ削除の確認。参照が残っているときは、消させずに理由だけ読ませる。 */
-  const [removePageTarget, setRemovePageTarget] = useState<
-    { page: Page; referrers: string[] } | null
-  >(null)
-  /** 登録・取り下げの結果。`alert()` の代わりに画面へ残して読ませる。 */
+   * 確認の窓。**ブラウザの `confirm()` は使わない。**
+   * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
+   * 画像比較にも写らない。何が止まって何が残るのかを本文で読ませる。
+   *
+   * 開いている窓は1つだけ。`ConfirmDialog` を3つ並べるより、どれが開いて
+   * いるかを1か所で見たほうが、二重に開く形を作りにくい。
+   */
+  const [confirmKind, setConfirmKind] = useState<'removePage' | 'publish' | 'unpublish' | null>(null)
+  /** 押した時点のページ。窓を開けたまま別のページに切り替えても、対象は動かさない。 */
+  const [removePageTarget, setRemovePageTarget] = useState<Page | null>(null)
+  const [confirmError, setConfirmError] = useState('')
+  /** 登録・取り下げの結果。`alert()` の代わりに画面へ残す。 */
   const [notice, setNotice] = useState('')
+
+  const closeConfirm = () => {
+    if (publishing || unpublishing) return
+    setConfirmKind(null)
+    setRemovePageTarget(null)
+    setConfirmError('')
+  }
 
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -289,38 +296,51 @@ function Editor({
     setSelectedAreaId(null)
   }
 
-  /*
-    削除しようとしているページが他ページのタブ切替から参照されていないか先に見る。
-    参照が残ったまま消すと、LINEへ登録するときに行き先が見つからず失敗する。
-    参照があるときは**確認のボタンを出さない**（`onConfirm` を渡さない）。
-    押せてしまう窓で止めるより、押せない形で理由を読ませる。
-  */
-  function removePage(pageId: string) {
-    if (pages.length <= 1) return
-    const page = pages.find((p) => p.id === pageId)
-    if (!page) return
+  /**
+   * このページを消せない理由。空なら消せる。
+   *
+   * 参照を残したまま消すと、LINE 登録のときに `target page not found` で
+   * 落ちる。理由は窓の中に並べて、押し口は出さない。
+   */
+  function removePageBlockers(target: Page): string[] {
+    const reasons: string[] = []
+    if (pages.length <= 1) {
+      reasons.push('リッチメニューには最低1ページ必要です。これが最後の1ページなので削除できません。')
+    }
     const referrers = pages
-      .filter((p) => p.id !== pageId)
+      .filter((p) => p.id !== target.id)
       .filter((p) =>
         p.areas.some(
           (a) =>
             a.actionType === 'richmenuswitch' &&
-            (a.actionData as { targetPageId?: string }).targetPageId === pageId,
+            (a.actionData as { targetPageId?: string }).targetPageId === target.id,
         ),
       )
-      .map((p) => p.name)
-    setRemovePageTarget({ page, referrers })
+    if (referrers.length > 0) {
+      reasons.push(
+        `${referrers.map((p) => `「${p.name}」`).join('、')}のタブ切替ボタンが、このページを行き先にしています。先に行き先を変えてから削除してください。`,
+      )
+    }
+    return reasons
   }
 
-  function applyRemovePage(pageId: string) {
+  function askRemovePage(target: Page) {
+    setConfirmError('')
+    setRemovePageTarget(target)
+    setConfirmKind('removePage')
+  }
+
+  function removePage(target: Page) {
+    if (removePageBlockers(target).length > 0) return
     const remaining = pages
-      .filter((p) => p.id !== pageId)
+      .filter((p) => p.id !== target.id)
       .map((p, i) => ({ ...p, orderIndex: i }))
     setPages(remaining)
-    if (activePageId === pageId) {
+    if (activePageId === target.id) {
       setActivePageId(remaining[0]?.id ?? null)
     }
     setSelectedAreaId(null)
+    setConfirmKind(null)
     setRemovePageTarget(null)
   }
 
@@ -376,42 +396,49 @@ function Editor({
   }
 
   async function handlePublish() {
-    if (publishing) return
+    // 二度押しを受け付けない。窓のボタンも `busy` で止まるが、
+    // 二重の登録が走ると LINE 側に同じメニューが2つ出る。
+    if (publishing || unpublishing || saving || busy) return
     setPublishing(true)
-    setPublishError('')
     setError(null)
+    setConfirmError('')
+    setNotice('')
     try {
       await persistDraft()
       const res = await api.richMenuGroups.publish(groupId)
-      if (!res.success) throw new Error(res.error ?? 'LINE 登録失敗')
-      setConfirmingPublish(false)
-      setNotice('LINEへの登録が終わりました。友だちに見せるには、一覧画面の「友だちに表示」を実行してください。')
+      // 失敗を握りつぶさない。返事を見ずに閉じると、登録できていないのに
+      // 終わったように見える。
+      if (!res.success) throw new Error(res.error ?? 'publish failed')
+      setConfirmKind(null)
+      setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
       await reload()
     } catch {
-      setPublishError('LINEに登録できませんでした。下書きは保存されていません。時間をおいて、もう一度お試しください。')
+      // 生のAPIエラーは出さない。運用者が次にすることだけを窓に書く。
+      setConfirmError('LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。')
     } finally {
       setPublishing(false)
     }
   }
 
   async function handleUnpublish() {
-    if (unpublishing) return
+    if (publishing || unpublishing || saving || busy) return
     setUnpublishing(true)
-    setUnpublishError('')
     setError(null)
+    setConfirmError('')
+    setNotice('')
     try {
       const res = await api.richMenuGroups.unpublish(groupId)
-      if (!res.success) throw new Error(res.error ?? '取り下げ失敗')
+      if (!res.success) throw new Error(res.error ?? 'unpublish failed')
       const warnings = res.data?.warnings ?? []
-      setConfirmingUnpublish(false)
+      setConfirmKind(null)
       setNotice(
         warnings.length > 0
-          ? `LINE上のメニュー登録を取り下げました。ただし一部やり残しがあります：${warnings.join(' / ')}`
-          : 'LINE上のメニュー登録を取り下げました。友だちのトーク画面からは消えています。',
+          ? `LINE上のメニュー登録を取り下げました。ただし、一部は取り下げきれていません: ${warnings.join(' / ')}`
+          : 'LINE上のメニュー登録を取り下げました。もう一度「LINEに登録」すれば元に戻せます。',
       )
       await reload()
     } catch {
-      setUnpublishError('取り下げできませんでした。時間をおいて、もう一度お試しください。LINE上のメニューは残ったままです。')
+      setConfirmError('取り下げできませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
       setUnpublishing(false)
     }
@@ -524,7 +551,10 @@ function Editor({
               {saving ? '保存中...' : '下書き保存'}
             </button>
             <button
-              onClick={() => { setPublishError(''); setNotice(''); setConfirmingPublish(true) }}
+              onClick={() => {
+                setConfirmError('')
+                setConfirmKind('publish')
+              }}
               disabled={saving || publishing || unpublishing || busy}
               className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
               style={{ backgroundColor: 'var(--color-accent)' }}
@@ -546,16 +576,16 @@ function Editor({
         ← 一覧に戻る
       </Link>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded mb-4">
-          {error}
+      {/* 登録・取り下げの結果。`alert()` と違い、押したあとも読み返せる。 */}
+      {notice && (
+        <div className="bg-success-bg text-success text-sm p-3 rounded mb-4" role="status">
+          {notice}
         </div>
       )}
 
-      {/* LINEへの登録・取り下げの結果。`alert()` と違って読み返せる。 */}
-      {notice && (
-        <div className="bg-success-bg text-success border-success-bg text-sm p-3 rounded mb-4 border">
-          {notice}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded mb-4">
+          {error}
         </div>
       )}
 
@@ -884,7 +914,10 @@ function Editor({
                 </div>
               </div>
               <button
-                onClick={() => { setUnpublishError(''); setNotice(''); setConfirmingUnpublish(true) }}
+                onClick={() => {
+                  setConfirmError('')
+                  setConfirmKind('unpublish')
+                }}
                 disabled={saving || publishing || unpublishing || busy}
                 className="shrink-0 px-3 py-2 text-sm font-medium border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
               >
@@ -903,7 +936,7 @@ function Editor({
                 </div>
               </div>
               <button
-                onClick={() => removePage(activePage.id)}
+                onClick={() => askRemovePage(activePage)}
                 className="shrink-0 px-3 py-2 text-sm font-medium border border-red-300 text-red-700 bg-white rounded-lg hover:bg-red-50 transition-colors"
               >
                 ページ削除
@@ -932,51 +965,94 @@ function Editor({
         </div>
       </section>
 
+      {/*
+        ページの削除。**`destructive` は付けない。** ここで消えるのは画面上の
+        下書きだけで、保存するまで保存済みのメニューは変わらない。保存前なら
+        画面を開き直せば戻る。戻せる操作に赤い窓を出すと、本当に戻せない操作
+        （下の「このリッチメニュー全体を削除」）と見分けがつかなくなる。
+      */}
       <ConfirmDialog
-        open={confirmingPublish}
+        open={confirmKind === 'removePage' && removePageTarget !== null}
+        title={removePageTarget ? `ページ「${removePageTarget.name}」を削除しますか？` : ''}
+        description={
+          removePageTarget && removePageBlockers(removePageTarget).length > 0
+            ? 'このページはいま削除できません。理由を直してから、もう一度お試しください。'
+            : 'このページを編集画面から外します。保存するまで、保存済みのメニューは変わりません。'
+        }
+        confirmLabel="削除する"
+        error={confirmError}
+        // 消せないときは押し口ごと出さない。
+        onConfirm={
+          removePageTarget && removePageBlockers(removePageTarget).length === 0
+            ? () => removePage(removePageTarget)
+            : undefined
+        }
+        onCancel={closeConfirm}
+      >
+        {removePageTarget && (
+          <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+            {removePageBlockers(removePageTarget).map((reason) => (
+              <li key={reason} className="text-danger font-semibold">
+                ・{reason}
+              </li>
+            ))}
+            <li>
+              ・消えること: このページに置いたボタン
+              <span className="tabular-nums">{removePageTarget.areas.length}</span>
+              個も一緒に外れます。
+            </li>
+            {/*
+              `rich_menu_area_taps` には外部キーを張っていない
+              （`packages/db/schema.sql`）。ボタンを消しても、押された記録は残る。
+            */}
+            <li>・残ること: これまでに押された回数の記録は残ります。</li>
+            <li>・戻せます: 保存する前なら、この画面を開き直せば元に戻ります。</li>
+          </ul>
+        )}
+      </ConfirmDialog>
+
+      {/*
+        LINE への登録。**`destructive` は付けない。**「LINEから取り下げ」で
+        元に戻せる。
+      */}
+      <ConfirmDialog
+        open={confirmKind === 'publish'}
         title="このリッチメニューをLINEに登録しますか？"
-        description="いまの下書きを保存してから、LINE公式アカウントにメニューを登録します。この操作だけでは友だちのトーク画面にはまだ出ません。友だちに見せるには、登録のあとで一覧画面の「友だちに表示」を実行してください。あとから「LINEから取り下げ」で戻せます。"
+        description="いまの編集内容を保存してから、LINE公式アカウントへ登録します。"
         confirmLabel="LINEに登録する"
         busy={publishing}
-        error={publishError}
+        error={confirmError}
         onConfirm={() => void handlePublish()}
-        onCancel={() => {
-          if (publishing) return
-          setPublishError('')
-          setConfirmingPublish(false)
-        }}
-      />
+        onCancel={closeConfirm}
+      >
+        <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+          <li>・まだ起きないこと: この操作だけでは、友だちのトーク画面には出ません。</li>
+          <li>・次にすること: 友だちに見せるには、登録後に一覧の「友だちに表示」を実行してください。</li>
+          <li>・戻せます: 登録したあとでも「LINEから取り下げ」で下書きに戻せます。</li>
+        </ul>
+      </ConfirmDialog>
 
+      {/*
+        LINE からの取り下げ。**`destructive` は付けない。**
+        もう一度登録すれば元に戻せる。
+      */}
       <ConfirmDialog
-        open={confirmingUnpublish}
+        open={confirmKind === 'unpublish'}
         title="このリッチメニューをLINEから取り下げますか？"
-        description="LINE公式アカウント上のメニュー登録（別名・本体・全員の既定）を解除します。いまこのメニューを見ている友だちのトーク画面からも消えます。管理画面の下書きは残るので、もう一度「LINEに登録」すれば元に戻せます。"
+        description="LINE公式アカウント上のメニュー登録（alias / richmenu）を解除し、下書きに戻します。"
         confirmLabel="取り下げる"
         busy={unpublishing}
-        error={unpublishError}
+        error={confirmError}
         onConfirm={() => void handleUnpublish()}
-        onCancel={() => {
-          if (unpublishing) return
-          setUnpublishError('')
-          setConfirmingUnpublish(false)
-        }}
-      />
-
-      <ConfirmDialog
-        open={removePageTarget !== null}
-        title={removePageTarget && removePageTarget.referrers.length > 0
-          ? `ページ「${removePageTarget.page.name}」はまだ削除できません`
-          : `ページ「${removePageTarget?.page.name ?? ''}」を削除しますか？`}
-        description={removePageTarget && removePageTarget.referrers.length > 0
-          ? `このページは${removePageTarget.referrers.map((n) => `「${n}」`).join('、')}のタブ切替から参照されています。参照を残したまま消すと、LINEへ登録するときに行き先が見つからず失敗します。先に各ボタンの行き先を変えてから、もう一度お試しください。`
-          : `このページに置いた${removePageTarget?.page.areas.length ?? 0}個のボタンも一緒に消えます。ボタンが押された記録は残ります。ほかのページとLINE上の登録は変わりません。保存するまでは反映されないので、保存せずにこの画面を離れれば元のままです。`}
-        confirmLabel="削除する"
-        onConfirm={removePageTarget && removePageTarget.referrers.length === 0
-          ? () => applyRemovePage(removePageTarget.page.id)
-          : undefined}
-        cancelLabel={removePageTarget && removePageTarget.referrers.length > 0 ? '閉じる' : 'キャンセル'}
-        onCancel={() => setRemovePageTarget(null)}
-      />
+        onCancel={closeConfirm}
+      >
+        <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+          <li>・止まること: いまこのメニューを見ている友だちのトーク画面から、メニューが消えます。</li>
+          <li>・残ること: 編集した中身はこの管理画面に残ります。消えるのはLINE側の登録だけです。</li>
+          <li>・残ること: これまでに押された回数の記録は残ります。</li>
+          <li>・戻せます: もう一度「LINEに登録」すれば、また出せます。</li>
+        </ul>
+      </ConfirmDialog>
     </main>
   )
 }

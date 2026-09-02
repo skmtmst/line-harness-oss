@@ -31,10 +31,13 @@ interface ScenarioListProps {
   scenarios: ScenarioRow[]
   onToggleActive: (id: string, current: boolean) => void
   /**
-   * 削除を実行する。**うまくいったかを返す。**
-   * 返り値を見ないと、失敗しても確認窓が閉じてしまい、消えたように見える。
+   * 削除の実行。
+   *
+   * **待てる形にしてある。** 確認窓は投げっぱなしにせず、終わるまで
+   * 「処理中…」を出して二度押しを止め、投げた先が失敗したら窓の中に出す。
+   * `void` を返す従来の呼び出し側もそのまま渡せる。
    */
-  onDelete: (id: string) => Promise<boolean>
+  onDelete: (id: string) => void | Promise<void>
   folders?: Folder[]
   onMoveFolder?: (id: string, folderId: string) => void
   /** 掴んで並べ替えたときに、見えている順で呼ばれる。 */
@@ -60,25 +63,47 @@ export default function ScenarioList({
 }: ScenarioListProps) {
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
+
   /*
-    削除の確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
-    `friend_scenarios` はシナリオに `ON DELETE CASCADE` で繋がっているので、
-    配信中の友だちの進み具合まで消える。これを本文で読ませられないと、
-    「通が消えるだけ」と思ったまま押してしまう。
-  */
+   * **ブラウザの `confirm()` を使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
+   * 画像比較にも写らないので、確認の絵をそもそも撮れない。何が消えるのかを
+   * 本文で読ませたいので、共通の `ConfirmDialog` へ移した。
+   */
   const [deleteTarget, setDeleteTarget] = useState<ScenarioRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const confirmDelete = async () => {
-    if (!deleteTarget || deleting) return
+  /*
+   * **押した時点のシナリオを窓に固定する。**
+   *
+   * 一覧はヘッダーでLINEアカウントを切り替えると引き直される。窓を開けた
+   * まま切り替えると、窓が指しているシナリオがいまの一覧に居なくなる。
+   * ここでアカウントIDを見ずに「いまの一覧に居るか」で見ているのは、
+   * アカウントの切り替え以外（他の人が消した・検索で外れた）でも同じことが
+   * 起きるため。窓は黙って消さず、選び直してもらう。
+   */
+  const targetStillListed =
+    deleteTarget !== null && scenarios.some((s) => s.id === deleteTarget.id)
+
+  /**
+   * 削除を投げる。
+   *
+   * 処理中は受け付けない。二度押しで2回叩くと、2回目は既に消えたものを
+   * 指すことになる。失敗は握りつぶさず、窓の中に運用者の言葉で出す。
+   */
+  const runDelete = async () => {
+    if (!deleteTarget || deleting || !targetStillListed) return
     setDeleting(true)
     setDeleteError('')
     try {
-      if (!(await onDelete(deleteTarget.id))) throw new Error('delete_failed')
+      await onDelete(deleteTarget.id)
       setDeleteTarget(null)
     } catch {
-      setDeleteError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      setDeleteError(
+        'このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。',
+      )
     } finally {
       setDeleting(false)
     }
@@ -96,13 +121,65 @@ export default function ScenarioList({
     onReorder(order)
   }
 
+  /*
+   * 窓は一覧が空になっても出したままにする。アカウントを切り替えて一覧が
+   * 空になった瞬間に窓ごと消えると、押したはずの確認がどこへ行ったのか
+   * 分からなくなる。中で「選び直してください」と伝えて閉じてもらう。
+   */
+  const confirmDialog = (
+    <ConfirmDialog
+      open={deleteTarget !== null}
+      title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
+      description="各通の中身と、購読中の人の進み具合が一緒に消えます。すでに送ったメッセージは友だちの手元に残り、取り消せません。この操作は取り消せません。"
+      confirmLabel="削除する"
+      destructive
+      busy={deleting}
+      error={deleteError}
+      onConfirm={targetStillListed ? () => void runDelete() : undefined}
+      onCancel={() => {
+        if (deleting) return
+        setDeleteTarget(null)
+        setDeleteError('')
+      }}
+    >
+      {deleteTarget && (
+        <div className="text-ink-secondary space-y-2 text-sm">
+          <p>
+            購読中 {(deleteTarget.subscriberCount ?? 0).toLocaleString('ja-JP')}人 ／ 通数{' '}
+            {deleteTarget.stepCount === undefined
+              ? '— 読み込めませんでした'
+              : `${deleteTarget.stepCount}通`}
+          </p>
+          {deleteTarget.lineAccountId === null && (
+            <p className="text-warning font-medium">
+              全アカウント共通のシナリオです。すべてのアカウントから消えます。
+            </p>
+          )}
+          {/* 回答フォームや流入経路からの参照は、この一覧では数えていない。
+              「0件」と書くと、参照が無いのか数えていないのか分からなくなる。 */}
+          <p className="text-ink-faint text-xs">
+            回答フォーム・流入経路・計測リンクからの参照は数えられていません。消したあとに参照が外れることがあります。
+          </p>
+          {!targetStillListed && (
+            <p className="text-warning font-medium">
+              このシナリオが一覧から外れました（LINEアカウントの切り替えなど）。この窓を閉じて、いまの一覧から選び直してください。
+            </p>
+          )}
+        </div>
+      )}
+    </ConfirmDialog>
+  )
+
   if (scenarios.length === 0) {
     return (
-      <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-        <p className="text-ink-faint text-sm">
-          シナリオがありません。「＋ シナリオを作成」から作ってください。
-        </p>
-      </div>
+      <>
+        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+          <p className="text-ink-faint text-sm">
+            シナリオがありません。「＋ シナリオを作成」から作ってください。
+          </p>
+        </div>
+        {confirmDialog}
+      </>
     )
   }
 
@@ -298,29 +375,7 @@ export default function ScenarioList({
         </table>
       </div>
 
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        title={`シナリオ「${deleteTarget?.name ?? ''}」を削除しますか？`}
-        description={`${
-          deleteTarget?.lineAccountId === null
-            ? 'これは全アカウント共通のシナリオです。削除するとすべてのアカウントから消えます。'
-            : 'このアカウントのシナリオを削除します。ほかのアカウントには影響しません。'
-        }通の中身と、${
-          deleteTarget?.subscriberCount === undefined
-            ? '配信中の友だちの進み具合も一緒に消えます（いま何人が配信中かは数えられていません）'
-            : `いま配信中の${deleteTarget.subscriberCount}人の進み具合も一緒に消えます`
-        }。途中まで届いていた人には、残りが届かなくなります。すでに送ったメッセージの履歴と友だちは残ります。この操作は元に戻せません。`}
-        confirmLabel="削除する"
-        destructive
-        busy={deleting}
-        error={deleteError}
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => {
-          if (deleting) return
-          setDeleteError('')
-          setDeleteTarget(null)
-        }}
-      />
+      {confirmDialog}
     </div>
   )
 }

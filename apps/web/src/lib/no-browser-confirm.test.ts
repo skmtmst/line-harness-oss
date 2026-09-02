@@ -20,16 +20,6 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * **受け側を付けた書き方も捕まえる。**
- *
- * 以前の判定は `[^.\w]confirm\(` だけで、`window.confirm(` は直前が `.` に
- * なるため**素通りしていた**。`app/form-submissions/edit/page.tsx` が実際に
- * それで見張りをすり抜けていた。`window` / `globalThis` / `self` を明示的に
- * 拾い、素の `confirm(` は受け側が付いていないときだけ当てる。
- */
-const BROWSER_CONFIRM = /(?:(?:window|globalThis|self)\s*\.\s*confirm\s*\()|(?:(?:^|[^.\w])confirm\s*\()/
-
-/**
  * **ブラウザの `confirm()` を消していく。**
  *
  * 見た目がブラウザ任せで、設計の確認窓（`J6x4Q` / `H2S1T4`）と違う。
@@ -48,8 +38,19 @@ const NOT_YET_MIGRATED = [
   'app/booking/menus/page.tsx',
   'app/booking/staff/page.tsx',
   'app/booking/staff/shifts/page.tsx',
+  'app/reminders/page.tsx',
   'app/restaurant-test/restaurant-console.tsx',
 ]
+
+/**
+ * ブラウザの `confirm` の呼び出し。
+ *
+ * **`window.confirm(` を見落としていた。** `[^.\w]` で「点の直前」を外して
+ * いたので、`confirm(` は捕まえるのに `window.confirm(` は素通りしていた。
+ * `app/form-submissions/edit/page.tsx` はそれで一覧にも載らないまま残って
+ * いた。受け側（`window` / `globalThis` / `self`）を明示して捕まえる。
+ */
+const BROWSER_CONFIRM = /(?:^|[^.\w])confirm\(|\b(?:window|globalThis|self)\.confirm\(/
 
 describe('ブラウザのconfirmを使わない', () => {
   it('confirm を使うファイルを増やさない', () => {

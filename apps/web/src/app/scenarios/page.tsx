@@ -205,19 +205,12 @@ export default function ScenariosPage() {
     }
   }
 
-  /*
-    削除の確認窓は一覧側（`components/scenarios/scenario-list`）が出す。
-    ここは実行だけを持ち、**うまくいったかを返す**。返さないと、失敗しても
-    確認窓が閉じてしまい、消えたように見える。
-  */
-  const handleDelete = async (id: string): Promise<boolean> => {
+  const handleDelete = async (id: string) => {
     try {
-      const res = await api.scenarios.delete(id)
-      if (!res.success) throw new Error(res.error)
+      await api.scenarios.delete(id)
       void loadScenarios()
-      return true
     } catch {
-      return false
+      setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 

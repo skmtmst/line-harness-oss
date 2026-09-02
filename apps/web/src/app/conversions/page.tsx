@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/dashboard/kpi-card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -55,6 +54,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -111,6 +111,17 @@ function ConversionsPageInner() {
   // 成果地点そのものが引けなかったときだけ「読み込めませんでした」を出す。
   // KPI に使う承認・案件が落ちても、表は出せる。
   const [loadFailed, setLoadFailed] = useState(false)
+  /*
+   * **ブラウザの `confirm()` を使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
+   * 画像比較にも写らない。成果地点を消すと、記録した成果もまとめて消える。
+   * それを本文で読ませたいので、共通の `ConfirmDialog` へ移した。
+   *
+   * この画面はヘッダーのLINEアカウントを見ていない（`/api/conversions/points`
+   * はアカウントで絞らない）ので、押した時点のアカウントを窓に固定する必要は
+   * ない。
+   */
   const [deleteTarget, setDeleteTarget] = useState<ConversionPoint | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -159,14 +170,14 @@ function ConversionsPageInner() {
 
   useEffect(() => { load() }, [])
 
-  /*
-    削除の確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
-    `conversion_events` は成果地点に `ON DELETE CASCADE` で繋がっている。
-    地点を消すと、そこで記録した成果も承認済みのものごと消える。
-    件数はレポートが引けたときだけ出す。引けていないのに `0件` と書くと、
-    記録が無いものと読み違えたまま消される。
-  */
-  const confirmDelete = async () => {
+  /**
+   * 成果地点を消す。
+   *
+   * 処理中は受け付けない（二度押しで2回叩くと、2回目は404になって
+   * 「消せませんでした」と出る。消えているのに失敗に見える）。
+   * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。
+   */
+  const runDelete = async () => {
     if (!deleteTarget || deleting) return
     setDeleting(true)
     setDeleteError('')
@@ -176,7 +187,7 @@ function ConversionsPageInner() {
       setDeleteTarget(null)
       await load()
     } catch {
-      setDeleteError('成果地点を削除できませんでした。時間をおいて、もう一度お試しください。')
+      setDeleteError('この成果地点を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }
@@ -384,7 +395,10 @@ function ConversionsPageInner() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => { setDeleteError(''); setDeleteTarget(point) }}
+                      onClick={() => {
+                        setDeleteError('')
+                        setDeleteTarget(point)
+                      }}
                       className="text-danger text-sm hover:underline"
                     >
                       削除
@@ -411,23 +425,46 @@ function ConversionsPageInner() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={`成果地点「${deleteTarget?.name ?? ''}」を削除しますか？`}
-        description={`この成果地点と、ここで記録した成果をすべて削除します（承認済みの記録も消えます）。${
-          deleteTarget && reportAvailable
-            ? `いま記録されているのは${countByPoint.get(deleteTarget.id) ?? 0}件です。`
-            : 'いま何件記録されているかは読み込めていません。'
-        }友だち・案件・ほかの成果地点は削除しません。この操作は元に戻せません。`}
+        designNode="d8d3Mz"
+        title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
+        description="この成果地点で記録した成果も一緒に消えます。承認済み・承認待ちの成果もまとめて消え、集計から外れます。この操作は取り消せません。"
         confirmLabel="削除する"
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void confirmDelete()}
+        onConfirm={() => void runDelete()}
         onCancel={() => {
           if (deleting) return
-          setDeleteError('')
           setDeleteTarget(null)
+          setDeleteError('')
         }}
-      />
+      >
+        {deleteTarget && (
+          <div className="text-ink-secondary space-y-2 text-sm">
+            <p>
+              種別：{EVENT_TYPE_LABELS[deleteTarget.eventType] ?? deleteTarget.eventType} ／ 計測方法：
+              {measureLabel(deleteTarget.measureMethod)}
+            </p>
+            <p>
+              記録した成果：
+              {reportAvailable ? (
+                <span className="tabular-nums">{(countByPoint.get(deleteTarget.id) ?? 0).toLocaleString('ja-JP')}件</span>
+              ) : (
+                <>— 読み込めませんでした。件数が分からないまま消すことになります。</>
+              )}
+            </p>
+            {/*
+              **取れない数を作らない。**
+              オートメーション（CV発火）やアフィリエイト案件がこの成果地点を
+              指していても、それを数える口が無い。「0件」と書くと、参照が
+              無いのか数えていないのか区別が付かなくなる。
+            */}
+            <p className="text-ink-faint text-xs">
+              オートメーション・アフィリエイト案件からの参照は数えられていません。消したあとに参照が切れることがあります。
+            </p>
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

@@ -3,10 +3,16 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { CommonVar, CommonVarDeleteImpact, CommonVarSchedule, Folder } from '@line-crm/shared'
+import type {
+  CommonVar,
+  CommonVarDeleteImpact,
+  CommonVarSchedule,
+  Folder,
+} from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText } from '../delete-impact'
 import {
@@ -20,7 +26,6 @@ import {
   saveErrorText,
   type ChangeImpactState,
 } from '../change-impact'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 共通情報の編集。
@@ -58,13 +63,6 @@ function EditCommonVarInner() {
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
-  /*
-    削除の確認（設計 `yPkWe` と同じ確認窓）。**ブラウザの `confirm()` を使わない。**
-    差し込み記号がどこで空になるかを本文で読ませられず、画像比較にも写らない。
-  */
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
 
   /**
    * 変える前の影響確認（設計 `uNBlA`）。
@@ -172,21 +170,79 @@ function EditCommonVarInner() {
   }
 
   /*
-    `common_var_schedules` は共通情報に `ON DELETE CASCADE` で繋がっているので、
-    まだ反映していない次回予約も一緒に消える。テンプレート・配信・フォルダ・
-    友だちは消えないが、差し込み記号だけが残って空欄で送られ続ける。
-  */
+   * 削除の確認。**ブラウザの `confirm()` は使わない。**
+   *
+   * もとの文言は「テンプレートに {{var.…}} が残っていると、その部分が
+   * 空になります」だった。**残っているかどうかを言っていなかった。**
+   * 一覧側（設計 `yPkWe`）と同じように、押した時点で使用先を読んでから見せる。
+   *
+   * **押した時点のLINEアカウントを窓に固定する。** ヘッダから切り替えられる
+   * 画面なので、切り替わったあとにそのまま消すと、いま見ていないアカウントの
+   * ものを消すことになる。切り替わったら窓は消さず、選び直してもらう。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string } | null>(null)
+  const [deletePhase, setDeletePhase] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const deleteAccountSwitched = deleteTarget !== null && deleteTarget.accountId !== selectedAccountId
+
+  const openDelete = async () => {
+    if (!item || !selectedAccountId) return
+    const target = { item, accountId: selectedAccountId }
+    setDeleteTarget(target)
+    setDeleteImpact(null)
+    setDeleteError('')
+    setDeletePhase('loading')
+    try {
+      const res = await api.commonVars.deleteImpact(target.item.id, target.accountId)
+      // 遅れて返った前の結果を、いま開いている窓に映さない。
+      if (latestAccountRef.current !== target.accountId) return
+      if (!res.success) throw new Error(res.error)
+      setDeleteImpact(res.data)
+      setDeletePhase('ready')
+    } catch {
+      // **使用先が読めないときは消させない。** 「0か所」と読み違えて消すと、
+      // 差し込んでいた文が空欄のまま送られ続ける。
+      setDeletePhase('error')
+    }
+  }
+
+  const closeDelete = () => {
+    if (deleting) return
+    setDeleteTarget(null)
+    setDeleteImpact(null)
+    setDeleteError('')
+    setDeletePhase('loading')
+  }
+
   const remove = async () => {
-    if (!item || !selectedAccountId || deleting) return
+    // 二度押しを受け付けない。読み込み中・切り替え後も走らせない。
+    if (!deleteTarget || deleting || deleteAccountSwitched) return
+    if (deletePhase !== 'ready' || !deleteImpact?.canDelete) return
     setDeleting(true)
     setDeleteError('')
     try {
-      const res = await api.commonVars.delete(item.id, selectedAccountId)
+      const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId)
+      // 失敗を握りつぶさない。返事を見ずに一覧へ戻すと、消えていないのに
+      // 消えたように見える。
       if (!res.success) throw new Error(res.error)
-      setConfirmingDelete(false)
       router.push('/contents/vars')
-    } catch {
-      setDeleteError('共通情報を削除できませんでした。時間をおいて、もう一度お試しください。')
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        // 読んだあとに使われ始めた。理由が変わっているので読み直して見せる。
+        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+        try {
+          const again = await api.commonVars.deleteImpact(deleteTarget.item.id, deleteTarget.accountId)
+          if (again.success) setDeleteImpact(again.data)
+          else setDeletePhase('error')
+        } catch {
+          setDeletePhase('error')
+        }
+        return
+      }
+      // 生のAPIエラーは出さない。運用者が次にすることだけを書く。
+      setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }
@@ -485,7 +541,7 @@ function EditCommonVarInner() {
                 共通情報一覧へ戻る
               </Link>
               <button
-                onClick={() => { setDeleteError(''); setConfirmingDelete(true) }}
+                onClick={() => void openDelete()}
                 className="text-danger hover:bg-danger-bg rounded-control px-3 py-2 text-sm"
               >
                 削除
@@ -571,21 +627,82 @@ function EditCommonVarInner() {
         </div>
       )}
 
+      {/*
+        取り消せないので `destructive` を付ける。共通情報を消すと
+        `common_var_schedules` は `var_id ... ON DELETE CASCADE` なので
+        次回予約も一緒に消える（`packages/db/migrations/101_content_library.sql`）。
+        テンプレート側は外部キーではなく差し込みキーの文字なので、消しても
+        テンプレートは残り、差し込んでいた場所が空欄になる。
+      */}
       <ConfirmDialog
-        open={confirmingDelete}
-        title={`「${item?.name ?? ''}」を削除しますか？`}
-        description={`この共通情報と、登録値・まだ反映していない次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。ただしテンプレートに {{var.${item?.varKey ?? ''}}} が残っていると、その部分が空欄のまま送られ続けます。この操作は元に戻せません。`}
+        open={deleteTarget !== null}
+        title={deleteTarget ? `共通情報「${deleteTarget.item.name}」を削除しますか？` : ''}
+        description="この共通情報と、登録値・次回の更新予約を削除します。テンプレート・配信・フォルダ・友だちは削除しません。この操作は取り消せません。"
         confirmLabel="削除する"
         destructive
         busy={deleting}
-        error={deleteError}
-        onConfirm={() => void remove()}
-        onCancel={() => {
-          if (deleting) return
-          setDeleteError('')
-          setConfirmingDelete(false)
-        }}
-      />
+        error={
+          deleteAccountSwitched
+            ? '窓を開けたあとにLINEアカウントが切り替わりました。この共通情報は、いま選んでいるアカウントのものではありません。閉じてから選び直してください。'
+            : deleteError
+        }
+        /*
+          消せないときは押し口ごと出さない（`ConfirmDialog` は `onConfirm` を
+          渡さないとボタンを出さない）。押せるように見えて何も起きない形にしない。
+        */
+        onConfirm={
+          deleteAccountSwitched || deletePhase !== 'ready' || !deleteImpact?.canDelete
+            ? undefined
+            : () => void remove()
+        }
+        onCancel={closeDelete}
+      >
+        <div className="space-y-2 text-xs leading-5">
+          {deletePhase === 'loading' ? (
+            <p className="text-ink-faint">使われている場所を読み込んでいます</p>
+          ) : deletePhase === 'error' ? (
+            <p className="text-danger font-semibold" role="alert">
+              使用先を読み込めませんでした。読み直してから、もう一度お試しください。
+            </p>
+          ) : deleteImpact ? (
+            <>
+              <p className={deleteImpact.blockingTotal > 0 ? 'text-danger font-semibold' : 'text-ink-secondary'}>
+                {deleteImpact.blockingTotal > 0
+                  ? `いま${deleteImpact.blockingTotal}か所で使われています。先に差し替えてください。`
+                  : '使っている設定はありません。'}
+              </p>
+              {deleteImpact.items
+                .filter((usage) => usage.blocksDeletion)
+                .map((usage) => (
+                  <p key={`${usage.kind}-${usage.href}`} className="text-ink-secondary">
+                    ・{usage.kindLabel}「{usage.name}」・{usage.status}
+                  </p>
+                ))}
+              {/*
+                **数えられていないものを「0か所」に混ぜない。**
+                所属を確かめられないフォームは、名前も件数も混ぜずに断る。
+              */}
+              {deleteImpact.unavailableReferences.map((ref) => (
+                <p key={ref.kind} className="text-ink-faint">
+                  ・{ref.kindLabel}からの参照{ref.count}件は、{ref.reason}。
+                </p>
+              ))}
+              {/*
+                件数は書かない。予約の読み込みに失敗しても画面は開くので、
+                そのときに「0件」と書くと、消えるものが無いように読める。
+              */}
+              <p className="text-ink-secondary">
+                ・消えること: この共通情報に登録した更新スケジュールも一緒に消えます。
+              </p>
+              <p className="text-ink-secondary">
+                ・残ること: テンプレートは残ります。{`{{var.${deleteTarget?.item.varKey ?? ''}}}`}
+                と書いてある場所は、これから空欄で送られます。
+              </p>
+              <p className="text-ink-secondary">・残ること: すでに送ったものは変わりません。</p>
+            </>
+          ) : null}
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

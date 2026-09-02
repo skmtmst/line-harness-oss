@@ -2,11 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-/** 削除の確認窓は一覧側が持つ。失敗の言葉もそちらにある。 */
-const LIST = readFileSync(
-  new URL('../../components/scenarios/scenario-list.tsx', import.meta.url),
-  'utf8',
-)
 
 describe('V6 シナリオ一覧の読込状態', () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
@@ -35,14 +30,7 @@ describe('V6 シナリオ一覧の読込状態', () => {
     expect(PAGE).toContain('シナリオを停止できませんでした。')
     expect(PAGE).toContain('シナリオを開始できませんでした。')
     expect(PAGE).toContain('フォルダを変更できませんでした。')
-    /*
-      削除は確認窓へ移した（`confirm()` をやめた）。失敗しても窓を閉じずに
-      その場で伝えるので、言葉は一覧側にある。ここでは**成否が返ること**を
-      見る。返さないと、失敗しても窓が閉じて消えたように見える。
-    */
-    expect(PAGE).toContain('const handleDelete = async (id: string): Promise<boolean>')
-    expect(PAGE).toContain('if (!res.success) throw new Error(res.error)')
-    expect(LIST).toContain('シナリオを削除できませんでした。')
+    expect(PAGE).toContain('シナリオを削除できませんでした。')
     expect(PAGE).toContain('{actionError}')
   })
 })

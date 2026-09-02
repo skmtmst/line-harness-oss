@@ -28,11 +28,11 @@ import {
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import OptionsDialog from '@/components/forms/options-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -73,6 +73,25 @@ function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
   }
 }
 
+/**
+ * そのページへ飛ばしている選択肢の数。
+ *
+ * ページを消すと、この分岐は行き先を失って「次へ進む」に戻る。消す前に
+ * 何本つなぎ直すのかを言うために数える。**数え漏らしを作らないよう、
+ * 全ページの入力ブロックを見る**（自分自身のページも数える。消えるまでは
+ * 分岐として生きているため）。
+ */
+function jumpsInto(layout: FormLayout, sectionId: string): number {
+  let count = 0
+  for (const section of layout.sections) {
+    for (const block of section.blocks) {
+      if (block.kind !== 'input' || !block.choices) continue
+      count += block.choices.filter((c) => c.jumpToSectionId === sectionId).length
+    }
+  }
+  return count
+}
+
 function FormEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -94,12 +113,6 @@ function FormEditInner() {
   const [submitCount, setSubmitCount] = useState(0)
   const [onSubmitTagId, setOnSubmitTagId] = useState('')
   const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
-  /*
-    ページ削除の確認（設計の確認窓）。**ブラウザの `window.confirm()` を使わない。**
-    受け側を付けた書き方は以前の見張りを素通りしていた。中身ごと消えることと、
-    分岐の行き先が外れることを本文で読ませてから決めさせる。
-  */
-  const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
   const [tab, setTab] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
@@ -287,21 +300,21 @@ function FormEditInner() {
   }
 
   /*
-    中身が入っているページだけ確認を出す。空のページは消しても失うものが無い。
-    どちらも**保存するまでDBには反映されない**ので、`destructive` は付けない。
-  */
-  const askRemoveSection = (index: number) => {
-    if (layout.sections.length <= 1) return
-    if (layout.sections[index].blocks.length === 0) {
-      removeSection(index)
-      return
-    }
-    setRemoveSectionIndex(index)
-  }
+   * ページの削除。**ブラウザの `confirm()` は使わない。**
+   * 何個のブロックが消えるのか、どの分岐がつなぎ直されるのかを本文で読ませる。
+   *
+   * **`destructive` は付けない。** ここで消えるのは画面上の下書きだけで、
+   * 「元に戻す」で戻せるし、保存するまで保存済みのフォームは変わらない。
+   * 戻せる操作に赤い窓を出すと、本当に戻せない操作と見分けがつかなくなる。
+   */
+  const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
+  const removeSectionTarget =
+    removeSectionIndex === null ? null : (layout.sections[removeSectionIndex] ?? null)
 
   const removeSection = (index: number) => {
     if (layout.sections.length <= 1) return
     const target = layout.sections[index]
+    if (!target) return
     setRemoveSectionIndex(null)
     setLayout((prev) => ({
       ...prev,
@@ -323,6 +336,16 @@ function FormEditInner() {
         })),
     }))
     setTab(Math.max(0, index - 1))
+  }
+
+  const askRemoveSection = (index: number) => {
+    if (layout.sections.length <= 1) return
+    // 中身が無いページは、消えるものが無いので確認しない。
+    if ((layout.sections[index]?.blocks.length ?? 0) === 0) {
+      removeSection(index)
+      return
+    }
+    setRemoveSectionIndex(index)
   }
 
   const save = async () => {
@@ -724,6 +747,41 @@ function FormEditInner() {
         </>
       )}
 
+      {/*
+        ページを消す前の確認。**「元に戻す」で戻せるので `destructive` は付けない。**
+        保存するまで、保存済みのフォームと集まった回答は変わらない。
+      */}
+      <ConfirmDialog
+        open={removeSectionTarget !== null}
+        title={removeSectionTarget ? `ページ「${removeSectionTarget.name}」を削除しますか？` : ''}
+        description="このページと、中に置いたブロックを画面から外します。保存するまで、保存済みのフォームは変わりません。"
+        confirmLabel="削除する"
+        onConfirm={() => {
+          if (removeSectionIndex !== null) removeSection(removeSectionIndex)
+        }}
+        onCancel={() => setRemoveSectionIndex(null)}
+      >
+        {removeSectionTarget && (
+          <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+            <li>
+              ・消えること: このページのブロック
+              <span className="tabular-nums">{removeSectionTarget.blocks.length}</span>
+              個が一緒に外れます。
+            </li>
+            {/* 行き先を失った分岐は「次へ進む」に戻る。何本つなぎ直すのかを先に言う。 */}
+            {jumpsInto(layout, removeSectionTarget.id) > 0 && (
+              <li>
+                ・つなぎ直すこと: このページへ飛ばしていた選択肢
+                <span className="tabular-nums">{jumpsInto(layout, removeSectionTarget.id)}</span>
+                件は、行き先が外れて「次へ進む」に戻ります。
+              </li>
+            )}
+            <li>・残ること: すでに集まった回答は消えません。</li>
+            <li>・戻せます: 上の「元に戻す」で戻せます。保存するまで保存済みのフォームは変わりません。</li>
+          </ul>
+        )}
+      </ConfirmDialog>
+
       {showOptions && (
         <OptionsDialog
           value={layout.options}
@@ -732,18 +790,6 @@ function FormEditInner() {
           onClose={() => setShowOptions(false)}
         />
       )}
-
-      <ConfirmDialog
-        open={removeSectionIndex !== null}
-        title={`ページ「${removeSectionIndex === null ? '' : layout.sections[removeSectionIndex]?.name ?? ''}」を中身ごと削除しますか？`}
-        description={`このページに置いた${removeSectionIndex === null ? 0 : layout.sections[removeSectionIndex]?.blocks.length ?? 0}個の項目も一緒に消えます。このページへ飛ばしていた選択肢は行き先が外れ、「次へ進む」に戻ります。これまでの回答データは消えません。保存するまでは反映されないので、保存せずにこの画面を離れれば元のままです。`}
-        confirmLabel="削除する"
-        onConfirm={() => {
-          if (removeSectionIndex === null) return
-          removeSection(removeSectionIndex)
-        }}
-        onCancel={() => setRemoveSectionIndex(null)}
-      />
     </div>
   )
 }
