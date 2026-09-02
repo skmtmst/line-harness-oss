@@ -44,6 +44,17 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).not.toContain('準備中')
   })
 
+  it('APIの入れ子が欠けても画面を落とさず、0件とも書かない', () => {
+    expect(HISTORY).toContain('mileagePaginationTotal(result)')
+    expect(HISTORY).not.toContain('result?.pagination.total')
+    expect(PAGE).toContain('mileagePaginationTotal(overview)')
+    expect(PAGE).not.toContain('overview?.pagination.total')
+    expect(FRIEND_DETAIL).toContain('mileageRewardedActions(mileage.insights)')
+    expect(FRIEND_DETAIL).toContain('mileageConnectedAccounts(mileage.connections)')
+    expect(FRIEND_DETAIL).toContain('付与記録の回数は未取得')
+    expect(FRIEND_DETAIL).toContain('接続先はありません')
+  })
+
   it('残高は共通トップバーで選んだLINEアカウントだけを取得する', () => {
     expect(PAGE).toContain('selectedAccountId')
     expect(PAGE).toContain('accountId: accountAtRequest')
