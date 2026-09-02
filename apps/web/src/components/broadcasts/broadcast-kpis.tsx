@@ -4,6 +4,20 @@ import { useEffect, useState } from 'react'
 import { api, type BroadcastStats } from '@/lib/api'
 
 /**
+ * 帯の副題に出す数。
+ *
+ * **口が想定の形を返さなくても `undefined` を画面に出さない。**
+ * `予約中 undefined` が実際に出ていた（撮影用のモックが
+ * `/api/broadcasts/stats` を持たず、別の形が返っていた）。
+ * 数が無いなら `—` にして、単位も付けない。
+ */
+export function countText(value: unknown, unit: string): string {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toLocaleString('ja-JP')}${unit}`
+    : '—'
+}
+
+/**
  * 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信` の KPIs）。
  *
  * 設計は「今月の配信 / 到達 / 平均開封率 / 今月の残枠」の4枚。
@@ -37,13 +51,13 @@ export default function BroadcastKpis() {
       title: '今月の配信',
       value: stats?.thisMonth ?? null,
       unit: '件',
-      detail: stats ? `予約中 ${stats.scheduled}` : '—',
+      detail: `予約中 ${countText(stats?.scheduled, '件')}`,
     },
     {
       title: '到達',
       value: stats?.delivered ?? null,
       unit: '通',
-      detail: stats ? `失敗 ${stats.failed}` : '—',
+      detail: `失敗 ${countText(stats?.failed, '通')}`,
     },
     {
       title: '平均開封率',
@@ -72,9 +86,14 @@ export default function BroadcastKpis() {
             ) : (
               <>
                 <span className="text-ink text-2xl font-bold tabular-nums">
-                  {card.value === null ? '—' : card.value.toLocaleString('ja-JP')}
+                  {typeof card.value === 'number' && Number.isFinite(card.value)
+                    ? card.value.toLocaleString('ja-JP')
+                    : '—'}
                 </span>
-                <span className="text-ink-secondary text-xs">{card.unit}</span>
+                {/* **数が無いときは単位も出さない。** `—件` は数に見える。 */}
+                {typeof card.value === 'number' && Number.isFinite(card.value) && (
+                  <span className="text-ink-secondary text-xs">{card.unit}</span>
+                )}
               </>
             )}
           </p>

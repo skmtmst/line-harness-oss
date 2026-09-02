@@ -1,0 +1,145 @@
+import type { CommonVarDeleteImpact } from '@line-crm/shared'
+import { ApiError } from '@/lib/api'
+import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
+import { placeholderText } from './delete-impact'
+
+/**
+ * 共通情報を**変える前**の影響確認（設計 `uNBlA` 14-1-B）。
+ *
+ * この画面は「値を直して保存する」だけの形になっていた。差し込み先が
+ * 何十か所あっても、押した瞬間に全部が変わる。**変える前に、どこが
+ * 変わるのかを見せる**のが設計の骨である。
+ *
+ * いま読める口は使用先台帳（`GET /api/common-vars/:id/delete-impact`）
+ * だけである。ここからは「どこで使われているか」「いまどう出ているか」
+ * 「送信済みで変わらないもの」が読める。
+ *
+ * **変更後の文と文字数の検査は読めない。** 設計の
+ * `POST /api/common-vars/:id/impact-preview` はまだ無い。取れないものを
+ * それらしく作らず、`—` と理由を出す。引き継ぎは
+ * `docs/design-qa/v6-common-var-change-impact-handoff.md`。
+ */
+
+/** 影響確認の読み込み状態。**実値0と、読めなかったを混ぜない。** */
+export type ChangeImpactState = 'loading' | 'ready' | 'error' | 'forbidden'
+
+/** 口がまだ無い節の呼び名。未接続の理由文をここから作る。 */
+export const CHANGE_PREVIEW_SOURCE = '変更後の文と文字数の検査'
+
+/** 「変更後の文」の節に出す理由。 */
+export function changePreviewNotConnected(): string {
+  return notConnectedText(CHANGE_PREVIEW_SOURCE)
+}
+
+/** 読み込みに失敗したときの状態。403は「見る権限がありません」と分ける。 */
+export function impactStateFromError(err: unknown): ChangeImpactState {
+  return err instanceof ApiError && err.status === 403 ? 'forbidden' : 'error'
+}
+
+/** 数が出ないときに、その理由を運用者の言葉で言う。 */
+export function impactStateText(state: ChangeImpactState): string | null {
+  if (state === 'loading') return STATE_TEXT.loading
+  if (state === 'error') return STATE_TEXT.error
+  if (state === 'forbidden') return STATE_TEXT.forbiddenView
+  return null
+}
+
+/**
+ * 保存すると何か所が変わるか。
+ *
+ * `total` には送信済みの記録も入っている。**送信済みは変わらない。**
+ * まとめて「15か所が変わります」と言うと、もう送った分まで書き換わると
+ * 読めてしまう。分けて数える。
+ */
+export function changeCounts(impact: CommonVarDeleteImpact): {
+  immediate: number
+  historical: number
+  hidden: number
+} {
+  return {
+    immediate: impact.blockingTotal,
+    historical: impact.historicalTotal,
+    hidden: impact.unscopedFormTotal,
+  }
+}
+
+/**
+ * 節の見出し文。
+ *
+ * **0か所は0か所と言う。** 差し込まれていない共通情報なら、保存しても
+ * どこも変わらない。それが分かれば運用者はそのまま保存できる。
+ */
+export function changeSummaryText(impact: CommonVarDeleteImpact): string {
+  const { immediate } = changeCounts(impact)
+  if (immediate === 0) {
+    return `${placeholderText(impact.variable.varKey)} はどこにも差し込まれていません。`
+      + '保存しても、いま変わる場所はありません。'
+  }
+  return `保存すると、${placeholderText(impact.variable.varKey)} を差し込んでいる `
+    + `${immediate.toLocaleString('ja-JP')}か所がすぐ変わります。`
+}
+
+/** 送信済みの分。**「変わりません」を書かないと、遡って直ると誤解される。** */
+export function historicalText(impact: CommonVarDeleteImpact): string | null {
+  const { historical } = changeCounts(impact)
+  if (historical === 0) return null
+  return `送信済みの${historical.toLocaleString('ja-JP')}か所は変わりません。`
+    + 'すでに届いた文は書き換わりません。'
+}
+
+/** 名前を出せない使用先。**件数は隠さない。** */
+export function hiddenText(impact: CommonVarDeleteImpact): string | null {
+  if (impact.unavailableReferences.length === 0) return null
+  return impact.unavailableReferences
+    .map((ref) => `${ref.kindLabel}${ref.count.toLocaleString('ja-JP')}件（${ref.reason}）`)
+    .join('／')
+}
+
+/** すぐ変わる使用先だけを、表に出す順で返す。送信済みは混ぜない。 */
+export function immediateItems(impact: CommonVarDeleteImpact) {
+  return impact.items.filter((item) => item.blocksDeletion)
+}
+
+/**
+ * 保存が落ちた理由を、運用者の言葉にする。
+ *
+ * `fetchApi` は2xx以外を投げるので、`if (!res.success)` の枝には
+ * 届かない。**そのまま catch で「保存に失敗しました」だけ出すと、
+ * 権限が無いのか、対象が消えたのか、サーバーが落ちたのかが分からず、
+ * 運用者は同じ操作を繰り返すしかなくなる。**
+ *
+ * 本文をそのまま出してよいのは400だけ（`BODY_MESSAGE_STATUSES`）。
+ * それ以外は `API error: 500` のような内部文が入るので、status から
+ * こちらで言葉を決める。
+ */
+export function saveErrorText(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return '保存できませんでした。通信が切れている可能性があります。'
+      + '接続を確かめて、もう一度お試しください。'
+  }
+  if (err.status === 400 && err.message && !/^API error: /.test(err.message)) {
+    return err.message
+  }
+  switch (err.status) {
+    case 400:
+      return '入力の内容が受け付けられませんでした。名前と値を確かめてください。'
+    case 401:
+      return 'ログインの状態が切れています。ログインし直してから、もう一度お試しください。'
+    case 403:
+      return `${STATE_TEXT.forbiddenAct}。共通情報を保存できるのは管理者だけです。`
+    case 404:
+      return 'この共通情報は見つかりませんでした。'
+        + 'ほかの人が削除したか、選んでいるLINEアカウントが違います。一覧から開き直してください。'
+    case 409:
+      return 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。'
+    case 422:
+      return '差し込み名は後から変えられません。名前と値だけを直してください。'
+    case 429:
+      return '短い時間に操作が集中しました。少し待ってから、もう一度お試しください。'
+    default:
+      return err.status >= 500
+        ? 'サーバー側で保存できませんでした。時間をおいて、もう一度お試しください。'
+          + '続く場合は管理者へ連絡してください。'
+        : '保存できませんでした。もう一度お試しください。'
+  }
+}
