@@ -36,3 +36,28 @@ export function savedSearchKpiValues(
     callsThisMonth: null,
   }
 }
+
+/** 使用先での絞り込み。設計 `QKx8Q` のツールバー2つめ。 */
+export type SavedSearchUsageFilter = 'all' | 'used' | 'unused'
+
+/**
+ * 一覧の絞り込み（設計 `QKx8Q` の「条件名・用途で検索」「使用先：すべて」）。
+ *
+ * どちらも**すでに読み込んだ一覧の中だけ**で効かせる。新しい口は要らない。
+ *
+ * 使用先が未取得（`usedIn` が無い）の行は、使用中とも未使用とも言えない。
+ * どちらの絞り込みでも**消さずに残す**。消すと「未使用だけ」で出した一覧が
+ * 実は使用中の条件を隠していた、ということが起きる。
+ */
+export function filterSavedSearches<T extends Pick<SavedSearch, 'name' | 'usedIn'>>(
+  items: T[],
+  query: string,
+  usage: SavedSearchUsageFilter,
+): T[] {
+  const needle = query.trim().toLocaleLowerCase('ja')
+  return items.filter((item) => {
+    if (needle && !item.name.toLocaleLowerCase('ja').includes(needle)) return false
+    if (usage === 'all' || item.usedIn === undefined) return true
+    return usage === 'used' ? item.usedIn.length > 0 : item.usedIn.length === 0
+  })
+}
