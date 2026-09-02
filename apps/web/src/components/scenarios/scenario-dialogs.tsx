@@ -31,7 +31,7 @@ function Shell({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="rounded-card w-full max-w-3xl bg-white shadow-lg">
+      <div className="rounded-panel w-full max-w-3xl bg-white shadow-lg">
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">{title}</h2>
@@ -184,7 +184,7 @@ export function OnCompleteDialog({
         </>
       }
     >
-      {error && <p className="rounded-card bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>}
+      {error && <p className="rounded-panel bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>}
       <div className="space-y-3">
         {(
           [
@@ -204,7 +204,7 @@ export function OnCompleteDialog({
         ).map((opt) => (
           <label
             key={opt.value}
-            className={`rounded-card flex cursor-pointer gap-3 border p-4 ${
+            className={`rounded-panel flex cursor-pointer gap-3 border p-4 ${
               draftMode === opt.value ? 'border-accent bg-accent-soft' : 'border-hairline'
             }`}
           >
@@ -363,7 +363,7 @@ export function TestSendDialog({
         </>
       }
     >
-      <p className="rounded-card bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">
+      <p className="rounded-panel bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">
         本物のLINEメッセージが届きます。相手を間違えないでください。下書きの通もテストでは送ります。
       </p>
       <input
@@ -372,7 +372,7 @@ export function TestSendDialog({
         placeholder="名前で探す"
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
       />
-      <div className="border-hairline rounded-card mt-3 max-h-64 overflow-y-auto border">
+      <div className="border-hairline rounded-panel mt-3 max-h-64 overflow-y-auto border">
         {friendsStatus === 'ready' && friends.map((friend) => (
           <button
             key={friend.id}
@@ -397,7 +397,7 @@ export function TestSendDialog({
       </div>
       {result && (
         <p
-          className={`rounded-card mt-3 px-4 py-3 text-sm ${
+          className={`rounded-panel mt-3 px-4 py-3 text-sm ${
             result.ok ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'
           }`}
         >

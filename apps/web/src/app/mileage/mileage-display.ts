@@ -47,6 +47,24 @@ export function mileageSourceLabel(value: string): string {
   return SOURCE_LABELS[value] ?? 'その他の自動処理'
 }
 
+/**
+ * 発生元の補足行（設計 `MvZm5` 履歴 / `HIU5O` マイル明細）。
+ *
+ * **`調整元ID` を画面へ出さない。** 中身は問い合わせ番号や注文番号そのもの
+ * （`INQ-20260823-018` `ORD-20260822-0007`）で、運用者がこの表で読む値では
+ * ない。しかも枠に入らず途中で切れていた。**IDの断片は、IDより読めない。**
+ *
+ * この行に要るのは「元をたどれる記録が残っているか」だけなので、それだけを
+ * 言葉で出す。番号そのものは、手で増減させるときの確認画面に出る。
+ */
+export function mileageSourceNoteText(input: {
+  sourceReferenceId?: string | null
+  hasSourceEvent: boolean
+}): string {
+  const hasReference = (input.sourceReferenceId ?? '').trim().length > 0
+  return hasReference || input.hasSourceEvent ? '元の記録あり' : '元の記録なし'
+}
+
 export function formatMileageChange(value: number): string {
   const number = Math.abs(value).toLocaleString('ja-JP')
   if (value > 0) return `+${number}`

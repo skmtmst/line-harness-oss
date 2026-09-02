@@ -83,7 +83,7 @@
     "direct-secondary-button": 7,
     "direct-primary-button": 1,
     "arbitrary-value": 5,
-    "direct-th": 8,
+    "direct-th": 6,
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
@@ -598,7 +598,7 @@
     "arbitrary-value": 7
   },
   "components/friend-fields/tag-csv-import-dialog.tsx": {
-    "unresolved-classname": 51
+    "unresolved-classname": 55
   },
   "components/friend-fields/tag-editor-v4.tsx": {
     "direct-primary-button": 3,
