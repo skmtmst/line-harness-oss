@@ -45,6 +45,7 @@ max_retries = 5
 retry_delay = 60
 
 [vars]
+RESTAURANT_TEST_ENABLED = "true"
 WORKER_NAME = "nen-line-stg"
 ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
 LIFF_PAGES_PROJECT = ""
