@@ -4,8 +4,9 @@
 
 ## 1. 現在地
 
-- 基準ブランチ：`codex/development`
-- 基準SHA：`b15da96a5f49915e0f49f0dbef0ed8396b3ad347`
+- 再開するブランチ：`codex/development`（開始時に必ず最新を取得する）
+- 画面・検証環境の確認済みSHA：`b15da96a5f49915e0f49f0dbef0ed8396b3ad347`
+- この文書を本流へ入れた直後のSHA：`6fe27904816a1a330b05a9907a82a97bc6c2745a`
 - 台帳：`scripts/visual-qa/screens.mjs`
 - 総数：262 Node
 
