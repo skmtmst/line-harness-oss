@@ -5,7 +5,6 @@ import Link from 'next/link'
 import type { FriendAddRouting, FriendAddAction } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 
 type Option = { id: string; name: string }
@@ -49,7 +48,7 @@ export default function FriendAddSettingsPage() {
     setFields([])
     setOptionsError(false)
     if (!accountId) return () => { cancelled = true }
-    void Promise.all([api.supportMarks.list(accountId), api.friendFields.list()]).then(([m, f]) => {
+    void Promise.all([api.supportMarks.list(accountId), api.friendFields.list(accountId)]).then(([m, f]) => {
       if (cancelled) return
       if (m.success) setMarks(m.data.map(x => ({ id: x.id, name: x.name })))
       if (f.success) setFields(f.data.map(x => ({ id: x.id, name: x.name })))
@@ -223,35 +222,18 @@ export default function FriendAddSettingsPage() {
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title="友だち追加時の配信"
-          description="友だちに追加されたときに何を配信するかを決めます。はじめての人と、以前からの友だち・ブロックを解除した人で分けられます。"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button href="/friend-add-settings/runs">実行結果を見る</Button>
-              <TestRunButton accountId={accountId} scenarioName={scenarioName} />
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving}
-                title={routingError() || undefined}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
-              >
-                {saving ? '保存中…' : '保存'}
-              </button>
-              {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。
-                  他の画面（一斉配信・成果とアフィリエイトなど）と同じ扱い。 */}
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-            </div>
-          }
-        />
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <Button href="/friend-add-settings/runs">実行結果を見る</Button>
+        <TestRunButton accountId={accountId} scenarioName={scenarioName} />
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          title={routingError() || undefined}
+          className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+        >
+          {saving ? '保存中…' : '保存'}
+        </button>
       </div>
 
       <div data-design="Alert" className="space-y-2">
@@ -439,6 +421,15 @@ export default function FriendAddSettingsPage() {
               title="判定の基準"
               description="どちらに振り分けるかの判定方法です。通常は変更しません。"
             />
+            {/*
+              重なりの心配をここで打ち消す。実装（`classifyFriend`）は
+              「はじめて」か「以前から」のどちらか一方だけを返し、①と②が
+              同時に走ることはない。②で「はじめての人と同じもの」を選んだ
+              ときだけ、②に振り分けられた人へ①の内容が届く。
+            */}
+            <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
+              1人の友だちは①と②のどちらか一方にだけ振り分けられ、両方が動くことはありません（②で「はじめての人と同じもの」を選んだときだけ、②に振り分けられた人へ①の内容が届きます）。
+            </p>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="はじめての人の判定">
                 <Select
@@ -465,8 +456,8 @@ export default function FriendAddSettingsPage() {
             </div>
             {routing.criteria.firstTime === 'first_followed_at_missing' && (
               <p className="bg-warning-bg text-warning rounded-card mt-3 px-3 py-2 text-xs leading-relaxed">
-                この基準は、いまのデータでは使えません。マイグレーション 065
-                が既存の行すべてに初回フォロー日を埋めたため、未記録の人がもう居ません。
+                この基準は、いまのデータでは使えません。過去に追加された友だちにも
+                あとから初回フォロー日を記録したため、未記録の人がもう居ません。
                 このままだと全員が「以前から」に振り分けられます。
               </p>
             )}
@@ -486,10 +477,12 @@ export default function FriendAddSettingsPage() {
                     ? 'ブロックされたことがある？'
                     : '初回フォロー日は記録済み？'
                 }
+                /* 運用者はテーブル名も列名も知らない。画面には、何を見て
+                   決めているかを運用の言葉で書く。 */
                 note={
                   routing.criteria.firstTime === 'unfollow_count_zero'
-                    ? 'friends.unfollow_count を見る'
-                    : 'friends.first_followed_at を見る'
+                    ? 'これまでにブロックされた回数を見る'
+                    : '初回フォロー日の記録があるかを見る'
                 }
               />
               <FlowArrow />
@@ -548,10 +541,10 @@ export default function FriendAddSettingsPage() {
               <p className="text-ink text-xs font-bold">この1か月の実績</p>
               <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
                 {breakdownError
-                  ? '実績を取得できませんでした。画面を再読み込みしてください。'
+                  ? '実績を読み込めませんでした。画面を再読み込みしてください。'
                   : breakdown
                   ? `はじめて ${breakdown.firstTime}人 ・ 以前から ${breakdown.returning}人。うち${breakdown.unblocked}人はブロック解除でした。`
-                  : '読み込み中…'}
+                  : '読み込んでいます'}
               </p>
             </div>
           </div>

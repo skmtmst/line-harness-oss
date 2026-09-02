@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getAccountSetting, setAccountSetting } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 
@@ -122,7 +123,7 @@ function settingIsEnabled(raw: string | null): boolean {
   }
 }
 
-function specializedCatalog(raw: string | null): string[] {
+export function specializedCatalog(raw: string | null): string[] {
   if (!raw) return [...NEN_SPECIALIZED_FEATURES];
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -214,7 +215,34 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       features?: Record<string, unknown>;
       sidebarOrder?: unknown;
       sidebarItemOrder?: unknown;
+      catalog?: unknown;
     }>();
+
+    if (body.catalog !== undefined) {
+      const staff = c.get('staff');
+      // TODO(OPS-b): 運営フラグが追加されたら、既定統括による暫定判定を見直す。
+      if (staff?.role !== 'owner' || staff.readOnly
+        || (staff.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
+        return c.json({ success: false, error: 'この操作には運営権限が必要です' }, 403);
+      }
+      if (!Array.isArray(body.catalog)) {
+        return c.json({ success: false, error: 'catalog は配列で指定してください' }, 400);
+      }
+      if (body.catalog.some((key) => typeof key !== 'string'
+        || !NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature))) {
+        return c.json({ success: false, error: 'catalog に知らない専用機能が含まれています' }, 400);
+      }
+      const catalog = body.catalog.filter(
+        (key): key is ToggleableFeature => typeof key === 'string'
+          && NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature),
+      );
+      await setAccountSetting(
+        c.env.DB,
+        accountId,
+        SPECIALIZED_CATALOG_KEY,
+        JSON.stringify(catalog),
+      );
+    }
 
     const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
     if (unknownKeys.length > 0) {

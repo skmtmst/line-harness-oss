@@ -7,6 +7,21 @@ import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
+import type { SegmentCondition } from '@/lib/segment-condition'
+
+function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
+  const parse = (key: 'scoreMin' | 'scoreMax') => {
+    const raw = params.get(key)
+    if (raw === null || !/^-?\d+$/.test(raw)) return null
+    const value = Number(raw)
+    return Number.isSafeInteger(value) ? value : null
+  }
+  const min = parse('scoreMin')
+  const max = parse('scoreMax')
+  if (min === null && max === null) return null
+  if (min !== null && max !== null && min > max) return null
+  return { operator: 'AND', rules: [{ type: 'score_range', value: { min, max } }] }
+}
 
 /**
  * 一斉配信の作成を、URL で開けるようにする。
@@ -19,6 +34,7 @@ function NewBroadcastPageContent() {
   const searchParams = useSearchParams()
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
+  const initialCondition = scoreRangeCondition(new URLSearchParams(searchParams.toString()))
 
   const load = useCallback(async () => {
     try {
@@ -52,11 +68,16 @@ function NewBroadcastPageContent() {
       ) : (
         <BroadcastForm
           tags={tags}
-          onSuccess={() => router.push('/broadcasts')}
+          onSuccess={(broadcast) => router.push(
+            broadcast.status === 'scheduled'
+              ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
+              : '/broadcasts',
+          )}
           onCancel={() => router.push('/broadcasts')}
           openTemplatePickerInitially={searchParams.get('templatePicker') === '1'}
           initialTemplateId={searchParams.get('templateId')}
           initialContentTemplateId={searchParams.get('contentTemplateId')}
+          initialCondition={initialCondition}
         />
       )}
     </div>
