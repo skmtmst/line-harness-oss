@@ -1,5 +1,12 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../index.js';
+
+const accountAccessMocks = vi.hoisted(() => ({
+  canAccessAllLineAccounts: vi.fn(),
+}));
+
+vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 const dbMocks = {
   getScenarios: vi.fn(),
@@ -66,9 +73,19 @@ function makeScenarioDb(rows: ScenarioRow[]) {
 }
 
 function setupApp(db: D1Database) {
-  const app = new Hono<{ Bindings: { DB: D1Database } }>();
+  const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.env = { DB: db };
+    c.env = { DB: db } as Env['Bindings'];
+    c.set('staff', {
+      id: 'owner-1',
+      name: '管理者',
+      role: 'owner',
+      readOnly: false,
+      tenantId: 'tenant-1',
+      permissionKeys: ['/scenarios'],
+      assignedLineAccountId: null,
+      canAccessDescendantAccounts: true,
+    });
     await next();
   });
   app.route('/', scenariosModule);
@@ -88,6 +105,7 @@ const rowBase = {
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  accountAccessMocks.canAccessAllLineAccounts.mockReset().mockResolvedValue(true);
 });
 
 describe('GET /api/scenarios?lineAccountId=X', () => {
@@ -149,5 +167,183 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { success: boolean; data: unknown[] };
     expect(body.data).toEqual([]);
+  });
+});
+
+describe('POST /api/scenarios/:id/test-send', () => {
+  function testSendDb() {
+    let stepReads = 0;
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/SELECT id, line_account_id FROM scenarios/i.test(sql)) {
+              return { id: 'scenario-1', line_account_id: 'account-1' };
+            }
+            return null;
+          },
+          async all() {
+            stepReads += 1;
+            return { results: [] };
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+    return { db, stepReads: () => stepReads };
+  }
+
+  test('別LINEアカウントの友だちには送信処理を始めない', async () => {
+    dbMocks.getScenarioById.mockResolvedValue({ id: 'scenario-1', line_account_id: 'account-1' });
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    const { db, stepReads } = testSendDb();
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/test-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ friendId: 'friend-2' }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ success: false });
+    expect(stepReads()).toBe(0);
+  });
+
+  test('担当者から見えない友だちは存在を隠して送信処理を始めない', async () => {
+    dbMocks.getScenarioById.mockResolvedValue({ id: 'scenario-1', line_account_id: 'account-1' });
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-hidden', line_account_id: 'account-1' });
+    accountAccessMocks.canAccessAllLineAccounts
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const { db, stepReads } = testSendDb();
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/test-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ friendId: 'friend-hidden' }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(stepReads()).toBe(0);
+  });
+});
+
+describe('シナリオ通の本文契約', () => {
+  const visibleScenario = {
+    id: 'scenario-1',
+    line_account_id: 'account-1',
+  };
+
+  test('5,001文字の本文は作成前に止める', async () => {
+    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
+    const response = await setupApp({} as D1Database).request('/api/scenarios/scenario-1/steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stepOrder: 1,
+        delayMinutes: 0,
+        messageType: 'text',
+        messageContent: 'あ'.repeat(5_001),
+      }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'TEMPLATE_TEXT_TOO_LONG',
+      actualCharacters: 5_001,
+    });
+    expect(dbMocks.createScenarioStep).not.toHaveBeenCalled();
+  });
+
+  test('5,001文字の本文は更新前にも止める', async () => {
+    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
+    const response = await setupApp({} as D1Database).request(
+      '/api/scenarios/scenario-1/steps/step-1',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageType: 'text',
+          messageContent: 'あ'.repeat(5_001),
+        }),
+      },
+    );
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'TEMPLATE_TEXT_TOO_LONG',
+      actualCharacters: 5_001,
+    });
+    expect(dbMocks.updateScenarioStep).not.toHaveBeenCalled();
+  });
+
+  test('質問は空のテキスト本文を要求せず保存できる', async () => {
+    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/SELECT delivery_mode FROM scenarios/i.test(sql)) {
+              return { delivery_mode: 'relative' };
+            }
+            if (/SELECT id FROM scenario_steps/i.test(sql)) return null;
+            return null;
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+    dbMocks.createScenarioStep.mockResolvedValue({
+      id: 'step-1',
+      scenario_id: 'scenario-1',
+      step_order: 1,
+      delay_minutes: 0,
+      offset_days: null,
+      offset_minutes: null,
+      delivery_time: null,
+      message_type: 'text',
+      message_content: '',
+      condition_type: null,
+      condition_value: null,
+      next_step_on_false: null,
+      template_id: null,
+      on_reach_tag_id: null,
+      after_send: 'continue',
+      target_condition_json: null,
+      question_json: JSON.stringify({
+        text: '体調はいかがですか？',
+        tapMode: 'single',
+        choices: [{ label: 'よい', behavior: 'none' }],
+      }),
+      is_draft: 0,
+      created_at: '2026-09-02T00:00:00.000',
+    });
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stepOrder: 1,
+        delayMinutes: 0,
+        messageType: 'text',
+        messageContent: '',
+        question: {
+          text: '体調はいかがですか？',
+          tapMode: 'single',
+          choices: [{ label: 'よい', behavior: 'none' }],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(dbMocks.createScenarioStep).toHaveBeenCalledTimes(1);
   });
 });

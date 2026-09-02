@@ -16,6 +16,7 @@ const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', '
 const DUPLICATES = readFileSync(join(HERE, '..', '..', 'app', 'duplicates', 'page.tsx'), 'utf8')
 const USERS_TABLE = readFileSync(join(HERE, '..', 'users', 'users-table.tsx'), 'utf8')
 const USER_ROW = readFileSync(join(HERE, '..', 'users', 'user-row.tsx'), 'utf8')
+const USERS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'users', 'page.tsx'), 'utf8')
 const STRUCTURE = readFileSync(join(HERE, '..', '..', 'lib', 'design-structure.json'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
@@ -86,15 +87,18 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('V6の検索・絞り込みの名前と実行先を固定する', () => {
-    expect(PAGE).toContain('const SECONDARY_CONTROL')
+    expect(PAGE).toContain('const SEARCH_ROW_SECONDARY')
     expect(PAGE).toContain('名前・LINE名・タグ・メモで検索')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
-    expect(PAGE).toContain("localStorage.getItem('friends.savedSearch')")
-    expect(PAGE).toContain('この条件で表示')
+    expect(PAGE).toContain('api.savedSearches.list')
+    expect(PAGE).toContain('savedSearchId')
+    expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')
-    expect(PAGE).toContain('担当者：すべて')
-    expect(PAGE).toContain('シナリオ：すべて')
+    /* 「担当者：すべて」は共通Selectの label + option から組み立てる。 */
+    expect(PAGE).toContain('label="担当者"')
+    expect(PAGE).toContain('label="シナリオ"')
+    expect(PAGE).toContain("{ value: '', label: 'すべて' }")
     expect(PAGE).toContain('注目のみ')
     expect(PAGE).toContain('data-design-node="pRHvc"')
     expect(ADVANCED).toContain('z-[100]')
@@ -119,17 +123,25 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('絞り込みをV6の固定幅に収め、右側へ引き伸ばさない', () => {
-    expect(PAGE).toContain('className="w-37.5 shrink-0"')
-    expect(PAGE).toContain('className="w-40 shrink-0"')
+    /*
+      2026-09-02: 幅を設計の実寸へ直した。150/150/160/160 は実装側の痩せで、
+      設計 `PhxG6` はタグ156 / 対応156 / 担当者176 / シナリオ184。
+    */
+    expect(PAGE).toContain('className="w-39 shrink-0" data-filter="tag"')
+    expect(PAGE).toContain('className="w-39 shrink-0" data-filter="response"')
+    expect(PAGE).toContain('className="w-44 shrink-0" data-filter="operator"')
+    expect(PAGE).toContain('className="w-46 shrink-0" data-filter="scenario"')
+    expect(PAGE).not.toContain('className="w-37.5 shrink-0"')
     expect(PAGE).not.toContain('className="min-w-[150px] flex-1"')
     expect(PAGE).not.toContain('className="min-w-[160px] flex-1"')
   })
 
-  it('重複・統合ユーザー・統合詳細もV4の表密度と色へそろえる', () => {
+  it('重複画面の密度を保ち、統合ユーザーはV6の実Nodeへ結び付ける', () => {
     expect(DUPLICATES).toContain('rounded-[14px]')
     expect(DUPLICATES).toContain('#DADDE2')
-    expect(USERS_TABLE).toContain('rounded-[14px]')
-    expect(USER_ROW).toContain('#EAEBED')
+    expect(USERS_PAGE).toContain('data-design-node="r7eSi"')
+    expect(USERS_TABLE).toContain('rounded-v6-card')
+    expect(USER_ROW).toContain('border-v6-divider')
     expect(USER_ROW).toContain('登録アカウント詳細')
   })
 

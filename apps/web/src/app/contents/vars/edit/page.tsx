@@ -1,12 +1,12 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarSchedule, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import Header from '@/components/layout/header'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 共通情報の編集。
@@ -23,6 +23,9 @@ function jstNowLocalInput(): { date: string; time: string } {
 }
 
 function EditCommonVarInner() {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -48,14 +51,22 @@ function EditCommonVarInner() {
       setError('共通情報が指定されていません')
       return
     }
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setItem(null)
+      setLoading(false)
+      setError(accountLoading ? '' : 'LINEアカウントを選択してください')
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const [vars, folderList, scheduleList] = await Promise.all([
-        api.commonVars.list(),
+        api.commonVars.list(accountAtRequest),
         api.folders.list('common_var'),
-        api.commonVars.schedules(id),
+        api.commonVars.schedules(id, accountAtRequest),
       ])
+      if (accountAtRequest !== latestAccountRef.current) return
       if (folderList.success) setFolders(folderList.data)
       if (scheduleList.success) setSchedules(scheduleList.data)
       const found = vars.success ? vars.data.find((v) => v.id === id) : undefined
@@ -68,18 +79,19 @@ function EditCommonVarInner() {
       setFolderId(found.folderId ?? '')
       setValue(found.value)
     } catch {
-      setError('読み込みに失敗しました')
+      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [id])
+  }, [accountLoading, id, selectedAccountId])
 
   useEffect(() => {
     void load()
   }, [load])
 
   const save = async () => {
-    if (!item || saving) return
+    if (!item || saving || !selectedAccountId) return
+    const accountAtRequest = selectedAccountId
     if (!name.trim()) {
       setError('共通情報名を入力してください')
       return
@@ -88,11 +100,12 @@ function EditCommonVarInner() {
     setError('')
     setSaved(false)
     try {
-      const res = await api.commonVars.update(item.id, {
+      const res = await api.commonVars.update(item.id, accountAtRequest, {
         name: name.trim(),
         value,
         folderId: folderId || null,
       })
+      if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
         return
@@ -107,7 +120,7 @@ function EditCommonVarInner() {
   }
 
   const remove = async () => {
-    if (!item) return
+    if (!item || !selectedAccountId) return
     if (
       !confirm(
         `「${item.name}」を削除しますか？\n` +
@@ -117,7 +130,7 @@ function EditCommonVarInner() {
       return
     setError('')
     try {
-      await api.commonVars.delete(item.id)
+      await api.commonVars.delete(item.id, selectedAccountId)
       router.push('/contents/vars')
     } catch {
       setError('削除に失敗しました')
@@ -125,14 +138,14 @@ function EditCommonVarInner() {
   }
 
   const addSchedule = async () => {
-    if (!item || !draft) return
+    if (!item || !draft || !selectedAccountId) return
     if (!draft.date) {
       setError('開始日を入れてください')
       return
     }
     setError('')
     try {
-      const res = await api.commonVars.addSchedule(item.id, {
+      const res = await api.commonVars.addSchedule(item.id, selectedAccountId, {
         effectiveFrom: `${draft.date}T${draft.time || '00:00'}`,
         value: draft.value,
       })
@@ -148,10 +161,10 @@ function EditCommonVarInner() {
   }
 
   const removeSchedule = async (scheduleId: string) => {
-    if (!item) return
+    if (!item || !selectedAccountId) return
     setError('')
     try {
-      await api.commonVars.deleteSchedule(item.id, scheduleId)
+      await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
       void load()
     } catch {
       setError('予約の削除に失敗しました')
@@ -167,8 +180,6 @@ function EditCommonVarInner() {
         <span className="mx-1.5">›</span>
         <span>共通情報編集</span>
       </nav>
-
-      <Header title="共通情報編集" />
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 max-w-3xl rounded-lg border p-4 text-sm">
