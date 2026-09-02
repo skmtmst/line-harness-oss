@@ -81,7 +81,7 @@ describe('ブラウザのconfirmを使わない', () => {
     expect(src).toContain('ConfirmDialog')
     expect(src).toContain('confirmLabel="削除する"')
     expect(src).toContain('destructive')
-    expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
+    expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_CONFIRM)
     // 押している間に二度押しできない
     expect(src).toContain('selected.size === 0 || deleting')
     // 失敗を握りつぶさず、成功済みを再試行しない。
