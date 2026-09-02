@@ -20,6 +20,16 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 /**
+ * **受け側を付けた書き方も捕まえる。**
+ *
+ * 以前の判定は `[^.\w]confirm\(` だけで、`window.confirm(` は直前が `.` に
+ * なるため**素通りしていた**。`app/form-submissions/edit/page.tsx` が実際に
+ * それで見張りをすり抜けていた。`window` / `globalThis` / `self` を明示的に
+ * 拾い、素の `confirm(` は受け側が付いていないときだけ当てる。
+ */
+const BROWSER_CONFIRM = /(?:(?:window|globalThis|self)\s*\.\s*confirm\s*\()|(?:(?:^|[^.\w])confirm\s*\()/
+
+/**
  * **ブラウザの `confirm()` を消していく。**
  *
  * 見た目がブラウザ任せで、設計の確認窓（`J6x4Q` / `H2S1T4`）と違う。
@@ -33,37 +43,19 @@ function walk(dir: string, out: string[] = []): string[] {
  * 直したら一覧から消す。空にできたら `confirm(` を全面禁止にする。
  */
 const NOT_YET_MIGRATED = [
-  'app/automations/page.tsx',
   'app/booking/bookings/detail/page.tsx',
   'app/booking/bookings/page.tsx',
   'app/booking/menus/page.tsx',
   'app/booking/staff/page.tsx',
   'app/booking/staff/shifts/page.tsx',
-  'app/broadcasts/page.tsx',
-  'app/contents/vars/edit/page.tsx',
-  'app/conversions/page.tsx',
-  'app/events/bookings/page.tsx',
-  'app/pools/page.tsx',
-  'app/reminders/edit/page.tsx',
-  'app/reminders/page.tsx',
   'app/restaurant-test/restaurant-console.tsx',
-  'app/rich-menus/edit/page.tsx',
-  'app/staff/page.tsx',
-  'app/templates/detail/page.tsx',
-  'app/templates/page.tsx',
-  'app/webhooks/page.tsx',
-  'components/broadcasts/broadcast-asset-manager.tsx',
-  'components/events/event-form.tsx',
-  'components/events/event-wizard.tsx',
-  'components/rich-menus/apply-to-tag-modal.tsx',
-  'components/scenarios/scenario-list.tsx',
 ]
 
 describe('ブラウザのconfirmを使わない', () => {
   it('confirm を使うファイルを増やさない', () => {
     const offenders = walk(SRC)
       .filter((f) => !/confirm-dialog/.test(f))
-      .filter((f) => /(?:^|[^.\w])confirm\(/.test(code(fs.readFileSync(f, 'utf8'))))
+      .filter((f) => BROWSER_CONFIRM.test(code(fs.readFileSync(f, 'utf8'))))
       .map((f) => path.relative(SRC, f))
       .sort()
     const unexpected = offenders.filter((f) => !NOT_YET_MIGRATED.includes(f))
@@ -75,7 +67,7 @@ describe('ブラウザのconfirmを使わない', () => {
     expect(src).toContain('ConfirmDialog')
     expect(src).toContain('confirmLabel="削除する"')
     expect(src).toContain('destructive')
-    expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
+    expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_CONFIRM)
     // 押している間に二度押しできない
     expect(src).toContain('selected.size === 0 || deleting')
     // 失敗を握りつぶさず、成功済みを再試行しない。

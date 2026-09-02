@@ -7,6 +7,7 @@ import type { CommonVar, CommonVarSchedule, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 共通情報の編集。
@@ -44,6 +45,13 @@ function EditCommonVarInner() {
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
+  /*
+    削除の確認（設計 `yPkWe` と同じ確認窓）。**ブラウザの `confirm()` を使わない。**
+    差し込み記号がどこで空になるかを本文で読ませられず、画像比較にも写らない。
+  */
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = useCallback(async () => {
     if (!id) {
@@ -119,21 +127,24 @@ function EditCommonVarInner() {
     }
   }
 
+  /*
+    `common_var_schedules` は共通情報に `ON DELETE CASCADE` で繋がっているので、
+    まだ反映していない次回予約も一緒に消える。テンプレート・配信・フォルダ・
+    友だちは消えないが、差し込み記号だけが残って空欄で送られ続ける。
+  */
   const remove = async () => {
-    if (!item || !selectedAccountId) return
-    if (
-      !confirm(
-        `「${item.name}」を削除しますか？\n` +
-          `テンプレートに {{var.${item.varKey}}} が残っていると、その部分が空になります。`,
-      )
-    )
-      return
-    setError('')
+    if (!item || !selectedAccountId || deleting) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.commonVars.delete(item.id, selectedAccountId)
+      const res = await api.commonVars.delete(item.id, selectedAccountId)
+      if (!res.success) throw new Error(res.error)
+      setConfirmingDelete(false)
       router.push('/contents/vars')
     } catch {
-      setError('削除に失敗しました')
+      setDeleteError('共通情報を削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -352,7 +363,7 @@ function EditCommonVarInner() {
                 共通情報一覧へ戻る
               </Link>
               <button
-                onClick={() => void remove()}
+                onClick={() => { setDeleteError(''); setConfirmingDelete(true) }}
                 className="text-danger hover:bg-danger-bg rounded-control px-3 py-2 text-sm"
               >
                 削除
@@ -437,6 +448,22 @@ function EditCommonVarInner() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`「${item?.name ?? ''}」を削除しますか？`}
+        description={`この共通情報と、登録値・まだ反映していない次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。ただしテンプレートに {{var.${item?.varKey ?? ''}}} が残っていると、その部分が空欄のまま送られ続けます。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void remove()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setConfirmingDelete(false)
+        }}
+      />
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { ApiError, api } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { isActiveAdministrator, staffActionPolicy } from './staff-actions'
 
 type AuditRow = { id: string; adminUserId: string | null; userName: string; action: string; screen: string | null; connectionSource: string | null; createdAt: string }
@@ -44,6 +45,27 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const [notifications, setNotifications] = useState<Record<string, Channel>>(() => Object.fromEntries(NOTIFICATIONS.map(([key]) => [key, member.notificationPreferences[key] ?? { email: true, line: true }])))
   const [saving, setSaving] = useState(false), [statusSaving, setStatusSaving] = useState(false), [error, setError] = useState('')
   const [loginCount, setLoginCount] = useState<number | null>(null), [loginHistoryLoading, setLoginHistoryLoading] = useState(administrator), [loginHistoryFailed, setLoginHistoryFailed] = useState(false)
+  /*
+    LINE連携の解除は設計の確認窓で聞く。**ブラウザの `confirm()` を使わない。**
+    解除するとLINE通知が届かなくなり、ログインもできなくなる。
+    招待メールから認証し直せば戻せるので `destructive` は付けない。
+  */
+  const [confirmingUnlink, setConfirmingUnlink] = useState(false), [unlinking, setUnlinking] = useState(false), [unlinkError, setUnlinkError] = useState('')
+  const unlinkLine = async () => {
+    if (unlinking) return
+    setUnlinking(true); setUnlinkError('')
+    try {
+      const res = await api.staff.update(member.id, { lineLinked: false })
+      if (!res.success) throw new Error(res.error)
+      setConfirmingUnlink(false)
+      await onSaved()
+      onClose()
+    } catch {
+      setUnlinkError('LINE連携を解除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setUnlinking(false)
+    }
+  }
   const policy = staffActionPolicy({ member, currentUserId, administrator, activeAdministratorCount })
   useEffect(() => {
     if (!administrator) return
@@ -60,9 +82,19 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <label className="text-sm font-medium text-ink">名前 <span className="text-warning">必須</span><input value={name} onChange={(e) => setName(e.target.value)} className="mt-2 h-11 w-full rounded-control border border-hairline px-3 outline-none focus:border-accent" /></label>}<label className="text-sm font-medium text-ink">メールアドレス <span className="text-warning">必須</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 h-11 w-full rounded-control border border-hairline px-3 outline-none focus:border-accent" /></label></div>
     {administrator && <div className="mt-5"><p className="text-sm font-medium text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <button key={value} onClick={() => setRole(value)} className={`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent' : 'border-hairline text-ink-secondary'}`}>{ROLE_LABEL[value]}</button>)}</div></div>}
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-medium text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2 text-xs ${permissions.includes(key) ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissions.includes(key)} onChange={() => setPermissions((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])} />{label}</label>)}</div></div>}
-    <div className="mt-5"><p className="text-sm font-medium text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-medium ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <button onClick={async () => { if (confirm('LINE連携を解除しますか？')) { await api.staff.update(member.id, { lineLinked: false }); await onSaved(); onClose() } }} className="cursor-pointer rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs">連携解除</button>}</div></div>
+    <div className="mt-5"><p className="text-sm font-medium text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-medium ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <button onClick={() => { setUnlinkError(''); setConfirmingUnlink(true) }} className="cursor-pointer rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs">連携解除</button>}</div></div>
     <div className="mt-5"><p className="text-sm font-medium text-ink">通知設定</p><div className="mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 p-3"><div><p className="text-sm text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs">メール<NotificationSwitch checked={notifications[key].email} onChange={() => toggleNotification(key, 'email')} label={`${label}メール`} /></div><div className="flex items-center gap-2 text-xs">LINE<NotificationSwitch checked={notifications[key].line} onChange={() => toggleNotification(key, 'line')} label={`${label}LINE`} /></div></div>)}</div></div>
     <div className="mt-6 flex justify-end gap-2"><button onClick={onClose} className="cursor-pointer rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button onClick={() => void save()} disabled={saving} className="cursor-pointer rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent disabled:opacity-50">✓ {saving ? '保存中…' : '変更を保存'}</button></div>
+    <ConfirmDialog
+      open={confirmingUnlink}
+      title={`${member.name}さんのLINE連携を解除しますか？`}
+      description="このユーザーはLINEでログインできなくなり、LINEへの通知も届かなくなります。ユーザー自身と、役割・見せる範囲・入った記録は残ります。招待メールからもう一度LINE認証をすれば連携し直せます。"
+      confirmLabel="連携を解除する"
+      busy={unlinking}
+      error={unlinkError}
+      onConfirm={() => void unlinkLine()}
+      onCancel={() => { if (unlinking) return; setUnlinkError(''); setConfirmingUnlink(false) }}
+    />
   </div></Modal>
 }
 
@@ -82,6 +114,26 @@ function StaffPageHost() {
   const tab = useMergedTab(STAFF_TABS, 'tab', 'members')
   const [members, setMembers] = useState<StaffMember[]>([]), [accountNames, setAccountNames] = useState<Record<string, string>>({}), [me, setMe] = useState<StaffMember | null>(null), [audits, setAudits] = useState<AuditRow[]>([]), [query, setQuery] = useState(''), [roleFilter, setRoleFilter] = useState('all'), [statusFilter, setStatusFilter] = useState('all'), [loading, setLoading] = useState(true), [error, setError] = useState('')
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null)
+  /*
+    二段階認証の解除も設計の確認窓で聞く。**ブラウザの `confirm()` を使わない。**
+    解除するとログインがLINE認証だけになる。同じ画面から登録し直せるので
+    `destructive` は付けない（登録済みのコードは無効になり、QRは取り直しになる）。
+  */
+  const [disableTwoFactorTarget, setDisableTwoFactorTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableTwoFactorError, setDisableTwoFactorError] = useState('')
+  const disableTwoFactor = async () => {
+    if (!disableTwoFactorTarget || disablingTwoFactor) return
+    setDisablingTwoFactor(true); setDisableTwoFactorError('')
+    try {
+      const res = await api.staff.disableTwoFactor(disableTwoFactorTarget.id)
+      if (!res.success) throw new Error(res.error)
+      setDisableTwoFactorTarget(null)
+      await load()
+    } catch {
+      setDisableTwoFactorError('二段階認証を解除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDisablingTwoFactor(false)
+    }
+  }
   const administrator = me?.role === 'admin' || me?.role === 'owner'
   const load = useCallback(async () => { setLoading(true); setError(''); try { const [staffResult, meResult, accountsResult] = await Promise.all([api.staff.list(), api.staff.me(), api.lineAccounts.list()]); if (staffResult.success) setMembers(staffResult.data); if (accountsResult.success) setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name]))); if (meResult.success) { setMe(meResult.data); if (meResult.data.role === 'admin' || meResult.data.role === 'owner') { const auditResult = await api.loginAudit.list({ limit: 200 }); if (auditResult.success) setAudits(auditResult.data) } } } catch (caught) { setError(messageOf(caught)) } finally { setLoading(false) } }, [])
   useEffect(() => { void load() }, [load])
@@ -94,15 +146,25 @@ function StaffPageHost() {
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
   const missing = members.filter((member) => member.isActive && !member.twoFactorEnabled).length, loginAudits = audits.filter((row) => row.action === 'login')
   const canEdit = (member: StaffMember) => Boolean(administrator || (me?.role === 'staff' && me.id === member.id))
-  const openTwoFactor = async (member: StaffMember) => { if (member.twoFactorEnabled) { if (!confirm(`${member.name} の二段階認証を解除しますか？`)) return; try { await api.staff.disableTwoFactor(member.id); await load() } catch (caught) { setError(messageOf(caught)) } } else setSettingTwoFactor(member) }
+  const openTwoFactor = (member: StaffMember) => { if (member.twoFactorEnabled) { setDisableTwoFactorError(''); setDisableTwoFactorTarget(member) } else setSettingTwoFactor(member) }
   return <div data-design-node="e3jz3"><div className="mb-4"><MergedTabs basePath="/staff" tabs={STAFF_TABS} active={tab} defaultKey="members" actions={administrator && tab === 'members' ? <Link href="/staff/new" className="cursor-pointer rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent">ユーザーを追加</Link> : null} /></div>
     {tab === 'audit' ? <div data-design-node="jwVlo"><LoginAudit /></div> : <>
     {missing > 0 && <div className="mb-4 flex items-center rounded-card bg-warning-bg px-4 py-3 text-sm"><p>🔑　二段階認証が未設定のユーザーが <b>{missing}人</b> います</p></div>}
     <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="管理スタッフ" value={`${members.length}`} unit="人" note={`管理者 ${members.filter((m) => m.role === 'admin' || m.role === 'owner').length}・その他 ${members.filter((m) => m.role !== 'admin' && m.role !== 'owner').length}`} /><Kpi label="二要素認証" value={`${members.filter((m) => m.twoFactorEnabled).length} / ${members.length}`} note={`未設定 ${missing}人`} /><Kpi label="過去30日のログイン" value={`${loginAudits.length}`} unit="回" note={`失敗 ${audits.filter((row) => row.action === 'fail').length}`} /><Kpi label="最終ログイン" value={loginAudits[0]?.createdAt ? new Date(loginAudits[0].createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '—'} note={loginAudits[0]?.userName ?? '記録なし'} /></div>
     {error && <p className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
     <div id="staff-list" className="min-h-[540px] rounded-card border border-hairline bg-canvas"><div className="flex flex-wrap gap-3 border-b border-hairline p-4"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・メールで検索" className="min-w-64 flex-1 rounded-control border border-hairline px-3 py-2 text-sm outline-none focus:border-accent" /><Select aria-label="役割で絞り込む" value={roleFilter} onChange={setRoleFilter} options={[{ value: 'all', label: 'すべての役割' }, { value: 'admin', label: '管理者' }, { value: 'staff', label: 'スタッフ' }, { value: 'viewer', label: '閲覧のみ' }]} /><Select aria-label="利用状態で絞り込む" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: 'すべての利用状態' }, { value: 'active', label: '有効' }, { value: 'inactive', label: '無効' }]} /></div>
-      <div><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">ユーザー</Th><Th className="w-1/8">役割</Th><Th className="w-1/5">担当範囲</Th><Th className="w-1/8">LINE連携</Th><Th className="w-1/8">二段階認証</Th><Th className="w-1/12">利用状態</Th><Th className="w-1/12" align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">読み込み中…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うユーザーはいません。</td></tr> : shown.map((member) => <tr key={member.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={member.name}>{member.name}</p><p className="truncate text-xs text-ink-faint" title={member.email ?? ''}>{member.email ?? '—'}</p></td><td className="px-3 py-3"><span className="whitespace-nowrap rounded-pill bg-info-bg px-2 py-1 text-xs text-accent">{ROLE_LABEL[member.role]}</span></td><td className="truncate px-3 py-3 text-xs" title={member.accountScope !== 'accounts' ? '全店舗' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明な店舗').join('、')}>{member.accountScope !== 'accounts' ? '全店舗' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明な店舗').join('、')}</td><td className="px-3 py-3"><span className={`whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.lineLinked ? 'bg-accent-soft text-success' : 'bg-warning-bg text-warning'}`}>{member.lineLinked ? '連携済み' : '未連携'}</span></td><td className="px-3 py-3">{canEdit(member) ? <button onClick={() => void openTwoFactor(member)} className={`cursor-pointer whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.twoFactorEnabled ? 'bg-accent-soft text-success' : 'bg-canvas-sunken text-warning hover:bg-warning-bg'}`}>{member.twoFactorEnabled ? '設定済み' : '未設定'}</button> : <span className="whitespace-nowrap rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">{member.twoFactorEnabled ? '設定済み' : '未設定'}</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.isActive ? 'bg-accent-soft text-success' : 'bg-danger-bg text-danger'}`}>{member.isActive ? '有効' : '無効'}</span></td><td className="px-3 py-3 text-right">{canEdit(member) ? <button onClick={() => setEditing(member)} className="cursor-pointer whitespace-nowrap rounded-control border border-accent px-3 py-1.5 text-xs font-medium text-success hover:bg-accent-soft">範囲を編集</button> : <span className="text-xs text-ink-faint">不可</span>}</td></tr>)}</tbody></table></div><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">編集では、役割・見せる機能・LINE連携・通知設定・利用状態を変更できます。</p></div>
-    {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}</div>
+      <div><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">ユーザー</Th><Th className="w-1/8">役割</Th><Th className="w-1/5">担当範囲</Th><Th className="w-1/8">LINE連携</Th><Th className="w-1/8">二段階認証</Th><Th className="w-1/12">利用状態</Th><Th className="w-1/12" align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">読み込み中…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うユーザーはいません。</td></tr> : shown.map((member) => <tr key={member.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={member.name}>{member.name}</p><p className="truncate text-xs text-ink-faint" title={member.email ?? ''}>{member.email ?? '—'}</p></td><td className="px-3 py-3"><span className="whitespace-nowrap rounded-pill bg-info-bg px-2 py-1 text-xs text-accent">{ROLE_LABEL[member.role]}</span></td><td className="truncate px-3 py-3 text-xs" title={member.accountScope !== 'accounts' ? '全店舗' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明な店舗').join('、')}>{member.accountScope !== 'accounts' ? '全店舗' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明な店舗').join('、')}</td><td className="px-3 py-3"><span className={`whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.lineLinked ? 'bg-accent-soft text-success' : 'bg-warning-bg text-warning'}`}>{member.lineLinked ? '連携済み' : '未連携'}</span></td><td className="px-3 py-3">{canEdit(member) ? <button onClick={() => openTwoFactor(member)} className={`cursor-pointer whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.twoFactorEnabled ? 'bg-accent-soft text-success' : 'bg-canvas-sunken text-warning hover:bg-warning-bg'}`}>{member.twoFactorEnabled ? '設定済み' : '未設定'}</button> : <span className="whitespace-nowrap rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">{member.twoFactorEnabled ? '設定済み' : '未設定'}</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.isActive ? 'bg-accent-soft text-success' : 'bg-danger-bg text-danger'}`}>{member.isActive ? '有効' : '無効'}</span></td><td className="px-3 py-3 text-right">{canEdit(member) ? <button onClick={() => setEditing(member)} className="cursor-pointer whitespace-nowrap rounded-control border border-accent px-3 py-1.5 text-xs font-medium text-success hover:bg-accent-soft">範囲を編集</button> : <span className="text-xs text-ink-faint">不可</span>}</td></tr>)}</tbody></table></div><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">編集では、役割・見せる機能・LINE連携・通知設定・利用状態を変更できます。</p></div>
+    {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}
+    <ConfirmDialog
+      open={disableTwoFactorTarget !== null}
+      title={`${disableTwoFactorTarget?.name ?? ''}さんの二段階認証を解除しますか？`}
+      description="このユーザーのログインは、LINE認証だけになります。認証アプリに登録済みのコードは使えなくなります。ユーザー・役割・見せる範囲・入った記録は変わりません。同じ画面から設定し直せますが、QRコードは取り直しになります。"
+      confirmLabel="解除する"
+      busy={disablingTwoFactor}
+      error={disableTwoFactorError}
+      onConfirm={() => void disableTwoFactor()}
+      onCancel={() => { if (disablingTwoFactor) return; setDisableTwoFactorError(''); setDisableTwoFactorTarget(null) }}
+    /></div>
 }
 
 export default function StaffPage() {

@@ -8,6 +8,7 @@ import ImageUploader from '@/components/shared/image-uploader'
 import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
 import { generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -515,6 +516,19 @@ function SlotsStep({
   const [bandEnd, setBandEnd] = useState('17:00')
   const [slotMinutes, setSlotMinutes] = useState(90)
   const [bulkCapacity, setBulkCapacity] = useState('')
+  /*
+    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
+    何件できるのか・どの枠が消えるのかを本文で読ませられず、
+    画像比較にも写らない。
+  */
+  const [bulkPreview, setBulkPreview] = useState<
+    Array<{ starts_at: string; ends_at: string; capacity: number | null }> | null
+  >(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState('')
+  const [removeTarget, setRemoveTarget] = useState<EventSlot | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
 
   async function addOne() {
     setBusy(true)
@@ -556,9 +570,9 @@ function SlotsStep({
       if (generated.length === 0) {
         throw new Error('条件に合う枠が0件でした。期間と曜日を確かめてください')
       }
-      if (!confirm(`${generated.length}件の枠を追加します。よろしいですか？`)) return
-      await eventsApi.createSlots(accountId, eventId, generated)
-      await refreshSlots()
+      // 作る前に下見を出す。ここではまだ1件も作っていない。
+      setBulkError('')
+      setBulkPreview(generated)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -566,17 +580,41 @@ function SlotsStep({
     }
   }
 
-  async function removeSlot(s: EventSlot) {
-    if (!confirm('この枠を削除しますか？')) return
-    setBusy(true)
+  async function createBulk() {
+    if (!bulkPreview || bulkBusy) return
+    setBulkBusy(true)
+    setBulkError('')
+    try {
+      await eventsApi.createSlots(accountId, eventId, bulkPreview)
+      setBulkPreview(null)
+      await refreshSlots()
+    } catch {
+      // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
+      // どこまで作られたかを見せるため、失敗しても一覧を取り直す。
+      setBulkError('枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。')
+      await refreshSlots()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  /*
+    申込が入っている枠はボタンを押せないようにしてある
+    （`disabled={busy || taken > 0}`）。ここまで来るのは申込0件の枠だけ。
+  */
+  async function removeSlot() {
+    if (!removeTarget || removing) return
+    setRemoving(true)
+    setRemoveError('')
     setErr(null)
     try {
-      await eventsApi.deleteSlot(accountId, eventId, s.id)
+      await eventsApi.deleteSlot(accountId, eventId, removeTarget.id)
+      setRemoveTarget(null)
       await refreshSlots()
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+    } catch {
+      setRemoveError('枠を削除できませんでした。あとから申込が入った可能性があります。読み直してから、もう一度お試しください。')
     } finally {
-      setBusy(false)
+      setRemoving(false)
     }
   }
 
@@ -785,7 +823,7 @@ function SlotsStep({
                         </td>
                         <td className="px-2 py-2 text-right">
                           <button
-                            onClick={() => removeSlot(s)}
+                            onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
                             disabled={busy || taken > 0}
                             title={taken > 0 ? '申込が入っているため削除できません' : undefined}
                             className="text-danger text-xs hover:underline disabled:no-underline disabled:opacity-30"
@@ -892,6 +930,37 @@ function SlotsStep({
           </ul>
         </AsideCard>
       </div>
+
+      <ConfirmDialog
+        open={bulkPreview !== null}
+        title={`${bulkPreview?.length ?? 0}件の予約枠を追加しますか？`}
+        description={`${bulkPreview && bulkPreview.length > 0 ? formatSlotJp(bulkPreview[0].starts_at, bulkPreview[0].ends_at) : ''}から${bulkPreview && bulkPreview.length > 0 ? formatSlotJp(bulkPreview[bulkPreview.length - 1].starts_at, bulkPreview[bulkPreview.length - 1].ends_at) : ''}までをまとめて追加します。いまある枠は消えません。追加した枠は1件ずつ削除できます（申込が入ったあとは削除できません）。`}
+        confirmLabel="まとめて追加する"
+        busy={bulkBusy}
+        error={bulkError}
+        onConfirm={() => void createBulk()}
+        onCancel={() => {
+          if (bulkBusy) return
+          setBulkError('')
+          setBulkPreview(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title="この予約枠を削除しますか？"
+        description={`${removeTarget ? formatSlotJp(removeTarget.starts_at, removeTarget.ends_at) : ''}の枠を削除します。この枠はもう選べなくなります。いま申込は入っていません。ほかの枠とイベント本体は残ります。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={removing}
+        error={removeError}
+        onConfirm={() => void removeSlot()}
+        onCancel={() => {
+          if (removing) return
+          setRemoveError('')
+          setRemoveTarget(null)
+        }}
+      />
     </div>
   )
 }

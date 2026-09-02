@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { eventsApi, type EventBookingItem, type EventDetail } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '承認待ち' },
@@ -49,6 +50,14 @@ function BookingsInner() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+    運営キャンセルの確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
+    友だちへLINE通知が飛ぶ＝送り直しも取り消しもできないので、
+    誰のどの枠を取り消すのかを本文で読ませてから決めさせる。
+  */
+  const [cancelTarget, setCancelTarget] = useState<EventBookingItem | null>(null)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
 
   const refresh = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
@@ -114,17 +123,18 @@ function BookingsInner() {
     }
   }
 
-  async function adminCancel(id: string) {
-    if (!selectedAccountId || !eventId) return
-    if (!confirm('運営側でキャンセルしますか？友だちにLINE通知が送られます。')) return
-    setBusy(true)
+  async function adminCancel() {
+    if (!cancelTarget || !selectedAccountId || !eventId || cancelling) return
+    setCancelling(true)
+    setCancelError('')
     try {
-      await eventsApi.adminCancelBooking(selectedAccountId, eventId, id)
+      await eventsApi.adminCancelBooking(selectedAccountId, eventId, cancelTarget.id)
+      setCancelTarget(null)
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setCancelError('キャンセルできませんでした。時間をおいて、もう一度お試しください。')
     } finally {
-      setBusy(false)
+      setCancelling(false)
     }
   }
 
@@ -318,7 +328,7 @@ function BookingsInner() {
                               無断
                             </button>
                             <button
-                              onClick={() => adminCancel(b.id)}
+                              onClick={() => { setCancelError(''); setCancelTarget(b) }}
                               disabled={busy}
                               className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium hover:bg-white disabled:opacity-50"
                             >
@@ -335,6 +345,22 @@ function BookingsInner() {
             </div>
           )}
         </div>
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        title={`${cancelTarget?.friend_display_name ?? cancelTarget?.friend_id.slice(0, 8) ?? ''}さんの予約を運営側でキャンセルしますか？`}
+        description={`${cancelTarget ? formatJp(cancelTarget.slot_starts_at) : ''}の枠の確定を取り消し、この友だちへLINEでキャンセルのお知らせを送ります。送ったお知らせは取り消せません。空いた枠はほかの人が予約できるようになります。予約の記録は「キャンセル」として残ります。`}
+        confirmLabel="キャンセルして通知する"
+        destructive
+        busy={cancelling}
+        error={cancelError}
+        onConfirm={() => void adminCancel()}
+        onCancel={() => {
+          if (cancelling) return
+          setCancelError('')
+          setCancelTarget(null)
+        }}
+      />
     </div>
   )
 }

@@ -11,6 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import WebhookInteractions from './webhook-interactions'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -71,6 +72,15 @@ function WebhooksPageInner() {
     | null
   >(null)
   const [rotateSecretValue, setRotateSecretValue] = useState('')
+  /*
+    削除の確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
+    何が止まり何が残るかを本文で読ませられず、画像比較にも写らない。
+  */
+  const [deleteTarget, setDeleteTarget] = useState<
+    { direction: 'incoming'; item: IncomingWebhook } | { direction: 'outgoing'; item: OutgoingWebhook } | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -160,37 +170,32 @@ function WebhooksPageInner() {
     }
   }
 
-  const handleDeleteIncoming = async (id: string) => {
+  /*
+    受信・送信のどちらも同じ経路で消す。`webhook_interaction_logs.webhook_id` は
+    外部キーではないので、**やり取りの記録は削除しても残る**。設定だけが消える。
+  */
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return
     const requestAccountId = selectedAccountId
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
-      return setError('LINEアカウントの一覧を読み直してください')
+      setDeleteError('LINEアカウントの一覧を読み直してから、もう一度お試しください。')
+      return
     }
-    if (!confirm('この受信Webhookを削除しますか？')) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      const res = await api.webhooks.incoming.delete(id, requestAccountId)
+      const res = deleteTarget.direction === 'incoming'
+        ? await api.webhooks.incoming.delete(deleteTarget.item.id, requestAccountId)
+        : await api.webhooks.outgoing.delete(deleteTarget.item.id, requestAccountId)
       if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('削除に失敗しました')
-    }
-  }
-
-  const handleDeleteOutgoing = async (id: string) => {
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId || loadedAccountId !== requestAccountId) {
-      return setError('LINEアカウントの一覧を読み直してください')
-    }
-    if (!confirm('この送信Webhookを削除しますか？')) return
-    try {
-      const res = await api.webhooks.outgoing.delete(id, requestAccountId)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
-    } catch {
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('削除に失敗しました')
+      setDeleteError('Webhookを削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -690,7 +695,7 @@ function WebhooksPageInner() {
                         {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
                       </button>
                       <button
-                        onClick={() => handleDeleteIncoming(wh.id)}
+                        onClick={() => { setDeleteError(''); setDeleteTarget({ direction: 'incoming', item: wh }) }}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         削除
@@ -826,7 +831,7 @@ function WebhooksPageInner() {
                         {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
                       </button>
                       <button
-                        onClick={() => handleDeleteOutgoing(wh.id)}
+                        onClick={() => { setDeleteError(''); setDeleteTarget({ direction: 'outgoing', item: wh }) }}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         削除
@@ -841,6 +846,26 @@ function WebhooksPageInner() {
           </div>
         )
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget?.direction === 'outgoing'
+          ? `送信Webhook「${deleteTarget?.item.name ?? ''}」を削除しますか？`
+          : `受信Webhook「${deleteTarget?.item.name ?? ''}」を削除しますか？`}
+        description={deleteTarget?.direction === 'outgoing'
+          ? 'この送信先への通知を止めて、URL・シークレット・再送の設定を削除します。これまでのやり取りの記録は「やり取り」タブに残ります。同じURLをもう一度登録し直すことはできますが、この設定自体は元に戻せません。'
+          : 'この受信口を閉じて、シークレットを削除します。以降このURLへ送られたものは受け取りません。これまでのやり取りの記録は「やり取り」タブに残ります。同じ受信口をもう一度作り直すことはできますが、この設定自体は元に戻せません。'}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }

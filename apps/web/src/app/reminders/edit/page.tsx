@@ -7,6 +7,7 @@ import type { Reminder, ReminderStep, Tag } from '@line-crm/shared'
 import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * リマインダの編集。
@@ -60,6 +61,13 @@ function ReminderEditInner() {
   const [sendAtTime, setSendAtTime] = useState('')
   const [newStep, setNewStep] = useState<StepDraft>(emptyStep('countdown'))
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
+  /*
+    通の削除の確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
+    どの通が止まるのかを本文で読ませられず、画像比較にも写らない。
+  */
+  const [deleteStepTarget, setDeleteStepTarget] = useState<ReminderStep | null>(null)
+  const [deletingStep, setDeletingStep] = useState(false)
+  const [deleteStepError, setDeleteStepError] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -150,14 +158,19 @@ function ReminderEditInner() {
     }
   }
 
-  async function handleDeleteStep(stepId: string) {
-    if (!confirm('この通を削除します。よろしいですか。')) return
+  async function handleDeleteStep() {
+    if (!deleteStepTarget || deletingStep) return
+    setDeletingStep(true)
+    setDeleteStepError('')
     try {
-      const res = await api.reminders.deleteStep(id, stepId)
+      const res = await api.reminders.deleteStep(id, deleteStepTarget.id)
       if (!res.success) throw new Error(res.error)
+      setDeleteStepTarget(null)
       await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '削除に失敗しました')
+    } catch {
+      setDeleteStepError('この通を削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeletingStep(false)
     }
   }
 
@@ -326,7 +339,7 @@ function ReminderEditInner() {
                       </p>
                     </div>
                     <button
-                      onClick={() => void handleDeleteStep(step.id)}
+                      onClick={() => { setDeleteStepError(''); setDeleteStepTarget(step) }}
                       className="shrink-0 text-xs text-red-600 hover:underline"
                     >
                       削除
@@ -447,6 +460,26 @@ function ReminderEditInner() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteStepTarget !== null}
+        title="この通を削除しますか？"
+        description={`${deleteStepTarget ? describeReminderTiming({
+          offsetDays: deleteStepTarget.offsetDays,
+          sendAtTime: deleteStepTarget.sendAtTime,
+          offsetMinutes: deleteStepTarget.offsetMinutes,
+        }, mode) : ''}に送る予定の通を削除します。この通はもう届きません。ほかの通とリマインダ本体、すでに送った履歴は残ります。この操作は元に戻せません。`}
+        confirmLabel="この通を削除"
+        destructive
+        busy={deletingStep}
+        error={deleteStepError}
+        onConfirm={() => void handleDeleteStep()}
+        onCancel={() => {
+          if (deletingStep) return
+          setDeleteStepError('')
+          setDeleteStepTarget(null)
+        }}
+      />
     </main>
   )
 }

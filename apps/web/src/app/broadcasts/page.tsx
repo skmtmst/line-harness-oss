@@ -12,6 +12,7 @@ import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
 import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -79,6 +80,14 @@ function BroadcastList() {
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
+  /*
+    削除の確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
+    見た目がブラウザ任せで、何が止まり何が残るかを本文で読ませられず、
+    画像比較にも写らないので確認の絵が撮れない。
+  */
+  const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadInsight = async (id: string) => {
     try {
@@ -135,13 +144,25 @@ function BroadcastList() {
     broadcasts.filter(b => b.status === 'sent').forEach(b => loadInsight(b.id))
   }, [broadcasts])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この配信を削除してもよいですか？')) return
+  /*
+    削除は下書きと予約中だけに出している。送信済みの配信は消せない。
+    `broadcast_insights` は配信に `ON DELETE CASCADE` で繋がっているので
+    一緒に消えるが、`messages_log` は `ON DELETE SET NULL` なので
+    送信履歴そのものは残り、配信との紐付けだけが外れる。
+  */
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.broadcasts.delete(id)
-      load()
+      const res = await api.broadcasts.delete(deleteTarget.id)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      setDeleteError('配信を削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -568,7 +589,7 @@ function BroadcastList() {
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
-                            onClick={() => handleDelete(broadcast.id)}
+                            onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}
                             className="px-3 py-1 min-h-[44px] text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
                           >
                             削除
@@ -587,6 +608,21 @@ function BroadcastList() {
             </div>
           </div>
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
+        description="この配信の下書きと予約を削除します。予約していた送信は行われません。開封・クリックの集計も一緒に消えます。すでに送ったメッセージの履歴は残りますが、この配信との紐付けは外れます。この操作は元に戻せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }

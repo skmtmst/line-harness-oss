@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/dashboard/kpi-card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -110,6 +111,9 @@ function ConversionsPageInner() {
   // 成果地点そのものが引けなかったときだけ「読み込めませんでした」を出す。
   // KPI に使う承認・案件が落ちても、表は出せる。
   const [loadFailed, setLoadFailed] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ConversionPoint | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -155,10 +159,27 @@ function ConversionsPageInner() {
 
   useEffect(() => { load() }, [])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('このCVポイントを削除しますか？')) return
-    await api.conversions.deletePoint(id)
-    load()
+  /*
+    削除の確認（設計の確認窓）。**ブラウザの `confirm()` を使わない。**
+    `conversion_events` は成果地点に `ON DELETE CASCADE` で繋がっている。
+    地点を消すと、そこで記録した成果も承認済みのものごと消える。
+    件数はレポートが引けたときだけ出す。引けていないのに `0件` と書くと、
+    記録が無いものと読み違えたまま消される。
+  */
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await api.conversions.deletePoint(deleteTarget.id)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await load()
+    } catch {
+      setDeleteError('成果地点を削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   // 成果地点ごとのCV数。レポートは成果地点IDで返る。
@@ -363,7 +384,7 @@ function ConversionsPageInner() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => handleDelete(point.id)}
+                      onClick={() => { setDeleteError(''); setDeleteTarget(point) }}
                       className="text-danger text-sm hover:underline"
                     >
                       削除
@@ -387,6 +408,26 @@ function ConversionsPageInner() {
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`成果地点「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description={`この成果地点と、ここで記録した成果をすべて削除します（承認済みの記録も消えます）。${
+          deleteTarget && reportAvailable
+            ? `いま記録されているのは${countByPoint.get(deleteTarget.id) ?? 0}件です。`
+            : 'いま何件記録されているかは読み込めていません。'
+        }友だち・案件・ほかの成果地点は削除しません。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }

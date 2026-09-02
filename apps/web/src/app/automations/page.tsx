@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
@@ -101,6 +102,17 @@ export default function AutomationsPage() {
   const [form, setForm] = useState<CreateFormState>({ ...initialForm })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  /*
+    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
+    全アカウント共通のルールに触ると影響が全社に及ぶので、
+    何が止まり何が残るかを本文で読ませてから決めさせる。
+  */
+  const [toggleTarget, setToggleTarget] = useState<Automation | null>(null)
+  const [toggling, setToggling] = useState(false)
+  const [toggleError, setToggleError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Automation | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadAutomations = useCallback(async () => {
     setLoading(true)
@@ -198,35 +210,63 @@ export default function AutomationsPage() {
     }
   }
 
-  const handleToggleActive = async (id: string, current: boolean) => {
-    // Globals fire for every account; flipping one from an account-scoped view
-    // would silently affect all accounts, so warn first.
-    const target = automations.find((a) => a.id === id)
-    if (target?.lineAccountId === null) {
-      const ok = confirm(
-        `「${target.name}」は全アカウント共通のオートメーションです。${current ? '無効化' : '有効化'}するとすべてのアカウントに影響します。続行しますか?`,
-      )
-      if (!ok) return
-    }
+  const applyToggle = async (target: Automation) => {
     try {
-      await api.automations.update(id, { isActive: !current })
-      loadAutomations()
+      const res = await api.automations.update(target.id, { isActive: !target.isActive })
+      if (!res.success) throw new Error(res.error)
+      await loadAutomations()
+      return true
     } catch {
-      setError('ステータスの変更に失敗しました')
+      return false
     }
   }
 
-  const handleDelete = async (id: string) => {
-    const target = automations.find((a) => a.id === id)
-    const message = target?.lineAccountId === null
-      ? `「${target.name}」は全アカウント共通のオートメーションです。削除するとすべてのアカウントから消えます。本当に削除しますか?`
-      : 'このオートメーションを削除してもよいですか？'
-    if (!confirm(message)) return
+  /*
+    全アカウント共通（`lineAccountId === null`）のルールだけ確認を出す。
+    1つのアカウントだけを見ているつもりで切り替えると、他のアカウントの
+    自動処理まで一緒に止まる。アカウント固有のものはそのまま切り替える。
+  */
+  const handleToggleActive = async (target: Automation) => {
+    if (target.lineAccountId === null) {
+      setToggleError('')
+      setToggleTarget(target)
+      return
+    }
+    if (!(await applyToggle(target))) setError('ステータスの変更に失敗しました')
+  }
+
+  const confirmToggle = async () => {
+    if (!toggleTarget || toggling) return
+    setToggling(true)
+    setToggleError('')
     try {
-      await api.automations.delete(id)
-      loadAutomations()
+      if (!(await applyToggle(toggleTarget))) throw new Error('toggle_failed')
+      setToggleTarget(null)
     } catch {
-      setError('削除に失敗しました')
+      setToggleError('切り替えできませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  /*
+    `automation_logs` はルールに `ON DELETE CASCADE` で繋がっているので、
+    このルールが動いた記録も一緒に消える。すでにタグを付けた・配信した結果
+    そのものは友だち側に残る。
+  */
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await api.automations.delete(deleteTarget.id)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await loadAutomations()
+    } catch {
+      setDeleteError('ルールを削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -401,7 +441,7 @@ export default function AutomationsPage() {
               <div className="flex items-start justify-between mb-2">
                 <h3 className="text-sm font-semibold text-ink leading-tight">{automation.name}</h3>
                 <button
-                  onClick={() => handleToggleActive(automation.id, automation.isActive)}
+                  onClick={() => void handleToggleActive(automation)}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                     automation.isActive ? 'bg-green-500' : 'bg-gray-300'
                   }`}
@@ -463,7 +503,7 @@ export default function AutomationsPage() {
               {/* Actions */}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
                 <button
-                  onClick={() => handleDelete(automation.id)}
+                  onClick={() => { setDeleteError(''); setDeleteTarget(automation) }}
                   className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
                 >
                   削除
@@ -473,6 +513,45 @@ export default function AutomationsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={toggleTarget !== null}
+        title={toggleTarget?.isActive
+          ? `「${toggleTarget?.name ?? ''}」を全アカウントで停止しますか？`
+          : `「${toggleTarget?.name ?? ''}」を全アカウントで動かしますか？`}
+        description={toggleTarget?.isActive
+          ? 'これは全アカウント共通のルールです。停止すると、いま見ているアカウントだけでなくすべてのアカウントで動かなくなります。これまでに実行した結果と記録は残ります。あとから同じ場所で動かし直せます。'
+          : 'これは全アカウント共通のルールです。動かすと、いま見ているアカウントだけでなくすべてのアカウントで実行されます。過去にさかのぼって実行することはありません。あとから同じ場所で止められます。'}
+        confirmLabel={toggleTarget?.isActive ? '全アカウントで停止する' : '全アカウントで動かす'}
+        busy={toggling}
+        error={toggleError}
+        onConfirm={() => void confirmToggle()}
+        onCancel={() => {
+          if (toggling) return
+          setToggleError('')
+          setToggleTarget(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`ルール「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description={`${
+          deleteTarget?.lineAccountId === null
+            ? 'これは全アカウント共通のルールです。削除するとすべてのアカウントから消えます。'
+            : 'このアカウントのルールを削除します。ほかのアカウントには影響しません。'
+        }このルールの実行記録も一緒に消えます。これまでに付けたタグ・送ったメッセージ・進んだシナリオはそのまま残ります。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }
