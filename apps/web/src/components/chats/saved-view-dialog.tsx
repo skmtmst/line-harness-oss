@@ -18,6 +18,9 @@ import { createPortal } from 'react-dom'
 const NAME_LIMIT = 40
 
 export type SavedViewCondition = { label: string; value: string }
+export type SavedViewSaveResult =
+  | { success: true }
+  | { success: false; error: string }
 
 export default function SavedViewDialog({
   open,
@@ -33,7 +36,8 @@ export default function SavedViewDialog({
   /** 同じ名前があるかを見るための一覧 */
   existingNames: string[]
   saving: boolean
-  onSave: (name: string) => Promise<void> | void
+  /** 保存先が成功を返したときだけ、完了画面へ進める。 */
+  onSave: (name: string) => Promise<SavedViewSaveResult>
   onClose: () => void
 }) {
   const [name, setName] = useState('')
@@ -73,7 +77,11 @@ export default function SavedViewDialog({
       return
     }
     setError('')
-    await onSave(trimmed)
+    const result = await onSave(trimmed)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
     setDone(true)
   }
 

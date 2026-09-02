@@ -16,7 +16,7 @@ import type { SegmentCondition } from './segment-condition'
 const TYPE_LABELS: Record<string, string> = {
   text: 'テキスト',
   image: '写真',
-  flex: 'Flex',
+  flex: 'カード型',
   location: '位置情報',
   video: '動画',
   audio: '音声',

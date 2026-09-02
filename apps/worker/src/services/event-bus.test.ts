@@ -53,6 +53,8 @@ vi.mock('@line-crm/db', async () => {
     getFriendScore: vi.fn().mockResolvedValue(0),
     getTemplateById: vi.fn().mockResolvedValue(null),
     recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+    createWebhookInteraction: vi.fn().mockResolvedValue({ id: 'webhook-run-1' }),
+    finishWebhookInteraction: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -304,6 +306,34 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
 
     expect(dbModule.getActiveOutgoingWebhooksByEvent)
       .toHaveBeenCalledWith(db, 'message_received', 'account-a');
+  });
+
+  it('送信結果をアカウント別の記録へ残し、配送IDを送る', async () => {
+    const dbModule = await import('@line-crm/db');
+    const deliveryModule = await import('./outgoing-webhook-delivery.js');
+    const db = fakeDb({ capturedInserts: [] });
+    (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([{
+        id: 'webhook-a', name: '顧客管理', url: 'https://example.com/hook',
+        secret: null, event_types: '["friend.added"]', max_retries: 0,
+      }]);
+
+    await fireEvent(db, 'friend.added', {
+      sourceEventId: 'friend-event-1', sourceKind: 'line_webhook',
+    }, undefined, 'account-a');
+
+    expect(dbModule.createWebhookInteraction).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a', webhookId: 'webhook-a', direction: 'outgoing',
+      idempotencyKey: 'outgoing_webhook:webhook-a:line_webhook:friend-event-1',
+    }));
+    expect(deliveryModule.deliverWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'webhook-a' }),
+      expect.any(String),
+      { idempotencyKey: 'outgoing_webhook:webhook-a:line_webhook:friend-event-1' },
+    );
+    expect(dbModule.finishWebhookInteraction).toHaveBeenCalledWith(
+      db, 'webhook-run-1', 'account-a', expect.objectContaining({ status: 'succeeded' }),
+    );
   });
 
   it('アカウント未指定時はfriendIdから一度だけ解決する', async () => {

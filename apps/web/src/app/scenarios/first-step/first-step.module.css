@@ -1,0 +1,20 @@
+/*
+ * 1通目設定の実寸（設計 `V6 5 kk8dz`）。
+ *
+ * 右の下見は幅500。入力は日数110・時刻130・高さ38、本文は高さ118。
+ * どれもトークンには無い設計固有の数なので、ここへ名前を付けて置く。
+ */
+
+.smallField {
+  height: 38px;
+  width: 110px;
+}
+
+.timeField {
+  height: 38px;
+  width: 130px;
+}
+
+.bodyField {
+  height: 118px;
+}

@@ -27,6 +27,7 @@ import { runExpirer } from './services/booking-expirer.js';
 import { processDueEventReminders } from './services/event-booking-reminders.js';
 import { processDueMeetConsultationReminders } from './services/meet-consultation-reminders.js';
 import { processDueAutomationRuns } from './services/automation-engine.js';
+import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
 import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
@@ -39,6 +40,7 @@ import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
+import { friendBulkRuns } from './routes/friend-bulk-runs.js';
 import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
@@ -64,9 +66,8 @@ import { scoring } from './routes/scoring.js';
 import { templates } from './routes/templates.js';
 import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
-// notifications ルート (notification_rules CRUD + notifications 一覧) は
-// インボックス機能 (/api/inbox/unanswered) に置き換えたため削除。
-// DB テーブル notification_rules / notifications は archive 目的で残してある。
+// 旧通知ルールCRUDはインボックスへ置き換え済み。ダッシュボードの通知パネルだけを公開する。
+import { notificationCenter } from './routes/notification-center.js';
 import { stripe } from './routes/stripe.js';
 import { health } from './routes/health.js';
 import { automations } from './routes/automations.js';
@@ -290,6 +291,7 @@ app.use('*', tenantScopeMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', friendBulkRuns);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
@@ -317,6 +319,7 @@ app.route('/', scoring);
 app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
+app.route('/', notificationCenter);
 app.route('/', stripe);
 app.route('/', health);
 app.route('/', automations);
@@ -443,15 +446,22 @@ app.get('/r/:ref', async (c) => {
   // entry_route: entry_routes owns the ref namespace, so an existing route
   // (even one whose pool is paused) keeps its behavior unchanged. An affiliate
   // ref resolves its LINE account directly (no pool) and lands on that
-  // account's LIFF. is_active=0 links still redirect (spec §8) — pausing an
-  // affiliate link only stops NEW attribution, never breaks existing links.
+  // account's LIFF. Stopped links do not redirect or count a new click.
   // The click is counted here (the landing page hit), and `ref` still rides
   // through to LIFF state below so the existing ref_tracking flow attributes
   // the eventual friend-add via /auth/callback + /api/liff/link.
   let affiliateResolved = false;
   if (!route) {
     const affiliateLink = await getAffiliateLinkByRefCode(c.env.DB, ref);
-    if (affiliateLink) {
+    if (affiliateLink && (
+      affiliateLink.is_active !== 1 || affiliateLink.affiliate_is_active === 0
+    )) {
+      return c.html(
+        '<!doctype html><html lang="ja"><meta charset="utf-8"><title>この紹介リンクは停止しています</title><body><main><h1>この紹介リンクは停止しています</h1><p>紹介元の運用者へ、新しいリンクをご確認ください。</p></main></body></html>',
+        410,
+      );
+    }
+    if (affiliateLink?.is_active === 1) {
       await incrementAffiliateLinkClick(c.env.DB, ref);
       affiliateResolved = true;
       if (affiliateLink.line_account_id) {
@@ -1144,6 +1154,18 @@ async function scheduled(
     console.error('automation-v6 cron error:', e);
   }
 
+  // 友だち一括操作は対象IDを固定したサーバ側ジョブ。待機中の共通アクションと、
+  // Worker終了でleaseが切れた対象だけを再開する。失敗分は利用者が再試行するまで触らない。
+  try {
+    const result = await processDueFriendBulkRuns(env.DB, {
+      now: new Date(event.scheduledTime).toISOString(),
+      executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+    });
+    if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
+  } catch (e) {
+    console.error('friend bulk runs cron error:', e);
+  }
+
   // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
   if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
     try {
@@ -1260,7 +1282,7 @@ async function scheduled(
       const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
       if (
         purged.events + purged.dailyMetrics + purged.reconciliationRuns
-        + purged.funnelRuns + purged.crossRuns + purged.audiences > 0
+        + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
       ) {
         console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
       }

@@ -92,9 +92,100 @@ export interface TagWithUsage extends TagWithCount {
   cleanup_reasons: TagCleanupReason[];
 }
 
-type TagWithUsageRow = Omit<TagWithUsage, 'cleanup_reasons'> & {
-  has_operational_references: number;
+type TagWithUsageRow = Omit<TagWithUsage, 'cleanup_reasons'>;
+
+type TagUsageCountRow = {
+  tag_id: string;
+  count: number;
 };
+
+type TagUsageReferenceRow = {
+  tag_id: string;
+  entity_id: string;
+};
+
+/** D1実測：5項まで。6項で SQLITE_ERROR 7500。1項の余裕を確保する。 */
+export const MAX_TAG_USAGE_COMPOUND_SELECT_TERMS = 4;
+
+/**
+ * 削除を妨げる運用設定からタグIDを読むSELECT。
+ * 配列へ参照元を追加しても、下の組み立て処理が安全な項数へ自動分割する。
+ */
+export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
+  'SELECT target_tag_id AS tag_id FROM broadcasts WHERE target_tag_id IS NOT NULL',
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM broadcasts b,
+     json_tree(CASE WHEN json_valid(b.segment_conditions) THEN b.segment_conditions ELSE 'null' END) j
+    WHERE j.type = 'text'`,
+  'SELECT on_submit_tag_id AS tag_id FROM forms WHERE on_submit_tag_id IS NOT NULL',
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM forms f,
+     json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j WHERE j.type = 'text'`,
+  'SELECT trigger_tag_id AS tag_id FROM scenarios WHERE trigger_tag_id IS NOT NULL',
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenarios s,
+     json_tree(CASE WHEN json_valid(s.audience_condition_json) THEN s.audience_condition_json ELSE 'null' END) j
+    WHERE j.type = 'text'`,
+  'SELECT tag_id FROM scenario_triggers WHERE tag_id IS NOT NULL',
+  'SELECT on_reach_tag_id AS tag_id FROM scenario_steps WHERE on_reach_tag_id IS NOT NULL',
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenario_actions a,
+     json_tree(CASE WHEN json_valid(a.config_json) THEN a.config_json ELSE 'null' END) j WHERE j.type = 'text'`,
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenario_actions a,
+     json_tree(CASE WHEN json_valid(a.condition_json) THEN a.condition_json ELSE 'null' END) j WHERE j.type = 'text'`,
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM auto_replies a,
+     json_tree(CASE WHEN json_valid(a.actions_json) THEN a.actions_json ELSE 'null' END) j WHERE j.type = 'text'`,
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM auto_replies a,
+     json_tree(CASE WHEN json_valid(a.friend_conditions_json) THEN a.friend_conditions_json ELSE 'null' END) j
+    WHERE j.type = 'text'`,
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM saved_searches s,
+     json_tree(CASE WHEN json_valid(s.conditions_json) THEN s.conditions_json ELSE 'null' END) j WHERE j.type = 'text'`,
+  ...[
+    ['automation_versions', 'trigger_config'], ['automation_versions', 'condition_config'],
+    ['automation_versions', 'action_config'], ['automations', 'conditions'], ['automations', 'actions'],
+    ['common_action_versions', 'action_config'], ['rich_menu_groups', 'targeting_condition'],
+    ['rich_menu_areas', 'tag_ids'], ['templates', 'carousel_actions_json'], ['funnels', 'segment_json'],
+    ['funnel_steps', 'match_json'], ['analytics_funnel_versions', 'steps_json'],
+    ['analytics_funnel_versions', 'segment_json'], ['analytics_funnel_versions', 'comparison_groups_json'],
+  ].map(([table, column]) => `SELECT CAST(j.value AS TEXT) AS tag_id FROM ${table} r,
+     json_tree(CASE WHEN json_valid(r.${column}) THEN r.${column} ELSE 'null' END) j WHERE j.type = 'text'`),
+  'SELECT tag_on_attend AS tag_id FROM webinars WHERE tag_on_attend IS NOT NULL',
+  'SELECT tag_on_cta_click AS tag_id FROM webinars WHERE tag_on_cta_click IS NOT NULL',
+  'SELECT target_tag_id AS tag_id FROM reminders WHERE target_tag_id IS NOT NULL',
+  'SELECT tag_id FROM entry_routes WHERE tag_id IS NOT NULL',
+  'SELECT tag_id FROM tracked_links WHERE tag_id IS NOT NULL',
+  'SELECT auto_tag_id AS tag_id FROM menus WHERE auto_tag_id IS NOT NULL',
+  'SELECT tag_id FROM affiliate_offers WHERE tag_id IS NOT NULL',
+  'SELECT visible_tag_id AS tag_id FROM events WHERE visible_tag_id IS NOT NULL',
+  `SELECT CAST(j.value AS TEXT) AS tag_id FROM account_settings s,
+     json_tree(CASE WHEN json_valid(s.value) THEN s.value ELSE 'null' END) j
+    WHERE s.key = 'friend_add_routing' AND j.type = 'text'`,
+] as const;
+
+export function buildTagUsageBlockingReferenceQueries(
+  selects: readonly string[] = TAG_USAGE_BLOCKING_REFERENCE_SELECTS,
+): string[] {
+  const queries: string[] = [];
+  for (let offset = 0; offset < selects.length; offset += MAX_TAG_USAGE_COMPOUND_SELECT_TERMS) {
+    const referenceSelects = selects
+      .slice(offset, offset + MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)
+      .join('\nUNION\n');
+    queries.push(`SELECT DISTINCT r.tag_id
+      FROM (${referenceSelects}) r
+      JOIN tags known ON known.id = r.tag_id`);
+  }
+  return queries;
+}
+
+export async function collectTagUsageBlockingTagIds(
+  db: D1Database,
+  selects: readonly string[] = TAG_USAGE_BLOCKING_REFERENCE_SELECTS,
+): Promise<Set<string>> {
+  const blockingTagIds = new Set<string>();
+  for (const query of buildTagUsageBlockingReferenceQueries(selects)) {
+    const references = await db.prepare(query).all<{ tag_id: string | null }>();
+    for (const reference of references.results) {
+      if (reference.tag_id !== null) blockingTagIds.add(reference.tag_id);
+    }
+  }
+  return blockingTagIds;
+}
 
 /**
  * 見た目だけ違う同名タグをまとめて見つけるための比較名。
@@ -129,7 +220,7 @@ export async function getTagsWithCounts(
 }
 
 /**
- * タグ一覧の「どこで使われているか」を、一覧1回分のSQLで返す。
+ * タグ一覧の「どこで使われているか」を返す。
  *
  * JSON列は部分一致で探さない。たとえば tag-1 を探すときに tag-10 まで
  * 数えてしまうため、json_tree の文字列値とタグIDが完全一致した行だけを見る。
@@ -141,10 +232,53 @@ export async function getTagsWithCounts(
 export async function getTagsWithUsage(
   db: D1Database,
 ): Promise<TagWithUsage[]> {
-  const result = await db
-    .prepare(
-      `WITH
-       broadcast_refs(tag_id, entity_id) AS (
+  const result = await db.prepare(
+    `SELECT t.*, fo.color AS folder_color,
+            COUNT(DISTINCT ft.friend_id) AS friend_count
+       FROM tags t
+       LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
+      GROUP BY t.id
+      ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
+  ).all<Omit<TagWithUsageRow,
+    'assign_source' | 'used_in_broadcasts' | 'used_in_forms' |
+    'used_in_scenarios' | 'used_in_auto_replies' |
+    'used_in_saved_searches' | 'other_action_count'>>();
+
+  const scenarioReferenceSelects = [
+    'SELECT trigger_tag_id AS tag_id, id AS entity_id FROM scenarios WHERE trigger_tag_id IS NOT NULL',
+    `SELECT CAST(j.value AS TEXT) AS tag_id, s.id AS entity_id
+       FROM scenarios s,
+            json_tree(CASE WHEN json_valid(s.audience_condition_json)
+                           THEN s.audience_condition_json ELSE 'null' END) j
+      WHERE j.type = 'text'`,
+    'SELECT tag_id, scenario_id AS entity_id FROM scenario_triggers WHERE tag_id IS NOT NULL',
+    `SELECT on_reach_tag_id AS tag_id, scenario_id AS entity_id
+       FROM scenario_steps WHERE on_reach_tag_id IS NOT NULL`,
+    `SELECT CAST(j.value AS TEXT) AS tag_id, a.scenario_id AS entity_id
+       FROM scenario_actions a,
+            json_tree(CASE WHEN json_valid(a.config_json)
+                           THEN a.config_json ELSE 'null' END) j
+      WHERE j.type = 'text'`,
+    `SELECT CAST(j.value AS TEXT) AS tag_id, a.scenario_id AS entity_id
+       FROM scenario_actions a,
+            json_tree(CASE WHEN json_valid(a.condition_json)
+                           THEN a.condition_json ELSE 'null' END) j
+      WHERE j.type = 'text'`,
+  ] as const;
+  const scenarioReferenceQueries: string[] = [];
+  for (let offset = 0; offset < scenarioReferenceSelects.length;
+    offset += MAX_TAG_USAGE_COMPOUND_SELECT_TERMS) {
+    const references = scenarioReferenceSelects
+      .slice(offset, offset + MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)
+      .join('\nUNION\n');
+    scenarioReferenceQueries.push(`WITH refs(tag_id, entity_id) AS (${references})
+      SELECT DISTINCT r.tag_id, r.entity_id
+        FROM refs r JOIN tags known ON known.id = r.tag_id`);
+  }
+
+  const usageQueries = {
+    used_in_broadcasts: `WITH refs(tag_id, entity_id) AS (
          SELECT target_tag_id, id FROM broadcasts WHERE target_tag_id IS NOT NULL
          UNION
          SELECT CAST(j.value AS TEXT), b.id
@@ -152,42 +286,16 @@ export async function getTagsWithUsage(
                 json_tree(CASE WHEN json_valid(b.segment_conditions)
                                THEN b.segment_conditions ELSE 'null' END) j
           WHERE j.type = 'text'
-       ),
-       form_refs(tag_id, entity_id) AS (
+       )`,
+    used_in_forms: `WITH refs(tag_id, entity_id) AS (
          SELECT on_submit_tag_id, id FROM forms WHERE on_submit_tag_id IS NOT NULL
          UNION
          SELECT CAST(j.value AS TEXT), f.id
            FROM forms f,
                 json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j
           WHERE j.type = 'text'
-       ),
-       scenario_refs(tag_id, entity_id) AS (
-         SELECT trigger_tag_id, id FROM scenarios WHERE trigger_tag_id IS NOT NULL
-         UNION
-         SELECT CAST(j.value AS TEXT), s.id
-           FROM scenarios s,
-                json_tree(CASE WHEN json_valid(s.audience_condition_json)
-                               THEN s.audience_condition_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT tag_id, scenario_id FROM scenario_triggers WHERE tag_id IS NOT NULL
-         UNION
-         SELECT on_reach_tag_id, scenario_id
-           FROM scenario_steps WHERE on_reach_tag_id IS NOT NULL
-         UNION
-         SELECT CAST(j.value AS TEXT), a.scenario_id
-           FROM scenario_actions a,
-                json_tree(CASE WHEN json_valid(a.config_json)
-                               THEN a.config_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT), a.scenario_id
-           FROM scenario_actions a,
-                json_tree(CASE WHEN json_valid(a.condition_json)
-                               THEN a.condition_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-       ),
-       auto_reply_refs(tag_id, entity_id) AS (
+       )`,
+    used_in_auto_replies: `WITH refs(tag_id, entity_id) AS (
          SELECT CAST(j.value AS TEXT), a.id
            FROM auto_replies a,
                 json_tree(CASE WHEN json_valid(a.actions_json)
@@ -199,15 +307,15 @@ export async function getTagsWithUsage(
                 json_tree(CASE WHEN json_valid(a.friend_conditions_json)
                                THEN a.friend_conditions_json ELSE 'null' END) j
           WHERE j.type = 'text'
-       ),
-       saved_search_refs(tag_id, entity_id) AS (
+       )`,
+    used_in_saved_searches: `WITH refs(tag_id, entity_id) AS (
          SELECT CAST(j.value AS TEXT), s.id
            FROM saved_searches s,
                 json_tree(CASE WHEN json_valid(s.conditions_json)
                                THEN s.conditions_json ELSE 'null' END) j
           WHERE s.scope = 'friends' AND j.type = 'text'
-       ),
-       action_refs(tag_id, action_key) AS (
+       )`,
+    other_action_count: `WITH refs(tag_id, action_key) AS (
          -- 「他N」は、このタグを付ける設定ではなく、このタグが付いた後に
          -- 動くもの。旧列と複数トリガー表の両方に同じシナリオがあっても、
          -- action_key を同じにして1件だけ数える。
@@ -252,216 +360,74 @@ export async function getTagsWithUsage(
                   THEN a.actions ELSE '[]' END) action
           WHERE a.event_type IN ('tag_change', 'tag_added')
             AND condition_value.type = 'text'
-       ),
-       -- 「未使用」は友だち0人だけでは決めない。削除確認と同じ18種類の
-       -- 運用設定を一覧1回分のSQLで調べ、どこにも参照がない場合だけ候補にする。
-       -- 実行履歴は運用設定ではないため含めない。
-       blocking_refs(tag_id) AS (
-         SELECT tag_id FROM broadcast_refs
-         UNION
-         SELECT tag_id FROM form_refs
-         UNION
-         SELECT tag_id FROM scenario_refs
-         UNION
-         SELECT tag_id FROM auto_reply_refs
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM saved_searches s,
-                json_tree(CASE WHEN json_valid(s.conditions_json)
-                               THEN s.conditions_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM automation_versions v,
-                json_tree(CASE WHEN json_valid(v.trigger_config)
-                               THEN v.trigger_config ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM automation_versions v,
-                json_tree(CASE WHEN json_valid(v.condition_config)
-                               THEN v.condition_config ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM automation_versions v,
-                json_tree(CASE WHEN json_valid(v.action_config)
-                               THEN v.action_config ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM automations a,
-                json_tree(CASE WHEN json_valid(a.conditions)
-                               THEN a.conditions ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM automations a,
-                json_tree(CASE WHEN json_valid(a.actions)
-                               THEN a.actions ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM common_action_versions v,
-                json_tree(CASE WHEN json_valid(v.action_config)
-                               THEN v.action_config ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM rich_menu_groups g,
-                json_tree(CASE WHEN json_valid(g.targeting_condition)
-                               THEN g.targeting_condition ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM rich_menu_areas a,
-                json_tree(CASE WHEN json_valid(a.tag_ids)
-                               THEN a.tag_ids ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM templates mt,
-                json_tree(CASE WHEN json_valid(mt.carousel_actions_json)
-                               THEN mt.carousel_actions_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT tag_on_attend FROM webinars WHERE tag_on_attend IS NOT NULL
-         UNION
-         SELECT tag_on_cta_click FROM webinars WHERE tag_on_cta_click IS NOT NULL
-         UNION
-         SELECT target_tag_id FROM reminders WHERE target_tag_id IS NOT NULL
-         UNION
-         SELECT tag_id FROM entry_routes WHERE tag_id IS NOT NULL
-         UNION
-         SELECT tag_id FROM tracked_links WHERE tag_id IS NOT NULL
-         UNION
-         SELECT auto_tag_id FROM menus WHERE auto_tag_id IS NOT NULL
-         UNION
-         SELECT tag_id FROM affiliate_offers WHERE tag_id IS NOT NULL
-         UNION
-         SELECT visible_tag_id FROM events WHERE visible_tag_id IS NOT NULL
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM funnels f,
-                json_tree(CASE WHEN json_valid(f.segment_json)
-                               THEN f.segment_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM funnel_steps fs,
-                json_tree(CASE WHEN json_valid(fs.match_json)
-                               THEN fs.match_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM analytics_funnel_versions v,
-                json_tree(CASE WHEN json_valid(v.steps_json)
-                               THEN v.steps_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM analytics_funnel_versions v,
-                json_tree(CASE WHEN json_valid(v.segment_json)
-                               THEN v.segment_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM analytics_funnel_versions v,
-                json_tree(CASE WHEN json_valid(v.comparison_groups_json)
-                               THEN v.comparison_groups_json ELSE 'null' END) j
-          WHERE j.type = 'text'
-         UNION
-         SELECT CAST(j.value AS TEXT)
-           FROM account_settings s,
-                json_tree(CASE WHEN json_valid(s.value)
-                               THEN s.value ELSE 'null' END) j
-          WHERE s.key = 'friend_add_routing' AND j.type = 'text'
-       ),
-       blocking_tag_ids AS (
-         SELECT r.tag_id
-           FROM blocking_refs r
-           JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       ),
-       broadcast_counts AS (
-         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
-           FROM broadcast_refs r JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       ),
-       form_counts AS (
-         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
-           FROM form_refs r JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       ),
-       scenario_counts AS (
-         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
-           FROM scenario_refs r JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       ),
-       auto_reply_counts AS (
-         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
-           FROM auto_reply_refs r JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       ),
-       saved_search_counts AS (
-         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
-           FROM saved_search_refs r JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       ),
-       action_counts AS (
-         SELECT r.tag_id, COUNT(DISTINCT r.action_key) count
-           FROM action_refs r JOIN tags known ON known.id = r.tag_id
-          GROUP BY r.tag_id
-       )
-       SELECT t.*, fo.color AS folder_color,
-              COUNT(DISTINCT ft.friend_id) AS friend_count,
-              CASE
-                WHEN t.id IN (
-                  'nen-tag-pet-birthday-this-month',
-                  'nen-tag-pet-birthday-next-month',
-                  'nen-tag-delivery-birthday'
-                ) THEN 'birthday'
-                WHEN t.id = 'nen-tag-member-line-linked' THEN 'line_login'
-                WHEN t.id LIKE 'nen-tag-purchase-%'
-                  OR t.id LIKE 'nen-tag-payment-%'
-                  OR t.id LIKE 'nen-tag-product-%' THEN 'ec_purchase'
-                WHEN t.id LIKE 'nen-tag-member-%'
-                  OR t.id LIKE 'nen-tag-subscription-%' THEN 'ec'
-                WHEN COALESCE(fc.count, 0) > 0 THEN 'form'
-                ELSE NULL
-              END AS assign_source,
-              COALESCE(bc.count, 0) AS used_in_broadcasts,
-              COALESCE(fc.count, 0) AS used_in_forms,
-              COALESCE(sc.count, 0) AS used_in_scenarios,
-              COALESCE(ac.count, 0) AS used_in_auto_replies,
-              COALESCE(ssc.count, 0) AS used_in_saved_searches,
-              COALESCE(act.count, 0) AS other_action_count,
-              CASE WHEN bri.tag_id IS NULL THEN 0 ELSE 1 END
-                AS has_operational_references
-         FROM tags t
-         LEFT JOIN friend_tags ft ON ft.tag_id = t.id
-         LEFT JOIN folders fo ON fo.id = t.folder_id
-         LEFT JOIN broadcast_counts bc ON bc.tag_id = t.id
-         LEFT JOIN form_counts fc ON fc.tag_id = t.id
-         LEFT JOIN scenario_counts sc ON sc.tag_id = t.id
-         LEFT JOIN auto_reply_counts ac ON ac.tag_id = t.id
-         LEFT JOIN saved_search_counts ssc ON ssc.tag_id = t.id
-         LEFT JOIN action_counts act ON act.tag_id = t.id
-         LEFT JOIN blocking_tag_ids bri ON bri.tag_id = t.id
-        GROUP BY t.id
-        ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
-    )
-    .all<TagWithUsageRow>();
+       )`,
+  } as const;
+
+  type UsageField = keyof typeof usageQueries | 'used_in_scenarios';
+  const usageCounts = new Map<UsageField, Map<string, number>>();
+  for (const [field, refsQuery] of Object.entries(usageQueries) as
+    [keyof typeof usageQueries, string][]) {
+    const distinctKey = field === 'other_action_count' ? 'action_key' : 'entity_id';
+    const counts = await db.prepare(`${refsQuery}
+      SELECT r.tag_id, COUNT(DISTINCT r.${distinctKey}) count
+        FROM refs r JOIN tags known ON known.id = r.tag_id
+       GROUP BY r.tag_id`).all<TagUsageCountRow>();
+    usageCounts.set(field, new Map(
+      counts.results.map((row) => [row.tag_id, Number(row.count)]),
+    ));
+  }
+
+  const scenarioReferences = new Map<string, Set<string>>();
+  for (const query of scenarioReferenceQueries) {
+    const references = await db.prepare(query).all<TagUsageReferenceRow>();
+    for (const reference of references.results) {
+      const entityIds = scenarioReferences.get(reference.tag_id) ?? new Set<string>();
+      entityIds.add(reference.entity_id);
+      scenarioReferences.set(reference.tag_id, entityIds);
+    }
+  }
+  usageCounts.set('used_in_scenarios', new Map(
+    [...scenarioReferences].map(([tagId, entityIds]) => [tagId, entityIds.size]),
+  ));
+
+  const rows: TagWithUsageRow[] = result.results.map((tag) => {
+    const usedInForms = usageCounts.get('used_in_forms')?.get(tag.id) ?? 0;
+    const normalizedId = tag.id.toLocaleLowerCase('en-US');
+    let assignSource: TagAssignSource | null = null;
+    if ([
+      'nen-tag-pet-birthday-this-month',
+      'nen-tag-pet-birthday-next-month',
+      'nen-tag-delivery-birthday',
+    ].includes(tag.id)) assignSource = 'birthday';
+    else if (tag.id === 'nen-tag-member-line-linked') assignSource = 'line_login';
+    else if (/^nen-tag-(purchase|payment|product)-/u.test(normalizedId)) assignSource = 'ec_purchase';
+    else if (/^nen-tag-(member|subscription)-/u.test(normalizedId)) assignSource = 'ec';
+    else if (usedInForms > 0) assignSource = 'form';
+
+    return {
+      ...tag,
+      friend_count: Number(tag.friend_count),
+      assign_source: assignSource,
+      used_in_broadcasts: usageCounts.get('used_in_broadcasts')?.get(tag.id) ?? 0,
+      used_in_forms: usedInForms,
+      used_in_scenarios: usageCounts.get('used_in_scenarios')?.get(tag.id) ?? 0,
+      used_in_auto_replies: usageCounts.get('used_in_auto_replies')?.get(tag.id) ?? 0,
+      used_in_saved_searches: usageCounts.get('used_in_saved_searches')?.get(tag.id) ?? 0,
+      other_action_count: usageCounts.get('other_action_count')?.get(tag.id) ?? 0,
+    };
+  });
+
+  const blockingTagIds = await collectTagUsageBlockingTagIds(db);
 
   const duplicateCounts = new Map<string, number>();
-  for (const row of result.results) {
+  for (const row of rows) {
     const normalizedName = normalizeTagNameForCleanup(row.name);
     duplicateCounts.set(normalizedName, (duplicateCounts.get(normalizedName) ?? 0) + 1);
   }
 
-  return result.results.map(({ has_operational_references, ...row }) => {
+  return rows.map((row) => {
     const cleanupReasons: TagCleanupReason[] = [];
-    if (Number(row.friend_count) === 0 && Number(has_operational_references) === 0) {
+    if (Number(row.friend_count) === 0 && !blockingTagIds.has(row.id)) {
       cleanupReasons.push('unused');
     }
     if ((duplicateCounts.get(normalizeTagNameForCleanup(row.name)) ?? 0) > 1) {

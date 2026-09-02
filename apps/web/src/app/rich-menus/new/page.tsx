@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
+import StepTrail from '@/components/shared/step-trail'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import {
@@ -12,6 +13,7 @@ import {
   templateToAreas,
   type RichMenuTemplate,
 } from '@/lib/rich-menu-templates'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
   {
@@ -75,6 +77,7 @@ function TemplatePreview({ template }: { template: RichMenuTemplate }) {
 }
 
 export default function NewRichMenuPage() {
+  usePageTitle('リッチメニューを作る')
   const router = useRouter()
   const { selectedAccount } = useAccount()
   const [name, setName] = useState('')
@@ -123,7 +126,7 @@ export default function NewRichMenuPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    <main data-design-node="XtfO3" className="mx-auto max-w-4xl p-6">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー
@@ -134,14 +137,27 @@ export default function NewRichMenuPage() {
 
       <div data-design="Head">
         <Header
-          title="リッチメニューを作る"
           description="名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。"
         />
       </div>
 
+      {/*
+        **段を出す。**この画面で全部決めるのか、まだ続きがあるのかが
+        本文の断りだけでは伝わらない。設計 12-1 は 形とボタン → 誰に出すか →
+        公開のしかた の3段。ここは1段目。
+      */}
+      <StepTrail
+        label="リッチメニュー作成の進み方"
+        items={[
+          { label: '形を決める', state: 'current' },
+          { label: 'ボタンと出し分け', state: 'todo' },
+          { label: '公開のしかた', state: 'todo' },
+        ]}
+      />
+
       <form
         onSubmit={handleSubmit}
-        className="border-hairline bg-canvas rounded-card space-y-6 border p-6 shadow-sm"
+        className="border-hairline bg-canvas rounded-card mt-4 space-y-6 border p-6 shadow-sm"
       >
         <div>
           <label className="text-ink-secondary mb-1 block text-sm font-medium">

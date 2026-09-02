@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -86,26 +87,38 @@ export interface QuestionEditorProps {
   onChange: (next: ScenarioQuestion) => void
   /** 選択肢ごとのアクション設定を開く。保存済みの通でだけ使える。 */
   onOpenChoiceActions?: (choiceIndex: number) => void
+  /** 質問テンプレートのように、選択肢を横に見比べる画面。 */
+  choiceColumns?: boolean
 }
 
-export default function QuestionEditor({ value, onChange, onOpenChoiceActions }: QuestionEditorProps) {
+export default function QuestionEditor({
+  value,
+  onChange,
+  onOpenChoiceActions,
+  choiceColumns = false,
+}: QuestionEditorProps) {
+  const { selectedAccountId } = useAccount()
   const [tags, setTags] = useState<{ id: string; name: string }[]>([])
   const [fields, setFields] = useState<{ id: string; name: string }[]>([])
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [openChoice, setOpenChoice] = useState<number | null>(0)
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setFields([])
+      return
+    }
     void (async () => {
       const [tagRes, fieldRes, scenarioRes] = await Promise.all([
         api.tags.list(),
-        api.friendFields.list(),
+        api.friendFields.list(selectedAccountId),
         api.scenarios.list(),
       ])
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
       if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
     })()
-  }, [])
+  }, [selectedAccountId])
 
   const setChoice = (index: number, patch: Partial<QuestionChoice>) => {
     const choices = [...value.choices]
@@ -159,7 +172,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
         </select>
       </div>
 
-      <div className="space-y-3">
+      <div className={choiceColumns ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
         {value.choices.map((choice, index) => (
           <div key={index} className="border-hairline rounded-card border">
             <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
