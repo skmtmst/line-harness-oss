@@ -45,17 +45,21 @@ function withoutComments(source: string): string {
 /**
  * 表示に当たる部分だけを取り出す。
  *
- *   1. タグとタグの間の文字（`{}` を含む式は中身が変数なので外す）
+ *   1. タグの間の地の文
  *   2. 目に見える属性（`title` `aria-label` など）の文字列
  *   3. テンプレート文字列の地の文（`調整元ID: ${…}` のような組み立て）
  *
- * 受け口の項目名（`link.ref_code` `item.friendId`）は式なので入らない。
+ * **式で途切れた地の文も1つずつ拾う。** `重複 identity_key 検出 ({n} 件)` は
+ * 「タグからタグまで」では取れない。途中に `{n}` が挟まっているので、
+ * `>` から `{` までで一度切れる。切れた側にDBの語が残っていた。
+ *
+ * 受け口の項目名（`link.ref_code` `item.friendId`）は式の中なので入らない。
  * **項目名まで禁じると、受け口を読むことすらできなくなる。**
  */
 function displayText(source: string): string {
   const stripped = withoutComments(source)
   const parts: string[] = []
-  for (const match of stripped.matchAll(/>([^<>{}]+)</g)) parts.push(match[1])
+  for (const match of stripped.matchAll(/[>}]([^<>{}]+)(?=[<{])/g)) parts.push(match[1])
   for (const match of stripped.matchAll(
     /\b(?:title|aria-label|placeholder|label|description|note|sub|alt)\s*=\s*"([^"]*)"/g,
   )) parts.push(match[1])
