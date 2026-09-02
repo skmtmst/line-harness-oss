@@ -6,8 +6,11 @@ import { countDebt, totals } from '../../../scripts/design-debt.mjs'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const WEB = join(SRC, '..')
+// 2026-09-02: /tags を外した。`app/tags/page.tsx` に残っていた旧V5の枝は
+// 描かれない死んだコードで、そこにあった共通Th 8セルも画面には出ていない。
+// 正本の `components/friend-fields/tags-page-v4.tsx` はまだ直書きの `<th>` で、
+// 共通Thへは寄せていないため、ここでは見張れない。
 const targets = [
-  'app/tags/page.tsx',
   'app/reminders/page.tsx',
   'app/templates/page.tsx',
   'app/conversions/page.tsx',
@@ -19,12 +22,14 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し73セルを共通Thで維持する', () => {
+  it('5ルートのV6標準見出し65セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(73)
+    // 2026-09-02: 描かれない /tags のV5枝を消し、8セル減って65。
+    // **減ったので締め直す。**
+    expect(migrated).toBe(65)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
@@ -59,7 +64,11 @@ describe('表見出しの第1段階移行', () => {
     // シナリオ一覧と友だち情報欄に加え、対応マークの見出しも共通 `Th` へ寄せた。
     // 2026-09-02: #475 がログインユーザーと入った記録の19見出しを共通Thへ移した。
     // 最新 development との統合後の木を再計測し、237へ締め直す。
-    expect(debt['direct-th']).toBe(237)
+    // 2026-09-02: 一斉配信の一覧を設計 `q76C35` の6列へ組み直し、見出し8つ
+    // （中身は7つで1列ずれていた）を6つにした。直書きの見出しが2つ減るので
+    // 公式スクリプト（node apps/web/scripts/design-debt.mjs）で数え直して
+    // 235へ締め直す。共通 `Th` への寄せは別途。
+    expect(debt['direct-th']).toBe(235)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

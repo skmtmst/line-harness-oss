@@ -17,6 +17,7 @@ import {
   listView,
   type TemplatesFailure,
 } from './list-state-kind'
+import { templateDeleteDescription } from './template-delete-message'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
 
@@ -109,7 +110,15 @@ export default function TemplatesPage() {
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  /**
+   * 削除の確認。ブラウザの `confirm()` は見た目がブラウザ任せで、
+   * 何が止まり・何が残るのかを本文で読ませられず、画像比較にも写らない。
+   * 共通の `ConfirmDialog` へ移した（設計 `H2S1T4` / `M9cij`）。
+   * 使用数も持たせて、本文を使用数で言い分ける。
+   */
+  const [pendingDelete, setPendingDelete] = useState<
+    { id: string; name: string; usageCount: number } | null
+  >(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
@@ -278,6 +287,7 @@ export default function TemplatesPage() {
     setSavingEdit(false)
   }
 
+  // 押しただけでは消さない。窓を開くだけにする。使用中なら使用先へ送る。
   const handleDelete = (template: Pick<Template, 'id' | 'name' | 'usageCount'>) => {
     const { id, name, usageCount } = template
     if (usageCount > 0) {
@@ -286,25 +296,25 @@ export default function TemplatesPage() {
       return
     }
     setDeleteError('')
-    setPendingDelete({ id, name })
+    setPendingDelete({ id, name, usageCount })
   }
 
   const confirmDelete = async () => {
-    if (!pendingDelete) return
+    // 押している間は受け付けない。二度押しで2回目が404になり、
+    // 「削除できませんでした」とだけ出て消えている、という食い違いが起きる。
+    if (!pendingDelete || deleting) return
     const target = pendingDelete
     setDeleting(true)
     setDeleteError('')
     try {
-      const result = await api.templates.delete(target.id)
-      if (!result.success) {
-        setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
-        return
-      }
+      const res = await api.templates.delete(target.id)
+      if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       if (drawerId === target.id) setDrawerId(null)
       await load()
     } catch {
-      setDeleteError('削除に失敗しました')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }
@@ -910,18 +920,18 @@ export default function TemplatesPage() {
       <div data-design-node="M9cij">
         <ConfirmDialog
           open={pendingDelete !== null}
-          title="テンプレートを削除しますか？"
-          description={`「${pendingDelete?.name ?? ''}」を削除します。この操作は元に戻せません。`}
-          confirmLabel="テンプレートを削除"
+          title={`テンプレート「${pendingDelete?.name ?? ''}」を削除しますか？`}
+          description={templateDeleteDescription(pendingDelete?.usageCount ?? 0)}
+          confirmLabel="削除する"
           destructive
           busy={deleting}
-          error={deleteError || undefined}
+          error={deleteError}
+          onConfirm={() => void confirmDelete()}
           onCancel={() => {
             if (deleting) return
             setPendingDelete(null)
             setDeleteError('')
           }}
-          onConfirm={() => void confirmDelete()}
         />
       </div>
       </div>
