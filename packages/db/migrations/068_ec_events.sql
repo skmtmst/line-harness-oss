@@ -25,4 +25,3 @@ CREATE INDEX IF NOT EXISTS idx_ec_events_customer
   ON ec_events(customer_id, received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ec_events_friend
   ON ec_events(friend_id, received_at DESC);
-
