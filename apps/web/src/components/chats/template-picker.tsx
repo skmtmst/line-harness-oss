@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import TemplateFolderSelect, {
+  type TemplateFolderOption,
+  type TemplateFolderStatus,
+} from './template-folder-select'
+
+type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /**
  * テンプレートを選ぶ（設計 V2 2-1-1）。
@@ -24,32 +31,77 @@ export default function TemplatePicker({
   onClose: () => void
   onPick: (content: string) => void
 }) {
+  const { selectedAccountId } = useAccount()
   const [templates, setTemplates] = useState<Template[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [search, setSearch] = useState('')
   const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [category, setCategory] = useState<'all' | 'frequent' | 'reservation' | 'ec'>('all')
+  const [templatesStatus, setTemplatesStatus] = useState<TemplateLoadStatus>('idle')
+  const [foldersStatus, setFoldersStatus] = useState<TemplateFolderStatus>('loading')
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(selectedAccountId)
+  const accountDataCurrent = loadedAccountId === selectedAccountId
+  const scopedTemplates = accountDataCurrent ? templates : []
+  const scopedFolders = accountDataCurrent ? folders : []
+  const visibleTemplatesStatus = accountDataCurrent ? templatesStatus : 'loading'
+  const visibleFoldersStatus = accountDataCurrent ? foldersStatus : 'loading'
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      // 閉じている間に前回分を捨て、次に開いた最初の描画から
+      // 未取得状態にする（effect後の一瞬だけ前アカウントを出さない）。
+      setTemplates([])
+      setFolders([])
+      setSelectedId('')
+      setFolderId('')
+      setTemplatesStatus('loading')
+      setFoldersStatus('loading')
+      setLoadedAccountId(selectedAccountId)
+      return
+    }
     let cancelled = false
+    // LINEアカウントを切り替えたあとに前アカウントの内容を一瞬でも
+    // 見せない。開くたびに未取得へ戻し、0件と区別する。
+    setTemplates([])
+    setFolders([])
+    setSelectedId('')
+    setFolderId('')
+    setTemplatesStatus('loading')
+    setFoldersStatus('loading')
+    setLoadedAccountId(selectedAccountId)
     void api.templates.list().then((res) => {
-      if (!cancelled && res.success) setTemplates(res.data as unknown as Template[])
+      if (cancelled) return
+      if (res.success) {
+        setTemplates(res.data as unknown as Template[])
+        setTemplatesStatus('ready')
+      } else {
+        setTemplatesStatus('error')
+      }
+    }).catch(() => {
+      if (!cancelled) setTemplatesStatus('error')
     })
     // 置き場（099 で templates.folder_id が入っている）。
     void api.folders.list('template').then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
+      if (cancelled) return
+      if (res.success) {
+        setFolders(res.data)
+        setFoldersStatus('ready')
+      } else {
+        setFoldersStatus('error')
+      }
+    }).catch(() => {
+      if (!cancelled) setFoldersStatus('error')
     })
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, selectedAccountId])
 
   /** 文字のテンプレートだけが対象。種別タブは「メッセージ」で固定。 */
   const textTemplates = useMemo(
-    () => templates.filter((t) => t.messageType === 'text'),
-    [templates],
+    () => scopedTemplates.filter((t) => t.messageType === 'text'),
+    [scopedTemplates],
   )
 
   /** 置き場ごとの件数。0件でも出す（空だと分かるほうがよい）。 */
@@ -59,10 +111,56 @@ export default function TemplatePicker({
     return map
   }, [textTemplates])
 
+  /** 親子1段の置き場を、設計どおり同じパネルで選べる順番へ並べる。 */
+  const folderOptions = useMemo<TemplateFolderOption[]>(() => {
+    const children = new Map<string | null, Folder[]>()
+    for (const folder of scopedFolders) {
+      const parentId = scopedFolders.some((candidate) => candidate.id === folder.parentId)
+        ? folder.parentId
+        : null
+      children.set(parentId, [...(children.get(parentId) ?? []), folder])
+    }
+    const countReady = visibleTemplatesStatus === 'ready'
+    const options: TemplateFolderOption[] = [
+      { value: '', label: 'すべてのフォルダ', count: countReady ? textTemplates.length : null },
+    ]
+    for (const parent of children.get(null) ?? []) {
+      const childFolders = children.get(parent.id) ?? []
+      const count = countReady
+        ? (folderCounts.get(parent.id) ?? 0)
+          + childFolders.reduce((sum, child) => sum + (folderCounts.get(child.id) ?? 0), 0)
+        : null
+      options.push({ value: parent.id, label: parent.name, count })
+      for (const child of childFolders) {
+        options.push({
+          value: child.id,
+          label: child.name,
+          count: countReady ? folderCounts.get(child.id) ?? 0 : null,
+          depth: 1,
+        })
+      }
+    }
+    options.push({
+      value: '__none__',
+      label: '未分類',
+      count: countReady ? folderCounts.get('') ?? 0 : null,
+    })
+    return options
+  }, [folderCounts, scopedFolders, visibleTemplatesStatus, textTemplates.length])
+
+  /** 親フォルダを選んだときは、その直下のフォルダも一緒に表示する。 */
+  const selectedFolderIds = useMemo(() => {
+    if (!folderId || folderId === '__none__') return null
+    return new Set([
+      folderId,
+      ...scopedFolders.filter((folder) => folder.parentId === folderId).map((folder) => folder.id),
+    ])
+  }, [folderId, scopedFolders])
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = textTemplates.filter((t) => {
-      if (folderId === '__none__' ? t.folderId !== null : folderId && t.folderId !== folderId) {
+      if (folderId === '__none__' ? Boolean(t.folderId) : selectedFolderIds && !selectedFolderIds.has(t.folderId ?? '')) {
         return false
       }
       if (!q) return true
@@ -72,7 +170,7 @@ export default function TemplatePicker({
     if (category === 'reservation') return filtered.filter((template) => /予約|来店|前日|日程/.test(`${template.name} ${template.messageContent}`))
     if (category === 'ec') return filtered.filter((template) => /EC|注文|発送|配送|商品/.test(`${template.name} ${template.messageContent}`))
     return filtered
-  }, [category, textTemplates, search, folderId])
+  }, [category, textTemplates, search, folderId, selectedFolderIds])
 
   if (!open) return null
 
@@ -118,18 +216,12 @@ export default function TemplatePicker({
               className="w-full rounded-lg border border-[#E5E7EB] py-2.5 pr-3 pl-9 text-sm outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
             />
           </div>
-          <select
+          <TemplateFolderSelect
             value={folderId}
-            onChange={(e) => setFolderId(e.target.value)}
-            aria-label="フォルダ"
-            className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none focus:border-[#06C755]"
-          >
-            <option value="">すべてのフォルダ（{textTemplates.length}）</option>
-            {folders.map((folder) => (
-              <option key={folder.id} value={folder.id}>{folder.name}（{folderCounts.get(folder.id) ?? 0}）</option>
-            ))}
-            <option value="__none__">未分類（{folderCounts.get('') ?? 0}）</option>
-          </select>
+            onChange={setFolderId}
+            options={folderOptions}
+            status={visibleFoldersStatus}
+          />
         </div>
 
         <div className="min-h-0 flex-1 grid-cols-[350px_1fr] md:grid">
@@ -151,11 +243,17 @@ export default function TemplatePicker({
                   {item.label}
                 </button>
               ))}
-              <span className="ml-auto text-[11px] text-[#98A2B3]">{shown.length}件</span>
+              <span className="ml-auto text-[11px] text-[#98A2B3]">
+                {visibleTemplatesStatus === 'ready' ? `${shown.length}件` : '—'}
+              </span>
             </div>
-            {shown.length === 0 ? (
+            {visibleTemplatesStatus === 'loading' ? (
+              <p className="px-4 py-10 text-center text-sm text-ink-faint">テンプレートを読み込んでいます。</p>
+            ) : visibleTemplatesStatus === 'error' ? (
+              <p className="px-4 py-10 text-center text-sm text-danger">テンプレートを読み込めませんでした。もう一度開き直してください。</p>
+            ) : shown.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-[#98A2B3]">
-                {templates.length === 0 ? '文字のテンプレートがまだありません。' : '見つかりませんでした。'}
+                {scopedTemplates.length === 0 ? '文字のテンプレートがまだありません。' : '見つかりませんでした。'}
               </p>
             ) : (
               <ul className="space-y-2">

@@ -63,10 +63,12 @@ export default function NewBookingMenuPage() {
 
   return (
     <CreatePage
+      designNode="GhOb3"
       title="メニューを追加する"
       description="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
       saveLabel="メニューを追加"
+      showHeader={false}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
         if (!name.trim()) return 'メニュー名を入力してください'

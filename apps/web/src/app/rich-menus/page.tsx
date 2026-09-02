@@ -1,20 +1,68 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
-import type { RichMenuTapStats } from '@/lib/api'
+import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import Pagination from '@/components/shared/pagination'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import {
+  audienceReason,
+  audienceText,
+  blockerTexts,
+  canDelete as canDeleteImpact,
+  impactMatchesRequest,
+  impactFromError,
+  nextDisplayText,
+  recommendedActionText,
+  referenceKindText,
+  sameDeleteImpactRequest,
+  type DeleteImpactRequest,
+} from './delete-impact'
+import {
+  compareTargetingGroups,
+  moveTargetingGroup,
+  orderTargetingGroups,
+} from './targeting-order'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
 
-type SortKey = 'taps' | 'updated' | 'name' | 'manual'
+type SortKey = 'taps' | 'updated' | 'name' | 'priority'
+
+type RichMenuAction = 'load' | 'reorder' | 'delete' | 'externalDelete' | 'import'
+
+/** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
+function richMenuError(error: unknown, action: RichMenuAction): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
+    if (error.status === 404) return '対象のリッチメニューが見つかりません。一覧を読み直してください。'
+    if (error.status === 409) {
+      return action === 'delete' || action === 'externalDelete'
+        ? '使用中のため削除できませんでした。表示先を確認してから、もう一度お試しください。'
+        : 'ほかの変更と重なりました。一覧を読み直してから、もう一度お試しください。'
+    }
+    if (error.status === 429) return 'LINEへの操作が混み合っています。少し待ってから、もう一度お試しください。'
+  }
+
+  switch (action) {
+    case 'load':
+      return 'リッチメニューを読み込めませんでした。通信状態を確認して、もう一度読み込んでください。'
+    case 'reorder':
+      return 'リッチメニューの順番を変更できませんでした。一覧を読み直してから、もう一度お試しください。'
+    case 'delete':
+      return 'リッチメニューを削除できませんでした。状態を確認して、もう一度お試しください。'
+    case 'externalDelete':
+      return 'LINE上のリッチメニューを削除できませんでした。LINEの状態を確認して、もう一度お試しください。'
+    case 'import':
+      return 'LINE上のリッチメニューを取り込めませんでした。LINEの状態を確認して、もう一度お試しください。'
+  }
+}
 
 /**
  * よく使う絞り込み。
@@ -38,11 +86,14 @@ type RichMenuGroupListItem = {
   isDefaultForAll: boolean
   targetingEnabled: boolean
   targetingCondition: string | null
+  /** 複数の条件に当てはまったときに、実際に見る順番。小さいほど先。 */
+  targetingPriority: number
   /** 159: フォルダ。分けていなければ null。 */
   folderId: string | null
   /** 160: 自分で決める並び順。 */
   displayOrder: number
   thumbnailR2Key: string | null
+  createdAt: string
   updatedAt: string
 }
 
@@ -74,8 +125,14 @@ type LineMenu = {
   } | null
 }
 
+type DeleteTarget =
+  | { kind: 'managed'; group: RichMenuGroupListItem }
+  | { kind: 'external'; menu: LineMenu }
+
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
+  const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
+  const importRequestGenerationRef = useRef(0)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -90,30 +147,85 @@ export default function RichMenusListPage() {
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>('taps')
+  const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [savedFilter, setSavedFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  /*
+    消したときの影響（契約 #608）。**窓を開けてから読む。**
+    一覧を出すたびに全件ぶん読むと、消さない人にも重い問い合わせが走る。
+  */
+  const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
+  const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /** アカウント・対象・開き直しの世代で、遅い応答を捨てる。 */
+  const impactRequestRef = useRef<DeleteImpactRequest | null>(null)
+  const impactRequestGenerationRef = useRef(0)
+  /** 同じ窓の読み直しで、前の読み込み結果が後から上書きしないための世代。 */
+  const impactLoadGenerationRef = useRef(0)
+  const [publishedDeleteTarget, setPublishedDeleteTarget] =
+    useState<RichMenuGroupListItem | null>(null)
+  const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  useEffect(() => {
+    activeAccountRef.current = selectedAccount?.id ?? null
+    importRequestGenerationRef.current += 1
+    setGroups([])
+    setExternal(null)
+    setTapStats(null)
+    setError(null)
+    setExternalError(null)
+    setApplyTo(null)
+    setDeleteTarget(null)
+    setPublishedDeleteTarget(null)
+    setImportTarget(null)
+    setImportBusy(false)
+    setImportError(null)
+    setImportedMenuName(null)
+    setDeleteBusy(false)
+    setDeleteError(null)
+    impactRequestGenerationRef.current += 1
+    impactLoadGenerationRef.current += 1
+    impactRequestRef.current = null
+    setImpact(null)
+    setImpactPhase('idle')
+    setPage(1)
+    if (!selectedAccount?.id) setLoading(false)
+  }, [selectedAccount?.id])
 
   const reload = useCallback(async () => {
-    if (!selectedAccount?.id) return
+    if (!selectedAccount?.id) {
+      setLoading(false)
+      return
+    }
+    const accountId = selectedAccount.id
     setLoading(true)
+    setGroups([])
+    setExternal(null)
+    setTapStats(null)
     setError(null)
     setExternalError(null)
     try {
       // 並列に: D1 管理 group の一覧と、LINE 上の現状
       const [groupsRes, externalRes, tapRes] = await Promise.allSettled([
-        api.richMenuGroups.list(selectedAccount.id),
-        api.richMenuGroups.external(selectedAccount.id),
-        api.richMenuGroups.tapStats(selectedAccount.id),
+        api.richMenuGroups.list(accountId),
+        api.richMenuGroups.external(accountId),
+        api.richMenuGroups.tapStats(accountId),
       ])
+      if (activeAccountRef.current !== accountId) return
       // 数が取れなくても一覧は出す。集計は付随情報なので、落ちても本体は止めない。
       setTapStats(
         tapRes.status === 'fulfilled' && tapRes.value.success ? tapRes.value.data : null,
       )
       if (groupsRes.status === 'fulfilled') {
-        if (!groupsRes.value.success) throw new Error(groupsRes.value.error ?? '取得失敗')
+        if (!groupsRes.value.success) throw new Error('load_failed')
         setGroups(groupsRes.value.data)
       } else {
         throw groupsRes.reason
@@ -123,21 +235,19 @@ export default function RichMenusListPage() {
         if (v.success) {
           setExternal(v.data)
         } else {
-          setExternalError(v.error ?? 'LINE 上の状態取得に失敗')
+          setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
           setExternal(null)
         }
       } else {
-        setExternalError(
-          externalRes.reason instanceof Error
-            ? externalRes.reason.message
-            : String(externalRes.reason),
-        )
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
         setExternal(null)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (activeAccountRef.current === accountId) {
+        setError(richMenuError(e, 'load'))
+      }
     } finally {
-      setLoading(false)
+      if (activeAccountRef.current === accountId) setLoading(false)
     }
   }, [selectedAccount?.id])
 
@@ -155,85 +265,174 @@ export default function RichMenusListPage() {
 
   const [reorderBusy, setReorderBusy] = useState(false)
 
-  /**
-   * 1つ上／下と順番を入れ替える。
-   *
-   * 画面に出ている並びの中で入れ替える。フォルダや絞り込みで隠れているものは
-   * 動かさない。見えていないものが動くと、何が起きたか分からなくなる。
-   */
+  /** 1つ上／下と、友だちへ実際に出す優先順を入れ替える。 */
   async function moveGroup(group: RichMenuGroupListItem, delta: number) {
-    const list = shownGroups
-    const index = list.findIndex((g) => g.id === group.id)
-    const target = list[index + delta]
-    if (!target) return
+    // 実際の判定と同じ targetingPriority 順で全件を並べる。絞り込み中の
+    // 画面だけを基準にすると、隠れているメニューとの優先関係が壊れる。
+    const reordered = moveTargetingGroup(groups, group.id, delta === -1 ? -1 : 1)
+    if (!reordered) return
     setReorderBusy(true)
     try {
-      // 同じ数字どうしだと入れ替えても並びが変わらない。並んでいる位置を
-      // そのまま番号にして、確実に前後が入れ替わるようにする。
-      await Promise.all([
-        api.richMenuGroups.update(group.id, { displayOrder: index + delta }),
-        api.richMenuGroups.update(target.id, { displayOrder: index }),
-      ])
+      // 古いデータは同じ優先番号を持つことがある。変更した2件だけを交換すると
+      // 同順位が残るため、全件を0,1,2…へそろえる。displayOrder も同じ値へ寄せ、
+      // 以前の「自分で決めた順」を読む場所とも食い違わせない。
+      await Promise.all(
+        reordered.map((item) =>
+          api.richMenuGroups.update(item.id, {
+            targetingPriority: item.priority,
+            displayOrder: item.priority,
+          }),
+        ),
+      )
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      alert(richMenuError(e, 'reorder'))
     } finally {
       setReorderBusy(false)
     }
   }
 
-  async function handleDelete(group: RichMenuGroupListItem) {
+  function beginImpactRequest(accountId: string, groupId: string): DeleteImpactRequest {
+    const request = {
+      accountId,
+      groupId,
+      generation: impactRequestGenerationRef.current + 1,
+    }
+    impactRequestGenerationRef.current = request.generation
+    impactRequestRef.current = request
+    return request
+  }
+
+  async function loadImpact(request: DeleteImpactRequest) {
+    /*
+      **遅れて返った別のメニューの結果を映さない。** Aを読み込み中に窓を
+      閉じてBを開くと、あとから返るAの結果がBの窓に出る。表示とボタンの
+      可否が別のメニューのものになる（サーバは削除時に確かめ直すので
+      誤って消しはしないが、読んでいるものと押せるものが食い違う）。
+    */
+    const loadGeneration = impactLoadGenerationRef.current + 1
+    impactLoadGenerationRef.current = loadGeneration
+    setImpactPhase('loading')
+    setImpact(null)
+    try {
+      const res = await api.richMenuGroups.deleteImpact(request.groupId)
+      if (
+        !sameDeleteImpactRequest(impactRequestRef.current, request)
+        || impactLoadGenerationRef.current !== loadGeneration
+      ) return
+      if (!res.success) throw new Error('impact_failed')
+      if (!impactMatchesRequest(res.data, request)) throw new Error('impact_scope_mismatch')
+      setImpact(res.data)
+      setImpactPhase('ready')
+    } catch {
+      if (
+        !sameDeleteImpactRequest(impactRequestRef.current, request)
+        || impactLoadGenerationRef.current !== loadGeneration
+      ) return
+      /*
+        影響が読めないときは**消させない**。何が起きるか分からないまま
+        取り消せない操作をさせるより、読み直してもらうほうがよい。
+      */
+      setImpactPhase('error')
+    }
+  }
+
+  function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
-      alert(
-        `「${group.name}」は LINE に登録されています。\n\n` +
-          '編集画面の「危険な操作」から「LINE から取り下げ」を実行してから、改めて削除してください。',
-      )
+      setPublishedDeleteTarget(group)
       return
     }
-    if (!confirm(`「${group.name}」を削除します。元には戻せません。`)) return
+    setDeleteError(null)
+    setDeleteTarget({ kind: 'managed', group })
+    if (!selectedAccount?.id) return
+    const request = beginImpactRequest(selectedAccount.id, group.id)
+    void loadImpact(request)
+  }
+
+  function handleDeleteExternal(menu: LineMenu) {
+    if (!selectedAccount?.id) return
+    setDeleteError(null)
+    beginImpactRequest(selectedAccount.id, `external:${menu.richMenuId}`)
+    setDeleteTarget({ kind: 'external', menu })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deleteBusy) return
+    const request = impactRequestRef.current
+    if (!request) return
+    const action: RichMenuAction = deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'
+    setDeleteBusy(true)
+    setDeleteError(null)
     try {
-      const res = await api.richMenuGroups.delete(group.id)
-      if (!res.success) throw new Error(res.error ?? '削除失敗')
+      if (deleteTarget.kind === 'managed') {
+        const res = await api.richMenuGroups.delete(deleteTarget.group.id)
+        if (!res.success) throw new Error('delete_failed')
+      } else {
+        if (!selectedAccount?.id) throw new Error('account_missing')
+        const res = await api.richMenuGroups.deleteExternal(
+          deleteTarget.menu.richMenuId,
+          selectedAccount.id,
+        )
+        if (!res.success) throw new Error('delete_failed')
+      }
+      if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      setDeleteTarget(null)
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      /*
+        **409は「読んだあとに状態が変わった」。** Workerがその時点の影響を
+        一緒に返すので、古い「消せます」を残さず描き直す。
+      */
+      if (e instanceof ApiError && e.status === 409) {
+        const latest = impactFromError(e.data)
+        if (latest && impactMatchesRequest(latest, request)) {
+          setImpact(latest)
+          setImpactPhase('ready')
+        } else if (deleteTarget.kind === 'managed') {
+          void loadImpact(request)
+        }
+      }
+      setDeleteError(richMenuError(e, action))
+    } finally {
+      if (sameDeleteImpactRequest(impactRequestRef.current, request)) setDeleteBusy(false)
     }
   }
 
-  async function handleDeleteExternal(menu: LineMenu) {
+  function handleImport(menu: LineMenu) {
     if (!selectedAccount?.id) return
-    if (
-      !confirm(
-        `LINE 上のリッチメニュー「${menu.name}」(richMenuId: ${menu.richMenuId.slice(0, 14)}...) を削除します。\n\n` +
-          'この管理画面外で作成されたメニューを LINE 公式アカウントから消します。元に戻せません。\n\n続行しますか？',
-      )
-    )
-      return
-    try {
-      const res = await api.richMenuGroups.deleteExternal(menu.richMenuId, selectedAccount.id)
-      if (!res.success) throw new Error(res.error ?? '削除失敗')
-      await reload()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
-    }
+    setImportError(null)
+    setImportTarget(menu)
   }
 
-  async function handleImport(menu: LineMenu) {
-    if (!selectedAccount?.id) return
-    if (
-      !confirm(
-        `「${menu.name}」を管理画面に取り込みます。\n\n` +
-          '取り込み後は「管理画面で作成・編集するメニュー」セクションに表示され、編集や友だちへの再適用が可能になります。\n\n続行しますか？',
-      )
-    )
-      return
+  async function confirmImport() {
+    if (!selectedAccount?.id || !importTarget || importBusy) return
+    const menu = importTarget
+    const accountId = selectedAccount.id
+    const requestGeneration = ++importRequestGenerationRef.current
+    setImportBusy(true)
+    setImportError(null)
     try {
-      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, selectedAccount.id)
-      if (!res.success) throw new Error(res.error ?? '取り込み失敗')
-      alert(`取り込みました: ${res.data?.name ?? menu.name}`)
+      const res = await api.richMenuGroups.importFromLine(menu.richMenuId, accountId)
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
+      if (!res.success) throw new Error('import_failed')
+      setImportTarget(null)
+      setImportedMenuName(res.data?.name ?? menu.name)
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      if (
+        importRequestGenerationRef.current !== requestGeneration ||
+        activeAccountRef.current !== accountId
+      ) return
+      setImportError(richMenuError(e, 'import'))
+    } finally {
+      if (
+        importRequestGenerationRef.current === requestGeneration &&
+        activeAccountRef.current === accountId
+      ) setImportBusy(false)
     }
   }
 
@@ -243,18 +442,34 @@ export default function RichMenusListPage() {
   const topArea = tapStats?.byArea[0] ?? null
   const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
   const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
+  const groupKpiState = !selectedAccount?.id
+    ? 'unselected'
+    : loading
+      ? 'loading'
+      : error
+        ? 'error'
+        : 'ready'
+  const groupKpiReady = groupKpiState === 'ready'
+  const groupKpiUnavailableText =
+    groupKpiState === 'unselected'
+      ? 'LINEアカウントを選ぶと表示します'
+      : groupKpiState === 'loading'
+        ? '読み込んでいます'
+        : '一覧を取得できませんでした'
 
   const q = query.trim()
-  const byQuery = q
+  const byQuery = !reordering && q
     ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
     : groups
   const inFolder = byQuery.filter((g) => {
+    if (reordering) return true
     if (folderFilter === UNFILED) return !g.folderId
     if (folderFilter) return g.folderId === folderFilter
     return true
   })
 
   const inSaved = inFolder.filter((g) => {
+    if (reordering) return true
     if (savedFilter === 'published') return g.status === 'published'
     if (savedFilter === 'draft') return g.status === 'draft'
     if (savedFilter === 'used') return (tapsByGroup.get(g.id) ?? 0) > 0
@@ -270,72 +485,42 @@ export default function RichMenusListPage() {
         return a.name.localeCompare(b.name, 'ja')
       case 'updated':
         return b.updatedAt.localeCompare(a.updatedAt)
-      case 'manual':
-        // 自分で決めた順。同じ数字なら更新の新しい順（一覧の既定と同じ）。
-        return a.displayOrder - b.displayOrder || b.updatedAt.localeCompare(a.updatedAt)
+      case 'priority':
+        // Worker が友だちへ出すメニューを選ぶ順番と同じ。
+        return compareTargetingGroups(a, b)
     }
   })
 
-  const shownGroups = sorted.slice(0, pageSize)
-  const hiddenCount = sorted.length - shownGroups.length
+  const priorityRankByGroup = new Map(
+    orderTargetingGroups(groups)
+      .map((group, index) => [group.id, index + 1]),
+  )
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const shownGroups = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setPage(1)
+  }, [folderFilter, pageSize, query, savedFilter, sortKey])
 
   return (
-    <main className="p-6 max-w-7xl mx-auto">
-      <div data-design="Head">
-        <Header
-          title="リッチメニュー"
-          description="トーク画面の下に表示されるメニューを作ります。友だちの状態ごとに出し分けでき、タップ数を計測できます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <button
-                onClick={() => {
-                  // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
-                  // 他の順で上下させても、次に開いたときその順で並ばない。
-                  setSortKey('manual')
-                  setReordering((v) => !v)
-                }}
-                aria-pressed={reordering}
-                className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
-                  reordering
-                    ? 'border-accent bg-accent-soft text-ink'
-                    : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                }`}
-              >
-                {reordering ? '並び替えを終える' : '並び替え'}
-              </button>
-              <button
-                onClick={() => setFolderDialogOpen(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
-              >
-                フォルダを追加
-              </button>
-              <Link
-                href="/rich-menus/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-              >
-                メニューを作成
-              </Link>
-            </div>
-          }
-        />
-      </div>
-
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <main data-design-node="GO8RQ" className="p-6 max-w-7xl mx-auto">
+      <div
+        data-design="KPIs"
+        data-group-kpi-state={groupKpiState}
+        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">メニュー</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {groups.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
+            {groupKpiReady ? groups.length : '—'}
+            {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {groups.filter((g) => g.status === 'published').length}
+            {groupKpiReady
+              ? `公開中 ${groups.filter((g) => g.status === 'published').length}`
+              : `公開中 —・${groupKpiUnavailableText}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -364,14 +549,16 @@ export default function RichMenusListPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">出し分け</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {targetingCount}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
+            {groupKpiReady ? targetingCount : '—'}
+            {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {targetingCount > 0
-              ? 'タグ条件で自動的に切り替わります'
-              : 'タグ条件で出し分けているメニューはありません'}
+            {groupKpiReady
+              ? targetingCount > 0
+                ? 'タグ条件で自動的に切り替わります'
+                : 'タグ条件で出し分けているメニューはありません'
+              : groupKpiUnavailableText}
           </p>
         </div>
       </div>
@@ -380,6 +567,18 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
+        <Link
+          href="/rich-menus/new"
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+        >
+          メニューを作る
+        </Link>
+        <button
+          onClick={() => setFolderDialogOpen(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
+        >
+          フォルダを追加
+        </button>
         <input
           type="search"
           value={query}
@@ -395,10 +594,10 @@ export default function RichMenusListPage() {
           aria-label="並び順"
           className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
         >
+          <option value="priority">出す順番（自分で決めた順）</option>
           <option value="taps">タップ数が多い順</option>
           <option value="updated">更新が新しい順</option>
           <option value="name">名前順</option>
-          <option value="manual">自分で決めた順</option>
         </select>
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
         <select
@@ -413,6 +612,28 @@ export default function RichMenusListPage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => {
+            // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
+            setSortKey('priority')
+            setPage(1)
+            setReordering((v) => !v)
+          }}
+          aria-pressed={reordering}
+          className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
+            reordering
+              ? 'border-accent bg-accent-soft text-ink'
+              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+          }`}
+        >
+          {reordering ? '並び替えを終える' : '出す順番を変える'}
+        </button>
+      </div>
+
+      <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
+        <span className="font-semibold">出す順番：</span>
+        上にあるメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、
+        いちばん上の1つだけが表示されます。
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
@@ -449,7 +670,10 @@ export default function RichMenusListPage() {
 
       {selectedAccount && !loading && error && (
         <div className="bg-danger-bg border border-danger-bg text-danger text-sm p-3 rounded mb-4">
-          {error}
+          <p>{error}</p>
+          <button type="button" className="mt-2 underline" onClick={() => void reload()}>
+            もう一度読み込む
+          </button>
         </div>
       )}
 
@@ -465,7 +689,7 @@ export default function RichMenusListPage() {
       )}
       {selectedAccount && !loading && externalError && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded mb-6">
-          LINE 公式アカウントの状態取得に失敗しました: {externalError}
+          {externalError}
         </div>
       )}
 
@@ -566,6 +790,9 @@ export default function RichMenusListPage() {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
                     <span className="whitespace-nowrap">
+                      出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
+                    </span>
+                    <span className="whitespace-nowrap">
                       サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}
                     </span>
                     {tapStats && (
@@ -588,7 +815,9 @@ export default function RichMenusListPage() {
               </Link>
               {reordering && (
                 <div className="border-hairline bg-canvas-sunken flex items-center justify-between gap-2 border-t px-4 py-2">
-                  <span className="text-ink-faint text-[11px]">並び順 {g.displayOrder}</span>
+                  <span className="text-ink-faint text-[11px]">
+                    出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
+                  </span>
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => void moveGroup(g, -1)}
@@ -624,8 +853,15 @@ export default function RichMenusListPage() {
                 >
                   編集
                 </Link>
+                <Link
+                  href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`}
+                  className="text-ink-secondary hover:underline"
+                >
+                  切替のつながりを見る
+                </Link>
                 <button
                   onClick={() => handleDelete(g)}
+                  data-qa-open={g.status === 'published' ? 'szXsT-published' : 'szXsT'}
                   className="text-ink-faint hover:text-red-600 hover:underline"
                   title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
                 >
@@ -638,10 +874,18 @@ export default function RichMenusListPage() {
         </div>
       )}
 
-      {hiddenCount > 0 && (
-        <p className="text-ink-faint mt-3 text-center text-xs">
-          ほかに {hiddenCount} 件あります。「表示」を増やすと出ます。
-        </p>
+      {selectedAccount && !loading && !error && sorted.length > 0 && (
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <p className="text-ink-faint text-xs">
+            {(currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, sorted.length)}件 / 全{sorted.length}件
+          </p>
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            ariaLabel="リッチメニューのページ送り"
+          />
+        </div>
       )}
 
       {applyTo && (
@@ -651,6 +895,193 @@ export default function RichMenusListPage() {
           onClose={() => setApplyTo(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={importTarget !== null}
+        designNode="TL7tp"
+        title={
+          importTarget
+            ? `「${importTarget.name}」を管理画面に取り込みますか？`
+            : 'LINE上のメニューを管理画面に取り込みますか？'
+        }
+        description="LINE公式アカウント上にある設定を読み取り、管理画面へ新しく追加します。"
+        confirmLabel="管理画面に取り込む"
+        busy={importBusy}
+        error={importError ?? undefined}
+        onCancel={() => {
+          if (importBusy) return
+          setImportTarget(null)
+          setImportError(null)
+        }}
+        onConfirm={() => void confirmImport()}
+      >
+        <ul className="space-y-2 text-sm text-ink-secondary">
+          <li>
+            <strong className="text-ink">管理画面に追加するもの：</strong>
+            名前・画像・ボタンの設定
+          </li>
+          <li>
+            <strong className="text-ink">上書きするもの：</strong>
+            ありません。すでに管理中のメニューは重ねて取り込みません。
+          </li>
+          <li>
+            <strong className="text-ink">LINE上に残るもの：</strong>
+            現在のメニューと、友だちに表示している状態
+          </li>
+        </ul>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={importedMenuName !== null}
+        designNode="TL7tp"
+        title={
+          importedMenuName
+            ? `「${importedMenuName}」を管理画面に取り込みました`
+            : '管理画面に取り込みました'
+        }
+        description="LINE上の表示は変更していません。管理画面で編集できるようになりました。"
+        cancelLabel="閉じる"
+        onCancel={() => setImportedMenuName(null)}
+      />
+
+      <ConfirmDialog
+        open={publishedDeleteTarget !== null}
+        designNode="szXsT"
+        title={
+          publishedDeleteTarget
+            ? `「${publishedDeleteTarget.name}」は先にLINEから取り下げてください`
+            : '先にLINEから取り下げてください'
+        }
+        description="LINEに登録中のリッチメニューは、管理画面だけから削除できません。いまは削除していません。"
+        cancelLabel="閉じる"
+        onCancel={() => setPublishedDeleteTarget(null)}
+      >
+        <ol className="space-y-2 text-sm text-ink-secondary">
+          <li>
+            <strong className="text-ink">次にすること：</strong>
+            「編集」→「危険な操作」→「LINEから取り下げ」の順に進んでください。
+          </li>
+          <li>
+            <strong className="text-ink">そのあと：</strong>
+            一覧へ戻り、改めて「削除」を選んでください。
+          </li>
+          <li>
+            <strong className="text-ink">いま残っているもの：</strong>
+            LINE上の表示、管理画面の設定、これまでのタップ記録は変更していません。
+          </li>
+        </ol>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        designNode="szXsT"
+        title={
+          deleteTarget
+            ? `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
+            : 'リッチメニューを削除しますか？'
+        }
+        description={
+          deleteTarget?.kind === 'managed'
+            ? '管理画面に保存したこのリッチメニューを削除します。LINEに登録中のメニューは、先に取り下げない限り削除できません。'
+            : 'この管理画面外で作成されたリッチメニューを、LINE公式アカウントから削除します。'
+        }
+        confirmLabel={deleteTarget?.kind === 'external' ? 'LINEから削除' : '削除する'}
+        destructive
+        busy={deleteBusy}
+        error={deleteError ?? undefined}
+        onCancel={() => {
+          if (deleteBusy) return
+          impactRequestGenerationRef.current += 1
+          impactLoadGenerationRef.current += 1
+          impactRequestRef.current = null
+          setDeleteTarget(null)
+          setDeleteError(null)
+          setImpact(null)
+          setImpactPhase('idle')
+        }}
+        {...(deleteTarget?.kind === 'external' || canDeleteImpact({ impact, busy: deleteBusy })
+          ? { onConfirm: () => void confirmDelete() }
+          : {})}
+      >
+        {deleteTarget?.kind === 'managed' ? (
+          <>
+            <ul className="space-y-2 text-sm text-ink-secondary">
+              <li>
+                <strong className="text-ink">消えるもの：</strong>
+                このリッチメニューの設定と画像
+              </li>
+              <li>
+                <strong className="text-ink">残るもの：</strong>
+                同じフォルダのほかのメニューと、これまでのタップ記録
+              </li>
+              <li>
+                <strong className="text-danger">元に戻せません。</strong>
+              </li>
+            </ul>
+            {/*
+              消したあとに何が起きるか（契約 #608）。読込・失敗・通常を
+              分ける。**読めないときは消させない。**
+            */}
+            {impactPhase === 'loading' ? (
+              <p className="mt-3 text-xs text-ink-faint">消したときの影響を確認しています…</p>
+            ) : impactPhase === 'error' ? (
+              <p className="mt-3 text-xs font-semibold text-danger" role="alert">
+                消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。
+              </p>
+            ) : impact ? (
+              <div className="border-hairline mt-3 space-y-1.5 border-t pt-3 text-xs leading-5 text-ink-secondary">
+                <p>
+                  <strong className="text-ink">いま表示している人数：</strong>
+                  {audienceText(impact.currentAudience)}
+                  {audienceReason(impact.currentAudience)
+                    ? `（${audienceReason(impact.currentAudience)}）`
+                    : ''}
+                </p>
+                <p>
+                  <strong className="text-ink">次に出るメニュー：</strong>
+                  {nextDisplayText(impact.nextDisplay)}
+                </p>
+                <p>
+                  <strong className="text-ink">切替元：</strong>
+                  {impact.incomingSwitches.length === 0
+                    ? 'ありません'
+                    : impact.incomingSwitches
+                        .map((sw) => `${sw.sourceGroupName}の「${sw.areaLabel ?? sw.sourcePageName}」`)
+                        .join('・')}
+                </p>
+                <p>
+                  <strong className="text-ink">使っている自動処理：</strong>
+                  {impact.operationalReferences.length === 0
+                    ? 'ありません'
+                    : impact.operationalReferences
+                        .map((ref) => `${referenceKindText(ref.kind)}「${ref.ownerName}」`)
+                        .join('・')}
+                </p>
+                {blockerTexts(impact.blockers).map((text) => (
+                  <p key={text} className="font-semibold text-danger" role="alert">{text}</p>
+                ))}
+                {impact.blockers.length === 0 ? null : (
+                  <p className="text-ink-faint">{recommendedActionText(impact.recommendedAction)}</p>
+                )}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <ul className="space-y-2 text-sm text-ink-secondary">
+            <li>
+              <strong className="text-ink">消えるもの：</strong>
+              LINE公式アカウント上のこのリッチメニュー
+            </li>
+            <li>
+              <strong className="text-ink">残るもの：</strong>
+              管理画面で作成・編集しているほかのリッチメニュー
+            </li>
+            <li>
+              <strong className="text-danger">元に戻せません。</strong>
+            </li>
+          </ul>
+        )}
+      </ConfirmDialog>
     </main>
   )
 }
@@ -814,6 +1245,7 @@ function ExternalSection({
                       <div className="flex flex-col items-end gap-1">
                         <button
                           onClick={() => onImport(m)}
+                          data-qa-open="TL7tp"
                           className="text-accent text-xs font-medium hover:underline"
                           title="管理画面に取り込んで以後 UI で操作可能にする"
                         >
