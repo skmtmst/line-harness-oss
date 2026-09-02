@@ -15,6 +15,8 @@ export interface AffiliateLink {
   click_count: number;
   /** Offer this link belongs to (ASP Phase 2). NULL = 汎用リンク. */
   offer_id: string | null;
+  /** ref-code lookup時だけ付く。紹介者停止後の新規流入を止める。 */
+  affiliate_is_active?: number;
 }
 
 // ── slug generation ──────────────────────────────────────────────────────────
@@ -122,7 +124,12 @@ export async function getAffiliateLinkByRefCode(
   refCode: string,
 ): Promise<AffiliateLink | null> {
   return db
-    .prepare(`SELECT * FROM affiliate_links WHERE ref_code = ?`)
+    .prepare(
+      `SELECT al.*, a.is_active AS affiliate_is_active
+         FROM affiliate_links al
+         JOIN affiliates a ON a.id = al.affiliate_id
+        WHERE al.ref_code = ?`,
+    )
     .bind(refCode)
     .first<AffiliateLink>();
 }

@@ -8,7 +8,7 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'u
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 const FRIEND_INFO = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 const INBOX_KPIS = readFileSync(join(HERE, 'inbox-kpis.tsx'), 'utf8')
-const INBOX_SELECT = readFileSync(join(HERE, 'inbox-select.tsx'), 'utf8')
+const INBOX_DROPDOWN = readFileSync(join(HERE, 'inbox-dropdown.tsx'), 'utf8')
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
 const WORKER_CHATS = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'chats.ts'),
@@ -16,6 +16,10 @@ const WORKER_CHATS = readFileSync(
 )
 const WORKER_EMAIL = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'support-inbox.ts'),
+  'utf8',
+)
+const VISUAL_QA_MOCK = readFileSync(
+  join(HERE, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'),
   'utf8',
 )
 
@@ -38,7 +42,7 @@ describe('受信箱V4で既存機能を失わない', () => {
 
   it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
     expect(TEMPLATE_PICKER).toContain('入力欄へ挿入')
-    expect(TEMPLATE_PICKER).toContain('すべてのフォルダ')
+    expect(TEMPLATE_PICKER).toContain('FolderDropdown')
     expect(TEMPLATE_PICKER).toContain('送信内容のプレビュー')
     expect(PAGE).toContain('setMessageContent')
     expect(TEMPLATE_PICKER).toContain('createPortal')
@@ -120,19 +124,18 @@ describe('受信箱V4の画面契約', () => {
 
   it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
-    expect(PAGE).toContain('aria-label="担当者で絞り込む"')
+    expect(PAGE).toContain('ariaLabel="担当者で絞り込む"')
     expect(PAGE).toContain("assigneeFilter === 'unassigned'")
     expect(PAGE).toContain('item.assignedStaffId === assigneeFilter')
     expect(PAGE).toContain('chat.operatorId !== assigneeFilter')
   })
 
   it('担当と対応をV6専用プルダウンで操作し、開状態も確認できる', () => {
-    expect(PAGE).toContain("import InboxSelect")
-    expect(PAGE).toContain('aria-label="担当者を変更"')
-    expect(PAGE).toContain('aria-label="対応マークを変更"')
-    expect(INBOX_SELECT).toContain('role="listbox"')
-    expect(INBOX_SELECT).toContain('担当者名を検索')
-    expect(INBOX_SELECT).not.toContain('<select')
+    expect(PAGE).toContain('import { OperatorDropdown, StatusDropdown')
+    expect(PAGE).toContain('ariaLabel="担当者を変える"')
+    expect(PAGE).toContain('ariaLabel="対応マークを変える"')
+    expect(INBOX_DROPDOWN).toContain('role="listbox"')
+    expect(INBOX_DROPDOWN).toContain('担当者名を検索')
   })
 
   it('トーク見出しに本名・注目・代替アバターを出す', () => {
@@ -142,17 +145,24 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain("__attention: next ? '1' : null")
     expect(WORKER_CHATS).toContain('friendRealName: friend?.real_name || null')
     expect(WORKER_CHATS).toContain("isAttention: friendMetadata.__attention === '1'")
+    expect(VISUAL_QA_MOCK).toContain('friendRealName: friend?.realName ?? null')
+    expect(VISUAL_QA_MOCK).toContain("isAttention: friend?.metadata?.__attention === '1'")
   })
 
   it('会話を切り替えた後に古い詳細応答を表示・操作へ使わない', () => {
     expect(PAGE).toContain('const detailRequestIdRef = useRef(0)')
     expect(PAGE).toContain('requestId !== detailRequestIdRef.current')
     expect(PAGE).toContain('detailRequestIdRef.current += 1')
+    expect(PAGE).toContain('detailAccountRef.current === selectedAccountId')
+    expect(PAGE).toContain('setSelectedChatId(null)')
+    expect(PAGE).toContain('current?.id === updatingChatId')
+    expect(PAGE).toContain('if (!chatDetail || attentionSaving) return')
+    expect(PAGE).not.toContain('チャット詳細の読み込みに失敗しました:')
   })
 
   it('シナリオ開始の札と時刻を分ける', () => {
     expect(PAGE).toContain('<Link2 aria-hidden="true"')
-    expect(PAGE).toContain('<time className="text-[10px] text-ink-faint">{startedAt}</time>')
+    expect(PAGE).toContain('<time className="text-micro text-ink-faint">{startedAt}</time>')
   })
 
   it('狭い画面でも対応状況の見出しを1行で表示する', () => {

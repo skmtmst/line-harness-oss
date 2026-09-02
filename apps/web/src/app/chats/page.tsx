@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
+import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
+import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -18,7 +21,6 @@ import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
-import InboxSelect, { type InboxSelectOption } from '@/components/chats/inbox-select'
 import { Link2, Star } from 'lucide-react'
 
 interface Chat {
@@ -93,13 +95,6 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'in_progress', label: '対応中' },
   { key: 'on_hold', label: '保留' },
   { key: 'resolved', label: '対応済' },
-]
-
-const chatStatusOptions: InboxSelectOption[] = [
-  { value: 'unread', label: '未対応', tone: 'danger' },
-  { value: 'in_progress', label: '対応中', tone: 'warning' },
-  { value: 'on_hold', label: '保留', tone: 'info' },
-  { value: 'resolved', label: '対応済', tone: 'success' },
 ]
 
 type InboxSavedViewConditions = {
@@ -402,6 +397,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [unreadOnly, setUnreadOnly] = useState(false)
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
@@ -483,6 +481,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreChats, setHasMoreChats] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [attentionSaving, setAttentionSaving] = useState(false)
   const [error, setError] = useState('')
   const [messageContent, setMessageContent] = useState('')
   const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
@@ -501,6 +500,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
   const detailRequestIdRef = useRef(0)
+  const detailAccountRef = useRef(selectedAccountId)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedNameQuery(nameQuery.trim()), 250)
@@ -651,36 +651,41 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sort: 'newest',
   })
 
-  const createSavedView = async () => {
-    if (savingView) return
-    const name = savedViewName.trim()
+  const createSavedView = async (nameOverride?: string): Promise<SavedViewSaveResult> => {
+    if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
+    // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
+    // 状態の更新を待つと、1回目の保存が空の名前で走る。
+    const name = (nameOverride ?? savedViewName).trim()
     if (!name) {
-      setSavedViewError('名前を入力してください')
-      return
+      const message = '名前を入力してください'
+      setSavedViewError(message)
+      return { success: false, error: message }
     }
     setSavingView(true)
     setSavedViewError('')
     try {
       if (!selectedAccountId) {
-        setSavedViewError('LINE公式アカウントを選んでください')
-        return
+        const message = 'LINE公式アカウントを選んでください'
+        setSavedViewError(message)
+        return { success: false, error: message }
       }
       const response = await api.chats.savedViews.create(selectedAccountId, {
         name,
         conditions: currentSavedViewConditions(),
       })
       if (!response.success) {
-        setSavedViewError(response.error || '保存できませんでした')
-        return
+        const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+        setSavedViewError(message)
+        return { success: false, error: message }
       }
       setSavedViewName('')
       await loadSavedViews()
-    } catch (savedViewCreateError) {
-      setSavedViewError(
-        savedViewCreateError instanceof Error
-          ? savedViewCreateError.message
-          : '保存できませんでした',
-      )
+      return { success: true }
+    } catch {
+      // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
+      const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+      setSavedViewError(message)
+      return { success: false, error: message }
     } finally {
       setSavingView(false)
     }
@@ -710,19 +715,30 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       if (res.success) {
         setChatDetail(res.data as unknown as ChatDetail)
       } else {
-        // API は 200 で success:false を返す可能性 (例: 404 lookup)。詳細を画面に出す。
-        const errMsg = (res as { error?: string }).error ?? '不明なエラー'
-        setError(`チャット詳細の読み込みに失敗しました: ${errMsg}`)
+        setChatDetail(null)
+        setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
       }
-    } catch (err) {
+    } catch {
       if (requestId !== detailRequestIdRef.current) return
-      // ネットワーク / parse / auth fail などの例外。empty catch だと原因不明だったので詳細を出す。
-      const msg = err instanceof Error ? err.message : String(err)
-      setError(`チャット詳細の読み込みに失敗しました: ${msg}`)
+      setChatDetail(null)
+      setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
       if (requestId === detailRequestIdRef.current) setDetailLoading(false)
     }
   }, [])
+
+  // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
+  // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
+  useEffect(() => {
+    if (detailAccountRef.current === selectedAccountId) return
+    detailAccountRef.current = selectedAccountId
+    detailRequestIdRef.current += 1
+    setSelectedChatId(null)
+    setSelectedFriendId(null)
+    setChatDetail(null)
+    setDetailLoading(false)
+    setAttentionSaving(false)
+  }, [selectedAccountId])
 
   useEffect(() => {
     loadChats()
@@ -1043,14 +1059,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
   const handleAttentionUpdate = async () => {
-    if (!chatDetail) return
+    if (!chatDetail || attentionSaving) return
+    const updatingChatId = chatDetail.id
     const next = !chatDetail.isAttention
-    setChatDetail((current) => current ? { ...current, isAttention: next } : current)
+    setAttentionSaving(true)
+    setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: next } : current)
     try {
       await api.friends.updateMetadata(chatDetail.friendId, { __attention: next ? '1' : null })
     } catch {
-      setChatDetail((current) => current ? { ...current, isAttention: !next } : current)
+      setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: !next } : current)
       setError('注目の変更に失敗しました。')
+    } finally {
+      setAttentionSaving(false)
     }
   }
 
@@ -1107,19 +1127,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
     ?? null
-  const operatorOptions: InboxSelectOption[] = [
-    { value: '', label: '未割り当て' },
-    ...operators.map((operator) => ({
-      value: operator.id,
-      label: operator.name,
-      initial: operator.name.charAt(0),
-    })),
-  ]
-  const assigneeOptions: InboxSelectOption[] = [
-    { value: 'all', label: 'すべて' },
-    ...operatorOptions,
-  ]
-
   return (
     <div className="space-y-3">
       {/* Error */}
@@ -1154,20 +1161,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
           </button>
         ))}
-        <details className="relative ml-auto">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
-            絞り込み
-          </summary>
-          <div className="absolute top-[calc(100%+6px)] right-0 z-30 w-52 rounded-lg border border-[#E5E7EB] bg-canvas p-3 shadow-lg">
-            <p className="text-[11px] font-semibold text-[#667085]">対応状態</p>
-            <div className="mt-2 grid gap-1">
-              {statusFilters.map((filter) => (
-                <button key={filter.key} type="button" onClick={() => setStatusFilter(filter.key)} className={`rounded-md px-2 py-1.5 text-left text-xs ${statusFilter === filter.key ? 'bg-[#EAFBF0] font-semibold text-[#057A37]' : 'text-[#667085] hover:bg-[#F7F8F6]'}`}>{filter.label}</button>
-              ))}
-            </div>
-          </div>
-        </details>
+        <span className="ml-auto" />
+        {/*
+          設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
+          右から420pxのパネルが出る（`bXyEA`）。
+
+          以前は `<details>` の小さな箱（208px）で、中身は対応状態だけだった。
+          設計は 対応マーク・担当者・受信経路・期限・メッセージ種別・未読だけ の
+          6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
+        */}
+        <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+          絞り込み
+        </Button>
         <div className="relative">
           <Button
             type="button"
@@ -1212,33 +1217,56 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 ))}
               </div>
+              {/*
+                前はここに名前の入力欄と保存ボタンが直接並んでいた。
+                **何を保存しようとしているのかが書いていない**ので、絞り込みを
+                変えたつもりで前の条件を保存してしまう。設計（`Ln4zS`）は
+                名前と「保存する条件」を並べて見せてから保存させる。
+              */}
               <div className="border-hairline mt-3 border-t pt-3">
-                <label htmlFor="saved-inbox-view-name" className="text-ink-faint text-xs font-semibold">
-                  現在の条件を保存
-                </label>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    id="saved-inbox-view-name"
-                    value={savedViewName}
-                    onChange={(event) => setSavedViewName(event.target.value)}
-                    maxLength={40}
-                    placeholder="例：自分の未対応"
-                    className="border-hairline focus:ring-accent min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none focus:border-accent focus:ring-2"
-                  />
-                  <Button
-                    variant="primary"
-                    type="button"
-                    onClick={() => void createSavedView()}
-                    disabled={savingView}
-                  >
-                    {savingView ? '保存中' : '保存'}
-                  </Button>
-                </div>
+                <Button variant="primary" type="button" onClick={() => setSaveDialogOpen(true)}>
+                  この条件を保存
+                </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
             </div>
           )}
         </div>
+        <SavedViewDialog
+          open={saveDialogOpen}
+          conditions={[
+            { label: '対応マーク', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
+            { label: '担当者', value: assigneeFilter === 'all' ? 'すべて' : assigneeFilter === 'unassigned' ? '未割り当て' : (operators.find((o) => o.id === assigneeFilter)?.name ?? 'すべて') },
+            { label: '受信経路', value: channel === 'all' ? 'LINE・MAIL' : channel === 'line' ? 'LINE' : 'MAIL' },
+          ]}
+          existingNames={savedViews.map((view) => view.name)}
+          saving={savingView}
+          onSave={async (name) => {
+            setSavedViewName(name)
+            return createSavedView(name)
+          }}
+          onClose={() => setSaveDialogOpen(false)}
+        />
+        <InboxFilterPanel
+          open={filterOpen}
+          value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
+          operators={operators}
+          onChange={(next) => {
+            setStatusFilter(next.status as StatusFilter)
+            setAssigneeFilter(next.assignee)
+            setUnreadOnly(next.unreadOnly)
+            if (next.channel !== channel) {
+              router.push(next.channel === 'all' ? '/chats' : `/chats?channel=${next.channel}`)
+            }
+          }}
+          onReset={() => {
+            setStatusFilter('all')
+            setAssigneeFilter('all')
+            setUnreadOnly(false)
+            router.push('/chats')
+          }}
+          onClose={() => setFilterOpen(false)}
+        />
       </section>
 
       <div
@@ -1269,15 +1297,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               />
             </div>
-            <InboxSelect
-              aria-label="担当者で絞り込む"
-              className="mt-2 w-full"
-              value={assigneeFilter === 'unassigned' ? '' : assigneeFilter}
-              onChange={(next) => setAssigneeFilter(next === '' ? 'unassigned' : next)}
-              options={assigneeOptions}
-              prefix="担当者"
-              searchable
-            />
+            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
+              <span className="shrink-0">担当者</span>
+              <span className="min-w-0 flex-1">
+                <OperatorDropdown
+                  value={assigneeFilter}
+                  operators={operators}
+                  onChange={setAssigneeFilter}
+                  label="担当者"
+                  ariaLabel="担当者で絞り込む"
+                />
+              </span>
+            </label>
             <div className="mt-2 flex items-center gap-1">
               {CHANNELS.map((item) => (
                 <button
@@ -1604,11 +1635,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
+                  {/*
+                    設計 `xGLVe` の見出しは、アバター・名前・「本名・種別・
+                    最終受信」の3点。**写真が無い人でも丸は出す。** 頭文字を
+                    入れておかないと、灰色の空丸が並んで誰の会話か目で追えない。
+                  */}
                   {chatDetail.friendPictureUrl ? (
-                    <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
+                    <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
                   ) : (
-                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-v6-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
-                      {chatDetail.friendName.charAt(0)}
+                    <span className="bg-accent-soft text-accent flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                      {(chatDetail.friendName || '?').charAt(0)}
                     </span>
                   )}
                   <div className="min-w-0">
@@ -1633,25 +1669,29 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     type="button"
                     aria-label={chatDetail.isAttention ? '注目から外す' : '注目にする'}
                     aria-pressed={chatDetail.isAttention}
+                    disabled={attentionSaving}
                     onClick={() => void handleAttentionUpdate()}
-                    className={`flex h-9 w-9 items-center justify-center rounded-control border ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
+                    className={`flex h-9 w-9 items-center justify-center rounded-control border disabled:cursor-wait disabled:opacity-60 ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
                   >
                     <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
                   </button>
-                  <InboxSelect
-                    aria-label="担当者を変更"
-                    className="w-36"
-                    value={chatDetail.operatorId ?? ''}
-                    onChange={(next) => void handleOperatorUpdate(next || null)}
-                    options={operatorOptions}
-                    prefix="担当"
-                  />
-                  <InboxSelect
-                    aria-label="対応マークを変更"
-                    className="w-32"
-                    value={chatDetail.status}
+                  {/*
+                    素の `<select>` から専用のプルダウンへ替えた。
+                    **開いた中身がブラウザ任せだと画像に写らない。** 設計の
+                    2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
+                    ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
+                  */}
+                  <StatusDropdown
+                    value={chatDetail.status as ChatStatus}
                     onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
-                    options={chatStatusOptions}
+                    ariaLabel="対応マークを変える"
+                  />
+                  <OperatorDropdown
+                    value={chatDetail.operatorId ?? 'unassigned'}
+                    operators={operators}
+                    onChange={(next) => void handleOperatorUpdate(next === 'unassigned' ? null : next)}
+                    label="担当"
+                    ariaLabel="担当者を変える"
                   />
                   {!showFriendInfo && (
                     <button
@@ -1726,7 +1766,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <Link2 aria-hidden="true" size={13} />
                               シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
-                            <time className="text-[10px] text-ink-faint">{startedAt}</time>
+                            <time className="text-micro text-ink-faint">{startedAt}</time>
                           </div>
                         </div>
                       )

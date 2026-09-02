@@ -190,16 +190,19 @@ export async function computeDedupBroadcastPreview(
   return { totalSelected, uniqueRecipients, reduction, reductionRate, perAccount };
 }
 
-import { LineClient, type Message } from '@line-crm/line-sdk';
+import { LineClient } from '@line-crm/line-sdk';
 import { getLineAccountById, jstNow, updateBroadcastLineRequestId } from '@line-crm/db';
-import { calculateStaggerDelay, sleep, addMessageVariation } from './stealth.js';
-import {
-  assertNoUnresolvedBroadcastVariables,
-  hasRecipientVariables,
-  renderBroadcastMessageContent,
-} from './render-message.js';
-import { buildMessage } from './broadcast.js';
+import { calculateStaggerDelay, sleep } from './stealth.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import {
+  assertMessagePartsResolved,
+  buildMessages,
+  hasRecipientVariablesInParts,
+  parseBroadcastMessageParts,
+  renderMessageParts,
+  varyTextMessages,
+  type BroadcastMessagePart,
+} from './broadcast-message-set.js';
 
 // LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
 // これ以上に増やすことはできない。
@@ -299,6 +302,8 @@ export async function processMultiAccountDedupBroadcast(
     target_tag_id?: string | null;
     message_type: string;
     message_content: string;
+    message_bubbles_json?: string | null;
+    messageParts?: BroadcastMessagePart[];
     alt_text?: string | null;
     dedup_progress?: string | null;
     aggregation_unit?: string | null;
@@ -374,22 +379,24 @@ export async function processMultiAccountDedupBroadcast(
     if (remaining.length === 0) continue; // このアカに残作業なし
 
     const client = lineClientFactory(account.channel_access_token);
-    const accountContent = renderBroadcastMessageContent(
-      broadcast.message_type,
-      broadcast.message_content,
-      { liffId: (account as unknown as { liff_id?: string | null }).liff_id ?? null },
-    );
-    const personalized = hasRecipientVariables(accountContent);
-    if (!personalized) assertNoUnresolvedBroadcastVariables(accountContent);
+    const sourceParts = broadcast.messageParts ?? parseBroadcastMessageParts({
+      messageType: broadcast.message_type,
+      messageContent: broadcast.message_content,
+      messageBubblesJson: broadcast.message_bubbles_json,
+      altText: broadcast.alt_text,
+    });
+    const accountParts = renderMessageParts(sourceParts, {
+      liffId: (account as unknown as { liff_id?: string | null }).liff_id ?? null,
+    });
+    const personalized = hasRecipientVariablesInParts(accountParts);
+    if (!personalized) assertMessagePartsResolved(accountParts);
     const deliveryBatchSize = personalized ? PERSONALIZED_PUSH_BATCH_SIZE : MULTICAST_BATCH_SIZE;
     const totalBatches = Math.ceil(remaining.length / deliveryBatchSize);
 
     // Per-account の liff_id でテンプレ変数 ({{liff_id}}) を置換してから
     // buildMessage する。これで 1 broadcast から複数アカへ配信する際、
     // 友だちの所属アカに対応した LIFF URL が届く (events の運用要件)。
-    const message = personalized
-      ? null
-      : buildMessage(broadcast.message_type, accountContent, broadcast.alt_text ?? undefined);
+    const messages = personalized ? null : buildMessages(accountParts);
 
     try {
       for (let i = 0; i < remaining.length; i += deliveryBatchSize) {
@@ -416,53 +423,46 @@ export async function processMultiAccountDedupBroadcast(
         if (personalized) {
           for (const recipient of batch) {
             try {
-              const content = renderBroadcastMessageContent(broadcast.message_type, accountContent, {
+              const renderedParts = renderMessageParts(accountParts, {
                 displayName: recipient.displayName,
               });
-              assertNoUnresolvedBroadcastVariables(content);
-              const recipientMessage = buildMessage(
-                broadcast.message_type,
-                content,
-                broadcast.alt_text ?? undefined,
-              );
+              assertMessagePartsResolved(renderedParts);
+              const recipientMessages = buildMessages(renderedParts);
               const retryKey = await createBroadcastRetryKey(
                 broadcast.id,
                 'dedup-personalized-push',
                 recipient.friendId,
-                broadcast.message_type,
-                content,
+                JSON.stringify(recipientMessages),
               );
-              await client.pushMessage(recipient.lineUserId, [recipientMessage], retryKey, [unit]);
-              delivered.push({ recipient, messageType: broadcast.message_type, content });
+              await client.pushMessage(recipient.lineUserId, recipientMessages, retryKey, [unit]);
+              for (const part of renderedParts) {
+                delivered.push({ recipient, messageType: part.messageType, content: part.messageContent });
+              }
             } catch (err) {
               batchDeliveryError = err;
               break;
             }
           }
         } else {
-          let batchMessage = message!;
-          if (batchMessage.type === 'text' && totalBatches > 1) {
-            batchMessage = { ...batchMessage, text: addMessageVariation(batchMessage.text, batchIdx) } as Message;
-          }
+          const batchMessages = varyTextMessages(messages!, batchIdx, totalBatches);
           const retryKey = await createBroadcastRetryKey(
             broadcast.id,
             'dedup-multicast',
             account.id,
             ...batch.map((r) => r.identKey),
-            JSON.stringify(batchMessage),
+            JSON.stringify(batchMessages),
           );
-          await client.multicast(batch.map((r) => r.lineUserId), [batchMessage], [unit], retryKey);
+          await client.multicast(batch.map((r) => r.lineUserId), batchMessages, [unit], retryKey);
           for (const recipient of batch) {
-            delivered.push({
-              recipient,
-              messageType: broadcast.message_type,
-              content: accountContent,
-            });
+            for (const part of accountParts) {
+              delivered.push({ recipient, messageType: part.messageType, content: part.messageContent });
+            }
           }
         }
 
         // multicast 成功直後に identKey を sent set へ追加。
         for (const { recipient: r } of delivered) {
+          if (sentSet.has(r.identKey)) continue;
           progress.sentIdentKeys.push(r.identKey);
           sentSet.add(r.identKey);
         }
