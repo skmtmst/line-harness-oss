@@ -12,6 +12,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 
 function displayText(value: string): string {
   return value
@@ -34,6 +35,7 @@ function questionSummary(question: ScenarioQuestion): string[] {
 function QuestionTemplatePageInner() {
   usePageTitle('質問を作る')
   const router = useRouter()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
   const [name, setName] = useState('')
@@ -46,21 +48,25 @@ function QuestionTemplatePageInner() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setCategories([])
+      return
+    }
     let cancelled = false
-    void api.templates.list().then((res) => {
+    void api.templates.list(undefined, selectedAccountId).then((res) => {
       if (cancelled || !res.success) return
       setCategories([...new Set(res.data.map((item) => item.category).filter(Boolean))])
     })
     return () => { cancelled = true }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
-    if (!id) return
+    if (!id || !selectedAccountId) return
     let cancelled = false
     setLoading(true)
     setError('')
-    void Promise.all([api.templates.get(id), api.templates.usages(id)])
-      .then(([template, usages]) => {
+    void api.templates.get(id)
+      .then((template) => {
         if (cancelled) return
         if (!template.success || !template.data.question) {
           setError('質問テンプレートを読み込めませんでした。')
@@ -69,9 +75,7 @@ function QuestionTemplatePageInner() {
         setName(template.data.name)
         setCategory(template.data.category || '未分類')
         setQuestion(template.data.question as ScenarioQuestion)
-        if (usages.success) {
-          setUsageCount(usages.data.scenarioSteps.length)
-        }
+        setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
       .catch(() => {
         if (!cancelled) setError('質問テンプレートを読み込めませんでした。')
@@ -80,11 +84,15 @@ function QuestionTemplatePageInner() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [id])
+  }, [id, selectedAccountId])
 
   const summaries = useMemo(() => questionSummary(question), [question])
 
   const save = async (questionStatus: 'draft' | 'published') => {
+    if (!selectedAccountId) {
+      setError('上のバーでLINE公式アカウントを選んでください。')
+      return
+    }
     if (!name.trim()) {
       setError('テンプレート名を入力してください。')
       return
@@ -100,6 +108,7 @@ function QuestionTemplatePageInner() {
     setSaving(true)
     setError('')
     const payload = {
+      accountId: selectedAccountId,
       name: name.trim(),
       category: category.trim() || '未分類',
       messageType: 'text',
@@ -123,7 +132,7 @@ function QuestionTemplatePageInner() {
     }
   }
 
-  if (loading) return <ListState kind="loading" title="質問テンプレートを読み込んでいます" />
+  if (loading || accountLoading) return <ListState kind="loading" title="質問テンプレートを読み込んでいます" />
 
   return (
     <div data-design-node="NNDMR" className="pb-24">

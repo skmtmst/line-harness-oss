@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => mocks)
 
+const accountAccess = vi.hoisted(() => ({
+  canAccessAllLineAccounts: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(),
+}))
+vi.mock('../services/account-access.js', () => accountAccess)
+
 import { templates } from './templates.js'
 
 const question = {
@@ -40,6 +46,11 @@ const bindings = { DB: {} as D1Database } as Env['Bindings']
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.getCarouselTapTotals.mockResolvedValue(new Map())
+  accountAccess.canAccessAllLineAccounts.mockResolvedValue(true)
+  accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: false,
+  })
   mocks.createTemplate.mockImplementation(async (_db, input) => ({
     id: 'question-1',
     name: input.name,
@@ -54,6 +65,7 @@ beforeEach(() => {
     folder_id: null,
     created_at: '2026-08-29T12:00:00+09:00',
     updated_at: '2026-08-29T12:00:00+09:00',
+    line_account_id: 'account-1',
   }))
 })
 
@@ -63,6 +75,7 @@ describe('question templates', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
+        accountId: 'account-1',
         name: '継続の意思をうかがう',
         category: '定期便',
         messageType: 'flex',
@@ -90,6 +103,7 @@ describe('question templates', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
+        accountId: 'account-1',
         name: '不完全な質問',
         category: '定期便',
         messageType: 'text',
@@ -108,6 +122,7 @@ describe('question templates', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
+        accountId: 'account-1',
         name: '壊れた選択肢',
         category: '定期便',
         messageType: 'text',
@@ -134,6 +149,7 @@ describe('question templates', () => {
       usage_count: 0,
       created_at: '2026-08-29T12:00:00+09:00',
       updated_at: '2026-08-29T12:00:00+09:00',
+      line_account_id: 'account-1',
     }])
 
     const response = await app().request('/api/templates', {}, bindings)
