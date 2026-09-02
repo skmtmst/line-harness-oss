@@ -5446,7 +5446,9 @@ export type WebinarCtaCard = {
 }
 
 export const webinarApi = {
-  list: () => fetchApi<{ data: Webinar[] }>('/api/webinars'),
+  list: (accountId?: string) => fetchApi<{ data: Webinar[] }>(
+    `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+  ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   create: (input: WebinarInput) =>
     fetchApi<{ data: Webinar }>('/api/webinars', { method: 'POST', body: JSON.stringify(input) }),

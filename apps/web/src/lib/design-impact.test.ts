@@ -12,8 +12,9 @@ describe('共通部品の影響範囲', () => {
 
   // 2026-09-02: /tags の旧V5画面（`app/tags/page.tsx` の描かれない枝）を消した。
   // 表示は `components/friend-fields/tags-page-v4.tsx` が正本で、
-  // 入口のpageは共通Button・共通ページ送りを使わなくなったため76→75。
-  it('共通Buttonを直接importする75ファイルだけを利用先に数える', () => {
+  // 入口のpageは共通Button・共通ページ送りを使わなくなった。
+  // development 側も別に増減しているので、統合後の実数へ合わせる。
+  it('共通Buttonを直接importする80ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -70,6 +71,7 @@ describe('共通部品の影響範囲', () => {
       'app/webhooks/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webinars/edit/page.tsx',
+      'app/webinars/page.tsx',
       'components/auto-replies/edit-dialog.tsx',
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
@@ -104,7 +106,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする18ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする19ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -123,6 +125,7 @@ describe('共通部品の影響範囲', () => {
       'app/reminders/page.tsx',
       'app/rich-menus/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
+      'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
       'components/friends/friend-list-table.tsx',
