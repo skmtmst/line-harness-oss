@@ -77,9 +77,10 @@ describe('受信箱V4の画面契約', () => {
 
   it('V4の検索・チャネル・表示切替を持つ', () => {
     expect(PAGE).toContain('名前・メールアドレス・内容で検索')
-    expect(PAGE).toContain('顧客情報を開く')
+    // 設計 `H3lAOB`：開閉は同じ場所の1つのボタン。閉じる口が右パネルの中だけ
+    // だと、閉じたあと戻す口を別の場所で探すことになる。
+    expect(PAGE).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
     expect(PAGE).toContain('aria-label="顧客情報を閉じる"')
-    expect(PAGE).not.toContain("showFriendInfo ? '顧客情報を閉じる'")
     expect(EMAIL_THREAD).toContain('顧客情報を開く')
     expect(PAGE).toContain('新しい順')
   })
@@ -109,16 +110,15 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain("msg.sentByStaffName ?? '担当者'")
   })
 
-  it('内部メモは送信欄と分けたダイアログで編集できる', () => {
+  it('内部メモは送信欄と分けて編集でき、保存の口を残す', () => {
+    // 設計 `B7CER8` で画面を覆う窓から「内部メモ」ボタンの上に出る紙へ移した。
+    // 覆う窓のままだと、直前のやり取りを見ながら書けない。
     expect(PAGE).toContain('handleSaveMemo')
-    expect(PAGE).toContain('createPortal(')
     expect(PAGE).toContain('aria-labelledby="chat-internal-memo-title"')
     expect(EMAIL_THREAD).toContain('createPortal(')
     expect(EMAIL_THREAD).toContain('aria-labelledby="email-internal-memo-title"')
     expect(EMAIL_THREAD).toContain('/notes`')
-    expect(PAGE).toContain('担当者だけに表示され、相手には送信されません。')
     expect(EMAIL_THREAD).toContain('担当者だけに表示され、相手には送信されません。')
-    expect(PAGE).not.toContain('>\n                          閉じる\n                        </button>')
     expect(EMAIL_THREAD).not.toContain('>閉じる</button>')
   })
 

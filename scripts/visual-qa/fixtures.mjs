@@ -864,6 +864,32 @@ export const FRIEND_MILEAGE = {
     spent: 0,
   },
   history: [],
+  /*
+    **`insights` と `connections` を欠かさない。**
+
+    口の契約は `{ summary, history, insights, connections }` の4つ。
+    `insights` が無いと `mileage/friends/detail/page.tsx` が
+    `insights.rewardedActions` で投げ、**画面ごと「画面を表示できませんでした」
+    になって `HIU5O` と `vz0Ji` が1枚も撮れない。**
+    型に無い名前で書いても握りつぶされるだけなので、`MileageSelfInsights` と
+    `MileageConnectedAccount` の名前をそのまま使う。
+  */
+  insights: {
+    accountCount: 1,
+    rewardedActions: 3,
+    referralMiles: 0,
+    qualityReferralCount: 0,
+    lastEarnedAt: '2026-08-24T20:53:00+09:00',
+  },
+  connections: [
+    {
+      accountId: 'visual-qa-account',
+      accountName: '画面確認アカウント',
+      friendId: 'friend-1',
+      available: 5,
+      lastEarnedAt: '2026-08-24T20:53:00+09:00',
+    },
+  ],
 }
 
 /**

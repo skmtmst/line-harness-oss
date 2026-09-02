@@ -509,7 +509,13 @@ function InflowLinksPageInner() {
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
   // 「稼働中」は登録済みの行。orphan（外部が発行した未登録 ref）は流入実績が
   // あるだけで、こちらから止める・直すができないので数に入れない。
-  const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length
+  // 帯は画面全体の要約なので、**フォルダの選択や検索文字で数が変わってはいけない。**
+  // ここを `sortedRows`（フォルダ＋検索で絞ったもの）から数えていたため、
+  // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
+  // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
+  // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
+  const accountRouteCount = accountFilteredRows.length
+  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
   /*
     **読み込めていないときに0件と書かない。**
 
@@ -564,7 +570,7 @@ function InflowLinksPageInner() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
-          value={routeCountAvailable ? sortedRows.length : null}
+          value={routeCountAvailable ? accountRouteCount : null}
           unit="件"
           detail={
             routeCountAvailable

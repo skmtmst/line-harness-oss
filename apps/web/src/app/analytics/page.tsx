@@ -1286,13 +1286,33 @@ function metricText(
   return value.value.toLocaleString('ja-JP')
 }
 
+/**
+ * 指標が自分で言っている状態を見てから数を出す。
+ *
+ * 契約では `AnalyticsMetric` が `value` と一緒に `state` と `reason` を持っている。
+ * 初回集計を待っている（`pending`）ときや取得に失敗した（`failed`）とき、
+ * サーバは `value` に 0 を入れて返すことがある。**それをそのまま描くと
+ * 「日別集計の初回更新を待っています」と「0人」が同じカードに並び、
+ * 読む人には0が実測に見える。**
+ *
+ * 実測できた（`available`）か、途中まで集計できた（`partial`）ときだけ数を出す。
+ * それ以外は `—` にして、理由のほうを読ませる。
+ */
+function shownValue(metric: AnalyticsMetric<number>): number | null {
+  if (metric.value === null) return null
+  return metric.state === 'available' || metric.state === 'partial' ? metric.value : null
+}
+
 function MetricCell({ metric, percent, currency }: {
   metric: AnalyticsMetric<number | string>
   percent?: boolean
   currency?: boolean
 }) {
-  return <span className={metric.value === null ? 'text-ink-faint' : 'text-ink'} title={metric.reason ?? undefined}>
-    {metricText(metric, { percent, currency })}
+  // 表の桁も帯と同じ決めごとで出す。`value === null` だけ見ていると、
+  // 集計待ちの 0 が実測の 0 と同じ濃さで並ぶ。
+  const shown = metric.state === 'available' || metric.state === 'partial'
+  return <span className={metric.value === null || !shown ? 'text-ink-faint' : 'text-ink'} title={metric.reason ?? undefined}>
+    {shown ? metricText(metric, { percent, currency }) : '—'}
   </span>
 }
 
@@ -1316,19 +1336,28 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const addedValue = shownValue(overview.metrics.added)
+  const removedValue = shownValue(overview.metrics.removed)
+  // 差し引きは増加と減少から導いた値。元の2つが出せないなら、差し引きも出せない。
+  // ここを道連れにしないと「増えた —／減った —／差し引き 0人」という読めない並びになる。
+  const netValue = addedValue === null || removedValue === null ? null : shownValue(overview.metrics.net)
+  const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
+  // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
+  // 0 が並んだ30行を出さずに理由を1行で出す。
+  const daysShown = overview.state === 'available' || overview.state === 'partial'
   return <div data-design-node="Zxezb" className="space-y-4">
     {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="増えた友だち" value={overview.metrics.added.value} unit="人" detail={overview.metrics.added.reason ?? `初回 ${metricText(overview.metrics.firstTime)}人`} />
-      <KpiCard title="減った友だち" value={overview.metrics.removed.value} unit="人" detail={overview.metrics.removed.reason ?? 'ブロック・解除'} />
-      <KpiCard title="差し引き" value={overview.metrics.net.value} unit="人" detail="増加 − 減少" />
-      <KpiCard title="現在つながっている" value={overview.metrics.currentFriends.value} unit="人" detail={`再追加 ${metricText(overview.metrics.returning)}人`} />
+      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `初回 ${metricText(overview.metrics.firstTime)}人`)} />
+      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : 'ブロック・解除')} />
+      <KpiCard title="差し引き" value={netValue} unit="人" detail={overview.metrics.net.reason ?? (netValue === null ? pendingReason : '増加 − 減少')} />
+      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? `再追加 ${metricText(overview.metrics.returning)}人`} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3"><h2 className="text-sm font-semibold">日ごとの増減</h2><span className="text-ink-faint text-xs">{state.data.period.from}〜{state.data.period.to}</span></div>
       <table className="w-full table-fixed">
         <thead><TableHeadRow><Th>日付</Th><Th align="right">増加</Th><Th align="right">減少</Th><Th align="right">差し引き</Th><Th>同日の施策</Th></TableHeadRow></thead>
-        <tbody className="divide-hairline divide-y">{[...overview.days].reverse().map((day) => {
+        <tbody className="divide-hairline divide-y">{!daysShown ? <tr><td colSpan={5} className="text-ink-faint p-8 text-center text-sm">{pendingReason}</td></tr> : [...overview.days].reverse().map((day) => {
           const campaigns = overview.campaigns.filter((item) => item.date === day.date)
           const names = campaigns.map((item) => item.name).join('、')
           return <tr key={day.date} className="text-sm"><td className="px-4 py-2 tabular-nums">{day.date}</td><td className="px-4 py-2 text-right tabular-nums">{day.added}</td><td className="px-4 py-2 text-right tabular-nums">{day.removed}</td><td className="px-4 py-2 text-right font-medium tabular-nums">{day.net > 0 ? '+' : ''}{day.net}</td><td className="text-ink-secondary truncate px-4 py-2" title={names || undefined}>{names || '—'}</td></tr>

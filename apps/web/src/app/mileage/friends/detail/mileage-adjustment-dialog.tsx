@@ -229,7 +229,7 @@ export default function MileageAdjustmentDialog({
           ) : (
             <section aria-label="変更内容の確認" className="space-y-3">
               <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
-              <dl className="overflow-hidden rounded-card border border-hairline text-sm">
+              <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
                 <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} mile</dd></div>
                 <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} mile</dd></div>
                 <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} mile</dd></div>
