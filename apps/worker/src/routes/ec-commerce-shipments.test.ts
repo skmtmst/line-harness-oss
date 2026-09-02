@@ -32,7 +32,7 @@ async function callShipments(rows: Row[], query = '') {
   // 権限そのものの検証は middleware/role-guard.test.ts が持つ。
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false });
+    c.set('staff', { id: 'env-owner', name: 'Staff', role: 'owner', readOnly: false });
     return next();
   });
   app.route('/', ecCommerce);
@@ -97,7 +97,11 @@ describe('GET /api/ec-commerce/shipments', () => {
         order_items: JSON.stringify([{ name: '鹿肉ミンチ', quantity: 2 }]),
       }),
     ]);
-    expect((withSubscriptionItems.later as Row[])[0].items).toBe('猪肉スライス × 1');
+    const withItems = [
+      ...(withSubscriptionItems.soon as Row[]),
+      ...(withSubscriptionItems.later as Row[]),
+    ];
+    expect(withItems[0].items).toBe('猪肉スライス × 1');
 
     const withoutSubscriptionItems = await callShipments([
       orderRow({
@@ -107,7 +111,11 @@ describe('GET /api/ec-commerce/shipments', () => {
         order_items: JSON.stringify([{ name: '鹿肉ミンチ', quantity: 2 }]),
       }),
     ]);
-    expect((withoutSubscriptionItems.later as Row[])[0].items).toBe('鹿肉ミンチ × 2');
+    const withoutItems = [
+      ...(withoutSubscriptionItems.soon as Row[]),
+      ...(withoutSubscriptionItems.later as Row[]),
+    ];
+    expect(withoutItems[0].items).toBe('鹿肉ミンチ × 2');
   });
 
   it('商品情報がどちらにも無くても壊れない', async () => {
@@ -163,7 +171,10 @@ describe('GET /api/ec-commerce/shipments', () => {
       orderRow({ id: 'b', event_type: 'ec.subscription.upcoming', scheduled_shipping_date: '2026-09-01' }),
       orderRow({ id: 'c', event_type: 'ec.subscription.upcoming', scheduled_shipping_date: '2026-09-15' }),
     ]);
-    expect((data.later as Row[]).map((row) => row.id)).toEqual(['b', 'c', 'a']);
+    // 実行日が予定日に近づくと先頭行は「今日・明日」へ移る。区分に依存せず、
+    // 返事全体で日付順が保たれることを確認する。
+    const all = [...(data.soon as Row[]), ...(data.later as Row[])];
+    expect(all.map((row) => row.id)).toEqual(['b', 'c', 'a']);
   });
 
   it('走査した件数と上限を返す（取りこぼしの判断に使う）', async () => {

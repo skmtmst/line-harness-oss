@@ -206,6 +206,23 @@ describe('V6分析イベントと日別投影', () => {
     `);
     crossInsert.run('old-cross', '2025-07-25T00:00:00.000Z');
     crossInsert.run('kept-cross', '2025-07-27T00:00:00.000Z');
+    sqlite.exec(`
+      INSERT INTO analytics_saved_analyses (
+        id, line_account_id, name, kind, created_by_name, created_at, updated_at
+      ) VALUES ('saved-a','account-a','経路 × タグ','cross','担当A','2025-07-01','2025-07-01');
+      INSERT INTO analytics_saved_analysis_versions (
+        id, saved_analysis_id, line_account_id, version_number, definition_json, created_at
+      ) VALUES ('saved-version-a','saved-a','account-a',1,'{}','2025-07-01');
+      INSERT INTO analytics_saved_analysis_snapshots (
+        id, saved_analysis_id, analysis_version_id, line_account_id,
+        source_kind, source_result_id, period_from, period_to, time_zone,
+        data_cutoff_at, state, result_json, created_at
+      ) VALUES
+        ('old-snapshot','saved-a','saved-version-a','account-a','cross','old-cross',
+         '2025-07-01','2025-07-07','Asia/Tokyo','2025-07-08','available','{}','2025-07-25T00:00:00.000Z'),
+        ('kept-snapshot','saved-a','saved-version-a','account-a','cross','kept-cross',
+         '2025-07-01','2025-07-07','Asia/Tokyo','2025-07-08','available','{}','2025-07-27T00:00:00.000Z');
+    `);
     sqlite.prepare(
       `INSERT INTO analytics_url_exposure_queue (
          message_id, line_account_id, status, attempts, available_at,
@@ -230,6 +247,7 @@ describe('V6分析イベントと日別投影', () => {
       events: 1,
       dailyMetrics: 1,
       crossRuns: 1,
+      savedSnapshots: 1,
       urlExposures: 1,
       urlExposureQueue: 1,
     });
@@ -238,6 +256,8 @@ describe('V6分析イベントと日別投影', () => {
       .toEqual([{ metric_key: 'kept' }]);
     expect(sqlite.prepare(`SELECT id FROM analytics_cross_runs`).all())
       .toEqual([{ id: 'kept-cross' }]);
+    expect(sqlite.prepare(`SELECT id FROM analytics_saved_analysis_snapshots`).all())
+      .toEqual([{ id: 'kept-snapshot' }]);
     expect(sqlite.prepare(`SELECT message_id FROM analytics_url_exposures`).all())
       .toEqual([{ message_id: 'kept-message' }]);
     expect(sqlite.prepare(`SELECT message_id FROM analytics_url_exposure_queue`).all())

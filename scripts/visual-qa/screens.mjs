@@ -166,7 +166,10 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'IAf7j', name: '3-1-C 友だち（一括アクション）',
-    steps: [{ click: '表示中の友だちをすべて選ぶ', role: 'checkbox' }],
+    steps: [
+      { click: '表示中の友だちをすべて選ぶ', role: 'checkbox' },
+      { click: '操作を選ぶ' },
+    ],
   },
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0' },
   {
@@ -177,14 +180,12 @@ export const SCREENS = [
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates' },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
-    route: '/friends?tab=duplicates', status: 'unimplemented',
-    why: '重複検出タブに「再計算」しか無く、**候補を1件ずつ開く導線が無い**。設計は統合前の確認まで見せる',
+    route: '/friends/identity-candidates',
   },
   { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged' },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
-    route: '/friends?tab=merged', status: 'unimplemented',
-    why: '統合ユーザーの行を開く導線が無い（再計算とページ送りだけ）',
+    route: '/friends?tab=merged', steps: [{ click: '統合ユーザーを開く' }],
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
