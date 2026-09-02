@@ -3212,6 +3212,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
         usageCount: number;
