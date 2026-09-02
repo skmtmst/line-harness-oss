@@ -15,6 +15,7 @@ import {
   createCommonVar,
   updateCommonVar,
   deleteCommonVar,
+  getCommonVarUsageImpact,
   getCommonVarSchedules,
   createCommonVarSchedule,
   deleteCommonVarSchedule,
@@ -25,7 +26,10 @@ import {
   type CommonVar,
   type CommonVarSchedule,
   type CommonVarType,
+  type CommonVarUsageImpact,
+  type CommonVarUsageItem,
 } from '@line-crm/db';
+import type { CommonVarDeleteImpact, CommonVarUsageKind } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -566,6 +570,7 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
 function serializeVar(row: CommonVar) {
   return {
     id: row.id,
+    lineAccountId: row.line_account_id,
     folderId: row.folder_id,
     name: row.name,
     varKey: row.var_key,
@@ -573,6 +578,10 @@ function serializeVar(row: CommonVar) {
     value: row.value,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    nextSchedule: row.next_effective_from
+      ? { effectiveFrom: row.next_effective_from, value: row.next_value ?? '' }
+      : null,
+    pendingScheduleCount: Number(row.pending_schedule_count ?? 0),
   };
 }
 
@@ -586,9 +595,121 @@ function serializeSchedule(row: CommonVarSchedule) {
   };
 }
 
+const COMMON_VAR_USAGE_KIND_LABELS: Record<CommonVarUsageKind, string> = {
+  template: 'テンプレート',
+  broadcast: '一斉配信',
+  scenario: 'シナリオ配信',
+  reminder: 'リマインダ',
+  auto_reply: '自動応答',
+  form: '回答フォーム',
+  automation: 'オートメーション',
+  friend_add: '友だち追加時の配信',
+  common_action: '共通アクション',
+};
+
+function collectReadableStrings(value: unknown, token: string, out: string[]): void {
+  if (typeof value === 'string') {
+    if (value.includes(token)) out.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectReadableStrings(item, token, out);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      collectReadableStrings(item, token, out);
+    }
+  }
+}
+
+/** JSON設定の内部構造を出さず、差し込みを含む人向けの文だけを短く返す。 */
+function readableCommonVarUsage(content: string, token: string): string {
+  let text = content;
+  try {
+    const strings: string[] = [];
+    collectReadableStrings(JSON.parse(content) as unknown, token, strings);
+    // 共通情報を増減する操作は varKey を内部JSONに持つ。人向けの文が
+    // 無いときはJSONを見せず、下の共通文へ倒す。
+    text = strings.join(' ／ ');
+  } catch {
+    // 通常の本文はJSONではない。
+  }
+  const compact = text.replace(/\s+/g, ' ').trim();
+  if (!compact) return 'この設定の中で使われています';
+  return compact.length > 180 ? `${compact.slice(0, 179)}…` : compact;
+}
+
+function commonVarUsageHref(item: CommonVarUsageItem): string {
+  const id = encodeURIComponent(item.source_parent_id ?? item.source_id);
+  switch (item.kind) {
+    case 'template': return `/templates/edit?id=${id}`;
+    case 'broadcast': return `/broadcasts/detail?id=${id}`;
+    case 'scenario': return `/scenarios/detail?id=${id}`;
+    case 'reminder': return `/reminders/edit?id=${id}`;
+    case 'auto_reply': return `/auto-replies/edit?id=${id}`;
+    case 'form': return `/form-submissions/edit?id=${id}`;
+    case 'automation': return '/automations';
+    case 'friend_add': return '/friend-add-settings';
+    case 'common_action': return `/common-actions/versions?id=${id}`;
+  }
+}
+
+function commonVarUsageStatus(item: CommonVarUsageItem): string {
+  if (item.is_historical === 1) return '送信済み・変わりません';
+  if (item.source_status === 'scheduled') return '配信予約中';
+  if (item.source_status === 'sending') return '配信中';
+  if (item.source_status === 'draft') return '下書き';
+  if (item.source_status === 'stopped') return '停止中';
+  return '使われています';
+}
+
+function serializeCommonVarDeleteImpact(
+  variable: CommonVar,
+  impact: CommonVarUsageImpact,
+): CommonVarDeleteImpact {
+  const token = `{{var.${variable.var_key}}}`;
+  const canDelete = impact.blockingTotal === 0;
+  return {
+    variable: { id: variable.id, name: variable.name, varKey: variable.var_key },
+    total: impact.total,
+    blockingTotal: impact.blockingTotal,
+    historicalTotal: impact.historicalTotal,
+    unscopedFormTotal: impact.unscopedFormTotal,
+    canDelete,
+    byKind: impact.byKind,
+    items: impact.items.map((item) => ({
+      kind: item.kind,
+      kindLabel: COMMON_VAR_USAGE_KIND_LABELS[item.kind],
+      name: item.source_name,
+      status: commonVarUsageStatus(item),
+      href: commonVarUsageHref(item),
+      blocksDeletion: item.is_historical !== 1,
+      currentPreview: readableCommonVarUsage(item.source_content, token)
+        .replaceAll(token, variable.value),
+    })),
+    unavailableReferences: impact.unscopedFormTotal > 0
+      ? [{
+          kind: 'form',
+          kindLabel: COMMON_VAR_USAGE_KIND_LABELS.form,
+          count: impact.unscopedFormTotal,
+          reason: '所属するLINEアカウントを確認できないため、名前と内容は表示しません',
+        }]
+      : [],
+    checkedAt: jstNow(),
+    recommendedAction: canDelete ? 'delete' : 'review_references',
+  };
+}
+
 contents.get('/api/common-vars', async (c) => {
   try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const items = await getCommonVars(c.env.DB, {
+      lineAccountId: accountId,
       folderId: c.req.query('folderId') || undefined,
     });
     return c.json({ success: true, data: items.map(serializeVar) });
@@ -601,6 +722,11 @@ contents.get('/api/common-vars', async (c) => {
 contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
 
@@ -614,6 +740,7 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       : 'text';
 
     const created = await createCommonVar(c.env.DB, {
+      lineAccountId: accountId,
       name,
       varKey: String(body.varKey),
       type,
@@ -633,7 +760,12 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
 contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const existing = await getCommonVarById(c.env.DB, id);
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getCommonVarById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
@@ -648,7 +780,7 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
         422,
       );
     }
-    const updated = await updateCommonVar(c.env.DB, id, {
+    const updated = await updateCommonVar(c.env.DB, id, accountId, {
       name: body.name === undefined ? undefined : String(body.name).trim(),
       value: body.value === undefined ? undefined : String(body.value),
       ...(('folderId' in body) ? { folderId: body.folderId ? String(body.folderId) : null } : {}),
@@ -660,18 +792,68 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
   }
 });
 
+contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    return c.json({ success: true, data: serializeCommonVarDeleteImpact(existing, impact) });
+  } catch (err) {
+    console.error('GET /api/common-vars/:id/delete-impact error:', err);
+    return c.json(
+      { success: false, error: '使用先を確認できないため削除できません' },
+      503,
+    );
+  }
+});
+
 contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteCommonVar(c.env.DB, c.req.param('id'));
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    const deleteImpact = serializeCommonVarDeleteImpact(existing, impact);
+    if (!deleteImpact.canDelete) {
+      return c.json(
+        {
+          success: false,
+          error: `${impact.blockingTotal}件で使用中のため削除できません`,
+          code: 'common_var_delete_blocked',
+          data: deleteImpact,
+        },
+        409,
+      );
+    }
+    await deleteCommonVar(c.env.DB, existing.id, accountId);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/common-vars/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json(
+      { success: false, error: '使用先を確認できないため削除できません' },
+      503,
+    );
   }
 });
 
 contents.get('/api/common-vars/:id/schedules', async (c) => {
   try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const items = await getCommonVarSchedules(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: items.map(serializeSchedule) });
   } catch (err) {
@@ -683,7 +865,12 @@ contents.get('/api/common-vars/:id/schedules', async (c) => {
 contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), async (c) => {
   try {
     const varId = c.req.param('id');
-    const existing = await getCommonVarById(c.env.DB, varId);
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const existing = await getCommonVarById(c.env.DB, varId, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<{ effectiveFrom?: unknown; value?: unknown }>();
@@ -718,7 +905,14 @@ contents.delete(
   requireRole('owner', 'admin'),
   async (c) => {
     try {
-      await deleteCommonVarSchedule(c.env.DB, c.req.param('scheduleId'));
+      const accountId = c.req.query('accountId')?.trim();
+      if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+      if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+      await deleteCommonVarSchedule(c.env.DB, c.req.param('scheduleId'), existing.id);
       return c.json({ success: true, data: null });
     } catch (err) {
       console.error('DELETE /api/common-vars/:id/schedules/:scheduleId error:', err);

@@ -42,6 +42,7 @@ describe('SummaryCardへの移行契約', () => {
       'components/dashboard/kpi-card.tsx',
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
+      'components/users/summary-bar.tsx',
     ]
 
     for (const file of files) {
@@ -58,12 +59,12 @@ describe('SummaryCardへの移行契約', () => {
 
     expect(part.status).toBe('active')
     expect(part.pencilNodes).toEqual(expect.arrayContaining(['XywGr', 'mNUQ3']))
-    expect(part.routes.v5).toEqual(['/friends', '/tags'])
+    expect(part.routes.v5).toEqual(['/friends', '/tags', '/users'])
     expect(part.routes.broadcast).toEqual(['/scenarios'])
     expect(part.routes.v6).toEqual(
       expect.arrayContaining(['/analytics', '/conversions', '/inflow-links', '/affiliates', '/reminders', '/templates']),
     )
-    expect(Object.values(part.routes).flat()).toHaveLength(9)
+    expect(Object.values(part.routes).flat()).toHaveLength(10)
     expect(part.visualVerification.status).toBe('unverified')
     expect(part.visualVerification.requiredViewports).toEqual([1440, 1920])
   })

@@ -4,11 +4,17 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getFriendFields: vi.fn(),
+  getFriendFieldsForScope: vi.fn(),
   getFriendFieldById: vi.fn(),
+  getFriendFieldByIdForScope: vi.fn(),
   createFriendField: vi.fn(),
+  createFriendFieldForScope: vi.fn(),
   updateFriendField: vi.fn(),
   deleteFriendField: vi.fn(),
   countFriendFieldValues: vi.fn(),
+  countFriendFieldValuesForScope: vi.fn(),
+  getFriendFieldListSummary: vi.fn(),
+  getFriendFieldValuesForMigration: vi.fn(),
   getFriendFieldsWithValues: vi.fn(),
   setFriendFieldValue: vi.fn(),
   recordLoginAudit: vi.fn(),
@@ -30,13 +36,19 @@ const mocks = {
   ],
 };
 vi.mock('@line-crm/db', () => mocks);
+const accountMocks = {
+  getVisibleLineAccountScope: vi.fn().mockResolvedValue({ allowedAccountIds: ['account-1'] }),
+};
+vi.mock('../services/account-access.js', () => ({
+  getVisibleLineAccountScope: accountMocks.getVisibleLineAccountScope,
+}));
 
 const { friendFields } = await import('./friend-fields.js');
 
 function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, tenantId: 'tenant-1' });
     return next();
   });
   app.route('/', friendFields);
@@ -81,17 +93,24 @@ const FIELD = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  accountMocks.getVisibleLineAccountScope.mockResolvedValue({ allowedAccountIds: ['account-1'] });
   mocks.getFriendFields.mockResolvedValue([FIELD]);
+  mocks.getFriendFieldsForScope.mockResolvedValue([{ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 }]);
   mocks.getFriendFieldById.mockResolvedValue(FIELD);
+  mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
   mocks.createFriendField.mockResolvedValue(FIELD);
+  mocks.createFriendFieldForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
   mocks.updateFriendField.mockResolvedValue(FIELD);
   mocks.countFriendFieldValues.mockResolvedValue(0);
+  mocks.countFriendFieldValuesForScope.mockResolvedValue(0);
+  mocks.getFriendFieldListSummary.mockResolvedValue({ total: 1, inUse: 0, registeredFriends: 0, formLinks: null, updatedThisMonth: 0 });
+  mocks.getFriendFieldValuesForMigration.mockResolvedValue([]);
   mocks.getFriendFieldsWithValues.mockResolvedValue([{ ...FIELD, value: null, updated_by: null }]);
 });
 
 describe('項目の作成', () => {
   it('差し込み名の形が正しければ作れる', async () => {
-    const res = await req(makeApp(), '/api/friend-fields', 'POST', {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
       name: 'ペットの名前',
       fieldKey: 'pet_name',
       type: 'text',
@@ -100,17 +119,17 @@ describe('項目の作成', () => {
   });
 
   it('差し込み名の形が違えば422', async () => {
-    const res = await req(makeApp(), '/api/friend-fields', 'POST', {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
       name: 'x',
       fieldKey: 'ペット',
       type: 'text',
     });
     expect(res.status).toBe(422);
-    expect(mocks.createFriendField).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
   });
 
   it('知らない種類は422', async () => {
-    const res = await req(makeApp(), '/api/friend-fields', 'POST', {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
       name: 'x',
       fieldKey: 'x',
       type: 'rating',
@@ -119,7 +138,7 @@ describe('項目の作成', () => {
   });
 
   it('選択肢は文字列の配列だけ', async () => {
-    const res = await req(makeApp(), '/api/friend-fields', 'POST', {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
       name: 'x',
       fieldKey: 'x',
       type: 'select',
@@ -129,8 +148,8 @@ describe('項目の作成', () => {
   });
 
   it('差し込み名が重複したら409', async () => {
-    mocks.createFriendField.mockRejectedValue(new Error('UNIQUE constraint failed'));
-    const res = await req(makeApp(), '/api/friend-fields', 'POST', {
+    mocks.createFriendFieldForScope.mockRejectedValue(new Error('UNIQUE constraint failed'));
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
       name: 'x',
       fieldKey: 'dup',
       type: 'text',
@@ -139,22 +158,36 @@ describe('項目の作成', () => {
   });
 });
 
+describe('LINEアカウントの境界', () => {
+  it('選択中アカウントが無ければ一覧を返さない', async () => {
+    const res = await req(makeApp(), '/api/friend-fields', 'GET');
+    expect(res.status).toBe(400);
+    expect(mocks.getFriendFieldsForScope).not.toHaveBeenCalled();
+  });
+
+  it('担当外アカウントは存在を明かさず404', async () => {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-2', 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getFriendFieldsForScope).not.toHaveBeenCalled();
+  });
+});
+
 describe('項目の更新', () => {
   it('種類は変えられない', async () => {
     // 既に入っている値の意味が変わる（「犬」が数値項目になる等）。
-    const res = await req(makeApp(), '/api/friend-fields/ff-1', 'PATCH', { type: 'number' });
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'PATCH', { type: 'number' });
     expect(res.status).toBe(422);
     expect(mocks.updateFriendField).not.toHaveBeenCalled();
   });
 
   it('差し込み名も変えられない', async () => {
     // テンプレートの差し込みが黙って空になる。
-    const res = await req(makeApp(), '/api/friend-fields/ff-1', 'PATCH', { fieldKey: 'other' });
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'PATCH', { fieldKey: 'other' });
     expect(res.status).toBe(422);
   });
 
   it('同じ値を送るぶんには通る', async () => {
-    const res = await req(makeApp(), '/api/friend-fields/ff-1', 'PATCH', {
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'PATCH', {
       type: 'text',
       fieldKey: 'pet_name',
       name: '新しい名前',
@@ -165,24 +198,83 @@ describe('項目の更新', () => {
 
 describe('項目の削除', () => {
   it('値が入っていれば人数を返して止める', async () => {
-    mocks.countFriendFieldValues.mockResolvedValue(12);
-    const res = await req(makeApp(), '/api/friend-fields/ff-1', 'DELETE');
+    mocks.countFriendFieldValuesForScope.mockResolvedValue(12);
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
     const body = (await res.json()) as { usageCount: number; code: string };
     expect(body).toMatchObject({ usageCount: 12, code: 'IN_USE' });
     expect(mocks.deleteFriendField).not.toHaveBeenCalled();
   });
 
-  it('force=1 なら消す', async () => {
-    mocks.countFriendFieldValues.mockResolvedValue(12);
-    const res = await req(makeApp(), '/api/friend-fields/ff-1?force=1', 'DELETE');
-    expect(res.status).toBe(200);
-    expect(mocks.deleteFriendField).toHaveBeenCalled();
+  it('force=1 でも値があれば消さない', async () => {
+    mocks.countFriendFieldValuesForScope.mockResolvedValue(12);
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1&force=1', 'DELETE');
+    expect(res.status).toBe(409);
+    expect(mocks.deleteFriendField).not.toHaveBeenCalled();
   });
 
   it('使われていなければそのまま消せる', async () => {
-    const res = await req(makeApp(), '/api/friend-fields/ff-1', 'DELETE');
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'DELETE');
     expect(res.status).toBe(200);
+  });
+});
+
+describe('項目移行の事前確認', () => {
+  it('選択中アカウントの値だけを種類に合わせて数える', async () => {
+    mocks.getFriendFieldValuesForMigration.mockResolvedValue([
+      { friend_id: 'friend-1', value: '090-1234-5678' },
+      { friend_id: 'friend-2', value: '電話なし' },
+      { friend_id: 'friend-3', value: '' },
+    ]);
+    const res = await req(
+      makeApp(),
+      '/api/friend-fields/ff-1/migration-preview?lineAccountId=account-1',
+      'POST',
+      { targetType: 'tel' },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        summary: { total: number; convertible: number; review: number; invalid: number };
+        rows: Array<{ friendId: string; status: string }>;
+      };
+    };
+    expect(body.data.summary).toEqual({ total: 3, convertible: 1, review: 1, invalid: 1 });
+    expect(body.data.rows).toEqual([
+      expect.objectContaining({ friendId: 'friend-2', status: 'review' }),
+      expect.objectContaining({ friendId: 'friend-3', status: 'invalid' }),
+    ]);
+    expect(mocks.getFriendFieldValuesForMigration).toHaveBeenCalledWith(
+      env.DB,
+      'ff-1',
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+    );
+  });
+
+  it('存在しない種類は422で止める', async () => {
+    const res = await req(
+      makeApp(),
+      '/api/friend-fields/ff-1/migration-preview?lineAccountId=account-1',
+      'POST',
+      { targetType: 'rating' },
+    );
+    expect(res.status).toBe(422);
+    expect(mocks.getFriendFieldValuesForMigration).not.toHaveBeenCalled();
+  });
+
+  it('実在しない日付を自動変換しない', async () => {
+    mocks.getFriendFieldValuesForMigration.mockResolvedValue([
+      { friend_id: 'friend-1', value: '2026-02-31' },
+    ]);
+    const res = await req(
+      makeApp(),
+      '/api/friend-fields/ff-1/migration-preview?lineAccountId=account-1',
+      'POST',
+      { targetType: 'date' },
+    );
+    const body = (await res.json()) as { data: { summary: { review: number }; rows: Array<{ reason: string }> } };
+    expect(body.data.summary.review).toBe(1);
+    expect(body.data.rows[0].reason).toContain('存在する日付');
   });
 });
 

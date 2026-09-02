@@ -26,6 +26,15 @@ import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const BASE = process.env.VISUAL_QA_BASE ?? 'http://localhost:3101'
 
+/** 画面が落ちたときに出る文言。出ていたら撮らない。 */
+const FAILURE_TEXTS = [
+  '画面を表示できませんでした',
+  '店舗が選ばれていません',
+  'Application error',
+  'Runtime TypeError',
+  'Runtime Error',
+]
+
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(`--${name}`)
 const value = (name) => {
@@ -60,7 +69,17 @@ function check() {
 }
 
 async function newPage(browser, width, height, clock) {
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
+  /*
+    **日本時間で撮る。** 撮る機械の時計帯そのままだと、設計の「14:16」が
+    「12:16」になる。設計は日本時間で描かれているので、ここを合わせないと
+    時刻の入る画面すべてが「差がある」ように見える。
+  */
+  const page = await browser.newPage({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+    timezoneId: 'Asia/Tokyo',
+    locale: 'ja-JP',
+  })
   /*
     相対時刻（「6日前」）は `Date.now()` から出る。止めないと**日をまたぐ
     たびに絵が変わり**、基準画像として使えない。
@@ -87,6 +106,12 @@ async function newPage(browser, width, height, clock) {
 async function runSteps(page, steps = [], node = '') {
   for (const step of steps) {
     if (step.wait) { await page.waitForTimeout(step.wait); continue }
+    if (step.fill !== undefined) {
+      // 入力してから撮る状態（保存した検索の名前など）。
+      await page.getByLabel(step.fill).fill(step.text ?? '')
+      await page.waitForTimeout(step.after ?? 300)
+      continue
+    }
     const root = step.scope === 'main' ? page.locator('main') : page
     const target = root.getByRole(step.role ?? 'button', { name: step.click })
     const one = step.nth === undefined ? target.first() : target.nth(step.nth)
@@ -111,6 +136,12 @@ async function captureImpl(feature) {
   if (!list.length) { console.error(`機能${feature} の画面が screens.mjs にありません`); process.exit(1) }
   const browser = await chromium.launch()
   let shot = 0
+  /*
+    **1枚目で止めない。** 17枚ある機能で最初の1枚が撮れないたびに止まると、
+    残り16枚の状態が分からないまま直しに入ることになる。撮れなかったものを
+    ためて、最後にまとめて出す。**黙って飛ばすのではなく、必ず一覧にする。**
+  */
+  const failures = []
   for (const s of list) {
     if (s.status === 'unimplemented') {
       console.log(`${s.node}\t未実装のため撮らない\t${s.why}`)
@@ -120,34 +151,55 @@ async function captureImpl(feature) {
     mkdirSync(out, { recursive: true })
     for (const width of WIDTHS) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
-      await page.goto(`${BASE}${s.route}`, { waitUntil: 'networkidle', timeout: 120_000 })
-      await page.waitForTimeout(1200)
+      try {
+        await page.goto(`${BASE}${s.route}`, { waitUntil: 'networkidle', timeout: 120_000 })
+        await page.waitForTimeout(1200)
 
-      // 行き先を必ず見る。**クエリまで見る**（タブは `?tab=` でしか区別できない）。
-      const url = new URL(page.url())
-      const landed = url.pathname + url.search
-      if (landed !== s.route) throw new Error(`${s.node}: ${s.route} から ${landed} へ飛ばされた`)
-      const body = await page.locator('body').innerText()
-      if (body.includes('LINEでログイン')) throw new Error(`${s.node}: ログイン画面になっている`)
+        // 行き先を必ず見る。**クエリまで見る**（タブは `?tab=` でしか区別できない）。
+        const url = new URL(page.url())
+        const landed = url.pathname + url.search
+        if (landed !== s.route) throw new Error(`${s.route} から ${landed} へ飛ばされた`)
+        const body = await page.locator('body').innerText()
+        if (body.includes('LINEでログイン')) throw new Error('ログイン画面になっている')
+        /*
+          **落ちた画面をそのまま撮らない。** 受信箱で会話を開いたとき、
+          右の顧客情報が `mileage.summary.programName` で落ち、画面が
+          「もう一度試す」だけになっていた。それでも撮影は成功していて、
+          設計と並べる直前まで気づけなかった。
+        */
+        for (const bad of FAILURE_TEXTS) {
+          if (body.includes(bad)) throw new Error(`「${bad}」で止まっている`)
+        }
 
-      await runSteps(page, s.steps, s.node)
-      await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
+        await runSteps(page, s.steps, s.node)
+        await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
 
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      )
-      await page.screenshot({
-        path: join(out, `${s.node}-${width}.png`),
-        fullPage: s.mode === 'page',
-      })
-      console.log(`${s.node}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
-      if (overflow >= 2) console.log(`  ⚠ ${s.node} ${width}px に横スクロールが出ている`)
-      await page.close()
-      shot += 1
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        )
+        await page.screenshot({
+          path: join(out, `${s.node}-${width}.png`),
+          fullPage: s.mode === 'page',
+        })
+        console.log(`${s.node}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
+        if (overflow >= 2) console.log(`  ⚠ ${s.node} ${width}px に横スクロールが出ている`)
+        shot += 1
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        console.log(`${s.node}\t${width}px\t撮れず\t${reason.split('\n')[0]}`)
+        failures.push(`${s.node} ${width}px: ${reason.split('\n')[0]}`)
+      } finally {
+        await page.close()
+      }
     }
   }
   await browser.close()
-  console.log(`実装 ${shot}枚`)
+  console.log(`\n実装 ${shot}枚`)
+  if (failures.length) {
+    console.log(`\n撮れなかったもの ${failures.length}件:`)
+    for (const f of failures) console.log(`  ${f}`)
+    process.exitCode = 1
+  }
 }
 
 async function captureDesign(feature, from) {
