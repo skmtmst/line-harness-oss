@@ -23,7 +23,14 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
   })
 
   it('画面名をNEN配信にそろえ、内部エラーを表示しない', () => {
-    expect(EDITOR).toContain('Header title="NEN配信を編集する"')
+    /*
+     * **画面名は上部バーだけが持つ。**
+     * 以前は本文にも `<Header title="NEN配信を編集する">` を出しており、
+     * 上部バーと二重だった。設計（Pencil）の本文に画面名テキストは無い。
+     * 上部バーへ渡す `usePageTitle` に替えたので、名前はここで見張る。
+     */
+    expect(EDITOR).toContain("usePageTitle('NEN配信を編集する')")
+    expect(EDITOR).not.toContain('Header title=')
     expect(EDITOR).toContain('NEN配信へ戻る')
     expect(EDITOR).not.toContain('フォロー配信へ戻る')
     expect(EDITOR).not.toContain('setError(e instanceof Error ? e.message')

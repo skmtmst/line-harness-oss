@@ -33,11 +33,11 @@ import {
   FRIEND_ADD_LIFECYCLE_VALIDATION,
   CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
-  FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
+  DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS,
+  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
 } from './fixtures.mjs'
@@ -301,6 +301,8 @@ const SHAPES = {
   '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 1, members: 0, consultations: 0 },
   '/api/friends/stats': FRIEND_STATS,
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
+  '/api/users-grouped': USERS_GROUPED,
+  '/api/duplicates/stats': DUPLICATE_STATS,
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
   '/api/media': MEDIA_ITEMS,
@@ -456,7 +458,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
     // `undefined` になり `friendName.charAt(0)` で落ちる。
     const row = CHATS.find((c) => c.id === chat[1])
-    if (row) return { success: true, data: { ...row, messages: FRIEND_MESSAGES[row.friendId] ?? [] } }
+    if (row) {
+      const friend = FRIEND_DETAILS[row.friendId]
+      return {
+        success: true,
+        data: {
+          ...row,
+          friendRealName: friend?.realName ?? null,
+          isAttention: friend?.metadata?.__attention === '1',
+          messages: FRIEND_MESSAGES[row.friendId] ?? [],
+        },
+      }
+    }
   }
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }

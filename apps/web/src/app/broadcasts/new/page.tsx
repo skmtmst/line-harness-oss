@@ -68,7 +68,11 @@ function NewBroadcastPageContent() {
       ) : (
         <BroadcastForm
           tags={tags}
-          onSuccess={() => router.push('/broadcasts')}
+          onSuccess={(broadcast) => router.push(
+            broadcast.status === 'scheduled'
+              ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
+              : '/broadcasts',
+          )}
           onCancel={() => router.push('/broadcasts')}
           openTemplatePickerInitially={searchParams.get('templatePicker') === '1'}
           initialTemplateId={searchParams.get('templateId')}

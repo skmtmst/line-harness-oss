@@ -20,6 +20,10 @@ interface ConfirmDialogProps {
    * （設計 `FpgxH`）。`Dialog` はもともと受け取れるので、素通しにする。
    */
   children?: ReactNode
+  /** 見出しの左に置く絵。危険な操作は警告、と一目で分かるようにする。 */
+  titleIcon?: ReactNode
+  /** 実行ボタンの中、文字の左に置く絵。 */
+  confirmIcon?: ReactNode
   /** この確認画面に対応するPencilの実Node。 */
   designNode?: string
   /**
@@ -41,6 +45,8 @@ export default function ConfirmDialog({
   busy = false,
   error,
   children,
+  titleIcon,
+  confirmIcon,
   designNode,
   onConfirm,
   onCancel,
@@ -55,6 +61,8 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy}
       error={error}
+      titleIcon={titleIcon}
+      confirmIcon={confirmIcon}
       designNode={designNode}
       onConfirm={onConfirm}
       onCancel={onCancel}

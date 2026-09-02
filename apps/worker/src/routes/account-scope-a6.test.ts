@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getAutomationLogs: vi.fn(),
   getAutoReplyById: vi.fn(),
   createAutoReply: vi.fn(),
+  getFolderById: vi.fn(),
   getAutoReplyHitCounts: vi.fn(),
   getAffiliateOfferById: vi.fn(),
   createAffiliateOffer: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   getAutomationLogs: mocks.getAutomationLogs,
   getAutoReplyById: mocks.getAutoReplyById,
   createAutoReply: mocks.createAutoReply,
+  getFolderById: mocks.getFolderById,
   getAutoReplyHitCounts: mocks.getAutoReplyHitCounts,
   getAffiliateOfferById: mocks.getAffiliateOfferById,
   createAffiliateOffer: mocks.createAffiliateOffer,
@@ -95,6 +97,7 @@ beforeEach(() => {
   mocks.getAutomationLogs.mockResolvedValue([]);
   mocks.getAutoReplyById.mockResolvedValue(autoReply);
   mocks.createAutoReply.mockResolvedValue(autoReply);
+  mocks.getFolderById.mockResolvedValue(null);
   mocks.getAutoReplyHitCounts.mockResolvedValue([]);
   mocks.getAffiliateOfferById.mockResolvedValue(offer);
   mocks.createAffiliateOffer.mockResolvedValue(offer);
@@ -150,5 +153,50 @@ describe('A-6 account tenant scope', () => {
       '/api/auto-replies/auto-reply',
       request('PUT', { lineAccountId: '' }),
     )).status).toBe(403);
+  });
+
+  test('auto-reply rejects a folder belonging to another feature', async () => {
+    mocks.getFolderById.mockResolvedValue({ id: 'folder', kind: 'tag' });
+    const response = await app(autoReplies).request(
+      '/api/auto-replies',
+      request('POST', {
+        keyword: 'test',
+        responseContent: 'reply',
+        lineAccountId: 'own',
+        folderId: 'folder',
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect(mocks.createAutoReply).not.toHaveBeenCalled();
+  });
+
+  test('auto-reply rejects a folder that no longer exists', async () => {
+    mocks.getFolderById.mockResolvedValue(null);
+    const response = await app(autoReplies).request(
+      '/api/auto-replies',
+      request('POST', {
+        keyword: 'test',
+        responseContent: 'reply',
+        lineAccountId: 'own',
+        folderId: 'missing-folder',
+      }),
+    );
+    expect(response.status).toBe(422);
+    expect(mocks.createAutoReply).not.toHaveBeenCalled();
+  });
+
+  test('auto-reply accepts an auto-reply folder', async () => {
+    mocks.getFolderById.mockResolvedValue({ id: 'folder', kind: 'auto_reply' });
+    const response = await app(autoReplies).request(
+      '/api/auto-replies',
+      request('POST', {
+        keyword: 'test',
+        responseContent: 'reply',
+        lineAccountId: 'own',
+        folderId: 'folder',
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(mocks.createAutoReply).toHaveBeenCalled();
   });
 });

@@ -349,7 +349,8 @@
       "routes": {
         "v5": [
           "/friends",
-          "/tags"
+          "/tags",
+          "/users"
         ],
         "v6": [
           "/analytics",
@@ -1318,7 +1319,7 @@
       "pencilUsage": "一覧ツールバーへ適用開始",
       "lastCheckedAt": "2026-08-24",
       "note": "検索語・読込中・無効・クリア操作を同じ部品へ固定し、Lucideのsearchアイコンを使う。",
-      "routes": { "active": ["/tags", "/scenarios", "/visual-qa/friend-attributes?state=controls"], "impact": "一覧検索を持つ管理画面" },
+      "routes": { "active": ["/friends", "/tags", "/scenarios", "/visual-qa/friend-attributes?state=controls"], "impact": "一覧検索を持つ管理画面" },
       "visualVerification": { "status": "verified", "requiredViewports": [1440, 1920], "reason": "B3の固定状態でPencil部品画像と個別比較する。" },
       "declarations": [
         { "pencil": "phlR1 layout: horizontal", "class": "search", "prop": "display", "source": "flex", "resolved": "flex" },
@@ -1349,7 +1350,7 @@
       "pencilUsage": "スタッフ追加と一覧ツールバーへ適用開始",
       "lastCheckedAt": "2026-08-24",
       "note": "閉・開・選択・無効・エラーを同じ部品の状態へ統合し、値変更は既存処理へ返す。V6専用選択部品は未確認。",
-      "routes": { "active": ["/staff/new", "/tags", "/scenarios", "/visual-qa/friend-attributes?state=controls"], "impact": "選択欄を持つ管理画面" },
+      "routes": { "active": ["/friends", "/staff/new", "/tags", "/scenarios", "/visual-qa/friend-attributes?state=controls"], "impact": "選択欄を持つ管理画面" },
       "visualVerification": { "status": "verified", "requiredViewports": [1440, 1920], "reason": "B3の固定状態でPencil部品画像と開閉状態を比較する。" },
       "declarations": [
         { "pencil": "rpot9 width: 176", "class": "standard", "prop": "width", "source": "176px", "resolved": "176px" },

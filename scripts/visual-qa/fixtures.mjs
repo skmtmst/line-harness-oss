@@ -365,6 +365,102 @@ export const FRIENDS = [
 ]
 
 /**
+ * 統合ユーザー一覧と重複集計。
+ *
+ * どちらも既定の EMPTY_PAGE では描けない1件返しの口。`rows` や
+ * `perAccount` を欠くと画面が落ちるため、Workerの返却契約と同じ形で持つ。
+ * 連絡先は平文の個人情報を置かず、画面と同じマスク済みの値にする。
+ */
+export const USERS_GROUPED = {
+  total: 2,
+  page: 1,
+  pageSize: 50,
+  computedAt: '2026-08-31T01:00:00.000Z',
+  rows: [
+    {
+      identityKey: 'uid:merged-person-1',
+      identityKeyKind: 'uid',
+      displayName: '田中 はなこ',
+      pictureUrl: null,
+      accounts: [
+        {
+          accountId: 'visual-qa-account',
+          accountName: '画面確認アカウント',
+          lineUserId: 'U-visual-merged-1',
+          isFollowing: true,
+          joinedAt: '2026-08-01T01:00:00.000Z',
+          friendId: 'friend-merged-1',
+        },
+        {
+          accountId: 'visual-qa-branch',
+          accountName: '画面確認・支店',
+          lineUserId: 'U-visual-merged-2',
+          isFollowing: true,
+          joinedAt: '2026-08-03T01:00:00.000Z',
+          friendId: 'friend-merged-2',
+        },
+      ],
+      xUsername: null,
+      emails: ['ta***@example.jp'],
+      phones: ['090-****-0001'],
+      lastActivityAt: '2026-08-30T01:00:00.000Z',
+      isDuplicate: true,
+    },
+    {
+      identityKey: 'solo:friend-solo-1',
+      identityKeyKind: 'solo',
+      displayName: '佐藤 けん',
+      pictureUrl: null,
+      accounts: [
+        {
+          accountId: 'visual-qa-account',
+          accountName: '画面確認アカウント',
+          lineUserId: 'U-visual-solo-1',
+          isFollowing: true,
+          joinedAt: '2026-08-10T01:00:00.000Z',
+          friendId: 'friend-solo-1',
+        },
+      ],
+      xUsername: null,
+      emails: [],
+      phones: [],
+      lastActivityAt: '2026-08-29T01:00:00.000Z',
+      isDuplicate: false,
+    },
+  ],
+}
+
+export const DUPLICATE_STATS = {
+  totalFollowing: 231,
+  uniquePeople: 228,
+  friendDups: 3,
+  duplicateGroups: 3,
+  wastedPerBroadcastYen: 9,
+  msgUnitYen: 3,
+  perAccount: [
+    {
+      accountId: 'visual-qa-account',
+      accountName: '画面確認アカウント',
+      friends: 150,
+      dups: 3,
+      dupRate: 3 / 150,
+    },
+    {
+      accountId: 'visual-qa-branch',
+      accountName: '画面確認・支店',
+      friends: 81,
+      dups: 3,
+      dupRate: 3 / 81,
+    },
+  ],
+  pairwiseOverlap: [
+    { fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-branch', overlap: 3 },
+    { fromAccountId: 'visual-qa-branch', toAccountId: 'visual-qa-account', overlap: 3 },
+  ],
+  computedAt: '2026-08-31T01:00:00.000Z',
+}
+
+/**
  * 回答フォーム削除確認（`gBp2J`）の読み口。
  *
  * - `archive`: 回答と利用先があるので、物理削除ではなく保管する

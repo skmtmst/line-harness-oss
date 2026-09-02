@@ -13,6 +13,8 @@ import { readArrayGetPaths } from './api-shapes.mjs';
 import { IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND, IDENTITY_CANDIDATE_LISTS } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { DUPLICATE_STATS, USERS_GROUPED } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -21,6 +23,17 @@ describe('画面確認モックの口の形', () => {
     for (const path of ['/api/tags', '/api/tag-groups', '/api/chats', '/api/scenarios', '/api/broadcasts', '/api/automations', '/api/rich-menu-groups']) {
       expect(paths.has(path), `${path} を配列の口として拾えていない`).toBe(true);
     }
+  });
+
+  it('交差型で書かれた一覧の口も拾う', () => {
+    /*
+      `fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: … }>` は
+      型の末尾が `}` なので `^ApiResponse<…>$` に当たらず、この1件だけ
+      黙って抜けていた。抜けると `{items:[],total:0}` が返り、`/ec-commerce`
+      が描画の途中で `events.map is not a function` を投げて、本文が丸ごと
+      「画面を表示できませんでした」に置き換わる。**撮ると空の絵になる。**
+    */
+    expect(paths.has('/api/ec-commerce/events'), '交差型の口を配列として拾えていない').toBe(true);
   });
 
   it('1件だけ返す口を配列にしない', () => {
@@ -82,6 +95,29 @@ describe('統合ユーザー詳細の画面確認データ', () => {
   it('0件を未取得へ変えず、平文のメールと電話を置かない', () => {
     expect(MERGED_PERSON_EMPTY.profileValues).toEqual([]);
     const serialized = JSON.stringify([MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY]);
+    expect(serialized).not.toContain('tanaka@example.jp');
+    expect(serialized).not.toContain('090-1234-5678');
+    expect(serialized).toContain('***');
+  });
+});
+
+describe('統合ユーザー一覧と重複集計の画面確認データ', () => {
+  it('Workerと同じ器を持ち、通常状態を空の一覧で代用しない', () => {
+    expect(USERS_GROUPED).toMatchObject({ total: 2, page: 1, pageSize: 50 });
+    expect(USERS_GROUPED.rows).toHaveLength(2);
+    expect(USERS_GROUPED.rows[0].accounts).toHaveLength(2);
+    expect(DUPLICATE_STATS).toMatchObject({
+      totalFollowing: 231,
+      uniquePeople: 228,
+      friendDups: 3,
+      duplicateGroups: 3,
+    });
+    expect(DUPLICATE_STATS.perAccount).toHaveLength(2);
+    expect(DUPLICATE_STATS.pairwiseOverlap).toHaveLength(2);
+  });
+
+  it('平文のメールと電話を固定データへ置かない', () => {
+    const serialized = JSON.stringify(USERS_GROUPED);
     expect(serialized).not.toContain('tanaka@example.jp');
     expect(serialized).not.toContain('090-1234-5678');
     expect(serialized).toContain('***');

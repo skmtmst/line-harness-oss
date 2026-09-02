@@ -64,7 +64,9 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('既存の更新APIから決めごとの停止と再開を操作できる', () => {
     expect(PAGE).toContain("updateRule(rule, { isActive: !rule.isActive })")
     expect(PAGE).toContain("rule.isActive ? '決めごとを停止' : '決めごとを再開'")
-    expect(PAGE).toContain("rule.isActive ? '動いています' : '止めています'")
+    // 2026-09-02: 一覧をカード格子から設計の表へ移し、状態を共通Chipで出す。
+    // 言い方は変えていない。
+    expect(PAGE).toContain('<Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>')
   })
 
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
