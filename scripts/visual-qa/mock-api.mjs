@@ -290,6 +290,89 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
  */
 const SHAPES = {
   '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
+  /*
+    マイルの履歴。**既定の器（`{items,total,page,limit}`）では形が違う。**
+
+    契約は `MileageAdminHistory = { items, pagination: { total, limit, offset } }`。
+    口が無いと既定の器が返り、`pagination` が無いので
+    `mileage-history-tab.tsx` の `result?.pagination.total` が投げ、
+    **機能17の4枚が「画面を表示できませんでした」で1枚も撮れない。**
+    （`?.` が `result` にしか掛かっていないのは実装側の弱さでもある。台帳に別途書いた）
+  */
+  /*
+    行動スコア。契約は `ActionScoreOverview = { summary, items, pagination }`。
+    口が無いと既定の器が返り、`action-score-tab.tsx:124` の
+    `overview?.pagination.total` が投げて `z3PB2` が撮れない。
+  */
+  /*
+    成果承認。**契約は配列**（`ConversionApprovalItem[]`）。
+    `api.ts` 側のURLがテンプレート文字列（`?${qs}` を後ろに足す形）なので
+    `readArrayGetPaths()` が拾えず、既定の器 `{items,total,page,limit}` が返っていた。
+    そのため `tabs.tsx` の `items.map` が投げ、**`n5VVTb` が撮れなかった。**
+    行が無いと「表に無い種別が内部の記号のまま出ていないか」も見られないので、
+    承認待ち・承認済み・重複ありの3行を置く。
+  */
+  '/api/conversions/approvals': [
+    {
+      eventId: 'cv-1', createdAt: '2026-08-24T20:53:00+09:00',
+      friendId: 'friend-1', friendName: 'さかもとまさと',
+      affiliateId: 'af-1', affiliateName: 'Masato.S',
+      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
+      conversionPointName: '購入完了', value: 12000,
+      approvalStatus: 'pending', duplicateFlag: false,
+    },
+    {
+      eventId: 'cv-2', createdAt: '2026-08-19T09:12:00+09:00',
+      friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
+      affiliateId: 'af-1', affiliateName: 'Masato.S',
+      offerId: null, offerName: null, offerRewardMiles: null,
+      conversionPointName: '資料請求', value: null,
+      approvalStatus: 'approved', duplicateFlag: false,
+    },
+    {
+      eventId: 'cv-3', createdAt: '2026-08-13T20:52:00+09:00',
+      friendId: 'friend-3', friendName: null,
+      affiliateId: 'af-2', affiliateName: null,
+      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
+      conversionPointName: '購入完了', value: 8000,
+      approvalStatus: 'pending', duplicateFlag: true,
+    },
+  ],
+  '/api/action-scores/friends': {
+    summary: {
+      scoredFriends: 5, high: 1, normal: 3, low: 1, decreased30d: 0,
+      highMin: 70, normalMin: 40,
+    },
+    items: [
+      { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
+      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', score: 55, band: 'normal', change30d: 0, lastActionAt: '2026-08-19T09:12:00+09:00' },
+      { friendId: 'friend-3', displayName: '菅野 亮', score: 31, band: 'low', change30d: -6, lastActionAt: '2026-08-13T20:52:00+09:00' },
+    ],
+    pagination: { total: 3, limit: 20, offset: 0 },
+  },
+  '/api/mileage/history': {
+    items: [
+      {
+        id: 'ml-1', friendId: 'friend-1', friendName: 'さかもとまさと',
+        entryType: 'earn', status: 'confirmed', mode: 'automatic',
+        amount: 5, balanceAfter: 5, reason: '写真の投稿が通りました',
+        occurredAt: '2026-08-24T20:53:00+09:00', createdAt: '2026-08-24T20:53:00+09:00',
+      },
+      {
+        id: 'ml-2', friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
+        entryType: 'earn', status: 'confirmed', mode: 'automatic',
+        amount: 3, balanceAfter: 3, reason: '友だち追加',
+        occurredAt: '2026-08-19T09:12:00+09:00', createdAt: '2026-08-19T09:12:00+09:00',
+      },
+      {
+        id: 'ml-3', friendId: 'friend-3', friendName: '菅野 亮',
+        entryType: 'spend', status: 'confirmed', mode: 'manual',
+        amount: -2, balanceAfter: 1, reason: '手で減らしました',
+        occurredAt: '2026-08-13T20:52:00+09:00', createdAt: '2026-08-13T20:52:00+09:00',
+      },
+    ],
+    pagination: { total: 3, limit: 20, offset: 0 },
+  },
   '/api/settings/features': {
     features: FEATURES,
     sidebarOrder: null,
