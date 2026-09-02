@@ -2420,14 +2420,14 @@ export const SCREENS = [
     `capture.spec.mjs` が撮っている（`tags-csv-*`）。
   */
   { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**#578 `a744c582` で撮り直した。** ルート `/tags`。1440・1920とも横スクロール0。 帯4つは タグ数101件「未使用24件」／付与済み友だち186人「1つ以上付与」／今月の付与214回「手動・自動」／整理候補26件「未使用・重複名」。フォルダの縦帯も 101件／すべて101／VIP14／ペット12／会員18／健康16／購入21／未分類20 と実データ。 「フォルダを削除しても、中のタグは未分類として残ります。」と、消したときどうなるかを先に言う形は保たれている。 P2 **4つのタブのうち帯を持つのはここだけ。** `rIhbN` `HBTk0` `QKx8Q` には帯が無く、同じ画面なのにタブ間で作りが揃っていない。`QKx8Q`（保存した検索）は帯はあるが3つが `—件`。 取得元：`friend-attributes-v6/hqrOv.txt`。推奨修正：4タブで帯の作りをそろえる。**4画面をまたぐので、4つを1本のPRで一度に動かす**（片方だけ直すと、ちぐはぐが増える）',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#578 `a744c582` で撮り直した。** ルート `/tags`。1440・1920とも横スクロール0。 帯4つは タグ数101件「未使用24件」／付与済み友だち186人「1つ以上付与」／今月の付与214回「手動・自動」／整理候補26件「未使用・重複名」。フォルダの縦帯も 101件／すべて101／VIP14／ペット12／会員18／健康16／購入21／未分類20 と実データ。 「フォルダを削除しても、中のタグは未分類として残ります。」と、消したときどうなるかを先に言う形は保たれている。 P2 **4つのタブのうち帯を持つのはここだけ。** `rIhbN` `HBTk0` `QKx8Q` には帯が無く、同じ画面なのにタブ間で作りが揃っていない。`QKx8Q`（保存した検索）は帯はあるが3つが `—件`。 取得元：`friend-attributes-v6/hqrOv.txt`。推奨修正：4タブで帯の作りをそろえる。**4画面をまたぐので、4つを1本のPRで一度に動かす**（片方だけ直すと、ちぐはぐが増える）',
     verdictSource: 'friend-attributes-v6/hqrOv.txt', verdictHead: '7b509106',
   },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
     steps: [{ click: '削除', scope: 'main' }],
-    verdict: 'structure_match_data_pending', verdictNote: '**構造は設計とそろっている。** ルート `/tags`（タグ削除の確認）。残るのは実データの接続——**消す前に「何人に付いているか」を出す口**が要る（`zGZMA` と同じ根、束11）。取得元：`friend-attributes-v6/dKlkz.txt`。1440・1920とも横スクロール0',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **構造は設計とそろっている。** ルート `/tags`（タグ削除の確認）。残るのは実データの接続——**消す前に「何人に付いているか」を出す口**が要る（`zGZMA` と同じ根、束11）。取得元：`friend-attributes-v6/dKlkz.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friend-attributes-v6/dKlkz.txt', verdictHead: '7b509106',
   },
   {
@@ -2435,7 +2435,7 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-select',
     why: 'ファイルを選ばせる操作が要る。`capture.spec.mjs` の `tags-csv-select` が撮っている',
-    verdict: 'structure_match_data_pending', verdictNote: 'CSV一括登録の選択画面。作りは一致。取り込みの口が固定データのままで、実データにつながっていない',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** CSV一括登録の選択画面。作りは一致。取り込みの口が固定データのままで、実データにつながっていない',
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   {
@@ -2443,7 +2443,7 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-preview',
     why: '同上。`tags-csv-preview` が撮っている',
-    verdict: 'needs_fix', verdictNote: '**訂正：前の判定「行ごとの内訳を出さない」は誤り。取り消す。** ルート `/tags`（CSVで一括登録 → 取り込む内容を確認）。撮影は `capture.spec.mjs` の `tags-csv-preview`（ファイルを選ばせる操作が要るため、こちらの仕掛けでは撮らない）。**実装は確認画面を持ち、件数も理由も出している**（`tag-csv-import-dialog.tsx:205-225`）——**読み込んだ行／新しく登録／重複で見送り／入力確認**の4つを件数で出し、その4つで**行を絞り込める**。失敗した行は **タグ名・フォルダ・エラー理由** の3列でCSVに書き出せる（`tag-csv-import.ts:89`）。**良い点**：「登録できる行だけを登録します。入力確認の行は、直してからもう一度取り込めます。」「入力確認があっても、登録できる行だけ先に登録できます。」と**部分的に進めることを先に書く**。「フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。」と**勝手に捨てないこと**も書く。上限は「UTF-8・最大500件」。**P2 残る差**：設計は **新規と更新**を分けるが、実装に「更新」が無い——**すでにあるタグは『重複で見送り』**になり、上書きできない。**推奨修正**：既存タグのフォルダだけ直したいときの道が無いので、「更新」を足すか、見送りの理由に「すでにあります」と出して編集画面へ誘導する。取得元：`tag-csv-import-dialog.tsx` ＋ `tag-csv-import.ts`',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **訂正：前の判定「行ごとの内訳を出さない」は誤り。取り消す。** ルート `/tags`（CSVで一括登録 → 取り込む内容を確認）。撮影は `capture.spec.mjs` の `tags-csv-preview`（ファイルを選ばせる操作が要るため、こちらの仕掛けでは撮らない）。**実装は確認画面を持ち、件数も理由も出している**（`tag-csv-import-dialog.tsx:205-225`）——**読み込んだ行／新しく登録／重複で見送り／入力確認**の4つを件数で出し、その4つで**行を絞り込める**。失敗した行は **タグ名・フォルダ・エラー理由** の3列でCSVに書き出せる（`tag-csv-import.ts:89`）。**良い点**：「登録できる行だけを登録します。入力確認の行は、直してからもう一度取り込めます。」「入力確認があっても、登録できる行だけ先に登録できます。」と**部分的に進めることを先に書く**。「フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。」と**勝手に捨てないこと**も書く。上限は「UTF-8・最大500件」。**P2 残る差**：設計は **新規と更新**を分けるが、実装に「更新」が無い——**すでにあるタグは『重複で見送り』**になり、上書きできない。**推奨修正**：既存タグのフォルダだけ直したいときの道が無いので、「更新」を足すか、見送りの理由に「すでにあります」と出して編集画面へ誘導する。取得元：`tag-csv-import-dialog.tsx` ＋ `tag-csv-import.ts`',
     verdictSource: 'tag-csv-import-dialog.tsx:205 + tag-csv-import.ts:89', verdictHead: 'c275749d',
   },
   {
@@ -2451,7 +2451,7 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-success',
     why: '同上。`tags-csv-success` が撮っている',
-    verdict: 'structure_match_data_pending', verdictNote: 'CSV取り込み・完了。作りは一致。取り込み結果が固定データのままで、実データにつながっていない',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** CSV取り込み・完了。作りは一致。取り込み結果が固定データのままで、実データにつながっていない',
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   {
@@ -2459,25 +2459,25 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-partial',
     why: '同上。`tags-csv-partial` が撮っている',
-    verdict: 'structure_match_data_pending', verdictNote: 'CSV取り込み・一部失敗。作りは一致。行ごとの失敗理由が口から返らず、いまの固定データは全行同じ文。実装は返ってきた文をそのまま出すので、口が理由を分ければ直る',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** CSV取り込み・一部失敗。作りは一致。行ごとの失敗理由が口から返らず、いまの固定データは全行同じ文。実装は返ってきた文をそのまま出すので、口が理由を分ければ直る',
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
-    verdict: 'match', verdictNote: '**#420 `f77de350` で、前に挙げたP1が3つとも解消した。** ルート `/tags?tab=fields`。1440・1920とも横スクロール0。 **① 「入力済み」が未取得なのに `0人` と出る、が直った。** 一覧は `api.friendFields.list(accountId, { withUsage: true })` で読むようになり（`field-list.tsx:55`）、値は `field.usageCount ?? \'—\'` で出す（`:139`）。**取れていれば実値（187人・164人・141人・72人）、取れなければ `—`。0で埋めない。** **② 帯4つが入った**：項目数 4件（使用中4件）／登録済み友だち 187人（1項目以上を登録）／フォーム連携 **`—`（未取得）**／今月の更新 3件（追加・編集）。**フォーム連携だけ口が無いので `—` と未取得の札**で、**取れているものと取れていないものが同じ帯の中で見分けられる**。 **③ 「表示先」が出るようになった**（前は本文を数えて0件）。 **④ 使用中の項目には「移行」、使っていない項目には削除のごみ箱**（`:143,144`）。使用中の削除は押せなくして `title` に「値が入っているため、先に項目を移行してください」と理由を書く。**共通項目には鍵の印**（「共通項目は直接削除できません」）。**押せなくして理由を書く形は `g89Tc`（メディアの一括削除）と同じ手本。** **`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は0件。** 取得元：`friend-attributes-v6/HBTk0.txt` ＋ `field-list.tsx:55,139`',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#420 `f77de350` で、前に挙げたP1が3つとも解消した。** ルート `/tags?tab=fields`。1440・1920とも横スクロール0。 **① 「入力済み」が未取得なのに `0人` と出る、が直った。** 一覧は `api.friendFields.list(accountId, { withUsage: true })` で読むようになり（`field-list.tsx:55`）、値は `field.usageCount ?? \'—\'` で出す（`:139`）。**取れていれば実値（187人・164人・141人・72人）、取れなければ `—`。0で埋めない。** **② 帯4つが入った**：項目数 4件（使用中4件）／登録済み友だち 187人（1項目以上を登録）／フォーム連携 **`—`（未取得）**／今月の更新 3件（追加・編集）。**フォーム連携だけ口が無いので `—` と未取得の札**で、**取れているものと取れていないものが同じ帯の中で見分けられる**。 **③ 「表示先」が出るようになった**（前は本文を数えて0件）。 **④ 使用中の項目には「移行」、使っていない項目には削除のごみ箱**（`:143,144`）。使用中の削除は押せなくして `title` に「値が入っているため、先に項目を移行してください」と理由を書く。**共通項目には鍵の印**（「共通項目は直接削除できません」）。**押せなくして理由を書く形は `g89Tc`（メディアの一括削除）と同じ手本。** **`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は0件。** 取得元：`friend-attributes-v6/HBTk0.txt` ＋ `field-list.tsx:55,139`',
     verdictSource: 'friend-attributes-v6/HBTk0.txt + field-list.tsx:139', verdictHead: '7b509106',
   },
   {
     node: 'yKEdO', feature: 4, name: '4-2-C 一覧の状態（空・読込・エラー）',
     dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
     states: { apis: ['**/api/friend-fields*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'match', verdictNote: '**#420 `f77de350` で、残っていたP1（帯が未取得を `0人` と出す）が解消した。読込・空・失敗を撮って確かめた。** ルート `/tags?tab=fields`（空・読込・失敗）。1440・1920とも横スクロール0。 **取得失敗のとき帯は4つとも `—`**：項目数 `—件`／登録済み友だち `—人`（1項目以上を登録）／フォーム連携 `—件`（回答の登録先）／今月の更新 `—件`（追加・編集）。**通常のとき（`HBTk0`）は 4件・187人・3件 と実値**なので、**未取得と実値が見分けられる**。 **前のP0（失敗を空として出し、「項目を追加」の誘いを同時に出す）は解決済み**で、この head でも保たれている。 **`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は0件。** 取得元：`friend-attributes-v6/yKEdO-error.txt` ＋ `HBTk0.txt`',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#420 `f77de350` で、残っていたP1（帯が未取得を `0人` と出す）が解消した。読込・空・失敗を撮って確かめた。** ルート `/tags?tab=fields`（空・読込・失敗）。1440・1920とも横スクロール0。 **取得失敗のとき帯は4つとも `—`**：項目数 `—件`／登録済み友だち `—人`（1項目以上を登録）／フォーム連携 `—件`（回答の登録先）／今月の更新 `—件`（追加・編集）。**通常のとき（`HBTk0`）は 4件・187人・3件 と実値**なので、**未取得と実値が見分けられる**。 **前のP0（失敗を空として出し、「項目を追加」の誘いを同時に出す）は解決済み**で、この head でも保たれている。 **`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は0件。** 取得元：`friend-attributes-v6/yKEdO-error.txt` ＋ `HBTk0.txt`',
     verdictSource: 'friend-attributes-v6/yKEdO-error.txt', verdictHead: '7b509106',
   },
   { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**P1 人数が「人」だけで数字が出ない。** ルート `/tags?tab=marks`。撮った本文の「いまの人数」列は **未対応・対応中・保留・対応済・気にかける の5行とも「人」だけ**で、数字が入っていない（`[0-9]+人` を数えて0件）。原因は `mark-list.tsx:176` が `{mark.friendCount}人` を出すのに、**`SupportMark` の型に `friendCount` が無い**こと。どの口も返さないので常に空になる。設計は 未対応23人／対応中19人／対応済186人／保留3人 を出す。**推奨修正**：数を返す口ができるまでは **`—人`** と出す（空にしない）。空欄は「0人」とも「取れていない」とも読めない。**P1 帯4つが無い**（設計は マークの種類4件（使用中4件）／未対応23人（全体の10.0%）／対応中19人／過去7日の変更74回）。同じ画面の4タブのうち**タグ（`hqrOv`）だけが帯を持ち**、作りが揃っていない。取得元：`friend-attributes-v6/rIhbN.txt`。1440・1920とも横スクロール0',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P1 人数が「人」だけで数字が出ない。** ルート `/tags?tab=marks`。撮った本文の「いまの人数」列は **未対応・対応中・保留・対応済・気にかける の5行とも「人」だけ**で、数字が入っていない（`[0-9]+人` を数えて0件）。原因は `mark-list.tsx:176` が `{mark.friendCount}人` を出すのに、**`SupportMark` の型に `friendCount` が無い**こと。どの口も返さないので常に空になる。設計は 未対応23人／対応中19人／対応済186人／保留3人 を出す。**推奨修正**：数を返す口ができるまでは **`—人`** と出す（空にしない）。空欄は「0人」とも「取れていない」とも読めない。**P1 帯4つが無い**（設計は マークの種類4件（使用中4件）／未対応23人（全体の10.0%）／対応中19人／過去7日の変更74回）。同じ画面の4タブのうち**タグ（`hqrOv`）だけが帯を持ち**、作りが揃っていない。取得元：`friend-attributes-v6/rIhbN.txt`。1440・1920とも横スクロール0',
     verdictSource: 'friend-attributes-v6/rIhbN.txt', verdictHead: '7b509106',
   },
-  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした（内部の識別子 `ss-` や `support_mark` `scenario_id` が0件）。画面全体は要修正のまま。** ルート `/tags?tab=searches`。帯は 保存した条件5件「上限50件」／配信で使用中 **`—件`**「変更時は影響確認」／該当者0人 **`—件`**「条件の見直し候補」／今月の呼び出し **`—回`**「呼び出し記録は未接続」。**取れていないものを `—` と書き、なぜ取れないかを添えている**のは良い（0で埋めていない）。**P1 4つの帯のうち3つが未取得のまま。** 「配信で使用中」が出ないと、**消してよい条件かどうかが判断できない**。**P2 この画面でできるのは名前の確認と削除だけ**——「新しく保存するときは、友だち一覧の絞り込みから『この条件を保存』を押してください。」と**どこで作るかを書いている**のは良いが、設計 4-4 は条件の要約と使用先をこの一覧に出す。**推奨修正**：使用先の口（`uNBlA` と同じ考え方）をつなぐ。取得元：`friend-attributes-v6/QKx8Q.txt`。1440・1920とも横スクロール0', verdictSource: 'friend-attributes-v6/QKx8Q.txt' , verdictHead: '7b509106' },
+  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#539 → #541 `e929f22a` で束3の完了条件を満たした（内部の識別子 `ss-` や `support_mark` `scenario_id` が0件）。画面全体は要修正のまま。** ルート `/tags?tab=searches`。帯は 保存した条件5件「上限50件」／配信で使用中 **`—件`**「変更時は影響確認」／該当者0人 **`—件`**「条件の見直し候補」／今月の呼び出し **`—回`**「呼び出し記録は未接続」。**取れていないものを `—` と書き、なぜ取れないかを添えている**のは良い（0で埋めていない）。**P1 4つの帯のうち3つが未取得のまま。** 「配信で使用中」が出ないと、**消してよい条件かどうかが判断できない**。**P2 この画面でできるのは名前の確認と削除だけ**——「新しく保存するときは、友だち一覧の絞り込みから『この条件を保存』を押してください。」と**どこで作るかを書いている**のは良いが、設計 4-4 は条件の要約と使用先をこの一覧に出す。**推奨修正**：使用先の口（`uNBlA` と同じ考え方）をつなぐ。取得元：`friend-attributes-v6/QKx8Q.txt`。1440・1920とも横スクロール0', verdictSource: 'friend-attributes-v6/QKx8Q.txt' , verdictHead: '7b509106' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
@@ -2485,46 +2485,46 @@ export const SCREENS = [
   {
     node: 'l25rlp', feature: 4, name: '4-1-A タグを作る・初期状態',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'page',
-    verdict: 'match', verdictNote: '**#605 `3b5098a3`（#422 `e7816e9a` の上）で解けた。** ルート `/tags/new`。1440・1920とも横スクロール0。 **① 連動がOFFのとき、名前だけを並べていたのを中身つきにした。** 「今後のマイル倍率」が何倍なのか、「連動」で何を送れるのかが読めず、ONにして初めて分かる形だった。いまは 本人へのマイル付与（このタグが初めて付いた本人に +N mile）／紹介者へのマイル付与（紹介した人に +N mile）／今後のマイル倍率（このタグを持つ間、獲得マイルを 1.2／1.5／2.0／3.0倍）／連動アクション（テキスト送信・テンプレート送信・タグ操作・シナリオ開始など）。 **② ★の切り替え方が2通りあることを言う**（「このスイッチ、またはタグ一覧の星をクリックして…」）。 **③「この設定で起きること」の3つ目**を「配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます」にした。 「保存しただけでは、まだ誰にも届きません」の帯も設計どおり在る。 操作の置き場だけ設計と違う（設計は右上、実装は下の帯に「まだ保存していません」と一緒）が、**押す前に保存されていないと分かる形なので、実装のほうが安全側**。差とはしない。 取得元：`friend-attributes-v6/l25rlp-1440.png` ＋ `tag-editor-v4.tsx:LINKED_PREVIEW`',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#605 `3b5098a3`（#422 `e7816e9a` の上）で解けた。** ルート `/tags/new`。1440・1920とも横スクロール0。 **① 連動がOFFのとき、名前だけを並べていたのを中身つきにした。** 「今後のマイル倍率」が何倍なのか、「連動」で何を送れるのかが読めず、ONにして初めて分かる形だった。いまは 本人へのマイル付与（このタグが初めて付いた本人に +N mile）／紹介者へのマイル付与（紹介した人に +N mile）／今後のマイル倍率（このタグを持つ間、獲得マイルを 1.2／1.5／2.0／3.0倍）／連動アクション（テキスト送信・テンプレート送信・タグ操作・シナリオ開始など）。 **② ★の切り替え方が2通りあることを言う**（「このスイッチ、またはタグ一覧の星をクリックして…」）。 **③「この設定で起きること」の3つ目**を「配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます」にした。 「保存しただけでは、まだ誰にも届きません」の帯も設計どおり在る。 操作の置き場だけ設計と違う（設計は右上、実装は下の帯に「まだ保存していません」と一緒）が、**押す前に保存されていないと分かる形なので、実装のほうが安全側**。差とはしない。 取得元：`friend-attributes-v6/l25rlp-1440.png` ＋ `tag-editor-v4.tsx:LINKED_PREVIEW`',
     verdictSource: 'friend-attributes-v6/l25rlp-1920.png', verdictHead: '7b509106',
   },
   {
     node: 'tP0RW', feature: 4, name: '4-1-B タグを作る・連動ON',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'page',
     steps: [{ click: 'タグ連動', role: 'switch' }],
-    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/tP0RW.txt`。1440・1920とも横スクロール0。**具体的な差は、設計画像が用意できてから詰める**（この機能は `design-qa-remaining10.md` に画像が無く、文章の記述だけで見ている） **推奨修正**：**残作業**：この機能は `design-qa-remaining10.md` に設計画像が無く、文章の記述だけで見ている。**設計画像が用意できるまで、具体的な差は書けない。** 用意できたら `LfrQs` `VjXGX` `byqIW` `KoT6c` と同時に詰める。',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/tP0RW.txt`。1440・1920とも横スクロール0。**具体的な差は、設計画像が用意できてから詰める**（この機能は `design-qa-remaining10.md` に画像が無く、文章の記述だけで見ている） **推奨修正**：**残作業**：この機能は `design-qa-remaining10.md` に設計画像が無く、文章の記述だけで見ている。**設計画像が用意できるまで、具体的な差は書けない。** 用意できたら `LfrQs` `VjXGX` `byqIW` `KoT6c` と同時に詰める。',
     verdictSource: 'friend-attributes-v6/tP0RW.txt', verdictHead: '7b509106',
   },
   {
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'viewport', height: 1320,
     steps: [{ click: 'タグ連動', role: 'switch' }, { click: '＋ アクションを追加' }],
-    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/LfrQs.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める **推奨修正**：`tP0RW` と同じ。**設計画像が用意できるまで具体的な差は書けない。** 4-1 の窓は同じ束なのでまとめて詰める。',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/LfrQs.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める **推奨修正**：`tP0RW` と同じ。**設計画像が用意できるまで具体的な差は書けない。** 4-1 の窓は同じ束なのでまとめて詰める。',
     verdictSource: 'friend-attributes-v6/LfrQs.txt', verdictHead: '7b509106',
   },
   {
     node: 'ee0sk', feature: 4, name: '4-1-D タグを編集・既存設定あり',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**#605 `3b5098a3` で撮り直した。前の判定のうち1つは誤りだったので取り消す。** ルート `/tags/edit?id=tag-0`。1440・1920とも横スクロール0。 **「複製のボタンが無い」は誤り。#422 で「複製して新規作成」が既に入っていた。** development の古い絵をもとに書いた判定だった。 **「OFFに戻すと…すでに積んだマイルは取り消されません」を足した。** OFFにすれば元通りだと読めてしまうため。 P2 連動アクションの種類名が設計と違う（設計は テキスト送信・タグ追加・シナリオ開始、実装は メッセージ・シナリオ）。種類は追加ドロワー（`LfrQs`）の持ち物で、そちらは**設計画像が無いため触れない**。 P2 4枚のカードの補足（このタグを持つ友だち／まだ受け取っていない人／紹介者が登録されている人／さかのぼりません）が足りない。 取得元：`friend-attributes-v6/ee0sk-1440.png` ＋ `tag-editor-v4.tsx:393`',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#605 `3b5098a3` で撮り直した。前の判定のうち1つは誤りだったので取り消す。** ルート `/tags/edit?id=tag-0`。1440・1920とも横スクロール0。 **「複製のボタンが無い」は誤り。#422 で「複製して新規作成」が既に入っていた。** development の古い絵をもとに書いた判定だった。 **「OFFに戻すと…すでに積んだマイルは取り消されません」を足した。** OFFにすれば元通りだと読めてしまうため。 P2 連動アクションの種類名が設計と違う（設計は テキスト送信・タグ追加・シナリオ開始、実装は メッセージ・シナリオ）。種類は追加ドロワー（`LfrQs`）の持ち物で、そちらは**設計画像が無いため触れない**。 P2 4枚のカードの補足（このタグを持つ友だち／まだ受け取っていない人／紹介者が登録されている人／さかのぼりません）が足りない。 取得元：`friend-attributes-v6/ee0sk-1440.png` ＋ `tag-editor-v4.tsx:393`',
     verdictSource: 'friend-attributes-v6/ee0sk-1920.png', verdictHead: '7b509106',
   },
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'viewport', height: 1590,
     steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }, { click: 'タグを保存' }],
-    verdict: 'needs_fix', verdictNote: '**P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/VjXGX.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める **推奨修正**：`tP0RW` `LfrQs` と同じ束。**設計画像待ち。** ただし遡及反映は「さかのぼるかどうか」を伝える窓なので、`ee0sk` に書いた「OFFに戻すと…すでに積んだマイルは取り消されません。」の注記と対で見る。',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 設計との差は並びと文言。** ルート `/tags`。取得元：`friend-attributes-v6/VjXGX.txt`。1440・1920とも横スクロール0。具体的な差は設計画像が用意できてから詰める **推奨修正**：`tP0RW` `LfrQs` と同じ束。**設計画像待ち。** ただし遡及反映は「さかのぼるかどうか」を伝える窓なので、`ee0sk` に書いた「OFFに戻すと…すでに積んだマイルは取り消されません。」の注記と対で見る。',
     verdictSource: 'friend-attributes-v6/VjXGX.txt', verdictHead: 'c275749d',
   },
   {
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
     dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**`7b509106` の1440・1920を設計と見比べて、書き直した。判定は据え置き。** **入ったもの**：押せない主要操作に理由が付いた——「フォルダを追加」が灰色のとき、本文に「フォルダ名を入力すると保存できます」と出る。フォルダ名（必須）・フォルダの色・一覧での表示、「フォルダをあとで削除しても、中に入れたタグや友だち情報欄は削除されず『未分類』に残ります。」の言い分けも設計どおり。**残る差**：①設計は**一覧の上に開く1つの窓**で、「このダイアログは追加のときも編集のときも同じものを使います。」と明記されている。実装は `/tags/folders/new` という**別ページ**なので、追加と編集を1つにできていない（設計の窓には「フォルダを削除」も並ぶ）。②実装だけに「作成する場所（タグ／友だち情報欄）」の節がある。③色の並びが違う（設計は緑始まりの8色、実装は青始まりの8色）。**壊れ値・内部IDは0件。** **推奨修正**：①窓に寄せて編集と1つにする。②は残してよいが、設計にも足すかを決める。',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **`7b509106` の1440・1920を設計と見比べて、書き直した。判定は据え置き。** **入ったもの**：押せない主要操作に理由が付いた——「フォルダを追加」が灰色のとき、本文に「フォルダ名を入力すると保存できます」と出る。フォルダ名（必須）・フォルダの色・一覧での表示、「フォルダをあとで削除しても、中に入れたタグや友だち情報欄は削除されず『未分類』に残ります。」の言い分けも設計どおり。**残る差**：①設計は**一覧の上に開く1つの窓**で、「このダイアログは追加のときも編集のときも同じものを使います。」と明記されている。実装は `/tags/folders/new` という**別ページ**なので、追加と編集を1つにできていない（設計の窓には「フォルダを削除」も並ぶ）。②実装だけに「作成する場所（タグ／友だち情報欄）」の節がある。③色の並びが違う（設計は緑始まりの8色、実装は青始まりの8色）。**壊れ値・内部IDは0件。** **推奨修正**：①窓に寄せて編集と1つにする。②は残してよいが、設計にも足すかを決める。',
     verdictSource: 'friend-attributes-v6/byqIW.txt', verdictHead: '7b509106',
   },
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
     dir: 'friend-attributes-v6', route: '/tags/fields/new', mode: 'page',
-    verdict: 'needs_fix', verdictNote: '**#578 `a744c582`（#420 を含む）で撮り直した。絵ではなく型を読んで数え直した。** ルート `/tags/fields/new`。1440・1920とも横スクロール0。 P1 種類が設計の12に対し10。`FriendFieldType`（`packages/shared/src/types.ts:177`）は text／textarea／number／date／select／multi_select／checkbox／url／tel／email。**設計にある 日時・画像・PDF が無く、設計に無い 真偽（checkbox）が増えている。** 日時が無いと、予約時刻のような値を1つの欄で持てない（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。 **これは画面だけでは作れない。** 種類を足すには共有の型・Workerの検査・保存先がそろって要る。Codex側。 P2 既定値の決め方が違う——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。 取得元：`friend-attributes-v6/A1ZYeP-1440.png` ＋ `packages/shared/src/types.ts:177`。推奨修正：`FriendFieldType` に datetime／image／file を足す（Codex側・P1）',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#578 `a744c582`（#420 を含む）で撮り直した。絵ではなく型を読んで数え直した。** ルート `/tags/fields/new`。1440・1920とも横スクロール0。 P1 種類が設計の12に対し10。`FriendFieldType`（`packages/shared/src/types.ts:177`）は text／textarea／number／date／select／multi_select／checkbox／url／tel／email。**設計にある 日時・画像・PDF が無く、設計に無い 真偽（checkbox）が増えている。** 日時が無いと、予約時刻のような値を1つの欄で持てない（日付と時刻を別々の欄に分けることになり、リマインダの起点に使えない）。 **これは画面だけでは作れない。** 種類を足すには共有の型・Workerの検査・保存先がそろって要る。Codex側。 P2 既定値の決め方が違う——設計は「未設定」「［お名前］を使う」から選ぶ形、実装は自由入力。 取得元：`friend-attributes-v6/A1ZYeP-1440.png` ＋ `packages/shared/src/types.ts:177`。推奨修正：`FriendFieldType` に datetime／image／file を足す（Codex側・P1）',
     verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '7b509106',
   },
   {
@@ -2534,7 +2534,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    verdict: 'needs_fix', verdictNote: '**#420 `f77de350` で本文が取れた。前の判定（404の絵から書かれていた）を置き換える。** ルート `/tags/fields/migrate?id=field-birthday`。1440・1920とも横スクロール0。**development には無い画面で、#420 の枝にある。** **先に事前確認だけを行う形**：「**まず事前確認だけを行います。友だちの値や既存の項目は変更しません。**確認が必要な値を直してから、移行を実行してください。」——**押しても何も動かないことを先に書く**ので、確かめてから進める。 **いま使っている項目と、新しく作る項目を左右に並べる**：「誕生日 `{{field.birthday}}` 日付 → 新しく作る項目（項目名・種類）」。差し込み名も出るので、**テンプレートのどこが影響するか**が分かる。 **種類は10種類**（1行テキスト・複数行テキスト・数値・日付・単一選択・複数選択・真偽・URL・電話番号・メール）で、**それぞれに例が付く**（「日付 — 誕生日など」「数値 — 体重など」）。**P1 設計の12種類のうち 日時・画像・PDF が無く、真偽が増えている**（`A1ZYeP` と同じ差。移行先の選択肢もそこに引きずられる）。**日時が無いので、予約時刻のような値は移行先を作れない。** **P2 事前確認の結果（何件が移り、何件が直しを要るか）は、押してからでないと出ない。** 設計は移行の前に件数を見せる。**推奨修正**：種類の不足は `A1ZYeP` と同じ直しで一緒に解ける。件数は `uNBlA`（変える前に影響を見る）と同じ形にできる。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friend-attributes-v6/KoT6c.txt`', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '7b509106',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#420 `f77de350` で本文が取れた。前の判定（404の絵から書かれていた）を置き換える。** ルート `/tags/fields/migrate?id=field-birthday`。1440・1920とも横スクロール0。**development には無い画面で、#420 の枝にある。** **先に事前確認だけを行う形**：「**まず事前確認だけを行います。友だちの値や既存の項目は変更しません。**確認が必要な値を直してから、移行を実行してください。」——**押しても何も動かないことを先に書く**ので、確かめてから進める。 **いま使っている項目と、新しく作る項目を左右に並べる**：「誕生日 `{{field.birthday}}` 日付 → 新しく作る項目（項目名・種類）」。差し込み名も出るので、**テンプレートのどこが影響するか**が分かる。 **種類は10種類**（1行テキスト・複数行テキスト・数値・日付・単一選択・複数選択・真偽・URL・電話番号・メール）で、**それぞれに例が付く**（「日付 — 誕生日など」「数値 — 体重など」）。**P1 設計の12種類のうち 日時・画像・PDF が無く、真偽が増えている**（`A1ZYeP` と同じ差。移行先の選択肢もそこに引きずられる）。**日時が無いので、予約時刻のような値は移行先を作れない。** **P2 事前確認の結果（何件が移り、何件が直しを要るか）は、押してからでないと出ない。** 設計は移行の前に件数を見せる。**推奨修正**：種類の不足は `A1ZYeP` と同じ直しで一緒に解ける。件数は `uNBlA`（変える前に影響を見る）と同じ形にできる。 **`undefined`・`NaN`・`Invalid Date`・`API error` は0件。** 取得元：`friend-attributes-v6/KoT6c.txt`', verdictSource: 'friend-attributes-v6/KoT6c.txt', verdictHead: '7b509106',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
   },
   {
@@ -2562,8 +2562,8 @@ export const SCREENS = [
         ],
       },
     ],
-    verdict: 'needs_fix',
-    verdictNote: '契約枝 `codex/kenta-v6-support-mark-rules-api`（head `e95ac2b5`）の上に画面を実装。**未実装から外した。** 名前・色・並び順・初期値と自動変更ルールを同じ面で扱い、きっかけ5つ・優先順位・手動変更の保護時間を確認して保存できる。**並びは実行順そのもの**（Workerの `ORDER BY priority DESC, created_at ASC` と同じ）で、複数一致したときは上から1本だけ動くことを先に言う。読込中・0件・取得失敗・権限不足・版競合を混ぜず、5状態を撮った。**409では窓を閉じず**、書いた内容を残したまま「最新の内容を読み直す」を出す。停止は履歴を消さないことを確認窓に書く。残る差：設計は追加専用の1枚（パンくず「対応マーク > マークを追加」と下部の「キャンセル／対応マークを追加」）で、実装は一覧と同じ面に置いている。設計のルールは畳んだチップ（「担当者を割り当てたとき」→「このマークに変更」）で、実装は行に開いて出す。**条件（`condition`）の組み立ては未対応**——口は `SegmentCondition` を受けるが、組み立ての部品は `XBkiQ` と共通化してから入れる',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** 契約枝 `codex/kenta-v6-support-mark-rules-api`（head `e95ac2b5`）の上に画面を実装。**未実装から外した。** 名前・色・並び順・初期値と自動変更ルールを同じ面で扱い、きっかけ5つ・優先順位・手動変更の保護時間を確認して保存できる。**並びは実行順そのもの**（Workerの `ORDER BY priority DESC, created_at ASC` と同じ）で、複数一致したときは上から1本だけ動くことを先に言う。読込中・0件・取得失敗・権限不足・版競合を混ぜず、5状態を撮った。**409では窓を閉じず**、書いた内容を残したまま「最新の内容を読み直す」を出す。停止は履歴を消さないことを確認窓に書く。残る差：設計は追加専用の1枚（パンくず「対応マーク > マークを追加」と下部の「キャンセル／対応マークを追加」）で、実装は一覧と同じ面に置いている。設計のルールは畳んだチップ（「担当者を割り当てたとき」→「このマークに変更」）で、実装は行に開いて出す。**条件（`condition`）の組み立ては未対応**——口は `SegmentCondition` を受けるが、組み立ての部品は `XBkiQ` と共通化してから入れる',
     verdictSource: 'Claude実装',
     verdictHead: '7b509106',
   },
@@ -2578,13 +2578,13 @@ export const SCREENS = [
       決着していない**（消すのか、しまうのか）。要判断として残す。
     */
     steps: [{ click: '対応中を保管', scope: 'main' }],
-    verdict: 'needs_fix', verdictNote: '**P1 対応マークを消すとき、何人に付いているかも移り先も言わない。** ルート `/tags?tab=marks`。撮った本文の行は「マーク名／新規の初期値／いまの人数／自動で変わるとき」と「削除」で、**人数が空**（`rIhbN` と同じ根）。消す前に**何人から外れるのか**が分からない。設計は消す前に人数と移り先を出す。**新しい口が要る**（束11）ので、段1（`ConfirmDialog` 化）だけ先にはできない——**人数を出せないまま窓だけ作ると、空欄の窓になる**。取得元：`friend-attributes-v6/zGZMA.txt`。1440・1920とも横スクロール0 **推奨修正**：**人数を返す口が先**（束11）。**人数を出せないまま窓だけ作ると、空欄の窓になる**ので、段1（`ConfirmDialog` 化）だけ先にはできない。同じ根の `rIhbN` と一緒に直す。',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **P1 対応マークを消すとき、何人に付いているかも移り先も言わない。** ルート `/tags?tab=marks`。撮った本文の行は「マーク名／新規の初期値／いまの人数／自動で変わるとき」と「削除」で、**人数が空**（`rIhbN` と同じ根）。消す前に**何人から外れるのか**が分からない。設計は消す前に人数と移り先を出す。**新しい口が要る**（束11）ので、段1（`ConfirmDialog` 化）だけ先にはできない——**人数を出せないまま窓だけ作ると、空欄の窓になる**。取得元：`friend-attributes-v6/zGZMA.txt`。1440・1920とも横スクロール0 **推奨修正**：**人数を返す口が先**（束11）。**人数を出せないまま窓だけ作ると、空欄の窓になる**ので、段1（`ConfirmDialog` 化）だけ先にはできない。同じ根の `rIhbN` と一緒に直す。',
     verdictSource: 'friend-attributes-v6/zGZMA.txt', verdictHead: 'c275749d',
   },
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
     node: 'XBkiQ', feature: 4, name: '4-4-A 保存した検索の条件確認・編集',
-    verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした。** 条件の編集で、対応マークとシナリオが**IDの手入力ではなく選ぶ形**になり、項目名もキーのまま出なくなった（`ss-` `support_mark` `scenario_id` はいずれも0件）。**#541 は #539 を含む**ので、この head で両方を見たことになる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の条件の組み立て（入れ子の and/or）はこの直しの外 **ルート**：`/tags/searches/edit?id=ss-1`。**取得元**：`friend-attributes-v6/XBkiQ.txt`。**推奨修正**：条件の組み立てを入れ子の and/or にする。**`Igi72`（友だち一覧の詳細条件）と同じ部品**なので、そちらと共通化する。**IDの手入力をやめて選ぶ形にした直し（#539→#541）は維持する。**', verdictSource: 'tags-v6/XBkiQ.txt',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **#539 → #541 `e929f22a` で束3の完了条件を満たした。** 条件の編集で、対応マークとシナリオが**IDの手入力ではなく選ぶ形**になり、項目名もキーのまま出なくなった（`ss-` `support_mark` `scenario_id` はいずれも0件）。**#541 は #539 を含む**ので、この head で両方を見たことになる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の条件の組み立て（入れ子の and/or）はこの直しの外 **ルート**：`/tags/searches/edit?id=ss-1`。**取得元**：`friend-attributes-v6/XBkiQ.txt`。**推奨修正**：条件の組み立てを入れ子の and/or にする。**`Igi72`（友だち一覧の詳細条件）と同じ部品**なので、そちらと共通化する。**IDの手入力をやめて選ぶ形にした直し（#539→#541）は維持する。**', verdictSource: 'tags-v6/XBkiQ.txt',
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
     verdictHead: '7b509106',
   },
