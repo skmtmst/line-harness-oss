@@ -27,7 +27,7 @@ describe('V6 確認窓への移行（4本目）', () => {
     expect(src).not.toMatch(
       /(?:(?:window|globalThis|self)\s*\.\s*confirm\s*\()|(?:(?:^|[^.\w])confirm\s*\()/,
     )
-    expect(src).not.toMatch(/(?:^|[^.\w])alert\s*\()/)
+    expect(src).not.toMatch(/(?:^|[^.\w])alert\s*\(/)
   })
 })
 
