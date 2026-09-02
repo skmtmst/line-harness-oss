@@ -131,6 +131,7 @@ import {
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
+import { restaurantTestEnabled } from './lib/environment-features.js';
 import {
   resolveOgForEvent,
   resolveOgForForm,
@@ -148,6 +149,7 @@ export type Env = {
     CONTACT_EMAIL?: string;
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
+    RESTAURANT_TEST_ENABLED?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
@@ -1314,7 +1316,7 @@ async function scheduled(
 
   // 飲食店向け予約メールの原文は、既定90日で非公開R2から破棄する。
   // D1の台帳行は残し、r2_keyとstatusで破棄済みを追跡する。
-  if (event.cron === '0 */6 * * *') {
+  if (event.cron === '0 */6 * * *' && restaurantTestEnabled(env)) {
     try {
       const result = await deleteExpiredRestaurantRawEmails(env);
       if (result.deleted + result.failed > 0) {

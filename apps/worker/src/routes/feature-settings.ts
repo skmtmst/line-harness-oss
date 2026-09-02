@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { getAccountSetting, setAccountSetting } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 /**
@@ -153,7 +154,9 @@ featureSettings.get('/api/settings/features', async (c) => {
     const features: Record<string, boolean> = {};
     for (const key of TOGGLEABLE_FEATURES) {
       const raw = await getAccountSetting(c.env.DB, accountId, `${SETTING_PREFIX}${key}`);
-      features[key] = featureIsEnabled(raw, key);
+      features[key] = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
+        ? false
+        : featureIsEnabled(raw, key);
     }
 
     const orderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ORDER_KEY);
@@ -253,11 +256,14 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
     }
 
     for (const [key, value] of Object.entries(body.features ?? {})) {
+      const enabled = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
+        ? false
+        : value !== false;
       await setAccountSetting(
         c.env.DB,
         accountId,
         `${SETTING_PREFIX}${key}`,
-        JSON.stringify({ enabled: value !== false }),
+        JSON.stringify({ enabled }),
       );
     }
 

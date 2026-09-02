@@ -124,7 +124,9 @@ if [ "$SKIP_ADMIN" -eq 1 ]; then
   step "4/4 管理画面 — スキップ"
 else
   step "4/4 管理画面 ビルド＋デプロイ"
-  NEXT_PUBLIC_API_URL="$STAGING_API_URL" pnpm --filter web build
+  NEXT_PUBLIC_API_URL="$STAGING_API_URL" \
+    NEXT_PUBLIC_RESTAURANT_TEST_ENABLED="true" \
+    pnpm --filter web build
   if [ "$APPLY" -eq 1 ]; then
     # `pages deploy` は wrangler.staging.toml を読まないため、Worker と違って
     # account_id が渡らない。複数の Cloudflare アカウントに所属していると
