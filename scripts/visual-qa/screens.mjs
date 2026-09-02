@@ -1837,6 +1837,18 @@ export const SCREENS = [
     （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
   { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。未取得と実値0の扱いは、この機能がいちばんよくできている。** 本文に `—` が28か所あり、**`0件` は1つも無い**（数えていないものを0で埋めていない）。データ締切も日本時間で出る。構造は設計とそろっており、残るのは実データの接続', verdictSource: 'analytics-v6/Zxezb.txt + analytics-v6/design-qa.md' , verdictHead: '7b509106' },
+    // ---- 2026-09-02 `a0bb3f44`（#676 マージ後）で撮り直した ----
+    // **「データ未接続」は実装の話ではなく、撮影側に口が無かっただけだった。**
+    //   `/api/analytics/friends` がモックに無く、既定の器 `{items,total,page,limit}` が返っていた。
+    //   画面は `state.data.data` を読むので `overview.metrics` で投げ、
+    //   **機能20の9枚が1枚も撮れていなかった**（前の判定の「`—` が28か所」もこれが原因）。
+    // 契約どおりの形を返すようにしたら、実値で描かれた：
+    //   増えた友だち 58人／初回 52人、減った友だち 11人／ブロック・解除、
+    //   差し引き 47人／増加 − 減少、現在つながっている 1,842人／再追加 6人。
+    //   日ごとの表は30行、同日の施策は名前か `—`。
+    // #676 の直し（集計できていない値を0と書かない）は
+    // `analytics-pending-value-contract.test.ts` が見張っている（わざと戻して落ちるところまで確認済み）。
+    // 取得元：`analytics-v6/Zxezb-1440.png`（`a0bb3f44`）
   { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 社内テスト配信の開封・クリックが **`—`** で、帯に「20人未満は取得対象外」と**理由**が付く。**0ではなく取れないことが分かる**形。残るのは実データの接続', verdictSource: 'analytics-v6/J6Inc.txt + analytics-v6/design-qa.md' , verdictHead: '7b509106' },
   { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 広告費が `—` のとき**差し引きも `—`** になる。**片方が未取得なら計算結果も未取得**で、0円として引き算していない。残るのは実データの接続', verdictSource: 'analytics-v6/YBGtm.txt + analytics-v6/design-qa.md' , verdictHead: '7b509106' },
   {
@@ -2919,6 +2931,12 @@ export const CAPTURED_AT = {
     { pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4'], note: 'development そのもので撮った（根元9本のマージ後）' },
     { pr: 584, head: 'd0e62d59', on: '2026-08-30', screens: ['QQ1SR'], note: '使われ方の4つの帯と片づけの導線。通常・読込・空・失敗の4状態' },
+    { pr: 676, head: 'a0bb3f44', on: '2026-09-02',
+      screens: ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'dfwD4'],
+      note: '#676・#677 が入った木で撮り直した。**それまで機能20は9枚とも「画面を表示できませんでした」で1枚も撮れていなかった。**'
+        + '原因は実装ではなく撮影側で、`/api/analytics/friends`・`reactions`・`routes`・`usage` の口がモックに無く、'
+        + '既定の器 `{items,total,page,limit}` が返って `overview.metrics` で投げていた。契約どおりの形を返すようにして7 Node が撮れた。'
+        + '`Fh2Qj`（ファネル）はまだ撮れない。' },
   ],
   21: [
     { pr: 446, head: '4307088d', on: '2026-08-28' },
