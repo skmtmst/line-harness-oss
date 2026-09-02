@@ -310,9 +310,8 @@
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 6,
-    "direct-secondary-button": 9,
-    "direct-primary-button": 3,
-    "direct-th": 7
+    "direct-secondary-button": 8,
+    "direct-primary-button": 3
   },
   "app/scenarios/first-step/page.tsx": {
     "direct-secondary-button": 3,
