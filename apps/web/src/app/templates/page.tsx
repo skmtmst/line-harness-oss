@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -9,6 +8,7 @@ import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manag
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import {
   createBlockedReason,
@@ -18,6 +18,7 @@ import {
   type TemplatesFailure,
 } from './list-state-kind'
 import styles from './templates-v6.module.css'
+import { useAccount } from '@/contexts/account-context'
 
 interface Template {
   id: string
@@ -45,6 +46,10 @@ interface TemplateDetail {
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
+    scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>
+    reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
+    richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
+    trackedLinks: Array<{ id: string; name: string }>
   }
   createdAt: string
   updatedAt: string
@@ -86,6 +91,8 @@ function formatDate(iso: string): string {
 }
 
 export default function TemplatesPage() {
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
@@ -102,48 +109,69 @@ export default function TemplatesPage() {
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [drawerData, setDrawerData] = useState<TemplateDetail | null>(null)
-  const [scenarioStepUsages, setScenarioStepUsages] = useState<Array<{
-    scenarioId: string
-    scenarioName: string
-    stepId: string
-    stepOrder: number
-  }>>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [editContent, setEditContent] = useState<string | null>(null)
   const [editName, setEditName] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
 
+  useEffect(() => {
+    activeAccountRef.current = selectedAccountId
+    setDrawerId(null)
+    setShowCreate(false)
+    setPendingDelete(null)
+    setDeleteError('')
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
+    if (!selectedAccountId) {
+      setTemplates([])
+      setFailure(null)
+      setLoading(false)
+      return
+    }
+    const accountId = selectedAccountId
     setLoading(true)
     setError('')
     setFailure(null)
+    // アカウントを切り替えたとき、前のアカウントの行を残さない。
+    setTemplates([])
     try {
-      const res = await api.templates.list()
+      const res = await api.templates.list(undefined, accountId)
+      if (activeAccountRef.current !== accountId) return
       if (res.success) {
         setTemplates(res.data)
       } else {
         setFailure(failureOfResponse())
       }
     } catch (e) {
-      // 権限不足を「読み込めませんでした」に混ぜない。
-      setFailure(failureOf(e))
+      if (activeAccountRef.current === accountId) {
+        // 権限不足を「読み込めませんでした」に混ぜない。
+        setFailure(failureOf(e))
+      }
     } finally {
-      setLoading(false)
+      if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
     let cancelled = false
+    if (!selectedAccountId) {
+      setAssetCounts({})
+      return () => { cancelled = true }
+    }
     void Promise.all(
       ASSET_KINDS.map(async (kind) => {
-        const result = await api.broadcastMessageAssets.list({ kind })
+        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
         return [kind, result.success ? result.data.length : undefined] as const
       }),
     ).then((entries) => {
@@ -151,32 +179,25 @@ export default function TemplatesPage() {
       setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
     })
     return () => { cancelled = true }
-  }, [])
+  }, [selectedAccountId])
 
   // Drawer fetch
   useEffect(() => {
-    if (!drawerId) { setDrawerData(null); setDrawerError(null); setScenarioStepUsages([]); return }
+    if (!drawerId) { setDrawerData(null); setDrawerError(null); return }
     let cancelled = false
     setDrawerLoading(true)
     setDrawerError(null)
     setDrawerData(null)
-    setScenarioStepUsages([])
-    Promise.all([
-      api.templates.get(drawerId),
-      api.templates.usages(drawerId).catch(() => null),
-    ]).then(([detailRes, usagesRes]) => {
+    api.templates.get(drawerId).then((detailRes) => {
       if (cancelled) return
       if (detailRes.success && detailRes.data) {
         setDrawerData(detailRes.data)
       } else {
-        setDrawerError((detailRes as { error?: string }).error ?? '読み込みに失敗しました')
+        setDrawerError('テンプレートの詳細を読み込めませんでした。')
       }
-      if (usagesRes && usagesRes.success) {
-        setScenarioStepUsages(usagesRes.data.scenarioSteps)
-      }
-    }).catch((err) => {
+    }).catch(() => {
       if (cancelled) return
-      setDrawerError(err instanceof Error ? err.message : String(err))
+      setDrawerError('テンプレートの詳細を読み込めませんでした。')
     }).finally(() => {
       if (!cancelled) setDrawerLoading(false)
     })
@@ -206,12 +227,16 @@ export default function TemplatesPage() {
   }, {})
 
   const handleCreate = async () => {
+    if (!selectedAccountId) {
+      setFormError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
     if (!form.name.trim()) { setFormError('テンプレート名を入力してください'); return }
     if (!form.messageContent.trim()) { setFormError('メッセージ内容を入力してください'); return }
     setSaving(true)
     setFormError('')
     try {
-      const res = await api.templates.create(form)
+      const res = await api.templates.create({ ...form, accountId: selectedAccountId })
       if (res.success) {
         setShowCreate(false)
         setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
@@ -253,18 +278,35 @@ export default function TemplatesPage() {
     setSavingEdit(false)
   }
 
-  const handleDelete = async (id: string, usageCount: number) => {
+  const handleDelete = (template: Pick<Template, 'id' | 'name' | 'usageCount'>) => {
+    const { id, name, usageCount } = template
     if (usageCount > 0) {
-      if (!confirm(`このテンプレートは ${usageCount} 箇所で使用されています。削除すると参照がクリアされます。続行しますか？`)) return
-    } else {
-      if (!confirm('このテンプレートを削除しますか？')) return
+      setDrawerId(id)
+      setError(`${usageCount}件で使用中です。使用先を差し替えてから削除してください。`)
+      return
     }
+    setDeleteError('')
+    setPendingDelete({ id, name })
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    const target = pendingDelete
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.templates.delete(id)
-      if (drawerId === id) setDrawerId(null)
-      load()
+      const result = await api.templates.delete(target.id)
+      if (!result.success) {
+        setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
+        return
+      }
+      setPendingDelete(null)
+      if (drawerId === target.id) setDrawerId(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      setDeleteError('削除に失敗しました')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -276,6 +318,19 @@ export default function TemplatesPage() {
     matched: filteredTemplates.length,
   })
   const createBlocked = createBlockedReason({ loading, failure })
+
+  const scenarioStepUsages = drawerData?.usedBy.scenarioSteps ?? []
+  const reminderStepUsages = drawerData?.usedBy.reminderSteps ?? []
+  const richMenuAreaUsages = drawerData?.usedBy.richMenuAreas ?? []
+  const trackedLinkUsages = drawerData?.usedBy.trackedLinks ?? []
+  const drawerUsageCount = drawerData
+    ? drawerData.usedBy.autoReplies.length
+      + drawerData.usedBy.automations.length
+      + scenarioStepUsages.length
+      + reminderStepUsages.length
+      + richMenuAreaUsages.length
+      + trackedLinkUsages.length
+    : 0
 
   return (
     <div data-design-node="W7LBc">
@@ -325,17 +380,20 @@ export default function TemplatesPage() {
           <div className="flex items-center gap-2">
             {/* 押せない理由は本文に出す。押せないボタンを黙って置かない。 */}
             <Button
-              onClick={() => setShowCreate(true)}
+              onClick={() => {
+                if (!selectedAccountId) {
+                  setError('上のバーでLINE公式アカウントを選んでください')
+                  return
+                }
+                setShowCreate(true)
+              }}
               variant="primary"
               disabled={createBlocked !== null}
               aria-describedby={createBlocked ? 'tpl-create-blocked' : undefined}
             >
               テンプレートを作る
             </Button>
-            <Button
-              href="/templates/questions/new"
-              variant="secondary"
-            >
+            <Button href="/templates/questions/new" variant="secondary">
               質問を作る
             </Button>
             {createBlocked && (
@@ -534,9 +592,20 @@ export default function TemplatesPage() {
         一覧の状態。**「まだ1件も無い」「絞り込みに合わない」「読み込めない」
         「権限がない」を言い分ける。** 以前は4つとも同じ1文だったので、
         読み込みに失敗したときも、登録したものが消えたように見えていた。
+        アカウント未選択は development が足した5つ目の言い分け。**同じ文へ
+        まとめない。** 選ぶまでは読みに行っていないので、失敗ではない。
       */}
-      {view === 'loading' ? (
+      {accountLoading || view === 'loading' ? (
         <ListState kind="loading" title="読み込んでいます" />
+      ) : !selectedAccountId ? (
+        <ListState
+          kind="empty"
+          title={
+            accounts.length > 0
+              ? '上のバーでLINE公式アカウントを選んでください'
+              : 'LINE公式アカウントが登録されていません'
+          }
+        />
       ) : view === 'forbidden' ? (
         <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
       ) : view === 'error' ? (
@@ -618,12 +687,20 @@ export default function TemplatesPage() {
                       >
                         一斉配信で使う
                       </a>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
-                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
-                      >
-                        削除
-                      </button>
+                      {t.usageCount > 0 ? (
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); setDrawerId(t.id) }}
+                        >
+                          使用先を見る
+                        </Button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
+                          className="hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium text-red-500"
+                        >
+                          テンプレートを削除
+                        </button>
+                      )}
                       </div>
                     </td>
                   </tr>
@@ -767,38 +844,59 @@ export default function TemplatesPage() {
                 {/* Used by */}
                 <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">
-                    使用箇所 ({drawerData.usedBy.autoReplies.length + drawerData.usedBy.automations.length + scenarioStepUsages.length})
+                    使用箇所 ({drawerUsageCount})
                   </h4>
-                  {(drawerData.usedBy.autoReplies.length === 0 && drawerData.usedBy.automations.length === 0 && scenarioStepUsages.length === 0) ? (
+                  {drawerUsageCount === 0 ? (
                     <p className="text-[11px] text-ink-faint italic">どこからも使用されていません</p>
                   ) : (
                     <>
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href="/auto-replies" className="text-blue-600 hover:underline">
+                            <a href="/auto-replies" className="text-accent hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
-                            <a href="/automations" className="text-blue-600 hover:underline">
+                            <a href="/automations" className="text-accent hover:underline">
                               オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
                             </a>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-blue-600 hover:underline">
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent hover:underline">
                               シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
+                        {reminderStepUsages.map((rs) => (
+                          <li key={`rs-${rs.stepId}`}>
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent hover:underline">
+                              リマインダ: {rs.reminderName}
+                            </a>
+                          </li>
+                        ))}
+                        {richMenuAreaUsages.map((area) => (
+                          <li key={`rm-${area.areaId}`}>
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent hover:underline">
+                              リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
+                            </a>
+                          </li>
+                        ))}
+                        {trackedLinkUsages.map((link) => (
+                          <li key={`tl-${link.id}`}>
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent hover:underline">
+                              流入リンク: {link.name}
+                            </a>
+                          </li>
+                        ))}
                       </ul>
-                      {scenarioStepUsages.length > 0 && (
+                      {drawerUsageCount > 0 && (
                         <p className="mt-2 text-[10px] text-amber-700">
-                          ⚠ このテンプレートを修正すると、上記すべてに一斉反映されます
+                          このテンプレートは使用中です。削除する前に使用先を差し替えてください。
                         </p>
                       )}
                     </>
@@ -809,6 +907,23 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
+      <div data-design-node="M9cij">
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          title="テンプレートを削除しますか？"
+          description={`「${pendingDelete?.name ?? ''}」を削除します。この操作は元に戻せません。`}
+          confirmLabel="テンプレートを削除"
+          destructive
+          busy={deleting}
+          error={deleteError || undefined}
+          onCancel={() => {
+            if (deleting) return
+            setPendingDelete(null)
+            setDeleteError('')
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      </div>
       </div>
       </div>
       </> : <BroadcastAssetManager kind={activeSection} />}

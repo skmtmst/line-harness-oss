@@ -1,8 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
+import { useAccount } from '@/contexts/account-context'
 import { webinarApi, type Webinar } from '@/lib/api'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
@@ -44,32 +47,78 @@ function scheduleSummary(w: Webinar): string {
   return parts.join(' / ')
 }
 
+type SortKey = 'updated' | 'created' | 'name'
+type SavedFilter = '' | 'active' | 'draft'
+
 export default function WebinarsPage() {
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const requestGeneration = useRef(0)
   const [items, setItems] = useState<Webinar[]>([])
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('updated')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
+  const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  const visibleItems = loadedAccountId === selectedAccountId ? items : []
 
   const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await webinarApi.list()
-      setItems(res.data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
+    const generation = ++requestGeneration.current
+    if (!selectedAccountId) {
+      setItems([])
+      setLoadedAccountId(null)
+      setError(false)
       setLoading(false)
+      return
     }
-  }, [])
+    const accountId = selectedAccountId
+    setLoading(true)
+    setItems([])
+    setLoadedAccountId(null)
+    setError(false)
+    try {
+      const res = await webinarApi.list(accountId)
+      if (requestGeneration.current !== generation) return
+      setItems(res.data)
+      setLoadedAccountId(accountId)
+    } catch {
+      if (requestGeneration.current === generation) setError(true)
+    } finally {
+      if (requestGeneration.current === generation) setLoading(false)
+    }
+  }, [selectedAccountId])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  // タイトルと slug の両方を見る。URLで探すこともあるため。
-  const q = query.trim()
-  const shown = q ? items.filter((w) => w.title.includes(q) || w.slug.includes(q)) : items
+  const filtered = useMemo(() => {
+    // タイトルと slug の両方を見る。URLで探すこともあるため。
+    const q = query.trim()
+    const searched = q
+      ? visibleItems.filter((w) => w.title.includes(q) || w.slug.includes(q))
+      : visibleItems
+    const narrowed = savedFilter
+      ? searched.filter((w) => w.status === savedFilter)
+      : searched
+    return [...narrowed].sort((a, b) => {
+      if (sortKey === 'name') return a.title.localeCompare(b.title, 'ja')
+      if (sortKey === 'created') return b.createdAt.localeCompare(a.createdAt)
+      return b.updatedAt.localeCompare(a.updatedAt)
+    })
+  }, [visibleItems, query, savedFilter, sortKey])
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, savedFilter, sortKey, pageSize, selectedAccountId])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const visibleStart = (currentPage - 1) * pageSize
+  const visible = filtered.slice(visibleStart, visibleStart + pageSize)
 
   return (
     <>
@@ -79,6 +128,12 @@ export default function WebinarsPage() {
           description="動画セミナーの申込から視聴、視聴後のフォロー配信までを管理します。"
           action={
             <div className="flex flex-wrap gap-2">
+              <Link
+                href="/webinars/new"
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+              >
+                ウェビナーを作成
+              </Link>
               <button
                 disabled
                 title="マニュアルは準備中です"
@@ -86,27 +141,6 @@ export default function WebinarsPage() {
               >
                 マニュアル
               </button>
-              <button
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                並び替え
-              </button>
-              {/* ウェビナーにフォルダを持たせる列が無い。 */}
-              <button
-                disabled
-                title="フォルダは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                フォルダを追加
-              </button>
-              <Link
-                href="/webinars/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-              >
-                ウェビナーを作成
-              </Link>
             </div>
           }
         />
@@ -116,11 +150,11 @@ export default function WebinarsPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ウェビナー</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {items.length}
+            {visibleItems.length}
             <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {items.filter((w) => w.status === 'active').length}
+            公開中 {visibleItems.filter((w) => w.status === 'active').length}
           </p>
         </div>
         {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
@@ -156,47 +190,74 @@ export default function WebinarsPage() {
           />
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
           <select
-            disabled
-            title="並び替えは準備中です"
-            className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value as SortKey)}
+            aria-label="並び順"
+            className="border-hairline rounded-control border px-2 py-2 text-sm"
           >
-            <option>申込が多い順</option>
+            <option value="updated">更新が新しい順</option>
+            <option value="created">作成が新しい順</option>
+            <option value="name">名前順</option>
           </select>
           <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
           <select
-            disabled
-            title="表示件数の切り替えは準備中です"
-            className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+            aria-label="表示件数"
+            className="border-hairline rounded-control border px-2 py-2 text-sm"
           >
-            <option>20件</option>
+            {[20, 50, 100].map((size) => (
+              <option key={size} value={size}>{size}件表示</option>
+            ))}
           </select>
         </div>
 
         <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
           <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-          {['よく使う', '公開中のみ', '下書きのみ'].map((label) => (
+          {([
+            { key: 'active', label: '公開中のみ' },
+            { key: 'draft', label: '下書きのみ' },
+          ] as const).map(({ key, label }) => (
             <button
-              key={label}
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+              key={key}
+              onClick={() => setSavedFilter(savedFilter === key ? '' : key)}
+              aria-pressed={savedFilter === key}
+              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+                savedFilter === key
+                  ? 'border-accent bg-accent-soft text-ink'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+              }`}
             >
               {label}
             </button>
           ))}
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
-        {loading ? (
+        {accountLoading || loading ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
             読み込み中...
           </div>
-        ) : shown.length === 0 ? (
+        ) : !selectedAccountId ? (
+          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+            <div className="text-ink font-medium">
+              {accounts.length > 0
+                ? '上のバーでLINE公式アカウントを選んでください'
+                : 'LINE公式アカウントが登録されていません'}
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
+            <div className="text-danger font-medium">ウェビナーを読み込めませんでした</div>
+            <p className="text-ink-secondary mt-2 text-sm">通信状態を確認して、もう一度読み込んでください。</p>
+            <Button
+              variant="primary"
+              onClick={() => void refresh()}
+              className="mt-4"
+            >
+              もう一度読み込む
+            </Button>
+          </div>
+        ) : visibleItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
             <p className="text-sm text-gray-500 mb-4">
@@ -209,9 +270,14 @@ export default function WebinarsPage() {
               最初のウェビナーを作成
             </Link>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+            <div className="text-ink font-medium">条件に合うウェビナーはありません</div>
+            <p className="text-ink-faint mt-2 text-sm">検索文字か保存した条件を変えてください。</p>
+          </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            {shown.map((w) => (
+            {visible.map((w) => (
               <Link
                 key={w.id}
                 href={`/webinars/edit?id=${w.id}`}
@@ -235,6 +301,19 @@ export default function WebinarsPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+        {!loading && !error && selectedAccountId && filtered.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ink-faint text-xs tabular-nums">
+              {visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件
+            </p>
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              onPageChange={setPage}
+              ariaLabel="ウェビナー一覧のページ送り"
+            />
           </div>
         )}
       </div>
