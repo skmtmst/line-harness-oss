@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
+import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
@@ -549,19 +550,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const loadEmails = useCallback(async () => {
     try {
       const res = await fetchApi<{ success: boolean; data: { items: EmailInboxItem[] } }>(
-        `/api/support/inbox?${new URLSearchParams({
-          channel: 'email',
+        `/api/support/inbox?${buildSupportEmailInboxQuery({
           status: statusFilter,
-          limit: '200',
-          ...(debouncedNameQuery ? { q: debouncedNameQuery } : {}),
-          ...(selectedAccountId ? { lineAccountId: selectedAccountId } : {}),
+          query: debouncedNameQuery,
         })}`,
       )
       if (res.success) setEmailItems(res.data.items)
     } catch {
       // メールが出ないだけ。LINEのトークは使える。
     }
-  }, [statusFilter, debouncedNameQuery, selectedAccountId])
+  }, [statusFilter, debouncedNameQuery])
 
   useEffect(() => {
     void loadEmails()

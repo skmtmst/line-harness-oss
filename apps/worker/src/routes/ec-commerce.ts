@@ -595,10 +595,14 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
         shipDate: date,
         shipDateSource: source,
         // 今日・明日とそれ以降で分けるための印。日付の比較は文字列で足りる。
-        bucket: date && todayJst && date <= tomorrowJst ? ('soon' as const) : ('later' as const),
+        bucket: date && todayJst && date >= todayJst && date <= tomorrowJst
+          ? ('soon' as const)
+          : ('later' as const),
       };
     })
-    .filter((row) => row.shipDate !== null)
+    // 過去の注文は「出荷予定」ではない。以前は上限だけを見ていたため、
+    // 何週間も前の注文まで「今日・明日」に入り続けていた。
+    .filter((row) => row.shipDate !== null && (!todayJst || row.shipDate >= todayJst))
     .sort((a, b) => (a.shipDate ?? '').localeCompare(b.shipDate ?? ''));
 
   const soon = shipments.filter((row) => row.bucket === 'soon');
