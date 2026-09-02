@@ -26,7 +26,7 @@ export default function UsersFilters({
         type="search"
         value={q}
         onChange={(e) => onChange({ q: e.target.value })}
-        placeholder="名前・X・メール・電話・LINE ID で検索"
+        placeholder="名前・X・メール・電話・UIDで検索"
         className="min-w-[240px] flex-1 rounded-[9px] border border-[#DADDE2] px-3 py-2 text-sm outline-none focus:border-[#07C653]"
       />
       <label className="flex items-center gap-2 whitespace-nowrap text-sm text-[#565F59]">
@@ -35,7 +35,7 @@ export default function UsersFilters({
           checked={onlyDups}
           onChange={(e) => onChange({ onlyDups: e.target.checked })}
         />
-        重複のみ
+        複数アカウントのみ
       </label>
       <select
         value={account}

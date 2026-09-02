@@ -52,41 +52,42 @@ type SavedFilter = '' | 'active' | 'draft'
 
 export default function WebinarsPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
-  const activeAccountRef = useRef<string | null>(selectedAccountId)
+  const requestGeneration = useRef(0)
   const [items, setItems] = useState<Webinar[]>([])
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(false)
 
-  useEffect(() => {
-    activeAccountRef.current = selectedAccountId
-  }, [selectedAccountId])
+  const visibleItems = loadedAccountId === selectedAccountId ? items : []
 
   const refresh = useCallback(async () => {
+    const generation = ++requestGeneration.current
     if (!selectedAccountId) {
       setItems([])
-      setError(null)
+      setLoadedAccountId(null)
+      setError(false)
       setLoading(false)
       return
     }
     const accountId = selectedAccountId
     setLoading(true)
     setItems([])
-    setError(null)
+    setLoadedAccountId(null)
+    setError(false)
     try {
       const res = await webinarApi.list(accountId)
-      if (activeAccountRef.current !== accountId) return
+      if (requestGeneration.current !== generation) return
       setItems(res.data)
-    } catch (e) {
-      if (activeAccountRef.current === accountId) {
-        setError(e instanceof Error ? e.message : String(e))
-      }
+      setLoadedAccountId(accountId)
+    } catch {
+      if (requestGeneration.current === generation) setError(true)
     } finally {
-      if (activeAccountRef.current === accountId) setLoading(false)
+      if (requestGeneration.current === generation) setLoading(false)
     }
   }, [selectedAccountId])
 
@@ -98,8 +99,8 @@ export default function WebinarsPage() {
     // タイトルと slug の両方を見る。URLで探すこともあるため。
     const q = query.trim()
     const searched = q
-      ? items.filter((w) => w.title.includes(q) || w.slug.includes(q))
-      : items
+      ? visibleItems.filter((w) => w.title.includes(q) || w.slug.includes(q))
+      : visibleItems
     const narrowed = savedFilter
       ? searched.filter((w) => w.status === savedFilter)
       : searched
@@ -108,7 +109,7 @@ export default function WebinarsPage() {
       if (sortKey === 'created') return b.createdAt.localeCompare(a.createdAt)
       return b.updatedAt.localeCompare(a.updatedAt)
     })
-  }, [items, query, savedFilter, sortKey])
+  }, [visibleItems, query, savedFilter, sortKey])
 
   useEffect(() => {
     setPage(1)
@@ -149,11 +150,11 @@ export default function WebinarsPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ウェビナー</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {items.length}
+            {visibleItems.length}
             <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {items.filter((w) => w.status === 'active').length}
+            公開中 {visibleItems.filter((w) => w.status === 'active').length}
           </p>
         </div>
         {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
@@ -247,7 +248,7 @@ export default function WebinarsPage() {
         ) : error ? (
           <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
             <div className="text-danger font-medium">ウェビナーを読み込めませんでした</div>
-            <p className="text-ink-secondary mt-2 text-sm">{error}</p>
+            <p className="text-ink-secondary mt-2 text-sm">通信状態を確認して、もう一度読み込んでください。</p>
             <Button
               variant="primary"
               onClick={() => void refresh()}
@@ -256,7 +257,7 @@ export default function WebinarsPage() {
               もう一度読み込む
             </Button>
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
             <p className="text-sm text-gray-500 mb-4">

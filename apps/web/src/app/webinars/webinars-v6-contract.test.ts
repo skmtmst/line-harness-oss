@@ -31,7 +31,8 @@ describe('V6 ウェビナー一覧の契約', () => {
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
     expect(PAGE).toContain('webinarApi.list(accountId)')
-    expect(PAGE).toContain('activeAccountRef.current !== accountId')
+    expect(PAGE).toContain('requestGeneration.current !== generation')
+    expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
     expect(PAGE).toContain('上のバーでLINE公式アカウントを選んでください')
     expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
@@ -45,6 +46,8 @@ describe('V6 ウェビナー一覧の契約', () => {
 
   it('取得失敗を空の一覧と混ぜず、同じ画面で再取得できる', () => {
     expect(PAGE).toContain('ウェビナーを読み込めませんでした')
+    expect(PAGE).toContain('通信状態を確認して、もう一度読み込んでください。')
+    expect(PAGE).not.toContain('e instanceof Error ? e.message')
     expect(PAGE).toContain('onClick={() => void refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
   })

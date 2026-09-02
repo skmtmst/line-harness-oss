@@ -83,6 +83,8 @@ const COMMAND_CENTER_METADATA_TYPE = 'line_harness_command_center';
 export const TASK_ACTION_ID = 'line_harness_task_status';
 const MAX_HISTORY_PAGES = 5;
 const MAX_SLACK_CONTENT_LENGTH = 2_500;
+const MAX_COMMAND_CENTER_BYTES = 3_800;
+const COMMAND_CENTER_OMISSION_NOTE = '_一部の項目を省略しています。_';
 
 const ERROR_PATTERN = /(エラー|白(?:い)?画面|例外|失敗|動かない|できない|不具合|クラッシュ|競合|conflict|error|exception|failed|failure|crash)/i;
 const IDEA_PATTERN = /(アイデア|改善案|提案|思いつ|将来案|検討案|こうしたい|正本化|idea|proposal|suggestion)/i;
@@ -841,9 +843,12 @@ export function buildSlackCommandCenterText(
   tasks: SlackCommandCenterTask[],
   occurredAt: string,
   previousText?: string,
+  itemLimits?: { prs: number; tasks: number; halvePreviousPrs?: boolean },
 ): string {
-  const prs = [...(openPrs || [])].sort((a, b) => a.number - b.number).slice(0, 20);
+  const allPrs = [...(openPrs || [])].sort((a, b) => a.number - b.number).slice(0, 20);
+  const prs = allPrs.slice(0, itemLimits?.prs ?? allPrs.length);
   const duplicateLines = taskDuplicateLines(tasks);
+  const duplicateCount = duplicateLines.length;
   const reviewCount = tasks.filter((task) => task.status === 'review').length;
   let prLines: string[];
   if (openPrs) {
@@ -859,10 +864,12 @@ export function buildSlackCommandCenterText(
     ])];
   } else {
     prLines = (previousPrSection(previousText) || 'GitHub情報は次のCodex報告で同期します').split('\n');
+    if (itemLimits?.halvePreviousPrs) prLines = prLines.slice(0, Math.ceil(prLines.length / 2));
   }
-  const taskLines = tasks.length === 0
+  const visibleTasks = tasks.slice(0, itemLimits?.tasks ?? 15);
+  const taskEntries = tasks.length === 0
     ? ['- 未完了タスクなし']
-    : tasks.slice(0, 15).flatMap((task) => {
+    : visibleTasks.map((task) => {
       const source = task.sourceChannel && task.sourceThreadTs
         ? `｜<https://slack.com/archives/${task.sourceChannel}/p${task.sourceThreadTs.replace('.', '')}|元スレッド>`
         : '';
@@ -870,23 +877,63 @@ export function buildSlackCommandCenterText(
       return [
         `- ${task.taskId}｜${task.operator}｜${task.status === 'working' ? '作業中' : '確認待ち'}${related}${source}`,
         `  ${taskEnvironmentLabel(task)}｜停止理由：${taskStopReason(task)}｜${task.title}`,
-      ];
+      ].join('\n');
     });
-  return [
+  let omitted = Boolean(itemLimits?.halvePreviousPrs) ||
+    prs.length < allPrs.length || tasks.length > visibleTasks.length;
+  const render = () => [
     '*【LINE Harness 開発指令盤】*',
-    `更新：${formattedJst(occurredAt)} JST｜作業中 ${tasks.length - reviewCount}｜確認待ち ${reviewCount}｜未完了PR ${openPrs ? prs.length : '前回同期'}｜重複候補 ${duplicateLines.length}`,
+    `更新：${formattedJst(occurredAt)} JST｜作業中 ${tasks.length - reviewCount}｜確認待ち ${reviewCount}｜未完了PR ${openPrs ? allPrs.length : '前回同期'}｜重複候補 ${duplicateCount}`,
     '',
     '*PR順・追い越し判断*',
     ...prLines,
     '',
     '*作業・停止・反映状況*',
-    ...taskLines,
+    ...taskEntries,
     '',
     '*重複*',
     ...(duplicateLines.length > 0 ? duplicateLines : ['- なし']),
     '',
+    ...(omitted ? [COMMAND_CENTER_OMISSION_NOTE] : []),
     '_PR番号は作成順です。先に上げてよいかは「変更重複・Draft・チェック・競合」で判定します。正本はGitHubです。_',
-  ].join('\n').slice(0, 3_900);
+  ].join('\n');
+  const byteLength = (value: string) => new TextEncoder().encode(value).length;
+  while (byteLength(render()) > MAX_COMMAND_CENTER_BYTES && taskEntries.length > 0) {
+    taskEntries.pop();
+    omitted = true;
+  }
+  while (byteLength(render()) > MAX_COMMAND_CENTER_BYTES && prLines.length > 1) {
+    prLines.splice(Math.max(1, prLines.length - 2), 2);
+    omitted = true;
+  }
+  while (byteLength(render()) > MAX_COMMAND_CENTER_BYTES && duplicateLines.length > 0) {
+    duplicateLines.pop();
+    omitted = true;
+  }
+  if (byteLength(render()) <= MAX_COMMAND_CENTER_BYTES) return render();
+
+  omitted = true;
+  const lines = render().split('\n');
+  const protectedLines = new Set([
+    '*PR順・追い越し判断*',
+    '*作業・停止・反映状況*',
+    '*重複*',
+    '- なし',
+    COMMAND_CENTER_OMISSION_NOTE,
+    '_PR番号は作成順です。先に上げてよいかは「変更重複・Draft・チェック・競合」で判定します。正本はGitHubです。_',
+  ]);
+  while (byteLength(lines.join('\n')) > MAX_COMMAND_CENTER_BYTES) {
+    let removableIndex = -1;
+    for (let index = lines.length - 1; index > 1; index -= 1) {
+      if (!protectedLines.has(lines[index])) {
+        removableIndex = index;
+        break;
+      }
+    }
+    if (removableIndex < 0) break;
+    lines.splice(removableIndex, 1);
+  }
+  return lines.join('\n');
 }
 
 async function refreshSlackCommandCenter(
@@ -911,7 +958,17 @@ async function refreshSlackCommandCenter(
     const tasks = messages.map(commandCenterTask).filter((task): task is SlackCommandCenterTask => Boolean(task));
     const text = buildSlackCommandCenterText(openPrs, tasks, occurredAt, existing?.text);
     if (existing?.ts) {
-      await slackApi(token, 'chat.update', { channel: commandChannel, ts: existing.ts, text }, fetcher);
+      try {
+        await slackApi(token, 'chat.update', { channel: commandChannel, ts: existing.ts, text }, fetcher);
+      } catch (error) {
+        if (!String(error).endsWith(':msg_too_long')) throw error;
+        const retryText = buildSlackCommandCenterText(openPrs, tasks, occurredAt, existing.text, {
+          prs: Math.floor(Math.min(openPrs?.length ?? 0, 20) / 2),
+          tasks: Math.floor(Math.min(tasks.length, 15) / 2),
+          halvePreviousPrs: !openPrs,
+        });
+        await slackApi(token, 'chat.update', { channel: commandChannel, ts: existing.ts, text: retryText }, fetcher);
+      }
     } else {
       await slackApi(token, 'chat.postMessage', {
         channel: commandChannel,

@@ -134,4 +134,12 @@ describe('配送', () => {
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
     expect(headers['X-Webhook-Signature']).toBeUndefined();
   });
+
+  it('同じ出来事を送り直しても受け手が二重処理を防げる配送IDを付ける', async () => {
+    stubFetch([200]);
+    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, idempotencyKey: 'delivery-1' });
+    const call = vi.mocked(fetch).mock.calls[0];
+    const headers = (call[1] as RequestInit).headers as Record<string, string>;
+    expect(headers['X-Webhook-Delivery-Id']).toBe('delivery-1');
+  });
 });
