@@ -6,7 +6,7 @@
 
 | 項目 | 状態 | 場所 |
 |---|---|---|
-| 要件定義 34 本 | 見直し済み。PR #690 がレビュー待ち(マージはまだ) | docs/v6-requirements/、PR https://github.com/skmtmst/line-harness-oss/pull/690 |
+| 要件定義 34 本 | 見直し済み。「人の判断が要る点」4 件は 2026-09-03 に決定し PR #690 のコメントに記録。マージ後は codex/development が正本 | docs/v6-requirements/、PR https://github.com/skmtmst/line-harness-oss/pull/690 |
 | 横断契約(アクション一覧、版の 2 分類、権限、再試行、未取得表示、工程ゲート) | 1 本化済み。正本は索引 §5 の表 | docs/v6-requirements/v6-requirements-master-index.md §5 |
 | Pencil への修正依頼 | 50 件を集約済み(1〜29 要件由来、30〜50 設計画像由来)。反映は未 | docs/v6-requirements/v6-32-feature-cross-review.md §7 |
 | Pencil 設計の採点 | 6 / 10。直すべき点 21 件 | 評価ページ「Pencil 設計の採点」 |
@@ -33,7 +33,7 @@
 所有: docs/v6-requirements/、scripts/visual-qa/、docs/design-qa/、components/shared/、Pencil。routes / services / packages/db は Codex の領域。
 
 今週の順番:
-1. PR #690(要件見直し)を読み、「人の判断が要る点」4 件の回答をもらってからマージする。回答が変われば該当章だけ直す。
+1. PR #690(要件見直し)がマージ済みであることを確認し、最新の codex/development を取り込んでから始める。判断 4 件の結論は PR #690 のコメントにある。
 2. Pencil の ★V6 に、横断レビュー §7 の 50 件(1〜29 は要件由来、30〜50 は設計画像の確認由来。優先度順)を反映する。反映した画面は html-css で書き出し直し、docs/design-reference/ を更新し、その画面の判定を未判定に戻す。
 3. docs/design-reference/ に無い機能(4、9〜32)の設計画像を Pencil から書き出して揃える。設計画像が無い機能は一致判定ができない。
 4. 安全修正の独立 PR: apps/worker/src/routes/stripe.ts:91-104 の秘密未設定パスを 503 に。site-tracking.ts:212 / affiliates.ts:375 / rich-menus.ts:85-207 / images.ts:99 にアカウント境界チェック。route-guard-coverage.test.ts に「:id / :friendId を持つルートは境界関数を呼ぶ」検査。
@@ -65,7 +65,7 @@
 
 ## 4. 人が決めること(エージェントには任せない)
 
-1. PR #690 の「人の判断が要る点」4 件: 権限モデルを 30 に統一、回答フォームの回答 URL を参照型に、一斉配信の二者承認の 1 人運用代替、25 を参照しない 5 機能の扱い。
+1. (決定済み 2026-09-03)PR #690 の 4 件: 権限モデルは 30 に統一、回答 URL は参照型、二者承認は 1 人運用で本人再確認に代替、25 を参照する 5 機能に 1 行追記。
 2. tags のテナント分離方針(単一組織か多テナントか)。決まるまでコードは書かない。
 3. Lステップ検証用アカウントの契約(月 2,980 円〜)。未確認前提 10 件のうち影響「高」3 件を実機で潰す。
 4. 本番 Cron Trigger の実設定確認(Cloudflare ダッシュボード)。
