@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit,
-  getStaffAccountScopeIds, replaceStaffAccountScopes,
+  getStaffAccountScopeIds, replaceStaffAccountScopes, revokeStaffAuthentication,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -11,7 +11,7 @@ import { sendStaffInviteEmail, sendStaffLineLinkEmail } from '../services/staff-
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
 import { getLineAccounts } from '@line-crm/db';
-import { filterVisibleLineAccounts } from '../services/account-access.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const staff = new Hono<Env>();
@@ -88,7 +88,7 @@ async function mayAssignAccountScopes(
   if (requestedScope === 'all') return currentMember?.account_scope !== 'accounts';
   const allowedIds = currentMember?.account_scope === 'accounts'
     ? await getStaffAccountScopeIds(db, current.id)
-    : filterVisibleLineAccounts(await getLineAccounts(db), current).map((account) => account.id);
+    : (await getVisibleLineAccountScope(db, current)).allowedAccountIds;
   return requestedIds.every((id) => allowedIds.includes(id));
 }
 
@@ -216,7 +216,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (!body.assignedLineAccountId) {
       return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
     }
-    const visibleAccounts = filterVisibleLineAccounts(await getLineAccounts(c.env.DB), c.get('staff'));
+    const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
     if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
@@ -336,7 +336,7 @@ staff.patch('/api/staff/:id', async (c) => {
     if (!body.assignedLineAccountId) {
       return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
     }
-    const visibleAccounts = filterVisibleLineAccounts(await getLineAccounts(c.env.DB), current);
+    const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, current)).accounts;
     if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
@@ -373,6 +373,17 @@ staff.patch('/api/staff/:id', async (c) => {
   });
   if (updated && accountScope.accountScope !== undefined) {
     await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
+  }
+  const authenticationPolicyChanged =
+    body.role !== undefined ||
+    body.isActive !== undefined ||
+    body.lineLinked === false ||
+    body.permissionKeys !== undefined ||
+    body.assignedLineAccountId !== undefined ||
+    body.canAccessDescendantAccounts !== undefined ||
+    body.accountScope !== undefined;
+  if (updated && authenticationPolicyChanged) {
+    await revokeStaffAuthentication(c.env.DB, id);
   }
   return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
@@ -425,6 +436,7 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
     totp_enabled_at: new Date().toISOString(),
     totp_last_used_step: null,
   });
+  if (updated) await revokeStaffAuthentication(c.env.DB, id);
   return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!) });
 });
 
@@ -439,18 +451,22 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
     totp_enabled_at: null,
     totp_last_used_step: null,
   });
+  if (updated) await revokeStaffAuthentication(c.env.DB, id);
   return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   const id = c.req.param('id');
-  if (id === c.get('staff').id) return c.json({ success: false, error: '自分自身は削除できません' }, 400);
+  if (id === c.get('staff').id) return c.json({ success: false, error: '自分自身は利用停止できません' }, 400);
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
-  await deleteStaffMember(c.env.DB, id);
-  return c.json({ success: true, data: null });
+  const updated = await updateStaffMember(c.env.DB, id, { is_active: 0 });
+  await revokeStaffAuthentication(c.env.DB, id);
+  return updated
+    ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) })
+    : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 export { staff };

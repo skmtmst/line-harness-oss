@@ -9,6 +9,8 @@ vi.mock('@line-crm/db', () => ({
     { id: 'account-2', parent_line_account_id: null, tenant_id: DEFAULT_TENANT_ID },
     { id: 'account-b', parent_line_account_id: null, tenant_id: 'tenant-B' },
   ]),
+  getStaffById: vi.fn(async () => ({ account_scope: 'all' })),
+  getStaffAccountScopeIds: vi.fn(async () => []),
 }));
 
 import { conversations } from './conversations.js';

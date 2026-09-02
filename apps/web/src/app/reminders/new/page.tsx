@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ReminderTriggerType, Tag } from '@line-crm/shared'
+import type { Folder, ReminderTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import Button from '@/components/shared/button'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -11,6 +12,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { TextArea } from '@/components/shared/form-controls'
+import { useAccount } from '@/contexts/account-context'
 
 const TRIGGERS: Array<{ key: ReminderTriggerType; label: string }> = [
   { key: 'manual', label: '手動で対象を登録' },
@@ -28,8 +30,10 @@ const OFFSETS = [
 ]
 
 export default function NewReminderPage() {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [folderId, setFolderId] = useState('')
   const [triggerType, setTriggerType] = useState<ReminderTriggerType>('booking')
   const [sendAtTime, setSendAtTime] = useState('19:00')
   const [offsetMinutes, setOffsetMinutes] = useState(1440)
@@ -37,6 +41,9 @@ export default function NewReminderPage() {
   const [messageContent, setMessageContent] = useState('')
   const [activateNow, setActivateNow] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [foldersLoadState, setFoldersLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [foldersReloadToken, setFoldersReloadToken] = useState(0)
   // 154: 友だち情報欄の日付を起点にするときの設定
   const [triggerFieldId, setTriggerFieldId] = useState('')
   const [repeatYearly, setRepeatYearly] = useState(true)
@@ -47,14 +54,6 @@ export default function NewReminderPage() {
   const [deliveryMode, setDeliveryMode] = useState<'time' | 'countdown'>('countdown')
   const [offsetDays, setOffsetDays] = useState(-1)
   const [stepSendAtTime, setStepSendAtTime] = useState('10:00')
-  /*
-    156 で `reminders.folder_id` が入り、一覧はフォルダで分けられるように
-    なっている（`reminders/page.tsx` の移動プルダウン）。**作る画面だけが
-    取り残されていた。** 一覧で分けられるのに作るときに選べないと、
-    作ったそばから未分類に落ち、あとで1件ずつ移し直すことになる。
-  */
-  const [folderId, setFolderId] = useState('')
-  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
     void api.tags.list().then((res) => {
@@ -63,11 +62,9 @@ export default function NewReminderPage() {
     void api.templates.list().then((res) => {
       if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
-    void api.folders.list('reminder').then((res) => {
-      if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name })))
-    })
     // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
-    void api.friendFields.list().then((res) => {
+    if (!selectedAccountId) return
+    void api.friendFields.list(selectedAccountId).then((res) => {
       if (res.success) {
         setDateFields(
           res.data
@@ -76,7 +73,30 @@ export default function NewReminderPage() {
         )
       }
     })
-  }, [])
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    let active = true
+    setFolders([])
+    setFolderId('')
+    setFoldersLoadState('loading')
+    void api.folders.list('reminder')
+      .then((res) => {
+        if (!active) return
+        if (res.success) {
+          setFolders(res.data)
+          setFoldersLoadState('ready')
+        } else {
+          setFoldersLoadState('error')
+        }
+      })
+      .catch(() => {
+        if (active) setFoldersLoadState('error')
+      })
+    return () => {
+      active = false
+    }
+  }, [foldersReloadToken])
 
   return (
     <CreatePage
@@ -85,6 +105,8 @@ export default function NewReminderPage() {
       parent={['リマインダ', '/reminders']}
       saveLabel="リマインダを作成"
       validate={() => {
+        if (accountLoading) return 'LINEアカウントを確認しています'
+        if (!selectedAccountId) return 'LINEアカウントを選んでください'
         if (!name.trim()) return 'リマインダ名を入力してください'
         // テンプレートを選んでいれば本文は要らない。どちらも空なら何も届かない。
         if (!templateId && !messageContent.trim()) {
@@ -98,17 +120,18 @@ export default function NewReminderPage() {
       onReset={() => {
         setName('')
         setDescription('')
-        setMessageContent('')
         setFolderId('')
+        setMessageContent('')
       }}
       onSave={async () => {
         const res = await api.reminders.create({
           name: name.trim(),
           description: description.trim() || null,
+          lineAccountId: selectedAccountId!,
+          folderId: folderId || null,
           triggerType,
           sendAtTime: triggerType === 'manual' ? null : sendAtTime || null,
           targetTagId: targetTagId || null,
-          folderId: folderId || null,
           deliveryMode,
           triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
           repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
@@ -175,20 +198,38 @@ export default function NewReminderPage() {
 
         <Field
           label="フォルダ"
-          htmlFor="rm-folder"
-          note={folders.length ? '一覧をフォルダで分けるための箱です。' : 'フォルダはまだありません。一覧から追加できます。'}
+          note={foldersLoadState === 'error'
+            ? 'フォルダを読み込めませんでした。未取得と0件を区別するため、選択を止めています。'
+            : foldersLoadState === 'ready' && folders.length === 0
+              ? 'フォルダはまだありません。一覧から追加できます。'
+              : '一覧で作ったリマインダ用フォルダから選べます。'}
         >
-          <select
-            id="rm-folder"
-            value={folderId}
-            onChange={(e) => setFolderId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">未分類</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={folderId}
+              onChange={(event) => setFolderId(event.target.value)}
+              disabled={foldersLoadState !== 'ready'}
+              className={inputClass}
+            >
+              <option value="">
+                {foldersLoadState === 'loading'
+                  ? 'フォルダを読み込み中'
+                  : foldersLoadState === 'error'
+                    ? 'フォルダを読み込めませんでした'
+                    : '未分類'}
+              </option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+            {foldersLoadState === 'error' && (
+              <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>
+                フォルダを再読み込み
+              </Button>
+            )}
+          </div>
         </Field>
 
         <Field label="説明" htmlFor="rm-desc" note="管理用のメモです。">

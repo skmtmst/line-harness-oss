@@ -10,6 +10,7 @@ import { MANUAL_LINKS } from '@/lib/manual-links'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import TermsConsent from './terms-consent'
 import { initialWizardStep, STEP } from './terms-state'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const steps = [
   ['利用規約への同意', 'musuboの利用規約と、個人情報の取扱いをご確認ください。'],
@@ -61,6 +62,7 @@ function Field({
 }
 
 export default function NewRestaurantStorePage() {
+  usePageTitle('店舗を追加')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [step, setStep] = useState<number>(STEP.TERMS)
@@ -158,7 +160,7 @@ export default function NewRestaurantStorePage() {
   }
 
   return <div>
-    <Header title="店舗を追加" description="利用規約の確認からLINE公式アカウントの接続まで、5つの手順で進めます。" action={<Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>} />
+    <Header description="利用規約の確認からLINE公式アカウントの接続まで、5つの手順で進めます。" action={<Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>} />
     <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
       <ol className="rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
         const number = index + 1

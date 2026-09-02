@@ -157,6 +157,26 @@ describe('admin webinar tenant scope', () => {
     expect((await res.json() as { data: unknown[] }).data).toHaveLength(1);
   });
 
+  test('一覧で選んだLINEアカウントだけをSQLで絞る', async () => {
+    const all = vi.fn(async () => ({ results: [makeWebinar({ account_id: 'account-a' })] }));
+    const bind = vi.fn(() => ({ all }));
+    const prepare = vi.fn((_sql: string) => ({ bind }));
+    const originalDb = env.DB;
+    env.DB = { prepare } as unknown as D1Database;
+
+    const res = await adminReq('/api/webinars?account_id=account-a');
+
+    env.DB = originalDb;
+    expect(res.status).toBe(200);
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('WHERE account_id = ?');
+    expect(bind).toHaveBeenCalledWith('account-a');
+  });
+
+  test('一覧で別統括のLINEアカウントを指定しても存在を返さない', async () => {
+    const res = await adminReq('/api/webinars?account_id=account-b');
+    expect(res.status).toBe(404);
+  });
+
   test.each([
     ['GET', '/api/webinars/w-other'],
     ['PUT', '/api/webinars/w-other'],
@@ -785,6 +805,7 @@ describe('admin CRUD', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        accountId: 'account-a',
         title: 'テストウェビナー',
         slug: 'test-webinar',
         durationSeconds: 7200,
@@ -804,14 +825,25 @@ describe('admin CRUD', () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
     const noTitle = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: 'x' }),
+      body: JSON.stringify({ accountId: 'account-a', slug: 'x' }),
     });
     expect(noTitle.status).toBe(400);
     const badSlug = await adminReq('/api/webinars', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 't', slug: 'Bad Slug!' }),
+      body: JSON.stringify({ accountId: 'account-a', title: 't', slug: 'Bad Slug!' }),
     });
     expect(badSlug.status).toBe(400);
+  });
+
+  test('POST — LINEアカウント未指定は保存しない', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(null);
+    const res = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '未所属', slug: 'missing-account' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'account_id_required' });
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
   test('PUT /api/webinars/:id/comments — 一括置換', async () => {

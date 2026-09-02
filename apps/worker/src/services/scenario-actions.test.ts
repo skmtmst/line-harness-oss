@@ -60,8 +60,8 @@ beforeEach(() => {
   db = created.db
   raw = created.raw
 
-  insertFriend(raw, 'f1')
-  insertFriend(raw, 'f2')
+  insertFriend(raw, 'f1', { line_account_id: 'account-1' })
+  insertFriend(raw, 'f2', { line_account_id: 'account-2' })
 
   raw
     .prepare(
@@ -83,7 +83,7 @@ beforeEach(() => {
   raw
     .prepare(`INSERT INTO friend_fields (id, name, field_key, type) VALUES ('fld1','来店','visits','number')`)
     .run()
-  raw.prepare(`INSERT INTO common_vars (id, name, var_key, type, value) VALUES ('v1','在庫','stock','number','10')`).run()
+  raw.prepare(`INSERT INTO common_vars (id, line_account_id, name, var_key, type, value) VALUES ('v1','account-1','在庫','stock','number','10')`).run()
 })
 
 describe('タグ操作', () => {

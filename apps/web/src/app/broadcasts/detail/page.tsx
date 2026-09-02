@@ -1,11 +1,16 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { api, type ApiBroadcast } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
+import { messageTypeLabel } from '@/lib/broadcast-summary'
+import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
+import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き',
@@ -25,45 +30,77 @@ function BroadcastDetailInner() {
     uniqueClick: number | null
     suppressedByAudienceSize: boolean
   } | null>(null)
-  const [loading, setLoading] = useState(true)
+  // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
+  // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
+  const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
+  const [reloadToken, setReloadToken] = useState(0)
+  const contentRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     let active = true
     setBroadcast(null)
     setInsight(null)
-    setLoading(true)
+    setInsightState('loading')
+    setLoadState('loading')
     if (!id || accountLoading) {
       return
     }
     if (!selectedAccountId) {
-      setLoading(false)
+      setLoadState('not-found')
       return
     }
     void (async () => {
       try {
-        const [detail, stats] = await Promise.all([
-          api.broadcasts.get(id),
-          api.analytics.broadcasts(selectedAccountId),
-        ])
+        const detail = await api.broadcasts.get(id)
         if (!active) return
-        if (detail.success) setBroadcast(detail.data)
-        if (stats.success) {
-          const found = stats.data.find((b) => b.broadcastId === id)
-          if (found) setInsight(found)
+        if (!detail.success || !broadcastBelongsToSelectedAccount(detail.data, selectedAccountId)) {
+          setLoadState('not-found')
+          return
         }
-      } finally {
-        if (active) setLoading(false)
+
+        setBroadcast(detail.data)
+        setLoadState('ready')
+
+        // 詳細画面は送信日が30日より前でも開く。期間集計ではなく、
+        // この配信自身の保存済みインサイトを読む。
+        try {
+          const stats = await api.broadcasts.getInsight(id)
+          if (!active) return
+          if (stats.success && stats.data) {
+            setInsight({
+              delivered: stats.data.delivered,
+              uniqueImpression: stats.data.uniqueImpression,
+              uniqueClick: stats.data.uniqueClick,
+              suppressedByAudienceSize:
+                stats.data.uniqueImpression == null
+                && (stats.data.delivered ?? 0) > 0
+                && (stats.data.delivered ?? 0) < 20,
+            })
+            setInsightState('ready')
+          } else if (stats.success) {
+            // 200 で data が null。まだLINEから集計が返っていない。
+            setInsightState('ready')
+          } else {
+            setInsightState('error')
+          }
+        } catch {
+          // 配信本体は読めている。集計だけ落ちたことを、未取得と分けて出す。
+          if (active) setInsightState('error')
+        }
+      } catch (error) {
+        if (!active) return
+        setLoadState(error instanceof ApiError && error.status === 404 ? 'not-found' : 'error')
       }
     })()
     return () => {
       active = false
     }
-  }, [accountLoading, id, selectedAccountId])
+  }, [accountLoading, id, reloadToken, selectedAccountId])
 
   if (!id) {
     return (
       <div>
-        <Header title="配信の詳細" />
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           配信が指定されていません。
           <Link href="/broadcasts" className="text-accent ml-1 hover:underline">
@@ -102,14 +139,12 @@ function BroadcastDetailInner() {
           }
           action={
             <div className="flex flex-wrap gap-2">
-              {/* 送った内容は下に出ている。別画面で開く先が無い。 */}
-              <button
-                disabled
-                title="配信内容の別画面は準備中です。内容は下に出ています"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              <Button
+                onClick={() => contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                disabled={!broadcast}
               >
                 配信内容を見る
-              </button>
+              </Button>
               {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
               <button
                 disabled
@@ -123,13 +158,21 @@ function BroadcastDetailInner() {
         />
       </div>
 
-      {loading ? (
+      {loadState === 'loading' ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : !broadcast ? (
+      ) : loadState === 'error' ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
+          <p className="text-ink text-sm font-semibold">配信を読み込めませんでした</p>
+          <p className="text-ink-faint mt-1 text-xs">通信状態を確認して、もう一度お試しください。</p>
+          <Button className="mt-4" onClick={() => setReloadToken((value) => value + 1)}>
+            配信を再読み込み
+          </Button>
+        </div>
+      ) : loadState === 'not-found' || !broadcast ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          この配信は見つかりませんでした。
+          このLINEアカウントで確認できる配信は見つかりませんでした。
         </p>
       ) : (
         <div className="max-w-3xl space-y-4">
@@ -167,36 +210,76 @@ function BroadcastDetailInner() {
           </section>
 
           <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="送信" value={total} unit="件" detail={broadcast.scheduledAt ? '予約どおり実行' : '即時配信'} />
+            {/* 送信の欄は「これから」と「終わったこと」を書き分ける。
+                予約しただけの配信に「予約どおり実行」と書くと、まだ起きて
+                いないことを済んだことにしてしまう。 */}
+            <Stat
+              label="送信"
+              value={total}
+              unit="件"
+              detail={
+                broadcast.status === 'sent'
+                  ? broadcast.scheduledAt
+                    ? '予約どおり実行'
+                    : '即時配信'
+                  : broadcast.status === 'sending'
+                    ? '送信中'
+                    : broadcast.scheduledAt
+                      ? '予約した時刻に実行します'
+                      : 'まだ送っていません'
+              }
+            />
+            {/*
+              失敗数は `totalCount - successCount` でしか出せない。送信中は
+              「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+              出すと、起きていない失敗を作ることになる。完了してから出す。
+            */}
             <Stat
               label="到達"
               value={success}
               unit="件"
-              detail={`${pct(success, total)} ・ 失敗 ${failed}`}
+              detail={
+                broadcast.status === 'sent'
+                  ? `${pct(success, total)} ・ 失敗 ${failed.toLocaleString('ja-JP')}件`
+                  : broadcast.status === 'sending'
+                    ? '送信中のため、失敗の数は終わってから確定します'
+                    : '送信前のため、到達はまだありません'
+              }
             />
             <Stat
               label="開封"
-              value={insight?.uniqueImpression ?? null}
+              value={insightState === 'ready' ? insight?.uniqueImpression ?? null : null}
               unit="件"
               detail={
-                insight?.suppressedByAudienceSize
-                  ? '配信先が20人未満のため取れません'
-                  : insight?.uniqueImpression != null && insight.delivered
-                    ? pct(insight.uniqueImpression, insight.delivered)
-                    : '—'
+                insightState === 'loading'
+                  ? '読み込んでいます'
+                  : insightState === 'error'
+                    ? '読み込めませんでした'
+                    : openInsightDetail(insight)
               }
             />
             <Stat
               label="クリック"
-              value={insight?.uniqueClick ?? null}
+              value={insightState === 'ready' ? insight?.uniqueClick ?? null : null}
               unit="件"
               detail={
-                insight?.uniqueClick != null && insight.uniqueImpression
-                  ? `開封のうち ${pct(insight.uniqueClick, insight.uniqueImpression)}`
-                  : '—'
+                insightState === 'loading'
+                  ? '読み込んでいます'
+                  : insightState === 'error'
+                    ? '読み込めませんでした'
+                    : clickInsightDetail(insight)
               }
             />
           </div>
+
+          {insightState === 'error' ? (
+            <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center justify-between gap-3 border p-4">
+              <p className="text-ink-faint text-xs leading-relaxed">
+                開封・クリックを読み込めませんでした。送信の件数は上のとおりです。
+              </p>
+              <Button onClick={() => setReloadToken((value) => value + 1)}>集計を再読み込み</Button>
+            </div>
+          ) : null}
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">アカウント別の内訳</p>
@@ -218,13 +301,18 @@ function BroadcastDetailInner() {
                 同じ設定で作り直す
               </button>
             </div>
+            {/* 押せない理由は吹き出しだけでなく本文にも置く。触って初めて
+                分かる形にすると、押せないことしか伝わらない。 */}
+            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+              「複製して作る」「同じ設定で作り直す」は、既にある配信を種にして作り直す口がまだないため押せません。作成は空から始まります。
+            </p>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
               <Row
                 label="対象人数"
                 value={`${total.toLocaleString('ja-JP')}人（ブロック中を自動で除外）`}
               />
-              <Row label="メッセージ" value={`1通（${broadcast.messageType}）`} />
+              <Row label="メッセージ" value={`1通（${messageTypeLabel(broadcast.messageType)}）`} />
               <Row
                 label="送信タイミング"
                 value={
@@ -251,7 +339,11 @@ function BroadcastDetailInner() {
             </p>
           </section>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <section
+            ref={contentRef}
+            id="broadcast-content"
+            className="bg-canvas rounded-card border-hairline scroll-mt-20 border p-5"
+          >
             <p className="text-ink text-sm font-semibold">送った内容</p>
             <p className="text-ink-faint mt-0.5 mb-2 text-xs">実際に届いた形</p>
             <div className="bg-canvas-sunken rounded-card p-3">
@@ -268,8 +360,10 @@ function BroadcastDetailInner() {
                 ・開封は LINE の集計値です。個人単位では取れないため「誰が読んだか」は分かりません
               </li>
               <li>・配信対象が20人未満のときは、LINE側の仕様で開封数・クリック数が表示されません</li>
+              {/* 上のクリックは LINE の集計値（`broadcast_insights.unique_click`）。
+                  短縮URLの実測は別の数で、この欄には出していない。 */}
               <li>
-                ・クリックは短縮URL経由の実測値です。LINE側の集計値とは数字がずれることがあります
+                ・クリックも LINE の集計値で、母数は開封ではなく到達です。短縮URL（/t/…）の実測とは数字がずれることがあります
               </li>
             </ul>
           </section>
@@ -319,6 +413,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function BroadcastDetailPage() {
+  usePageTitle('配信の詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

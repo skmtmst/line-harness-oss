@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { toDraft } from '@/components/auto-replies/edit-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
@@ -13,9 +14,8 @@ const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
  * 編集を開いたときの中身を、1か所で作ること。
  *
  * 一覧の「編集」と `/auto-replies/edit?id=` が、それぞれ項目を並べ直して
- * いました。**どちらも `folderId` を渡しておらず**、開いて保存すると
- * そのルールがフォルダから外れて未分類へ落ちます。URL から開いたほうは
- * さらに曜日・アクション・キーワードの複数行まで落としていました。
+ * いました。URL から開いたほうは曜日・アクション・キーワードの複数行・
+ * 友だち条件を落としており、**開いて保存した時点でその設定が消えます。**
  *
  * 編集の窓は1つに寄せてあったのに（`edit/page.tsx` の覚え書き）、
  * **窓へ渡す中身は2つ持ったまま**で、そこが食い違っていました。
@@ -32,15 +32,27 @@ describe('自動応答の編集に渡す中身', () => {
     expect(EDIT).not.toContain('keywordMatchMode: res.data.keywordMatchMode')
   })
 
-  it('フォルダを落とさない', () => {
-    expect(DIALOG).toContain('folderId: rule.folderId ?? null')
-  })
-
   it('曜日・アクション・キーワードの複数行も落とさない', () => {
     expect(DIALOG).toContain('responseWeekdays: rule.responseWeekdays ?? null')
     expect(DIALOG).toContain('actions: rule.actions ?? null')
     expect(DIALOG).toContain('keywords: rule.keywords ?? null')
     expect(DIALOG).toContain('friendConditions: rule.friendConditions ?? null')
+    expect(DIALOG).toContain('folderId: rule.folderId ?? null')
+  })
+
+  it('フォルダ内のルールを開いても未分類へ移さない', () => {
+    expect(toDraft({
+      id: 'reply-1',
+      keyword: '予約',
+      matchType: 'contains',
+      responseType: 'text',
+      responseContent: '承りました',
+      templateId: null,
+      lineAccountId: 'account-1',
+      isActive: true,
+      priority: 10,
+      folderId: 'folder-1',
+    }).folderId).toBe('folder-1')
   })
 
   it('段の番号が、上から 1・2・3 の順に出る', () => {
