@@ -1553,7 +1553,7 @@
     },
     "/templates/detail": {
       "node": "O4ultt",
-      "name": "V2 4-3-2 テンプレートの詳細",
+      "name": "V2 4-3-2 テンプレートの詳細（V6共通枠へ移行中）",
       "sections": [
         "Body",
         "Crumb",
@@ -1563,8 +1563,6 @@
       ],
       "parts": [
         "詳細",
-        "本文と、このテンプレートがどこで使われているかを確認できます。",
-        "複製",
         "編集",
         "本文",
         "テキスト",
@@ -1582,7 +1580,18 @@
         "作成",
         "最終更新",
         "使われている数"
-      ]
+      ],
+      "visualVerification": {
+        "status": "blocked",
+        "referenceNodeIds": [
+          "O4ultt"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "V6の詳細専用Nodeが未確定。共通トップバーと安全な削除だけ先に反映し、V2との画像一致は完了扱いにしない。"
+      }
     },
     "/templates/edit": {
       "node": "XNGOk",
