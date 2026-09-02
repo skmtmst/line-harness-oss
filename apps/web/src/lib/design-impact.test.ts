@@ -74,6 +74,7 @@ describe('共通部品の影響範囲', () => {
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
       'components/broadcasts/segment-preset-controls.tsx',
+      'components/chats/friend-info-sidebar.tsx',
       'components/chats/template-folder-select.tsx',
       'components/friend-fields/field-list.tsx',
       'components/friend-fields/mark-list.tsx',

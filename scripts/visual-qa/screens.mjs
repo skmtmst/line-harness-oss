@@ -102,8 +102,12 @@ export const SCREENS = [
     ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
     steps: [...OPEN_CHAT, { click: '表示項目' }],
   },
-  // 未読の会話が並んだ状態。開かずにそのまま撮る。
-  { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読' },
+  /*
+    未読の会話が並んだ状態。**設計 `f0zn6` は会話を開いた形**で、
+    左の一覧だけを見せる絵ではない。開かずに撮ると、右が
+    「チャットを選択してください」のまま設計と並ばない。
+  */
+  { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読', steps: [...OPEN_CHAT] },
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
