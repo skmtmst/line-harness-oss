@@ -138,6 +138,7 @@ beforeEach(() => {
     RAW_MAIL: fakeRawMailBucket(),
     ASSETS: {} as Fetcher,
     RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
+    RESTAURANT_TEST_ENABLED: 'true',
     API_KEY: 'unused',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
@@ -151,6 +152,16 @@ afterEach(() => {
 });
 
 describe('飲食店向けcatch-all予約メール', () => {
+  it('無効な環境では予約メールを取り込まず拒否する', async () => {
+    env.RESTAURANT_TEST_ENABLED = 'false';
+    const message = email('r-12345678901234567890123456789012@intake.example.test');
+
+    await routeInboundEmail(message, env);
+
+    expect(message.setReject).toHaveBeenCalledWith('予約メール受信は現在利用できません');
+    expect(rawPut).not.toHaveBeenCalled();
+  });
+
   it('有効な取り込みアドレスから店舗を特定し、予約取り込みへ渡す', async () => {
     testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
       VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
