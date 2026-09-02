@@ -155,7 +155,8 @@ export const LIST_STATS = {
   marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },
   searches: { total: 0, limit: 5 },
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
-  scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 },
+  // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
+  scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
   reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0 },
 }
 
@@ -176,26 +177,41 @@ export const OPERATORS = [
   { id: 'operator-kenta', name: 'Kenta' },
 ]
 
+/**
+ * シナリオ配信の一覧。設計 `★ V6 5-1` `TC1b1` の5行そのまま。
+ *
+ * 1件だけで返していたころは、**配信方式も終了後の動きも1通りしか出ず**、
+ * 設計の5行（時刻／経過時間、一時停止／別シナリオへ／1つ前を再開、
+ * 稼働中／停止中／下書き）をどれも確かめられなかった。
+ */
 export const FRIEND_SCENARIOS = [
-  {
-    id: 'scenario-paused',
-    name: '停止中',
-    description: null,
-    triggerType: 'manual',
-    triggerTagId: null,
-    lineAccountId: 'visual-qa-account',
-    isActive: false,
-    deliveryMode: 'relative',
-    allowConcurrent: true,
-    displayOrder: 0,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    folderId: null,
-    audienceCondition: null,
-    onCompleteMode: 'pause',
-    onCompleteScenarioId: null,
-  },
-]
+  // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
+  ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
+  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'start_other', true],
+  ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
+  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'restart_prev', false],
+  ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
+].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
+  id: `scenario-${index}`,
+  name: String(name),
+  description: String(description),
+  triggerType: 'manual',
+  triggerTagId: null,
+  lineAccountId: 'visual-qa-account',
+  isActive: Boolean(isActive),
+  deliveryMode: String(deliveryMode),
+  allowConcurrent: true,
+  displayOrder: index,
+  folderId: null,
+  audienceCondition: null,
+  onCompleteMode: String(onCompleteMode),
+  onCompleteScenarioId: null,
+  subscriberCount: Number(subscriberCount),
+  completedCount: Number(completedCount),
+  stepCount: 3,
+  createdAt: `${day}T00:00:00.000Z`,
+  updatedAt: `${day}T00:00:00.000Z`,
+}))
 
 /**
  * 友だち追加時配信を公開する2画面（`ec9vg` / `quhg6`）の固定データ。
@@ -1160,4 +1176,52 @@ export const MERGED_PERSON_ERROR = {
 export const IDENTITY_CANDIDATE_DETECTION = {
   normal: { processed: 1, hasMore: false, nextCursor: null },
   empty: { processed: 0, hasMore: false, nextCursor: null },
+}
+
+/**
+ * シナリオの通。設計 `bV5Vs`（5-1-C シナリオ編集）の3通。
+ *
+ * **`steps` を配列で返さないと画面ごと落ちる**（`scenario.steps` を回す）。
+ * 空の一覧の形で返していたあいだ、シナリオを開くたびに「もう一度試す」
+ * だけの画面になっていた。
+ */
+export const SCENARIO_STEPS = [
+  [1, 0, 'ご登録ありがとうございます。まずはこちらをご覧ください。'],
+  [2, 1440, '使い方のご案内です。よくある質問もまとめました。'],
+  [3, 4320, 'ご不明な点はありませんか。お気軽にご返信ください。'],
+].map(([stepOrder, delayMinutes, messageContent], index) => ({
+  id: `step-${index}`,
+  scenarioId: 'scenario-0',
+  stepOrder: Number(stepOrder),
+  delayMinutes: Number(delayMinutes),
+  offsetDays: null,
+  offsetMinutes: null,
+  deliveryTime: null,
+  templateId: null,
+  onReachTagId: null,
+  afterSend: 'continue',
+  messageType: 'text',
+  messageContent: String(messageContent),
+  targetCondition: null,
+  question: null,
+  isDraft: false,
+  createdAt: '2026-08-16T00:00:00.000Z',
+}))
+
+/**
+ * シナリオの到達率。設計 `bV5Vs` の通ごとの数。
+ *
+ * 一覧の形で返していたあいだ、画面は `stats.steps.find(...)` で落ちていた。
+ * **配列には `steps` が無い。**
+ */
+export const SCENARIO_STATS = {
+  enrolledTotal: 428,
+  activeNow: 116,
+  completed: 312,
+  paused: 0,
+  steps: SCENARIO_STEPS.map((step, index) => ({
+    stepOrder: step.stepOrder,
+    reachedCount: [428, 381, 312][index] ?? 0,
+    reachedRate: [1, 0.89, 0.73][index] ?? 0,
+  })),
 }

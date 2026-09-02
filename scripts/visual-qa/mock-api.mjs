@@ -37,7 +37,7 @@ import {
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, USERS_GROUPED,
+  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
 } from './fixtures.mjs'
@@ -483,6 +483,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
+  }
+  if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
+  const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
+  if (scenario) {
+    // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
+    const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
+    return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
   }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
