@@ -45,6 +45,10 @@ const FRIENDS = { feature: 3, dir: 'friends-v6', route: '/friends', mode: 'page'
 const SCENARIO = { feature: 5, dir: 'scenarios-v6', mode: 'page' }
 const EDIT = '/scenarios/detail?id=scenario-0'
 
+/** 一斉配信。作成は `/broadcasts/new`、結果は `/broadcasts/detail?id=`。 */
+const BROADCAST = { feature: 6, dir: 'broadcasts-v6', mode: 'page' }
+const NEW_BC = '/broadcasts/new'
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -246,6 +250,57 @@ export const SCREENS = [
     why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
+  // ── 機能6 一斉配信 ──────────────────────────────────────
+  { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信', route: '/broadcasts' },
+  { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC },
+  {
+    ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
+    status: 'unconfirmed',
+    why: '「保存した条件から選ぶ」は在るが**押せない（無効のまま）**。先に対象の選び方を決める必要がありそう。実装が無いのか、順番の問題かは未確認',
+  },
+  { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC },
+  {
+    ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択', route: NEW_BC,
+    mode: 'viewport', height: 1080, steps: [{ click: 'テンプレートから選ぶ' }],
+  },
+  {
+    ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定', route: NEW_BC,
+    mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
+  },
+  {
+    ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信', route: NEW_BC,
+    mode: 'viewport', height: 1080, steps: [{ click: 'テスト送信' }],
+  },
+  {
+    ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
+    mode: 'viewport', height: 1080, steps: [{ click: '日時を指定して予約' }],
+  },
+  {
+    ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認', route: NEW_BC,
+  },
+  {
+    ...BROADCAST, node: 'bPF0s', name: '6-1-I 予約完了',
+    route: '/broadcasts/reserved?id=broadcast-0',
+  },
+  { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細', route: '/broadcasts/detail?id=broadcast-2' },
+  {
+    ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認', route: '/broadcasts',
+    mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
+  },
+  {
+    ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
+    status: 'unconfirmed',
+    why: '「この条件を保存」は在るが**押せない（無効のまま）**。条件を組んでからでないと押せないと思われる。未確認',
+  },
+  {
+    ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
+    mode: 'viewport', height: 1080, steps: [{ click: 'フォルダを追加' }],
+  },
+  {
+    ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）', route: '/broadcasts',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
   // ここには、設計と並べるために撮るものだけを置く。
@@ -309,6 +364,10 @@ export const DESIGN_SIZE = {
   L35UOV: [1920, 1840], IYjvu: [1920, 1840], TUveA: [1920, 1840], w72a2: [1920, 1840],
   ASsb3: [1920, 1840], ANgda: [1920, 1840], tBlkL: [1920, 1840], AuSDY: [1920, 1840],
   LHjwD: [1920, 1840],
+  q76C35: [1920, 1080], zZ9fA: [1920, 1136], cPk8A: [1920, 1080], XQfMD: [1920, 1136],
+  p97Tf: [1920, 1080], Bw0zt: [1920, 1136], h0kahp: [1920, 1080], vW4Es: [1920, 1080],
+  FpgxH: [1920, 1080], bPF0s: [1920, 1080], u6gHt: [1920, 1080], EGMb1: [1920, 1080],
+  sqFXf: [1920, 1080], xkRDb: [1920, 1080], TmHjF: [1920, 1080],
   TC1b1: [1920, 1080], cCB7r: [1920, 1080], kk8dz: [1920, 1153], bV5Vs: [1920, 1080],
   xfYLn: [1920, 1080], r6Gzsu: [1920, 1080], hz9ti: [1920, 1080], dqFft: [1920, 1080],
   EvVO5: [1920, 1080], RUxNf: [1920, 1080], NrBkW: [1920, 1080], g2UNV: [1920, 1080],

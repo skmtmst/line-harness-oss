@@ -1225,3 +1225,38 @@ export const SCENARIO_STATS = {
     reachedRate: [1, 0.89, 0.73][index] ?? 0,
   })),
 }
+
+/**
+ * 一斉配信の一覧。設計 `★ V6 6-1` `q76C35` の5行そのまま。
+ *
+ * **状態を1通りしか入れないと、状態ごとの見え方を確かめられない。**
+ * 設計は 予約済み・下書き（未設定）・送信済み・停止中 の4通りが並ぶが、
+ * **「停止中」は型に無い**（draft / scheduled / sending / sent の4つ）。
+ */
+export const BROADCASTS = [
+  // 題, 種別, 対象, 状態, 予定, 対象数, 成功数
+  ['8月キャンペーンのお知らせ', 'image', 'all', 'scheduled', '2026-08-24T01:00:00.000Z', 0, 0],
+  ['未購入者フォロー', 'text', 'segment', 'draft', null, 18, 0],
+  ['新商品発売のお知らせ', 'carousel', 'tag', 'sent', '2026-08-20T03:00:00.000Z', 624, 624],
+  ['予約空き枠のご案内', 'text', 'tag', 'sent', '2026-08-18T09:30:00.000Z', 203, 203],
+  /*
+    設計の5行目は「停止中／停止済み」だが、**その状態が型に無い**
+    （`BroadcastStatus` は draft / scheduled / sending / sent の4つ）。
+    近いものが無いので下書きで置き、突き合わせ文書に差として書いた。
+  */
+  ['重要なお知らせ', 'text', 'all', 'draft', '2026-08-17T00:00:00.000Z', 0, 0],
+].map(([title, messageType, targetType, status, scheduledAt, totalCount, successCount], index) => ({
+  id: `broadcast-${index}`,
+  title: String(title),
+  messageType: String(messageType),
+  messageContent: `${title}の本文です。`,
+  targetType: String(targetType),
+  targetTagId: targetType === 'tag' ? 'tag-0' : null,
+  status: String(status),
+  scheduledAt,
+  sentAt: status === 'sent' ? scheduledAt : null,
+  totalCount: Number(totalCount),
+  successCount: Number(successCount),
+  folderId: null,
+  createdAt: '2026-08-16T00:00:00.000Z',
+}))

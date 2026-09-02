@@ -31,7 +31,7 @@ import {
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
-  CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  BROADCASTS, CHATS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -491,6 +491,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
     return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
   }
+  if (pathname === '/api/broadcasts') return { success: true, data: BROADCASTS }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
