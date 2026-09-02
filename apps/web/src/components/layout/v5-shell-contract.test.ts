@@ -92,20 +92,26 @@ describe('共通部品への移管実証', () => {
   const dashboard = read('src', 'app', 'page.tsx')
   const chats = read('src', 'app', 'chats', 'page.tsx')
   const friends = read('src', 'app', 'friends', 'page.tsx')
-  const tags = read('src', 'app', 'tags', 'page.tsx')
+  /*
+    友だち属性は `app/tags/page.tsx` ではなく V4 本体を見る。
+    入口の page は V4 を1つ置くだけで、見出しもタブも持たない。
+    2026-09-02 にこの枝を消すまで、ここは page に残っていた
+    **描かれない旧V5コード**を見て合格していた。
+    画面ではなく死んだコードを見張っていたことになる。
+  */
+  const tags = read('src', 'components', 'friend-fields', 'tags-page-v4.tsx')
+  const tagEntry = read('src', 'app', 'tags', 'page.tsx')
   const tagEdit = read('src', 'app', 'tags', 'edit', 'page.tsx')
-
-  it.each([
-    ['友だち属性', tags],
-  ])('%sが共通Headerを使う', (_name, source) => {
-    expect(source).toContain("import Header from '@/components/layout/header'")
-    expect(source).toContain('<Header')
-  })
 
   it.each([
     ['ダッシュボード', dashboard],
     ['受信箱', chats],
     ['友だち', friends],
+    // 2026-09-02: 友だち属性もこちら側。V4 はタイトルと説明を共通トップバーへ
+    // 預けている（docs/v6-shell-contract.md §2）。旧V5だけが本文にHeaderを
+    // 置いていて、その死んだコードがここを「共通Headerを使う」側に見せていた。
+    ['友だち属性', tags],
+    ['友だち属性の入口', tagEntry],
   ])('%sは共通トップバーと重なる本文Headerを置かない', (_name, source) => {
     expect(source).not.toContain("import Header from '@/components/layout/header'")
     expect(source).not.toContain('<Header')
@@ -113,8 +119,10 @@ describe('共通部品への移管実証', () => {
 
   it('友だちと友だち属性が共通タブを使う', () => {
     expect(friends).toContain('<MergedTabs')
-    expect(tags).toContain('<MergedTabs')
-    expect(tags).toContain('variant="segmented"')
+    // 友だち属性のV4は画面内タブ（`shared/tabs` の `VPn1F`）。
+    // 自前で組んでいないことを見る。
+    expect(tags).toContain("import { Tabs } from '@/components/shared/tabs'")
+    expect(tags).toContain('<Tabs')
   })
 
   it('タグ編集が共通パンくずを使う', () => {

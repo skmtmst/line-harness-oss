@@ -1,0 +1,293 @@
+/*
+ * ルールを作る（Pencil ★V6 `Rv8Jv`）の、この画面だけの寸法。
+ *
+ * V6の作成画面は、共通部品だけでは足りない形を3つ持っている。
+ *
+ *   1. 決めごとの番号バッジ  26×26 / 丸 / 12px / 700
+ *   2. 主要ボタン            高さ40 / 角丸8 / 余白[0,14] / 13px / 700
+ *   3. プルダウン            高さ40 / 角丸8 / 13px
+ *
+ * 共通の `shared/button.tsx` は ★V5 の `nBRKk`（高さ36 / 600）が正本で、
+ * V5画面がそのまま使っている。**そちらは触らない。**V6の寸法を共通部品へ
+ * 入れるのは、V5画面の作り替えと同じPRでやるべきことで、この画面の
+ * 設計寄せに混ぜると、関係のない227枚が一緒に動く。
+ *
+ * `shared/select-field.tsx` も同じ理由で使っていない。あちらは ★V5 `rpot9`
+ * の高さ42が正本で、`v6-parts-contract.test.ts` が42で固定している。
+ */
+
+/* --- 決めごとの帯 ------------------------------------------------------ */
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* 番号バッジ。26×26・丸・12px・700。 */
+.stepBadge {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+/* まだ決めていない段は色を落とす。押せない印ではなく、進みぐあいの印。 */
+.stepBadgeIdle {
+  background: var(--color-step-idle);
+  color: var(--color-ink-faint);
+}
+
+.stepTitle {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
+.stepNote {
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+/* --- カード ------------------------------------------------------------ */
+
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile); /* 設計 r10 */
+  background: var(--color-canvas);
+  padding: 20px;
+}
+
+/* カードの中のまとまり。設計は r8。 */
+.group {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 14px;
+}
+
+.label {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.required {
+  margin-left: 6px;
+  color: var(--color-status-danger);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.note {
+  margin-top: 4px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+/* --- プルダウン -------------------------------------------------------- */
+
+.select {
+  display: block;
+  width: 100%;
+  height: 40px; /* 設計 h40 */
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control); /* 設計 r8 */
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label); /* 設計 13 */
+  font-weight: 600;
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e7781' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* --- ボタン ------------------------------------------------------------ */
+
+.action {
+  display: inline-flex;
+  height: 40px; /* 設計 h40 */
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control); /* 設計 r8 */
+  padding: 0 14px; /* 設計 padding [0,14] */
+  font-size: var(--text-label); /* 設計 13 */
+  font-weight: 700; /* 設計 700 */
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.actionPrimary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.actionPrimary:hover:not(:disabled) {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover);
+}
+
+.actionSecondary {
+  border-color: var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.actionSecondary:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+/* 「動きを追加」。設計だけ高さ44で、他の操作より背が高い。 */
+.addAction {
+  width: 100%;
+  height: 44px;
+  border-style: dashed;
+}
+
+/* 行の中の小さな操作。設計 h32 r6。 */
+.rowAction {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  padding: 0 10px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rowAction:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.rowAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* --- 右カラム ---------------------------------------------------------- */
+
+.body {
+  display: grid;
+  align-items: start;
+  gap: 16px;
+}
+
+@media (min-width: 1280px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr) 390px; /* 設計 右カラム w390 */
+  }
+}
+
+.sideCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.sideTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+/* 未接続の枠。値の場所には `—` を置き、理由を続けて書く。 */
+.sideMissingValue {
+  margin-top: 8px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-display);
+  font-weight: 700;
+}
+
+.sideMissingNote {
+  margin-top: 4px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.error {
+  color: var(--color-status-danger);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rowName {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+.field {
+  margin-top: 12px;
+}
+
+.textareaTall {
+  min-height: 120px; /* 設計 本文 h120 */
+}
+
+.stickyBar {
+  margin-top: 16px;
+}

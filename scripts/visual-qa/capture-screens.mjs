@@ -136,8 +136,20 @@ async function runSteps(page, steps = [], node = '') {
   for (const step of steps) {
     if (step.wait) { await page.waitForTimeout(step.wait); continue }
     if (step.fill !== undefined) {
-      // 入力してから撮る状態（保存した検索の名前など）。
-      await page.getByLabel(step.fill).fill(step.text ?? '')
+      /*
+        入力してから撮る状態（保存した検索の名前など）。
+
+        **`selector: true` のときは CSS 選択子として読む。**
+        台帳の10件は `input[placeholder^="例：8月キャンペーン"]` のような
+        選択子で書いてあるのに、ここが必ず `getByLabel` を通していたため、
+        **`fill` を使う手順が1つも通らず30秒で時間切れになっていた**
+        （`h0kahp` `vW4Es` `FpgxH` `uNBlA` が撮れなかった原因）。
+        ラベルで書いてある5件もあるので、両方を残す。
+      */
+      const field = step.selector
+        ? (step.scope === 'main' ? page.locator('main') : page).locator(step.fill).first()
+        : page.getByLabel(step.fill)
+      await field.fill(step.text ?? '', { timeout: 15_000 })
       await page.waitForTimeout(step.after ?? 300)
       continue
     }
