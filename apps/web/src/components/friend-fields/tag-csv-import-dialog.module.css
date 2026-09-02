@@ -194,6 +194,46 @@
   line-height: 1.4;
 }
 
+/* 設計 `sfTEW`：通る数は緑、直す数は赤。数の意味を色でも先に伝える。 */
+.summaryReady {
+  color: var(--color-v6-accent);
+}
+
+.summaryInvalid {
+  color: var(--color-status-danger);
+}
+
+.summaryDetail {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 設計 `sfTEW` の注意帯。押す前に、押したらどうなるかを書く。 */
+.warnBar {
+  display: flex;
+  gap: 9px;
+  border: 1px solid var(--color-status-warning-soft);
+  border-radius: var(--radius-tile);
+  background: var(--color-status-warning-soft);
+  padding: 12px 14px;
+  color: var(--color-status-warning);
+  flex-shrink: 0;
+}
+
+.warnTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.warnBody {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;

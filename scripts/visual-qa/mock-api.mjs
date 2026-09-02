@@ -300,6 +300,19 @@ const SHAPES = {
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 1, members: 0, consultations: 0 },
+  /*
+   * 一斉配信の帯（設計 `q76C35`）。**型どおりに返す。**
+   * ここが無かったせいで、一覧の帯が「予約中 undefined」「失敗 undefined」
+   * のまま撮れていた。返事が無いと別の形（items/total）へ落ちて、
+   * 画面はそれを数として読もうとする。`BroadcastStats` と同じ形にする。
+   */
+  '/api/broadcasts/stats': {
+    thisMonth: 12,
+    scheduled: 4,
+    delivered: 1842,
+    failed: 0,
+    openRate: 69.4,
+  },
   '/api/friends/stats': FRIEND_STATS,
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
   '/api/users-grouped': USERS_GROUPED,

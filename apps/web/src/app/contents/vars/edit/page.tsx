@@ -13,6 +13,19 @@ import { api, ApiError } from '@/lib/api'
 import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
+import { checkedAtText } from '../delete-impact'
+import {
+  changePreviewNotConnected,
+  changeSummaryText,
+  hiddenText,
+  historicalText,
+  immediateItems,
+  impactStateFromError,
+  impactStateText,
+  saveErrorText,
+  type ChangeImpactState,
+} from '../change-impact'
 
 /**
  * 共通情報の編集。
@@ -51,6 +64,34 @@ function EditCommonVarInner() {
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
 
+  /**
+   * 変える前の影響確認（設計 `uNBlA`）。
+   *
+   * 本体の読み込みとは別に持つ。使用先が読めなくても、名前や値の編集は
+   * 続けられるべきだからである。**読めなかったことを0か所として描かない。**
+   */
+  const [impact, setImpact] = useState<CommonVarDeleteImpact | null>(null)
+  const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
+
+  const loadImpact = useCallback(async (varId: string, accountId: string) => {
+    setImpactState('loading')
+    try {
+      const res = await api.commonVars.deleteImpact(varId, accountId)
+      if (accountId !== latestAccountRef.current) return
+      if (!res.success) {
+        setImpact(null)
+        setImpactState('error')
+        return
+      }
+      setImpact(res.data)
+      setImpactState('ready')
+    } catch (e) {
+      if (accountId !== latestAccountRef.current) return
+      setImpact(null)
+      setImpactState(impactStateFromError(e))
+    }
+  }, [])
+
   const load = useCallback(async () => {
     if (!id) {
       setLoading(false)
@@ -84,12 +125,13 @@ function EditCommonVarInner() {
       setName(found.name)
       setFolderId(found.folderId ?? '')
       setValue(found.value)
+      void loadImpact(found.id, accountAtRequest)
     } catch {
       if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [accountLoading, id, selectedAccountId])
+  }, [accountLoading, id, loadImpact, selectedAccountId])
 
   useEffect(() => {
     void load()
@@ -118,8 +160,10 @@ function EditCommonVarInner() {
       }
       setSaved(true)
       void load()
-    } catch {
-      setError('保存に失敗しました')
+    } catch (e) {
+      // `fetchApi` は2xx以外を投げる。ここで一言にまとめてしまうと、
+      // 権限が無いのか対象が消えたのかが運用者に届かない。
+      setError(saveErrorText(e))
     } finally {
       setSaving(false)
     }
@@ -338,6 +382,84 @@ function EditCommonVarInner() {
                 className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
               />
             </div>
+
+            {/*
+              変える前の影響確認（設計 `uNBlA` 14-1-B）。
+              **節は必ず出す。** 読めないものは `—` と理由にする。
+            */}
+            <section data-design-node="uNBlA">
+              <p className="text-ink text-sm font-semibold">
+                影響確認{' '}
+                <span className="text-ink-faint text-xs font-normal">
+                  保存すると、この値を差し込んでいる場所がすぐ変わります
+                </span>
+              </p>
+
+              {impactState !== 'ready' || !impact ? (
+                <div className="border-hairline mt-2 rounded border p-4" data-impact-state={impactState}>
+                  <p className="text-ink text-sm">
+                    {NOT_AVAILABLE}
+                    <span className="text-ink-secondary ml-2">{impactStateText(impactState)}</span>
+                  </p>
+                  {impactState === 'error' && (
+                    <button
+                      onClick={() => {
+                        if (item && selectedAccountId) void loadImpact(item.id, selectedAccountId)
+                      }}
+                      className="text-info mt-2 text-sm hover:underline"
+                    >
+                      {STATE_TEXT.retry}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="border-hairline mt-2 rounded border">
+                  <div className="border-hairline border-b p-3">
+                    <p className="text-ink text-sm">{changeSummaryText(impact)}</p>
+                    {historicalText(impact) && (
+                      <p className="text-ink-secondary mt-1 text-xs">{historicalText(impact)}</p>
+                    )}
+                    {hiddenText(impact) && (
+                      <p className="text-ink-secondary mt-1 text-xs">
+                        名前を確認できない使用先：{hiddenText(impact)}
+                      </p>
+                    )}
+                  </div>
+
+                  {immediateItems(impact).length > 0 && (
+                    <ul className="divide-hairline divide-y">
+                      {immediateItems(impact).map((usage) => (
+                        <li key={`${usage.kind}-${usage.href}-${usage.name}`} className="p-3">
+                          <p className="text-ink-faint text-xs">
+                            {usage.kindLabel}・{usage.status}
+                          </p>
+                          <Link href={usage.href} className="text-info text-sm hover:underline">
+                            {usage.name}
+                          </Link>
+                          <p className="text-ink-secondary mt-1 text-xs break-all">
+                            いまの文：{usage.currentPreview}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="border-hairline border-t p-3">
+                    <p className="text-ink-secondary text-xs">変更後の文と文字数の検査</p>
+                    <p className="text-ink mt-1 text-sm">
+                      {NOT_AVAILABLE}
+                      <span className="text-ink-secondary ml-2 text-xs">
+                        {changePreviewNotConnected()}
+                      </span>
+                    </p>
+                  </div>
+
+                  <p className="text-ink-faint border-hairline border-t px-3 py-2 text-xs">
+                    {checkedAtText(impact.checkedAt)} 時点で確かめました。
+                  </p>
+                </div>
+              )}
+            </section>
 
             {/* 更新スケジュール。Lステップと同じく、値の下に表で置く。 */}
             <section>
