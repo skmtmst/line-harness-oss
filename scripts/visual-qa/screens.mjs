@@ -1837,6 +1837,18 @@ export const SCREENS = [
     （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
   { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。未取得と実値0の扱いは、この機能がいちばんよくできている。** 本文に `—` が28か所あり、**`0件` は1つも無い**（数えていないものを0で埋めていない）。データ締切も日本時間で出る。構造は設計とそろっており、残るのは実データの接続', verdictSource: 'analytics-v6/Zxezb.txt + analytics-v6/design-qa.md' , verdictHead: '7b509106' },
+    // ---- 2026-09-02 `a0bb3f44`（#676 マージ後）で撮り直した ----
+    // **「データ未接続」は実装の話ではなく、撮影側に口が無かっただけだった。**
+    //   `/api/analytics/friends` がモックに無く、既定の器 `{items,total,page,limit}` が返っていた。
+    //   画面は `state.data.data` を読むので `overview.metrics` で投げ、
+    //   **機能20の9枚が1枚も撮れていなかった**（前の判定の「`—` が28か所」もこれが原因）。
+    // 契約どおりの形を返すようにしたら、実値で描かれた：
+    //   増えた友だち 58人／初回 52人、減った友だち 11人／ブロック・解除、
+    //   差し引き 47人／増加 − 減少、現在つながっている 1,842人／再追加 6人。
+    //   日ごとの表は30行、同日の施策は名前か `—`。
+    // #676 の直し（集計できていない値を0と書かない）は
+    // `analytics-pending-value-contract.test.ts` が見張っている（わざと戻して落ちるところまで確認済み）。
+    // 取得元：`analytics-v6/Zxezb-1440.png`（`a0bb3f44`）
   { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 社内テスト配信の開封・クリックが **`—`** で、帯に「20人未満は取得対象外」と**理由**が付く。**0ではなく取れないことが分かる**形。残るのは実データの接続', verdictSource: 'analytics-v6/J6Inc.txt + analytics-v6/design-qa.md' , verdictHead: '7b509106' },
   { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '**development `c275749d` で撮った。** 広告費が `—` のとき**差し引きも `—`** になる。**片方が未取得なら計算結果も未取得**で、0円として引き算していない。残るのは実データの接続', verdictSource: 'analytics-v6/YBGtm.txt + analytics-v6/design-qa.md' , verdictHead: '7b509106' },
   {
@@ -2155,6 +2167,15 @@ export const SCREENS = [
     verdictHead: '7b509106',
   },
   { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**P1 見本から作る道が無い。** ルート `/webhooks`。受信Webhookの追加は名前とソースタイプを自分で決める形で、**設計の「予約サービス」「アンケートツール」といった見本を選んで作る道が無い**。**P2 タブの言葉に内部の語が残る**——「受信 (Incoming)」「送信 (Outgoing)」。同じ言い回しは #545 で `k3WxrO` が「こちらから送る」へ直っているので、**ここだけ直っていない**。**良い点**：シークレットを「設定済」「未設定」とだけ書き、**値そのものを画面に出していない**（秘密値を出さない決めごとを守れている）。**P2 エンドポイントURLが撮影環境のもの**（`http://localhost:3180/...`）——環境由来で実装の不具合ではない。取得元：`webhooks-v6/M0Gb7.txt`。1440・1920とも横スクロール0 **推奨修正**：**タブの「受信 (Incoming)」「送信 (Outgoing)」を日本語だけにする**（同じ言い回しは #545 で `k3WxrO` が「こちらから送る」へ直っており、**ここだけ残っている**）。見本から作る道はそのあと。**シークレットを「設定済／未設定」とだけ書き値を出さない形は、`oHAN4`（EC連携のつなぎ先）の手本になるので残す。**', verdictSource: 'webhooks-v6/M0Gb7.txt' , verdictHead: '7b509106' },
+    // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
+    // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
+    //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
+    //   出さないことを見張っており、`page.tsx` に0件。`k3WxrO` の注記のほうが正しい。
+    // **P1「見本から作る道が無い」は実在した。** `sourceType` は自由入力で、
+    //   手がかりは置き文字の `line` だけだった。見本（LINE公式アカウント／予約サービス／
+    //   アンケートツール／ECサイト／決済サービス）から選ぶ形にして、その他は自由入力を残した。
+    //   列見出しの「ソースタイプ」も「どこから来るか」にし、未設定の `-`（半角）を `—` にした。
+    //   保存する値は今までどおりの文字列なので、口も保存の形も変えていない。
   {
     /*
       **#547 で「やり取りの記録」タブが入った。**
@@ -2910,6 +2931,12 @@ export const CAPTURED_AT = {
     { pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4'], note: 'development そのもので撮った（根元9本のマージ後）' },
     { pr: 584, head: 'd0e62d59', on: '2026-08-30', screens: ['QQ1SR'], note: '使われ方の4つの帯と片づけの導線。通常・読込・空・失敗の4状態' },
+    { pr: 676, head: 'a0bb3f44', on: '2026-09-02',
+      screens: ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'dfwD4'],
+      note: '#676・#677 が入った木で撮り直した。**それまで機能20は9枚とも「画面を表示できませんでした」で1枚も撮れていなかった。**'
+        + '原因は実装ではなく撮影側で、`/api/analytics/friends`・`reactions`・`routes`・`usage` の口がモックに無く、'
+        + '既定の器 `{items,total,page,limit}` が返って `overview.metrics` で投げていた。契約どおりの形を返すようにして7 Node が撮れた。'
+        + '`Fh2Qj`（ファネル）はまだ撮れない。' },
   ],
   21: [
     { pr: 446, head: '4307088d', on: '2026-08-28' },

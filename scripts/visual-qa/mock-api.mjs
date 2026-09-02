@@ -288,6 +288,9 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
  * 画面が増えて足りなくなったら、ここに1行足す。**推測で埋めない。**
  * 実際に落ちた画面のコンソールを見て、必要な形だけを足す。
  */
+/** 分析の指標1つ。`state` と `reason` を持つのが契約。 */
+const METRIC = (value, state = 'available', reason = null) => ({ value, state, reason })
+
 const SHAPES = {
   '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
   /*
@@ -349,6 +352,146 @@ const SHAPES = {
       { friendId: 'friend-3', displayName: '菅野 亮', score: 31, band: 'low', change30d: -6, lastActionAt: '2026-08-13T20:52:00+09:00' },
     ],
     pagination: { total: 3, limit: 20, offset: 0 },
+  },
+  /*
+    分析・友だちの増減。**既定の器では `data.data` が無く、画面ごと落ちる**
+    （`overview.metrics` で Cannot read properties of undefined）。
+    そのため機能20の9枚が1枚も撮れなかった。
+
+    契約は `AnalyticsEnvelope<{ state, stateReason, metrics, days, campaigns, … }>` で、
+    各指標が自分の `state` と `reason` を持つ。ここでは**実測できた状態**（`available`）を返す。
+    集計待ち（`pending` で `value` に 0 が入る）ときに `—` へ落ちることは
+    `analytics-pending-value-contract.test.ts` が見張っている。
+  */
+  '/api/analytics/friends': {
+    lineAccountId: 'visual-qa-account',
+    timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' },
+    dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      state: 'available',
+      stateReason: null,
+      metrics: {
+        added: METRIC(58), removed: METRIC(11), net: METRIC(47),
+        currentFriends: METRIC(1842), firstTime: METRIC(52), returning: METRIC(6),
+      },
+      days: [
+      { date: '2026-08-04', added: 3, removed: 0, net: 3 },
+      { date: '2026-08-05', added: 1, removed: 1, net: 0 },
+      { date: '2026-08-06', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-07', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-08', added: 5, removed: 1, net: 4 },
+      { date: '2026-08-09', added: 4, removed: 0, net: 4 },
+      { date: '2026-08-10', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-11', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-12', added: 2, removed: 1, net: 1 },
+      { date: '2026-08-13', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-14', added: 6, removed: 2, net: 4 },
+      { date: '2026-08-15', added: 3, removed: 0, net: 3 },
+      { date: '2026-08-16', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-17', added: 0, removed: 1, net: -1 },
+      { date: '2026-08-18', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-19', added: 4, removed: 1, net: 3 },
+      { date: '2026-08-20', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-21', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-22', added: 3, removed: 1, net: 2 },
+      { date: '2026-08-23', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-24', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-25', added: 5, removed: 1, net: 4 },
+      { date: '2026-08-26', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-27', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-28', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-29', added: 3, removed: 1, net: 2 },
+      { date: '2026-08-30', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-31', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-01', added: 4, removed: 1, net: 3 },
+      { date: '2026-09-02', added: 2, removed: 0, net: 2 },
+      ],
+      campaigns: [
+        { id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', occurredAt: '2026-08-24T10:00:00+09:00', date: '2026-08-24' },
+        { id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', occurredAt: '2026-08-18T18:30:00+09:00', date: '2026-08-18' },
+      ],
+      historyAvailableFrom: '2026-08-04',
+    },
+  },
+  /* 分析・配信の反応。`AnalyticsReactionsOverview`。 */
+  '/api/analytics/reactions': {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      metrics: {
+        sent: METRIC(1842), delivered: METRIC(1836), opened: METRIC(1274),
+        lineClicked: METRIC(318), trackedClicks: METRIC(204),
+        unavailableCampaigns: METRIC(1, 'partial', '20人未満の配信は開封を取得できません'),
+      },
+      campaigns: [
+        {
+          id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', sentAt: '2026-08-24T10:00:00+09:00',
+          targetPeople: METRIC(624), delivered: METRIC(624), opened: METRIC(438),
+          lineClicked: METRIC(112), outcomes: METRIC(9), fetchedAt: '2026-08-25T03:00:00+09:00',
+        },
+        {
+          id: 'bc-2', name: '予約空き枠のご案内', kind: 'broadcast', sentAt: '2026-08-18T18:30:00+09:00',
+          targetPeople: METRIC(203), delivered: METRIC(203), opened: METRIC(141),
+          lineClicked: METRIC(37), outcomes: METRIC(2), fetchedAt: '2026-08-19T03:00:00+09:00',
+        },
+        {
+          id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', sentAt: '2026-08-18T09:00:00+09:00',
+          targetPeople: METRIC(18), delivered: METRIC(18),
+          opened: METRIC(null, 'insufficient', '20人未満のため取得できません'),
+          lineClicked: METRIC(3), outcomes: METRIC(0), fetchedAt: null,
+        },
+      ],
+      trackedClickHours: [
+        { hour: 9, clicks: 22 }, { hour: 10, clicks: 48 }, { hour: 12, clicks: 31 },
+        { hour: 18, clicks: 57 }, { hour: 20, clicks: 46 },
+      ],
+      clickDefinition: 'クリック率は「そのURLを含む配信が届いた人数」に対する割合です。同じ人が複数回押しても、実人数は1として数えます。',
+    },
+  },
+  /* 分析・経路と成果。`AnalyticsRoutesOverview`。 */
+  '/api/analytics/routes': {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      attributionModel: 'first_touch',
+      attributionLabel: '最初に触れた経路',
+      routes: [
+        {
+          id: 'rt-1', refCode: 'sns-aug', name: 'SNSの8月投稿',
+          clicks: METRIC(412), friendAdds: METRIC(38), currentFriends: METRIC(35), reactionPeople: METRIC(21),
+          conversions: { approved: METRIC(4), pending: METRIC(1), rejected: METRIC(0), revenue: METRIC(48000) },
+          adCost: METRIC(12000), costPerFriend: METRIC(315), costPerConversion: METRIC(3000), profitAfterAdCost: METRIC(36000),
+        },
+        {
+          id: 'rt-2', refCode: null, name: '代理店A',
+          clicks: METRIC(97), friendAdds: METRIC(6), currentFriends: METRIC(6), reactionPeople: METRIC(2),
+          conversions: { approved: METRIC(0), pending: METRIC(0), rejected: METRIC(0), revenue: METRIC(0) },
+          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
+          costPerFriend: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+          costPerConversion: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+          profitAfterAdCost: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+        },
+      ],
+      searchConsoleHref: 'https://search.google.com/search-console',
+    },
+  },
+  /* 分析・使われ方。`AnalyticsUsageOverview`。 */
+  '/api/analytics/usage': {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      state: 'available', stateReason: null,
+      checkedAt: '2026-09-02T00:00:00+09:00', automaticDeletion: false,
+      summary: {
+        unusedItems: METRIC(79), automaticRuns: METRIC(214), manualSends: METRIC(12), estimatedHoursSaved: METRIC(1),
+      },
+      categories: [
+        { key: 'tags', label: 'タグ', href: '/tags', created: METRIC(101), inUse: METRIC(22), unused: METRIC(79), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-24') },
+        { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
+        { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
+      ],
+    },
   },
   '/api/mileage/history': {
     items: [
