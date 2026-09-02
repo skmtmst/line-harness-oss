@@ -15,6 +15,14 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { calculateAffiliateReward } from './affiliate-reward'
 import {
+  confirmedDetail,
+  confirmedThisMonth,
+  confirmedTotals,
+  confirmedUnit,
+  confirmedValue,
+  type ConfirmedState,
+} from './offer-kpi'
+import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
   OFFER_SORTS,
@@ -25,6 +33,20 @@ import {
   type OfferFilter,
   type OfferSort,
 } from './offer-list-view'
+
+/**
+ * 案件一覧のKPIの注記（設計 `GH8VL`）。
+ *
+ * 設計の字は「確定した件数」だが、**それだけでは0の意味が読めない。**
+ * 承認待ちが8件並んでいる横で「今月の成果0件」を見た運用者は、成果が
+ * 無いと受け取る。数え方は正しいので、数を変えず、何を数えていないかを
+ * 書き足す。
+ */
+const CONFIRMED_DETAIL = {
+  count: '確定した件数（承認待ちは含みません）',
+  yen: '確定した報酬の合計（承認待ちは含みません）',
+  miles: '報酬をマイルで払う分（承認待ちは含みません）',
+} as const
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -1490,8 +1512,11 @@ export function OffersTab() {
     } catch { /* silent */ }
   }, [])
 
-  // 今月に確定した成果。KPIの「今月の成果」「支払い予定」に要る。
+  // 今月に発生し、承認まで済んだ成果。KPIの「今月の成果」「支払い予定」に要る。
+  // **状態を別に持つ。** 取れなかったときに0を出すと、承認待ちが並んでいるのに
+  // 「今月の成果0件」と読めて、運用者が成果そのものが無いと誤解する。
   const [approvedThisMonth, setApprovedThisMonth] = useState<ConversionApprovalItem[]>([])
+  const [confirmedState, setConfirmedState] = useState<ConfirmedState>('loading')
 
   useEffect(() => {
     void loadOffers()
@@ -1500,15 +1525,22 @@ export function OffersTab() {
 
   useEffect(() => {
     let cancelled = false
+    setConfirmedState('loading')
     void api.conversionApprovals
       .list({ status: 'approved', limit: 200 })
       .then((res) => {
-        if (cancelled || !res.success || !Array.isArray(res.data)) return
-        const month = new Date().toISOString().slice(0, 7)
-        setApprovedThisMonth(res.data.filter((a) => a.createdAt.slice(0, 7) === month))
+        if (cancelled) return
+        if (!res.success || !Array.isArray(res.data)) {
+          setConfirmedState('error')
+          return
+        }
+        setApprovedThisMonth(confirmedThisMonth(res.data))
+        setConfirmedState('ready')
       })
       .catch(() => {
         // 承認が引けなくても、案件の一覧と作成は使える。
+        // ただし**数は出さない。** 0と読めなかったを混ぜない。
+        if (!cancelled) setConfirmedState('error')
       })
     return () => {
       cancelled = true
@@ -1535,10 +1567,8 @@ export function OffersTab() {
 
   // 設計のKPI。案件そのものと、そこから出た成果の両方を見る。
   const openCount = offers.filter((o) => o.isActive).length
-  const confirmedCount = approvedThisMonth.length
-  const confirmedYen = approvedThisMonth.reduce((sum, a) => sum + (a.value ?? 0), 0)
   // 案件に結びつかない成果（ref から案件を辿れないもの）はマイルが付かない。
-  const confirmedMiles = approvedThisMonth.reduce((sum, a) => sum + (a.offerRewardMiles ?? 0), 0)
+  const confirmed = confirmedTotals(approvedThisMonth)
 
   const exportCsv = () => {
     const csv = offersCsv(shown, {
@@ -1565,13 +1595,26 @@ export function OffersTab() {
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="公開中の案件" value={openCount} unit="件" detail="紹介できる案件の数" />
-        <KpiCard title="今月の成果" value={confirmedCount} unit="件" detail="確定した件数" />
-        <KpiCard title="支払い予定" value={confirmedYen} unit="円" detail="確定した報酬の合計" />
+        <KpiCard
+          title="今月の成果"
+          value={confirmedValue(confirmedState, confirmed.count)}
+          unit={confirmedUnit(confirmedState, '件')}
+          loading={confirmedState === 'loading'}
+          detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.count)}
+        />
+        <KpiCard
+          title="支払い予定"
+          value={confirmedValue(confirmedState, confirmed.yen)}
+          unit={confirmedUnit(confirmedState, '円')}
+          loading={confirmedState === 'loading'}
+          detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.yen)}
+        />
         <KpiCard
           title="付与予定マイル"
-          value={confirmedMiles}
-          unit="mile"
-          detail="報酬をマイルで払う分"
+          value={confirmedValue(confirmedState, confirmed.miles)}
+          unit={confirmedUnit(confirmedState, 'mile')}
+          loading={confirmedState === 'loading'}
+          detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.miles)}
         />
       </div>
 
