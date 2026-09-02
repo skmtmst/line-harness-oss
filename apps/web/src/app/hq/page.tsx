@@ -7,6 +7,7 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
 
 export default function HqPage() {
   const router = useRouter()
@@ -60,9 +61,11 @@ export default function HqPage() {
           </h1>
           <p className="mt-1 text-sm text-ink-secondary">LINE公式アカウントごとに店舗の管理画面へ移動できます。</p>
         </div>
-        <Button href="/restaurant-test/stores/new" variant="primary" className="shrink-0">
-          ＋店舗の新規アカウント登録
-        </Button>
+        {restaurantTestUiEnabled() ? (
+          <Button href="/restaurant-test/stores/new" variant="primary" className="shrink-0">
+            ＋店舗の新規アカウント登録
+          </Button>
+        ) : null}
       </header>
 
       {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
@@ -77,9 +80,11 @@ export default function HqPage() {
         <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
           <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
           <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録すると、ここから店舗へログインできます。</p>
-          <Button href="/restaurant-test/stores/new" variant="primary" className="mt-6">
-            ＋店舗の新規アカウント登録
-          </Button>
+          {restaurantTestUiEnabled() ? (
+            <Button href="/restaurant-test/stores/new" variant="primary" className="mt-6">
+              ＋店舗の新規アカウント登録
+            </Button>
+          ) : null}
         </section>
       ) : null}
 
