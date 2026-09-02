@@ -131,6 +131,8 @@ AI補助で許可するもの:
 
 ## 8. ポイント付与
 
+ここでのポイントは外部EC（23）のポイントであり、17マイレージのマイルとは別である（17 §13参照）。マイル台帳へ合算せず、用語も「ポイント」と「マイル」を分ける。
+
 V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再計算しない。
 
 - `photo_reward_policy`をversion化し、適用開始日時とpoint数を持つ
@@ -156,10 +158,11 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 
 権限:
 
-- photo.view、photo.review、photo.bulk_review
-- photo.download_original（再認証・監査）
-- photo.publish、photo.withdraw
-- photo.reward、photo.export
+- `photo.submission.view`、`photo.submission.review`、`photo.submission.bulk_review`
+- `photo.original.download`（再認証・監査）
+- `photo.publication.publish`、`photo.publication.withdraw`
+- `photo.reward.grant`、`photo.submission.export`
+- 命名は共通基盤（`v6-shared-platform-requirements.md` §3）の`domain.resource.action`に従う。
 - PII/同意は項目マスク。公開・一括・original downloadは監査必須
 
 ## 10. API
@@ -188,7 +191,7 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 - bulk一部対象外
 - public asset cache invalidation中/完了/失敗
 
-V6の「出しているもの」の表示回数は、placementごとの実測eventまたは配信logから算出する。取得できない利用先は`未取得`とし、0にしない。
+V6の「出しているもの」の表示回数は、placementごとの実測eventまたは配信logから算出する。取得できない利用先は値を`—`、ラベルを「未取得」とし（共通基盤 §9）、0にしない。
 
 ## 12. 既存移行
 
@@ -216,7 +219,9 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 
 ## 14. 完了条件
 
-- V6 4画面の主操作・状態・遷移が動く
+- V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 管理・LIFF・公開APIのaccount/friend境界testが通る
 - original非公開、EXIF除去、形式・寸法・decode検査が通る
 - AIだけで採否・公開されない
@@ -226,7 +231,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 - legacy 5ptと新版policyが再現可能
 - crop/rotateでoriginalが変わらない
 - 1440/1920で横スクロールなし
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 15. 実装順
 

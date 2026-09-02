@@ -224,6 +224,8 @@ V6編集画面の直接保存ボタンは、未使用時だけ有効にする。
 
 V6の「予約中の配信にも効きます」は、すべてへ暗黙適用しない。予約済み配信をライブ参照にしている場合だけ効くと明示する。
 
+この機能の利用先は**スナップショット型**である（`v6-32-feature-cross-review.md` §2）。配信job・ステップ・挿入先は取り込んだ版を固定し、新版への切替は利用先ごとに件数と差分を確認してmigration eventを記録する。上表のライブ参照は、利用先が明示的に選び影響確認を通した場合だけの例外とする。
+
 ## 7. 変更影響の確認
 
 ### 7-1. 使用先台帳
@@ -460,16 +462,18 @@ V6の確認入力は残すが、使用先がある定義の物理削除には使
 
 権限を分ける。
 
-- `common_var.read`
-- `common_var.create`
-- `common_var.edit_draft`
-- `common_var.preview_impact`
-- `common_var.publish`
-- `common_var.operate_number`
-- `common_var.replace`
-- `common_var.archive`
-- `common_var.export`
+- `common_var.definition.read`
+- `common_var.definition.create`
+- `common_var.draft.edit`
+- `common_var.impact.preview`
+- `common_var.version.publish`
+- `common_var.number.operate`
+- `common_var.usage.replace`
+- `common_var.definition.archive`
+- `common_var.definition.export`
 - `common_var.audit.read`
+
+命名は共通基盤（`v6-shared-platform-requirements.md` §3）の`domain.resource.action`に従う。
 
 APIで範囲と権限を検査する。画面の非表示だけにしない。権限外の使用先名・本文・件数も返さない。
 
@@ -574,9 +578,9 @@ APIで範囲と権限を検査する。画面の非表示だけにしない。�
 
 ## 19. 受け入れ条件
 
-1. V6の4実Nodeと同じ状態を実装し、正常な1920px設計画像と比較できる
+1. 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 2. 1440px・1920pxでページ・表の横スクロールがない
-3. 一覧で空、期限、未使用、使用数順、検索、ページ送りが動く
+3. 一覧の空・期限・未使用の絞り込み、使用数順、検索、ページ送りを自動テストで確認する
 4. 種類、範囲、値、メモ、期限、空値動作を保存できる
 5. 使用中の値変更は影響確認を飛ばせない
 6. 使用先件数・変更前後・予約中・公開中・上限超過が正データで出る
@@ -587,10 +591,13 @@ APIで範囲と権限を検査する。画面の非表示だけにしない。�
 11. 単一・複数LINEアカウント配信で正しい範囲の値を使う
 12. 使用中の定義は代替へ差し替え、件数照合後にアーカイブできる
 13. 権限外の値・使用先・本文をAPIが返さない
-14. 空、読込、エラー、権限不足、競合、期限切れ、一部失敗がある
-15. `準備中`、固定件数、固定結果のボタンがない
-16. 既存データのdry-run、バックアップ、件数照合、ロールバックを通る
-17. API、型検査、単体、統合、E2E、アクセシビリティ、画像比較が通る
+14. V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+15. 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+16. 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
+17. 競合、期限切れ、一部失敗の状態を自動テストで確認する
+18. `準備中`、固定件数、固定結果のボタンがない
+19. 既存データのdry-run、バックアップ、件数照合、ロールバックを通る
+20. API、型検査、単体、統合、E2E、アクセシビリティが通る
 
 ## 20. 実装順
 

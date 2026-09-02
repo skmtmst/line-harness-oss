@@ -1,8 +1,12 @@
-# V6 全32機能 要件定義 正本索引
+# V6 全34機能 要件定義 正本索引
 
-更新日: 2026-08-26
-状態: **32 / 32 完了**
+更新日: 2026-09-03
+状態: **34 / 34 完了**(2026-09-03 改訂: 横断契約の1本化、01・25 の書き直し、33・34 の追加)
 対象外: V6複製後の追加デザイン変更、コード変更、DB更新、本番反映
+
+## 0. この索引以外を要件として読まない
+
+要件の正本は、この索引が指す34本と§5の横断契約だけである。V2〜V5世代の要件・仕様(`requirements-v0.24.md`、`v1-to-v2-inventory.md`、`v5-*.md` など)は2026-09-03に`docs/archive/`へ移し、冒頭に廃止の目印を付けた。`AGENTS.md`「古い要件定義は読まない」も参照する。
 
 ## 1. 結論
 
@@ -53,6 +57,8 @@
 | 30 | ログインユーザー | [詳細](./v6-30-login-users-requirements-draft.md) | deny-by-default、三段階権限、session失効 |
 | 31 | 機能設定 | [詳細](./v6-31-feature-settings-requirements-draft.md) | 契約/会社/個人を分離、server強制 |
 | 32 | 運用状態 | [詳細](./v6-32-operations-status-requirements-draft.md) | server監視、kill switch、復旧、追記履歴 |
+| 33 | アカウント設定 | [詳細](./v6-33-account-settings-requirements-draft.md) | LINE公式アカウントの登録・検証・切替、Webhook URL突合、Lステップからの乗り換え |
+| 34 | はじめの設定と案内 | [詳細](./v6-34-onboarding-guidance-requirements-draft.md) | 初回セットアップの順路、レシピ、マニュアル導線、エラー文面 |
 
 ## 3. 実装判断
 
@@ -104,7 +110,25 @@
 
 共通正本は[横断整合レビュー](./v6-32-feature-cross-review.md)と[共通基盤要件](./v6-shared-platform-requirements.md)にまとめる。
 
-## 5. 次工程の成果物
+## 5. 2026-09-03 改訂で1本化した横断契約
+
+機能別要件より優先する正本を次に固定した。機能別要件に別の流儀が残っていたら、正本側が勝つ。
+
+| 契約 | 正本 | 内容 |
+|---|---|---|
+| 共通アクションのカタログ | [25 接続契約](./v6-25-automation-action-contract.md) | 第1期6・第2期7・第3期2の15処理。名称と順番を全文書で共有 |
+| 新版公開後の既存利用先 | [横断レビュー §2](./v6-32-feature-cross-review.md) | 参照型 / スナップショット型の2分類だけ |
+| 権限モデル | [30 ログインユーザー §7〜§8](./v6-30-login-users-requirements-draft.md) | `edit` / `view` / `none` ＋ 重要操作permission(`domain.resource.action`)＋項目マスク。役割表は既定bundle |
+| 再試行の既定 | [共通基盤 §6-2](./v6-shared-platform-requirements.md) | 外部API 3回、送信Webhook 8回・24時間(例外)、内部処理は再試行なし |
+| 未取得の表示文言 | [共通基盤 §9](./v6-shared-platform-requirements.md) | 値は `—`、ラベルは 未取得 / 取得失敗 / 権限不足 / 未接続 |
+| 画像比較 | [共通基盤 §10 工程ゲート](./v6-shared-platform-requirements.md) | 要件の完了条件から外し、PRの工程条件で担保 |
+| Pencilへの修正依頼 | [横断レビュー §7](./v6-32-feature-cross-review.md) | 02/03/04/09/10/13/16 に散在していた依頼を1表に集約 |
+| 完了条件の書き方 | 各要件書 | 「動く」「分かる」を禁止し、4状態の契約テスト・3経路の自動テスト・画面一覧一致の定型3行＋検証できる文だけ |
+
+書き直した要件書: 01 ダッシュボード(メトリクス契約とカラム定義を追加)、25 オートメーション(画面別状態仕様とLステップとの差を追加、カタログは接続契約へ)。
+新規: 33 アカウント設定、34 はじめの設定と案内。1人運用への配慮として、06 の二者承認と 30 のTOTP復旧を緩和した。
+
+## 6. 次工程の成果物
 
 - [横断整合レビュー](./v6-32-feature-cross-review.md)
 - [共通基盤要件](./v6-shared-platform-requirements.md)

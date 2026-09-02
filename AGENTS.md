@@ -99,3 +99,12 @@
 - PCの確認基準は幅1440pxと1920pxとし、主要な一覧画面でページ全体または表だけの横スクロールが発生しないことを確認してください。
 - スマートフォン、長いURL・秘密値の詳細表示、比較上すべての列が必須の表など、情報欠落を避ける必要がある場合だけ横スクロールまたは安全な折り返しを許可します。
 - 詳細な判断基準は `docs/admin-ui-design-guidelines.md` に従ってください。
+
+## 古い要件定義は読まない
+
+- 要件の正本は `docs/v6-requirements/v6-requirements-master-index.md` が指す 34 本と、その §5 の横断契約だけです。それ以外を要件として読まないでください。
+- `docs/archive/` 配下は V2〜V5 世代の廃止文書です。開かない・引用しない・実装の根拠にしないでください。git 履歴の確認だけに使います。
+- `docs/lstep-feature-parity-matrix.md` と `docs/lstep-gap-analysis.md` は 2026-08-15 時点の調査で、半分が既に実装済みと判明しています。「無い機能」の一覧として使わず、比較の根拠には `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使ってください。
+- `docs/design-reference/` と `docs/design-qa/` の `-v2` `-v3` `-v4` `-v5` が付くフォルダは旧設計の画像です。設計一致の比較には `-v6` だけを使ってください。
+- `docs/pendev-v4-implementation-runbook.md` は V3/V4 の積み残しにだけ使い、新しい画面の根拠にしないでください。
+- `docs/v6-requirements/v6-32-feature-requirements-progress.md` の実装・画像確認の状況は廃止済みです。実装の進捗は `docs/design-qa/v6-progress-ledger.md` を見てください。

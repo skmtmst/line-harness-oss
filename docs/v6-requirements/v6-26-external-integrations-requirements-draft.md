@@ -165,7 +165,7 @@ event typeを自由入力させない。内部event registryのIDとschemaを選
 - 4xxは原則恒久失敗
 - `Retry-After`を尊重
 - exponential backoff＋jitter
-- 既定最大8回・24時間、接続ごと上限
+- 既定最大8回・24時間。共通基盤（`v6-shared-platform-requirements.md`）§6-2の例外で、送信Webhookだけに適用する。接続ごと上限
 - retryはWorker内sleepで待たない
 - 連続失敗でcircuit open、運用者通知
 
@@ -427,7 +427,9 @@ secretとtokenはstep-up MFA必須。作成、公開、停止、rotate、retry�
 
 ## 19. 完了条件
 
-- V6 4画面の主操作が実URLへ遷移する
+- V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 接続・配送がorganization/LINE accountを越境しない
 - 送受信のHMAC、timestamp、event ID、replay拒否が通る
 - secretが暗号化され、list/detail/logへ出ない
@@ -441,7 +443,7 @@ secretとtokenはstep-up MFA必須。作成、公開、停止、rotate、retry�
 - automation/form等の直接fetchが残らない
 - `準備中`のボタンがない
 - 1440px・1920pxで横スクロールがない
-- V6実Node、設計画像、同幅実装画像を横並び確認する
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 20. 実装順
 
