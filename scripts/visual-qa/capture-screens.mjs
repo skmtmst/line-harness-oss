@@ -20,11 +20,34 @@ import { chromium } from '@playwright/test'
 import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mkdirSync, existsSync } from 'node:fs'
+import { mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const BASE = process.env.VISUAL_QA_BASE ?? 'http://localhost:3101'
+
+/**
+ * Pencil から書き出した設計HTMLの置き場。機能ごとに `f7/` `f8/` と分ける。
+ * リポジトリの外に置くので、場所は `V6_DESIGN_REF` で渡せる。
+ */
+const DESIGN_REF = process.env.V6_DESIGN_REF ?? join(ROOT, '..', '..', 'v6-design-ref')
+const designDirOf = (feature) => join(DESIGN_REF, `f${feature}`)
+
+/**
+ * 設計の大きさは**書き出したHTMLから読む。** 台帳へ手で書き写すと、
+ * 262枚のどこかで必ず1枚ずれる。ずれた高さで撮った絵を実装と並べると、
+ * **実装のせいに見える差**が出る。Pencil の書き出しは根の div に
+ * `width: 1920px; height: 1080px` を持っているので、そこが正。
+ */
+function sizeFromHtml(src) {
+  const head = readFileSync(src, 'utf8').slice(0, 4000)
+  const at = head.indexOf('data-pencil-name')
+  if (at < 0) return null
+  const style = head.slice(at, at + 1200)
+  const w = /width:\s*(\d+)px/.exec(style)
+  const h = /height:\s*(\d+)px/.exec(style)
+  return w && h ? [Number(w[1]), Number(h[1])] : null
+}
 
 /** 画面が落ちたときに出る文言。出ていたら撮らない。 */
 const FAILURE_TEXTS = [
@@ -60,7 +83,10 @@ function check() {
     if (!s.route || s.route === '—') problems.push(`${s.node}: route が無い`)
     if (!['page', 'viewport'].includes(s.mode)) problems.push(`${s.node}: mode が page/viewport ではない`)
     if (s.mode === 'viewport' && !s.height) problems.push(`${s.node}: viewport なのに height が無い`)
-    if (!DESIGN_SIZE[s.node]) problems.push(`${s.node}: 設計の大きさが分からない`)
+    /* 設計の大きさは書き出したHTMLから読む。無いときだけ台帳の値を使う。 */
+    if (!DESIGN_SIZE[s.node] && !existsSync(join(designDirOf(s.feature), `${s.node}.html`))) {
+      problems.push(`${s.node}: 設計HTMLも大きさの控えも無い`)
+    }
   }
   if (problems.length) {
     console.error('撮り方がそろっていません:\n  ' + problems.join('\n  '))
@@ -215,14 +241,20 @@ async function captureImpl(feature) {
 }
 
 async function captureDesign(feature, from) {
-  if (!from) { console.error('--from に、書き出したHTMLの置き場を渡してください'); process.exit(1) }
+  const dir = from ?? designDirOf(feature)
+  if (!existsSync(dir)) {
+    console.error(`設計HTMLの置き場が無い: ${dir}\n  --from で渡すか V6_DESIGN_REF を設定してください`)
+    process.exit(1)
+  }
   const list = screensOf(feature)
   const browser = await chromium.launch()
   let shot = 0
   for (const s of list) {
-    const src = join(from, `${s.node}.html`)
+    const src = join(dir, `${s.node}.html`)
     if (!existsSync(src)) { console.log(`${s.node}\tHTMLが無い（Pencilから書き出してください）`); continue }
-    const [w, h] = DESIGN_SIZE[s.node]
+    const size = sizeFromHtml(src) ?? DESIGN_SIZE[s.node]
+    if (!size) { console.log(`${s.node}\t大きさが読めない`); continue }
+    const [w, h] = size
     const out = join(ROOT, 'docs', 'design-reference', s.dir)
     mkdirSync(out, { recursive: true })
     const page = await newPage(browser, w, h)

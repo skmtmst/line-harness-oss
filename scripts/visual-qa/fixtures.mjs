@@ -157,7 +157,8 @@ export const LIST_STATS = {
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
   // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
   scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
-  reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0 },
+  // 設計 `M1EXwB` の帯: リマインダ9件（有効7）/ 送信予定124通 / 今月386通 / 失敗2通
+  reminders: { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 },
 }
 
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
@@ -1260,3 +1261,103 @@ export const BROADCASTS = [
   folderId: null,
   createdAt: '2026-08-16T00:00:00.000Z',
 }))
+
+/**
+ * 機能7 リマインダ。設計 `M1EXwB` の5行そのまま。
+ *
+ * **`Reminder` の型に照らして書く。** 設計の言葉（「予約日時の1日前」）は
+ * 見出しであって項目名ではない。`triggerType` は
+ * `'manual' | 'booking' | 'event' | 'friend_field'` の4つしかなく、
+ * ここに設計の日本語をそのまま入れると画面は既定値のまま描かれ、
+ * **5行とも同じきっかけで撮れてしまう**（機能4で一度やった）。
+ */
+export const REMINDER_FOLDERS = [
+  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'rf-contract', kind: 'reminder', name: '契約更新', parentId: null, displayOrder: 2, color: '#d97706' },
+  { id: 'rf-event', kind: 'reminder', name: 'イベント', parentId: null, displayOrder: 3, color: '#7c3aed' },
+  { id: 'rf-follow', kind: 'reminder', name: 'フォロー', parentId: null, displayOrder: 4, color: '#059669' },
+]
+
+export const REMINDERS = [
+  {
+    id: 'reminder-1', name: '予約前日のご案内', description: '予約日時の1日前',
+    isActive: true, triggerType: 'booking', deliveryMode: 'time',
+    triggerOffsetMinutes: -1440, sendAtTime: '18:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-booking', stepCount: 1, displayOrder: 1,
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z',
+  },
+  {
+    id: 'reminder-2', name: '予約1時間前のご案内', description: '予約日時の1時間前',
+    isActive: true, triggerType: 'booking', deliveryMode: 'countdown',
+    triggerOffsetMinutes: -60, sendAtTime: null, targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-booking', stepCount: 1, displayOrder: 2,
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T11:00:00.000Z',
+  },
+  {
+    id: 'reminder-3', name: '契約更新30日前', description: '契約終了の30日前',
+    isActive: true, triggerType: 'friend_field', deliveryMode: 'time',
+    triggerOffsetMinutes: -43200, sendAtTime: '10:00', targetTagId: null,
+    triggerFieldId: 'field-contract-end', repeatYearly: false,
+    folderId: 'rf-contract', stepCount: 2, displayOrder: 3,
+    createdAt: '2026-05-11T00:00:00.000Z', updatedAt: '2026-08-21T01:00:00.000Z',
+  },
+  {
+    /* 下書き。**0通なので「最終送信」は空。** ここを「—」ではなく空で
+       出すか、設計どおり空欄にするかは実装側の決めごと。 */
+    id: 'reminder-4', name: 'イベント当日案内', description: 'イベント当日',
+    isActive: false, triggerType: 'event', deliveryMode: 'time',
+    triggerOffsetMinutes: 0, sendAtTime: '09:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-event', stepCount: 1, displayOrder: 4,
+    createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    /* 停止中。設計は「下書き」と別の札で描いている。実装の `isActive` は
+       真偽値ひとつなので、**下書きと停止中を描き分けられない。** */
+    id: 'reminder-5', name: '未返信3日後フォロー', description: '最終送信の3日後',
+    isActive: false, triggerType: 'manual', deliveryMode: 'time',
+    triggerOffsetMinutes: 4320, sendAtTime: '12:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-follow', stepCount: 1, displayOrder: 5,
+    createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-19T03:00:00.000Z',
+  },
+]
+
+/** 設計 `M1EXwB` の帯。リマインダ9件（有効7）／送信予定124通／今月386通／失敗2通。 */
+export const REMINDER_STATS = { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 }
+
+/**
+ * 友だち情報欄の項目。リマインダの起点（`triggerFieldId`）に日付の欄が要る。
+ *
+ * **`FriendField` の型どおりに書く。** `type` は10種類の決まった言葉で、
+ * ここに設計の日本語を入れると欄は既定の1行入力として描かれ、
+ * 「日付の欄だけ選べる」という決まりを**何も確かめないまま**撮れてしまう。
+ */
+export const FRIEND_FIELDS = [
+  {
+    id: 'field-birthday', folderId: null, name: '誕生日', fieldKey: 'birthday',
+    type: 'date', options: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: true,
+    displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'field-contract-end', folderId: null, name: '契約終了日', fieldKey: 'contract_end',
+    type: 'date', options: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'field-next-delivery', folderId: null, name: '次回お届け日', fieldKey: 'next_delivery',
+    type: 'date', options: null, defaultValue: null, source: 'ec',
+    ecFieldPath: 'subscription.next_ship_at', ecIsMaster: true, isPersonal: false, isStarred: false,
+    displayOrder: 3, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'field-plan', folderId: null, name: 'ご契約プラン', fieldKey: 'plan',
+    type: 'select', options: ['ライト', 'スタンダード', 'プレミアム'], defaultValue: null,
+    source: 'manual', ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+]
