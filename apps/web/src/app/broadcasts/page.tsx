@@ -12,6 +12,7 @@ import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -87,6 +88,14 @@ function BroadcastList() {
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
+  /**
+   * 削除の確認。ブラウザの `confirm()` は「この配信を削除してもよいですか？」
+   * としか言えず、予約が取り消されることも、送った記録が残ることも読めない。
+   * 画像比較にも写らないので、共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadInsight = async (id: string) => {
     try {
@@ -143,13 +152,23 @@ function BroadcastList() {
     broadcasts.filter(b => b.status === 'sent').forEach(b => loadInsight(b.id))
   }, [broadcasts])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この配信を削除してもよいですか？')) return
+  const handleDelete = async () => {
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (!deleteTarget || deleting) return
+    const targetId = deleteTarget.id
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.broadcasts.delete(id)
-      load()
+      const res = await api.broadcasts.delete(targetId)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -575,7 +594,7 @@ function BroadcastList() {
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
-                            onClick={() => handleDelete(broadcast.id)}
+                            onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}
                             className="px-3 py-1 min-h-[44px] whitespace-nowrap text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
                           >
                             削除
@@ -594,6 +613,39 @@ function BroadcastList() {
             </div>
           </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`配信「${deleteTarget?.title ?? ''}」を削除しますか？`}
+        description={
+          deleteTarget?.status === 'scheduled'
+            ? '予約が取り消され、この配信は送られなくなります。下書きの中身も一緒に消えます。すでに送った配信の記録は残ります。この操作は取り消せません。'
+            : '下書きの中身が消えます。まだ送っていないので、友だちには何も届きません。この操作は取り消せません。'
+        }
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+      >
+        {deleteTarget && (
+          <dl className="text-xs text-ink-secondary space-y-1">
+            <div className="flex gap-2">
+              <dt className="text-ink-faint shrink-0">配信日時</dt>
+              <dd className="min-w-0">{formatDatetime(deleteTarget.scheduledAt)}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-ink-faint shrink-0">送り先</dt>
+              <dd className="min-w-0">{audienceSummary(deleteTarget, getTagName)}</dd>
+            </div>
+          </dl>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }
