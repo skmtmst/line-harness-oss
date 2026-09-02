@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
+import { useAccount } from '@/contexts/account-context'
 
 const TYPES = [
   { value: 'text', label: 'テキスト' },
@@ -15,6 +16,7 @@ const TYPES = [
 
 function TemplateEditInner() {
   const router = useRouter()
+  const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
 
@@ -72,6 +74,10 @@ function TemplateEditInner() {
   const willSplit = messageContent.length > SPLIT_AT
 
   const save = async () => {
+    if (!id && !selectedAccountId) {
+      setError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
     if (!name.trim()) {
       setError('名前を入力してください')
       return
@@ -85,7 +91,13 @@ function TemplateEditInner() {
     try {
       const res = id
         ? await api.templates.update(id, { name: name.trim(), category, messageType, messageContent })
-        : await api.templates.create({ name: name.trim(), category, messageType, messageContent })
+        : await api.templates.create({
+            accountId: selectedAccountId!,
+            name: name.trim(),
+            category,
+            messageType,
+            messageContent,
+          })
       if (!res.success) {
         setError(res.error)
         return

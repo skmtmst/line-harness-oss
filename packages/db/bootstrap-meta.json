@@ -223,7 +223,8 @@
     "259_form_archive_safety.sql",
     "261_media_account_scope.sql",
     "262_support_mark_archive.sql",
-    "263_webhook_interaction_logs.sql"
+    "263_webhook_interaction_logs.sql",
+    "264_nen_friend_add_coupons.sql"
   ],
-  "migrationCount": 224
+  "migrationCount": 225
 }
