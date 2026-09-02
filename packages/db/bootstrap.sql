@@ -1782,11 +1782,11 @@ CREATE TABLE nen_ec_member_snapshots (
   synced_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_friend_add_coupon_issues (
+CREATE TABLE "nen_friend_add_coupon_issues" (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   friend_id       TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
-  coupon_code     TEXT NOT NULL UNIQUE,
+  coupon_code     TEXT NOT NULL,
   discount_rate   INTEGER NOT NULL CHECK (discount_rate BETWEEN 1 AND 100),
   valid_from      TEXT NOT NULL,
   expires_at      TEXT NOT NULL,
