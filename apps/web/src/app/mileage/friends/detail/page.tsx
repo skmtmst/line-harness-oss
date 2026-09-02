@@ -26,6 +26,7 @@ import {
   mileageSourceNoteText,
   mileageStatusLabel,
 } from '../../mileage-display'
+import { mileageConnectedAccounts, mileageRewardedActions } from '../../mileage-response-state'
 import MileageAdjustmentDialog from './mileage-adjustment-dialog'
 
 type MileageDetail = {
@@ -108,6 +109,8 @@ function FriendMileageInner() {
   }
 
   const displayName = friend.displayName || '名前未設定'
+  const rewardedActions = mileageRewardedActions(mileage.insights)
+  const connectedAccounts = mileageConnectedAccounts(mileage.connections)
   return (
     <div data-design-node="HIU5O" className="space-y-4">
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
@@ -116,14 +119,20 @@ function FriendMileageInner() {
         <SummaryCard variant="v6" title="利用可能" value={mileage.summary.available} unit=" mile" detail="いま使える残高" />
         <SummaryCard variant="v6" title="確定待ち" value={mileage.summary.pending} unit=" mile" detail="条件の確定を待っています" />
         <SummaryCard variant="v6" title="30日以内に失効" value={null} unit=" mile" detail="失効ロットの接続が必要" badge="未取得" badgeTone="neutral" />
-        <SummaryCard variant="v6" title="生涯付与" value={mileage.summary.lifetimeEarned} unit=" mile" detail={`${mileage.insights.rewardedActions.toLocaleString('ja-JP')}回の付与記録`} />
+        <SummaryCard
+          variant="v6"
+          title="生涯付与"
+          value={mileage.summary.lifetimeEarned}
+          unit=" mile"
+          detail={rewardedActions === null ? '付与記録の回数は未取得' : `${rewardedActions.toLocaleString('ja-JP')}回の付与記録`}
+        />
         <SummaryCard variant="v6" title="使用済み" value={mileage.summary.spent} unit=" mile" detail="交換などで使った合計" />
       </div>
 
       <Card overflow="hidden">
         <CardHeader
           title="友だちと接続LINEアカウント"
-          meta={mileage.connections.length > 0 ? `${mileage.connections.length}件を表示` : '—'}
+          meta={connectedAccounts === null ? '—' : `${connectedAccounts.length}件を表示`}
           action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="primary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
@@ -133,9 +142,11 @@ function FriendMileageInner() {
             <p className="mt-1 text-xs text-v6-ink-faint">本人確認済みの接続先だけを表示します</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {mileage.connections.length > 0 ? mileage.connections.map((connection) => (
+            {connectedAccounts === null ? (
+              <span className="text-sm text-v6-ink-faint">接続先を確認できませんでした</span>
+            ) : connectedAccounts.length > 0 ? connectedAccounts.map((connection) => (
               <span key={connection.accountId} className="rounded-full border border-hairline bg-v6-surface px-3 py-1 text-xs font-semibold text-v6-ink-secondary">{connection.accountName}</span>
-            )) : <span className="text-sm text-v6-ink-faint">接続先を確認できませんでした</span>}
+            )) : <span className="text-sm text-v6-ink-faint">接続先はありません</span>}
           </div>
         </div>
       </Card>
