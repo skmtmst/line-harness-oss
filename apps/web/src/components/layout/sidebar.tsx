@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
 import SidebarIdentity from './sidebar-identity'
 import {
@@ -145,6 +146,7 @@ export default function Sidebar({
   const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections
 
   const visibleSections = sections
+    .filter((section) => section.id !== 'restaurant-test' || restaurantTestUiEnabled())
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {

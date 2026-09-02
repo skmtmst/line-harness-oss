@@ -31,6 +31,7 @@ import {
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
+  AUTO_REPLIES, AUTO_REPLY_FOLDERS,
   BROADCASTS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
@@ -507,6 +508,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
+    return { success: true, data: AUTO_REPLY_FOLDERS }
+  }
+  if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
+  if (autoReplyOne) {
+    const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {

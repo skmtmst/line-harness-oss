@@ -52,6 +52,9 @@ const NEW_BC = '/broadcasts/new'
 /** リマインダ。作成は `/reminders/new`、編集は `/reminders/edit?id=`。 */
 const REMINDER = { feature: 7, dir: 'reminders-v6', mode: 'page' }
 
+/** 自動応答。作る・直すは一覧の上に出る窓（`/auto-replies/edit?id=` でも開ける）。 */
+const AUTO_REPLY = { feature: 8, dir: 'auto-replies-v6', route: '/auto-replies', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -353,6 +356,56 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能8 自動応答 ──────────────────────────────────────
+  /*
+    設計は5段のウィザード（基本設定→どんなときに動くか→何を返すか→優先順位→確認）。
+    実装は一覧の上に出る**1枚の窓**で、段も右の「設定内容」も無い。
+  */
+  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答' },
+  {
+    ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
+    route: '/auto-replies/edit?id=ar-2',
+  },
+  {
+    ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
+    route: '/auto-replies/edit?id=ar-2',
+  },
+  {
+    ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
+    route: '/auto-replies/edit?id=ar-2',
+  },
+  {
+    ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
+    status: 'unimplemented',
+    why: '同じ言葉に複数のルールが当たるときの並びと止め方を見せる画面が無い。`grep 競合` が `/auto-replies` 配下で0件。**評価順の数字はあるが、重なっていることを教える場所が無い**',
+  },
+  {
+    ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
+    status: 'unimplemented',
+    why: '受信を想定した言葉を入れて、どのルールが反応するかを試す画面が無い（`grep テスト` が `/auto-replies` 配下で0件）',
+  },
+  {
+    ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
+    status: 'unimplemented', why: '有効化前チェックと最終確認の段が無い。窓の「保存」で即座に反映される',
+  },
+  {
+    ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
+    status: 'unimplemented', why: '8-1-F が無いので、その後の完了画面も無い',
+  },
+  {
+    ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
+    status: 'unimplemented',
+    why: '誰の何という入力に何が実行されたかを並べる画面が無い（`grep 実行結果|最近の実行|引継ぎ` が0件）。一覧の「当たった回数」までしか見えない',
+  },
+  {
+    ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
+    steps: [{ click: '自動応答「営業時間外の自動返信」を削除' }],
+  },
+  {
+    ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 

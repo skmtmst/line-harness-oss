@@ -27,6 +27,7 @@ import {
   type LineTokenIssueFailure,
 } from '../services/token-refresh.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import {
   chooseRestaurantTable,
@@ -109,6 +110,10 @@ function authenticatedTenantId(c: Context<Env>): string {
 }
 
 restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
+  if (!restaurantTestEnabled(c.env)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+
   const requestedTenant = tenantId(c);
   const staffTenant = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
   if (requestedTenant && requestedTenant !== staffTenant) {
