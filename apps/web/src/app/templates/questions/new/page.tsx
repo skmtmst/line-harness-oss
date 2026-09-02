@@ -10,6 +10,7 @@ import QuestionEditor, {
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 function displayText(value: string): string {
@@ -135,31 +136,33 @@ function QuestionTemplatePageInner() {
       </nav>
 
       {error && (
-        <div role="alert" className="bg-danger-bg text-danger mb-4 rounded-control px-4 py-3 text-sm">
+        <div role="alert" className="bg-danger-bg text-danger rounded-control text-label mb-4 px-4 py-3">
           {error}
         </div>
       )}
 
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">
         <main className="min-w-0 space-y-4 2xl:col-span-3">
-          <section className="bg-canvas border-hairline grid gap-4 rounded-card border p-4 lg:grid-cols-3">
-            <label className="min-w-0 text-sm font-semibold text-ink-secondary lg:col-span-2">
-              テンプレート名 <span className="text-danger text-xs">必須</span>
-              <input
+          <section className="bg-canvas border-hairline rounded-v6-card shadow-v6-card grid gap-4 border p-4 lg:grid-cols-3">
+            {/* 入力欄は共通部品（高さ40px・文字13px）。ここだけ余白と
+                文字サイズを直に組むと、同じ画面の中で高さが揃わない。 */}
+            <label className="text-label min-w-0 font-semibold text-ink-secondary lg:col-span-2">
+              テンプレート名 <span className="text-danger text-caption">必須</span>
+              <TextField
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 maxLength={120}
-                className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                className="mt-2"
                 placeholder="例：継続の意思をうかがう"
               />
             </label>
-            <label className="text-sm font-semibold text-ink-secondary">
+            <label className="text-label font-semibold text-ink-secondary">
               フォルダ
-              <input
+              <TextField
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
                 list="question-template-folders"
-                className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                className="mt-2"
               />
               <datalist id="question-template-folders">
                 {categories.map((item) => <option key={item} value={item} />)}
@@ -167,18 +170,18 @@ function QuestionTemplatePageInner() {
             </label>
           </section>
 
-          <section className="bg-canvas border-hairline rounded-card border p-4">
+          <section className="bg-canvas border-hairline rounded-v6-card shadow-v6-card border p-4">
             <QuestionEditor value={question} onChange={setQuestion} choiceColumns />
           </section>
         </main>
 
         <aside className="min-w-0 space-y-3 2xl:sticky 2xl:top-4 2xl:self-start">
-          <section className="overflow-hidden rounded-card bg-line-preview p-4 text-sm text-on-accent">
+          <section className="rounded-v6-card overflow-hidden bg-line-preview p-4 text-label text-on-accent">
             <h2 className="text-center font-bold">LINEプレビュー</h2>
             <p className="mx-auto mt-3 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">
               質問の見え方（山田 太郎さんの場合）
             </p>
-            <div className="mt-4 overflow-hidden rounded-card bg-canvas text-ink">
+            <div className="rounded-v6-card mt-4 overflow-hidden bg-canvas text-ink">
               {question.intro?.trim() && (
                 <p className="border-hairline border-b px-4 py-3 leading-relaxed">
                   {displayText(question.intro)}
@@ -195,7 +198,7 @@ function QuestionTemplatePageInner() {
             </div>
           </section>
 
-          <section className="rounded-card bg-line-answer-bg p-4 text-sm text-line-answer">
+          <section className="rounded-v6-card bg-line-answer-bg p-4 text-label text-line-answer">
             <h2 className="font-bold">答えをどこに残すか</h2>
             {summaries.length > 0 ? (
               <ul className="mt-2 space-y-1">
@@ -206,9 +209,9 @@ function QuestionTemplatePageInner() {
             )}
           </section>
 
-          <section className="bg-canvas border-hairline rounded-card border p-4 text-sm">
+          <section className="bg-canvas border-hairline rounded-v6-card shadow-v6-card border p-4 text-label">
             <h2 className="font-bold text-ink">この質問を使う場所</h2>
-            <p className="text-ink-secondary mt-2">
+            <p className="text-ink-secondary text-label mt-2">
               {id ? `シナリオ ${usageCount}通` : '保存後にシナリオから選べます'}
             </p>
             <Link href="/scenarios" className="text-accent mt-3 inline-block font-semibold hover:underline">

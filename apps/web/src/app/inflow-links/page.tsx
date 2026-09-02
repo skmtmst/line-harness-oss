@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
@@ -17,6 +17,11 @@ import AdIntegration from './ad-integration'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 
 interface MessageTemplate {
   id: string
@@ -46,6 +51,15 @@ interface RefSummaryData {
   totalFriends: number
   friendsWithRef: number
   friendsWithoutRef: number
+}
+
+function isRefSummaryData(value: unknown): value is RefSummaryData {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<RefSummaryData>
+  return Array.isArray(candidate.routes)
+    && Number.isFinite(candidate.totalFriends)
+    && Number.isFinite(candidate.friendsWithRef)
+    && Number.isFinite(candidate.friendsWithoutRef)
 }
 
 interface RefFriend {
@@ -79,6 +93,26 @@ function FolderIcon({ className = '' }: { className?: string }) {
   )
 }
 
+/**
+ * 並び順。**読み込んだ行から数えられるものだけ**にしてある。
+ * 実流入は `/api/analytics/ref-summary` の累計で返るので、
+ * 友だち追加・クリック・最新追加日は並べ替えられる。
+ */
+type RouteSort = 'friends-desc' | 'clicks-desc' | 'latest-desc' | 'name'
+
+const SORT_OPTIONS: Array<{ value: RouteSort; label: string }> = [
+  { value: 'friends-desc', label: '友だち追加が多い順' },
+  { value: 'clicks-desc', label: 'クリックが多い順' },
+  { value: 'latest-desc', label: '最近追加された順' },
+  { value: 'name', label: '流入元名順' },
+]
+
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10件表示' },
+  { value: '20', label: '20件表示' },
+  { value: '50', label: '50件表示' },
+]
+
 const MERGED_TABS = [
   { key: 'links', label: '流入経路' },
   { key: 'script', label: 'サイトスクリプト' },
@@ -87,6 +121,9 @@ const MERGED_TABS = [
 
 function InflowLinksPageInner() {
   const { selectedAccountId } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
+  const loadRequestRef = useRef(0)
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
@@ -95,8 +132,13 @@ function InflowLinksPageInner() {
   const [trackedLinks, setTrackedLinks] = useState<TrackedLinkRow[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [summary, setSummary] = useState<RefSummaryData | null>(null)
+  const [summaryAvailable, setSummaryAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [sort, setSort] = useState<RouteSort>('friends-desc')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   // editing state:
   //   - null       — modal closed
   //   - 'new'      — blank "create" modal
@@ -123,69 +165,105 @@ function InflowLinksPageInner() {
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
 
   const load = async () => {
+    const requestGeneration = ++loadRequestRef.current
+    const accountAtRequest = selectedAccountId
+    const isCurrent = () =>
+      requestGeneration === loadRequestRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
-    setError('')
+    setLoadFailed(false)
     // ref-summary は selectedAccountId を渡すと「そのアカで実流入があった
     // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
-    const summaryQuery = selectedAccountId ? `?lineAccountId=${selectedAccountId}` : ''
-    const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
-      api.entryRoutes.list(),
-      // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
-      // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
-      api.entryRouteGenres.list().catch(() => ({
-        success: false as const,
-        data: [] as EntryRouteGenre[],
-      })),
-      api.pools.list(),
-      api.scenarios.list(),
-      api.messageTemplates.list(),
-      api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
-      fetchApi<{ success: boolean; data: RefSummaryData }>(
-        `/api/analytics/ref-summary${summaryQuery}`,
-      ).catch(() => ({ success: false, data: null })),
-      api.trackedLinks.list().catch(() => ({ success: false, data: null })),
-    ])
-    if (r.success) setRoutes(r.data)
-    else setError('リファラルリンクの取得に失敗しました')
-    if (genreRes.success) setGenres(genreRes.data)
-    if (p.success) setPools(p.data)
-    if (s.success) setScenarios(s.data)
-    if (t.success) setTemplates(t.data)
-    if (tagRes.success) setTags(tagRes.data)
-    if ('success' in sum && sum.success && sum.data) setSummary(sum.data)
-    if (tl.success && tl.data) {
-      setTrackedLinks(
-        tl.data.map((row) => ({
-          id: row.id,
-          name: row.name,
-          scenarioId: row.scenarioId,
-          isActive: row.isActive,
+    try {
+      const summaryQuery = accountAtRequest ? `?lineAccountId=${accountAtRequest}` : ''
+      const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
+        api.entryRoutes.list(),
+        // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
+        // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
+        api.entryRouteGenres.list().catch(() => ({
+          success: false as const,
+          data: [] as EntryRouteGenre[],
         })),
-      )
-    }
+        api.pools.list(),
+        api.scenarios.list(),
+        api.messageTemplates.list(),
+        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
+        fetchApi<{ success: boolean; data: RefSummaryData }>(
+          `/api/analytics/ref-summary${summaryQuery}`,
+        ).catch(() => ({ success: false, data: null })),
+        api.trackedLinks.list().catch(() => ({ success: false, data: null })),
+      ])
+      if (!isCurrent()) return
+      if (r.success) setRoutes(r.data)
+      else setLoadFailed(true)
+      if (genreRes.success) setGenres(genreRes.data)
+      if (p.success) setPools(p.data)
+      if (s.success) setScenarios(s.data)
+      if (t.success) setTemplates(t.data)
+      if (tagRes.success) setTags(tagRes.data)
+      if ('success' in sum && sum.success && isRefSummaryData(sum.data)) {
+        setSummary(sum.data)
+        setSummaryAvailable(true)
+      } else {
+        setSummary(null)
+        setSummaryAvailable(false)
+      }
+      if (tl.success && tl.data) {
+        setTrackedLinks(
+          tl.data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            scenarioId: row.scenarioId,
+            isActive: row.isActive,
+          })),
+        )
+      }
 
-    // Load pool→accounts mapping after we know the pool list. Done in a 2nd
-    // round-trip so the table can render with summary stats immediately; the
-    // filter just doesn't apply the pool-membership rule until this resolves
-    // (zero-inflow rows still pass through friendCount > 0 path).
-    if (p.success) {
-      const entries = await Promise.all(
-        p.data.map(async (pool) => {
-          const res = await api.pools.accounts.list(pool.id)
-          const ids = res.success
-            ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
-            : new Set<string>()
-          return [pool.id, ids] as const
-        }),
-      )
-      setPoolMembers(Object.fromEntries(entries))
+      // Load pool→accounts mapping after we know the pool list. Done in a 2nd
+      // round-trip so the table can render with summary stats immediately; the
+      // filter just doesn't apply the pool-membership rule until this resolves
+      // (zero-inflow rows still pass through friendCount > 0 path).
+      if (p.success) {
+        const entries = await Promise.all(
+          p.data.map(async (pool) => {
+            const res = await api.pools.accounts.list(pool.id)
+            const ids = res.success
+              ? new Set(res.data.filter((a) => a.isActive).map((a) => a.lineAccountId))
+              : new Set<string>()
+            return [pool.id, ids] as const
+          }),
+        )
+        if (!isCurrent()) return
+        setPoolMembers(Object.fromEntries(entries))
+      }
+    } catch {
+      if (!isCurrent()) return
+      // 一覧そのものが引けない。空と言い分けるため、失敗として覚える。
+      setLoadFailed(true)
+      setSummary(null)
+      setSummaryAvailable(false)
+    } finally {
+      if (isCurrent()) setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
-    load()
+    // アカウントを変えた瞬間に前の一覧・集計・開いた操作を捨てる。
+    // 新しい取得が失敗しても、前のアカウントの値を表示しない。
+    setRoutes([])
+    setGenres([])
+    setPools([])
+    setScenarios([])
+    setTemplates([])
+    setTrackedLinks([])
+    setTags([])
+    setSummary(null)
+    setSummaryAvailable(false)
+    setPoolMembers({})
+    setEditing(null)
+    setQrRoute(null)
+    setPage(1)
+    void load()
     // サイドバー側でアカウントを切り替えたら、開きっぱなしの「ref 詳細」も
     // 持ち越さない (アカ A の友だちリストがアカ B の同じ ref 行に残ってしまう
     // クロスアカウントの情報漏れ防止)。stale-response guard だけでは閉じる側を
@@ -193,6 +271,9 @@ function InflowLinksPageInner() {
     setExpandedRef(null)
     setRefDetail(null)
     setRefDetailLoading(false)
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [selectedAccountId])
 
   const onCopy = async (refCode: string, id: string) => {
@@ -244,7 +325,7 @@ function InflowLinksPageInner() {
 
   // Index summary stats by ref_code for cheap lookup per row.
   const statsByRef = new Map<string, RefRouteStats>()
-  summary?.routes.forEach((r) => statsByRef.set(r.refCode, r))
+  summary?.routes?.forEach((r) => statsByRef.set(r.refCode, r))
 
   // Merge entry_routes (CRUD 対象), tracked_links (modern path), と
   // summary.routes (実流入のあった refs)。優先順位 = worker の applyRefAttribution
@@ -398,6 +479,9 @@ function InflowLinksPageInner() {
         || row.refCode.toLocaleLowerCase('ja').includes(normalizedSearch))
     : genreRows
   const sortedRows = [...filteredRows].sort((a, b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
+    if (sort === 'clicks-desc') return (b.stats?.clickCount ?? 0) - (a.stats?.clickCount ?? 0)
+    if (sort === 'friends-desc') return (b.stats?.friendCount ?? 0) - (a.stats?.friendCount ?? 0)
     const sa = a.stats?.latestAt ?? ''
     const sb = b.stats?.latestAt ?? ''
     if (!sa && !sb) return 0
@@ -405,6 +489,12 @@ function InflowLinksPageInner() {
     if (!sb) return -1
     return sb.localeCompare(sa)
   })
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize))
+  const currentRows = sortedRows.slice((page - 1) * pageSize, page * pageSize)
+  // 絞り込みでページ数が縮んだら、開いているページを最後のページへ寄せる。
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
   const genreOptions = availableGenres.map((genre) => genre.name)
 
   const formatDate = (iso: string | null) => {
@@ -422,7 +512,9 @@ function InflowLinksPageInner() {
   const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length
   const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
-  const addRate = totalClicks > 0 ? Math.round((totalFriends / totalClicks) * 100) : null
+  const addRate = summaryAvailable && totalClicks > 0
+    ? Math.round((totalFriends / totalClicks) * 100)
+    : null
 
   return (
     <div>
@@ -469,7 +561,12 @@ function InflowLinksPageInner() {
         />
         {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
         <KpiCard title="今月の追加" value={null} unit="人" detail="前月比は出せません" />
-        <KpiCard title="クリック" value={totalClicks} unit="回" detail="累計" />
+        <KpiCard
+          title="クリック"
+          value={summaryAvailable ? totalClicks : null}
+          unit="回"
+          detail={summaryAvailable ? '累計' : '取得できません'}
+        />
         <KpiCard
           title="平均の追加率"
           value={addRate}
@@ -478,22 +575,16 @@ function InflowLinksPageInner() {
         />
       </div>
 
-      {error && (
-        <div className="p-3 rounded bg-danger-bg border border-danger-bg text-danger text-sm mb-4">
-          {error}
-        </div>
-      )}
-
       <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside>
           <button
             onClick={() => setEditingGenre('new')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-v6-accent px-4 py-3 text-sm font-bold text-on-accent shadow-sm hover:bg-v6-accent-hover"
           >
             <span className="text-xl leading-none">＋</span>
             フォルダを追加
           </button>
-          <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-white shadow-sm">
+          <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-canvas shadow-sm">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="text-sm font-bold text-ink">フォルダ</h2>
               <p className="mt-0.5 text-xs text-ink-faint">選ぶと右側のリンクが切り替わります</p>
@@ -506,29 +597,29 @@ function InflowLinksPageInner() {
                 最初のフォルダを作ってください
               </button>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-hairline">
                 {availableGenres.map((genre) => {
                   const count = accountFilteredRows.filter((row) => row.genre === genre.name).length
                   const active = selectedGenre === genre.name
                   return (
                     <div
                       key={genre.id}
-                      className={`flex items-center transition ${active ? 'bg-emerald-50 text-emerald-800' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                      className={`flex items-center transition ${active ? 'bg-v6-accent-soft text-v6-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                     >
                       <button
                         onClick={() => setSelectedGenre(genre.name)}
                         className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
                       >
                         <span className="flex min-w-0 items-center gap-2">
-                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-emerald-600' : 'text-ink-faint'}`} />
+                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-v6-accent' : 'text-ink-faint'}`} />
                           <span className="truncate text-sm font-semibold">{genre.name}</span>
                         </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-canvas-sunken text-ink-faint'}`}>{count}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-v6-accent-soft text-v6-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{count}</span>
                       </button>
                       {!genre.id.startsWith('legacy-') && (
                         <button
                           onClick={() => setEditingGenre(genre)}
-                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-ink-faint hover:bg-white hover:text-blue-600"
+                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-ink-faint hover:bg-canvas hover:text-v6-action"
                           aria-label={`${genre.name}を編集`}
                         >
                           編集
@@ -540,7 +631,7 @@ function InflowLinksPageInner() {
                 {hasUncategorized && (
                   <button
                     onClick={() => setSelectedGenre(UNCATEGORIZED)}
-                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-amber-50 text-amber-800' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-v6-warning-bg text-v6-warning' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                   >
                     <span className="flex items-center gap-2 text-sm font-semibold">
                       <FolderIcon className="h-5 w-5 shrink-0" />
@@ -557,76 +648,103 @@ function InflowLinksPageInner() {
         </aside>
 
         <section className="min-w-0">
-          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
               <p className="text-xs text-ink-faint">{genreRows.length} リンク</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <label className="relative block">
-                <span className="sr-only">流入元名で検索</span>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="流入元名で検索"
-                  className="w-full rounded-lg border border-hairline py-2 pl-3 pr-9 text-sm sm:w-64"
-                />
-                <span aria-hidden="true" className="absolute right-3 top-2 text-ink-faint">⌕</span>
-              </label>
-              <span className="text-ink-faint self-center text-xs whitespace-nowrap">並び順</span>
-              <select
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-              >
-                <option>友だち追加が多い順</option>
-              </select>
-              <span className="text-ink-faint self-center text-xs whitespace-nowrap">表示</span>
-              <select
-                disabled
-                title="表示件数の切り替えは準備中です"
-                className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-              >
-                <option>20件</option>
-              </select>
-              <button
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchField
+                value={search}
+                onChange={(value) => {
+                  setSearch(value)
+                  setPage(1)
+                }}
+                onClear={() => {
+                  setSearch('')
+                  setPage(1)
+                }}
+                placeholder="流入元名で検索"
+                aria-label="流入元名で検索"
+                className="w-full sm:w-64"
+              />
+              <Select
+                aria-label="並び順"
+                label="並び順"
+                value={sort}
+                options={SORT_OPTIONS}
+                onChange={(value) => {
+                  setSort(value as RouteSort)
+                  setPage(1)
+                }}
+              />
+              <Select
+                aria-label="表示件数"
+                value={String(pageSize)}
+                options={PAGE_SIZE_OPTIONS}
+                onChange={(value) => {
+                  setPageSize(Number(value))
+                  setPage(1)
+                }}
+                size="page-size"
+              />
+              <Button
                 onClick={() => setEditing('new')}
+                variant="primary"
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                 title={selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
               >
-                ＋ このフォルダにURLを発行
-              </button>
+                このフォルダにURLを発行
+              </Button>
             </div>
           </div>
 
+          {/*
+            **保存した条件は札を作らない。**
+            設計には「よく使う」「今月分」など4つの札が描いてあるが、
+            条件を保存する口が無い。作り物の札を押せない形で置くと、
+            「保存したのに効かない」と読める。無いことを言葉で出す。
+          */}
           <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-            {['よく使う', '今月分', '追加率が高い', '計測停止中'].map((label) => (
-              <button
-                key={label}
-                disabled
-                title="保存した条件は準備中です"
-                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-              >
-                {label}
-              </button>
-            ))}
+            <Chip tone="neutral">—</Chip>
+            <span className="text-ink-faint text-xs">
+              まだ繋がっていません。条件の保存が接続されると表示されます。
+            </span>
           </div>
 
+      {/*
+        設計 `BMmxU`（18-1-F 空・読込・エラー）。**3つを言い分ける。**
+        いままでは枠2つしか無く、取得に失敗しても「まだリンクがありません」と
+        出ていた。運用する人からは、登録したリンクが消えたように見える。
+      */}
+      <div data-design-node="BMmxU">
       {loading ? (
-        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
-          読み込み中...
-        </div>
+        <ListState kind="loading" title="流入経路を読み込んでいます" />
+      ) : loadFailed ? (
+        <ListState
+          kind="error"
+          title="流入経路を読み込めませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={
+            <Button variant="secondary" onClick={() => void load()}>
+              流入経路を再読み込み
+            </Button>
+          }
+        />
       ) : sortedRows.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
-          {selectedGenre
-            ? `「${selectedGenreLabel}」にはまだリンクがありません。`
-            : '左側の「フォルダを追加」から最初のフォルダを作ってください。'}
-        </div>
+        <ListState
+          kind="empty"
+          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
+          description={
+            selectedGenre
+              ? '「このフォルダにURLを発行」から作ると、ここに出ます。'
+              : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
+          }
+        />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-hairline bg-white">
+        <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
             <colgroup>
               <col className="w-[11%]" />
@@ -676,8 +794,8 @@ function InflowLinksPageInner() {
                 <Th align="right">編集</Th>
               </TableHeadRow>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {sortedRows.map((r) => {
+            <tbody className="divide-y divide-hairline">
+              {currentRows.map((r) => {
                 const pool = pools.find((p) => p.id === r.poolId)
                 const sc = scenarios.find((s) => s.id === r.scenarioId)
                 const tag = tags.find((t) => t.id === r.tagId)
@@ -699,7 +817,7 @@ function InflowLinksPageInner() {
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
                           href={`/inflow-links/detail?id=${r.entryRouteId}`}
-                          className="block truncate whitespace-nowrap text-blue-600 hover:underline"
+                          className="block truncate whitespace-nowrap text-v6-action hover:underline"
                           onClick={(e) => e.stopPropagation()}
                           title={r.name}
                         >
@@ -709,7 +827,7 @@ function InflowLinksPageInner() {
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-[9px] text-emerald-700"
+                            className="shrink-0 rounded border border-v6-accent-border bg-v6-accent-soft px-1 py-0.5 text-[9px] text-v6-accent-hover"
                             title="tracked_links 登録済み — クリック計測 + シナリオ起動が設定されています。Pool 振り分けは持ちません。"
                           >
                             計測済
@@ -719,7 +837,7 @@ function InflowLinksPageInner() {
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] text-amber-700"
+                            className="shrink-0 rounded border border-v6-warning-bg bg-v6-warning-bg px-1 py-0.5 text-[9px] text-v6-warning"
                             title="entry_routes / tracked_links いずれにも未登録 — X Harness など外部システムが発行した ref。流入実績のみ集計。"
                           >
                             未登録
@@ -727,7 +845,7 @@ function InflowLinksPageInner() {
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-3 font-mono text-blue-600" title={r.refCode}>
+                    <td className="px-2 py-3 font-mono text-v6-action" title={r.refCode}>
                       <span className="block truncate whitespace-nowrap">{r.refCode}</span>
                     </td>
                     <td className="px-2 py-3 text-ink-secondary">
@@ -781,26 +899,26 @@ function InflowLinksPageInner() {
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {r.stats?.friendCount ?? 0}
+                      {summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {r.stats?.clickCount ?? 0}
+                      {summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
-                      {formatDate(r.stats?.latestAt ?? null)}
+                      {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
                     </td>
                     <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => onCopy(r.refCode, r.refCode)}
-                          className="text-[11px] font-medium text-blue-600 hover:text-blue-800"
+                          className="text-[11px] font-medium text-v6-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
                         >
                           {copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
+                          className="text-[11px] font-medium text-v6-accent-hover hover:underline"
                           aria-label={`${r.name}のQRコードを表示`}
                         >
                           QR
@@ -811,7 +929,7 @@ function InflowLinksPageInner() {
                       {editTarget ? (
                         <button
                           onClick={() => setEditing(editTarget)}
-                          className="whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100"
+                          className="whitespace-nowrap rounded-md border border-hairline bg-v6-action-soft px-2 py-1 text-[11px] font-medium text-v6-action hover:bg-v6-surface"
                           aria-label={`${r.name}のリンクを編集`}
                         >
                           編集
@@ -826,7 +944,7 @@ function InflowLinksPageInner() {
                       ) : (
                         <button
                           onClick={() => setEditing({ register: r.refCode })}
-                          className="text-xs text-blue-600 hover:underline"
+                          className="text-xs text-v6-action hover:underline"
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
                           登録
@@ -840,23 +958,11 @@ function InflowLinksPageInner() {
           </table>
         </div>
       )}
+      </div>
 
           <div data-design="tf" className="mt-3 flex items-center justify-end gap-2 text-xs">
             <span className="text-ink-faint tabular-nums">全 {sortedRows.length} 件</span>
-            <button
-              disabled
-              title="ページの切り替えは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
-            >
-              前へ
-            </button>
-            <button
-              disabled
-              title="ページの切り替えは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
-            >
-              次へ
-            </button>
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>
         </section>
       </div>
@@ -956,9 +1062,9 @@ function FragmentRow({
                     <Link
                       key={f.id}
                       href={`/chats?friend=${f.id}`}
-                      className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-hairline hover:border-blue-300"
+                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-v6-action"
                     >
-                      <span className="text-sm text-gray-800 font-medium truncate">
+                      <span className="text-sm text-ink font-medium truncate">
                         {f.displayName}
                       </span>
                       <span className="text-xs text-ink-faint ml-2 shrink-0">
@@ -1000,10 +1106,10 @@ function ReferralQrModal({
   }
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium text-emerald-700">リファラルリンク・QRコード</p>
+            <p className="text-xs font-medium text-v6-accent-hover">リファラルリンク・QRコード</p>
             <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
             <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
           </div>
@@ -1011,14 +1117,14 @@ function ReferralQrModal({
         </div>
         <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
           <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-white px-3 py-2 text-sm font-medium text-blue-600">
+          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-v6-action">
             {copied ? 'コピーしました' : 'URLをコピー'}
           </button>
         </div>
         <div className="mt-5 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
-          <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-white p-2" />
-          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
+          <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-canvas p-2" />
+          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-v6-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-v6-accent-hover">
             QRコードをダウンロード
           </a>
         </div>

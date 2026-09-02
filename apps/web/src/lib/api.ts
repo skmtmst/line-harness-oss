@@ -395,6 +395,12 @@ export type AnalyticsUsageOverview = AnalyticsEnvelope<{
   stateReason: string | null
   checkedAt: string
   automaticDeletion: false
+  summary: {
+    unusedItems: AnalyticsMetric<number>
+    automaticRuns: AnalyticsMetric<number>
+    manualSends: AnalyticsMetric<number>
+    estimatedHoursSaved: AnalyticsMetric<number>
+  }
   categories: Array<{
     key: string
     label: string
@@ -3206,6 +3212,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
         usageCount: number;
@@ -4231,7 +4238,7 @@ export const api = {
     loginSummary: (id: string) =>
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
     delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/staff/${id}`, { method: 'DELETE' }),
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, { method: 'DELETE' }),
     regenerateKey: (id: string) =>
       fetchApi<ApiResponse<{ apiKey: string }>>(`/api/staff/${id}/regenerate-key`, { method: 'POST' }),
     beginTwoFactorSetup: (id: string) =>

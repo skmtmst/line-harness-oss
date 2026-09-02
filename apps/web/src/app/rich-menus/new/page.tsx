@@ -13,6 +13,7 @@ import {
   templateToAreas,
   type RichMenuTemplate,
 } from '@/lib/rich-menu-templates'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
   {
@@ -76,6 +77,7 @@ function TemplatePreview({ template }: { template: RichMenuTemplate }) {
 }
 
 export default function NewRichMenuPage() {
+  usePageTitle('リッチメニューを作る')
   const router = useRouter()
   const { selectedAccount } = useAccount()
   const [name, setName] = useState('')
@@ -135,7 +137,6 @@ export default function NewRichMenuPage() {
 
       <div data-design="Head">
         <Header
-          title="リッチメニューを作る"
           description="名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。"
         />
       </div>

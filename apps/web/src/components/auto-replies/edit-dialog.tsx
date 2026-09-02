@@ -17,6 +17,7 @@ import {
   type InlineAction,
 } from './draft-fields'
 import ImageUploader from '@/components/shared/image-uploader'
+import Button from '@/components/shared/button'
 
 export interface AutoReplyDraft {
   id?: string
@@ -186,6 +187,8 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   )
   const [folderId, setFolderId] = useState(draft.folderId ?? '')
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [foldersLoadState, setFoldersLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [foldersReloadToken, setFoldersReloadToken] = useState(0)
   const [actions, setActions] = useState<InlineAction[]>(() => readInlineActions(draft.actions))
   const [friendConditions, setFriendConditions] = useState<SegmentCondition | null>(
     (draft.friendConditions as SegmentCondition | null) ?? null,
@@ -196,10 +199,26 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   const actionOptions = useActionOptions()
 
   useEffect(() => {
-    void api.folders.list('auto_reply').then((res) => {
-      if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name })))
-    })
-  }, [])
+    let active = true
+    setFolders([])
+    setFoldersLoadState('loading')
+    void api.folders.list('auto_reply')
+      .then((res) => {
+        if (!active) return
+        if (res.success && Array.isArray(res.data)) {
+          setFolders(res.data.map((f) => ({ id: f.id, name: f.name })))
+          setFoldersLoadState('ready')
+        } else {
+          setFoldersLoadState('error')
+        }
+      })
+      .catch(() => {
+        if (active) setFoldersLoadState('error')
+      })
+    return () => {
+      active = false
+    }
+  }, [foldersReloadToken])
 
   const flexTemplates = templates.filter((t) => t.messageType === 'flex')
   const textTemplates = templates.filter((t) => t.messageType === 'text')
@@ -331,21 +350,50 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               />
             </label>
 
-            <label className="mb-3 block">
-              <span className="text-ink-secondary text-xs">フォルダ</span>
-              <select
-                value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-                className="border-hairline rounded-control focus:ring-accent mt-1 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              >
-                <option value="">未分類</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
+            <div className="mb-3">
+              <label htmlFor="auto-reply-folder" className="text-ink-secondary text-xs">
+                フォルダ
+              </label>
+              <div className="mt-1 flex items-center gap-2">
+                <select
+                  id="auto-reply-folder"
+                  value={folderId}
+                  onChange={(e) => setFolderId(e.target.value)}
+                  disabled={foldersLoadState !== 'ready'}
+                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                >
+                  <option value="">
+                    {foldersLoadState === 'loading'
+                      ? 'フォルダを読み込み中'
+                      : foldersLoadState === 'error'
+                        ? 'フォルダを読み込めませんでした'
+                        : '未分類'}
                   </option>
-                ))}
-              </select>
-            </label>
+                  {folderId && !folders.some((folder) => folder.id === folderId) && (
+                    <option value={folderId}>
+                      {foldersLoadState === 'ready'
+                        ? '現在のフォルダ（一覧にありません）'
+                        : '現在のフォルダ（名前を確認できません）'}
+                    </option>
+                  )}
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+                {foldersLoadState === 'error' && (
+                  <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>
+                    再読み込み
+                  </Button>
+                )}
+              </div>
+              {foldersLoadState === 'error' && (
+                <span className="text-danger mt-1 block text-xs">
+                  フォルダを確認できないため、選択を変更できません。再読み込みしてください。
+                </span>
+              )}
+            </div>
 
             <div className="mb-3 flex gap-2">
               <button
