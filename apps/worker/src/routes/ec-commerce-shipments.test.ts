@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../index.js';
 import { ecCommerce } from './ec-commerce.js';
 
@@ -62,6 +62,15 @@ function orderRow(over: Row = {}): Row {
 }
 
 describe('GET /api/ec-commerce/shipments', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('通常注文は注文日時から出荷予定日を算出する', async () => {
     const data = await callShipments([orderRow()]);
     const all = [...(data.soon as Row[]), ...(data.later as Row[])];
@@ -163,6 +172,24 @@ describe('GET /api/ec-commerce/shipments', () => {
     ]);
     const all = [...(data.soon as Row[]), ...(data.later as Row[])];
     expect(all[0].shipDate).toBe('2026-08-14');
+  });
+
+  it('過去の注文は今日・明日の出荷予定へ混ぜない', async () => {
+    const data = await callShipments([
+      orderRow({
+        occurred_at: '2026-08-13T09:00:00+09:00',
+        received_at: '2026-08-13T09:00:00+09:00',
+      }),
+      orderRow({
+        id: 'today',
+        occurred_at: '2026-08-14T09:00:00+09:00',
+        received_at: '2026-08-14T09:00:00+09:00',
+      }),
+    ]);
+
+    expect((data.soon as Row[]).map((row) => row.id)).toEqual(['today']);
+    expect(data.later).toHaveLength(0);
+    expect(data.soonCount).toBe(1);
   });
 
   it('出荷予定日の早い順に並ぶ', async () => {
