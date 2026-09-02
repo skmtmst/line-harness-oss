@@ -8,7 +8,9 @@ import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
+import { templateDeleteDescription } from './template-delete-message'
 import styles from './templates-v6.module.css'
 
 interface Template {
@@ -106,6 +108,17 @@ export default function TemplatesPage() {
   const [editContent, setEditContent] = useState<string | null>(null)
   const [editName, setEditName] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+
+  /**
+   * 削除の確認。ブラウザの `confirm()` は見た目がブラウザ任せで、
+   * 何が止まり・何が残るのかを本文で読ませられず、画像比較にも写らない。
+   * 共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<
+    { id: string; name: string; usageCount: number } | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -240,18 +253,24 @@ export default function TemplatesPage() {
     setSavingEdit(false)
   }
 
-  const handleDelete = async (id: string, usageCount: number) => {
-    if (usageCount > 0) {
-      if (!confirm(`このテンプレートは ${usageCount} 箇所で使用されています。削除すると参照がクリアされます。続行しますか？`)) return
-    } else {
-      if (!confirm('このテンプレートを削除しますか？')) return
-    }
+  const handleDelete = async () => {
+    // 押している間は受け付けない。二度押しで2回目が404になり、
+    // 「削除できませんでした」とだけ出て消えている、という食い違いが起きる。
+    if (!deleteTarget || deleting) return
+    const targetId = deleteTarget.id
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.templates.delete(id)
-      if (drawerId === id) setDrawerId(null)
-      load()
+      const res = await api.templates.delete(targetId)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      if (drawerId === targetId) setDrawerId(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -561,7 +580,7 @@ export default function TemplatesPage() {
                         一斉配信で使う
                       </a>
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
+                        onClick={(e) => { e.stopPropagation(); setDeleteError(''); setDeleteTarget({ id: t.id, name: t.name, usageCount: t.usageCount }) }}
                         className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
                       >
                         削除
@@ -755,6 +774,22 @@ export default function TemplatesPage() {
       </div>
       </> : <BroadcastAssetManager kind={activeSection} />}
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`テンプレート「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description={templateDeleteDescription(deleteTarget?.usageCount ?? 0)}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+      />
     </div>
   )
 }

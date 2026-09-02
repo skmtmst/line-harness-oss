@@ -3,9 +3,11 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { templateDeleteDescription } from '../template-delete-message'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string }>
@@ -26,6 +28,9 @@ function TemplateDetailInner() {
   const [usage, setUsage] = useState<Usage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     if (!id) {
@@ -48,18 +53,28 @@ function TemplateDetailInner() {
 
   const usageCount = (usage?.autoReplies.length ?? 0) + (usage?.scenarioSteps.length ?? 0)
 
+  /**
+   * 削除の確認。ブラウザの `confirm()` では、何が止まり・何が残り・
+   * 戻せるのかを本文で読ませられず、画像比較にも写らなかった。
+   * 共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   */
   const remove = async () => {
-    const message =
-      usageCount > 0
-        ? `このテンプレートは ${usageCount} か所で使われています。\n削除すると、その箇所の本文が空になります。よろしいですか？`
-        : 'このテンプレートを削除しますか？'
-    if (!confirm(message)) return
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (deleting) return
+    setDeleting(true)
+    setDeleteError('')
     setError('')
     try {
-      await api.templates.delete(id)
+      const res = await api.templates.delete(id)
+      if (!res.success) throw new Error(res.error)
+      setConfirmOpen(false)
       router.push('/templates')
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : '削除に失敗しました')
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -194,7 +209,7 @@ function TemplateDetailInner() {
                   : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
               </p>
               <button
-                onClick={() => void remove()}
+                onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
                 className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium"
               >
                 削除する
@@ -239,6 +254,28 @@ function TemplateDetailInner() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`テンプレート「${template?.name ?? ''}」を削除しますか？`}
+        description={templateDeleteDescription(usageCount)}
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void remove()}
+        onCancel={() => {
+          if (deleting) return
+          setConfirmOpen(false)
+          setDeleteError('')
+        }}
+      >
+        {/* 使用箇所は自動応答とシナリオ配信しか数えられていない。
+            0か所と出ていても「どこからも使われていない」とは言い切れない。 */}
+        <p className="text-ink-faint text-xs leading-relaxed">
+          一斉配信・リマインダからの参照は、まだ数えられません。上の数に入っていません。
+        </p>
+      </ConfirmDialog>
     </div>
   )
 }
