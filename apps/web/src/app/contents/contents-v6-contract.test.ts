@@ -49,6 +49,37 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('filtered.slice((page - 1) * pageSize, page * pageSize)')
   })
 
+  it('無い保存容量のバーを作らず、繋がっていないと言う', () => {
+    // 設計は使用量のバー（220×5）と実績（53×5）を描いているが、
+    // `/api/media` は保存容量も上限も返さない。作り物の帯は出さない。
+    expect(PAGE).toContain('保存容量')
+    expect(PAGE).toContain('まだ繋がっていません。保存容量が接続されると表示されます。')
+    // 作り物の帯を出さない。幅を持つ帯は `style={{ width` でしか描けない。
+    expect(PAGE).not.toContain('style={{ width')
+  })
+
+  it('格子と一覧の切り替えを持つ', () => {
+    expect(PAGE).toContain("const [view, setView] = useState<MediaView>('grid')")
+    expect(PAGE).toContain('aria-label="並べ方"')
+    expect(PAGE).toContain('格子で並べる')
+    expect(PAGE).toContain('一覧で並べる')
+    expect(PAGE).toContain('aria-pressed={view === value}')
+  })
+
+  it('設計の実測どおりの高さと文字にする', () => {
+    // アップロード: 高さ40・角丸8・左右14・13px/700。
+    expect(PAGE).toContain('rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold')
+    // 検索: 幅420まで。表示切替: 枠40・各44。
+    expect(PAGE).toContain('min-w-64 max-w-[420px] flex-1')
+    expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
+    expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
+    // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。
+    expect(PAGE).toContain("view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'")
+    expect(PAGE).toContain('truncate text-caption font-bold')
+    expect(PAGE).toContain('text-ink-faint text-nano font-semibold tabular-nums')
+    expect(PAGE).toContain('text-nano font-bold tabular-nums')
+  })
+
   it('使用中メディアの強制削除口を持たない', () => {
     expect(PAGE).not.toContain('force: true')
     expect(PAGE).toContain('使用先から外すまで削除できません')

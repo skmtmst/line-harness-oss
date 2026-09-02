@@ -8,6 +8,7 @@ import {
   deleteAutoReply,
   getAutoReplyHitCounts,
   jstNow,
+  getFolderById,
 } from '@line-crm/db';
 import type { AutoReply as DbAutoReply } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -16,6 +17,18 @@ import { currentMonthRange } from '../lib/jst-range.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const autoReplies = new Hono<Env>();
+
+async function validateAutoReplyFolder(
+  db: D1Database,
+  folderId: unknown,
+): Promise<string | null> {
+  if (folderId === null || folderId === '' || folderId === undefined) return null;
+  if (typeof folderId !== 'string') return 'folderId must be a string';
+  const folder = await getFolderById(db, folderId);
+  if (!folder) return 'フォルダが見つかりません';
+  if (folder.kind !== 'auto_reply') return '自動応答用ではないフォルダは選べません';
+  return null;
+}
 
 async function requireVisibleAutoReply(c: Context<Env>, next: () => Promise<void>) {
   const item = await getAutoReplyById(c.env.DB, c.req.param('id')!);
@@ -506,6 +519,8 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
 
     const extras = readExtras(body as Record<string, unknown>);
     if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
+    const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
 
     const item = await createAutoReply(c.env.DB, {
       ...extras.value,
@@ -620,6 +635,8 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
 
     const extras = readExtras(body as Record<string, unknown>);
     if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
+    const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
     Object.assign(input, extras.value);
 
     const updated = await updateAutoReply(c.env.DB, id, input as Parameters<typeof updateAutoReply>[2]);
