@@ -157,4 +157,3 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8787 pnpm --filter web build
 - 最新base、CLEAN / MERGEABLEを確認してマージする
 - 管理画面変更なら検証環境へ反映する
 - 台帳は実際に撮って見たNodeだけ更新する
-
