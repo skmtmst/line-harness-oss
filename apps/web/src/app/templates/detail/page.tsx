@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string }>
@@ -65,7 +66,7 @@ function TemplateDetailInner() {
   if (!id) {
     return (
       <div>
-        <Header title="テンプレートの詳細" />
+
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           テンプレートが指定されていません。
           <Link href="/templates" className="text-accent ml-1 hover:underline">
@@ -252,6 +253,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function TemplateDetailPage() {
+  usePageTitle('テンプレートの詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

@@ -14,6 +14,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { deleteReminderSelection } from './delete-reminder-selection'
 
 /**
  * リマインダの一覧。
@@ -208,6 +209,13 @@ export default function RemindersPage() {
     }
   }
 
+  /*
+   * **ブラウザ標準の確認窓は使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓と違ううえ、画像比較にも写らない
+   * （`Y0Sn3` の失敗状態が撮れなかったのはこれが理由）。何が消えるかを
+   * 本文で読ませたいので、共通の `ConfirmDialog` へ移した。
+   */
   const requestDelete = (items: Reminder[]) => {
     if (!canDelete || items.length === 0) return
     setDeleteError('')
@@ -218,27 +226,36 @@ export default function RemindersPage() {
     if (deleting || pendingDelete.length === 0) return
     setDeleting(true)
     setDeleteError('')
-    const deletedIds = new Set<string>()
     try {
-      for (const reminder of pendingDelete) {
-        const result = await api.reminders.delete(reminder.id)
-        if (!result.success) throw new Error(result.error)
-        deletedIds.add(reminder.id)
+      // 複数削除は途中まで成功することがある。ここで打ち切ると残りへ進めないので、
+      // 共通の deleteReminderSelection に最後まで回させ、失敗したIDだけを受け取る。
+      // 削除済みをもう一度送らないよう、未完了分だけを確認画面に残して再試行できるようにする。
+      const failedIds = new Set(
+        await deleteReminderSelection(
+          pendingDelete.map((reminder) => reminder.id),
+          async (id) => {
+            const result = await api.reminders.delete(id)
+            return result.success
+          },
+        ),
+      )
+      const deleted = pendingDelete.filter((reminder) => !failedIds.has(reminder.id))
+      if (deleted.length > 0) {
+        setSelected((previous) => {
+          const remaining = new Set(previous)
+          for (const reminder of deleted) remaining.delete(reminder.id)
+          return remaining
+        })
       }
-      setSelected(new Set())
-      setPendingDelete([])
-      await loadReminders()
-    } catch {
-      // 複数削除の途中で失敗しても、削除済みをもう一度送らない。
-      // 未完了分だけを確認画面に残し、そのまま再試行できるようにする。
-      setSelected((previous) => {
-        const remaining = new Set(previous)
-        for (const id of deletedIds) remaining.delete(id)
-        return remaining
-      })
-      setPendingDelete((previous) => previous.filter((reminder) => !deletedIds.has(reminder.id)))
-      setDeleteError('このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。')
-      if (deletedIds.size > 0) await loadReminders()
+      setPendingDelete((previous) => previous.filter((reminder) => failedIds.has(reminder.id)))
+      if (failedIds.size > 0) {
+        setDeleteError(
+          failedIds.size === pendingDelete.length
+            ? 'このリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+            : `${failedIds.size}件のリマインダを削除できませんでした。削除できなかったものだけを残しています。`,
+        )
+      }
+      if (deleted.length > 0) await loadReminders()
     } finally {
       setDeleting(false)
     }

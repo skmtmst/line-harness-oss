@@ -33,6 +33,7 @@ import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import OptionsDialog from '@/components/forms/options-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
@@ -138,7 +139,7 @@ function FormEditInner() {
       try {
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
           api.tags.list(),
-          api.friendFields.list(),
+          selectedAccountId ? api.friendFields.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
           api.scenarios.list(),
           api.reminders.list(),
           api.templates.list(),
@@ -349,7 +350,7 @@ function FormEditInner() {
   if (!id) {
     return (
       <div>
-        <Header title="回答フォーム編集" />
+
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           フォームが指定されていません。
           <Link href="/form-submissions" className="text-accent ml-1 hover:underline">
@@ -718,6 +719,7 @@ function FormEditInner() {
 }
 
 export default function FormEditPage() {
+  usePageTitle('回答フォーム編集')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

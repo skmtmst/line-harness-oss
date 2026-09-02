@@ -53,11 +53,20 @@ describe('統合ユーザーV6の画面契約', () => {
   })
 
   it('KPI名を統合ユーザーの業務用語へそろえる', () => {
+    /* 面は共通SummaryCardへ移したので、名前は title= で渡す。 */
     for (const label of ['統合ユーザー', '紐付く友だち', '重複している行', '重複率']) {
-      expect(SUMMARY).toContain(`label="${label}"`)
+      expect(SUMMARY).toContain(`title="${label}"`)
     }
-    expect(SUMMARY).not.toContain('label="余分な行数"')
-    expect(SUMMARY).not.toContain('label="余分率"')
+    expect(SUMMARY).not.toContain('余分な行数')
+    expect(SUMMARY).not.toContain('余分率')
+  })
+
+  it('KPIの読み込み中・取得失敗・取得成功を分け、失敗を0件にしない', () => {
+    expect(SUMMARY).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
+    expect(SUMMARY).toContain('data-summary-state={status}')
+    expect(SUMMARY).toContain('value={stats?.uniquePeople ?? null}')
+    expect(SUMMARY).toContain('setStats(null)')
+    expect(SUMMARY).toContain('requestGuard.isCurrent(requestGeneration)')
   })
 
   it('共通ページ送りを使い横スクロールへ逃がさない', () => {

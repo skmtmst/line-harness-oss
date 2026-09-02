@@ -54,6 +54,15 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     expect(html).toContain('aria-selected="true"')
     expect(html).toContain('未読')
     expect(html).toContain('送信失敗')
+    const unavailable = renderToStaticMarkup(<NotificationPanel
+      open inline unreadCount={0} activeFilter="all"
+      filters={[{ id: 'all', label: 'すべて', count: null }]}
+      items={[]}
+      error="通知を読み込めませんでした"
+      onFilterChange={vi.fn()} onMarkAllRead={vi.fn()}
+    />)
+    expect(unavailable).toContain('>—<')
+    expect(unavailable).toContain('通知を読み込めませんでした')
   })
 
   it('代表画面は共通部品を使い、既存の保存・削除・追加処理を残す', () => {

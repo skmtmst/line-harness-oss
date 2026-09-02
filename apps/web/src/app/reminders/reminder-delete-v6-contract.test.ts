@@ -22,7 +22,10 @@ describe('V6 リマインダ削除確認の契約', () => {
   it('1件と複数件を同じ削除経路へ通し、失敗時はダイアログを閉じない', () => {
     expect(PAGE).toContain('requestDelete([r])')
     expect(PAGE).toContain('requestDelete(reminders.filter')
-    expect(PAGE).toContain('for (const reminder of pendingDelete)')
+    // 統合時に、削除の反復は本流で切り出された deleteReminderSelection へ寄せた。
+    // 1件でも複数件でも pendingDelete をそのまま渡すので、経路は1本のまま。
+    expect(PAGE).toContain('deleteReminderSelection(')
+    expect(PAGE).toContain('pendingDelete.map((reminder) => reminder.id)')
     expect(PAGE).toContain('setPendingDelete((previous) => previous.filter')
     expect(PAGE).toContain('状態を読み直してから、もう一度お試しください')
     expect(PAGE).not.toContain("setDeleteError(caught instanceof Error ? caught.message")

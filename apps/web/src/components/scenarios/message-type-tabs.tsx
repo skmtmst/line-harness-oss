@@ -1,4 +1,5 @@
 'use client'
+import styles from './message-type-tabs.module.css'
 
 /*
  * 送るものの種別を選ぶタブ。
@@ -72,8 +73,15 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
 
   return (
     <div>
-      {/* 横に9つ並ぶ。狭い画面では折り返す（横スクロールにすると隠れたタブに気づけない）。 */}
-      <div role="tablist" className="border-hairline flex flex-wrap gap-1 border-b">
+      {/*
+        設計は外枠h38・r8の帯に、h30・r6のタブを入れた形。
+        横に9つ並ぶ。狭い画面では折り返す（横スクロールにすると隠れたタブに気づけない）ので、
+        高さは `min-h` で持つ。1行に収まるときは設計どおり38pxになる。
+      */}
+      <div
+        role="tablist"
+        className={`${styles.rail} bg-canvas-sunken flex flex-wrap items-center gap-1 p-1`}
+      >
         {STEP_MESSAGE_KINDS.map((kind) => {
           const disabled = Boolean(kind.disabledReason)
           const active = kind.value === value
@@ -86,12 +94,12 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
               disabled={disabled}
               title={kind.disabledReason}
               onClick={() => !disabled && onChange(kind.value)}
-              className={`-mb-px rounded-t-control border border-b-0 px-4 py-2 text-sm transition-colors ${
+              className={`${styles.tab} px-3 text-micro font-bold transition-colors ${
                 active
-                  ? 'border-hairline bg-canvas text-ink border-b-canvas font-bold'
+                  ? 'border-hairline bg-canvas text-ink border'
                   : disabled
-                    ? 'border-transparent text-ink-faint cursor-not-allowed opacity-50'
-                    : 'border-transparent text-ink-secondary hover:bg-canvas-sunken'
+                    ? 'text-ink-faint cursor-not-allowed opacity-50'
+                    : 'text-ink-secondary hover:bg-canvas'
               }`}
             >
               {kind.label}

@@ -14,7 +14,8 @@ function setup(): D1Database {
       on_submit_webhook_fail_message TEXT, save_to_metadata INTEGER NOT NULL,
       is_active INTEGER NOT NULL, submit_count INTEGER NOT NULL,
       og_title TEXT, og_description TEXT, og_image_url TEXT,
-      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active', archived_at TEXT, revision INTEGER NOT NULL DEFAULT 1
     );
     CREATE TABLE line_accounts (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, country TEXT, display_order INTEGER NOT NULL
@@ -31,9 +32,9 @@ function setup(): D1Database {
     INSERT INTO line_accounts VALUES
       ('account-a', 'A店', 'JP', 1), ('account-b', 'B店', 'JP', 2);
     INSERT INTO forms VALUES
-      ('form-a', 'A用', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 1, NULL, NULL, NULL, '2026-08-01', '2026-08-01'),
-      ('form-b', 'B用', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL, NULL, '2026-08-02', '2026-08-02'),
-      ('legacy', '要確認', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL, NULL, '2026-08-03', '2026-08-03');
+      ('form-a', 'A用', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 1, NULL, NULL, NULL, '2026-08-01', '2026-08-01', 'active', NULL, 1),
+      ('form-b', 'B用', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL, NULL, '2026-08-02', '2026-08-02', 'active', NULL, 1),
+      ('legacy', '要確認', NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, 0, NULL, NULL, NULL, '2026-08-03', '2026-08-03', 'active', NULL, 1);
     INSERT INTO form_accounts VALUES ('form-a', 'account-a'), ('form-b', 'account-b');
     INSERT INTO friends VALUES ('friend-a', 'account-a');
     INSERT INTO form_submissions VALUES ('submission-a', 'form-a', 'friend-a', '2026-08-04');

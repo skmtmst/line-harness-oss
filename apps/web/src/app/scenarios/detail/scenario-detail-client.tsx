@@ -45,6 +45,14 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import {
+  scenarioReachBarWidth,
+  scenarioReachCountLabel,
+  scenarioReachPercent,
+  scenarioReachPercentLabel,
+} from './scenario-reach-display'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -164,7 +172,11 @@ interface ScenarioStats {
   activeNow: number
   completed: number
   paused: number
-  steps: Array<{ stepOrder: number; reachedCount: number; reachRate: number }>
+  steps: Array<{
+    stepOrder: number
+    reachedCount: number
+    reachRate?: number | null
+  }>
 }
 
 function FlexPreview({ content }: { content: string }) {
@@ -233,6 +245,7 @@ export default function ScenarioDetailClient({
   scenarioId: string
   showStarted?: boolean
 }) {
+  usePageTitle('シナリオ詳細')
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -259,6 +272,12 @@ export default function ScenarioDetailClient({
   /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
   const [previewStepId, setPreviewStepId] = useState<string | null>(null)
   const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
+  const [deleteStepTarget, setDeleteStepTarget] = useState<ScenarioStep | null>(null)
+  const [deletingStepId, setDeletingStepId] = useState<string | null>(null)
+  const [deleteStepError, setDeleteStepError] = useState('')
+  const [deleteScenarioOpen, setDeleteScenarioOpen] = useState(false)
+  const [deletingScenario, setDeletingScenario] = useState(false)
+  const [deleteScenarioError, setDeleteScenarioError] = useState('')
   const [showStepForm, setShowStepForm] = useState(false)
   /** 何通目のあとに差し込むか。末尾に足すときは null。 */
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
@@ -461,20 +480,18 @@ export default function ScenarioDetailClient({
   }
 
   const handleDeleteScenario = async () => {
-    if (!scenario) return
-    const count = stats?.activeNow ?? 0
-    const message =
-      count > 0
-        ? `「${scenario.name}」はいま ${count} 人が購読中です。\n削除すると配信が止まり、途中の人は続きを受け取れません。よろしいですか？`
-        : `「${scenario.name}」を削除しますか？`
-    if (!confirm(message)) return
-    setError('')
+    if (!scenario || deletingScenario) return
+    setDeletingScenario(true)
+    setDeleteScenarioError('')
     try {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
+      setDeleteScenarioOpen(false)
       router.push('/scenarios')
     } catch {
-      setError('削除に失敗しました')
+      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingScenario(false)
     }
   }
 
@@ -748,14 +765,22 @@ export default function ScenarioDetailClient({
     }
   }
 
-  const handleDeleteStep = async (stepId: string) => {
-    if (!confirm('このステップを削除してもよいですか？')) return
+  const handleDeleteStep = async () => {
+    if (!deleteStepTarget || deletingStepId) return
+    const stepId = deleteStepTarget.id
+    setDeletingStepId(stepId)
+    setDeleteStepError('')
     try {
-      await api.scenarios.deleteStep(id, stepId)
+      const result = await api.scenarios.deleteStep(id, stepId)
+      if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()
-      loadScenario()
+      setDeleteStepTarget(null)
+      void loadScenario()
+      void reloadStats()
     } catch {
-      setError('ステップの削除に失敗しました')
+      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingStepId(null)
     }
   }
 
@@ -1069,7 +1094,7 @@ export default function ScenarioDetailClient({
   if (loading) {
     return (
       <div>
-        <Header title="シナリオ詳細" />
+
         <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
           <div className="bg-canvas-sunken h-6 w-1/3 rounded" />
           <div className="h-4 bg-canvas-sunken rounded w-2/3" />
@@ -1082,7 +1107,7 @@ export default function ScenarioDetailClient({
   if (!scenario) {
     return (
       <div>
-        <Header title="シナリオ詳細" />
+
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
           <Link href="/scenarios" className="text-accent hover:text-accent-hover mt-4 inline-block text-sm">
@@ -1548,7 +1573,8 @@ export default function ScenarioDetailClient({
               <tbody>
                 {sortedSteps.map((step, idx) => {
                   const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
-                  const pct = stat ? Math.round(stat.reachRate * 100) : null
+                  const pct = scenarioReachPercent(stat?.reachRate)
+                  const reachBarWidth = scenarioReachBarWidth(pct)
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
@@ -1641,16 +1667,20 @@ export default function ScenarioDetailClient({
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
-                              <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
-                                <span
-                                  className="bg-accent block h-full rounded-full"
-                                  style={{ width: `${Math.min(100, pct ?? 0)}%` }}
-                                />
-                              </span>
+                              {reachBarWidth === null ? null : (
+                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                  <span
+                                    className="bg-accent block h-full rounded-full"
+                                    style={{ width: reachBarWidth }}
+                                  />
+                                </span>
+                              )}
                               <span className="text-ink text-sm tabular-nums">
-                                {stat.reachedCount}人
+                                {scenarioReachCountLabel(stat.reachedCount)}
                               </span>
-                              <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
+                              <span className="text-ink-faint text-xs tabular-nums">
+                                {scenarioReachPercentLabel(pct)}
+                              </span>
                             </span>
                           ) : (
                             <span className="text-ink-faint text-sm">—</span>
@@ -1721,7 +1751,10 @@ export default function ScenarioDetailClient({
                             </button>
                             <button
                               type="button"
-                              onClick={() => void handleDeleteStep(step.id)}
+                              onClick={() => {
+                                setDeleteStepError('')
+                                setDeleteStepTarget(step)
+                              }}
                               title="この通を削除する"
                               aria-label="この通を削除する"
                               className="text-ink-faint hover:text-danger"
@@ -1783,7 +1816,11 @@ export default function ScenarioDetailClient({
         </Link>
         <button
           type="button"
-          onClick={() => void handleDeleteScenario()}
+          data-qa-open="dqFft-scenario"
+          onClick={() => {
+            setDeleteScenarioError('')
+            setDeleteScenarioOpen(true)
+          }}
           className="text-danger hover:underline text-sm font-medium"
         >
           このシナリオを削除
@@ -1794,6 +1831,49 @@ export default function ScenarioDetailClient({
         open={previewOpen}
         scenarioId={id}
         onClose={() => setPreviewOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteStepTarget !== null}
+        title={deleteStepTarget ? `${deleteStepTarget.stepOrder}通目を削除しますか？` : 'この通を削除しますか？'}
+        description={deleteStepTarget
+          ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          : ''}
+        confirmLabel="この通を削除"
+        destructive
+        busy={deletingStepId !== null}
+        error={deleteStepError}
+        onConfirm={() => void handleDeleteStep()}
+        onCancel={() => {
+          if (deletingStepId) return
+          setDeleteStepTarget(null)
+          setDeleteStepError('')
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteScenarioOpen && scenario !== null}
+        title={scenario ? `「${scenario.name}」を削除しますか？` : 'このシナリオを削除しますか？'}
+        description={[
+          stats?.activeNow === undefined
+            ? '購読中の人数は確認できません。'
+            : stats.activeNow === 0
+              ? '現在購読中の友だちは0人です。'
+              : `現在${stats.activeNow.toLocaleString('ja-JP')}人が購読中です。途中の人は続きを受け取れません。`,
+          'シナリオの設定と今後の配信が削除されます。',
+          'これまでの配信履歴は監査記録として残ります。',
+          'この操作は取り消せません。',
+        ].join(' ')}
+        confirmLabel="このシナリオを削除"
+        destructive
+        busy={deletingScenario}
+        error={deleteScenarioError}
+        onConfirm={() => void handleDeleteScenario()}
+        onCancel={() => {
+          if (deletingScenario) return
+          setDeleteScenarioOpen(false)
+          setDeleteScenarioError('')
+        }}
       />
 
       {/* シナリオ全体の配信対象 */}

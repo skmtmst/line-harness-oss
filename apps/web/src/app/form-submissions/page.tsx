@@ -10,9 +10,12 @@ import { countryFlag } from '@/lib/country-flag'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import FormKpiValue from './form-kpi-value'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
+import type { FormLayout } from '@line-crm/shared'
+import { summarizeFormDestinations } from './form-destination-summary'
 
 interface UsedByAccount {
   id: string
@@ -27,6 +30,8 @@ interface Form {
   name: string
   description: string | null
   fields: Array<{ name: string; label: string; type?: string }>
+  layout: FormLayout
+  onSubmitTagId: string | null
   isActive: boolean
   submitCount?: number
   createdAt: string
@@ -131,6 +136,9 @@ export default function FormSubmissionsPage() {
   const [editingName, setEditingName] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const submissionRequest = useRef(0)
@@ -263,6 +271,35 @@ export default function FormSubmissionsPage() {
       setRenameError('フォーム名を変更できませんでした。もう一度お試しください。')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  const openDelete = (form: Form) => {
+    setDeleteTarget(form)
+    setDeleteError('')
+  }
+
+  const removeForm = async () => {
+    if (!deleteTarget || deleting || !selectedAccountId) return
+    const targetId = deleteTarget.id
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const result = await api.forms.remove(targetId, selectedAccountId)
+      if (!result.success) throw new Error('delete_failed')
+      setForms((current) => current.filter((form) => form.id !== targetId))
+      if (selectedFormId === targetId) {
+        submissionRequest.current += 1
+        setSelectedFormId(null)
+        setSubmissions([])
+        setSubmissionTotal(0)
+        setDetailSubmission(null)
+      }
+      setDeleteTarget(null)
+    } catch {
+      setDeleteError('この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -422,6 +459,7 @@ export default function FormSubmissionsPage() {
               const displayCount = form.submitCount ?? totalCount
               const normalizedName = displayFormName(form.name)
               const isDuplicate = (duplicateNameCounts.get(normalizedName.toLocaleLowerCase('ja-JP')) ?? 0) > 1
+              const destinationSummary = summarizeFormDestinations(form.layout, form.onSubmitTagId)
               return (
                 <article
                   key={form.id}
@@ -437,7 +475,7 @@ export default function FormSubmissionsPage() {
                         : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                     }`}
                   >
-                  <div className="mb-2 flex items-start gap-2 pr-7">
+                  <div className="mb-2 flex items-start gap-2 pr-14">
                     <h3 className={`text-sm font-semibold leading-snug ${isSelected ? 'text-accent' : 'text-gray-900'}`}>
                       {normalizedName}
                     </h3>
@@ -469,6 +507,13 @@ export default function FormSubmissionsPage() {
                     <div className="text-[11px] text-gray-300">回答元アカウントなし</div>
                   )}
 
+                  <div className="bg-canvas-sunken mt-3 flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-xs">
+                    <span className="text-ink-faint shrink-0">回答の保存先</span>
+                    <span className="text-ink truncate font-medium" title={destinationSummary.label}>
+                      {destinationSummary.label}
+                    </span>
+                  </div>
+
                   <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2 text-[11px] text-gray-400">
                     <span>{form.lastSubmittedAt ? `最終回答 ${formatRelative(form.lastSubmittedAt)}` : '回答はまだありません'}</span>
                     {!form.isActive && (
@@ -482,17 +527,30 @@ export default function FormSubmissionsPage() {
                   </div>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => openRename(form)}
-                    className="absolute right-3 top-3 rounded-md p-1 text-gray-300 opacity-60 transition hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
-                    aria-label={`${normalizedName}の名前を変更`}
-                    title="フォーム名を変更"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931ZM19.5 7.125 16.875 4.5M18 13.5V19.125A1.875 1.875 0 0 1 16.125 21H4.875A1.875 1.875 0 0 1 3 19.125V7.875A1.875 1.875 0 0 1 4.875 6H10.5" />
-                    </svg>
-                  </button>
+                  <div className="absolute right-3 top-3 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => openRename(form)}
+                      className="rounded-md p-1 text-gray-300 opacity-60 transition hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
+                      aria-label={`${normalizedName}の名前を変更`}
+                      title="フォーム名を変更"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931ZM19.5 7.125 16.875 4.5M18 13.5V19.125A1.875 1.875 0 0 1 16.125 21H4.875A1.875 1.875 0 0 1 3 19.125V7.875A1.875 1.875 0 0 1 4.875 6H10.5" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDelete(form)}
+                      className="text-ink-faint hover:bg-danger-bg hover:text-danger rounded-md p-1 opacity-60 transition group-hover:opacity-100"
+                      aria-label={`${normalizedName}を削除`}
+                      title="回答フォームを削除"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M19.228 5.79 18.16 19.673A2.25 2.25 0 0 1 15.916 21H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0V4.477c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
                 </article>
               )
             })}
@@ -741,6 +799,22 @@ export default function FormSubmissionsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget ? `「${displayFormName(deleteTarget.name)}」を削除しますか？` : '回答フォームを削除しますか？'}
+        description="フォームの質問・公開設定・集まった回答を削除します。回答から友だち情報欄やタグへ反映済みの内容は残ります。この操作は元に戻せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+        onConfirm={() => void removeForm()}
+      />
     </div>
   )
 }

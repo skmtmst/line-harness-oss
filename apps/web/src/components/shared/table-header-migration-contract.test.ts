@@ -19,14 +19,15 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し75セルを共通Thで維持する', () => {
+  it('6ルートのV6標準見出し74セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
     // 199: リマインダ一覧の削除操作も通常の表列として追加した。
     // 見出しだけ自前の th に戻さず、既存の共通 Th を使う。
-    expect(migrated).toBe(75)
+    // 統合時に本流側の増減も入ったので、件数は統合後の木で数え直した実測値。
+    expect(migrated).toBe(74)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
@@ -58,8 +59,10 @@ describe('表見出しの第1段階移行', () => {
     // V6の7列へ増やしても直書きを残さなかった。
     // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
     // 共通の `Th` を通すため、この数へは戻さない。
-    // シナリオ一覧の見出し9個も共通の `Th` へ寄せ、両方を合わせて267まで減った。
-    expect(debt['direct-th']).toBe(267)
+    // シナリオ一覧と友だち情報欄に加え、対応マークの見出しも共通 `Th` へ寄せた。
+    // 2026-09-02: #475 がログインユーザーと入った記録の19見出しを共通Thへ移した。
+    // 最新 development との統合後の木を再計測し、237へ締め直す。
+    expect(debt['direct-th']).toBe(237)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

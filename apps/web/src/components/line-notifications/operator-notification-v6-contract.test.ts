@@ -23,6 +23,9 @@ describe('V6 運用者へのお知らせ — 安全な下書き接続', () => {
     expect(list).toContain("state === 'ready' ? rules.length : null")
     expect(list).toContain('kind="error"')
     expect(list).toContain('kind="forbidden"')
+    expect(list).toContain("const filterCountsAvailable = Boolean(lineAccountId) && state === 'ready'")
+    expect(list).toContain("filterCountsAvailable ? rules.length : '—'")
+    expect(list).toContain("filterCountsAvailable ? missingRecipientCount : '—'")
   })
 
   it('作成は下書きだけを保存し、公開・テスト送信を装わない', () => {
