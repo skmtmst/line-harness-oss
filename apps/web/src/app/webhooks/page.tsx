@@ -43,6 +43,38 @@ const MERGED_TABS = [
   { key: 'notify', label: '未対応の通知' },
 ]
 
+/*
+  受け取る設定の「どこから来るか」を、**見本から選べるようにする**。
+
+  設計 `M0Gb7` は「予約サービス」「アンケートツール」のような見本を選んで作る道を
+  持っているが、実装は `sourceType` の自由入力だけだった。**何を書けばよいか
+  分からない欄**になっていて、`line` という置き文字だけが手がかりになっていた。
+
+  値（`value`）は今までどおりの文字列なので、口も保存の形も変えない。
+  見本に無いものは「その他」を選べば自由に書ける。
+*/
+const SOURCE_PRESETS = [
+  { value: 'line', label: 'LINE公式アカウント', hint: '友だち追加やメッセージの通知を受け取ります' },
+  { value: 'booking', label: '予約サービス', hint: '予約の確定・変更・取り消しを受け取ります' },
+  { value: 'form', label: 'アンケートツール', hint: '回答が届いたことを受け取ります' },
+  { value: 'ec', label: 'ECサイト', hint: '注文や発送の知らせを受け取ります' },
+  { value: 'payment', label: '決済サービス', hint: '支払いの成否を受け取ります' },
+] as const
+
+/** 見本に無い「その他」を選んだときだけ、自由入力に切り替える印。 */
+const SOURCE_OTHER = '__other__'
+
+/**
+ * 保存してある値を、画面の言葉に戻す。
+ *
+ * 未設定を `-`（半角ハイフン）で書いていた。V6の決めごとは `—`。
+ * 半角は数や記号に見えて、「無い」と読み取れない。
+ */
+function sourceLabel(value: string | null | undefined): string {
+  if (!value) return '—'
+  return SOURCE_PRESETS.find((preset) => preset.value === value)?.label ?? value
+}
+
 function WebhooksPageInner() {
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -57,7 +89,11 @@ function WebhooksPageInner() {
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
-  const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
+    const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
+  // 見本に無いものを選んだときだけ、自由入力に切り替える。
+  const [sourceIsOther, setSourceIsOther] = useState(false)
+  const selectedPreset = SOURCE_PRESETS.find((preset) => preset.value === inForm.sourceType) ?? null
+
   const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
 
   // After a successful create the API returns the secret exactly once.
@@ -492,13 +528,36 @@ function WebhooksPageInner() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ソースタイプ</label>
-              <input
-                value={inForm.sourceType}
-                onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
+              <label className="block text-sm font-medium text-gray-700 mb-1">どこから来るか</label>
+              <select
+                value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
+                onChange={(e) => {
+                  const next = e.target.value
+                  if (next === SOURCE_OTHER) { setSourceIsOther(true); setInForm({ ...inForm, sourceType: '' }); return }
+                  setSourceIsOther(false)
+                  setInForm({ ...inForm, sourceType: next })
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="line"
-              />
+              >
+                <option value="">選んでください</option>
+                {SOURCE_PRESETS.map((preset) => (
+                  <option key={preset.value} value={preset.value}>{preset.label}</option>
+                ))}
+                <option value={SOURCE_OTHER}>その他（自分で書く）</option>
+              </select>
+              {/* 選んだものが何を受け取るのかを、選んだ直後に出す。 */}
+              {selectedPreset ? (
+                <p className="mt-1 text-xs text-gray-500">{selectedPreset.hint}</p>
+              ) : null}
+              {sourceIsOther ? (
+                <input
+                  value={inForm.sourceType}
+                  onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
+                  className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="送ってくるサービスの名前"
+                  aria-label="どこから来るか（自分で書く）"
+                />
+              ) : null}
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -651,7 +710,7 @@ function WebhooksPageInner() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ソースタイプ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">どこから来るか</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">エンドポイントURL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">シークレット</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ステータス</th>
@@ -663,7 +722,7 @@ function WebhooksPageInner() {
                 {incoming.map((wh) => (
                   <tr key={wh.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{wh.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{wh.sourceType || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{sourceLabel(wh.sourceType)}</td>
                     <td className="px-4 py-3">
                       <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 break-all">
                         {endpointUrl(wh.id)}
