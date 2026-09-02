@@ -1,10 +1,59 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { api } from '@/lib/api'
+import { useState, useEffect, useMemo } from 'react'
+import { api, type ConversionApprovalItem } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
-import Header from '@/components/layout/header'
-import CcPromptButton from '@/components/cc-prompt-button'
+import KpiCard from '@/components/dashboard/kpi-card'
+
+/**
+ * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
+ *
+ * 設計は「指定ページへの到達 / EC連携からの通知」と、何が起きたら数えるのかを
+ * そのまま書いている。「URL到達」だと、誰がどのURLに来たときの話なのかが
+ * 読み取れない。
+ */
+function measureLabel(method: ConversionPoint['measureMethod']): string {
+  if (method === 'url_reach') return '指定ページへの到達'
+  if (method === 'webhook') return 'EC連携からの通知'
+  return '手動で記録'
+}
+
+/**
+ * 種別を運用者の言葉にする。
+ *
+ * 設計は「購入」「申込・登録」の2つでまとめている。実装の eventType は9種
+ * あるので、設計の2つに寄せられるものは寄せ、残りはそのまま出す。
+ */
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  purchase: '購入',
+  form_submit: '申込・登録',
+  friend_add: '申込・登録',
+  visit: '来店・参加',
+  // 作る画面が以前に送っていた値。過去に作った行がこれで残っている。
+  signup: '申込・登録',
+  reserve: '来店・参加',
+  other: 'その他',
+  scenario_step: 'シナリオ到達',
+  rich_menu_tap: 'リッチメニュー',
+  url_click: 'URLクリック',
+  keyword_sent: 'キーワード',
+  liff_view: 'LIFF閲覧',
+  custom: 'その他',
+}
+
+/** 過去28日ぶんに絞る。設計のKPIはどれも「過去28日」で数えている。 */
+function within28Days(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() <= 28 * 24 * 3600_000
+}
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -14,61 +63,97 @@ interface ConversionReportItem {
   totalValue: number
 }
 
-const ccPrompts = [
-  {
-    title: 'CV計測ポイント設定',
-    prompt: `コンバージョン計測ポイントの設定をサポートしてください。
-1. 主要なイベントタイプ（友だち追加、URLクリック、購入完了等）の説明
-2. 各CVポイントに設定すべき金額の目安を提案
-3. CVファネル全体の計測設計のベストプラクティス
-手順を示してください。`,
-  },
-  {
-    title: 'コンバージョン分析',
-    prompt: `現在のコンバージョンデータを分析してください。
-1. CVポイント別の発火回数と金額を集計
-2. イベントタイプ別のCV率とトレンドを分析
-3. CV率向上のための改善施策を提案
-結果をレポートしてください。`,
-  },
+/**
+ * 設計 6-1 は1画面に5タブ。並びは設計のまま、素のURLでは主役の
+ * 「成果地点（CV）」を開く。
+ *
+ * これまでは /conversions が2タブ、その中に入れていた /affiliates が
+ * さらに3タブを持つ二重構造だった。同じ ?tab= が2つの意味を持つので、
+ * 「案件を開くURL」を人に送れなかった。
+ */
+const MERGED_TABS = [
+  { key: 'affiliates', label: 'アフィリエイター' },
+  { key: 'offers', label: '案件' },
+  { key: 'approvals', label: '成果承認' },
+  { key: 'points', label: '成果地点（CV）' },
+  { key: 'report', label: 'レポート' },
 ]
 
-export default function ConversionsPage() {
+const DEFAULT_TAB = 'points'
+
+/**
+ * 並び順。**どれも読み込んだ行から数えられるものだけ**にしてある。
+ * 設計は「CV数が多い順」しか描いていないが、CV数はレポートから引けるので
+ * 実際に並べ替えられる。作れない並び（報酬順など）は足さない。
+ */
+type PointSort = 'cv-desc' | 'value-desc' | 'name'
+
+const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
+  { value: 'cv-desc', label: 'CV数が多い順' },
+  { value: 'value-desc', label: '成果単価が高い順' },
+  { value: 'name', label: '成果地点名順' },
+]
+
+const PAGE_SIZE = 20
+
+function ConversionsPageInner() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
+  const [reportAvailable, setReportAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', eventType: '', value: '' })
+  const [pending, setPending] = useState<ConversionApprovalItem[]>([])
+  const [approved, setApproved] = useState<ConversionApprovalItem[]>([])
+  const [openOffers, setOpenOffers] = useState(0)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<PointSort>('cv-desc')
+  const [page, setPage] = useState(1)
+  // 成果地点そのものが引けなかったときだけ「読み込めませんでした」を出す。
+  // KPI に使う承認・案件が落ちても、表は出せる。
+  const [loadFailed, setLoadFailed] = useState(false)
 
   const load = async () => {
     setLoading(true)
+    setLoadFailed(false)
+    setPoints([])
+    setReport([])
+    setReportAvailable(false)
+    setPending([])
+    setApproved([])
+    setOpenOffers(0)
     try {
-      const [pointsRes, reportRes] = await Promise.allSettled([
+      // 上のKPIは成果地点だけでは出ない。承認の待ち・確定と、公開中の案件を
+      // 一緒に引く。1つ落ちても他は出せるよう allSettled。
+      const [pointsRes, reportRes, pendingRes, approvedRes, offersRes] = await Promise.allSettled([
         api.conversions.points(),
         api.conversions.report(),
+        api.conversionApprovals.list({ status: 'pending', limit: 200 }),
+        api.conversionApprovals.list({ status: 'approved', limit: 200 }),
+        api.affiliateOffers.list({ activeOnly: true }),
       ])
-      if (pointsRes.status === 'fulfilled' && pointsRes.value.success) setPoints(pointsRes.value.data)
-      if (reportRes.status === 'fulfilled' && reportRes.value.success) setReport(reportRes.value.data)
-    } catch {}
+      if (pointsRes.status === 'fulfilled' && pointsRes.value.success && Array.isArray(pointsRes.value.data)) {
+        setPoints(pointsRes.value.data)
+      }
+      else setLoadFailed(true)
+      if (reportRes.status === 'fulfilled' && reportRes.value.success && Array.isArray(reportRes.value.data)) {
+        setReport(reportRes.value.data)
+        setReportAvailable(true)
+      }
+      if (pendingRes.status === 'fulfilled' && pendingRes.value.success && Array.isArray(pendingRes.value.data)) {
+        setPending(pendingRes.value.data)
+      }
+      if (approvedRes.status === 'fulfilled' && approvedRes.value.success && Array.isArray(approvedRes.value.data)) {
+        setApproved(approvedRes.value.data)
+      }
+      if (offersRes.status === 'fulfilled' && offersRes.value.success && Array.isArray(offersRes.value.data)) {
+        setOpenOffers(offersRes.value.data.length)
+      }
+    } catch {
+      setLoadFailed(true)
+    }
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name || !form.eventType) return
-    try {
-      await api.conversions.createPoint({
-        name: form.name,
-        eventType: form.eventType,
-        value: form.value ? Number(form.value) : null,
-      })
-      setForm({ name: '', eventType: '', value: '' })
-      setShowCreate(false)
-      load()
-    } catch {}
-  }
 
   const handleDelete = async (id: string) => {
     if (!confirm('このCVポイントを削除しますか？')) return
@@ -76,140 +161,210 @@ export default function ConversionsPage() {
     load()
   }
 
-  const eventTypes = [
-    { value: 'friend_add', label: '友だち追加' },
-    { value: 'rich_menu_tap', label: 'リッチメニュータップ' },
-    { value: 'url_click', label: 'URLクリック' },
-    { value: 'form_submit', label: 'フォーム送信' },
-    { value: 'keyword_sent', label: 'キーワード送信' },
-    { value: 'scenario_step', label: 'シナリオステップ到達' },
-    { value: 'liff_view', label: 'LIFF閲覧' },
-    { value: 'purchase', label: '購入完了' },
-    { value: 'custom', label: 'カスタム' },
-  ]
+  // 成果地点ごとのCV数。レポートは成果地点IDで返る。
+  const countByPoint = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const r of report) m.set(r.conversionPointId, r.totalCount)
+    return m
+  }, [report])
+
+  const kpi = useMemo(() => {
+    const approvedRecent = approved.filter((a) => within28Days(a.createdAt))
+    return {
+      confirmed: approvedRecent.length,
+      confirmedYen: approvedRecent.reduce((s, a) => s + (a.value ?? 0), 0),
+      pendingCount: pending.length,
+      pendingYen: pending.reduce((s, a) => s + (a.value ?? 0), 0),
+    }
+  }, [approved, pending])
+
+  const shown = useMemo(() => {
+    const q = query.trim()
+    const matched = q ? points.filter((p) => p.name.includes(q)) : points
+    return matched.toSorted((left, right) => {
+      if (sort === 'name') return left.name.localeCompare(right.name, 'ja')
+      if (sort === 'value-desc') return (right.value ?? 0) - (left.value ?? 0)
+      if (!reportAvailable) return 0
+      return (countByPoint.get(right.id) ?? 0) - (countByPoint.get(left.id) ?? 0)
+    })
+  }, [countByPoint, points, query, reportAvailable, sort])
+
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const current = useMemo(
+    () => shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, shown],
+  )
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   return (
-    <div>
-      <Header
-        title="コンバージョン計測"
-        description="CVポイント定義 & レポート"
-        action={
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="px-4 py-2 min-h-[44px] rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
-          >
-            {showCreate ? 'キャンセル' : '+ CVポイント作成'}
-          </button>
-        }
-      />
+    <div data-conversion-points-design="v6">
 
-      {showCreate && (
-        <form onSubmit={handleCreate} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CV名</label>
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="購入完了"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">イベントタイプ</label>
-              <select
-                value={form.eventType}
-                onChange={(e) => setForm({ ...form, eventType: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                required
-              >
-                <option value="">選択...</option>
-                {eventTypes.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">金額 (任意)</label>
-              <input
-                type="number"
-                value={form.value}
-                onChange={(e) => setForm({ ...form, value: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="0"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            className="mt-4 px-4 py-2 min-h-[44px] rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
-          >
-            作成
-          </button>
-        </form>
-      )}
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="確定した成果"
+          value={kpi.confirmed}
+          unit="件"
+          detail="過去28日"
+          loading={loading}
+        />
+        <KpiCard
+          title="承認待ち"
+          value={kpi.pendingCount}
+          unit="件"
+          detail={`合計 ¥${kpi.pendingYen.toLocaleString()}`}
+          action={{ label: '成果承認', href: '/conversions?tab=approvals' }}
+          loading={loading}
+        />
+        {/* 設計は「確定報酬」。報酬そのものを持つ列が無いので、確定した成果の
+            金額を出している。案件の料率で計算した額とは一致しない。 */}
+        <KpiCard
+          title="確定報酬"
+          value={kpi.confirmedYen}
+          unit="円"
+          detail="過去28日・成果の金額"
+          loading={loading}
+        />
+        <KpiCard
+          title="公開中の案件"
+          value={openOffers}
+          unit="件"
+          detail="紹介できる案件"
+          action={{ label: '案件', href: '/conversions?tab=offers' }}
+          loading={loading}
+        />
+      </div>
 
-      {/* Report Cards */}
-      {report.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-          {report.map((r) => (
-            <div key={r.conversionPointId} className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-700">{r.conversionPointName}</p>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{r.eventType}</span>
-              </div>
-              <div className="flex items-end gap-4">
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{r.totalCount}</p>
-                  <p className="text-xs text-gray-400">CV数</p>
-                </div>
-                {r.totalValue > 0 && (
-                  <div>
-                    <p className="text-lg font-semibold text-green-600">{r.totalValue.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' })}</p>
-                    <p className="text-xs text-gray-400">売上</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        <SearchField
+          value={query}
+          onChange={(value) => {
+            setQuery(value)
+            setPage(1)
+          }}
+          onClear={() => {
+            setQuery('')
+            setPage(1)
+          }}
+          placeholder="CV名で検索"
+          aria-label="CV名で検索"
+          className="min-w-64 flex-1"
+        />
+        <Select
+          aria-label="並び順"
+          label="並び順"
+          value={sort}
+          options={SORT_OPTIONS}
+          onChange={(value) => {
+            setSort(value as PointSort)
+            setPage(1)
+          }}
+        />
+        {/*
+          **期間と書き出しは押せる形にしない。**
+          成果地点の一覧も `/api/conversions/report` も期間を受け取らないので、
+          「今月」に絞った数は作れない。書き出しの口（CSV）も無い。
+          押せない札を置くより、無いことを言葉で出す。
+        */}
+        <p className="text-ink-faint text-caption">
+          <span className="text-ink-secondary font-medium">期間</span>{' '}
+          <span className="tabular-nums">—</span>{' '}
+          まだ繋がっていません。期間で絞る仕組みが接続されると表示されます。
+        </p>
+      </div>
 
-      {/* Points Table */}
+      {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。
+          列ごと消すと、その考え方が無い画面に見えてしまう。 */}
       {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">読み込み中...</div>
-      ) : points.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">CVポイントがまだありません</div>
+        <ListState kind="loading" title="成果地点を読み込んでいます" />
+      ) : loadFailed ? (
+        <ListState
+          kind="error"
+          title="成果地点を読み込めませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={
+            <Button variant="secondary" onClick={() => void load()}>
+              成果地点を再読み込み
+            </Button>
+          }
+        />
+      ) : shown.length === 0 ? (
+        <ListState
+          kind="empty"
+          title={query ? '条件に合う成果地点はありません' : 'まだ成果地点がありません'}
+          description={
+            query
+              ? '検索の言葉を変えてください。'
+              : '右上の「成果地点を追加」から登録すると、ここに出ます。'
+          }
+        />
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full min-w-[640px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CV名</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">イベントタイプ</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">金額</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">作成日</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
-              </tr>
+        <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+          <table className="w-full min-w-[880px]">
+            <thead>
+              <TableHeadRow>
+                <Th>成果地点（CV）名</Th>
+                <Th>種別</Th>
+                <Th>計測方法</Th>
+                <Th align="right">成果単価</Th>
+                <Th align="right">CV数</Th>
+                <Th>報酬</Th>
+                <Th>状態</Th>
+                <Th align="right">操作</Th>
+              </TableHeadRow>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {points.map((point) => (
-                <tr key={point.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{point.name}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{point.eventType}</span>
+            <tbody className="divide-hairline divide-y">
+              {current.map((point) => (
+                <tr key={point.id} className="hover:bg-canvas-sunken">
+                  <td className="text-ink px-4 py-3 text-sm font-medium">
+                    {point.name}
+                    {point.targetUrl && (
+                      <p className="text-ink-faint mt-0.5 max-w-[22rem] truncate text-[11px]" title={point.targetUrl}>
+                        {point.targetUrl}
+                      </p>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {point.value !== null ? `¥${point.value.toLocaleString()}` : '-'}
+                  <td className="text-ink-secondary px-4 py-3 text-sm">
+                    {EVENT_TYPE_LABELS[point.eventType] ?? point.eventType}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(point.createdAt).toLocaleDateString('ja-JP')}</td>
+                  <td className="text-ink-secondary px-4 py-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                        {measureLabel(point.measureMethod)}
+                      </span>
+                      {point.countRepeat === false && (
+                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                          一人一回
+                        </span>
+                      )}
+                      {point.attributionDays != null && (
+                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap tabular-nums">
+                          {point.attributionDays}日
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                    {point.value !== null ? `¥${point.value.toLocaleString()}` : '—'}
+                  </td>
+                  <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
+                    {reportAvailable ? (countByPoint.get(point.id) ?? 0) : '—'}
+                  </td>
+                  {/* 報酬は案件ごとの料率で決まる。成果地点と案件を結ぶ列が無いので出せない。 */}
+                  <td className="text-ink-faint px-4 py-3 text-sm">—</td>
+                  {/* 計測を止める仕組みが無い。作った成果地点は常に計測中。 */}
+                  <td className="px-4 py-3 text-sm">
+                    <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[11px]">計測中</span>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleDelete(point.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="text-danger text-sm hover:underline"
                     >
                       削除
                     </button>
@@ -220,7 +375,151 @@ export default function ConversionsPage() {
           </table>
         </div>
       )}
-      <CcPromptButton prompts={ccPrompts} />
+
+      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-ink-faint text-xs">
+          成果が出たあとの承認は「成果承認」タブで行います。旧デザインではCV計測とアフィリエイトが別ページに分かれていて、定義と承認の間で画面を往復する必要がありました。
+          <br />
+          書き出しはまだ繋がっていません。CSVを作る口が接続されると、この場所に操作が出ます。
+        </p>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-ink-faint tabular-nums">全 {shown.length} 件</span>
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+        </div>
+      </div>
     </div>
+  )
+}
+
+/**
+ * レポートのタブ。
+ *
+ * 成果地点ごとの件数と金額をそのまま出す。一覧の表にもCV数はあるが、
+ * あちらは「どう数えるか」を確かめる画面で、こちらは「いくらになったか」を
+ * 見る画面なので、金額を主にしている。
+ */
+function ReportTab() {
+  const [rows, setRows] = useState<ConversionReportItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.conversions
+      .report()
+      .then((r) => {
+        if (!cancelled && r.success) setRows(r.data)
+      })
+      .catch(() => {
+        // レポートが引けなくても、他のタブは使える。
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const total = rows.reduce((s, r) => s + r.totalValue, 0)
+
+  if (loading) {
+    return (
+      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+        読み込み中...
+      </div>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+        まだ成果の記録がありません。成果地点を作って計測が始まると、ここに出ます。
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+      <table className="w-full min-w-[560px]">
+        <thead>
+          <TableHeadRow>
+            <Th>成果地点（CV）名</Th>
+            <Th>種別</Th>
+            <Th align="right">CV数</Th>
+            <Th align="right">金額</Th>
+          </TableHeadRow>
+        </thead>
+        <tbody className="divide-hairline divide-y">
+          {rows.map((r) => (
+            <tr key={r.conversionPointId} className="hover:bg-canvas-sunken">
+              <td className="text-ink px-4 py-3 text-sm font-medium">{r.conversionPointName}</td>
+              <td className="text-ink-secondary px-4 py-3 text-sm">
+                {EVENT_TYPE_LABELS[r.eventType] ?? r.eventType}
+              </td>
+              <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">{r.totalCount}</td>
+              <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                {r.totalValue > 0 ? `¥${r.totalValue.toLocaleString()}` : '—'}
+              </td>
+            </tr>
+          ))}
+          <tr className="bg-canvas-sunken">
+            <td className="text-ink-secondary px-4 py-3 text-sm font-medium" colSpan={3}>
+              合計
+            </td>
+            <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+              ¥{total.toLocaleString()}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ConversionsPageHost() {
+  const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
+  /**
+   * タブごとのV6実Node。5タブすべてを埋める。
+   *
+   * `points` と `report` が抜けていて `data-design-node={undefined}` が
+   * そのまま出ていた。設計側の並びは `design-structure.json` の
+   * `/conversions` に "PouPn GH8VL n5VVTb ZrpKn GUxsj" として記録がある。
+   *
+   * **`d8d3Mz` は「19-1-C 成果地点の削除確認」の重ね画面**であって、
+   * 一覧のNodeではない（`docs/v6-requirements/v6-19-conversion-requirements-draft.md`）。
+   * 一覧に付けると、削除確認の画面とNodeが二重になる。
+   */
+  const nodeByTab: Record<string, string | undefined> = {
+    affiliates: 'PouPn',
+    offers: 'GH8VL',
+    approvals: 'n5VVTb',
+    points: 'ZrpKn',
+    report: 'GUxsj',
+  }
+  return (
+    <div data-design-node={nodeByTab[tab]}>
+      <MergedTabs
+        basePath="/conversions"
+        paramName="tab"
+        tabs={MERGED_TABS}
+        active={tab}
+        defaultKey={DEFAULT_TAB}
+        actions={tab === 'points' ? <Button href="/conversions/new" variant="primary">成果地点を追加</Button> : undefined}
+      />
+      {tab === 'points' && <ConversionsPageInner />}
+      {tab === 'affiliates' && <AffiliatorsTab />}
+      {tab === 'offers' && <OffersTab />}
+      {tab === 'approvals' && <ApprovalQueue />}
+      {tab === 'report' && <ReportTab />}
+    </div>
+  )
+}
+
+export default function ConversionsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <ConversionsPageHost />
+    </Suspense>
   )
 }

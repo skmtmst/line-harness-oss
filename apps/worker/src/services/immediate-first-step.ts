@@ -13,13 +13,16 @@ import {
   jstNow,
   toJstString,
 } from '@line-crm/db';
-import { LineClient } from '@line-crm/line-sdk';
+import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   buildMessage,
   expandVariables,
   resolveMetadata,
   messageToLogPayload,
 } from './step-delivery.js';
+import { decorateForFriendPush } from './auto-track.js';
+import { resolveInterpolationExtra } from './interpolation-context.js';
+import { buildQuestionMessages, parseQuestion } from './scenario-question.js';
 
 export interface ImmediatePushContext {
   defaultAccessToken: string;
@@ -80,8 +83,9 @@ export interface ImmediatePushOptions {
  *
  * Single implementation behind every instant-first-message entry point:
  * tag-triggered enrollment (friend-tag-attach), the click-campaign block in
- * applyRefAttribution (liff.ts), and the follow-webhook friend_add /
- * referral-route enrollments.
+ * applyRefAttribution (liff.ts), the follow-webhook friend_add /
+ * referral-route enrollments, and the OAuth /auth/callback friend_add
+ * auto-enroll loop (liff.ts).
  *
  * Exactly-once with the cron: the enrollment is CLAIMED
  * (claimFriendScenarioForDelivery, status active→delivering) before any
@@ -281,21 +285,54 @@ export async function pushImmediateFirstStep(
 
     // Independent D1 reads — resolve concurrently; this sits in front of the
     // reply-token send where latency eats into the token validity window.
-    const [resolvedMeta, resolved] = await Promise.all([
+    // ctxAccount is the caller-resolved channel (LIFF/OAuth flows), used for
+    // both the push token and the tracked-link owner below.
+    const [resolvedMeta, resolved, ctxAccount] = await Promise.all([
       resolveMetadata(db, { user_id: friend.user_id, metadata: friend.metadata }),
       resolveStepContent(db, firstStep),
+      ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
+    const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
+    const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
     const expanded = expandVariables(
       resolved.messageContent,
-      { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1],
+      friendWithMeta,
       ctx.workerUrl,
       resolved.messageType,
+      extra,
     );
-    const sentMessage = buildMessage(resolved.messageType, expanded);
+    // Same decoration pipeline as the cron (processStepDeliveries) via the
+    // shared helper. Link owner: the friend's own account, else the
+    // caller-resolved channel — LIFF/OAuth entry points run BEFORE the follow
+    // webhook wires friend.line_account_id, and an owner-less link would send
+    // that account's friends through the global LIFF consent screen.
+    const question = parseQuestion(resolved.questionJson);
+    let messages: Message[];
+    if (question) {
+      messages = buildQuestionMessages(
+        {
+          ...question,
+          intro: question.intro
+            ? expandVariables(question.intro, friendWithMeta, ctx.workerUrl, 'text', extra)
+            : question.intro,
+          text: expandVariables(question.text, friendWithMeta, ctx.workerUrl, 'text', extra),
+        },
+        firstStep.id,
+      );
+    } else {
+      const decorated = await decorateForFriendPush(
+        db,
+        resolved.messageType,
+        expanded,
+        ctx.workerUrl,
+        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId },
+      );
+      messages = [buildMessage(decorated.messageType, decorated.content)];
+    }
 
     try {
       if (options?.reply) {
-        await options.reply.client.replyMessage(options.reply.replyToken, [sentMessage]);
+        await options.reply.client.replyMessage(options.reply.replyToken, messages);
       } else {
         const pushTarget = options?.targetLineUserId ?? friend.line_user_id;
         if (!pushTarget) {
@@ -306,14 +343,13 @@ export async function pushImmediateFirstStep(
         // Token: caller-supplied account channel → friend's own account → env default.
         let accessToken = ctx.defaultAccessToken;
         if (ctx.accountChannelId) {
-          const acct = await getLineAccountByChannelId(db, ctx.accountChannelId);
-          if (acct?.channel_access_token) accessToken = acct.channel_access_token;
+          if (ctxAccount?.channel_access_token) accessToken = ctxAccount.channel_access_token;
         } else if (friend.line_account_id) {
           const acct = await getLineAccountById(db, friend.line_account_id);
           if (acct?.channel_access_token) accessToken = acct.channel_access_token;
         }
         const lineClient = new LineClient(accessToken);
-        await lineClient.pushMessage(pushTarget, [sentMessage]);
+        await lineClient.pushMessage(pushTarget, messages);
       }
     } catch (err) {
       // The message never left LINE's API — release so the cron retries on
@@ -334,23 +370,25 @@ export async function pushImmediateFirstStep(
     // Log what was actually delivered (post buildMessage normalization) so
     // the cooldown above sees it on subsequent calls and the dashboard chat
     // view mirrors LINE 1:1. delivery_type mirrors the send channel.
-    const logPayload = messageToLogPayload(sentMessage);
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?)`,
-      )
-      .bind(
-        crypto.randomUUID(),
-        friendId,
-        logPayload.messageType,
-        logPayload.content,
-        firstStep.id,
-        options?.reply ? 'reply' : null,
-        resolved.templateIdAtSend,
-        jstNow(),
-      )
-      .run();
+    for (const sentMessage of messages) {
+      const logPayload = messageToLogPayload(sentMessage);
+      await db
+        .prepare(
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, template_id_at_send, created_at)
+           VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          friendId,
+          logPayload.messageType,
+          logPayload.content,
+          firstStep.id,
+          options?.reply ? 'reply' : null,
+          resolved.templateIdAtSend,
+          jstNow(),
+        )
+        .run();
+    }
 
     await settleAfterSend();
     settleAfterSend = null;

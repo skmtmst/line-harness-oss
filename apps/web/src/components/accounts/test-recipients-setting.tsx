@@ -9,12 +9,18 @@ interface Friend {
   pictureUrl: string | null
 }
 
+interface LoginUserCandidate extends Friend {
+  staffName: string
+  sameAccount: boolean
+}
+
 interface TestRecipientsSettingProps {
   accountId: string
 }
 
 export default function TestRecipientsSetting({ accountId }: TestRecipientsSettingProps) {
   const [recipients, setRecipients] = useState<Friend[]>([])
+  const [loginUsers, setLoginUsers] = useState<LoginUserCandidate[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<Friend[]>([])
@@ -24,8 +30,16 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.accountSettings.getTestRecipients(accountId)
-      if (res.success) setRecipients(res.data)
+      const [recipientResult, loginUserResult] = await Promise.allSettled([
+        api.accountSettings.getTestRecipients(accountId),
+        api.accountSettings.getTestRecipientLoginUsers(accountId),
+      ])
+      if (recipientResult.status === 'fulfilled' && recipientResult.value.success) {
+        setRecipients(recipientResult.value.data)
+      }
+      if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success) {
+        setLoginUsers(loginUserResult.value.data)
+      }
     } catch { /* ignore */ }
     finally { setLoading(false) }
   }, [accountId])
@@ -86,6 +100,11 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
 
   if (loading) return <p className="text-xs text-gray-400">読み込み中...</p>
 
+  const recipientIds = new Set(recipients.map((recipient) => recipient.id))
+  const availableLoginUsers = loginUsers.filter(
+    (candidate) => candidate.sameAccount && !recipientIds.has(candidate.id),
+  )
+
   return (
     <div className="mt-3 pt-3 border-t border-gray-100">
       <h4 className="text-xs font-semibold text-gray-600 mb-2">テスト送信先</h4>
@@ -100,6 +119,32 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
               <button onClick={() => removeRecipient(r.id)} className="text-blue-400 hover:text-blue-600 ml-0.5">×</button>
             </span>
           ))}
+        </div>
+      )}
+
+      {/* LINE連携済みのログインユーザーは、友だち検索に埋もれないよう常に候補へ出す。 */}
+      {availableLoginUsers.length > 0 && (
+        <div className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50/60 p-2">
+          <p className="mb-1.5 text-[11px] font-medium text-emerald-800">ログインユーザーから追加</p>
+          <div className="flex flex-wrap gap-1.5">
+            {availableLoginUsers.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => addRecipient(candidate)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50"
+                title={`${candidate.staffName}をテスト送信先に追加`}
+              >
+                {candidate.pictureUrl ? (
+                  <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-full" />
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold">{candidate.staffName.charAt(0)}</span>
+                )}
+                <span>{candidate.staffName}</span>
+                <span aria-hidden="true" className="text-emerald-500">＋</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

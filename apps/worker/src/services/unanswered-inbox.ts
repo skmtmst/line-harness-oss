@@ -1,3 +1,5 @@
+import { keywordMatches } from './auto-reply.js';
+
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 2000;
 
@@ -38,11 +40,7 @@ function matchesAnyKeyword(
   rules: ActiveRuleRow[],
 ): boolean {
   if (messageType !== 'text') return false;
-  for (const ar of rules) {
-    if (ar.match_type === 'exact' && ar.keyword === content) return true;
-    if (ar.match_type === 'contains' && content.includes(ar.keyword)) return true;
-  }
-  return false;
+  return rules.some((ar) => keywordMatches(ar, content));
 }
 
 // 同じ incoming に対して outgoing 'auto_reply' (delivery_type='reply') が
@@ -168,7 +166,7 @@ export interface UnansweredRow {
   friendId: string;
   displayName: string | null;
   pictureUrl: string | null;
-  accountId: string;
+  accountId: string | null;
   accountName: string;
   lastIncomingAt: string;
   lastManualAt: string | null;
@@ -196,13 +194,17 @@ export interface UnansweredInboxOptions {
   minWaitMinutes?: number;
   page?: number;
   pageSize?: number;
+  /** Restrict output to accounts visible to the authenticated caller. */
+  allowedAccountIds: readonly string[];
+  /** Include legacy friends whose account assignment is missing. */
+  canSeeUnassigned: boolean;
 }
 
 interface RawCandidateRow {
   friend_id: string;
   display_name: string | null;
   picture_url: string | null;
-  line_account_id: string;
+  line_account_id: string | null;
   account_name: string;
   last_incoming: string;
   last_manual: string | null;
@@ -217,7 +219,11 @@ interface RawIncomingRow {
 }
 
 function applyFilters(rows: UnansweredRow[], opts: UnansweredInboxOptions): UnansweredRow[] {
-  let filtered = rows;
+  const allowed = new Set(opts.allowedAccountIds);
+  let filtered = rows.filter(
+    (r) => (r.accountId !== null && allowed.has(r.accountId))
+      || (opts.canSeeUnassigned && r.accountId === null),
+  );
   if (opts.account) {
     filtered = filtered.filter((r) => r.accountId === opts.account);
   }
@@ -318,7 +324,7 @@ async function getAllUnansweredRows(db: D1Database): Promise<UnansweredRow[]> {
 
 export async function computeUnansweredInbox(
   db: D1Database,
-  opts: UnansweredInboxOptions = {},
+  opts: UnansweredInboxOptions,
 ): Promise<UnansweredInboxResult> {
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, opts.pageSize ?? DEFAULT_PAGE_SIZE));
@@ -356,8 +362,11 @@ export async function getUnansweredFriendIds(db: D1Database): Promise<Set<string
   return new Set(map.keys());
 }
 
-export async function countUnanswered(db: D1Database): Promise<UnansweredCount> {
-  const allRows = await getAllUnansweredRows(db);
+export async function countUnanswered(
+  db: D1Database,
+  opts: Pick<UnansweredInboxOptions, 'allowedAccountIds' | 'canSeeUnassigned'>,
+): Promise<UnansweredCount> {
+  const allRows = applyFilters(await getAllUnansweredRows(db), opts);
 
   const byAccountMap = new Map<string, { accountName: string; count: number }>();
   let oldest: string | null = null;

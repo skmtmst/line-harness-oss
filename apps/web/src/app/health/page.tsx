@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
-import CcPromptButton from '@/components/cc-prompt-button'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface LineAccount {
   id: string
@@ -48,26 +47,8 @@ const statusConfig: Record<AccountMigration['status'], { label: string; textColo
   failed: { label: '失敗', textColor: 'text-red-700', bgColor: 'bg-red-100' },
 }
 
-const ccPrompts = [
-  {
-    title: 'BAN リスク診断',
-    prompt: `各LINEアカウントのBANリスクを診断してください。
-1. アカウントごとのエラーログとリスクレベルを確認
-2. エラーコード別の発生頻度と傾向を分析
-3. リスク軽減のための具体的なアクションプランを提案
-結果をレポートしてください。`,
-  },
-  {
-    title: 'アカウント移行手順',
-    prompt: `BANリスクの高いアカウントから友だちを移行する手順を説明してください。
-1. 移行元・移行先アカウントの選定基準
-2. 友だちデータの移行プロセスと注意事項
-3. 移行後の動作確認とフォローアップ手順
-手順を示してください。`,
-  },
-]
-
 export default function HealthPage() {
+  usePageTitle('BAN検知ダッシュボード')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
   const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthLog['riskLevel']>>({})
@@ -162,7 +143,6 @@ export default function HealthPage() {
 
   return (
     <div>
-      <Header title="BAN検知ダッシュボード" />
 
       {/* Error */}
       {error && (
@@ -201,7 +181,7 @@ export default function HealthPage() {
                       <div className="flex items-center gap-3">
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                          style={{ backgroundColor: '#06C755' }}
+                          style={{ backgroundColor: 'var(--color-accent)' }}
                         >
                           L
                         </div>
@@ -321,7 +301,7 @@ export default function HealthPage() {
                     type="submit"
                     disabled={migrating || !migrateToId}
                     className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    style={{ backgroundColor: '#06C755' }}
+                    style={{ backgroundColor: 'var(--color-accent)' }}
                   >
                     {migrating ? '移行中...' : '移行を開始'}
                   </button>
@@ -385,7 +365,7 @@ export default function HealthPage() {
                                 <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
                                   <div
                                     className="h-full rounded-full transition-all"
-                                    style={{ width: `${progress}%`, backgroundColor: '#06C755' }}
+                                    style={{ width: `${progress}%`, backgroundColor: 'var(--color-accent)' }}
                                   />
                                 </div>
                                 <span className="text-xs text-gray-500">
@@ -412,7 +392,6 @@ export default function HealthPage() {
           </div>
         </>
       )}
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }

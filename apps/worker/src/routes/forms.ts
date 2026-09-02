@@ -1,36 +1,170 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getForms,
   getFormsWithStats,
   getFormById,
+  getFormAccountIds,
+  getFormDeleteImpact,
+  formBelongsToLineAccount,
   createForm,
   updateForm,
-  deleteForm,
+  archiveFormAtRevision,
+  deleteFormAtRevision,
   getFormSubmissions,
+  getFormSubmissionsPage,
+  getLatestFormSubmission,
   createFormSubmission,
+  getFriendByLineUserIdForAccount,
+  getFriendById,
+  getLineAccountById,
   jstNow,
 } from '@line-crm/db';
-import { getFriendByLineUserId, getFriendById } from '@line-crm/db';
 import { enrollFriendInScenario } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { verifyCallerLineIdentity } from '../services/liff-auth.js';
+import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
+import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import type {
   Form as DbForm,
   FormSubmission as DbFormSubmission,
   FormUsedByAccount,
+  Friend as DbFriend,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { awardActivityMileage } from '../services/activity-mileage.js';
+import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import {
+  applyFormLayoutEffects,
+  checkFormGates,
+} from '../services/form-layout-effects.js';
+import {
+  collectInputs,
+  layoutToFields,
+  normalizeLayout,
+  parseLayout,
+  type FormLayout,
+} from '@line-crm/shared';
 
 const forms = new Hono<Env>();
 
+/** 回答に添付できる画像。heic は iPhone の既定の形式なので入れておく。 */
+const FORM_UPLOAD_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+};
+
+const FORM_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const FORM_ARCHIVE_BODY_MAX_BYTES = 16 * 1024;
+
+class FormArchiveBodyError extends Error {
+  constructor(readonly status: 400 | 413, message: string) {
+    super(message);
+  }
+}
+
+/** 小さい確認本文でも、宣言値と実際に読んだ量の両方へ上限を置く。 */
+async function readBoundedFormArchiveBody(request: Request): Promise<Record<string, unknown>> {
+  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
+  if (Number.isFinite(declared) && declared > FORM_ARCHIVE_BODY_MAX_BYTES) {
+    throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
+  }
+  const reader = request.body?.getReader();
+  if (!reader) return {};
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > FORM_ARCHIVE_BODY_MAX_BYTES) {
+      await reader.cancel();
+      throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new FormArchiveBodyError(400, '送信内容を読み取れませんでした');
+  }
+}
+
+/** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
+interface FormFieldDef {
+  id?: string;
+  name?: string;
+  label?: string;
+  type?: string;
+  /** 回答の登録先。友だち情報欄の項目ID。未設定なら情報欄には書かない */
+  friendFieldId?: string | null;
+}
+
+/**
+ * forms.fields を読む。
+ *
+ * 壊れていても空配列を返す。ここで例外を投げると、項目定義が1つ壊れた
+ * だけでフォームの送信そのものが失敗する。
+ */
+function parseFormFields(raw: string | null | undefined): FormFieldDef[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as FormFieldDef[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    // Hono unit tests do not provide a Workers ExecutionContext.
+    return undefined;
+  }
+}
+
+async function resolveFriendAccessToken(
+  db: D1Database,
+  friend: DbFriend,
+  defaultAccessToken: string,
+  context: string,
+): Promise<string> {
+  const accountId = friend.line_account_id ?? null;
+  if (!accountId) return resolveLineToken({ accountToken: null, defaultToken: defaultAccessToken, accountId: null, context });
+  const account = await getLineAccountById(db, accountId);
+  return resolveLineToken({ accountToken: account?.channel_access_token, defaultToken: defaultAccessToken, accountId, context });
+}
+
 function serializeForm(
   row: DbForm,
-  extra?: { lastSubmittedAt?: string | null; usedByAccounts?: FormUsedByAccount[] },
+  extra?: {
+    lastSubmittedAt?: string | null;
+    usedByAccounts?: FormUsedByAccount[];
+    accountScopeReviewRequired?: boolean;
+  },
 ) {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     fields: JSON.parse(row.fields || '[]') as unknown[],
+    layout: parseLayout(row.layout, row.fields),
     onSubmitTagId: row.on_submit_tag_id,
     onSubmitScenarioId: row.on_submit_scenario_id,
     onSubmitMessageType: row.on_submit_message_type,
@@ -40,6 +174,9 @@ function serializeForm(
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
     saveToMetadata: Boolean(row.save_to_metadata),
     isActive: Boolean(row.is_active),
+    status: row.status,
+    archivedAt: row.archived_at,
+    revision: row.revision,
     submitCount: row.submit_count,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
@@ -48,6 +185,73 @@ function serializeForm(
     updatedAt: row.updated_at,
     lastSubmittedAt: extra?.lastSubmittedAt ?? null,
     usedByAccounts: extra?.usedByAccounts ?? [],
+    accountScopeReviewRequired: extra?.accountScopeReviewRequired ?? false,
+  };
+}
+
+async function canUseFormFromAccount(
+  c: Context<Env>,
+  formId: string,
+  accountId: string | undefined,
+): Promise<boolean> {
+  if (!accountId) return false;
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return false;
+  return formBelongsToLineAccount(c.env.DB, formId, accountId);
+}
+
+/** 選択中だけでなく、フォームが所属する全アカウントを扱える人だけが実行する。 */
+async function authorizedDeleteImpact(
+  c: Context<Env>,
+  formId: string,
+  accountId: string,
+) {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return { kind: 'not_found' as const };
+  }
+  const impact = await getFormDeleteImpact(c.env.DB, formId, accountId);
+  if (!impact) return { kind: 'not_found' as const };
+  const allAccountIds = await getFormAccountIds(c.env.DB, formId);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), allAccountIds)) {
+    return { kind: 'forbidden' as const };
+  }
+  return { kind: 'ready' as const, impact };
+}
+
+function publicWebhookConfig(row: DbForm): {
+  hasSubmitWebhook: boolean;
+  webhookOrigin: string | null;
+  webhookGateId: string | null;
+} {
+  if (!row.on_submit_webhook_url) {
+    return { hasSubmitWebhook: false, webhookOrigin: null, webhookGateId: null };
+  }
+
+  try {
+    const url = new URL(row.on_submit_webhook_url);
+    const gateMatch = url.pathname.match(/\/engagement-gates\/([^/]+)\/verify\/?$/);
+    return {
+      hasSubmitWebhook: true,
+      // The LIFF client needs the service origin for its public replier/verify
+      // UX. Never expose the stored path, query string, or secret headers.
+      webhookOrigin: url.origin,
+      webhookGateId: gateMatch ? decodeURIComponent(gateMatch[1]) : null,
+    };
+  } catch {
+    return { hasSubmitWebhook: true, webhookOrigin: null, webhookGateId: null };
+  }
+}
+
+function serializePublicForm(row: DbForm) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    fields: JSON.parse(row.fields || '[]') as unknown[],
+    layout: parseLayout(row.layout, row.fields),
+    isActive: Boolean(row.is_active),
+    onSubmitMessageContent: row.on_submit_message_content,
+    onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
+    ...publicWebhookConfig(row),
   };
 }
 
@@ -62,16 +266,40 @@ function serializeSubmission(row: DbFormSubmission & { friend_name?: string | nu
   };
 }
 
+/**
+ * 受け取った layout を、保存できる形にそろえる。
+ *
+ * 外から来た JSON をそのまま入れない。形を正した上で、互換用の `fields`
+ * も同時に作り直す。`fields` はいまも送信時の必須チェックと回答一覧の
+ * 見出しが読んでいて、layout だけ更新すると両者がずれる。
+ */
+function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | null {
+  const layout = normalizeLayout(raw);
+  if (!layout) return null;
+  return {
+    layout: JSON.stringify(layout),
+    fields: JSON.stringify(layoutToFields(layout)),
+  };
+}
+
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
-forms.get('/api/forms', async (c) => {
+forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await getFormsWithStats(c.env.DB);
+    const accountId = c.req.query('account_id');
+    if (!accountId) {
+      return c.json({ success: false, error: 'account_id is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId] });
     return c.json({
       success: true,
       data: items.map((row) =>
         serializeForm(row, {
           lastSubmittedAt: row.last_submitted_at,
           usedByAccounts: row.used_by_accounts,
+          accountScopeReviewRequired: row.account_scope_review_required,
         }),
       ),
     });
@@ -89,7 +317,12 @@ forms.get('/api/forms/:id', async (c) => {
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    return c.json({ success: true, data: serializeForm(form) });
+    const staff = c.get('staff');
+    if (staff && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const data = staff ? serializeForm(form) : serializePublicForm(form);
+    return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -97,12 +330,13 @@ forms.get('/api/forms/:id', async (c) => {
 });
 
 // POST /api/forms — create form
-forms.post('/api/forms', async (c) => {
+forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
       description?: string | null;
       fields?: unknown[];
+      layout?: unknown;
       onSubmitTagId?: string | null;
       onSubmitScenarioId?: string | null;
       onSubmitMessageType?: 'text' | 'flex' | null;
@@ -114,16 +348,26 @@ forms.post('/api/forms', async (c) => {
       ogTitle?: string | null;
       ogDescription?: string | null;
       ogImageUrl?: string | null;
+      accountId?: string;
     }>();
 
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+
+    const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
 
     const form = await createForm(c.env.DB, {
       name: body.name,
       description: body.description ?? null,
-      fields: JSON.stringify(body.fields ?? []),
+      fields: normalized ? normalized.fields : JSON.stringify(body.fields ?? []),
+      layout: normalized ? normalized.layout : null,
       onSubmitTagId: body.onSubmitTagId ?? null,
       onSubmitScenarioId: body.onSubmitScenarioId ?? null,
       onSubmitMessageType: body.onSubmitMessageType ?? null,
@@ -135,6 +379,7 @@ forms.post('/api/forms', async (c) => {
       ogTitle: body.ogTitle ?? null,
       ogDescription: body.ogDescription ?? null,
       ogImageUrl: body.ogImageUrl ?? null,
+      lineAccountIds: [body.accountId],
     });
 
     return c.json({ success: true, data: serializeForm(form) }, 201);
@@ -144,14 +389,43 @@ forms.post('/api/forms', async (c) => {
   }
 });
 
+// POST /api/forms/drafts — 公開されていない空の下書きを作り、編集画面へ進む。
+forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ name?: string; accountId?: string }>()
+      .catch(() => ({} as { name?: string; accountId?: string }));
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const form = await createForm(c.env.DB, {
+      name: body.name?.trim() || '名称未設定のフォーム',
+      fields: '[]',
+      layout: null,
+      isActive: false,
+      lineAccountIds: [body.accountId],
+    });
+    return c.json({ success: true, data: serializeForm(form) }, 201);
+  } catch (err) {
+    console.error('POST /api/forms/drafts error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // PUT /api/forms/:id — update form
-forms.put('/api/forms/:id', async (c) => {
+forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const body = await c.req.json<{
       name?: string;
       description?: string | null;
       fields?: unknown[];
+      layout?: unknown;
       onSubmitTagId?: string | null;
       onSubmitScenarioId?: string | null;
       onSubmitMessageType?: 'text' | 'flex' | null;
@@ -171,6 +445,16 @@ forms.put('/api/forms/:id', async (c) => {
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
     if (body.fields !== undefined) updates.fields = JSON.stringify(body.fields);
+    // layout を受け取ったときは、fields もそこから作り直す。片方だけ新しい
+    // 状態にすると、送信時の必須チェックが古い項目を見に行く。
+    if (body.layout !== undefined) {
+      const normalized = normalizeLayoutInput(body.layout);
+      if (!normalized) {
+        return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+      }
+      updates.layout = normalized.layout;
+      updates.fields = normalized.fields;
+    }
     if (body.onSubmitTagId !== undefined) updates.onSubmitTagId = body.onSubmitTagId;
     if (body.onSubmitScenarioId !== undefined) updates.onSubmitScenarioId = body.onSubmitScenarioId;
     if (body.onSubmitMessageType !== undefined) updates.onSubmitMessageType = body.onSubmitMessageType;
@@ -197,32 +481,170 @@ forms.put('/api/forms/:id', async (c) => {
   }
 });
 
-// DELETE /api/forms/:id
-forms.delete('/api/forms/:id', async (c) => {
+// GET /api/forms/:id/delete-impact — 回答・利用先・開けなくなるURLを同時に確認する。
+forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    return c.json({ success: true, data: authorized.impact });
+  } catch (error) {
+    console.error('GET /api/forms/:id/delete-impact error:', error);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
+  }
+});
+
+// POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
+forms.post('/api/forms/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const expectedRevision = typeof body.expectedRevision === 'number'
+      ? body.expectedRevision
+      : Number.NaN;
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
+
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!authorized.impact.canArchive) {
+      return c.json({
+        success: false,
+        error: 'form_already_archived',
+        message: 'この回答フォームはすでに保管されています。',
+        data: authorized.impact,
+      }, 409);
+    }
+
+    const archived = await archiveFormAtRevision(c.env.DB, c.req.param('id'), expectedRevision);
+    if (!archived) {
+      const latest = await getFormDeleteImpact(c.env.DB, c.req.param('id'), accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
+    return c.json({
+      success: true,
+      data: {
+        status: 'archived',
+        archivedAt: archived.archived_at,
+        retainedSubmissionCount: authorized.impact.submissionCount,
+        retainedOpenCount: authorized.impact.openCount,
+        retainedReferenceCount: authorized.impact.referenceCount,
+        answerUrlUnavailable: true,
+      },
+    });
+  } catch (error) {
+    if (error instanceof FormArchiveBodyError) {
+      return c.json({ success: false, error: error.message }, error.status);
+    }
+    console.error('POST /api/forms/:id/archive error:', error);
+    return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
+  }
+});
+
+// DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
+forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const form = await getFormById(c.env.DB, id);
-    if (!form) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+    const accountId = c.req.query('account_id')?.trim();
+    const expectedRevision = Number(c.req.query('expected_revision'));
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
-    await deleteForm(c.env.DB, id);
+    const authorized = await authorizedDeleteImpact(c, id, accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!authorized.impact.canDelete) {
+      return c.json({
+        success: false,
+        error: 'form_archive_required',
+        message: '公開中、回答あり、または利用中のため、削除せず停止・保管してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (!await deleteFormAtRevision(c.env.DB, id, expectedRevision)) {
+      const latest = await getFormDeleteImpact(c.env.DB, id, accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/forms/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
 
 // GET /api/forms/:id/submissions — list submissions
-forms.get('/api/forms/:id/submissions', async (c) => {
+forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const form = await getFormById(c.env.DB, id);
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const submissions = await getFormSubmissions(c.env.DB, id);
-    return c.json({ success: true, data: submissions.map(serializeSubmission) });
+    const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
+    if (!hasPagination) {
+      // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
+      const submissions = await getFormSubmissions(c.env.DB, id);
+      return c.json({ success: true, data: submissions.map(serializeSubmission) });
+    }
+    const page = Number(c.req.query('page') ?? '1');
+    const limit = Number(c.req.query('limit') ?? '20');
+    const submissions = await getFormSubmissionsPage(c.env.DB, id, { page, limit });
+    return c.json({
+      success: true,
+      data: {
+        items: submissions.items.map(serializeSubmission),
+        total: submissions.total,
+        page: submissions.page,
+        limit: submissions.limit,
+      },
+    });
   } catch (err) {
     console.error('GET /api/forms/:id/submissions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -233,16 +655,26 @@ forms.get('/api/forms/:id/submissions', async (c) => {
 forms.post('/api/forms/:id/opened', async (c) => {
   try {
     const formId = c.req.param('id');
-    const body = await c.req.json<{ lineUserId?: string; friendId?: string }>();
-    const lineUserId = body.lineUserId;
-    const friendId = body.friendId;
-
-    // Resolve friend
-    let friend = friendId
-      ? await getFriendById(c.env.DB, friendId)
-      : lineUserId
-        ? await getFriendByLineUserId(c.env.DB, lineUserId)
-        : null;
+    // 保管後のURLは開けない。回答だけでなく「開いた記録」も増やさない。
+    if (!await getFormById(c.env.DB, formId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    // Open analytics may remain anonymous, but a caller can only attribute an
+    // open to the LINE identity proven by its ID token. Body-supplied customer
+    // IDs are intentionally ignored.
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (identity && (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId))) {
+      // 関係のない公式アカウントから開いた記録を、このフォームへ混ぜない。
+      return c.json({ success: true });
+    }
+    const friend = identity
+      ? await getFriendByLineUserIdForAccount(
+          c.env.DB,
+          identity.lineUserId,
+          identity.lineAccountId,
+        )
+      : null;
 
     const now = jstNow();
     await c.env.DB.prepare(
@@ -265,15 +697,21 @@ forms.post('/api/forms/:id/opened', async (c) => {
 // POST /api/forms/:id/partial — save survey answers without x_username (public, used by LIFF page 1)
 forms.post('/api/forms/:id/partial', async (c) => {
   try {
-    const formId = c.req.param('id');
-    const body = await c.req.json<{ lineUserId?: string; friendId?: string; data?: Record<string, unknown> }>();
+    const body = await c.req.json<{ data?: Record<string, unknown> }>();
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, c.req.param('id'), identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
 
-    // Resolve friend
-    let friend = body.friendId
-      ? await getFriendById(c.env.DB, body.friendId)
-      : body.lineUserId
-        ? await getFriendByLineUserId(c.env.DB, body.lineUserId)
-        : null;
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
 
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
@@ -293,6 +731,152 @@ forms.post('/api/forms/:id/partial', async (c) => {
   }
 });
 
+/**
+ * POST /api/forms/:id/files — 回答に添付する画像を預かる（回答画面から使う）
+ *
+ * 友だちが送ってくるので、スタッフ用の `/api/images` は使えない。本人確認は
+ * LIFF の id_token で行う。
+ *
+ * 誰でも投げられる口にしないため、次を満たしたときだけ受け取る。
+ *
+ *   - id_token で本人が特定できる（＝この公式アカウントの友だち）
+ *   - フォームが公開中である
+ *   - そのフォームに、実際にファイルを受け取るブロックがある
+ *
+ * 3つ目が無いと、フォームIDさえ知っていれば誰でも画像置き場として使える。
+ */
+forms.post('/api/forms/:id/files', async (c) => {
+  try {
+    const formId = c.req.param('id');
+    const form = await getFormById(c.env.DB, formId);
+    if (!form) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    if (!form.is_active) {
+      return c.json({ success: false, error: 'このフォームは受け付けていません' }, 400);
+    }
+
+    const layout = parseLayout(form.layout, form.fields);
+    const acceptsFile = collectInputs(layout).some((block) => block.type === 'file');
+    if (!acceptsFile) {
+      return c.json({ success: false, error: 'このフォームはファイルを受け付けていません' }, 400);
+    }
+
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
+    if (!friend) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+
+    const mimeType = (c.req.header('Content-Type') || '').split(';')[0].trim();
+    const extension = FORM_UPLOAD_TYPES[mimeType];
+    if (!extension) {
+      return c.json(
+        { success: false, error: '画像は jpg・png・gif・webp・heic のいずれかで送ってください' },
+        400,
+      );
+    }
+
+    // 本文を読む前に、申告された長さで断れるものは断る。10MBを読み込んでから
+    // 大きすぎると返すのは、相手の通信量を無駄に使う。
+    const declared = Number(c.req.header('Content-Length') || 0);
+    if (declared > FORM_UPLOAD_MAX_BYTES) {
+      return c.json({ success: false, error: '画像は10MBまでです' }, 400);
+    }
+
+    const data = await c.req.arrayBuffer();
+    if (data.byteLength === 0) {
+      return c.json({ success: false, error: 'ファイルが空です' }, 400);
+    }
+    if (data.byteLength > FORM_UPLOAD_MAX_BYTES) {
+      return c.json({ success: false, error: '画像は10MBまでです' }, 400);
+    }
+
+    // 誰の・どのフォームの添付かが、キーを見れば分かるようにしておく。
+    // 削除依頼が来たときに、消す対象をキーの形だけで絞り込める。
+    const key = `form-uploads/${formId}/${friend.id}/${crypto.randomUUID()}.${extension}`;
+    await c.env.IMAGES.put(key, data, {
+      httpMetadata: { contentType: mimeType },
+      customMetadata: { formId, friendId: friend.id },
+    });
+
+    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    return c.json(
+      { success: true, data: { key, url: `${workerUrl}/images/${key}`, mimeType, size: data.byteLength } },
+      201,
+    );
+  } catch (err) {
+    console.error('POST /api/forms/:id/files error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * GET /api/forms/:id/my-latest — 前回の自分の回答（回答画面から使う）
+ *
+ * オプションの「前回の回答を復元する」を入れているフォームだけが返す。
+ * 入れていないフォームで前の回答を返すと、本人が消したつもりの値が
+ * 別の端末で復活して見える。
+ */
+forms.get('/api/forms/:id/my-latest', async (c) => {
+  try {
+    const formId = c.req.param('id');
+    const form = await getFormById(c.env.DB, formId);
+    if (!form) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+
+    const layout = parseLayout(form.layout, form.fields);
+    if (!layout.options?.restorePrevious) {
+      return c.json({ success: true, data: null });
+    }
+
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
+    if (!friend) {
+      return c.json({ success: true, data: null });
+    }
+
+    const latest = await getLatestFormSubmission(c.env.DB, formId, friend.id);
+    if (!latest) {
+      return c.json({ success: true, data: null });
+    }
+
+    let answers: Record<string, unknown> = {};
+    try {
+      answers = JSON.parse(latest.data || '{}') as Record<string, unknown>;
+    } catch {
+      answers = {};
+    }
+    return c.json({ success: true, data: { answers, createdAt: latest.created_at } });
+  } catch (err) {
+    console.error('GET /api/forms/:id/my-latest error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // POST /api/forms/:id/submit — submit form (public, used by LIFF)
 forms.post('/api/forms/:id/submit', async (c) => {
   try {
@@ -306,74 +890,100 @@ forms.post('/api/forms/:id/submit', async (c) => {
     }
 
     const body = await c.req.json<{
-      lineUserId?: string;
-      friendId?: string;
       data?: Record<string, unknown>;
-      _skipWebhook?: boolean;
       trackedLinkId?: string;
     }>();
 
     const submissionData = body.data ?? {};
 
-    // Validate required fields
-    const fields = JSON.parse(form.fields || '[]') as Array<{
-      name: string;
-      label: string;
-      type: string;
-      required?: boolean;
-    }>;
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
+    if (!friend) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const friendId = friend.id;
 
-    for (const field of fields) {
-      if (field.required) {
-        const val = submissionData[field.name];
-        if (val === undefined || val === null || val === '') {
-          return c.json(
-            { success: false, error: `${field.label} は必須項目です` },
-            400,
-          );
+    // 受け付けてよいかを見る。
+    //
+    // layout を持つフォームは、必須だけでなく入力制限・選択数・回答期限・
+    // 1人1回・総数・選択肢の定員まで、ここで断る。断る理由はそのまま
+    // 回答画面に出るので、日本語で返す。
+    //
+    // layout が無い（昔のまま編集していない）フォームは、これまでどおり
+    // fields の必須だけを見る。
+    const layout: FormLayout | null = form.layout ? parseLayout(form.layout) : null;
+
+    if (layout) {
+      const rejected = await checkFormGates({
+        db: c.env.DB,
+        formId,
+        layout,
+        friendId,
+        submitCount: form.submit_count ?? 0,
+        answers: submissionData,
+      });
+      if (rejected) {
+        return c.json({ success: false, error: rejected }, 400);
+      }
+    } else {
+      const fields = JSON.parse(form.fields || '[]') as Array<{
+        name: string;
+        label: string;
+        type: string;
+        required?: boolean;
+      }>;
+
+      for (const field of fields) {
+        if (field.required) {
+          const val = submissionData[field.name];
+          if (val === undefined || val === null || val === '') {
+            return c.json(
+              { success: false, error: `${field.label} は必須項目です` },
+              400,
+            );
+          }
         }
       }
     }
 
-    // Resolve friend by lineUserId or friendId
-    let friendId: string | null = body.friendId ?? null;
-    if (!friendId && body.lineUserId) {
-      const friend = await getFriendByLineUserId(c.env.DB, body.lineUserId);
-      if (friend) {
-        friendId = friend.id;
-      }
-    }
-
-    // Webhook gate — skip if client pre-verified via repliers endpoint
+    // Browser-side verification is UX only. The server always performs the
+    // authoritative webhook check; client-supplied skip flags are discarded.
     delete submissionData._webhookVerified;
-    const skipWebhook = Boolean(body._skipWebhook);
     delete submissionData._skipWebhook;
     let webhookData: Record<string, unknown> | null = null;
-    if (form.on_submit_webhook_url && !skipWebhook) {
+    if (form.on_submit_webhook_url) {
       const webhookResult = await callFormWebhook(form, submissionData);
       webhookData = webhookResult.data as Record<string, unknown> | null;
       if (!webhookResult.passed) {
         // Webhook rejected — send fail message and stop
-        if (form.on_submit_webhook_fail_message && friendId) {
-          const friend = await getFriendById(c.env.DB, friendId);
-          if (friend?.line_user_id) {
+        if (form.on_submit_webhook_fail_message) {
+          if (friend.line_user_id) {
             try {
-              const { LineClient } = await import('@line-crm/line-sdk');
-              let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
-              if ((friend as unknown as Record<string, unknown>).line_account_id) {
-                const { getLineAccountById } = await import('@line-crm/db');
-                const account = await getLineAccountById(c.env.DB, (friend as unknown as Record<string, unknown>).line_account_id as string);
-                if (account) accessToken = account.channel_access_token;
-              }
-              const lineClient = new LineClient(accessToken);
-              await lineClient.pushMessage(friend.line_user_id, [{ type: 'text', text: form.on_submit_webhook_fail_message }]);
-              await c.env.DB
-                .prepare(
-                  `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-                   VALUES (?, ?, 'outgoing', 'text', ?, NULL, NULL, 'auto_reply', ?)`,
-                )
-                .bind(crypto.randomUUID(), friend.id, form.on_submit_webhook_fail_message, jstNow())
-                .run();
+              const accessToken = await resolveFriendAccessToken(
+                c.env.DB,
+                friend,
+                c.env.LINE_CHANNEL_ACCESS_TOKEN,
+                'forms.webhook-failure-send',
+              );
+              await pushViaHarnessProxy(
+                new URL(c.req.url).origin,
+                accessToken,
+                friend.line_user_id,
+                [{ type: 'text', text: form.on_submit_webhook_fail_message }],
+                crypto.randomUUID(),
+                (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
+              );
             } catch (e) {
               console.error('Failed to send webhook fail message:', e);
             }
@@ -382,22 +992,44 @@ forms.post('/api/forms/:id/submit', async (c) => {
         // Still save the submission for records
         const submission = await createFormSubmission(c.env.DB, {
           formId,
-          friendId: friendId || null,
+          friendId,
           data: JSON.stringify({ ...submissionData, _webhookResult: webhookResult.data }),
         });
         return c.json({ success: true, data: { ...serializeSubmission(submission), webhookPassed: false, webhookData: webhookResult.data } }, 201);
       }
     }
 
-    // Save submission (friendId null if not resolved — avoids FK constraint)
+    // Save submission against the authenticated caller only.
     const submission = await createFormSubmission(c.env.DB, {
       formId,
-      friendId: friendId || null,
+      friendId,
       data: JSON.stringify(submissionData),
     });
 
+    await awardActivityMileage(c.env.DB, {
+      eventType: 'form_submitted',
+      source: 'form',
+      sourceEventId: submission.id,
+      friendId,
+      subjectKey: formId,
+      metadata: { formId, formName: form.name },
+      occurredAt: submission.created_at,
+    });
+
+    const executionCtx = optionalExecutionCtx(c);
+    if (executionCtx && identity.lineAccountId) executionCtx.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: identity.lineAccountId,
+        eventType: 'form_submitted',
+        sourceEventId: submission.id,
+        friendId,
+        eventData: { formId, submissionId: submission.id },
+      })
+        .catch((error) => console.error('form automation event failed:', error)),
+    );
+
     // Side effects (best-effort, don't fail the request)
-    if (friendId) {
+    {
       const db = c.env.DB;
       const now = jstNow();
 
@@ -448,6 +1080,85 @@ forms.post('/api/forms/:id/submit', async (c) => {
         );
       }
 
+      // layout を持つフォームは、こちらで回答を配る。
+      //
+      // 登録先（情報欄・本名・システム表示名・個別メモ）、選択肢ごとの
+      // タグ／情報欄／動作、日付から動かすリマインダ、回答後の動作までを
+      // まとめて実行する。失敗しても送信は成功のまま（保存は済んでいる）。
+      if (layout) {
+        sideEffects.push(
+          applyFormLayoutEffects({
+            db,
+            layout,
+            friendId: friendId!,
+            answers: submissionData,
+            push: {
+              defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+              workerUrl: c.env.WORKER_URL,
+            },
+            pushText: async (text: string) => {
+              const target = await getFriendById(db, friendId!);
+              if (!target?.line_user_id) return;
+              const accessToken = await resolveFriendAccessToken(
+                db,
+                target,
+                c.env.LINE_CHANNEL_ACCESS_TOKEN,
+                'forms.layout-text-send',
+              );
+              await pushViaHarnessProxy(
+                new URL(c.req.url).origin,
+                accessToken,
+                target.line_user_id,
+                [{ type: 'text', text }],
+                crypto.randomUUID(),
+                (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
+              );
+            },
+          }).catch((err) => console.error('form layout effects failed:', err)),
+        );
+      }
+
+      // 回答を友だち情報欄へ書く。
+      //
+      // フォームの項目に friendFieldId を持たせておくと、その項目の回答が
+      // 友だち情報欄に入る。ここが「フォーム → 情報欄 → 友だち詳細 →
+      // テンプレートの差し込み」の線をつなぐ一点。
+      //
+      // metadata への保存とは別に持つ。metadata は形が決まっていない
+      // 置き場で、情報欄は型と差し込み名を持つ。両方に入れておけば、
+      // 既存の {{metadata.KEY}} を使っているテンプレートも壊れない。
+      sideEffects.push(
+        (async () => {
+          // layout があるときは applyFormLayoutEffects が書くので、ここは
+          // 動かさない。同じ値を2回書いても結果は同じだが、ECが正かどうかの
+          // 判定を2度走らせるだけ無駄になる。
+          if (layout) return;
+          const formFields = parseFormFields(form.fields);
+          const targets = formFields.filter((f) => f.friendFieldId);
+          if (targets.length === 0) return;
+          const { setFriendFieldValue, getFriendFieldById } = await import('@line-crm/db');
+          for (const field of targets) {
+            const answer = submissionData[field.name ?? field.id ?? ''];
+            if (answer === undefined) continue;
+            // ECが正の項目には書かない。フォームの回答で上書きすると、
+            // 次のEC同期で戻り、入れたはずの値が消えたように見える。
+            const target = await getFriendFieldById(db, field.friendFieldId!);
+            if (!target || target.ec_is_master === 1) continue;
+            await setFriendFieldValue(db, {
+              friendId: friendId!,
+              fieldId: field.friendFieldId!,
+              value:
+                answer == null
+                  ? null
+                  : Array.isArray(answer)
+                    ? answer.join(', ')
+                    : String(answer),
+              updatedBy: 'form',
+            });
+          }
+        })().catch((err) => console.error('form -> friend_fields failed:', err)),
+      );
+
       // Add tag — guarded attach so a tag_added-triggered scenario fires on
       // first-time submit (and never re-fires on duplicate submits).
       if (form.on_submit_tag_id) {
@@ -468,14 +1179,12 @@ forms.post('/api/forms/:id/submit', async (c) => {
           (async () => {
             const friend = await getFriendById(db, friendId!);
             if (!friend?.line_user_id) return;
-            const { LineClient } = await import('@line-crm/line-sdk');
-            let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
-            if ((friend as unknown as Record<string, unknown>).line_account_id) {
-              const { getLineAccountById } = await import('@line-crm/db');
-              const account = await getLineAccountById(db, (friend as unknown as Record<string, unknown>).line_account_id as string);
-              if (account) accessToken = account.channel_access_token;
-            }
-            const lineClient = new LineClient(accessToken);
+            const accessToken = await resolveFriendAccessToken(
+              db,
+              friend,
+              c.env.LINE_CHANNEL_ACCESS_TOKEN,
+              'forms.meet-link-send',
+            );
             const joinUrl = String(webhookData!.join_url);
             const meetFlex = {
               type: 'bubble',
@@ -504,16 +1213,14 @@ forms.post('/api/forms/:id/submit', async (c) => {
                 paddingAll: '16px',
               },
             };
-            await lineClient.pushMessage(friend.line_user_id, [
-              { type: 'flex', altText: 'ヒアリングの準備ができました', contents: meetFlex },
-            ]);
-            await db
-              .prepare(
-                `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-                 VALUES (?, ?, 'outgoing', 'flex', ?, NULL, NULL, 'auto_reply', ?)`,
-              )
-              .bind(crypto.randomUUID(), friend.id, JSON.stringify(meetFlex), jstNow())
-              .run();
+            await pushViaHarnessProxy(
+              new URL(c.req.url).origin,
+              accessToken,
+              friend.line_user_id,
+              [{ type: 'flex', altText: 'ヒアリングの準備ができました', contents: meetFlex }],
+              crypto.randomUUID(),
+              (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
+            );
           })(),
         );
       }
@@ -523,17 +1230,14 @@ forms.post('/api/forms/:id/submit', async (c) => {
         (async () => {
           console.log('Form reply: starting for friendId', friendId);
           const friend = await getFriendById(db, friendId!);
-          if (!friend?.line_user_id) { console.log('Form reply: no line_user_id'); return; }
-          console.log('Form reply: sending to', friend.line_user_id);
-          const { LineClient } = await import('@line-crm/line-sdk');
-          // Resolve access token from friend's account (multi-account support)
-          let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
-          if ((friend as unknown as Record<string, unknown>).line_account_id) {
-            const { getLineAccountById } = await import('@line-crm/db');
-            const account = await getLineAccountById(db, (friend as unknown as Record<string, unknown>).line_account_id as string);
-            if (account) accessToken = account.channel_access_token;
-          }
-          const lineClient = new LineClient(accessToken);
+          if (!friend?.line_user_id) { console.log('Form reply: no LINE recipient'); return; }
+          console.log('Form reply: sending');
+          const accessToken = await resolveFriendAccessToken(
+            db,
+            friend,
+            c.env.LINE_CHANNEL_ACCESS_TOKEN,
+            'forms.reply-send',
+          );
           const { buildMessage, expandVariables } = await import('../services/step-delivery.js');
           const apiOrigin = new URL(c.req.url).origin;
           const { resolveMetadata } = await import('../services/step-delivery.js');
@@ -592,7 +1296,9 @@ forms.post('/api/forms/:id/submit', async (c) => {
             messages.push(rewardFromTrackedLink as ReturnType<typeof buildMessage>);
           } else if (form.on_submit_message_type && form.on_submit_message_content) {
             // Custom form message replaces default diagnostic result
-            const expanded = expandVariables(form.on_submit_message_content, friendData, apiOrigin, form.on_submit_message_type);
+            const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
+            const extra = await resolveInterpolationExtra(db, friend.id, form.on_submit_message_content);
+            const expanded = expandVariables(form.on_submit_message_content, friendData, apiOrigin, form.on_submit_message_type, extra);
             // 1:1 push → /t リンクに f=<friendId> を焼き込み (LIFF 識別ホップ回避)
             const { appendFriendToTrackedLinks } = await import('../services/auto-track.js');
             const decorated = await appendFriendToTrackedLinks(db, expanded, apiOrigin, friend.id);
@@ -602,23 +1308,15 @@ forms.post('/api/forms/:id/submit', async (c) => {
             messages.push(buildMessage('flex', JSON.stringify(resultFlex)));
           }
 
-          await lineClient.pushMessage(friend.line_user_id, messages);
-
-          // Mirror every pushed message into messages_log so the dashboard chat
-          // view stays consistent with what the user actually receives in LINE.
-          // Without this the form's auto-reply is invisible to operators.
-          const { messageToLogPayload } = await import('../services/step-delivery.js');
-          const sentAt = jstNow();
-          for (const m of messages) {
-            const payload = messageToLogPayload(m);
-            await db
-              .prepare(
-                `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-                 VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'auto_reply', ?)`,
-              )
-              .bind(crypto.randomUUID(), friend.id, payload.messageType, payload.content, sentAt)
-              .run();
-          }
+          // プロキシが LINE 送信と messages_log 記録を一体で行う。
+          await pushViaHarnessProxy(
+            new URL(c.req.url).origin,
+            accessToken,
+            friend.line_user_id,
+            messages,
+            crypto.randomUUID(),
+            (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
+          );
         })(),
       );
 

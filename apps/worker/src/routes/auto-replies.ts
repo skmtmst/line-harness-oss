@@ -1,15 +1,82 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   getAutoReplies,
   getAutoReplyById,
   createAutoReply,
   updateAutoReply,
   deleteAutoReply,
+  getAutoReplyHitCounts,
+  jstNow,
+  getFolderById,
 } from '@line-crm/db';
 import type { AutoReply as DbAutoReply } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { currentMonthRange } from '../lib/jst-range.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const autoReplies = new Hono<Env>();
+
+async function validateAutoReplyFolder(
+  db: D1Database,
+  folderId: unknown,
+): Promise<string | null> {
+  if (folderId === null || folderId === '' || folderId === undefined) return null;
+  if (typeof folderId !== 'string') return 'folderId must be a string';
+  const folder = await getFolderById(db, folderId);
+  if (!folder) return 'フォルダが見つかりません';
+  if (folder.kind !== 'auto_reply') return '自動応答用ではないフォルダは選べません';
+  return null;
+}
+
+async function requireVisibleAutoReply(c: Context<Env>, next: () => Promise<void>) {
+  const item = await getAutoReplyById(c.env.DB, c.req.param('id')!);
+  if (!item || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [item.line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+  }
+  await next();
+}
+
+/** LINE から届くメッセージの種別。ここに無いものは対象にできない。 */
+const MESSAGE_KINDS = ['text', 'image', 'video', 'audio', 'file', 'location', 'sticker', 'postback'];
+
+function readPriority(raw: unknown): { ok: true; value: number } | { ok: false } {
+  const n = Number(raw);
+  // 上下に余裕を持たせる。間に挿し込めないと、並べ替えのたびに
+  // 全件を振り直すことになる。
+  if (!Number.isInteger(n) || n < -9999 || n > 9999) return { ok: false };
+  return { ok: true, value: n };
+}
+
+function readMessageKinds(raw: unknown): { ok: true; value: string[] | null } | { ok: false } {
+  if (raw === null || raw === undefined || (Array.isArray(raw) && raw.length === 0)) {
+    return { ok: true, value: null };
+  }
+  if (!Array.isArray(raw)) return { ok: false };
+  if (raw.some((v) => typeof v !== 'string' || !MESSAGE_KINDS.includes(v))) return { ok: false };
+  return { ok: true, value: raw as string[] };
+}
+
+
+/** "HH:MM"（24時間表記）かどうか。空文字と null は「指定なし」。 */
+function parseHhmm(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === null || value === undefined || value === '') return { ok: true, value: null };
+  if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return { ok: false };
+  return { ok: true, value };
+}
+
+/** 分。0 は「抑制しない」なので null に寄せる。 */
+function parseCooldown(value: unknown): { ok: true; value: number | null } | { ok: false } {
+  if (value === null || value === undefined || value === '') return { ok: true, value: null };
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 10_080) return { ok: false };
+  return { ok: true, value: n === 0 ? null : n };
+}
 
 interface EffectiveAccount {
   accountId: string;
@@ -27,8 +94,199 @@ interface SerializedAutoReply {
   templateId: string | null;
   lineAccountId: string | null;
   isActive: boolean;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  cooldownMinutes: number | null;
+  skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string[] | null;
+  /** 151: 応答したときに順に実行すること。 */
+  actions: unknown[] | null;
+  /** 151: 応答する曜日（0=日 … 6=土）。null なら曜日を問わない。 */
+  responseWeekdays: number[] | null;
+  /** 151: 'ignore' | 'include' | 'exclude'。 */
+  responseHolidayRule: string | null;
+  /** 151: 1人につき1回だけ応答する。 */
+  oncePerFriend: boolean;
+  /** 151: キーワードの複数行。null なら keyword / matchType を見る。 */
+  keywords: unknown[] | null;
+  /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
+  friendConditions: unknown | null;
+  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  respondToAll: boolean;
+  /** 158: 管理用の名前。空なら keyword を代わりに出す。 */
+  name: string | null;
+  /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+  keywordMatchMode: string;
+  /** フォルダ。分けていなければ null。 */
+  folderId: string | null;
+  /** 152: 当たった回数。一覧でだけ入る。 */
+  hits?: { period: number; total: number };
   createdAt: string;
   effectiveAccounts?: EffectiveAccount[];
+}
+
+const HOLIDAY_RULES = ['ignore', 'include', 'exclude'] as const;
+/** 151 で増えた設定をまとめて読む。作成と更新で同じものを使う。 */
+function readExtras(body: Record<string, unknown>):
+  | { ok: true; value: {
+      actions?: unknown[] | null;
+      responseWeekdays?: number[] | null;
+      responseHolidayRule?: string | null;
+      oncePerFriend?: boolean;
+      keywords?: unknown[] | null;
+      friendConditions?: unknown | null;
+      respondToAll?: boolean;
+      name?: string | null;
+      keywordMatchMode?: 'any' | 'all';
+      folderId?: string | null;
+    } }
+  | { ok: false; error: string } {
+  const value: Record<string, unknown> = {};
+
+  if ('actions' in body) {
+    const parsed = readActions(body.actions);
+    if (!parsed.ok) return { ok: false, error: 'actions must be an array' };
+    value.actions = parsed.value;
+  }
+  if ('responseWeekdays' in body) {
+    const parsed = readWeekdays(body.responseWeekdays);
+    if (!parsed.ok) return { ok: false, error: 'responseWeekdays must be integers from 0 (Sun) to 6 (Sat)' };
+    value.responseWeekdays = parsed.value;
+  }
+  if ('responseHolidayRule' in body) {
+    const parsed = readHolidayRule(body.responseHolidayRule);
+    if (!parsed.ok) return { ok: false, error: `responseHolidayRule must be one of ${HOLIDAY_RULES.join(', ')}` };
+    value.responseHolidayRule = parsed.value;
+  }
+  if ('oncePerFriend' in body) {
+    if (typeof body.oncePerFriend !== 'boolean') {
+      return { ok: false, error: 'oncePerFriend must be boolean' };
+    }
+    value.oncePerFriend = body.oncePerFriend;
+  }
+  if ('keywords' in body) {
+    const parsed = readKeywords(body.keywords);
+    if (!parsed.ok) {
+      return { ok: false, error: 'keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? }' };
+    }
+    value.keywords = parsed.value;
+  }
+  if ('friendConditions' in body) {
+    const parsed = readFriendConditions(body.friendConditions);
+    if (!parsed.ok) return { ok: false, error: 'friendConditions must be valid JSON' };
+    value.friendConditions = parsed.value;
+  }
+  if ('respondToAll' in body) {
+    if (typeof body.respondToAll !== 'boolean') {
+      return { ok: false, error: 'respondToAll must be boolean' };
+    }
+    value.respondToAll = body.respondToAll;
+  }
+  if ('folderId' in body) {
+    if (body.folderId === null || body.folderId === '') {
+      value.folderId = null;
+    } else if (typeof body.folderId !== 'string') {
+      return { ok: false, error: 'folderId must be a string' };
+    } else {
+      value.folderId = body.folderId;
+    }
+  }
+  if ('keywordMatchMode' in body) {
+    if (body.keywordMatchMode !== 'any' && body.keywordMatchMode !== 'all') {
+      return { ok: false, error: "keywordMatchMode must be 'any' or 'all'" };
+    }
+    value.keywordMatchMode = body.keywordMatchMode;
+  }
+  if ('name' in body) {
+    if (body.name === null || body.name === '') {
+      value.name = null;
+    } else if (typeof body.name !== 'string') {
+      return { ok: false, error: 'name must be a string' };
+    } else if ([...body.name].length > 250) {
+      return { ok: false, error: 'name must be 250 characters or fewer' };
+    } else {
+      value.name = body.name;
+    }
+  }
+
+  return { ok: true, value };
+}
+
+
+
+type Read<T> = { ok: true; value: T } | { ok: false };
+
+/** 応答したときに実行することの並び。 */
+function readActions(raw: unknown): Read<unknown[] | null> {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (!Array.isArray(raw)) return { ok: false };
+  return { ok: true, value: raw.length > 0 ? raw : null };
+}
+
+/** 応答する曜日（0=日 … 6=土）。 */
+function readWeekdays(raw: unknown): Read<number[] | null> {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (!Array.isArray(raw)) return { ok: false };
+  if (raw.some((v) => !Number.isInteger(v) || (v as number) < 0 || (v as number) > 6)) {
+    return { ok: false };
+  }
+  return { ok: true, value: raw.length > 0 ? (raw as number[]) : null };
+}
+
+function readHolidayRule(raw: unknown): Read<string | null> {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (typeof raw !== 'string' || !HOLIDAY_RULES.includes(raw as (typeof HOLIDAY_RULES)[number])) {
+    return { ok: false };
+  }
+  return { ok: true, value: raw };
+}
+
+/** キーワードの複数行。1行ずつ言葉と当て方を持つ。 */
+function readKeywords(raw: unknown): Read<unknown[] | null> {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (!Array.isArray(raw)) return { ok: false };
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return { ok: false };
+    const r = item as Record<string, unknown>;
+    if (typeof r.keyword !== 'string' || r.keyword === '') return { ok: false };
+    if (r.matchType !== undefined && r.matchType !== 'exact' && r.matchType !== 'contains') {
+      return { ok: false };
+    }
+    if (r.minLength !== undefined && (!Number.isInteger(r.minLength) || (r.minLength as number) < 0)) {
+      return { ok: false };
+    }
+  }
+  return { ok: true, value: raw.length > 0 ? raw : null };
+}
+
+/**
+ * 友だちの絞り込み。読めない JSON は断る。
+ *
+ * 保存できてしまうと、応答のたびに黙って「返さない」に倒れる（判定側が
+ * そうしている）。設定した人からは、当たるはずのルールが動かないだけに見える。
+ */
+function readFriendConditions(raw: unknown): Read<unknown | null> {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (typeof raw === 'object') return { ok: true, value: raw };
+  if (typeof raw === 'string') {
+    try {
+      return { ok: true, value: JSON.parse(raw) };
+    } catch {
+      return { ok: false };
+    }
+  }
+  return { ok: false };
+}
+
+/** 保存されている JSON を読む。壊れていても画面を落とさない。 */
+function readJson<T>(raw: string | null | undefined): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
 function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
@@ -41,6 +299,24 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     templateId: row.template_id,
     lineAccountId: row.line_account_id,
     isActive: Boolean(row.is_active),
+    activeFrom: row.active_from,
+    activeUntil: row.active_until,
+    cooldownMinutes: row.cooldown_minutes,
+    skipWhenOperatorActive: Boolean(row.skip_when_operator_active),
+    priority: Number(row.priority ?? 0),
+    messageKinds: row.message_kinds_json
+      ? (JSON.parse(row.message_kinds_json) as string[])
+      : null,
+    actions: readJson<unknown[]>(row.actions_json),
+    responseWeekdays: readJson<number[]>(row.response_weekdays_json),
+    responseHolidayRule: row.response_holiday_rule,
+    oncePerFriend: Boolean(row.once_per_friend),
+    keywords: readJson<unknown[]>(row.keywords_json),
+    friendConditions: readJson<unknown>(row.friend_conditions_json),
+    respondToAll: Boolean(row.respond_to_all),
+    name: row.name,
+    keywordMatchMode: row.keyword_match_mode ?? 'any',
+    folderId: row.folder_id,
     createdAt: row.created_at,
   };
 }
@@ -117,9 +393,25 @@ autoReplies.get('/api/auto-replies', async (c) => {
     const activeAccounts = accRes.results ?? [];
     const automationIdx = await buildAutomationKeywordIndex(c.env.DB);
 
+    // 当たった回数（152）。今月と累計を並べて出す。
+    // 数が取れなくても一覧は出す。付随情報なので、落ちても本体は止めない。
+    const range = currentMonthRange(jstNow());
+    let hitsById = new Map<string, { period: number; total: number }>();
+    try {
+      const counts = await getAutoReplyHitCounts(
+        c.env.DB,
+        accountId || null,
+        range.from,
+        range.to,
+      );
+      hitsById = new Map(counts.map((h) => [h.autoReplyId, { period: h.period, total: h.total }]));
+    } catch (err) {
+      console.error('GET /api/auto-replies — failed to count hits', err);
+    }
+
     const data: SerializedAutoReply[] = await Promise.all(
       items.map(async (row) => {
-        const base = serializeAutoReply(row);
+        const base = { ...serializeAutoReply(row), hits: hitsById.get(row.id) ?? { period: 0, total: 0 } };
         base.effectiveAccounts = await computeEffectiveAccounts(c.env.DB, row, activeAccounts, automationIdx);
         return base;
       }),
@@ -133,6 +425,8 @@ autoReplies.get('/api/auto-replies', async (c) => {
 });
 
 // GET /api/auto-replies/:id — get by ID
+autoReplies.use('/api/auto-replies/:id', requireVisibleAutoReply);
+autoReplies.use('/api/auto-replies/:id/*', requireVisibleAutoReply);
 autoReplies.get('/api/auto-replies/:id', async (c) => {
   try {
     const id = c.req.param('id');
@@ -148,7 +442,7 @@ autoReplies.get('/api/auto-replies/:id', async (c) => {
 });
 
 // POST /api/auto-replies — create
-autoReplies.post('/api/auto-replies', async (c) => {
+autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       keyword: string;
@@ -157,15 +451,56 @@ autoReplies.post('/api/auto-replies', async (c) => {
       responseContent?: string;
       templateId?: string | null;
       lineAccountId?: string | null;
+      activeFrom?: unknown;
+      activeUntil?: unknown;
+      cooldownMinutes?: unknown;
+      skipWhenOperatorActive?: unknown;
+      priority?: unknown;
+      messageKinds?: unknown;
+      respondToAll?: boolean;
+      name?: string | null;
+      keywordMatchMode?: 'any' | 'all';
+      folderId?: string | null;
     }>();
 
-    if (!body.keyword) {
+    // 一律で応答するルール（157）はキーワードを見ないので、空でも作れる。
+    // ただし列は NOT NULL なので、空文字を入れておく。
+    if (!body.keyword && body.respondToAll !== true) {
       return c.json({ success: false, error: 'keyword is required' }, 400);
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     // template_id があれば content は空でも OK (template から resolve される)。
     // silent も content 不要。それ以外は inline content 必須。
     if (!body.templateId && !body.responseContent && body.responseType !== 'silent') {
       return c.json({ success: false, error: 'templateId or responseContent required (unless responseType=silent)' }, 400);
+    }
+
+    const activeFrom = parseHhmm(body.activeFrom);
+    const activeUntil = parseHhmm(body.activeUntil);
+    const cooldown = parseCooldown(body.cooldownMinutes);
+    if (!activeFrom.ok || !activeUntil.ok) {
+      return c.json({ success: false, error: 'activeFrom/activeUntil must be HH:MM' }, 400);
+    }
+    if (!cooldown.ok) {
+      return c.json(
+        { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
+        400,
+      );
+    }
+    const priority = body.priority === undefined ? { ok: true as const, value: 0 } : readPriority(body.priority);
+    if (!priority.ok) {
+      return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+    }
+    const messageKinds = readMessageKinds(body.messageKinds);
+    if (!messageKinds.ok) {
+      return c.json(
+        { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
+        400,
+      );
     }
 
     // template_id が来てて content/type が空の場合、template の現在値を inline
@@ -182,13 +517,25 @@ autoReplies.post('/api/auto-replies', async (c) => {
       }
     }
 
+    const extras = readExtras(body as Record<string, unknown>);
+    if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
+    const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
+
     const item = await createAutoReply(c.env.DB, {
-      keyword: body.keyword,
+      ...extras.value,
+      keyword: body.keyword ?? '',
       matchType: body.matchType,
       responseType: resolvedResponseType,
       responseContent: resolvedResponseContent,
       templateId: body.templateId ?? null,
       lineAccountId: body.lineAccountId ?? null,
+      activeFrom: activeFrom.value,
+      activeUntil: activeUntil.value,
+      cooldownMinutes: cooldown.value,
+      skipWhenOperatorActive: body.skipWhenOperatorActive === true,
+      priority: priority.value,
+      messageKinds: messageKinds.value,
     });
 
     return c.json({ success: true, data: serializeAutoReply(item) }, 201);
@@ -199,7 +546,7 @@ autoReplies.post('/api/auto-replies', async (c) => {
 });
 
 // PUT /api/auto-replies/:id — update
-autoReplies.put('/api/auto-replies/:id', async (c) => {
+autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -210,6 +557,12 @@ autoReplies.put('/api/auto-replies/:id', async (c) => {
       templateId?: string | null;
       lineAccountId?: string | null;
       isActive?: boolean;
+      activeFrom?: unknown;
+      activeUntil?: unknown;
+      cooldownMinutes?: unknown;
+      skipWhenOperatorActive?: unknown;
+      priority?: unknown;
+      messageKinds?: unknown;
     }>();
 
     const input: Record<string, unknown> = {};
@@ -218,8 +571,56 @@ autoReplies.put('/api/auto-replies/:id', async (c) => {
     if (body.responseType !== undefined) input.responseType = body.responseType;
     if (body.responseContent !== undefined) input.responseContent = body.responseContent;
     if ('templateId' in body) input.templateId = body.templateId;
-    if ('lineAccountId' in body) input.lineAccountId = body.lineAccountId;
+    if ('lineAccountId' in body) {
+      if (body.lineAccountId !== null && body.lineAccountId !== undefined) {
+        if (!body.lineAccountId
+          || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+          return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+        }
+      }
+      input.lineAccountId = body.lineAccountId;
+    }
     if (body.isActive !== undefined) input.isActive = body.isActive;
+    if ('activeFrom' in body) {
+      const parsed = parseHhmm(body.activeFrom);
+      if (!parsed.ok) return c.json({ success: false, error: 'activeFrom must be HH:MM' }, 400);
+      input.activeFrom = parsed.value;
+    }
+    if ('activeUntil' in body) {
+      const parsed = parseHhmm(body.activeUntil);
+      if (!parsed.ok) return c.json({ success: false, error: 'activeUntil must be HH:MM' }, 400);
+      input.activeUntil = parsed.value;
+    }
+    if ('cooldownMinutes' in body) {
+      const parsed = parseCooldown(body.cooldownMinutes);
+      if (!parsed.ok) {
+        return c.json(
+          { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
+          400,
+        );
+      }
+      input.cooldownMinutes = parsed.value;
+    }
+    if ('skipWhenOperatorActive' in body) {
+      input.skipWhenOperatorActive = body.skipWhenOperatorActive === true;
+    }
+    if ('priority' in body) {
+      const parsed = readPriority(body.priority);
+      if (!parsed.ok) {
+        return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+      }
+      input.priority = parsed.value;
+    }
+    if ('messageKinds' in body) {
+      const parsed = readMessageKinds(body.messageKinds);
+      if (!parsed.ok) {
+        return c.json(
+          { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
+          400,
+        );
+      }
+      input.messageKinds = parsed.value;
+    }
 
     // templateId が新たに set されて responseContent が来てない場合は template の
     // 現在値を inline snapshot として書き込む (ON DELETE SET NULL の fallback 用)。
@@ -231,6 +632,12 @@ autoReplies.put('/api/auto-replies/:id', async (c) => {
         if (body.responseType === undefined) input.responseType = tpl.message_type;
       }
     }
+
+    const extras = readExtras(body as Record<string, unknown>);
+    if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
+    const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    Object.assign(input, extras.value);
 
     const updated = await updateAutoReply(c.env.DB, id, input as Parameters<typeof updateAutoReply>[2]);
 
@@ -246,7 +653,7 @@ autoReplies.put('/api/auto-replies/:id', async (c) => {
 });
 
 // DELETE /api/auto-replies/:id
-autoReplies.delete('/api/auto-replies/:id', async (c) => {
+autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const item = await getAutoReplyById(c.env.DB, id);

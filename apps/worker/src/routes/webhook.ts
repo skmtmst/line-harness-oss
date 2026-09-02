@@ -1,11 +1,15 @@
 import { Hono } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
+import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
+import { parseCarouselPostbackData } from '../lib/carousel-tap.js';
+import { handleCarouselTap } from '../services/carousel-tap.js';
+import { handleRichMenuTap } from '../services/rich-menu-tap.js';
 import type { WebhookRequestBody, WebhookEvent, TextEventMessage } from '@line-crm/line-sdk';
 import { createStickerMessageContent } from '@line-crm/shared';
 import {
   upsertFriend,
   updateFriendFollowStatus,
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
   getScenarios,
   enrollFriendInScenario,
   upsertChatOnMessage,
@@ -13,12 +17,30 @@ import {
   jstNow,
   getEntryRouteByRefCode,
   getMessageTemplateById,
+  getFriendAddScenarioIds,
+  resolveLineCredential,
+  recordFriendAddEvent,
+  captureFriendAddEventAttribution,
+  markFriendAddEventRouting,
+  toJstString,
+  recordAnalyticsEvent,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
+import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import { fireEvent } from '../services/event-bus.js';
-import { buildMessage, expandVariables } from '../services/step-delivery.js';
+import { matchAndReply } from '../services/auto-reply.js';
+import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
+import { parseQuestionPostback } from '../services/scenario-question.js';
+import { handleQuestionAnswer } from '../services/scenario-question-answer.js';
 import type { Env } from '../index.js';
+import { awardActivityMileage } from '../services/activity-mileage.js';
+import { createEccubeCoupon } from '../services/eccube-coupon.js';
+import { issueFriendAddCoupon } from '../services/friend-add-coupon.js';
+import {
+  classifyLineWebhookError,
+  processLineWebhookEvents,
+} from '../services/line-webhook-events.js';
 
 const webhook = new Hono<Env>();
 
@@ -28,13 +50,55 @@ const webhook = new Hono<Env>();
 // 128 MB Cloudflare Workers memory ceiling.
 const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024; // 1 MiB
 
+function logWebhookStepFailure(
+  stage: string,
+  error: unknown,
+  lineAccountId: string | null,
+  event?: WebhookEvent,
+): void {
+  console.error({
+    event: 'line_webhook_step_failed',
+    stage,
+    webhook_event_id: event?.webhookEventId ?? null,
+    line_account_id: lineAccountId,
+    event_type: event?.type ?? null,
+    reason: classifyLineWebhookError(error),
+  });
+}
+
+async function recordWebhookAnalyticsEvent(
+  db: D1Database,
+  lineAccountId: string | null,
+  event: WebhookEvent,
+  input: {
+    friendId?: string | null;
+    eventType: string;
+    dimensions?: Record<string, unknown>;
+  },
+): Promise<void> {
+  if (!lineAccountId) return;
+  try {
+    await recordAnalyticsEvent(db, {
+      lineAccountId,
+      friendId: input.friendId,
+      eventType: input.eventType,
+      sourceKind: 'line_webhook',
+      sourceId: event.webhookEventId,
+      occurredAt: new Date(event.timestamp).toISOString(),
+      dimensions: input.dimensions,
+    });
+  } catch (error) {
+    logWebhookStepFailure('analytics_event_record', error, lineAccountId, event);
+  }
+}
+
 async function ensureFriendFromWebhookUser(
   db: D1Database,
   lineClient: LineClient,
   userId: string,
   lineAccountId: string | null,
 ): Promise<Friend | null> {
-  let friend = await getFriendByLineUserId(db, userId);
+  let friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
 
   if (!friend) {
     let profile: Awaited<ReturnType<LineClient['getProfile']>> | null = null;
@@ -44,19 +108,22 @@ async function ensureFriendFromWebhookUser(
       // A signed webhook already proves this user interacted with the bot.
       // If profile lookup is temporarily unavailable, keep the event processable
       // by creating the friend with the LINE userId and filling profile later.
-      console.error('[webhook] Failed to get profile for unknown user', userId, err);
+      logWebhookStepFailure('unknown_user_profile', err, lineAccountId);
     }
 
     friend = await upsertFriend(db, {
       lineUserId: userId,
+      lineAccountId,
       displayName: profile?.displayName ?? null,
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
     });
-    console.log(`[webhook] auto-registered existing friend userId=${userId} friendId=${friend.id}`);
+    console.log({ event: 'line_webhook_friend_registered', line_account_id: lineAccountId });
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
+    // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、別アカウントの
+    // 行を「移動」せず、このアカウント用のfriend行を新規作成する。
     const now = jstNow();
     await db
       .prepare('UPDATE friends SET line_account_id = ?, is_following = 1, updated_at = ? WHERE id = ?')
@@ -156,15 +223,24 @@ webhook.post('/webhook', async (c) => {
   const lineClient = new LineClient(channelAccessToken);
 
   // 非同期処理 — LINE は ~1s 以内のレスポンスを要求
-  const processingPromise = (async () => {
-    for (const event of body.events) {
-      try {
-        await handleEvent(db, lineClient, event, channelAccessToken, matchedAccountId, c.env.WORKER_URL || new URL(c.req.url).origin, c.env.LIFF_URL, c.env.IMAGES);
-      } catch (err) {
-        console.error('Error handling webhook event:', err);
-      }
-    }
-  })();
+  const processingPromise = processLineWebhookEvents({
+    db,
+    events: body.events,
+    lineAccountId: matchedAccountId,
+    handle: (event) => handleEvent(
+      db,
+      lineClient,
+      event,
+      channelAccessToken,
+      matchedAccountId,
+      c.env.WORKER_URL || new URL(c.req.url).origin,
+      c.env.LIFF_URL,
+      c.env.IMAGES,
+      c.env.NEN_EC_BASE_URL && c.env.ECCUBE_WEBHOOK_SECRET
+        ? { baseUrl: c.env.NEN_EC_BASE_URL, secret: c.env.ECCUBE_WEBHOOK_SECRET }
+        : undefined,
+    ),
+  });
 
   c.executionCtx.waitUntil(processingPromise);
 
@@ -180,39 +256,83 @@ async function handleEvent(
   workerUrl?: string,
   liffUrl?: string,
   r2?: R2Bucket,
+  ecommerce?: { baseUrl: string; secret: string },
 ): Promise<void> {
   if (event.type === 'follow') {
     const userId =
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    console.log(`[follow] userId=${userId} lineAccountId=${lineAccountId}`);
+    console.log({
+      event: 'line_webhook_follow_received',
+      webhook_event_id: event.webhookEventId,
+      line_account_id: lineAccountId,
+      event_type: event.type,
+    });
 
     // プロフィール取得 & 友だち登録/更新
     let profile;
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error('Failed to get profile for', userId, err);
+      logWebhookStepFailure('follow_profile', err, lineAccountId, event);
     }
-
-    console.log(`[follow] profile=${profile?.displayName ?? 'null'}`);
 
     const friend = await upsertFriend(db, {
       lineUserId: userId,
+      lineAccountId,
       displayName: profile?.displayName ?? null,
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
     });
+    const friendKind = (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time';
 
-    console.log(`[follow] friend.id=${friend.id} friend.line_account_id=${(friend as any).line_account_id}`);
+    // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
+    // 再追加でも「今回開いたリンク」が取れた場合だけ候補を結び付ける。
+    let friendAddEventId: string | null = null;
+    if (lineAccountId) {
+      try {
+        friendAddEventId = await recordFriendAddEvent(db, {
+          lineAccountId,
+          friendId: friend.id,
+          webhookEventId: event.webhookEventId,
+          friendKind,
+          isUnblockedHint:
+            typeof (event as unknown as { follow?: { isUnblocked?: unknown } }).follow?.isUnblocked === 'boolean'
+              ? Boolean((event as unknown as { follow: { isUnblocked: boolean } }).follow.isUnblocked)
+              : null,
+          occurredAt: toJstString(new Date(event.timestamp)),
+        });
+      } catch (err) {
+        // 台帳の移行が遅れても、既存の友だち追加配信は止めない。
+        logWebhookStepFailure('friend_add_event_record', err, lineAccountId, event);
+      }
+    }
 
     // Set line_account_id for multi-account tracking (always update on follow)
     if (lineAccountId) {
       await db.prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
         .bind(lineAccountId, jstNow(), friend.id).run();
-      console.log(`[follow] line_account_id set to ${lineAccountId} for friend ${friend.id}`);
+      console.log({
+        event: 'line_webhook_friend_account_linked',
+        webhook_event_id: event.webhookEventId,
+        line_account_id: lineAccountId,
+        event_type: event.type,
+      });
     }
+
+    // 新規・再フォローのどちらでも、最初の友だち登録マイルを同じキーで非同期投入する。
+    // first_followed_at を使うため再フォローやWebhook再送では二重加算されない。
+    const firstFollowedAt = friend.first_followed_at ?? friend.created_at;
+    await awardActivityMileage(db, {
+      eventType: 'friend_registered',
+      source: 'line_relationship',
+      sourceEventId: `${friend.id}:friend_registered:${firstFollowedAt}`,
+      friendId: friend.id,
+      subjectKey: friend.id,
+      metadata: { lineAccountId },
+      occurredAt: firstFollowedAt,
+    });
 
     // Resolve referral link (entry_route) for this friend.
     // /auth/callback (OAuth path) writes friends.ref_code in parallel with
@@ -221,7 +341,26 @@ async function handleEvent(
     // otherwise override mode and intro pushes silently fall back to the
     // account default whenever the webhook wins the race.
     const { getFriendById } = await import('@line-crm/db');
-    let friendRefCode = (friend as { ref_code?: string | null }).ref_code ?? null;
+    let currentAttribution: { refCode: string; entryRouteId: string | null } | null = null;
+    if (friendAddEventId && lineAccountId) {
+      for (let attempt = 0; attempt < 5 && !currentAttribution; attempt++) {
+        try {
+          currentAttribution = await captureFriendAddEventAttribution(db, {
+            eventId: friendAddEventId,
+            lineAccountId,
+            friendId: friend.id,
+          });
+        } catch (err) {
+          logWebhookStepFailure('friend_add_attribution_capture', err, lineAccountId, event);
+          break;
+        }
+        if (!currentAttribution) await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    let friendRefCode = currentAttribution?.refCode
+      ?? (friend as { ref_code?: string | null }).ref_code
+      ?? null;
     if (!friendRefCode) {
       for (let attempt = 0; attempt < 5; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -239,13 +378,91 @@ async function handleEvent(
     const runAccountScenarios =
       !referralRoute || referralRoute.run_account_friend_add_scenarios !== 0;
 
+    // 友だち追加時の配信の振り分け（設計 V2 4-6）。
+    //
+    // 設定が保存されているアカウントは、相手が「はじめて」か「以前からの友だち・
+    // ブロックを解除した人」かを見て、流すシナリオを1本に絞る。
+    //
+    // **保存されていないアカウントは routed:false が返る。** そのときは下の
+    // いままでどおりの経路（有効な friend_add シナリオを全部流す）に落ちる。
+    // ここを既定で絞ると、設定していないアカウントで配信が止まる。
+    let routing: Awaited<ReturnType<typeof applyFriendAddRouting>> | null = null;
+    try {
+      routing = runAccountScenarios
+        ? await applyFriendAddRouting(db, lineAccountId, friend, {
+            defaultAccessToken: lineAccessToken,
+            workerUrl,
+          })
+        : null;
+    } catch (err) {
+      if (friendAddEventId && lineAccountId) {
+        try {
+          await markFriendAddEventRouting(db, {
+            eventId: friendAddEventId,
+            lineAccountId,
+            status: 'failed',
+          });
+        } catch (ledgerErr) {
+          logWebhookStepFailure('friend_add_event_mark_failed', ledgerErr, lineAccountId, event);
+        }
+      }
+      throw err;
+    }
+    if (friendAddEventId && lineAccountId) {
+      try {
+        await markFriendAddEventRouting(db, {
+          eventId: friendAddEventId,
+          lineAccountId,
+          status: routing?.suppressed ? 'suppressed' : 'completed',
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
+      }
+    }
+
+    if (routing?.routed) {
+      for (const { scenarioId, enrollment, resumed } of routing.enrollments) {
+        try {
+          // 「前回読んだところから」で再開したぶんは、ここで1通目を出さない。
+          // 出すと続きではなく最初の1通がもう一度届く。次の通は
+          // next_delivery_at を見て cron が出す。
+          if (resumed) continue;
+          if (routing.timing !== 'immediate') continue;
+          const sent = await pushImmediateFirstStep(
+            db,
+            friend.id,
+            scenarioId,
+            { defaultAccessToken: lineAccessToken, workerUrl },
+            {
+              enrollment,
+              reply: { client: lineClient, replyToken: event.replyToken },
+              skipCooldown: true,
+            },
+          );
+          if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
+        } catch (err) {
+          logWebhookStepFailure('routed_scenario_delivery', err, lineAccountId, event);
+        }
+      }
+      if (routing.suppressed) {
+        console.log(`[friend-add-routing] suppressed (kind=${routing.kind})`);
+      }
+    }
+
     // friend_add シナリオに登録（このアカウントのシナリオのみ）
     // Skip entirely when a referral link explicitly overrides (run_account_friend_add_scenarios=0).
-    const scenarios = runAccountScenarios ? await getScenarios(db) : [];
+    // 振り分け設定があるアカウントはここを通らない（上で1本に絞ってある）。
+    const scenarios = runAccountScenarios && !routing?.routed ? await getScenarios(db) : [];
+    /*
+     * 「友だち追加で始まる」は scenario_triggers から引く（128）。
+     * 1本のシナリオに複数のきっかけを持たせられるようにしたため、
+     * scenarios.trigger_type は判断に使わない。
+     */
+    const friendAddIds = scenarios.length > 0 ? new Set(await getFriendAddScenarioIds(db)) : new Set<string>();
     for (const scenario of scenarios) {
       // Only trigger scenarios belonging to this account (or unassigned for backward compat)
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
-      if (scenario.trigger_type === 'friend_add' && scenario.is_active && scenarioAccountMatch) {
+      if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
         try {
           // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
@@ -271,9 +488,9 @@ async function handleEvent(
               skipCooldown: true,
             },
           );
-          if (sent) console.log(`Immediate delivery: sent scenario ${scenario.id} step 1 to ${userId}`);
+          if (sent) console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
         } catch (err) {
-          console.error('Failed to enroll friend in scenario', scenario.id, err);
+          logWebhookStepFailure('scenario_enrollment', err, lineAccountId, event);
         }
       }
     }
@@ -290,7 +507,7 @@ async function handleEvent(
             console.log(`[follow] referral intro push sent route=${referralRoute.id}`);
           }
         } catch (err) {
-          console.error('[follow] referral intro push failed', err);
+          logWebhookStepFailure('referral_intro_push', err, lineAccountId, event);
         }
       }
 
@@ -314,13 +531,40 @@ async function handleEvent(
             );
           }
         } catch (err) {
-          console.error('[follow] referral scenario enrollment failed', err);
+          logWebhookStepFailure('referral_scenario_enrollment', err, lineAccountId, event);
         }
       }
     }
 
+    // NENの友だち追加クーポンは、アカウント別設定が有効な場合だけ初回追加時に発行する。
+    // 再フォローとWebhook再送は発行台帳の一意制約でも二重発行を防ぐ。
+    if ('first_time' === friendKind && lineAccountId && ecommerce) {
+      try {
+        await issueFriendAddCoupon(db, {
+          lineAccountId,
+          friendId: friend.id,
+          now: new Date(event.timestamp),
+        }, {
+          createCoupon: (coupon) => createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, coupon),
+          sendText: (text) => lineClient.pushMessage(userId, [{ type: 'text', text }]).then(() => undefined),
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_coupon', err, lineAccountId, event);
+      }
+    }
+
     // イベントバス発火: friend_add（replyToken は Step 0 で使用済みの可能性あり）
-    await fireEvent(db, 'friend_add', { friendId: friend.id, eventData: { displayName: friend.display_name } }, lineAccessToken, lineAccountId);
+    await fireEvent(db, 'friend_add', {
+      sourceEventId: event.webhookEventId,
+      sourceKind: 'line_webhook',
+      occurredAt: new Date(event.timestamp).toISOString(),
+      friendId: friend.id,
+      eventData: {
+        displayName: friend.display_name,
+        friendKind,
+        attributionStatus: currentAttribution ? 'captured' : 'unavailable',
+      },
+    }, lineAccessToken, lineAccountId);
     return;
   }
 
@@ -329,7 +573,12 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    await updateFriendFollowStatus(db, userId, false);
+    const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
+    await updateFriendFollowStatus(db, userId, false, lineAccountId);
+    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      friendId: friend?.id,
+      eventType: 'friend_unfollow',
+    });
     return;
   }
 
@@ -342,74 +591,154 @@ async function handleEvent(
     const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
     if (!friend) return;
 
-    const postbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
 
-    // Match postback data against auto_replies (exact match on keyword)
-    const autoReplyQuery = lineAccountId
-      ? `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?) ORDER BY created_at ASC`
-      : `SELECT * FROM auto_replies WHERE is_active = 1 AND line_account_id IS NULL ORDER BY created_at ASC`;
-    const autoReplyStmt = db.prepare(autoReplyQuery);
-    const autoReplies = await (lineAccountId ? autoReplyStmt.bind(lineAccountId) : autoReplyStmt)
-      .all<{
-        id: string;
-        keyword: string;
-        match_type: 'exact' | 'contains';
-        response_type: string;
-        response_content: string;
-        template_id: string | null;
-      }>();
+    /*
+     * リッチメニューのボタン。
+     *
+     * どのボタンが押されたかを知るために、publish のときに data の先頭へ area の
+     * id を付けている。ここで剥がして、運用者が設定した本来の data だけを下流へ流す。
+     * 自動応答やオートメーションは「data がこの文字列と一致したら」で判定しているので、
+     * こちらの都合で付けた目印を混ぜたままにすると、今まで当たっていた条件に
+     * 当たらなくなる。
+     *
+     * 剥がすついでに、そのボタンに設定された動き（タグ付け・スコア加算・
+     * テンプレート送信）をここで実行する。
+     */
+    /*
+     * カルーセルの選択肢。
+     *
+     * リッチメニューと同じ考え方で、data にテンプレートと選択肢の番号を入れて
+     * ある。押されたら、その選択肢に設定されたアクションを実行する。
+     * 「1人につき1回まで」の制限にかかっていれば、決めたテキストを返して終わる。
+     */
+    const carouselTap = parseCarouselPostbackData(rawPostbackData);
+    if (carouselTap) {
+      await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+        friendId: friend.id,
+        eventType: 'postback_received',
+        dimensions: { matched: true },
+      });
+      try {
+        const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
+          lineAccountId,
+          replyToken: event.replyToken,
+        });
+        // 制限にかかったときは、ここで終わる。自動応答まで回すと、
+        // 「もう押せません」と自動応答の両方が届く。
+        if (result.kind === 'blocked') return;
+      } catch (err) {
+        logWebhookStepFailure('carousel_tap', err, lineAccountId, event);
+      }
+      // カルーセルの data は運用者が組んだ文字列ではないので、自動応答の
+      // キーワード照合には回さない。
+      return;
+    }
+
+    const tap = parseTapPostbackData(rawPostbackData);
+    let postbackReplyToken: string | undefined = event.replyToken;
+    let tapLabel: string | null = null;
+    if (tap) {
+      try {
+        const tapResult = await handleRichMenuTap(db, lineClient, friend, tap.areaId, {
+          lineAccountId,
+          replyToken: postbackReplyToken,
+        });
+        if (tapResult.replyTokenConsumed) postbackReplyToken = undefined;
+        tapLabel = tapResult.target?.label ?? null;
+      } catch (err) {
+        // ボタンの動きが失敗しても、下の自動応答までは止めない。
+        logWebhookStepFailure('rich_menu_tap', err, lineAccountId, event);
+      }
+    }
+    const postbackData = tap ? (tap.inner ?? '') : rawPostbackData;
+    // 押されたボタンに本来の data が無い（テンプレートを送るだけ等）ときは、
+    // トーク履歴に空行を残さないようボタン名を出す。
+    const postbackLogText =
+      postbackData || (tapLabel ? `[メニュー] ${tapLabel}` : '[メニュー]');
+
+    /*
+     * シナリオの質問メッセージの選択肢。
+     *
+     * data が `sq:<stepId>:<index>` の形なら、こちらで処理して抜ける。
+     * auto_replies のキーワード照合には回さない。`sq:...` は利用者が
+     * 打った言葉ではないので、キーワードに当たっても意味がない。
+     *
+     * 記録も向こうで取る（押した回数を数えるのに、記録より先に読む必要が
+     * あるため）。
+     */
+    const questionHit = parseQuestionPostback(postbackData);
+    if (questionHit) {
+      const answered = await handleQuestionAnswer(
+        db,
+        lineClient,
+        friend,
+        { ...questionHit, lineAccountId },
+        postbackReplyToken,
+      );
+      if (answered.handled) {
+        await fireEvent(db, 'postback_received', {
+          sourceEventId: event.webhookEventId,
+          sourceKind: 'line_webhook',
+          occurredAt: new Date(event.timestamp).toISOString(),
+          friendId: friend.id,
+          eventData: { text: postbackData, matched: true },
+          replyToken: answered.replyTokenConsumed ? undefined : postbackReplyToken,
+        }, lineAccessToken, lineAccountId);
+        return;
+      }
+    }
 
     // postback の incoming 自体を messages_log に記録する。Rich Menu のタップで
-     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
-     // delivery_type='push' は厳密には push ではないが、incoming/non-test として
-     // 既存 chat list / 詳細 SQL のフィルタを通すための妥当な値 (auto_reply text 同様)。
+    // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
+    // delivery_type='push' は厳密には push ではないが、incoming/non-test として
+    // 既存 chat list / 詳細 SQL のフィルタを通すための妥当な値 (auto_reply text 同様)。
     try {
       await db
         .prepare(
           `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
            VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
         )
-        .bind(crypto.randomUUID(), friend.id, postbackData, lineAccountId ?? null, jstNow())
+        .bind(crypto.randomUUID(), friend.id, postbackLogText, lineAccountId ?? null, jstNow())
         .run();
     } catch (err) {
-      console.error('Failed to log incoming postback', err);
+      logWebhookStepFailure('incoming_postback_log', err, lineAccountId, event);
     }
 
-    for (const rule of autoReplies.results) {
-      const isMatch = rule.match_type === 'exact'
-        ? postbackData === rule.keyword
-        : postbackData.includes(rule.keyword);
+    // postback data を auto_replies にマッチさせて返信 (テキスト経路と共通)。
+    // silent + automation で「返信なしでタグだけ付ける」構成もここで成立する。
+    // 本来の data が無いボタン（テンプレートを送るだけ等）は、自動応答の
+    // キーワード照合に回さない。空文字はどのキーワードとも照らし合わせようがない。
+    // 返信の権利（replyToken）を先にテンプレート送信で使い切っている場合も回さない。
+    // 自動応答は reply でしか返せないので、使い切った後に呼ぶと送信が失敗する。
+    const { matched: postbackMatched, replyTokenConsumed: postbackReplyTokenConsumed } =
+      postbackData && postbackReplyToken
+        ? await matchAndReply(db, lineClient, friend, postbackData, postbackReplyToken, {
+            lineAccountId,
+            workerUrl,
+            logContext: 'postback',
+            messageKind: 'postback',
+          })
+        : { matched: false, replyTokenConsumed: false };
 
-      if (isMatch) {
-        try {
-          const { resolveMetadata } = await import('../services/step-delivery.js');
-          const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
-          const resolved = await resolveAutoReplyContent(db, {
-            template_id: rule.template_id,
-            response_type: rule.response_type,
-            response_content: rule.response_content,
-          });
-          const expandedContent = expandVariables(resolved.content, { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1], workerUrl, resolved.messageType);
-          const replyMsg = buildMessage(resolved.messageType, expandedContent);
-          await lineClient.replyMessage(event.replyToken, [replyMsg]);
+    // イベントバス発火: 専用イベント postback_received。
+    // postback.data を text に載せることで、IF-THEN 自動化の keyword /
+    // keyword_exact 条件がリッチメニューのタップ（タグ付与等）に効く。
+    // message_received を流用しないのは意図的 — 流用すると既存インストールの
+    // message_received スコアリング・catch-all 自動化・送信 Webhook 購読者が
+    // メニュータップで誤発火し、条件側に source を見る術がないため。
+    // なお upsertChatOnMessage は呼ばない: メニュータップは自発メッセージでは
+    // ないので、未対応 inbox を汚さないのが正しい (テキスト経路との意図的な差分)。
+    await fireEvent(db, 'postback_received', {
+      sourceEventId: event.webhookEventId,
+      sourceKind: 'line_webhook',
+      occurredAt: new Date(event.timestamp).toISOString(),
+      friendId: friend.id,
+      // data が無いボタンでも、ボタン名でオートメーションを組めるようにする。
+      eventData: { text: postbackData || tapLabel || '', matched: postbackMatched },
+      replyToken: postbackReplyTokenConsumed ? undefined : postbackReplyToken,
+    }, lineAccessToken, lineAccountId);
 
-          // 送信ログ — Rich Menu 経由の Flex 応答もチャット詳細に残るようにする。
-          // テキスト auto_reply (line ~390) と同じパターン。
-          const { messageToLogPayload: logPayload } = await import('../services/step-delivery.js');
-          const replyPayload = logPayload(replyMsg);
-          await db
-            .prepare(
-              `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
-               VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'reply', 'auto_reply', ?, ?)`,
-            )
-            .bind(crypto.randomUUID(), friend.id, replyPayload.messageType, replyPayload.content, lineAccountId ?? null, jstNow())
-            .run();
-        } catch (err) {
-          console.error('Failed to send postback reply', err);
-        }
-        break;
-      }
-    }
     return;
   }
 
@@ -468,18 +797,31 @@ async function handleEvent(
       }
     }
 
+    const logId = crypto.randomUUID();
     await db
       .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-         VALUES (?, ?, 'incoming', ?, ?, NULL, NULL, 'user', ?)`,
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+         VALUES (?, ?, 'incoming', ?, ?, NULL, NULL, 'user', ?, ?)`,
       )
-      .bind(crypto.randomUUID(), friend.id, msg.type, finalContent, jstNow())
+      .bind(logId, friend.id, msg.type, finalContent, lineAccountId, jstNow())
       .run();
+    await awardActivityMileage(db, {
+      eventType: 'message_received',
+      source: 'line',
+      sourceEventId: logId,
+      friendId: friend.id,
+      metadata: { messageType: msg.type },
+    });
     // text と同様、非 text の自発メッセージ (画像/スタンプ等) でも chat を unread に戻す。
     // これが無いと resolved 除外 (unanswered-inbox CANDIDATES_SQL) が「解決済み後に
     // 画像だけ送ってきた友だち」をバッジ・未対応一覧から永久に落としてしまう。
     // 非 text は auto_reply keyword にマッチし得ないので常に要対応扱いで正しい。
     await upsertChatOnMessage(db, friend.id);
+    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      friendId: friend.id,
+      eventType: 'message_received',
+      dimensions: { messageType: msg.type, matched: false },
+    });
     return;
   }
 
@@ -499,11 +841,20 @@ async function handleEvent(
     // 受信メッセージをログに記録
     await db
       .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'user', ?)`,
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'user', ?, ?)`,
       )
-      .bind(logId, friend.id, incomingText, now)
+      .bind(logId, friend.id, incomingText, lineAccountId, now)
       .run();
+
+    await awardActivityMileage(db, {
+      eventType: 'message_received',
+      source: 'line',
+      sourceEventId: logId,
+      friendId: friend.id,
+      metadata: { messageType: 'text' },
+      occurredAt: now,
+    });
 
     // Cross-account trigger: send message from another account via UUID
     if (incomingText === '体験を完了する' && lineAccountId) {
@@ -512,13 +863,17 @@ async function handleEvent(
         if (friendRecord?.user_id) {
           // Find the same user on other accounts
           const otherFriends = await db.prepare(
-            'SELECT f.line_user_id, la.channel_access_token FROM friends f INNER JOIN line_accounts la ON la.id = f.line_account_id WHERE f.user_id = ? AND f.line_account_id != ? AND f.is_following = 1'
-          ).bind(friendRecord.user_id, lineAccountId).all<{ line_user_id: string; channel_access_token: string }>();
+            'SELECT f.line_user_id, f.line_account_id, la.channel_access_token, la.channel_access_token_encrypted FROM friends f INNER JOIN line_accounts la ON la.id = f.line_account_id WHERE f.user_id = ? AND f.line_account_id != ? AND f.is_following = 1'
+          ).bind(friendRecord.user_id, lineAccountId).all<{ line_user_id: string; line_account_id: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
 
           for (const other of otherFriends.results) {
-            const otherClient = new LineClient(other.channel_access_token);
-            const { buildMessage: bm } = await import('../services/step-delivery.js');
-            await otherClient.pushMessage(other.line_user_id, [bm('flex', JSON.stringify({
+            const accessToken = await resolveLineCredential(
+              other.channel_access_token_encrypted,
+              other.channel_access_token,
+              { lineAccountId: other.line_account_id, field: 'channel_access_token' },
+            );
+            const otherClient = new LineClient(accessToken);
+            await otherClient.pushMessage(other.line_user_id, [buildMessage('flex', JSON.stringify({
               type: 'bubble', size: 'giga',
               header: { type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: '#fffbeb',
                 contents: [{ type: 'text', text: `${friend.display_name || ''}さんへ`, size: 'lg', weight: 'bold', color: '#1e293b' }],
@@ -553,78 +908,22 @@ async function handleEvent(
           return;
         }
       } catch (err) {
-        console.error('Cross-account trigger error:', err);
+        logWebhookStepFailure('cross_account_trigger', err, lineAccountId, event);
       }
     }
 
-    // 自動返信チェック（このアカウントのルール + グローバルルールのみ）
-    // NOTE: Auto-replies use replyMessage (free, no quota) instead of pushMessage
-    // The replyToken is only valid for ~1 minute after the message event
-    const autoReplyQuery = lineAccountId
-      ? `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?) ORDER BY created_at ASC`
-      : `SELECT * FROM auto_replies WHERE is_active = 1 AND line_account_id IS NULL ORDER BY created_at ASC`;
-    const autoReplyStmt = db.prepare(autoReplyQuery);
-    const autoReplies = await (lineAccountId ? autoReplyStmt.bind(lineAccountId) : autoReplyStmt)
-      .all<{
-        id: string;
-        keyword: string;
-        match_type: 'exact' | 'contains';
-        response_type: string;
-        response_content: string;
-        template_id: string | null;
-        is_active: number;
-        created_at: string;
-      }>();
-
-    let matched = false;
-    let replyTokenConsumed = false;
-    for (const rule of autoReplies.results) {
-      const isMatch =
-        rule.match_type === 'exact'
-          ? incomingText === rule.keyword
-          : incomingText.includes(rule.keyword);
-
-      if (isMatch) {
-        // silent タイプ: 返信しないが matched=true にして unread / push を抑止する
-        if (rule.response_type === 'silent') {
-          matched = true;
-          break;
-        }
-
-        try {
-          const { resolveMetadata: resolveMeta2 } = await import('../services/step-delivery.js');
-          const resolvedMeta2 = await resolveMeta2(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
-          const resolved = await resolveAutoReplyContent(db, {
-            template_id: rule.template_id,
-            response_type: rule.response_type,
-            response_content: rule.response_content,
-          });
-          const expandedContent = expandVariables(resolved.content, { ...friend, metadata: resolvedMeta2 } as Parameters<typeof expandVariables>[1], workerUrl, resolved.messageType);
-          const replyMsg = buildMessage(resolved.messageType, expandedContent);
-          await lineClient.replyMessage(event.replyToken, [replyMsg]);
-          replyTokenConsumed = true;
-
-          // 送信ログ（replyMessage = 無料）— derive content from the built
-          // reply message so any cleanEmptyNodes / parse-failure fallback is
-          // reflected in the dashboard.
-          const outLogId = crypto.randomUUID();
-          const { messageToLogPayload: logPayload2 } = await import('../services/step-delivery.js');
-          const wbAutoReplyPayload = logPayload2(replyMsg);
-          await db
-            .prepare(
-              `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, created_at)
-               VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'reply', 'auto_reply', ?)`,
-            )
-            .bind(outLogId, friend.id, wbAutoReplyPayload.messageType, wbAutoReplyPayload.content, jstNow())
-            .run();
-        } catch (err) {
-          console.error('Failed to send auto-reply', err);
-        }
-
-        matched = true;
-        break;
-      }
-    }
+    // 自動返信チェック（このアカウントのルール + グローバルルールのみ）。
+    // silent タイプは返信しないが matched=true になり unread / push を抑止する。
+    const { matched, replyTokenConsumed } = await matchAndReply(
+      db,
+      lineClient,
+      friend,
+      incomingText,
+      event.replyToken,
+      // 種別は LINE から届いたものをそのまま渡す。ルール側で
+      // 「画像には返さない」といった絞り込みができる。
+      { lineAccountId, workerUrl, messageKind: event.message?.type ?? 'text' },
+    );
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする
     if (!matched) {
@@ -634,6 +933,9 @@ async function handleEvent(
     // イベントバス発火: message_received
     // Pass replyToken only when auto_reply didn't actually consume it
     await fireEvent(db, 'message_received', {
+      sourceEventId: event.webhookEventId,
+      sourceKind: 'line_webhook',
+      occurredAt: new Date(event.timestamp).toISOString(),
       friendId: friend.id,
       eventData: { text: incomingText, matched },
       replyToken: replyTokenConsumed ? undefined : event.replyToken,
@@ -641,24 +943,6 @@ async function handleEvent(
 
     return;
   }
-}
-
-/**
- * auto_reply 行の content/type を resolve する。template_id が set なら templates
- * から取得、参照切れや NULL のときは inline response_content/response_type を使う。
- */
-async function resolveAutoReplyContent(
-  db: D1Database,
-  rule: { template_id: string | null; response_type: string; response_content: string },
-): Promise<{ messageType: string; content: string }> {
-  if (rule.template_id) {
-    const { getTemplateById } = await import('@line-crm/db');
-    const tpl = await getTemplateById(db, rule.template_id);
-    if (tpl) {
-      return { messageType: tpl.message_type, content: tpl.message_content };
-    }
-  }
-  return { messageType: rule.response_type, content: rule.response_content };
 }
 
 export { webhook };

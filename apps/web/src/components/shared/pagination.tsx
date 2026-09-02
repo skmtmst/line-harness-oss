@@ -1,0 +1,91 @@
+import React from 'react'
+import styles from './pagination.module.css'
+
+export type PaginationItem = number | 'ellipsis'
+
+export type PaginationProps = {
+  page: number
+  pageCount: number
+  onPageChange: (page: number) => void
+  ariaLabel?: string
+  disabled?: boolean
+  className?: string
+}
+
+/** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
+export function paginationItems(page: number, pageCount: number): PaginationItem[] {
+  const total = Math.max(1, Math.floor(pageCount))
+  const current = Math.min(total, Math.max(1, Math.floor(page)))
+
+  if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1)
+  if (current <= 3) return [1, 2, 3, 'ellipsis', total]
+  if (current >= total - 2) return [1, 'ellipsis', total - 2, total - 1, total]
+  return [1, 'ellipsis', current, 'ellipsis', total]
+}
+
+function Ellipsis() {
+  return (
+    <span className={[styles.item, styles.page].join(' ')} aria-hidden="true">
+      …
+    </span>
+  )
+}
+
+/**
+ * Pencil V5/V6 の `Blot6` を正本にした共通ページネーション。
+ * 見た目と省略規則は部品側に置き、呼び出し側は現在ページと変更処理だけを渡す。
+ */
+export default function Pagination({
+  page,
+  pageCount,
+  onPageChange,
+  ariaLabel = 'ページ送り',
+  disabled = false,
+  className,
+}: PaginationProps) {
+  const total = Math.max(1, Math.floor(pageCount))
+  const current = Math.min(total, Math.max(1, Math.floor(page)))
+  const classes = [styles.pagination, className].filter(Boolean).join(' ')
+
+  return (
+    <nav aria-label={ariaLabel} className={classes}>
+      <button
+        type="button"
+        className={[styles.item, styles.control].join(' ')}
+        onClick={() => onPageChange(current - 1)}
+        disabled={disabled || current <= 1}
+        aria-label="前のページ"
+      >
+        前へ
+      </button>
+      {paginationItems(current, total).map((item, index) =>
+        item === 'ellipsis' ? (
+          <Ellipsis key={`ellipsis-${index}`} />
+        ) : (
+          <button
+            type="button"
+            key={item}
+            className={[styles.item, styles.page, item === current ? styles.current : '']
+              .filter(Boolean)
+              .join(' ')}
+            onClick={() => onPageChange(item)}
+            disabled={disabled}
+            aria-label={`${item}ページ目へ`}
+            aria-current={item === current ? 'page' : undefined}
+          >
+            {item}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        className={[styles.item, styles.control].join(' ')}
+        onClick={() => onPageChange(current + 1)}
+        disabled={disabled || current >= total}
+        aria-label="次のページ"
+      >
+        次へ
+      </button>
+    </nav>
+  )
+}

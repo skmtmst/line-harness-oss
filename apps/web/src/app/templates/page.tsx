@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { api, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
-import CcPromptButton from '@/components/cc-prompt-button'
 import ImageUploader from '@/components/shared/image-uploader'
+import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { Tabs } from '@/components/shared/tabs'
+import styles from './templates-v6.module.css'
+import { useAccount } from '@/contexts/account-context'
 
 interface Template {
   id: string
@@ -13,7 +18,11 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  question: TemplateQuestion | null
+  questionStatus: 'draft' | 'published'
   usageCount: number
+  /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+  tapCount: number
   createdAt: string
   updatedAt: string
 }
@@ -24,28 +33,43 @@ interface TemplateDetail {
   category: string
   messageType: string
   messageContent: string
+  question: TemplateQuestion | null
+  questionStatus: 'draft' | 'published'
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
+    scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>
+    reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
+    richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
+    trackedLinks: Array<{ id: string; name: string }>
   }
   createdAt: string
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'unused'
+type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'question' | 'unused'
+
+const ASSET_KINDS: readonly BroadcastAssetKind[] = [
+  'card_message',
+  'rich_message',
+  'coupon',
+  'research',
+]
 
 const messageTypeLabels: Record<string, string> = {
   text: 'テキスト',
   image: '画像',
   flex: 'Flex',
   carousel: 'Carousel',
+  question: '質問',
 }
 
 const typeBadgeColor: Record<string, string> = {
-  text: 'bg-gray-100 text-gray-700',
+  text: 'bg-canvas-sunken text-ink-secondary',
   flex: 'bg-purple-100 text-purple-700',
-  image: 'bg-blue-100 text-blue-700',
+  image: 'bg-info-bg text-info',
   carousel: 'bg-amber-100 text-amber-700',
+  question: 'bg-accent-soft text-accent-deep',
 }
 
 function formatDate(iso: string): string {
@@ -58,85 +82,109 @@ function formatDate(iso: string): string {
   })
 }
 
-const ccPrompts = [
-  {
-    title: 'テンプレート作成',
-    prompt: `新しいメッセージテンプレートの作成をサポートしてください。
-1. 用途別（挨拶、キャンペーン、通知、フォローアップ）のテンプレート文例を提案
-2. テキスト・Flexメッセージそれぞれの効果的な使い方
-3. カテゴリ分類と命名規則のベストプラクティス
-手順を示してください。`,
-  },
-]
-
 export default function TemplatesPage() {
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const activeAccountRef = useRef<string | null>(selectedAccountId)
+  const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
+  const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
+  const [nameQuery, setNameQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [drawerData, setDrawerData] = useState<TemplateDetail | null>(null)
-  const [scenarioStepUsages, setScenarioStepUsages] = useState<Array<{
-    scenarioId: string
-    scenarioName: string
-    stepId: string
-    stepOrder: number
-  }>>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [editContent, setEditContent] = useState<string | null>(null)
   const [editName, setEditName] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
 
+  useEffect(() => {
+    activeAccountRef.current = selectedAccountId
+    setDrawerId(null)
+    setShowCreate(false)
+    setPendingDelete(null)
+    setDeleteError('')
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
+    if (!selectedAccountId) {
+      setTemplates([])
+      setLoadError('')
+      setLoading(false)
+      return
+    }
+    const accountId = selectedAccountId
     setLoading(true)
-    setError('')
+    setTemplates([])
+    setLoadError('')
     try {
-      const res = await api.templates.list()
+      const res = await api.templates.list(undefined, accountId)
+      if (activeAccountRef.current !== accountId) return
       if (res.success) {
         setTemplates(res.data)
       } else {
-        setError(res.error)
+        setLoadError('テンプレートを読み込めませんでした。もう一度お試しください。')
       }
     } catch {
-      setError('テンプレートの読み込みに失敗しました。')
+      if (activeAccountRef.current === accountId) {
+        setLoadError('テンプレートの読み込みに失敗しました。')
+      }
     } finally {
-      setLoading(false)
+      if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedAccountId) {
+      setAssetCounts({})
+      return () => { cancelled = true }
+    }
+    void Promise.all(
+      ASSET_KINDS.map(async (kind) => {
+        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
+        return [kind, result.success ? result.data.length : undefined] as const
+      }),
+    ).then((entries) => {
+      if (cancelled) return
+      setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
+
   // Drawer fetch
   useEffect(() => {
-    if (!drawerId) { setDrawerData(null); setDrawerError(null); setScenarioStepUsages([]); return }
+    if (!drawerId) { setDrawerData(null); setDrawerError(null); return }
     let cancelled = false
     setDrawerLoading(true)
     setDrawerError(null)
     setDrawerData(null)
-    setScenarioStepUsages([])
-    Promise.all([
-      api.templates.get(drawerId),
-      api.templates.usages(drawerId).catch(() => null),
-    ]).then(([detailRes, usagesRes]) => {
+    api.templates.get(drawerId).then((detailRes) => {
       if (cancelled) return
       if (detailRes.success && detailRes.data) {
         setDrawerData(detailRes.data)
       } else {
-        setDrawerError((detailRes as { error?: string }).error ?? '読み込みに失敗しました')
+        setDrawerError('テンプレートの詳細を読み込めませんでした。')
       }
-      if (usagesRes && usagesRes.success) {
-        setScenarioStepUsages(usagesRes.data.scenarioSteps)
-      }
-    }).catch((err) => {
+    }).catch(() => {
       if (cancelled) return
-      setDrawerError(err instanceof Error ? err.message : String(err))
+      setDrawerError('テンプレートの詳細を読み込めませんでした。')
     }).finally(() => {
       if (!cancelled) setDrawerLoading(false)
     })
@@ -147,18 +195,35 @@ export default function TemplatesPage() {
   useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
 
   const filteredTemplates = templates.filter((t) => {
+    // 名前は手元で絞る。打つたびに取り直すと重い。
+    if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
+      return false
+    }
+    if (selectedCategory !== 'all' && (t.category || '未分類') !== selectedCategory) return false
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
+    if (typeFilter === 'question') return Boolean(t.question)
+    if (typeFilter === 'text') return t.messageType === 'text' && t.question === null
     return t.messageType === typeFilter
   })
 
+  const categoryCounts = templates.reduce<Record<string, number>>((counts, template) => {
+    const category = template.category || '未分類'
+    counts[category] = (counts[category] ?? 0) + 1
+    return counts
+  }, {})
+
   const handleCreate = async () => {
+    if (!selectedAccountId) {
+      setFormError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
     if (!form.name.trim()) { setFormError('テンプレート名を入力してください'); return }
     if (!form.messageContent.trim()) { setFormError('メッセージ内容を入力してください'); return }
     setSaving(true)
     setFormError('')
     try {
-      const res = await api.templates.create(form)
+      const res = await api.templates.create({ ...form, accountId: selectedAccountId })
       if (res.success) {
         setShowCreate(false)
         setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
@@ -200,38 +265,167 @@ export default function TemplatesPage() {
     setSavingEdit(false)
   }
 
-  const handleDelete = async (id: string, usageCount: number) => {
+  const handleDelete = (template: Pick<Template, 'id' | 'name' | 'usageCount'>) => {
+    const { id, name, usageCount } = template
     if (usageCount > 0) {
-      if (!confirm(`このテンプレートは ${usageCount} 箇所で使用されています。削除すると参照がクリアされます。続行しますか？`)) return
-    } else {
-      if (!confirm('このテンプレートを削除しますか？')) return
+      setDrawerId(id)
+      setError(`${usageCount}件で使用中です。使用先を差し替えてから削除してください。`)
+      return
     }
+    setDeleteError('')
+    setPendingDelete({ id, name })
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    const target = pendingDelete
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.templates.delete(id)
-      if (drawerId === id) setDrawerId(null)
-      load()
+      const result = await api.templates.delete(target.id)
+      if (!result.success) {
+        setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
+        return
+      }
+      setPendingDelete(null)
+      if (drawerId === target.id) setDrawerId(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      setDeleteError('削除に失敗しました')
+    } finally {
+      setDeleting(false)
     }
   }
 
+  const scenarioStepUsages = drawerData?.usedBy.scenarioSteps ?? []
+  const reminderStepUsages = drawerData?.usedBy.reminderSteps ?? []
+  const richMenuAreaUsages = drawerData?.usedBy.richMenuAreas ?? []
+  const trackedLinkUsages = drawerData?.usedBy.trackedLinks ?? []
+  const drawerUsageCount = drawerData
+    ? drawerData.usedBy.autoReplies.length
+      + drawerData.usedBy.automations.length
+      + scenarioStepUsages.length
+      + reminderStepUsages.length
+      + richMenuAreaUsages.length
+      + trackedLinkUsages.length
+    : 0
+
   return (
     <div>
-      <Header
-        title="テンプレート管理"
-        action={
+      <div data-design="TypeTabs" data-design-node="W7LBc kcmGB">
+        <Tabs
+          items={[
+            {
+              label: 'メッセージ',
+              count: loading ? undefined : templates.length,
+              current: activeSection === 'message',
+              onClick: () => { setActiveSection('message'); setShowCreate(false) },
+            },
+            {
+              label: 'カルーセル',
+              count: assetCounts.card_message,
+              current: activeSection === 'card_message',
+              onClick: () => { setActiveSection('card_message'); setShowCreate(false) },
+            },
+            {
+              label: 'リッチメッセージ',
+              count: assetCounts.rich_message,
+              current: activeSection === 'rich_message',
+              onClick: () => { setActiveSection('rich_message'); setShowCreate(false) },
+            },
+            {
+              label: 'クーポン',
+              count: assetCounts.coupon,
+              current: activeSection === 'coupon',
+              onClick: () => { setActiveSection('coupon'); setShowCreate(false) },
+            },
+            {
+              label: 'リサーチ',
+              count: assetCounts.research,
+              current: activeSection === 'research',
+              onClick: () => { setActiveSection('research'); setShowCreate(false) },
+            },
+          ]}
+        />
+      </div>
+
+      {activeSection === 'message' && (
+        <div
+          className={`${styles.createActions} flex items-center justify-between`}
+          data-design="CreateActions"
+          data-design-node="W7LBc FuBeQ"
+        >
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                if (!selectedAccountId) {
+                  setError('上のバーでLINE公式アカウントを選んでください')
+                  return
+                }
+                setShowCreate(true)
+              }}
+              variant="primary"
+            >
+              テンプレートを作る
+            </Button>
+            <Button href="/templates/questions/new" variant="secondary">
+              質問を作る
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div className={styles.body} data-design="Body">
+      {activeSection === 'message' ? <>
+      <div className={styles.contentLayout}>
+      <aside className={`${styles.folderRail} bg-canvas border-hairline shrink-0 rounded-card border p-3`} aria-label="テンプレートのフォルダ">
+        <div className="text-ink-secondary mb-2 flex items-center justify-between text-xs font-bold">
+          <span>フォルダ</span>
+          <span>{Object.keys(categoryCounts).length}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSelectedCategory('all')}
+          className={`flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === 'all' ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+        >
+          <span>すべて</span>
+          <span className="text-xs tabular-nums">{templates.length}</span>
+        </button>
+        {Object.entries(categoryCounts).map(([category, count]) => (
           <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            key={category}
+            type="button"
+            onClick={() => setSelectedCategory(category)}
+            className={`mt-1 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === category ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+            title={category}
           >
-            + 新規テンプレート
+            <span className="min-w-0 truncate">{category}</span>
+            <span className="ml-2 shrink-0 text-xs tabular-nums">{count}</span>
           </button>
-        }
-      />
+        ))}
+      </aside>
+      <div className="min-w-0 flex-1">
+
+      <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
+        一覧からテンプレートの中身・使われている場所・送信数を確認できます。
+      </div>
+
+      {/* 検索と並び順（設計 `Body` の上）。 */}
+      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+        <input
+          type="search"
+          placeholder="テンプレート名で検索"
+          aria-label="テンプレート名で検索"
+          value={nameQuery}
+          onChange={(e) => setNameQuery(e.target.value)}
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+      </div>
+
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
@@ -243,15 +437,16 @@ export default function TemplatesPage() {
           { key: 'text', label: 'テキスト' },
           { key: 'flex', label: 'Flex' },
           { key: 'image', label: '画像' },
+          { key: 'question', label: '質問' },
           { key: 'unused', label: '未使用' },
         ] as const).map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTypeFilter(key)}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              typeFilter === key ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+              typeFilter === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
-            style={typeFilter === key ? { backgroundColor: '#06C755' } : undefined}
+            style={typeFilter === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
           >
             {label}
           </button>
@@ -260,33 +455,33 @@ export default function TemplatesPage() {
 
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">新規テンプレートを作成</h2>
+        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">名前 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-red-500">*</span></label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="例: コスト比較 flex"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">カテゴリ</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="例: general, 挨拶, 返信"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">タイプ</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas"
                 value={form.messageType}
                 onChange={(e) => setForm({ ...form, messageType: e.target.value })}
               >
@@ -296,7 +491,7 @@ export default function TemplatesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">内容 / JSON <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
               {form.messageType === 'image' ? (
                 <ImageUploader
                   mode="line-image"
@@ -327,7 +522,7 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <textarea
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                   rows={form.messageType === 'flex' ? 10 : 4}
                   placeholder={form.messageType === 'flex' ? '{"type":"bubble","body":...}' : 'メッセージ内容'}
                   value={form.messageContent}
@@ -339,94 +534,124 @@ export default function TemplatesPage() {
             {formError && <p className="text-xs text-red-600">{formError}</p>}
 
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={handleCreate}
                 disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-                style={{ backgroundColor: '#06C755' }}
+                variant="primary"
               >
                 {saving ? '作成中...' : '作成'}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
               >
                 キャンセル
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {/* Table */}
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {accountLoading || loading ? (
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 flex items-center gap-4 animate-pulse">
-              <div className="h-5 bg-gray-100 rounded w-12" />
+            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
+              <div className="h-5 bg-canvas-sunken rounded w-12" />
               <div className="flex-1 space-y-2">
                 <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-gray-100 rounded w-32" />
+                <div className="h-2 bg-canvas-sunken rounded w-32" />
               </div>
-              <div className="h-3 bg-gray-100 rounded w-12" />
-              <div className="h-3 bg-gray-100 rounded w-24" />
+              <div className="h-3 bg-canvas-sunken rounded w-12" />
+              <div className="h-3 bg-canvas-sunken rounded w-24" />
             </div>
           ))}
         </div>
+      ) : !selectedAccountId ? (
+        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+          <p className="text-ink font-medium">
+            {accounts.length > 0
+              ? '上のバーでLINE公式アカウントを選んでください'
+              : 'LINE公式アカウントが登録されていません'}
+          </p>
+        </div>
+      ) : loadError ? (
+        <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
+          <p className="text-danger font-medium">テンプレートを読み込めませんでした</p>
+          <p className="text-ink-secondary mt-2 text-sm">{loadError}</p>
+          <Button className="mt-4" variant="primary" onClick={() => void load()}>
+            もう一度読み込む
+          </Button>
+        </div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">該当するテンプレートがありません</p>
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
+          <p className="text-ink-faint">該当するテンプレートがありません</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">タイプ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">カテゴリ</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">使用数</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">更新日</th>
-                  <th className="px-4 py-3" />
-                </tr>
+                <TableHeadRow>
+                  <Th>テンプレート</Th>
+                  <Th>中身</Th>
+                  <Th>使われている場所</Th>
+                  <Th>送信数</Th>
+                  <Th>更新</Th>
+                  <Th>操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-hairline">
                 {filteredTemplates.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => setDrawerId(t.id)}
-                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${drawerId === t.id ? 'bg-green-50' : ''}`}
+                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-gray-100 text-gray-700'}`}>
-                        {messageTypeLabels[t.messageType] ?? t.messageType}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">{t.name}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-md">
+                      <p className="text-sm font-medium text-ink">{t.name}</p>
+                      <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
-                        {t.category}
+                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                        {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
+                      </span>
+                      <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
+                        {t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-sm ${t.usageCount === 0 ? 'text-gray-400' : 'text-gray-900 font-medium'}`}>
-                        {t.usageCount}
-                      </span>
+                      <span className="text-ink-faint text-sm" title="テンプレート別の送信数はまだ取得できません">—</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{formatDate(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
-                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50 rounded-md"
+                      <div className="flex items-center justify-end gap-2">
+                      <a
+                        href={`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-md border border-hairline px-2.5 py-1 text-xs font-bold text-accent hover:bg-accent-soft"
                       >
-                        削除
-                      </button>
+                        一斉配信で使う
+                      </a>
+                      {t.usageCount > 0 ? (
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); setDrawerId(t.id) }}
+                        >
+                          使用先を見る
+                        </Button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
+                          className="hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium text-red-500"
+                        >
+                          テンプレートを削除
+                        </button>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -443,8 +668,8 @@ export default function TemplatesPage() {
             className="fixed inset-0 bg-black/30 z-30 lg:hidden"
             onClick={() => setDrawerId(null)}
           />
-          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-white shadow-xl border-l border-gray-200 z-40 overflow-y-auto">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline z-40 overflow-y-auto">
+            <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {editName !== null ? (
                   <input
@@ -452,7 +677,7 @@ export default function TemplatesPage() {
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="flex-1 border border-hairline rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 ) : (
                   <h3
@@ -466,38 +691,48 @@ export default function TemplatesPage() {
               </div>
               <button
                 onClick={() => setDrawerId(null)}
-                className="ml-2 text-gray-400 hover:text-gray-600 text-2xl leading-none px-1"
+                className="ml-2 text-ink-faint hover:text-ink-secondary text-2xl leading-none px-1"
               >
                 ×
               </button>
             </div>
 
             {drawerLoading ? (
-              <div className="p-6 text-sm text-gray-400">読み込み中...</div>
+              <div className="p-6 text-sm text-ink-faint">読み込み中...</div>
             ) : drawerError ? (
               <div className="p-6">
                 <p className="text-sm text-red-600 mb-2">読み込みに失敗しました</p>
-                <p className="text-xs text-gray-500">{drawerError}</p>
+                <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
               <div className="p-4 space-y-5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.messageType] ?? 'bg-gray-100 text-gray-700'}`}>
-                    {messageTypeLabels[drawerData.messageType] ?? drawerData.messageType}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                    {messageTypeLabels[drawerData.question ? 'question' : drawerData.messageType] ?? drawerData.messageType}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
                   </span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
                   </span>
                 </div>
 
                 {/* Preview */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">プレビュー</h4>
-                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 overflow-x-auto">
-                    {drawerData.messageType === 'flex' ? (
+                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
+                  <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
+                    {drawerData.question ? (
+                      <div className="space-y-2">
+                        {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
+                        <p className="text-sm font-semibold whitespace-pre-wrap">{drawerData.question.text}</p>
+                        {drawerData.question.choices.map((choice, index) => (
+                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent">
+                            {choice.label}
+                          </div>
+                        ))}
+                      </div>
+                    ) : drawerData.messageType === 'flex' ? (
                       (() => {
                         try {
                           return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
@@ -521,29 +756,35 @@ export default function TemplatesPage() {
                 </div>
 
                 {/* Edit JSON / content */}
-                <div>
-                  <h4 className="text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
+                {drawerData.question ? (
+                  <Button
+                    href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
+                    variant="secondary"
+                  >
+                    質問を編集
+                  </Button>
+                ) : <div>
+                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                    className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                   />
-                </div>
+                </div>}
 
                 {(editContent !== null || editName !== null) && (
                   <div className="flex gap-2">
                     <button
                       onClick={handleSaveEdit}
                       disabled={savingEdit}
-                      className="px-3 py-1.5 text-xs font-medium text-white rounded-md disabled:opacity-50"
-                      style={{ backgroundColor: '#06C755' }}
+                      className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                     >
                       {savingEdit ? '保存中...' : '保存'}
                     </button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}
-                      className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md"
                     >
                       キャンセル
                     </button>
@@ -552,39 +793,60 @@ export default function TemplatesPage() {
 
                 {/* Used by */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
-                    使用箇所 ({drawerData.usedBy.autoReplies.length + drawerData.usedBy.automations.length + scenarioStepUsages.length})
+                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">
+                    使用箇所 ({drawerUsageCount})
                   </h4>
-                  {(drawerData.usedBy.autoReplies.length === 0 && drawerData.usedBy.automations.length === 0 && scenarioStepUsages.length === 0) ? (
-                    <p className="text-[11px] text-gray-400 italic">どこからも使用されていません</p>
+                  {drawerUsageCount === 0 ? (
+                    <p className="text-[11px] text-ink-faint italic">どこからも使用されていません</p>
                   ) : (
                     <>
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href="/auto-replies" className="text-blue-600 hover:underline">
-                              🔗 自動返信: {ar.keyword} <span className="text-gray-400">({ar.matchType})</span>
+                            <a href="/auto-replies" className="text-accent hover:underline">
+                              自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
-                            <a href="/automations" className="text-blue-600 hover:underline">
-                              🔗 オートメーション: {au.name} <span className="text-gray-400">({au.eventType})</span>
+                            <a href="/automations" className="text-accent hover:underline">
+                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
                             </a>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-blue-600 hover:underline">
-                              🎬 シナリオ: {ss.scenarioName} <span className="text-gray-400">#{ss.stepOrder}</span>
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent hover:underline">
+                              シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
+                            </a>
+                          </li>
+                        ))}
+                        {reminderStepUsages.map((rs) => (
+                          <li key={`rs-${rs.stepId}`}>
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent hover:underline">
+                              リマインダ: {rs.reminderName}
+                            </a>
+                          </li>
+                        ))}
+                        {richMenuAreaUsages.map((area) => (
+                          <li key={`rm-${area.areaId}`}>
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent hover:underline">
+                              リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
+                            </a>
+                          </li>
+                        ))}
+                        {trackedLinkUsages.map((link) => (
+                          <li key={`tl-${link.id}`}>
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent hover:underline">
+                              流入リンク: {link.name}
                             </a>
                           </li>
                         ))}
                       </ul>
-                      {scenarioStepUsages.length > 0 && (
+                      {drawerUsageCount > 0 && (
                         <p className="mt-2 text-[10px] text-amber-700">
-                          ⚠ このテンプレートを修正すると、上記すべてに一斉反映されます
+                          このテンプレートは使用中です。削除する前に使用先を差し替えてください。
                         </p>
                       )}
                     </>
@@ -595,8 +857,27 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
-
-      <CcPromptButton prompts={ccPrompts} />
+      <div data-design-node="M9cij">
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          title="テンプレートを削除しますか？"
+          description={`「${pendingDelete?.name ?? ''}」を削除します。この操作は元に戻せません。`}
+          confirmLabel="テンプレートを削除"
+          destructive
+          busy={deleting}
+          error={deleteError || undefined}
+          onCancel={() => {
+            if (deleting) return
+            setPendingDelete(null)
+            setDeleteError('')
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      </div>
+      </div>
+      </div>
+      </> : <BroadcastAssetManager kind={activeSection} />}
+      </div>
     </div>
   )
 }

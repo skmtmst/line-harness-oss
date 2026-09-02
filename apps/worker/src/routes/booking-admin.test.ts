@@ -1,10 +1,15 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../index.js';
 
 const availabilityMocks = {
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
-  getAvailability: vi.fn(async () => ({
-    by_staff: [{ staff_id: 's1', display_name: 'A', slots: [] }],
+  getAvailability: vi.fn(async (_db: unknown, params: { from: string }) => ({
+    by_staff: [{
+      staff_id: 's1',
+      display_name: 'A',
+      slots: availabilityMocks.computeSlots().map((slot) => ({ date: params.from, ...slot })),
+    }],
   })),
 };
 vi.mock('../services/availability.js', () => availabilityMocks);
@@ -12,10 +17,22 @@ vi.mock('../services/availability.js', () => availabilityMocks);
 const notifierMocks = { sendBookingNotification: vi.fn() };
 vi.mock('../services/booking-notifier.js', () => notifierMocks);
 
+const accountAccessMocks = {
+  canAccessAllLineAccounts: vi.fn(async () => true),
+};
+vi.mock('../services/account-access.js', () => accountAccessMocks);
+
 const { default: booking } = await import('./booking.js');
 
 function makeApp(db: unknown) {
-  const app = new Hono();
+  const app = new Hono<Env>();
+  // 予約の枠組みは管理者、承認はスタッフに限定した。ここで見たいのは本体の
+  // 挙動なので、認証は通った状態にしてから渡す。権限の検証は
+  // middleware/role-guard.test.ts が持つ。
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+    return next();
+  });
   app.route('/', booking);
   return { app, env: { DB: db } };
 }
@@ -35,6 +52,14 @@ describe('GET /api/booking/admin/menus/:id/staff', () => {
     const { app, env } = makeApp(emptyDb);
     const res = await app.request('/api/booking/admin/menus/m1/staff', {}, env);
     expect(res.status).toBe(400);
+  });
+
+  test('403 when the selected LINE account is outside the operator scope', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request('/api/booking/admin/menus/m1/staff?account_id=other', {}, env);
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({ error: 'forbidden_account' });
   });
 
   test('200 with staff list', async () => {
@@ -158,9 +183,27 @@ describe('POST /api/booking/admin/bookings', () => {
       ],
       ['FROM staff_shifts', { first: { start_time: '10:00', end_time: '19:00' } }],
       ['SELECT starts_at, block_ends_at FROM bookings', { all: { results: [] } }],
+      ['INSERT INTO booking_idempotency_keys', { run: { meta: { changes: 1 } } }],
+      ['UPDATE booking_idempotency_keys', { run: { meta: { changes: 1 } } }],
       ['INSERT INTO bookings', { run: { meta: { changes: insertChanges } } }],
     ]);
   }
+
+  test('400 without Idempotency-Key', async () => {
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      env,
+      execCtx,
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'missing_idempotency_key' });
+  });
 
   test('400 without account_id', async () => {
     const { app, env } = makeApp(emptyDb);
@@ -169,7 +212,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-1' },
       },
       env,
       execCtx,
@@ -185,7 +228,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-2' },
       },
       env,
       execCtx,
@@ -202,7 +245,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-3' },
       },
       env,
       execCtx,
@@ -217,6 +260,33 @@ describe('POST /api/booking/admin/bookings', () => {
     expect(reminders.length).toBeGreaterThan(0);
   });
 
+  test('同じキーの再送は保存済みの予約を返し、予約を追加しない', async () => {
+    const db = scriptedDb([
+      ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
+      ['FROM booking_idempotency_keys', {
+        first: {
+          response_status: 201,
+          response_body: JSON.stringify({ booking_id: 'existing', status: 'confirmed', calendar_sync: 'synced' }),
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+      }],
+    ]);
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify(validBody),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'same-booking' },
+      },
+      env,
+      execCtx,
+    );
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toMatchObject({ booking_id: 'existing' });
+    expect(db.calls.some((call) => call.sql.includes('INSERT INTO bookings'))).toBe(false);
+  });
+
   test('409 on slot conflict (atomic insert 0 rows)', async () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
     const db = happyDb(0);
@@ -226,7 +296,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-4' },
       },
       env,
       execCtx,
@@ -243,7 +313,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-5' },
       },
       env,
       execCtx,
@@ -264,7 +334,7 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify(validBody),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-6' },
       },
       env,
       execCtx,
@@ -274,7 +344,7 @@ describe('POST /api/booking/admin/bookings', () => {
     expect(body.error).toBe('staff_not_found');
   });
 
-  test('existing-bookings window uses correct JST bounds for a September date', async () => {
+  test('server-side availability recheck receives the correct September JST date', async () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
     const db = happyDb();
     const { app, env } = makeApp(db);
@@ -291,20 +361,16 @@ describe('POST /api/booking/admin/bookings', () => {
       {
         method: 'POST',
         body: JSON.stringify({ ...validBody, starts_at: `${sepYear}-09-10T02:00:00.000Z` }),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'booking-create-7' },
       },
       env,
       execCtx,
     );
     expect(res.status).toBe(201);
-    // The busy-window query must bind real ISO timestamps, never a corrupted
-    // string from the old `.replace('-09', ...)` (which mangled September dates).
-    const windowQuery = db.calls.find(
-      (c) => c.sql.includes('SELECT starts_at, block_ends_at FROM bookings'),
+    expect(availabilityMocks.getAvailability).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ from: `${sepYear}-09-10`, to: `${sepYear}-09-10` }),
     );
-    const [, endUtc, startUtc] = windowQuery!.params as [string, string, string];
-    expect(startUtc).toBe(`${sepYear}-09-09T15:00:00.000Z`); // JST Sep 10 00:00 = prev-day 15:00Z
-    expect(endUtc).toBe(`${sepYear}-09-10T15:00:00Z`); // JST Sep 11 00:00 = Sep 10 15:00Z
   });
 });
 

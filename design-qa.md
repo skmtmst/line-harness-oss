@@ -1,0 +1,443 @@
+# 受信箱 V4 の細部調整 — design QA
+
+## 比較対象
+
+- 参照デザイン: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/hSLxG.png`
+- 実装（1440px）: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-visual-polish-1440.png`
+- 内部メモ画面: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-memo-modal-1440.png`
+- メール顧客情報（1920px）: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-email-1920.png`
+- 同一画面での比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-side-by-side.png`
+- 状態: ローカルの確認用データだけを使用。開発・本番データは変更していない。
+
+## 表示条件
+
+- 参照デザイン: 3840 × 3680 px。
+- 実装確認: 1440 × 1000 px と 1920 × 1080 px。
+- 1440px は `scrollWidth === clientWidth === 1425`、1920px は `scrollWidth === clientWidth === 1905`。ページ全体の横スクロールなし。
+- 参照と実装を同じ比較画面に配置し、文字、余白、操作位置、3ペインの比率、モーダル背景を目視確認した。
+
+## 確認結果
+
+- P0 / P1 / P2 の未解決差分なし。
+- LINE と MAIL の4文字バッジ、ラベル、並び順が狭い一覧幅でも途中改行しない。
+- 「すべて確認済みにする」は表示されない。
+- 送信元LINEアカウントと実際の担当者を分けて表示する。
+- LINE顧客情報は会話IDではなく友だちIDで読み込み、中央には閉じる操作を重複表示しない。
+- メールでも顧客情報を開閉できる。閉じた後は中央の「顧客情報を開く」だけが表示される。
+- 内部メモは送信欄とは別の中央ポップアップで開き、「担当者だけに表示され、相手には送信されません」と明示する。
+- 内部メモとテンプレート選択のどちらも `document.body` 直下へ表示し、顧客情報の「閉じる」を含む背景全体に同じブラインドがかかる。
+- 集計APIの一部項目が欠けても受信箱全体が停止しない。
+
+## 操作確認
+
+1. LINE会話を開き、顧客情報、マイル、対応、タグを表示できた。
+2. 右側の「閉じる」で顧客情報を閉じ、中央の「顧客情報を開く」から再表示できた。
+3. 「内部メモ」で専用ポップアップを開き、既存メモが別のテキスト欄へ入ることを確認した。
+4. 「テンプレートを選択」を開き、右側の顧客情報操作も背景と一緒に暗くなることを確認した。
+5. メール会話を開き、顧客情報を右側へ表示し、同じ開閉動作を確認した。
+6. 最終タブのブラウザログにエラー・警告なし。
+
+## 比較履歴
+
+1. 初回確認では、チャネル行の短い文字が1440pxで折り返し、顧客情報が会話IDを友だちIDとして読み込んで画面が停止した。
+2. チャネル操作を縮まない1行表示へ直し、選択中会話の `friendId` を使うよう修正した。
+3. 再比較で、参照デザインと同じ情報階層、メモの独立性、モーダル背景、横幅の収まりを確認した。
+
+final result: passed
+
+---
+
+# V6 受信箱・共通トップバー重複解消 Design QA
+
+## 比較対象
+
+- source visual truth: Pencil `pencil-new.pen` の共通トップバー `cBSCb` と `docs/v6-shell-contract.md` §2
+- implementation route: `/chats`
+- before: PR #387時点の `chats-1440/1920-darwin.png`
+- after:
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/chats-1440-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/chats-1920-darwin.png`
+
+## 正規化
+
+- implementation: 1440 x 1000 / 1920 x 1000 CSS px、同じモックデータ・同じ未選択状態
+- before / afterを同じ比較入力で確認した。
+- この確認は、受信箱全体のV6視覚一致ではなく、共通トップバーと本文の重複解消だけを対象とする。
+
+## Full-view comparison evidence
+
+- 変更前は、共通トップバーの「受信箱」「マニュアル」と、本文の「受信箱」「マニュアル」が二重に表示されていた。
+- 変更後は共通トップバーだけに残り、KPIが本文の先頭へ上がった。
+- 1440 / 1920の2画像を3回連続で差分0として確認した。
+- 既存12ルート、タグ4状態、削除2状態、CSV4状態を含む全44画像も通過した。
+- 両幅でページ全体の横スクロールは0pxだった。
+
+## Focused region comparison evidence
+
+- 上端: 56pxの共通トップバーに画面名とマニュアルを1組だけ表示する。
+- 本文先頭: 旧 `Header` 行を削除し、KPIを最初の帯にした。
+- 既存のKPI、絞り込み、3カラム、返信操作には変更を加えていない。
+
+## Required fidelity surfaces
+
+- Fonts and typography: 共通トップバーの既存V6設定をそのまま使用した。
+- Spacing and layout rhythm: 重複行だけを取り除き、新しい余白や寸法は追加していない。
+- Colors and visual tokens: 変更なし。既存トークンのみ。
+- Image quality and asset fidelity: 対象箇所に画像資産はない。
+- Copy and content: 「受信箱」「マニュアル」を消したのではなく、シェル側の1組へ統合した。
+
+## Findings
+
+- P0 / P1 / P2: この変更範囲の残件なし。
+- 受信箱全体のV6 260画面との完全比較は、引き続き `unverified`。このPRでは完了を名乗らない。
+
+## Primary interactions tested
+
+- `/chats`への着地、ログイン画面への誤遷移なし
+- 1440 / 1920で横スクロールなし
+- Web全635テスト、型検査、本番用Webビルド
+
+## Console errors checked
+
+- Visual QAでエラー画面、店舗未選択、ログイン画面への転送なし。
+
+## Final result
+
+final result: passed
+
+---
+
+# Design QA — V5 B4 オーバーレイ・通知・メニュー
+
+## 比較対象
+
+- Pencil実ノード: `J6x4Q`（標準確認）、`H2S1T4`（重要操作）、`VJKAT`（右詳細）、`ApbSZ` / `zPRvi` / `I5rKbM`（通知）、`hGpFq`（操作メニュー）、`z6TmF`（通知パネル）。
+- 参照画像: `docs/design-reference/overlays-v5/source/`。Pencilから実ノード単位で2倍書き出しした画像。
+- 実装画像: `docs/design-reference/overlays-v5/implementation/`。アプリ内ブラウザで同じ状態を固定表示して取得した画像。
+- 同一画像での比較: `docs/design-reference/overlays-v5/comparison-sheet-1440.png`。左がPencil、右が実装。
+- 状態: ローカルの固定表示だけを使用。API、DB、開発・本番データは変更していない。
+
+## 確認条件
+
+- Pencil画像を50%へ正規化し、実装と同じ画像へ並べて、文字、色、枠、角丸、影、余白、各状態を目視比較した。
+- 標準確認844×142px、右詳細844×190px、通知844×48px、操作メニュー200×231px、通知パネル380×517pxで確認した。
+- 1440×1200pxと1920×1200pxの6状態すべてで `scrollWidth === clientWidth`。ページ全体の横スクロールなし。
+- V6の代表画面12ルートに対象8ノードの直接参照が無かったため、確認できたV5実ノードを正本にした。V6と同一とは判定していない。
+
+## 確認結果
+
+- P0 / P1 / P2 の未解決差分なし。
+- Dialog: 標準・重要操作、処理中、失敗、Escape、フォーカス循環、背景スクロール停止、元の操作へのフォーカス復帰を共通化した。
+- Drawer: 右側の全高表示とPencilの固定詳細状態を同じ部品で扱い、閉じる、未保存、処理中、失敗を持たせた。
+- Notice: 成功・入力注意・失敗を意味別に固定し、読み上げ、任意の自動消去、閉じる操作を持たせた。
+- ActionMenu: 上下移動、色変更、削除、注記をPencilと同じ密度にそろえ、矢印キー、Home / End、Escape、外側クリックを共通化した。
+- NotificationPanel: 全件・エラー・更新の絞り込み、未読、読み込み中、空、失敗、全件表示、設定の状態まで実装した。通知APIと入口が未定のため、実画面への接続だけを待つ。
+- 影は `shadow-float` へ変数化し、Pencilの `0 6 18 #19202626` と一致させた。
+
+## 操作確認
+
+1. 標準確認のキャンセルでダイアログが閉じることを確認した。
+2. 右詳細の閉じる操作でパネルが消えることを確認した。
+3. 成功通知の閉じる操作で通知が消えることを確認した。
+4. 通知パネルの「エラー」を選ぶと `aria-selected=true` になり、6件から3件へ絞られることを確認した。
+5. 操作メニューで下矢印を押すと、次の「色を変える」へフォーカスが移ることを確認した。
+6. 最終タブのブラウザログにエラー・警告なし。
+
+## 比較履歴
+
+1. 初回比較で通知パネルがPencilより14px高かった。
+2. 各通知行と下部操作の余白を調整し、Pencilと同じ380×517pxへそろえた。
+3. 8部品を同じ比較画像で再確認し、未解決の重大・主要・軽微差分がないことを確認した。
+
+final result: passed
+
+---
+
+# Design QA — V5 B3 入力・検索・選択
+
+## 比較対象
+
+- Pencil実ノード: `ytG7l`（1行入力）、`keKe3`（複数行入力）、`phlR1`（検索）、`rpot9`（選択・閉）、`niGPF`（表示件数）、`Gfsb4`（選択・開）。
+- 参照画像: `docs/design-reference/controls-v5/source/`。Pencilから実ノード単位で2倍書き出しした画像。
+- 実装画像: `docs/design-reference/controls-v5/qa-b3/implementation-1440.jpg`、`implementation-1920.jpg`。
+- 同一画像での比較: `docs/design-reference/controls-v5/qa-b3/comparison-sheet.png`。各行の左がPencil、右が実装。
+- 状態: ローカルの固定表示だけを使用。API、DB、開発・本番データは変更していない。
+
+## 確認条件
+
+- Pencil画像を50%へ正規化し、入力320×40px、複数行480×120px、検索720×42px、選択176×42px、表示件数128×42px、開状態844×156pxで実装と並べた。
+- 1440pxと1920pxの両方で `scrollWidth === clientWidth`。ページ全体の横スクロールなし。
+- 文字、色、枠、角丸、余白、アイコン、開閉状態、選択行を同じ比較画像で目視確認した。
+
+## 確認結果
+
+- P0 / P1 / P2 の未解決差分なし。
+- 入力: 白地、1px枠、8px角丸、13px文字、40px高、左右12pxを一致させた。複数行は120px高、14px余白、行高1.7で、Pencilに無いリサイズつまみを表示しない。
+- 検索: 42px高、左右14px、17pxのLucide検索アイコン、10px間隔、12px文字を一致させた。
+- 選択: 閉・表示件数・開を1部品の状態へ統合し、42pxの操作部、38pxの選択肢、選択色、チェック、上下矢印を一致させた。
+- focus状態はPencil未定義のため独自色を追加せず、ブラウザ既定の輪郭を消さない。
+- チェックボックスとスイッチは共通正本Nodeが見つからないため推測実装せず、設計判断待ちとして契約に記録した。
+
+## 操作確認
+
+1. 1行入力と複数行入力へ文字を入力できた。
+2. 検索語を入力するとクリア操作が現れ、押すと空になることを確認した。
+3. 選択欄を開閉し、「未使用」を選ぶと表示が `使用状態：未使用` へ変わることを確認した。
+4. 最終タブのブラウザログにエラーなし。
+
+final result: passed
+
+---
+
+# Design QA — ダッシュボード V5 B2 共通部品
+
+## 比較対象
+
+- Pencil実ノード: `fJ2hc`（ダッシュボード）、`t0jk8p`（カード見出し）、`xRvDB`（状態バッジ）、`H0V8EK`（アイコン操作）。
+- 参照画像: `docs/design-reference/dashboard-v5/01-dashboard-1920.png/fJ2hc.png`（3840×3224pxを1920×1612pxへ正規化）。
+- 実装画像: `docs/design-reference/dashboard-v5/qa-b2/implementation-1920.png`、`implementation-1440.png`。
+- 同一画像での比較: `docs/design-reference/dashboard-v5/qa-b2/reference-vs-implementation-1920.png`。左が参照、右が実装。
+- 状態: ローカルの固定データだけを使用。API、DB、開発・本番データは変更していない。
+
+## 確認条件
+
+- 1920×1612pxで参照と実装を同じ画像へ並べ、カードの位置、寸法、余白、枠、角丸、影、文字、状態色を目視比較した。
+- 1440×1200pxでは `scrollWidth === clientWidth === 1440` を確認し、ページ全体の横スクロールがないことを確認した。
+- B2の対象はCard、CardHeader、StatusBadgeとし、ダッシュボード全機能・全状態のV5移行完了判定は行っていない。
+
+## 確認結果
+
+- P0 / P1の未解決差分なし。
+- Card: 白地、1pxの枠、10px角丸、共通影、16px/18pxの余白が参照と一致する。
+- CardHeader: 48pxの標準見出しと58pxのダッシュボード見出しを名前付きsizeで固定し、題、件数、右操作の位置と文字階層が一致する。
+- StatusBadge: neutral、info、warning、success、dangerの意味色と、表内のcompactサイズを共通propsで再現できる。
+- 既存のダッシュボード機能とデータ取得は残し、外側の直書きカードだけを共通部品へ載せ替えた。
+- 任意値記法は今回の対象4ファイルで18件減り、全体1432件まで基準を締めた。カードの18px直書きと影の直書きも対象ファイルから除去した。
+- 1440px、1920pxともカードの重なり、文字の途中改行、ページ全体の横スクロールはない。
+
+## 残る範囲
+
+- `H0V8EK`のIconButtonはコード実装済みだが、実画面への適用と画像比較は次の対象に残す。
+- 参照画像にある通知、表示件数変更、番号ページ切替、全右サイドカード、友だち追加リンクはB3〜B5またはダッシュボード画面移行で扱う。
+- 比較用アカウント欄は固定データを持たないため読み込み表示。B2の部品判定には含めない。
+
+final result: passed
+
+---
+
+# Design QA — 受信箱・友だち V4
+
+## 比較対象
+
+- Pencil V4 友だち一覧: `/private/tmp/pencil-v4-friends/Wi50h.png`（1920×1080）
+- Pencil V4 詳細検索: `/private/tmp/pencil-v4-friends/EoHvu.png`（1920×1080）
+- 受信箱の参照画像: `/var/folders/6v/dqgxy7ts2b12xlw5764btjc40000gn/T/codex-clipboard-8366b2e8-8ac8-4f10-b7f7-ce6a7b4c6bca.png`（1039×530）
+- 実装: `http://localhost:3012/friends` と `http://localhost:3012/chats`
+- 同一比較画面: `http://127.0.0.1:4020/`
+
+## 確認条件
+
+- 友だち一覧: 1440×900、1920×1080
+- 受信箱: 1144×900
+- 状態: 一覧、詳細検索モーダル、重複検出、統合ユーザー、統合ユーザー詳細、友だち詳細、メール内部メモ
+- 文字密度、余白、枠線、角丸、影、中央揃え、モーダルの重なり、横スクロールを確認
+
+## 修正と再確認
+
+1. 友だち一覧の上部一括アクション、操作列、開くリンクを削除した。
+2. 件数と表示件数を一覧見出しの右側へ移し、最終接触と行内容を中央にそろえた。
+3. 詳細検索をV4のAND/OR構造、件数表示、下部操作へそろえた。
+4. 重複検出、統合ユーザー、展開した統合ユーザー詳細をV4の表密度と色へそろえた。
+5. 受信箱のKPI見出しを1行固定にし、担当者プルダウンとメール内部メモの独立モーダルを確認した。
+6. 友だち詳細に残っていた「すべて確認済みにする」を削除し、再表示で非表示を確認した。
+
+## 最終判定
+
+- 1440px・1920pxとも主要領域の横スクロールなし。
+- V4参照との差は、利用者の明示指定で削除した操作列のみ。
+- 主要操作とモーダルは実画面で動作確認済み。
+
+final result: passed
+
+---
+
+# Design QA — 受信箱のチャネルバッジ
+
+## 比較対象
+
+- 参照画像: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.36.45 PM.png`（1121×853 px）
+- 実装画像: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-channel-icons-1120.png`（676×1031 px）
+- 同一画面での重点比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-channel-icons-comparison.png`（1254×247 px）
+- 状態: 受信箱の「すべて」選択時。LINE・MAILのチャネル絞り込みが表示されている状態。
+
+## 比較条件
+
+- 参照はデスクトップ幅、実装はアプリ内ブラウザの通常幅で確認した。全体の列構成はレスポンシブ差があるため、依頼対象のチャネル行を重点比較した。
+- 重点比較は参照を200×60 px、実装を201×65 pxで切り出し、どちらも3倍へ拡大して同じ画像内に並べた。deviceScaleFactor相当は1。
+- 実装画面はページ横スクロールなし。LINE・MAILボタンはそれぞれ44×32 px、48×32 pxで1行表示。
+
+## 確認結果
+
+- P0 / P1 / P2 の未解決差分なし。
+- 文字・フォント: 重複していた右側の「LINE」「メール」を削除し、バッジ内のLINE・MAILだけを表示した。文字の太さとサイズは既存のチャネルバッジを維持。
+- 余白・配置: バッジをボタン中央へ寄せ、隣の「すべて」「新しい順」と干渉しない。
+- 色: LINEの緑、MAILの白・グレー、選択背景は既存V4トークンを維持。
+- 画像・アイコン: 新しい画像置換はなく、既存のLINE・MAILバッジをそのまま使用。
+- 文言: 見た目から重複文字だけを外し、`aria-label` と `title` に「LINE」「メール」を残した。
+
+## 操作確認
+
+1. LINEバッジを押すと `/chats?channel=line` へ切り替わり、選択状態になった。
+2. 「すべて」を押すと `/chats` へ戻り、選択状態になった。
+3. ブラウザログにエラー・警告なし。
+
+## 比較履歴
+
+1. 参照画像ではLINE・MAILバッジの右側に同じ意味の文字が重複していた。
+2. 重複文字を削除し、実装画像でバッジだけが1行に並ぶことを再確認した。
+
+final result: passed
+
+---
+
+# Design QA — 受信箱・友だち・ダッシュボードの細部調整
+
+## 比較対象
+
+- 受信箱参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.48.48 PM.png`、`/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.52.04 PM.png`
+- 友だち参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.54.59 PM.png`（1350×901 px）
+- ダッシュボード参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 2.05.43 PM.png`（1350×749 px）
+- 内部メモ参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.50.43 PM.png`
+- 受信箱実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-details-1600x900.png`（1600×900 px）
+- 友だち実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/friends-visual-details-1600x900.png`（1585×892 px）
+- ダッシュボード実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-heading-1600x900.png`（1585×892 px）
+- 内部メモ実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/internal-memo-no-close-1600x900.png`
+- 全体比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/visual-details-comparison.png`
+- 内部メモ重点比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/internal-memo-comparison.png`
+
+## 確認条件
+
+- PC表示を1600×900へ固定し、同じ確認用データで受信箱、友だち一覧、ダッシュボードを確認した。
+- 参照と実装を同じ比較画像へ配置し、文字、余白、ボタン高、吹き出し、モーダル操作を目視確認した。
+- ローカルの確認用APIだけを使用し、開発・本番データは変更していない。
+
+## 確認結果
+
+- P0 / P1 / P2 の未解決差分なし。
+- 文字: ダッシュボード見出しを受信箱と同じ24px・700へ統一した。担当者名は表示領域を広げ、途中で省略されない。
+- 余白: 受信箱と友だち一覧の説明文を削除し、タイトル直下の内容を上へ詰めた。
+- 操作: 顧客情報の「表示項目」と「閉じる」はともに32px高。内部メモは上部の重複した「閉じる」を外し、下部の「キャンセル」「保存」だけを残した。
+- 配置: 受信メッセージのアバターと吹き出しを上端でそろえ、送信メッセージの担当者表示は吹き出し横で全文を確認できる。
+- 色・枠線・角丸・影: 既存V4トークンを維持し、新しい色や装飾は追加していない。
+
+## 操作確認
+
+1. LINE会話を選び、顧客情報パネルが表示されることを確認した。
+2. 顧客情報の2ボタンを実測し、どちらも32px高であることを確認した。
+3. 内部メモを開き、ダイアログ内の操作が「キャンセル」「保存」の2つだけであることを確認した。
+4. 友だち一覧へ遷移し、説明文がなく一覧全体が上へ詰まることを確認した。
+5. ダッシュボードへ遷移し、見出しが24px・700で表示されることを確認した。
+
+## 比較履歴
+
+1. 初回参照では説明文の分だけ主要領域が下がり、ダッシュボード見出しだけ大きく、内部メモに閉じる操作が重複していた。
+2. 説明文、見出し、ボタン高、メッセージ行、内部メモ操作を修正した。
+3. 実装画像を再取得し、全体比較と内部メモ重点比較で指定箇所が解消していることを確認した。
+
+final result: passed
+
+---
+
+# V6 4-1 タグCSV一括登録 Design QA
+
+## 比較対象
+
+- source visual truth: `/Users/kentakenta/.pencil/documents/4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen`
+- Pencil実Node:
+  - 選択 `H374MR`
+  - 確認 `sfTEW`
+  - 完了 `op1rh`
+  - 一部失敗 `QzRsJ`
+- implementation route: `/tags` の「CSVで一括登録」から開く実フロー
+- implementation screenshots:
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-select-1920-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-preview-1920-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-success-1920-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-partial-1920-darwin.png`
+  - 同名の `1440` 版4枚
+
+## 正規化
+
+- source: 1920 x 1080 px、Pencilの1920画面、density 1相当
+- implementation: 1920 x 1080 CSS px / 1440 x 1080 CSS px、Playwright `deviceScaleFactor: 1`
+- 1920は同じ画面全体・同じモックデータ・同じ状態で比較した。
+- 1440はPencilに同幅の正本がないため、レスポンシブ安全性として左右の見切れとページ全体の横スクロールがないことを検査した。
+- ブラウザUIや端末枠は含めていない。
+
+## Full-view comparison evidence
+
+- Pencilの4 Nodeを `TakeScreenshot` で取得し、各1920実装画像と同じ比較入力で確認した。
+- モーダル面の実測値を正本へ合わせた。
+  - 選択: 620 x 455
+  - 確認: 1200 x 696
+  - 完了: 620 x 245
+  - 一部失敗: 1000 x 511
+- オーバーレイ、面の角丸、内側余白、見出し、説明、集計、状態色、表、下部操作の構成を確認した。
+- 1440 / 1920の8画像を3回連続で差分0として確認した。
+- 既存ルートと4-1の空・読込・失敗・権限不足・削除を含む全44画像も通過した。
+
+## Focused region comparison evidence
+
+- 選択欄: ブラウザ標準の英語入力を使わず、「CSVを選ぶ」「ファイル未選択」「UTF-8・最大500件」を正本どおり日本語で分離した。
+- 確認表: 新規・見送り・入力確認を同じ画面で確認し、60文字上限・改行禁止・未分類への移動を表示した。
+- 結果面: 全件成功と一部失敗を別Node・別画像で確認した。
+- 一部失敗: 入らなかった行だけの一覧とCSV書き出し操作を確認した。
+- 画像・ロゴ・独自イラストはこの4状態に存在しない。アイコンは既存のLucideを使用した。
+
+## Required fidelity surfaces
+
+- Fonts and typography: 既存のV6管理画面フォント、20px見出し、13px説明、12px表文字、太さと1行省略を確認した。
+- Spacing and layout rhythm: 4面の幅・高さ、28px内側余白、18px間隔、12px角丸、中央配置を確認した。
+- Colors and visual tokens: canvas / hairline / ink / accent / info / warning / danger の既存トークンを使用した。生の状態色は追加していない。
+- Image quality and asset fidelity: 対象画面に画像資産はない。状態アイコンはベクターのLucideで鮮明に表示される。
+- Copy and content: 内部語を出さず、未取得と0件、見送りと入力確認、成功と一部失敗を別の言葉で表示した。
+
+## Comparison history
+
+1. [P1] 確認面の500行が他領域を押しつぶした。
+   - fix: 面の高さを696pxへ固定し、見出し・集計・絞り込み・下部操作を縮ませず、表だけをスクロール領域にした。
+   - post-fix: `tags-csv-preview-1920-darwin.png` で集計4枚と操作が正しく表示されることを確認した。
+2. [P1] 選択欄がブラウザ標準の英語 `Choose File / No file chosen` を表示した。
+   - fix: 入力はアクセシブルに隠し、日本語の選択ボタン・ファイル名・条件を表示した。
+   - post-fix: `tags-csv-select-1440-darwin.png` と1920版で確認した。
+3. [P1] ファイル選択直後にPortalが移動すると、選択内容が失われる競合があった。
+   - fix: マウント完了前は描画せず、開くたびにダイアログを新規マウントする形へ変更した。
+   - post-fix: 8画像を3回連続で実操作から通した。
+4. [P2] 確認画像の先頭行が新規だけで、見送り・入力確認を目視できなかった。
+   - fix: 件数を変えず、代表行を先頭に並べるVisual QAデータへ変更した。
+   - post-fix: 状態バッジと理由を同じ確認画像で確認した。
+5. [P2] 直接の表見出しを9個追加し、共通部品の契約に反した。
+   - fix: 既存の `TableHeadRow` / `Th` を再利用した。
+   - post-fix: Web全632件、全44画像、本番用Webビルドを通した。
+
+## Findings
+
+- P0 / P1 / P2: 残件なし。
+- P3: なし。正本にない装飾は追加しない。
+
+## Primary interactions tested
+
+- CSV選択、BOM付きUTF-8解析、引用符・カンマ・改行、500行上限、1MB上限
+- dry-run確認、状態別絞り込み、登録、全件成功、一部失敗
+- 入らなかった行だけのCSV書き出し、数式注入対策
+- Escape / 背景クリック / 処理中の閉じ防止 / フォーカス管理
+- 1440 / 1920でページ全体の横スクロールとモーダル見切れがないこと
+
+## Console errors checked
+
+- Visual QAの44試験で、対象画面の500・ログイン遷移・`準備中`停止がないことを確認した。
+- 対象操作に起因するブラウザエラーなし。
+
+## Final result
+
+final result: passed

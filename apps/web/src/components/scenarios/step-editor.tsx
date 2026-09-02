@@ -14,6 +14,11 @@ const messageTypeLabels: Record<MessageType, string> = {
   text: 'テキスト',
   image: '画像',
   flex: 'Flexメッセージ',
+  location: '位置情報',
+  video: '動画',
+  audio: '音声',
+  sticker: 'スタンプ',
+  carousel: 'カルーセル',
 }
 
 function minutesToDisplay(minutes: number): { days: number; hours: number; mins: number } {
@@ -214,7 +219,7 @@ export default function StepEditor({ step, stepOrder, onSave, onCancel }: StepEd
           onClick={handleSave}
           disabled={saving}
           className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity"
-          style={{ backgroundColor: '#06C755' }}
+          style={{ backgroundColor: 'var(--color-accent)' }}
         >
           {saving ? '保存中...' : '保存'}
         </button>

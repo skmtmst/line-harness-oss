@@ -1,0 +1,731 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  applyMileageRulesForEvent,
+  processPendingMileageEvents,
+  enqueueFollowingMileageMilestones,
+  getMileageConnectedAccountsForFriend,
+  getMileageAdminHistory,
+  getMileageAdminOverview,
+  getMileageEarningOpportunitiesForFriend,
+  getMileageSelfInsights,
+  getMileageHistoryForFriend,
+  getMileageSummaryForFriend,
+  MileageAdjustmentError,
+  postMileageAdjustment,
+  postMileageEntry,
+  updateMileageRule,
+} from '../src/mileage.js';
+import { addTagToFriend, enqueueHistoricTagMileage } from '../src/tags.js';
+import { updateFriendFollowStatus } from '../src/friends.js';
+import {
+  getMileageManualAdjustmentPolicy,
+  setMileageManualAdjustmentPolicy,
+} from '../src/account-settings.js';
+import { getActionScoreOverview } from '../src/scoring.js';
+
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const BENIGN = /duplicate column name|already exists/i;
+const FIXED_NOW = new Date('2026-08-10T00:00:00.000+09:00');
+
+function execSafe(db: Database.Database, sql: string) {
+  for (const statement of sql.split(/;\s*(?:\r?\n|$)/).map((item) => item.trim()).filter(Boolean)) {
+    try { db.exec(statement); } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!BENIGN.test(message)) throw error;
+    }
+  }
+}
+
+function setupSqlite() {
+  const db = new Database(':memory:');
+  execSafe(db, readFileSync(join(PACKAGE_ROOT, 'schema.sql'), 'utf8'));
+  for (const file of readdirSync(join(PACKAGE_ROOT, 'migrations')).filter((name) => name.endsWith('.sql')).sort()) {
+    execSafe(db, readFileSync(join(PACKAGE_ROOT, 'migrations', file), 'utf8'));
+  }
+  db.prepare(`INSERT INTO users (id, display_name) VALUES ('user-1', '横断ユーザー')`).run();
+  db.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+              VALUES ('account-1', 'channel-1', '公式A', 'token', 'secret'),
+                     ('account-2', 'channel-2', '公式B', 'token', 'secret')`).run();
+  db.prepare(`INSERT INTO friends
+                (id, line_user_id, display_name, picture_url, user_id, line_account_id)
+              VALUES ('friend-1', 'U1', 'ユーザーA', 'https://example.com/a.jpg', 'user-1', 'account-1'),
+                     ('friend-2', 'U2', 'ユーザーB', NULL, 'user-1', 'account-2')`).run();
+  return db;
+}
+
+function asD1(sqlite: Database.Database): D1Database {
+  return {
+    prepare(sql: string) {
+      return {
+        bind(...params: unknown[]) {
+          const statement = sqlite.prepare(sql);
+          return {
+            async run() {
+              const result = statement.run(...params);
+              return { success: true, results: [], meta: { changes: result.changes } };
+            },
+            async first<T>() { return (statement.get(...params) as T) ?? null; },
+            async all<T>() { return { success: true, results: statement.all(...params) as T[], meta: {} }; },
+          };
+        },
+      };
+    },
+  } as unknown as D1Database;
+}
+
+describe('configurable mileage rules', () => {
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(FIXED_NOW);
+    sqlite = setupSqlite();
+    db = asD1(sqlite);
+  });
+
+  afterEach(() => {
+    sqlite.close();
+    vi.useRealTimers();
+  });
+
+  it('enforces the message daily cap across two LINE accounts for one user', async () => {
+    for (let index = 0; index < 6; index += 1) {
+      await applyMileageRulesForEvent(db, {
+        eventType: 'message_received',
+        source: 'line',
+        sourceEventId: `message-${index}`,
+        friendId: index % 2 === 0 ? 'friend-1' : 'friend-2',
+        occurredAt: `2026-08-09T10:0${index}:00.000+09:00`,
+      });
+    }
+    const queue = await processPendingMileageEvents(db, { now: '2026-08-10T10:10:00.000+09:00' });
+
+    const summary = await getMileageSummaryForFriend(db, 'friend-1');
+    expect(summary.available).toBe(5);
+    expect(queue).toMatchObject({ processed: 6, granted: 5, failed: 0 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM engagement_events`).get()).toEqual({ count: 6 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger`).get()).toEqual({ count: 5 });
+  });
+
+  it('awards the same tracked link once per day and the same form once overall', async () => {
+    for (const id of ['click-1', 'click-2']) {
+      await applyMileageRulesForEvent(db, {
+        eventType: 'link_clicked', source: 'tracked_link', sourceEventId: id,
+        friendId: 'friend-1', subjectKey: 'link-1', occurredAt: '2026-08-09T12:00:00.000+09:00',
+      });
+    }
+    for (const id of ['form-1', 'form-2']) {
+      await applyMileageRulesForEvent(db, {
+        eventType: 'form_submitted', source: 'form', sourceEventId: id,
+        friendId: 'friend-2', subjectKey: 'form-A', occurredAt: `2026-08-${id === 'form-1' ? '09' : '10'}T12:00:00.000+09:00`,
+      });
+    }
+    await processPendingMileageEvents(db, { now: '2026-08-10T13:00:00.000+09:00' });
+
+    const summary = await getMileageSummaryForFriend(db, 'friend-2');
+    expect(summary.available).toBe(12);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM engagement_events`).get()).toEqual({ count: 4 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger`).get()).toEqual({ count: 2 });
+  });
+
+  it('builds one cross-account ranking row and respects edited rule amounts', async () => {
+    await updateMileageRule(db, 'builtin-booking-created', { amount: 25 });
+    await applyMileageRulesForEvent(db, {
+      eventType: 'message_received', source: 'line', sourceEventId: 'message-1',
+      friendId: 'friend-1', occurredAt: '2026-08-09T10:00:00.000+09:00',
+    });
+    await applyMileageRulesForEvent(db, {
+      eventType: 'booking_created', source: 'booking', sourceEventId: 'booking-1',
+      friendId: 'friend-2', occurredAt: '2026-08-09T11:00:00.000+09:00',
+    });
+    await processPendingMileageEvents(db, { now: '2026-08-10T12:00:00.000+09:00' });
+
+    const overview = await getMileageAdminOverview(db);
+    const member = overview.members.find((item) => item.identityKey === 'user:user-1');
+    expect(member).toMatchObject({
+      available: 26,
+      accountCount: 2,
+      actionCount: 2,
+      messageCount: 1,
+      bookingCount: 1,
+    });
+    expect(member?.accountNames).toEqual(expect.arrayContaining(['公式A', '公式B']));
+
+    const accountOverview = await getMileageAdminOverview(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1', 'account-2'],
+    });
+    expect(accountOverview.members).toHaveLength(1);
+    expect(accountOverview.members[0]).toMatchObject({
+      primaryFriendId: 'friend-1', available: 26, actionCount: 2, accountCount: 1,
+    });
+
+    const selfInsights = await getMileageSelfInsights(db, 'friend-1');
+    expect(selfInsights).toMatchObject({
+      accountCount: 2,
+      rewardedActions: 2,
+      referralMiles: 0,
+      qualityReferralCount: 0,
+      lastEarnedAt: '2026-08-09T11:00:00.000+09:00',
+    });
+  });
+
+  it('shows only incomplete webinar mileage opportunities for the current LINE account', async () => {
+    sqlite.prepare(`UPDATE line_accounts SET liff_id = '2000000000-TestLiff' WHERE id = 'account-1'`).run();
+    sqlite.prepare(
+      `INSERT INTO webinars
+         (id, account_id, title, slug, status, duration_seconds, schedule_json,
+          cta_json, created_at, updated_at)
+       VALUES ('webinar-1', 'account-1', 'AI活用ウェビナー', 'ai-webinar', 'active',
+               1263, '[]', '{"label":"詳しく見る","url":"https://example.com"}',
+               '2026-08-01T10:00:00.000+09:00', '2026-08-09T10:00:00.000+09:00'),
+              ('webinar-other', 'account-2', '別アカウント配信', 'other-webinar', 'active',
+               1263, '[]', NULL,
+               '2026-08-01T10:00:00.000+09:00', '2026-08-09T11:00:00.000+09:00')`,
+    ).run();
+
+    const fresh = await getMileageEarningOpportunitiesForFriend(db, 'friend-1', {
+      now: '2026-08-10T10:00:00.000+09:00',
+    });
+    const freshWebinar = fresh.find((item) => item.type === 'webinar');
+    const registeredAccount = fresh.find((item) => item.id === 'friend-add:account-1');
+    expect(fresh).toHaveLength(2);
+    expect(registeredAccount).toMatchObject({
+      completed: true,
+      mileageStatus: 'waiting',
+      ctaLabel: '登録済み',
+    });
+    expect(freshWebinar).toMatchObject({
+      id: 'webinar:webinar-1',
+      rewardMiles: 55,
+      nextRewardMiles: 5,
+      progressPercent: 0,
+      ctaLabel: '今すぐ参加する',
+    });
+    expect(freshWebinar?.description).toContain('5分視聴');
+    expect(freshWebinar?.url).toContain('2000000000-TestLiff');
+
+    sqlite.prepare(
+      `INSERT INTO webinar_viewers
+         (id, webinar_id, friend_id, session_start_at, joined_at, last_position_seconds)
+       VALUES ('viewer-1', 'webinar-1', 'friend-1', 1,
+               '2026-08-10T10:00:00.000+09:00', 400)`,
+    ).run();
+    const inProgress = await getMileageEarningOpportunitiesForFriend(db, 'friend-1');
+    const inProgressWebinar = inProgress.find((item) => item.type === 'webinar');
+    expect(inProgressWebinar).toMatchObject({
+      rewardMiles: 50,
+      nextRewardMiles: 10,
+      ctaLabel: '続きから参加する',
+    });
+    expect(inProgressWebinar?.description).toContain('続きからあと約9分');
+
+    sqlite.prepare(
+      `UPDATE webinar_viewers
+          SET last_position_seconds = 1263,
+              cta_clicked_at = '2026-08-10T10:20:00.000+09:00'
+        WHERE id = 'viewer-1'`,
+    ).run();
+    const completed = await getMileageEarningOpportunitiesForFriend(db, 'friend-1');
+    expect(completed.filter((item) => item.type === 'webinar')).toEqual([]);
+    expect(completed.filter((item) => item.type === 'friend_add')).toHaveLength(1);
+  });
+
+  it('shows one friend-add mileage mission for each active unregistered LINE account', async () => {
+    sqlite.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, liff_id, display_order)
+       VALUES ('account-3', 'channel-3', '公式C', 'token', 'secret',
+               '2000000000-FriendC', 3)`,
+    ).run();
+
+    const opportunities = await getMileageEarningOpportunitiesForFriend(db, 'friend-1');
+    expect(opportunities).toHaveLength(1);
+    expect(opportunities[0]).toMatchObject({
+      id: 'friend-add:account-3',
+      type: 'friend_add',
+      title: '公式Cを友だち追加',
+      rewardMiles: 5,
+      nextRewardMiles: 5,
+      progressPercent: 0,
+      ctaLabel: '友だち追加する',
+    });
+    expect(opportunities[0].description).toContain('4アカウント分のマイルを合算');
+    expect(opportunities[0].url).toContain('2000000000-FriendC');
+
+    sqlite.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, user_id, line_account_id, is_following)
+       VALUES ('friend-3', 'U3', 'ユーザーC', 'user-1', 'account-3', 1)`,
+    ).run();
+    const registered = await getMileageEarningOpportunitiesForFriend(db, 'friend-1');
+    expect(registered).toHaveLength(1);
+    expect(registered[0]).toMatchObject({
+      id: 'friend-add:account-3',
+      completed: true,
+      mileageStatus: 'waiting',
+      creditedMiles: 0,
+      ctaLabel: '登録済み',
+    });
+
+    await applyMileageRulesForEvent(db, {
+      eventType: 'friend_registered',
+      source: 'line_relationship',
+      sourceEventId: 'friend-3:friend_registered:2026-08-10T10:00:00.000+09:00',
+      friendId: 'friend-3',
+      occurredAt: '2026-08-10T10:00:00.000+09:00',
+    });
+    await processPendingMileageEvents(db, { now: '2026-08-10T10:05:00.000+09:00' });
+    const credited = await getMileageEarningOpportunitiesForFriend(db, 'friend-1');
+    expect(credited[0]).toMatchObject({
+      completed: true,
+      mileageStatus: 'credited',
+      creditedMiles: 5,
+    });
+    expect(credited[0].description).toContain('+5 mile 加算済み');
+  });
+
+  it('keeps ingestion asynchronous and applies a configured tag reward and tier multiplier', async () => {
+    sqlite.prepare(
+      `INSERT INTO tags
+         (id, name, color, mileage_reward, mileage_multiplier_bps, mileage_multiplier_priority)
+       VALUES ('tier-gold', 'Gold会員', '#F59E0B', 20, 15000, 10)`,
+    ).run();
+    await addTagToFriend(db, 'friend-1', 'tier-gold');
+    await applyMileageRulesForEvent(db, {
+      eventType: 'form_submitted', source: 'form', sourceEventId: 'form-tier',
+      friendId: 'friend-2', subjectKey: 'form-tier', occurredAt: '2026-08-10T10:00:00.000+09:00',
+    });
+
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(0);
+    const queue = await processPendingMileageEvents(db, { now: '2026-08-10T10:05:00.000+09:00' });
+    expect(queue).toMatchObject({ processed: 2, granted: 2, failed: 0 });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(35);
+
+    const formLedger = sqlite.prepare(
+      `SELECT amount, json_extract(metadata, '$.baseAmount') AS base_amount,
+              json_extract(metadata, '$.multiplierBps') AS multiplier_bps
+         FROM mileage_ledger WHERE source_event_id = 'form-tier'`,
+    ).get();
+    expect(formLedger).toEqual({ amount: 15, base_amount: 10, multiplier_bps: 15000 });
+  });
+
+  it('rewards registration and continuous following once without tier multiplication', async () => {
+    sqlite.prepare(
+      `UPDATE friends
+          SET is_following = 1,
+              first_followed_at = '2026-05-01T10:00:00.000+09:00',
+              current_follow_started_at = '2026-05-01T10:00:00.000+09:00',
+              last_followed_at = '2026-05-01T10:00:00.000+09:00'
+        WHERE id = 'friend-1'`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tags
+         (id, name, color, mileage_multiplier_bps, mileage_multiplier_priority)
+       VALUES ('tier-loyalty', '特別会員', '#84CC16', 15000, 20)`,
+    ).run();
+    await addTagToFriend(db, 'friend-1', 'tier-loyalty');
+
+    const first = await enqueueFollowingMileageMilestones(db, {
+      now: '2026-08-10T10:00:00.000+09:00',
+      limitPerMilestone: 100,
+    });
+    expect(first).toMatchObject({ eventsCreated: 4, queued: 4 });
+    await processPendingMileageEvents(db, { now: '2026-08-10T10:05:00.000+09:00' });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(85);
+
+    const repeated = await enqueueFollowingMileageMilestones(db, {
+      now: '2026-08-10T10:10:00.000+09:00',
+      limitPerMilestone: 100,
+    });
+    expect(repeated).toMatchObject({ eventsCreated: 0, queued: 0 });
+    await processPendingMileageEvents(db, { now: '2026-08-10T10:15:00.000+09:00' });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(85);
+
+    const overview = await getMileageAdminOverview(db);
+    expect(overview.members.find((item) => item.identityKey === 'user:user-1')).toMatchObject({
+      unfollowCount: 0,
+    });
+  });
+
+  it('resets the continuous-follow streak after a block and preserves earned miles', async () => {
+    sqlite.prepare(
+      `UPDATE friends
+          SET is_following = 1,
+              first_followed_at = '2026-07-01T10:00:00.000+09:00',
+              current_follow_started_at = '2026-07-01T10:00:00.000+09:00',
+              last_followed_at = '2026-07-01T10:00:00.000+09:00'
+        WHERE id = 'friend-1'`,
+    ).run();
+    await enqueueFollowingMileageMilestones(db, {
+      now: '2026-08-10T10:00:00.000+09:00',
+      limitPerMilestone: 100,
+    });
+    await processPendingMileageEvents(db, { now: '2026-08-10T10:05:00.000+09:00' });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(35);
+
+    await updateFriendFollowStatus(db, 'U1', false);
+    await updateFriendFollowStatus(db, 'U1', true);
+    const relationship = sqlite.prepare(
+      `SELECT is_following, current_follow_started_at, unfollow_count
+         FROM friends WHERE id = 'friend-1'`,
+    ).get() as { is_following: number; current_follow_started_at: string | null; unfollow_count: number };
+    expect(relationship.is_following).toBe(1);
+    expect(relationship.current_follow_started_at).not.toBe('2026-07-01T10:00:00.000+09:00');
+    expect(relationship.unfollow_count).toBe(1);
+
+    const immediatelyAfter = await enqueueFollowingMileageMilestones(db, {
+      now: '2026-08-10T10:10:00.000+09:00',
+      limitPerMilestone: 100,
+    });
+    expect(immediatelyAfter.eventsCreated).toBe(0);
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(35);
+  });
+
+  it('rewards the introducer for referred booking, viewing, purchase, and tag quality', async () => {
+    sqlite.prepare(`INSERT INTO users (id, display_name) VALUES ('user-referrer', '紹介者')`).run();
+    sqlite.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, user_id, line_account_id, created_at, updated_at)
+       VALUES ('friend-referrer', 'U-REFERRER', '紹介者', 'user-referrer', 'account-1',
+               '2026-07-01T10:00:00.000+09:00', '2026-07-01T10:00:00.000+09:00')`,
+    ).run();
+    sqlite.prepare(
+      `UPDATE friends
+          SET created_at = '2026-08-01T10:00:00.000+09:00',
+              updated_at = '2026-08-01T10:00:00.000+09:00'
+        WHERE id = 'friend-1'`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliates (id, name, code, friend_id)
+       VALUES ('affiliate-referrer', '紹介者', 'REFERRER', 'friend-referrer')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_links
+         (id, affiliate_id, ref_code, is_active, created_at)
+       VALUES ('affiliate-link-referrer', 'affiliate-referrer', 'GOODREF', 1,
+               '2026-08-01T09:59:00.000+09:00')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO ref_tracking (id, ref_code, friend_id, created_at)
+       VALUES ('ref-touch', 'GOODREF', 'friend-1', '2026-08-01T10:00:01.000+09:00')`,
+    ).run();
+
+    for (const sourceEventId of ['booking-quality-1', 'booking-quality-2']) {
+      await applyMileageRulesForEvent(db, {
+        eventType: 'booking_created', source: 'booking', sourceEventId,
+        friendId: 'friend-1', occurredAt: '2026-08-05T10:00:00.000+09:00',
+      });
+    }
+    for (const sourceEventId of ['watch-quality-1', 'watch-quality-2']) {
+      await applyMileageRulesForEvent(db, {
+        eventType: 'webinar_completed', source: 'webinar', sourceEventId,
+        friendId: 'friend-1', subjectKey: 'webinar-quality',
+        occurredAt: '2026-08-06T10:00:00.000+09:00',
+      });
+    }
+    for (const sourceEventId of ['purchase-quality-1', 'purchase-quality-2']) {
+      await applyMileageRulesForEvent(db, {
+        eventType: 'purchase_completed', source: 'stripe', sourceEventId,
+        friendId: 'friend-1', subjectKey: sourceEventId,
+        occurredAt: '2026-08-07T10:00:00.000+09:00',
+      });
+    }
+    sqlite.prepare(
+      `INSERT INTO tags
+         (id, name, color, mileage_reward, referral_mileage_reward)
+       VALUES ('seminar-attended', 'セミナー参加', '#10B981', 10, 0)`,
+    ).run();
+    await addTagToFriend(db, 'friend-1', 'seminar-attended');
+
+    await processPendingMileageEvents(db, {
+      now: '2026-08-10T10:00:00.000+09:00',
+      limit: 100,
+    });
+    expect((await getMileageSummaryForFriend(db, 'friend-referrer')).available).toBe(180);
+
+    sqlite.prepare(
+      `UPDATE tags SET referral_mileage_reward = 25 WHERE id = 'seminar-attended'`,
+    ).run();
+    expect(await enqueueHistoricTagMileage(db, 'seminar-attended')).toBeGreaterThan(0);
+    await processPendingMileageEvents(db, {
+      now: '2026-08-10T10:05:00.000+09:00',
+      limit: 100,
+    });
+    const referrerSummary = await getMileageSummaryForFriend(db, 'friend-referrer');
+    expect(referrerSummary.available).toBe(205);
+
+    const referralEntries = sqlite.prepare(
+      `SELECT amount, source, json_extract(metadata, '$.referredFriendId') AS referred_friend_id
+         FROM mileage_ledger
+        WHERE beneficiary_friend_id = 'friend-referrer'
+        ORDER BY amount`,
+    ).all();
+    expect(referralEntries).toEqual([
+      { amount: 25, source: 'tag_referral', referred_friend_id: 'friend-1' },
+      { amount: 30, source: 'webinar', referred_friend_id: 'friend-1' },
+      { amount: 50, source: 'booking', referred_friend_id: 'friend-1' },
+      { amount: 100, source: 'stripe', referred_friend_id: 'friend-1' },
+    ]);
+
+    const overview = await getMileageAdminOverview(db);
+    expect(overview.members.find((item) => item.identityKey === 'user:user-referrer')).toMatchObject({
+      referralMiles: 205,
+      qualityReferralCount: 1,
+    });
+    expect(await getMileageSelfInsights(db, 'friend-referrer')).toMatchObject({
+      accountCount: 1,
+      rewardedActions: 4,
+      referralMiles: 205,
+      qualityReferralCount: 1,
+    });
+  });
+
+  it('does not award quality miles for a self-referral', async () => {
+    sqlite.prepare(
+      `INSERT INTO affiliates (id, name, code, friend_id)
+       VALUES ('affiliate-self', '本人', 'SELF', 'friend-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_links (id, affiliate_id, ref_code, is_active, created_at)
+       VALUES ('affiliate-link-self', 'affiliate-self', 'SELFREF', 1, '2026-08-01')`,
+    ).run();
+    sqlite.prepare(
+      `UPDATE friends SET created_at = '2026-08-01T10:00:00.000+09:00' WHERE id = 'friend-1'`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO ref_tracking (id, ref_code, friend_id, created_at)
+       VALUES ('self-touch', 'SELFREF', 'friend-1', '2026-08-01T10:00:01.000+09:00')`,
+    ).run();
+
+    await applyMileageRulesForEvent(db, {
+      eventType: 'booking_created', source: 'booking', sourceEventId: 'self-booking',
+      friendId: 'friend-1', occurredAt: '2026-08-02T10:00:00.000+09:00',
+    });
+    await processPendingMileageEvents(db, { now: '2026-08-10T10:00:00.000+09:00' });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(20);
+  });
+
+  it('scopes admin history to the selected account without splitting a verified wallet', async () => {
+    sqlite.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, user_id, line_account_id)
+       VALUES ('friend-unlinked', 'U3', '別の人', NULL, 'account-2')`,
+    ).run();
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', status: 'available', amount: 10,
+      reason: '公式Aで付与', source: 'booking', sourceEventId: 'booking-a',
+      mileageRuleId: 'builtin-booking-created',
+      idempotencyKey: 'history-booking-a', occurredAt: '2026-08-08T10:00:00.000+09:00',
+    });
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-2', entryType: 'grant', status: 'pending', amount: 20,
+      reason: '公式Bで付与', source: 'form', sourceEventId: 'form-b',
+      idempotencyKey: 'history-form-b', occurredAt: '2026-08-09T10:00:00.000+09:00',
+    });
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-unlinked', entryType: 'grant', status: 'available', amount: 30,
+      reason: '別の人へ付与', source: 'booking', sourceEventId: 'booking-other',
+      idempotencyKey: 'history-booking-other', occurredAt: '2026-08-10T10:00:00.000+09:00',
+    });
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'adjustment', status: 'available', amount: -5,
+      reason: '問い合わせ調整', source: 'manual',
+      idempotencyKey: 'history-manual', occurredAt: '2026-08-10T11:00:00.000+09:00',
+    });
+
+    const selectedOnly = await getMileageAdminHistory(db, { accountId: 'account-1' });
+    expect(selectedOnly.pagination.total).toBe(2);
+    expect(selectedOnly.items.some((item) => item.reason === '公式Bで付与')).toBe(false);
+
+    const accountA = await getMileageAdminHistory(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1', 'account-2'],
+    });
+    expect(accountA.pagination.total).toBe(3);
+    expect(accountA.items.map((item) => item.reason)).toEqual([
+      '問い合わせ調整', '公式Bで付与', '公式Aで付与',
+    ]);
+    expect(accountA.items.every((item) => item.primaryFriendId === 'friend-1')).toBe(true);
+    expect(accountA.items[0]).toMatchObject({ mode: 'manual', hasSourceEvent: false });
+    expect(accountA.items[1]).toMatchObject({ mode: 'automatic', hasSourceEvent: true });
+    expect(accountA.items[2]).toMatchObject({ ruleName: '予約' });
+
+    const accountB = await getMileageAdminHistory(db, {
+      accountId: 'account-2', entryType: 'grant', status: 'available', search: '別の人',
+    });
+    expect(accountB.pagination.total).toBe(1);
+    expect(accountB.items[0]).toMatchObject({
+      primaryFriendId: 'friend-unlinked', displayName: '別の人', amount: 30,
+    });
+
+    expect(await getMileageConnectedAccountsForFriend(db, 'friend-1', ['account-1'])).toEqual([
+      { accountId: 'account-1', accountName: '公式A', friendId: 'friend-1' },
+    ]);
+    expect(await getMileageConnectedAccountsForFriend(db, 'friend-1', ['account-1', 'account-2']))
+      .toEqual([
+        { accountId: 'account-1', accountName: '公式A', friendId: 'friend-1' },
+        { accountId: 'account-2', accountName: '公式B', friendId: 'friend-2' },
+      ]);
+
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', status: 'available', amount: 1,
+      reason: '日本時間では9月1日', source: 'booking', sourceEventId: 'booking-september-jst',
+      idempotencyKey: 'history-september-jst', occurredAt: '2026-08-31T15:30:00.000Z',
+    });
+    const august = await getMileageAdminHistory(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1'], to: '2026-08-31',
+    });
+    expect(august.items.some((item) => item.reason === '日本時間では9月1日')).toBe(false);
+    const september = await getMileageAdminHistory(db, {
+      accountId: 'account-1', visibleAccountIds: ['account-1'], from: '2026-09-01', to: '2026-09-01',
+    });
+    expect(september.items.map((item) => item.reason)).toEqual(['日本時間では9月1日']);
+  });
+
+  it('appends a manual adjustment once and returns the original before/after values on retry', async () => {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', amount: 100,
+      reason: '初期付与', source: 'booking', idempotencyKey: 'manual-seed',
+    });
+    const input = {
+      friendId: 'friend-2', amount: -30, reason: '注文の取消分',
+      reasonCategory: 'order_correction', sourceReferenceId: 'ORDER-100',
+      idempotencyKey: 'manual-adjustment-1', executedByStaffId: 'owner-1',
+      executedByStaffName: '山本', lineAccountId: 'account-2',
+    } as const;
+
+    const first = await postMileageAdjustment(db, input);
+    expect(first).toMatchObject({ balanceBefore: 100, balanceAfter: 70, replayed: false });
+    expect(first.entry).toMatchObject({
+      beneficiary_user_id: 'user-1', beneficiary_friend_id: 'friend-2',
+      entry_type: 'adjustment', amount: -30, reason: '注文の取消分', source: 'admin_adjustment',
+      source_event_id: null,
+    });
+    expect((await getMileageHistoryForFriend(db, 'friend-1')).find((item) => item.mode === 'manual')).toMatchObject({
+      mode: 'manual', sourceReferenceId: 'ORDER-100', executedByStaffName: '山本',
+    });
+    expect((await getMileageAdminHistory(db, { accountId: 'account-2' })).items.find((item) => item.mode === 'manual')).toMatchObject({
+      mode: 'manual', hasSourceEvent: false, sourceReferenceId: 'ORDER-100',
+      executedByStaffName: '山本',
+    });
+
+    const retry = await postMileageAdjustment(db, input);
+    expect(retry).toMatchObject({
+      balanceBefore: 100, balanceAfter: 70, replayed: true,
+      entry: { id: first.entry.id },
+    });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(70);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'adjustment'`).get())
+      .toEqual({ count: 1 });
+  });
+
+  it('stores the high-value approval threshold per LINE account without a migration', async () => {
+    expect(await getMileageManualAdjustmentPolicy(db, 'account-1')).toBeNull();
+    await setMileageManualAdjustmentPolicy(db, 'account-1', { approvalThreshold: 5_000 });
+    expect(await getMileageManualAdjustmentPolicy(db, 'account-1')).toEqual({ approvalThreshold: 5_000 });
+    expect(await getMileageManualAdjustmentPolicy(db, 'account-2')).toBeNull();
+    await expect(setMileageManualAdjustmentPolicy(db, 'account-1', { approvalThreshold: 0 }))
+      .rejects.toThrow('positive integer');
+  });
+
+  it('fails closed when a decrement would make the shared wallet negative', async () => {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', amount: 50,
+      reason: '初期付与', source: 'booking', idempotencyKey: 'insufficient-seed',
+    });
+
+    await expect(postMileageAdjustment(db, {
+      friendId: 'friend-2', amount: -51, reason: '誤付与の取消',
+      reasonCategory: 'grant_correction', idempotencyKey: 'manual-too-large',
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-2',
+    })).rejects.toMatchObject<MileageAdjustmentError>({ code: 'insufficient_balance' });
+
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(50);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'adjustment'`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('refuses a friend outside the selected LINE account even when called directly', async () => {
+    await expect(postMileageAdjustment(db, {
+      friendId: 'friend-1', amount: 10, reason: '別アカウントからの操作',
+      reasonCategory: 'other', idempotencyKey: 'manual-cross-account',
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-2',
+    })).rejects.toMatchObject<MileageAdjustmentError>({ code: 'friend_not_found' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'adjustment'`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('rejects reusing an idempotency key for a different adjustment', async () => {
+    const base = {
+      friendId: 'friend-1', amount: 20, reason: '電話対応のお礼',
+      reasonCategory: 'customer_support', idempotencyKey: 'manual-conflict',
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-1',
+    } as const;
+    await postMileageAdjustment(db, base);
+
+    await expect(postMileageAdjustment(db, { ...base, amount: 21 }))
+      .rejects.toMatchObject<MileageAdjustmentError>({ code: 'idempotency_conflict' });
+    expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(20);
+  });
+
+  it('lets only one of two racing deductions consume the remaining balance', async () => {
+    await postMileageEntry(db, {
+      beneficiaryFriendId: 'friend-1', entryType: 'grant', amount: 100,
+      reason: '初期付与', source: 'booking', idempotencyKey: 'race-seed',
+    });
+    const make = (idempotencyKey: string) => postMileageAdjustment(db, {
+      friendId: 'friend-1', amount: -80, reason: '同時調整',
+      reasonCategory: 'grant_correction', idempotencyKey,
+      executedByStaffId: 'owner-1', executedByStaffName: '山本', lineAccountId: 'account-1',
+    });
+    const results = await Promise.allSettled([make('race-a'), make('race-b')]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect((results.find((result) => result.status === 'rejected') as PromiseRejectedResult).reason)
+      .toMatchObject({ code: 'insufficient_balance' });
+    expect((await getMileageSummaryForFriend(db, 'friend-2')).available).toBe(20);
+  });
+
+  it('builds account-scoped action-score bands and 30-day changes from existing score history', async () => {
+    sqlite.prepare(
+      `INSERT INTO friends (id, line_user_id, display_name, line_account_id, score)
+       VALUES ('friend-3', 'U3', 'ユーザーC', 'account-1', 10),
+              ('friend-4', 'U4', '未採点ユーザー', 'account-1', 0)`,
+    ).run();
+    sqlite.prepare(`UPDATE friends SET score = 75 WHERE id = 'friend-1'`).run();
+    sqlite.prepare(`UPDATE friends SET score = 40 WHERE id = 'friend-2'`).run();
+    sqlite.prepare(
+      `INSERT INTO friend_scores (id, friend_id, scoring_rule_id, score_change, reason, created_at)
+       VALUES ('score-old', 'friend-1', NULL, 80, '過去の反応', '2026-06-01T10:00:00.000+09:00'),
+              ('score-down', 'friend-1', NULL, -5, '30日間反応なし', '2026-08-09T10:00:00.000+09:00'),
+              ('score-other', 'friend-2', NULL, 40, '別アカウント', '2026-08-09T11:00:00.000+09:00'),
+              ('score-low', 'friend-3', NULL, 10, 'メッセージ返信', '2026-08-08T10:00:00.000+09:00')`,
+    ).run();
+
+    const overview = await getActionScoreOverview(db, {
+      accountId: 'account-1', now: FIXED_NOW.toISOString(), filter: 'all', limit: 20,
+    });
+    expect(overview.summary).toMatchObject({
+      scoredFriends: 2, high: 1, normal: 0, low: 1, decreased30d: 1,
+      highMin: 70, normalMin: 30,
+    });
+    expect(overview.items.map((item) => item.friendId)).toEqual(['friend-1', 'friend-3']);
+    expect(overview.items.some((item) => item.friendId === 'friend-4')).toBe(false);
+    expect(overview.items[0]).toMatchObject({
+      currentScore: 75, band: 'high', change30d: -5,
+      lastReason: '30日間反応なし', lastChangedAt: '2026-08-09T10:00:00.000+09:00',
+    });
+    expect(overview.items.some((item) => item.friendId === 'friend-2')).toBe(false);
+
+    const decreased = await getActionScoreOverview(db, {
+      accountId: 'account-1', now: FIXED_NOW.toISOString(), filter: 'decreased', limit: 20,
+    });
+    expect(decreased.pagination.total).toBe(1);
+    expect(decreased.items[0].friendId).toBe('friend-1');
+  });
+});

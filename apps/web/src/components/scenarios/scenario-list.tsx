@@ -1,150 +1,277 @@
+import { useState } from 'react'
 import Link from 'next/link'
-import type { Scenario, DeliveryMode } from '@line-crm/shared'
+import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
-type ScenarioWithCount = Scenario & { stepCount?: number }
-
-const triggerLabels: Record<string, string> = {
-  friend_add: '友だち追加時',
-  tag_added: 'タグ付与時',
-  manual: '手動',
+type ScenarioRow = Scenario & {
+  stepCount?: number
+  subscriberCount?: number
+  completedCount?: number
 }
 
-const deliveryModeStyles: Record<DeliveryMode, { bg: string; text: string; label: string }> = {
-  relative: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Legacy' },
-  elapsed: { bg: 'bg-blue-50', text: 'text-blue-700', label: '経過時間' },
-  absolute_time: { bg: 'bg-amber-50', text: 'text-amber-700', label: '時刻指定' },
+/**
+ * 配信方式。設計の一覧は「時刻」「日付」のように短く出す。
+ * relative は 028 以前の作り方で、いまは新しく作れない。
+ */
+const deliveryModeLabels: Record<DeliveryMode, string> = {
+  relative: '経過時間（旧）',
+  elapsed: '経過時間',
+  absolute_time: '時刻',
 }
 
-function ModeBadge({ mode }: { mode?: DeliveryMode }) {
-  const s = deliveryModeStyles[mode ?? 'relative']
-  return (
-    <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${s.bg} ${s.text}`}>
-      {s.label}
-    </span>
-  )
+/** 最終コンテンツを配り終えたあとどうするか（121）。 */
+const ON_COMPLETE_LABELS: Record<string, string> = {
+  pause: '一時停止',
+  resume_previous: '1つ前を再開',
+  move: '別のシナリオへ',
 }
 
 interface ScenarioListProps {
-  scenarios: ScenarioWithCount[]
+  scenarios: ScenarioRow[]
   onToggleActive: (id: string, current: boolean) => void
   onDelete: (id: string) => void
+  folders?: Folder[]
+  onMoveFolder?: (id: string, folderId: string) => void
+  /** 掴んで並べ替えたときに、見えている順で呼ばれる。 */
+  onReorder?: (ids: string[]) => void
   loading?: boolean
 }
 
-export default function ScenarioList({ scenarios, onToggleActive, onDelete, loading }: ScenarioListProps) {
+/**
+ * シナリオの一覧。
+ *
+ * 設計（V2 4-1）は表。以前は札を3列に並べていたが、シナリオが増えると
+ * 縦に伸びて、購読中の人数どうしを見比べられなかった。数を並べて読む
+ * 画面なので、列で揃える。
+ */
+export default function ScenarioList({
+  scenarios,
+  onToggleActive,
+  onDelete,
+  folders = [],
+  onMoveFolder,
+  onReorder,
+  loading,
+}: ScenarioListProps) {
+  /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
+  const [dragId, setDragId] = useState<string | null>(null)
+
+  const dropOn = (targetId: string) => {
+    const from = dragId
+    setDragId(null)
+    if (!from || from === targetId || !onReorder) return
+    const order = scenarios.map((s) => s.id)
+    const fromIdx = order.indexOf(from)
+    const toIdx = order.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
+    onReorder(order)
+  }
+
   if (scenarios.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-        <p className="text-gray-500">シナリオがありません。新しいシナリオを作成してください。</p>
+      <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+        <p className="text-ink-faint text-sm">
+          シナリオがありません。「＋ シナリオを作成」から作ってください。
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {scenarios.map((scenario) => (
-        <div key={scenario.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <Link
-              href={`/scenarios/detail?id=${scenario.id}`}
-              className="text-sm font-semibold text-gray-900 hover:text-green-600 transition-colors leading-tight"
-            >
-              {scenario.name}
-            </Link>
-            <div className="flex items-center gap-1.5">
-              {/* lineAccountId === null = global. Label it explicitly so an
-                 account-scoped view can't trick the operator into mutating a
-                 row that fires for every account. */}
-              {scenario.lineAccountId === null && (
-                <span
-                  className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
-                  title="全アカウントに適用されるシナリオです"
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px]">
+          <thead>
+            <TableHeadRow>
+              <Th className="w-10 px-2" aria-label="並び替え" />
+              {/*
+                名前の桁だけ「余ったぶんを全部取る」形にする。
+                `w-full max-w-0` は表の桁でよく使う組み合わせで、
+                他の桁が中身ぶんの幅を取ったあと、残りをここが受け取る。
+                max-w-0 が無いと、中身の長さで桁が広がって表が横に伸びる。
+
+                以前は 22rem で固定していたが、それだと広い画面でも
+                説明が途中で切れ、狭い画面では他の桁が潰れて
+                「配信方 / 式」「読了 / 済」と縦になっていた。
+              */}
+              <Th className="w-full max-w-0">
+                シナリオ名
+              </Th>
+              <Th>
+                配信方式
+              </Th>
+              <Th>
+                フォルダ
+              </Th>
+              <Th>
+                購読中
+              </Th>
+              <Th>
+                読了済
+              </Th>
+              <Th>
+                通数
+              </Th>
+              {/* 配り終えた人をどうするか。一覧で見えないと、シナリオを
+                  つないだつもりが繋がっていないことに気づけない。 */}
+              <Th>
+                終了後
+              </Th>
+              <Th>
+                状態
+              </Th>
+              <Th aria-label="操作" />
+            </TableHeadRow>
+          </thead>
+          <tbody className="divide-hairline divide-y">
+            {scenarios.map((s) => (
+              <tr key={s.id} className="hover:bg-canvas-sunken">
+                {/* 掴んで上下に入れ替える。よく使うものを上に置くための操作。 */}
+                <td
+                  className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center select-none active:cursor-grabbing"
+                  draggable={Boolean(onReorder)}
+                  onDragStart={() => setDragId(s.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => dropOn(s.id)}
+                  aria-label={`${s.name} を並び替える`}
+                  title="上下に動かして並び替え"
                 >
-                  全アカウント共通
-                </span>
-              )}
-              <ModeBadge mode={scenario.deliveryMode} />
-              <span
-                className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  scenario.isActive
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}
-              >
-                {scenario.isActive ? '有効' : '無効'}
-              </span>
-            </div>
-          </div>
-
-          {/* Description */}
-          {scenario.description && (
-            <p className="text-xs text-gray-500 line-clamp-2">{scenario.description}</p>
-          )}
-
-          {/* Metadata */}
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span>トリガー: {triggerLabels[scenario.triggerType] ?? scenario.triggerType}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <span>ステップ数: {scenario.stepCount ?? '-'}</span>
-            </span>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-            <Link
-              href={`/scenarios/detail?id=${scenario.id}`}
-              className="flex-1 text-center text-xs font-medium text-green-600 hover:text-green-700 py-1 min-h-[44px] flex items-center justify-center rounded-md hover:bg-green-50 transition-colors"
-            >
-              編集
-            </Link>
-            <button
-              onClick={() => {
-                // Globals fire for every account; warn before toggling from an
-                // account-scoped view so it can't be flipped by accident.
-                if (
-                  scenario.lineAccountId === null &&
-                  !confirm(
-                    `「${scenario.name}」は全アカウント共通のシナリオです。${scenario.isActive ? '無効化' : '有効化'}するとすべてのアカウントに影響します。続行しますか?`,
-                  )
-                ) {
-                  return
-                }
-                onToggleActive(scenario.id, scenario.isActive)
-              }}
-              disabled={loading}
-              className="flex-1 text-xs font-medium text-gray-600 hover:text-gray-900 py-1 min-h-[44px] flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors disabled:opacity-40"
-            >
-              {scenario.isActive ? '無効にする' : '有効にする'}
-            </button>
-            <button
-              onClick={() => {
-                const isGlobal = scenario.lineAccountId === null
-                const message = isGlobal
-                  ? `「${scenario.name}」は全アカウント共通のシナリオです。削除するとすべてのアカウントから消えます。本当に削除しますか?`
-                  : `「${scenario.name}」を削除してもよいですか？`
-                if (confirm(message)) {
-                  onDelete(scenario.id)
-                }
-              }}
-              disabled={loading}
-              className="flex-1 text-xs font-medium text-red-500 hover:text-red-700 py-1 min-h-[44px] flex items-center justify-center rounded-md hover:bg-red-50 transition-colors disabled:opacity-40"
-            >
-              削除
-            </button>
-          </div>
-        </div>
-      ))}
+                  ⠿
+                </td>
+                {/*
+                  説明が長いと、表そのものが横に伸びて横スクロールが出る。
+                  桁の幅に上限を付けて、はみ出すぶんは畳む。上限を付けずに
+                  line-clamp だけ当てても、桁は中身に合わせて広がる。
+                */}
+                <td className="w-full max-w-0 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Link
+                        href={`/scenarios/detail?id=${s.id}`}
+                        className="text-info min-w-0 truncate text-sm font-medium hover:underline"
+                      >
+                        {s.name}
+                      </Link>
+                      {/* 全アカウント共通のものは、触ると他のアカウントにも効く。
+                          名前の隣に出して、開く前に分かるようにする。
+                          名前が長くても、この札だけは縮めない。 */}
+                      {s.lineAccountId === null && (
+                        <span
+                          className="bg-warning-bg text-warning rounded-pill shrink-0 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                          title="全アカウントに適用されるシナリオです"
+                        >
+                          全アカウント共通
+                        </span>
+                      )}
+                    </div>
+                    {s.description && (
+                      <p className="text-ink-faint mt-0.5 truncate text-xs" title={s.description}>
+                        {s.description}
+                      </p>
+                    )}
+                  </div>
+                </td>
+                <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
+                  {deliveryModeLabels[s.deliveryMode ?? 'relative']}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <select
+                    value={s.folderId ?? ''}
+                    onChange={(event) => onMoveFolder?.(s.id, event.target.value)}
+                    aria-label={`${s.name}のフォルダ`}
+                    disabled={!onMoveFolder}
+                    className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas text-xs font-semibold text-ink"
+                  >
+                    <option value="">未分類</option>
+                    {folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
+                  {(s.subscriberCount ?? 0).toLocaleString('ja-JP')}
+                  <span className="text-ink-faint ml-0.5 text-xs">人</span>
+                  {/*
+                    0人のとき、作っただけでは配信されないことに気づけない。
+                    始め方への導線をその場に出す。
+                  */}
+                  {(s.subscriberCount ?? 0) === 0 && (
+                    <Link
+                      href={`/scenarios/detail?id=${s.id}`}
+                      className="text-info mt-0.5 block text-xs font-normal hover:underline"
+                    >
+                      配信を始める方法
+                    </Link>
+                  )}
+                </td>
+                <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
+                  {(s.completedCount ?? 0).toLocaleString('ja-JP')}
+                  <span className="text-ink-faint ml-0.5 text-xs">人</span>
+                </td>
+                <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums whitespace-nowrap">
+                  {s.stepCount ?? '—'}
+                  {s.stepCount !== undefined && (
+                    <span className="text-ink-faint ml-0.5 text-xs">通</span>
+                  )}
+                </td>
+                <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
+                  {ON_COMPLETE_LABELS[s.onCompleteMode ?? 'pause']}
+                </td>
+                {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
+                    札の中で折り返させない。 */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span
+                    className={`rounded-pill inline-block px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${
+                      s.isActive ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
+                    }`}
+                  >
+                    {s.isActive ? '配信可' : '停止中'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <button
+                    /*
+                      **撮影の入口。**文言（「停止」「再開」）で探すと、言葉を
+                      変えたときに撮影が黙って空振りする。Node ID を付ける。
+                      止めているものだけが「再開」＝配信開始の確認へ進む。
+                    */
+                    data-qa-open={s.isActive ? undefined : 'RUxNf'}
+                    onClick={() => {
+                      onToggleActive(s.id, s.isActive)
+                    }}
+                    disabled={loading}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40"
+                  >
+                    {s.isActive ? '停止' : '再開'}
+                  </button>
+                  <Link
+                    href={`/scenarios/detail?id=${s.id}`}
+                    className="text-accent mx-1 px-2.5 py-1 text-xs font-medium hover:underline"
+                  >
+                    編集
+                  </Link>
+                  <button
+                    onClick={() => {
+                      const message =
+                        s.lineAccountId === null
+                          ? `「${s.name}」は全アカウント共通のシナリオです。削除するとすべてのアカウントから消えます。本当に削除しますか？`
+                          : `「${s.name}」を削除してもよいですか？`
+                      if (confirm(message)) onDelete(s.id)
+                    }}
+                    disabled={loading}
+                    className="text-danger hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40"
+                  >
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

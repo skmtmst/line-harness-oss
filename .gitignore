@@ -13,9 +13,28 @@ dist-mcp/
 *.toml.bak
 .env.production
 .env.staging
+# Wrangler local secrets — matches apps/worker/.dev.vars and any other worker's copy at any depth
+.dev.vars
+.dev.vars.*
 apps/web/out/
+apps/docs/out/
 apps/worker/dist/
 .worktrees/
 .claude/worktrees/
+.claude/settings.local.json
 .line-harness-setup.json
 .line-harness-config.json
+
+# 反映履歴の組み立て結果。
+#
+# `docs/release-log/` から作られる生成物。コミットしていたので、**PRのたびに
+# 全員がこのファイルを書き換えて必ずぶつかっていた**（中身は同じでも、行の
+# 並びが1つ違うだけで衝突する）。
+#
+# `pretypecheck` / `pretest` / `prebuild` / `predev` で毎回作り直すので、
+# 置いておく必要が無い。
+apps/web/src/generated/release-log.json
+
+# 画像比較の差分と結果。基準画像だけを版に残す。
+test-results/
+playwright-report/

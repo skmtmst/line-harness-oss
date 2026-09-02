@@ -1,0 +1,54 @@
+/*
+ * スイッチ。Pencil V5 の機能設定（31-1）で43個並ぶ。
+ *
+ * 「消せない項目」は**灰色のままオンで、押せない**。
+ * オフに見せてはいけない（出ているのに消えているように読める）。
+ */
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px; /* width: 36 */
+  height: 20px; /* height: 20 */
+  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
+  background: var(--color-step-idle);
+  border: none;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+  flex: none;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px; /* つまみ 16 */
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas); /* fill: $canvas */
+  transition: transform 120ms ease-out;
+}
+
+.on {
+  background: var(--color-accent); /* fill: $accent */
+}
+
+.on::after {
+  transform: translateX(16px); /* つまみ x: 2 -> 18 */
+}
+
+/* 消せない項目。オンのまま押せない。 */
+.locked {
+  background: var(--color-hairline); /* fill: $hairline */
+  cursor: not-allowed;
+}
+
+.locked::after {
+  transform: translateX(16px);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}

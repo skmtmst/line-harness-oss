@@ -168,6 +168,8 @@ describe('normalizeInstallBindings', () => {
   });
 });
 
+// ─── Admin-only repair release selection ────────────────────────────────────
+
 function release(version: string): ReleaseEntry {
   return {
     version,

@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.20.0 (2026-08-10)
+
+### Added — Mileage economy
+
+- A shared, cross-account mileage ledger with idempotent grants, reversals, spending, expiration, adjustments, configurable rules, daily caps, asynchronous processing, and admin reporting.
+- Mileage rewards for LINE activity, bookings, form submissions, tracked-link clicks, purchases, tags, webinar viewing/completion/CTA clicks, Instagram engagement, and long-term follow status.
+- Quality-based referral mileage that rewards downstream actions by referred friends instead of raw friend-add counts alone.
+- A self-service LIFF wallet showing cross-account balances, credited LINE accounts, earning opportunities, referral offers, and accordion-style mileage history.
+- HMAC-signed, short-lived cross-account linking so users can safely consolidate mileage across multiple LINE Official Accounts.
+
+### Added — Webinar and consultation automation
+
+- Webinar funnel events, journey follow-ups, mileage processing, and follow-up scheduling.
+- Google Calendar availability synchronization and Google Meet consultation reminders.
+
+### Database
+
+- Additive migrations `051_booking_recurring_availability_google_calendar.sql` and `057` through `066` for webinar journeys, reminders, mileage, loyalty, and quality referrals.
+
 ## v0.17.0 (2026-07-08)
 
 ### Added — Link-tracking controls

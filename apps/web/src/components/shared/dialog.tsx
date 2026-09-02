@@ -1,0 +1,115 @@
+'use client'
+
+import React, { useEffect, useId, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useOverlayFocus } from './overlay-utils'
+import styles from './dialog.module.css'
+
+export type DialogProps = {
+  open: boolean
+  title: string
+  description?: string
+  tone?: 'default' | 'destructive'
+  busy?: boolean
+  error?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  onConfirm?: () => void
+  onCancel: () => void
+  children?: ReactNode
+  footer?: ReactNode
+  /**
+   * 見出しの左に置く絵。渡さなければ今までどおり何も足さない。
+   * 危険な操作の確認で「これは戻せない」を一目で分かるようにするため。
+   */
+  titleIcon?: ReactNode
+  /** 実行ボタンの中、文字の左に置く絵。処理中は文字だけにする。 */
+  confirmIcon?: ReactNode
+  /** 参照画像の固定比較やページ内プレビューで、背景を付けず面だけ表示する。 */
+  modal?: boolean
+  /** 画面固有のPencil Node。未指定なら共通部品のNodeだけを持つ。 */
+  designNode?: string
+}
+
+/** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
+export default function Dialog({
+  open,
+  title,
+  description,
+  tone = 'default',
+  busy = false,
+  error,
+  confirmLabel = '保存する',
+  cancelLabel = 'キャンセル',
+  onConfirm,
+  onCancel,
+  children,
+  footer,
+  titleIcon,
+  confirmIcon,
+  modal = true,
+  designNode,
+}: DialogProps) {
+  const titleId = useId()
+  const descriptionId = useId()
+  const [mounted, setMounted] = useState(false)
+  const panelRef = useOverlayFocus(open && modal, onCancel, busy)
+
+  useEffect(() => setMounted(true), [])
+  if (!open) return null
+
+  const titleNode = (
+    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{title}</h2>
+  )
+  const heading = (
+    <>
+      {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
+      {titleIcon ? (
+        <div className={styles.titleRow}>
+          <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
+          {titleNode}
+        </div>
+      ) : titleNode}
+      {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+    </>
+  )
+  const panel = (
+    <div
+      ref={panelRef}
+      className={`${styles.panel} ${styles.standardPanel}`}
+      role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
+      aria-modal={modal || undefined}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+      aria-busy={busy || undefined}
+      tabIndex={-1}
+      data-design-part="dialog"
+      data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
+    >
+      {tone === 'destructive' ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+      {children ? <div className={styles.content}>{children}</div> : null}
+      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {footer ?? (
+        <div className={styles.actions}>
+          <button type="button" className={`${styles.button} ${styles.designButton} ${styles.cancel}`} onClick={onCancel} disabled={busy}>{cancelLabel}</button>
+          {onConfirm ? (
+            <button type="button" className={`${styles.button} ${styles.designButton} ${tone === 'destructive' ? styles.danger : styles.confirm}`} onClick={onConfirm} disabled={busy}>
+              {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
+              {busy ? '処理中…' : confirmLabel}
+            </button>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+
+  if (!modal) return panel
+  const overlay = (
+    <div className={styles.overlay} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
+      if (!busy && event.target === event.currentTarget) onCancel()
+    }}>
+      {panel}
+    </div>
+  )
+  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+}

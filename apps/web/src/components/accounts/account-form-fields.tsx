@@ -57,11 +57,11 @@ export function FormSection({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-left"
       >
-        <div>
+        <div className="min-w-0 pr-3">
           <p className="text-sm font-semibold text-gray-800">{title}</p>
           {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
         </div>
-        <span className="text-gray-400 text-xs">{open ? '▼' : '▶'}</span>
+        <span className="shrink-0 text-xs text-gray-400">{open ? '▼' : '▶'}</span>
       </button>
       {open && <div className="p-4 space-y-3 bg-white">{children}</div>}
     </div>
@@ -165,7 +165,7 @@ export function AccountFormSections({
           hint={
             showMessagingRequired
               ? undefined
-              : '空欄なら現在の値を維持。再発行した場合のみ入力'
+              : '設定済み（再発行して変更する場合のみ入力）'
           }
         />
         <TextField
@@ -174,7 +174,7 @@ export function AccountFormSections({
           onChange={(v) => update({ channelSecret: v })}
           required={showMessagingRequired}
           type="password"
-          hint={showMessagingRequired ? undefined : '空欄なら現在の値を維持'}
+          hint={showMessagingRequired ? undefined : '設定済み（変更する場合のみ入力）'}
         />
       </FormSection>
 
@@ -195,6 +195,7 @@ export function AccountFormSections({
           value={state.loginChannelSecret}
           onChange={(v) => update({ loginChannelSecret: v })}
           type="password"
+          hint={showMessagingRequired ? undefined : '保存済みの値は表示しません。変更する場合のみ入力'}
         />
       </FormSection>
 

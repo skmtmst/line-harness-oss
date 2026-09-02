@@ -11,6 +11,8 @@
 
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { enrollByTrigger } from '../services/reminder-trigger.js';
 import {
   EVENT_NAME_MAX,
   EVENT_DESCRIPTION_MAX,
@@ -39,8 +41,21 @@ import {
   nextStatus,
   type EventBookingAction,
 } from '../services/event-booking-state.js';
+import { awardActivityMileage } from '../services/activity-mileage.js';
+import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { resolveLineCredential } from '@line-crm/db';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const events = new Hono<Env>();
+const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
+
+function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
 
 // ----------------------------------------------------------------
 // Helpers
@@ -106,7 +121,12 @@ function validateEventInput(
       }
     }
   }
-  for (const key of ['cancel_deadline_hours_before', 'reminder_hours_before', 'max_bookings_per_friend'] as const) {
+  for (const key of [
+    'cancel_deadline_hours_before',
+    'reminder_hours_before',
+    'max_bookings_per_friend',
+    'entry_cutoff_hours_before',
+  ] as const) {
     if (has(key) && body[key] != null) {
       const v = body[key];
       if (!Number.isInteger(v) || (v as number) < 0) {
@@ -150,12 +170,17 @@ function validateEventInput(
 // Admin: events CRUD
 // ============================================================
 
-events.post('/api/events/admin/events', async (c) => {
+events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const v = validateEventInput(body, true);
   if (!v.ok) return bad(c, v.code, 422);
+
+  if (Array.isArray(body.account_ids)
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), body.account_ids as string[])) {
+    return bad(c, ACCOUNT_ACCESS_ERROR, 403);
+  }
 
   const id = crypto.randomUUID();
   const targetType = (body.target_type as EventTargetType | undefined) ?? 'single';
@@ -175,8 +200,9 @@ events.post('/api/events/admin/events', async (c) => {
          is_published, sort_order,
          target_type, account_ids, dedup_priority,
          confirmation_message_extra, reminder_message_extra,
-         og_title, og_description, og_image_url
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         og_title, og_description, og_image_url,
+         visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -202,6 +228,9 @@ events.post('/api/events/admin/events', async (c) => {
       (body.og_title as string | null | undefined) ?? null,
       (body.og_description as string | null | undefined) ?? null,
       (body.og_image_url as string | null | undefined) ?? null,
+      (body.visible_tag_id as string | null | undefined) ?? null,
+      (body.waitlist_enabled as number | undefined) ?? 0,
+      (body.entry_cutoff_hours_before as number | null | undefined) ?? null,
     )
     .run();
   const row = await c.env.DB
@@ -236,7 +265,11 @@ events.get('/api/events/admin/events', async (c) => {
          (SELECT COUNT(*)
             FROM event_bookings b
            WHERE b.event_id = e.id AND b.status = 'requested'
-         ) AS pending_count
+         ) AS pending_count,
+         -- 申込条件。e.* に visible_tag_id は入るが ID だけでは一覧に出せない。
+         -- タグが消されていると NULL になるので、ID の有無と名前の有無は
+         -- 呼び出し側で別に見ること。
+         (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
        FROM events e
        WHERE e.deleted_at IS NULL AND (
          (e.target_type = 'single' AND e.line_account_id = ?)
@@ -268,7 +301,7 @@ events.get('/api/events/admin/events/:id', async (c) => {
   return c.json(row);
 });
 
-events.put('/api/events/admin/events/:id', async (c) => {
+events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const id = c.req.param('id');
@@ -287,6 +320,11 @@ events.put('/api/events/admin/events/:id', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const v = validateEventInput(body, false);
   if (!v.ok) return bad(c, v.code, 422);
+
+  if (Array.isArray(body.account_ids)
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), body.account_ids as string[])) {
+    return bad(c, ACCOUNT_ACCESS_ERROR, 403);
+  }
 
   const updatable = [
     'name',
@@ -308,6 +346,9 @@ events.put('/api/events/admin/events/:id', async (c) => {
     'og_title',
     'og_description',
     'og_image_url',
+    'visible_tag_id',
+    'waitlist_enabled',
+    'entry_cutoff_hours_before',
   ] as const;
   const setClauses: string[] = [];
   const setValues: unknown[] = [];
@@ -425,7 +466,7 @@ async function rebuildRemindersForSlot(db: D1Database, slot_id: string): Promise
   }
 }
 
-events.delete('/api/events/admin/events/:id', async (c) => {
+events.delete('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const id = c.req.param('id');
@@ -529,7 +570,32 @@ events.get('/api/events/admin/events/:id/slots', async (c) => {
   return c.json({ items: results ?? [] });
 });
 
-events.post('/api/events/admin/events/:id/slots', async (c) => {
+// GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
+//
+// 空きが出たときに誰へ声をかけるかを見るための画面用。並び順は「先に
+// 並んだ人から」。自動では繰り上げない。誰を通すかは運用の判断で、
+// 勝手に確定させると定員や承認の設定と食い違う。
+events.get('/api/events/admin/events/:id/waitlist', async (c) => {
+  const account_id = getAccountId(c);
+  if (!account_id) return bad(c, 'account_id_required', 400);
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT w.id, w.slot_id, w.friend_id, w.status, w.notified_at, w.created_at,
+              s.starts_at AS slot_starts_at,
+              f.display_name AS friend_name
+         FROM event_waitlist w
+         JOIN event_slots s ON s.id = w.slot_id
+         LEFT JOIN friends f ON f.id = w.friend_id
+        WHERE w.event_id = ? AND w.status IN ('waiting', 'invited')
+        ORDER BY s.starts_at ASC, w.created_at ASC
+        LIMIT 500`,
+    )
+    .bind(c.req.param('id'))
+    .all();
+  return c.json({ waitlist: results });
+});
+
+events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const event_id = c.req.param('id');
@@ -537,13 +603,18 @@ events.post('/api/events/admin/events/:id/slots', async (c) => {
 
   const body = (await c.req.json().catch(() => ({}))) as { slots?: SlotInput[] };
   if (!Array.isArray(body.slots) || body.slots.length === 0) return bad(c, 'slots_required', 422);
+  if (body.slots.length > 400) {
+    return bad(c, '一度に追加できるのは400件までです。400件以下に分けて追加してください', 422);
+  }
 
-  const inserted: Array<Record<string, unknown>> = [];
+  const insertStatements: D1PreparedStatement[] = [];
+  const ids: string[] = [];
   for (const s of body.slots) {
     const v = validateSlotInput(s, true);
     if (!v.ok) return bad(c, v.code, 422);
     const id = crypto.randomUUID();
-    await c.env.DB
+    ids.push(id);
+    insertStatements.push(c.env.DB
       .prepare(
         `INSERT INTO event_slots
            (id, event_id, starts_at, ends_at, capacity, is_active, sort_order)
@@ -557,15 +628,28 @@ events.post('/api/events/admin/events/:id/slots', async (c) => {
         s.capacity ?? null,
         s.is_active ?? 1,
         s.sort_order ?? 0,
-      )
-      .run();
-    const row = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(id).first();
-    if (row) inserted.push(row as Record<string, unknown>);
+      ));
   }
+  await c.env.DB.batch(insertStatements);
+
+  const rowsById = new Map<string, Record<string, unknown>>();
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const chunk = ids.slice(offset, offset + 90);
+    const placeholders = chunk.map(() => '?').join(',');
+    const { results } = await c.env.DB
+      .prepare(`SELECT * FROM event_slots WHERE id IN (${placeholders})`)
+      .bind(...chunk)
+      .all<Record<string, unknown>>();
+    for (const row of results ?? []) rowsById.set(row.id as string, row);
+  }
+  const inserted = ids.flatMap((id) => {
+    const row = rowsById.get(id);
+    return row ? [row] : [];
+  });
   return c.json({ items: inserted }, 201);
 });
 
-events.put('/api/events/admin/events/:id/slots/:slotId', async (c) => {
+events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const event_id = c.req.param('id');
@@ -796,6 +880,22 @@ events.get('/api/liff/events/:id', async (c) => {
     }
   }
 
+  // 公開対象を絞っているイベントは、そのタグを持たない人には無いものとして扱う。
+  // 「あるが見られない」だと、存在すること自体が伝わってしまう。
+  if (row.visible_tag_id) {
+    if (!caller) return bad(c, 'not_found', 404);
+    const me = await c.env.DB
+      .prepare(
+        `SELECT 1 FROM friend_tags ft
+           JOIN friends f ON f.id = ft.friend_id
+          WHERE f.line_user_id = ? AND f.line_account_id = ? AND ft.tag_id = ?
+          LIMIT 1`,
+      )
+      .bind(caller, account_id, row.visible_tag_id as string)
+      .first<{ 1: number }>();
+    if (!me) return bad(c, 'not_found', 404);
+  }
+
   return c.json({ ...row, my_existing_booking: myExistingBooking });
 });
 
@@ -834,6 +934,12 @@ interface EventDbRow {
   max_bookings_per_friend: number | null;
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
+  /** 公開対象を絞るタグ。null なら友だち全員 */
+  visible_tag_id: string | null;
+  /** 満席のあとキャンセル待ちを受けるか */
+  waitlist_enabled: number;
+  /** 申込の締め切り（開始の何時間前まで）。null なら開始まで受ける */
+  entry_cutoff_hours_before: number | null;
 }
 
 interface SlotDbRow {
@@ -917,11 +1023,13 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   // The outer scope already returned on null, so these throws are unreachable.
   if (friend == null) throw new Error('runBookingFlow: friend missing');
   if (callerLineUserId == null) throw new Error('runBookingFlow: callerLineUserId missing');
+  if (account_id == null) throw new Error('runBookingFlow: line account missing');
 
   const event = await c.env.DB
     .prepare(
       `SELECT id, name, venue_name, venue_url, requires_approval, max_bookings_per_friend,
-              reminder_day_before_enabled, reminder_hours_before
+              reminder_day_before_enabled, reminder_hours_before,
+              visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
          FROM events
         WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
           (target_type = 'single' AND line_account_id = ?)
@@ -953,6 +1061,24 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   if (!slot || slot.is_active !== 1) return finalize(409, { error: 'slot_inactive' });
   if (new Date(slot.starts_at).getTime() <= Date.now()) return finalize(410, { error: 'slot_started' });
 
+  // 公開対象を絞っているイベントは、そのタグを持つ人だけが申し込める。
+  // 一覧や詳細でも同じ条件で隠すが、URL を直接叩けば素通りするので
+  // 申込のところでも見る。
+  if (event.visible_tag_id) {
+    const tagged = await c.env.DB
+      .prepare(`SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ? LIMIT 1`)
+      .bind(friend.id, event.visible_tag_id)
+      .first<{ 1: number }>();
+    if (!tagged) return finalize(409, { error: 'event_unpublished' });
+  }
+
+  // 申込の締め切り。開始そのものは上で見ているので、ここは「何時間前まで」。
+  if (event.entry_cutoff_hours_before != null) {
+    const cutoffAt =
+      new Date(slot.starts_at).getTime() - event.entry_cutoff_hours_before * 3600_000;
+    if (Date.now() >= cutoffAt) return finalize(410, { error: 'entry_closed' });
+  }
+
   // Pre-flight friend-limit check は identity_key ベースに統合済 (後段の
   // sameIdentityActive ブロック参照)。friend_id ベースの単一アカウント
   // 内カウントは cross-account 同一人物を捉えられないので使わない。
@@ -969,7 +1095,30 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       )
       .bind(slot.id)
       .first<{ c: number }>();
-    if ((cnt?.c ?? 0) >= slotRow.capacity) return finalize(409, { error: 'slot_full' });
+    if ((cnt?.c ?? 0) >= slotRow.capacity) {
+      if (event.waitlist_enabled !== 1) return finalize(409, { error: 'slot_full' });
+      // キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
+      // 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
+      const identityKeyForWait = computeIdentityKey(friend);
+      await c.env.DB
+        .prepare(
+          `INSERT OR IGNORE INTO event_waitlist
+             (id, event_id, slot_id, friend_id, identity_key, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'waiting', ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          event.id,
+          slot.id,
+          friend.id,
+          identityKeyForWait,
+          new Date().toISOString(),
+        )
+        .run();
+      // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
+      // 出せない。
+      return finalize(200, { waitlisted: true, slot_id: slot.id });
+    }
   }
 
   // identity_key 算出: broadcasts dedup と同じ式 (url_token > uid > solo)。
@@ -1094,6 +1243,15 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     }
   }
 
+  await awardActivityMileage(c.env.DB, {
+    eventType: 'booking_created',
+    source: 'event_booking',
+    sourceEventId: id,
+    friendId: friend.id,
+    metadata: { bookingType: 'event', eventId: event.id, slotId: slot.id },
+    occurredAt: nowIso,
+  });
+
   if (status === 'confirmed') {
     const reminders = computeRemindersForBooking({
       starts_at_utc: slot.starts_at,
@@ -1103,22 +1261,50 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     await insertRemindersForBooking(c.env.DB, id, reminders);
   }
 
+  // イベントをきっかけにするリマインダへ登録する。承認待ちの段階では
+  // まだ登録しない。落選した人にまで「明日です」と届く。
+  if (status === 'confirmed') {
+    await enrollByTrigger(c.env.DB, {
+      triggerType: 'event',
+      friendId: friend.id,
+      startsAtIso: slot.starts_at as string,
+    }).catch((err) => console.error('reminder enroll (event) failed:', err));
+    optionalExecutionCtx(c)?.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: account_id,
+        eventType: 'calendar_booked',
+        sourceEventId: id,
+        friendId: friend.id,
+        eventData: {
+          bookingType: 'event', bookingId: id, eventId: event.id, slotId: slot.id,
+        },
+      })
+        .catch((error) => console.error('event booking automation event failed:', error)),
+    );
+  }
+
   // best-effort notification: do not fail the booking if push fails.
   try {
     const acc = await c.env.DB
       .prepare(
-        `SELECT la.channel_access_token, e.confirmation_message_extra
+        `SELECT la.channel_access_token, la.channel_access_token_encrypted,
+                e.confirmation_message_extra
            FROM line_accounts la
            JOIN events e ON e.id = ?
           WHERE la.id = ?`,
       )
       .bind(event.id, account_id)
-      .first<{ channel_access_token: string; confirmation_message_extra: string | null }>();
+      .first<{ channel_access_token: string; channel_access_token_encrypted: string | null; confirmation_message_extra: string | null }>();
     if (acc?.channel_access_token) {
+      const accessToken = await resolveLineCredential(
+        acc.channel_access_token_encrypted,
+        acc.channel_access_token,
+        { lineAccountId: account_id, field: 'channel_access_token' },
+      );
       const kind: EventNotificationKind =
         status === 'requested' ? 'received_pending' : 'received_confirmed';
       await sendEventBookingNotification({
-        channelAccessToken: acc.channel_access_token,
+        channelAccessToken: accessToken,
         toLineUserId: callerLineUserId,
         kind,
         ctx: {
@@ -1139,7 +1325,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
 });
 
 
-events.delete('/api/events/admin/events/:id/slots/:slotId', async (c) => {
+events.delete('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const event_id = c.req.param('id');
@@ -1257,7 +1443,9 @@ async function notifyBookingFriend(
         `SELECT e.name AS event_name, e.venue_name, e.venue_url,
                 e.confirmation_message_extra,
                 s.starts_at AS slot_starts_at,
+                b.line_account_id,
                 la.channel_access_token,
+                la.channel_access_token_encrypted,
                 f.line_user_id
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
@@ -1273,12 +1461,19 @@ async function notifyBookingFriend(
         venue_url: string | null;
         confirmation_message_extra: string | null;
         slot_starts_at: string;
+        line_account_id: string;
         channel_access_token: string;
+        channel_access_token_encrypted: string | null;
         line_user_id: string;
       }>();
     if (!row || !row.channel_access_token) return;
+    const accessToken = await resolveLineCredential(
+      row.channel_access_token_encrypted,
+      row.channel_access_token,
+      { lineAccountId: row.line_account_id, field: 'channel_access_token' },
+    );
     await sendEventBookingNotification({
-      channelAccessToken: row.channel_access_token,
+      channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
       kind,
       ctx: {
@@ -1294,7 +1489,7 @@ async function notifyBookingFriend(
   }
 }
 
-events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', async (c) => {
+events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRole('owner', 'admin', 'staff'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const event_id = c.req.param('id');
@@ -1357,6 +1552,19 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', async (c)
       });
       await insertRemindersForBooking(c.env.DB, booking.id, reminders);
     }
+    optionalExecutionCtx(c)?.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventType: 'calendar_booked',
+        sourceEventId: booking.id,
+        friendId: booking.friend_id,
+        eventData: {
+          bookingType: 'event', bookingId: booking.id,
+          eventId: booking.event_id, slotId: booking.slot_id,
+        },
+      })
+        .catch((error) => console.error('event booking automation event failed:', error)),
+    );
   }
 
   await notifyBookingFriend(c.env.DB, booking.id, action === 'confirm' ? 'confirmed' : 'rejected');
@@ -1367,7 +1575,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', async (c)
   return c.json(updated);
 });
 
-events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', async (c) => {
+events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRole('owner', 'admin', 'staff'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const event_id = c.req.param('id');
@@ -1393,7 +1601,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', async (c)
   return c.json({ ok: true });
 });
 
-events.put('/api/events/admin/events/:id/bookings/:bookingId', async (c) => {
+events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owner', 'admin', 'staff'), async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
   const event_id = c.req.param('id');

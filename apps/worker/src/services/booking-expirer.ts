@@ -3,13 +3,16 @@
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
+import { resolveLineCredential } from '@line-crm/db';
 
 interface StaleRow {
   id: string;
+  line_account_id: string;
   starts_at: string;
   menu_name: string;
   staff_name: string;
   channel_access_token: string;
+  channel_access_token_encrypted: string | null;
   line_user_id: string;
 }
 
@@ -32,10 +35,11 @@ export async function runExpirer(
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
   const stale = await db
     .prepare(
-      `SELECT b.id, b.starts_at,
+      `SELECT b.id, b.line_account_id, b.starts_at,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
+              la.channel_access_token_encrypted,
               f.line_user_id
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
@@ -66,8 +70,13 @@ export async function runExpirer(
       .bind(row.id)
       .run();
     try {
+      const accessToken = await resolveLineCredential(
+        row.channel_access_token_encrypted,
+        row.channel_access_token,
+        { lineAccountId: row.line_account_id, field: 'channel_access_token' },
+      );
       await params.sender({
-        channelAccessToken: row.channel_access_token,
+        channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
         kind: 'expired',
         ctx: {

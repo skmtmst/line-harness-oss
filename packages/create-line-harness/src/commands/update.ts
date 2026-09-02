@@ -618,6 +618,10 @@ export async function runUpdate(
     };
     const bundle = await downloadAndVerifyBundle(release, s);
     await deployAdminFromBundle(creds, cfg, bundle, s);
+
+    // The normal update reaches this step only after Admin succeeds. A
+    // partial update that failed at Admin never configured the new origin,
+    // so complete it here as part of the repair.
     await configureAdminAuth({
       workerName: cfg.workerName,
       workerUrl: cfg.workerPublicUrl,
@@ -726,7 +730,11 @@ export async function runUpdate(
   p.outro(pc.green(`🎉 v${upgrade.version} にアップデート完了`));
 }
 
-/** Pick the artifact matching the live Worker; never deploy a newer Admin. */
+/**
+ * Pick the release artifact matching the Worker that is already live.
+ * Repair must never silently choose manifest.latest: doing so could deploy
+ * an Admin that expects APIs the current Worker does not have.
+ */
 export function findReleaseForAdminRepair(
   releases: ReleaseEntry[],
   currentVersion: string,

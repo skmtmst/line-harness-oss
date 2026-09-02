@@ -1,4 +1,4 @@
-import { createTrackedLink } from '@line-crm/db';
+import { getOrCreateAutoTrackedLink } from '@line-crm/db';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 
 // Domains where Universal Links / App Links should be used
@@ -75,16 +75,19 @@ async function createTrackingMap(
   urls: Set<string>,
   linkBase: string,
   lineAccountId?: string | null,
+  templateId?: string | null,
 ): Promise<Map<string, { trackingUrl: string; originalUrl: string; label: string }>> {
-  // Inserts are independent (each generates its own id/short_code), so run
-  // them concurrently — a carousel can hold 10+ URIs and sequential D1
-  // round-trips add up inside per-friend delivery loops.
+  // Lookups are independent per URL, so run them concurrently — a carousel
+  // can hold 10+ URIs and sequential D1 round-trips add up inside per-friend
+  // delivery loops.
   const entries = await Promise.all(
     [...urls].map(async (url) => {
-      const link = await createTrackedLink(db, {
-        name: `auto: ${url.slice(0, 60)}`,
+      // Reuses the one auto link per (url, account) — per-friend delivery
+      // loops must not mint a fresh tracked_links row on every send.
+      const link = await getOrCreateAutoTrackedLink(db, {
         originalUrl: url,
         lineAccountId: lineAccountId ?? null,
+        templateId: templateId ?? null,
       });
       // /t/ URL — Worker handles LINE app detection and LIFF redirect server-side.
       // Prefer the short code (linkBase may be a branded short domain).
@@ -171,6 +174,8 @@ export interface AutoTrackOptions {
    * account's consent screen.
    */
   lineAccountId?: string | null;
+  /** この本文が属するテンプレート（110）。クリックをテンプレート単位で数えるため。 */
+  templateId?: string | null;
 }
 
 /**
@@ -191,6 +196,12 @@ export async function appendFriendToTrackedLinks(
   friendId: string | null | undefined,
 ): Promise<string> {
   if (!friendId) return content;
+  // Tracked links are always built as `${base}/t/${code}` (worker base, short
+  // domain, and legacy UUID form alike), so content without the literal
+  // '/t/' cannot contain one. Skip the settings read — this runs in front of
+  // reply-token sends where pre-send latency matters, and URL-free content
+  // is the common case.
+  if (!content.includes('/t/')) return content;
   const workerBase = workerUrl.replace(/\/$/, '');
   const linkBase = await resolveTrackedLinkBaseUrl(db, workerUrl);
   const bases = [...new Set([workerBase, linkBase])];
@@ -214,8 +225,8 @@ export async function appendFriendToTrackedLinks(
 
 /**
  * Auto-wrap URLs in message content with tracking links.
- * For text messages with URLs, converts to Flex with button.
- * For flex messages, replaces URLs inline.
+ * Text and flex messages both get their URLs replaced inline with tracked
+ * links; the message type is preserved.
  */
 export async function autoTrackContent(
   db: D1Database,
@@ -251,7 +262,7 @@ export async function autoTrackContent(
     // (無駄な link_clicks レコード防止)。
     const trackable = new Set([...urls].filter((u) => !isAppLinkDomain(u)));
     const urlMap = trackable.size > 0
-      ? await createTrackingMap(db, trackable, linkBase, options?.lineAccountId)
+      ? await createTrackingMap(db, trackable, linkBase, options?.lineAccountId, options?.templateId)
       : new Map<string, { trackingUrl: string; originalUrl: string; label: string }>();
 
     let result = content;
@@ -290,7 +301,7 @@ export async function autoTrackContent(
     [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes)),
   );
   if (trackableUris.size === 0) return { messageType, content };
-  const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId);
+  const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId, options?.templateId);
   rewriteActionUris(tree, (u) => {
     const tracked = uriMap.get(u);
     if (!tracked) return u;
@@ -339,4 +350,35 @@ function rewriteActionUris(node: unknown, fn: (u: string) => string): void {
   visitActionUris(node, (holder, key) => {
     holder[key] = fn(holder[key] as string);
   });
+}
+
+/**
+ * Full per-friend outgoing decoration pipeline: wrap raw URLs into tracked
+ * links (autoTrackContent), then bake f=<friendId> into /t links
+ * (appendFriendToTrackedLinks) so clicks attribute without the LIFF
+ * identification hop.
+ *
+ * Single implementation shared by the cron step delivery
+ * (step-delivery.ts) and the instant first-step push
+ * (immediate-first-step.ts) so the two pipelines cannot drift — whichever
+ * side wins the delivery claim, the friend receives identically decorated
+ * content.
+ *
+ * Per-friend sends only — never use for multicast/broadcast content (see
+ * appendFriendToTrackedLinks). Returns the input unchanged when workerUrl
+ * is not configured.
+ */
+export async function decorateForFriendPush(
+  db: D1Database,
+  messageType: string,
+  content: string,
+  workerUrl: string | undefined,
+  opts: { lineAccountId: string | null; friendId: string },
+): Promise<AutoTrackResult> {
+  if (!workerUrl) return { messageType, content };
+  const tracked = await autoTrackContent(db, messageType, content, workerUrl, {
+    lineAccountId: opts.lineAccountId,
+  });
+  const decorated = await appendFriendToTrackedLinks(db, tracked.content, workerUrl, opts.friendId);
+  return { messageType: tracked.messageType, content: decorated };
 }

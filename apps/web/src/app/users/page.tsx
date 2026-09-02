@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Header from '@/components/layout/header'
+import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
+import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
 import { api } from '@/lib/api'
 import type { UserRowData } from '@/components/users/user-row'
 
@@ -16,6 +18,7 @@ interface AccountOption {
 }
 
 export default function UsersPage() {
+  const embedded = useEmbeddedPage()
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -31,9 +34,14 @@ export default function UsersPage() {
   // フィルタ変更 / ページ移動で複数リクエストが in-flight になり、
   // 古い応答が後着で UI を上書きする事故を防ぐ。
   const requestSeqRef = useRef(0)
-  // 次の load() で worker キャッシュをバイパスするフラグ。
+  // 次の load() で最新状態を取り直すフラグ。
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  /*
+   * 開いている統合ユーザー（設計 `w8W4Eh`）。
+   * 同じ画面を二重に作らないため、別のルートは足さず一覧の面を差し替える。
+   */
+  const [openedPersonId, setOpenedPersonId] = useState<string | null>(null)
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -108,17 +116,38 @@ export default function UsersPage() {
   }, [load])
 
   const headerDescription = useMemo(
-    () => 'LINE 画像トークンで人単位にまとめた一覧。重複・X・フォーム回答を一目で。',
+    () => '複数のLINEアカウントにいる同じ人を、元の友だちを残したまま確認します。',
     [],
   )
 
+  if (openedPersonId) {
+    return (
+      <div className="space-y-4" data-users-design="v6">
+        {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
+        <MergedPersonDetailView
+          personId={openedPersonId}
+          onClose={() => setOpenedPersonId(null)}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <Header title="ユーザー一覧" description={headerDescription} />
+    <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
+      {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
+
+      <section className="rounded-v6-card border border-hairline bg-canvas px-4 py-3 shadow-v6-card">
+        <p className="text-sm font-bold text-v6-ink">
+          複数の友だちを、1人の顧客として横断管理します。
+        </p>
+        <p className="mt-1 text-xs leading-5 text-v6-ink-secondary">
+          元の友だちは残したまま、登録アカウント・最終接触・重複配信の確認ができます。同じ人か確認が必要なものは「要確認」と表示します。
+        </p>
+      </section>
 
       <SummaryBar />
 
-      <div className="flex items-start gap-3">
+      <div className="flex items-stretch gap-3">
         <div className="flex-1">
           <UsersFilters
             q={q}
@@ -136,18 +165,12 @@ export default function UsersPage() {
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          title="worker キャッシュをバイパスして再集計"
+          className="rounded-[9px] border border-[#DADDE2] bg-white px-4 text-xs font-semibold text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)] hover:bg-[#F6F6F8] disabled:opacity-50"
+          title="最新の状態を取得して一覧を更新"
         >
           {refreshing ? '再計算中…' : '再計算'}
         </button>
       </div>
-
-      {error && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          {error}
-        </div>
-      )}
 
       <UsersTable
         rows={rows}
@@ -155,7 +178,9 @@ export default function UsersPage() {
         page={page}
         pageSize={PAGE_SIZE}
         loading={loading}
+        error={Boolean(error)}
         onPageChange={setPage}
+        onOpenMergedPerson={setOpenedPersonId}
       />
     </div>
   )

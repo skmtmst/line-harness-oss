@@ -8,16 +8,24 @@ import { Hono } from 'hono';
 const dbMocks = {
   getLineAccounts: vi.fn(),
   getLineAccountById: vi.fn(),
+  getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
   deleteLineAccount: vi.fn(),
+  getAccountSetting: vi.fn(),
+  setAccountSetting: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
+  CredentialEncryptionKeyError: class CredentialEncryptionKeyError extends Error {},
+  jstNow: vi.fn(() => '2026-08-10T12:00:00.000+09:00'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
 const lineClientMocks = {
   getFollowersInsight: vi.fn(),
+  getFollowerIds: vi.fn(),
 };
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: vi.fn().mockImplementation(() => lineClientMocks),
@@ -27,7 +35,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 const { lineAccounts } = await import('./line-accounts.js');
 
 type TestEnv = {
-  Variables: { staff: { id: string; role: 'owner' | 'admin' | 'staff' } };
+  Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
   Bindings: { DB: D1Database };
 };
 
@@ -47,10 +55,11 @@ function makeDbStub(firstResult: unknown = null): D1Database {
 function setupApp(
   role: 'owner' | 'admin' | 'staff' = 'owner',
   dbStub: D1Database = makeDbStub(),
+  staffOverride: Partial<TestEnv['Variables']['staff']> = {},
 ) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'test-staff', role });
+    c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub };
     await next();
   });
@@ -77,8 +86,102 @@ const fakeAccount = {
 };
 
 beforeEach(() => {
-  for (const fn of Object.values(dbMocks)) fn.mockReset();
+  for (const fn of Object.values(dbMocks)) {
+    if ('mockReset' in fn) fn.mockReset();
+  }
   lineClientMocks.getFollowersInsight.mockReset();
+  lineClientMocks.getFollowerIds.mockReset();
+  dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
+  dbMocks.getLineAccountCredentialHealth.mockResolvedValue(null);
+  dbMocks.setAccountSetting.mockResolvedValue(undefined);
+  dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
+  lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith('/v2/bot/info')) return Response.json({ displayName: 'テスト' });
+    if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
+      return Response.json({ endpoint: 'http://localhost/webhook', active: true });
+    }
+    if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+    if (url.endsWith('/v2/bot/message/quota')) return Response.json({ type: 'limited', value: 200 });
+    return new Response(null, { status: 404 });
+  }));
+});
+
+describe('GET /api/line-accounts/:id/credential-health', () => {
+  const health = {
+    channel_access_token: {
+      encrypted: true,
+      decryptable: false,
+      source: 'plaintext' as const,
+    },
+    channel_secret: {
+      encrypted: true,
+      decryptable: true,
+      source: 'encrypted' as const,
+    },
+  };
+
+  test('returns only credential status for an account in the owner scope', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
+    const app = setupApp('owner');
+
+    const res = await app.request('/api/line-accounts/acc-1/credential-health');
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: typeof health };
+    expect(body).toEqual({ success: true, data: health });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('actual-access-value-must-not-return');
+    expect(serialized).not.toContain('actual-secret-value-must-not-return');
+    expect(Object.keys(body.data.channel_access_token).sort()).toEqual([
+      'decryptable',
+      'encrypted',
+      'source',
+    ]);
+  });
+
+  test('returns the same not-found response for an account outside the owner scope', async () => {
+    const otherAccount = {
+      ...fakeAccount,
+      id: 'acc-other',
+      tenant_id: 'other-organization',
+      parent_line_account_id: null,
+    };
+    dbMocks.getLineAccountById.mockResolvedValue(otherAccount);
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, parent_line_account_id: null },
+      otherAccount,
+    ]);
+    dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
+    const app = setupApp('owner', makeDbStub(), {
+      assignedLineAccountId: 'acc-1',
+      canAccessDescendantAccounts: true,
+    });
+
+    const res = await app.request('/api/line-accounts/acc-other/credential-health');
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'LINE account not found',
+    });
+    expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
+  });
+
+  test.each(['admin', 'staff'] as const)('rejects %s with 403', async (role) => {
+    dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
+    const app = setupApp(role);
+
+    const res = await app.request('/api/line-accounts/acc-1/credential-health');
+
+    expect(res.status).toBe(403);
+    expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/line-accounts/:id/follower-insight', () => {
@@ -128,6 +231,23 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
     expect(res.status).toBe(400);
     expect(lineClientMocks.getFollowersInsight).not.toHaveBeenCalled();
   });
+
+  test('assigned staff can fetch another account insight in the same organization', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, id: 'acc-2' });
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'acc-1', parent_line_account_id: null },
+      { ...fakeAccount, id: 'acc-2', parent_line_account_id: null },
+    ]);
+    lineClientMocks.getFollowersInsight.mockResolvedValue({
+      status: 'ready', followers: 123, targetedReaches: 111, blocks: 4,
+    });
+    const app = setupApp('staff', makeDbStub(), {
+      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
+    });
+    const res = await app.request('/api/line-accounts/acc-2/follower-insight?date=20260616');
+    expect(res.status).toBe(200);
+    expect(lineClientMocks.getFollowersInsight).toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/line-accounts', () => {
@@ -139,7 +259,7 @@ describe('POST /api/line-accounts', () => {
       liff_id: '2009624792-XXXX',
     });
 
-    const app = setupApp('owner');
+    const app = setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' });
     const res = await app.request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -161,17 +281,19 @@ describe('POST /api/line-accounts', () => {
       loginChannelId: '2009624792',
       loginChannelSecret: 'login-secret',
       liffId: '2009624792-XXXX',
+      tenantId: 'tenant-line-owner',
     });
 
-    const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret: string | null } };
+    const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret?: string | null; loginChannelSecretConfigured: boolean } };
     expect(body.success).toBe(true);
     expect(body.data.loginChannelId).toBe('2009624792');
     expect(body.data.liffId).toBe('2009624792-XXXX');
-    // serializeLineAccountFull exposes loginChannelSecret to owner-only POST response
-    expect(body.data.loginChannelSecret).toBe('login-secret');
+    // Saved credentials are never echoed to the browser after persistence.
+    expect(body.data.loginChannelSecret).toBeUndefined();
+    expect(body.data.loginChannelSecretConfigured).toBe(true);
   });
 
-  test('omits loginChannelId/etc when not provided (stores null)', async () => {
+  test('LINE LoginとLIFFがない場合は登録しない', async () => {
     dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
 
     const app = setupApp('owner');
@@ -186,21 +308,17 @@ describe('POST /api/line-accounts', () => {
       }),
     });
 
-    expect(res.status).toBe(201);
-    expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
-      loginChannelId: null,
-      loginChannelSecret: null,
-      liffId: null,
-    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test('trims whitespace and treats empty string as null for optional fields', async () => {
+  test('LIFF IDが空なら登録しない', async () => {
     dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
 
     // Use a complete login pair (both id+secret present) to focus on the
     // trim/empty-string normalization behavior. liffId is independent.
     const app = setupApp('owner');
-    await app.request('/api/line-accounts', {
+    const res = await app.request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -214,10 +332,107 @@ describe('POST /api/line-accounts', () => {
       }),
     });
 
-    expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
-      loginChannelId: '2009624792',
-      loginChannelSecret: 'login-secret',
-      liffId: null,
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('Messaging API接続確認が失敗した場合は登録しない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channelId: '123456789',
+        name: 'メイン',
+        channelAccessToken: 'invalid-token',
+        channelSecret: 'secret',
+        loginChannelId: '2009624792',
+        loginChannelSecret: 'login-secret',
+        liffId: '2009624792-XXXX',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/line-accounts/hierarchy', () => {
+  test('親子関係を検証して一括保存する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'parent', parent_line_account_id: null },
+      { ...fakeAccount, id: 'child', parent_line_account_id: null },
+    ]);
+    const batch = vi.fn().mockResolvedValue([]);
+    const db = Object.assign(makeDbStub(), { batch });
+    const app = setupApp('owner', db);
+
+    const res = await app.request('/api/line-accounts/hierarchy', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relationships: [{ id: 'child', parentLineAccountId: 'parent' }] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(batch.mock.calls[0][0]).toHaveLength(1);
+  });
+});
+
+describe('GET /api/line-accounts', () => {
+  test('担当店舗だけを返し、担当外店舗を一覧から除外する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      fakeAccount,
+      { ...fakeAccount, id: 'acc-2', channel_id: '987654321', name: '担当外' },
+    ]);
+    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
+
+    const res = await setupApp('staff').request('/api/line-accounts?live=0');
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      data: [{ id: 'acc-1' }],
+    });
+  });
+
+  test('Webhook URLの照合結果を秘密情報なしで返す', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ webhook: { status: string; expectedUrl: string }; plan: { key: string; label: string; monthlyMessageLimit: number }; channelAccessToken?: string }>;
+    };
+    expect(body.data[0].webhook).toMatchObject({
+      status: 'matched',
+      expectedUrl: 'http://localhost/webhook',
+    });
+    expect(body.data[0].channelAccessToken).toBeUndefined();
+    expect(body.data[0].plan).toMatchObject({
+      key: 'communication',
+      label: 'コミュニケーション',
+      monthlyMessageLimit: 200,
+    });
+  });
+});
+
+describe('GET /api/line-accounts/summary', () => {
+  test('閲覧できる稼働中アカウントの友だちを重複除外して集計する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
+    const first = vi.fn().mockResolvedValue({ count: 37 });
+    const bind = vi.fn(() => ({ first }));
+    const db = { prepare: vi.fn(() => ({ bind })) } as unknown as D1Database;
+    const app = setupApp('owner', db);
+    const res = await app.request('/api/line-accounts/summary');
+
+    expect(res.status).toBe(200);
+    expect(bind).toHaveBeenCalledWith('acc-1');
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: { uniqueFriendCount: 37 },
     });
   });
 });
@@ -341,6 +556,8 @@ describe('Login pair / uniqueness validation', () => {
         name: 'メイン',
         channelAccessToken: 'token',
         channelSecret: 'secret',
+        loginChannelId: '2009624792',
+        loginChannelSecret: 'login-secret',
         liffId: '2009624792-DUPLICATE',
       }),
     });

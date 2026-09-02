@@ -1,0 +1,41 @@
+.root {
+  display: flex;
+  min-height: 76px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 24px;
+}
+
+.content {
+  min-width: 0;
+  flex: 1;
+}
+
+.titleRow {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.title {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.description {
+  margin-top: 5px;
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.action {
+  flex-shrink: 0;
+}

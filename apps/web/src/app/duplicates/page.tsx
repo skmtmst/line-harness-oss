@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
+import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import { api } from '@/lib/api'
 
 interface PerAccountStat {
@@ -23,6 +25,7 @@ interface DuplicatesStatsData {
   uniquePeople: number
   friendDups: number
   duplicateGroups: number
+  // 送信実績ではなく friendDups × 単価の見積り。実績が繋がるまで画面には出さない。
   wastedPerBroadcastYen: number
   msgUnitYen: number
   perAccount: PerAccountStat[]
@@ -47,6 +50,7 @@ function formatRelative(iso: string): string {
 const fmt = new Intl.NumberFormat('ja-JP')
 
 export default function DuplicatesPage() {
+  const embedded = useEmbeddedPage()
   const [data, setData] = useState<DuplicatesStatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -60,10 +64,10 @@ export default function DuplicatesPage() {
       if (res.success) {
         setData(res.data)
       } else {
-        setError('集計の取得に失敗しました')
+        setError('読み込めませんでした')
       }
     } catch {
-      setError('集計の取得に失敗しました')
+      setError('読み込めませんでした')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -84,19 +88,24 @@ export default function DuplicatesPage() {
   }, [])
 
   return (
-    <div className="space-y-8">
-      <Header
-        title="重複検出"
-        description="複数アカウントに重複している友だちを把握し、配信コストの無駄を減らすためのビューです。"
-      />
+    <div className="space-y-4" data-duplicates-design="v4">
+      {!embedded ? (
+        <Header
+          title="重複検出"
+          description="複数アカウントに重複している友だちを把握し、配信コストの無駄を減らすためのビューです。"
+        />
+      ) : null}
 
       {loading && !data ? (
-        <div className="rounded-lg bg-white p-8 text-center text-gray-500 shadow-sm">
-          読み込み中…
+        <div className="rounded-[14px] border border-[#DADDE2] bg-white p-8 text-center text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+          読み込んでいます
         </div>
       ) : !data ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error || '集計の取得に失敗しました'}
+          <p>読み込めませんでした</p>
+          <div className="mt-2">
+            <Button variant="secondary" onClick={() => load()}>再読み込み</Button>
+          </div>
         </div>
       ) : (
         <>
@@ -106,35 +115,34 @@ export default function DuplicatesPage() {
               showing slightly stale numbers with a warning. */}
           {error && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              再計算に失敗しました: {error}
+              再計算できませんでした。表示中の数字は前回の集計です。
             </div>
           )}
           <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatCard label="友だち総数" value={fmt.format(data.totalFollowing)} />
             <StatCard label="ユニーク人数" value={fmt.format(data.uniquePeople)} />
+            {/*
+              friendDups は「重複した登録の行数」。送った通数ではない。
+              以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
+              さらに設計にない「月10本配信なら」という前提まで作っていた。
+              配信実績が繋がるまでは、数えられる行数だけを行数として出す。
+            */}
             <StatCard
-              label="余分な配信回数"
+              label="重複している行"
               value={fmt.format(data.friendDups)}
-              hint="重複ぶんの送信"
+              hint="複数登録による余分"
             />
             <StatCard
-              label="1配信あたり浪費"
-              value={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
-              hint={`¥${data.msgUnitYen}/通 換算`}
+              label="重複による配信コスト"
+              value="—"
+              hint="まだ繋がっていません。配信実績が接続されると表示されます。"
             />
           </section>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500">
-            <p>
-              月10本配信なら約{' '}
-              <span className="font-medium text-gray-700">
-                ¥{fmt.format(data.wastedPerBroadcastYen * 10)}
-              </span>{' '}
-              の浪費です。
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-[#565F59]">
             <div className="flex items-center gap-3">
               {data.computedAt && (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-[#8B938D]">
                   {formatRelative(data.computedAt)}に計算
                 </span>
               )}
@@ -142,7 +150,7 @@ export default function DuplicatesPage() {
                 type="button"
                 onClick={() => load({ forceRefresh: true })}
                 disabled={refreshing}
-                className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="h-9 rounded-[9px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#565F59] hover:bg-[#F6F6F8] disabled:opacity-50"
               >
                 {refreshing ? '再計算中…' : '再計算'}
               </button>
@@ -150,13 +158,13 @@ export default function DuplicatesPage() {
           </div>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-900">アカウント別ブレイクダウン</h2>
+            <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
             {data.perAccount.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-500">アカウントが登録されていません。</p>
+              <p className="mt-3 text-sm text-[#8B938D]">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+                <table className="w-full table-fixed text-sm">
+                  <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
                     <tr>
                       <th className="px-4 py-3">アカウント</th>
                       <th className="px-4 py-3 text-right">友だち数</th>
@@ -164,10 +172,10 @@ export default function DuplicatesPage() {
                       <th className="px-4 py-3 text-right">重複率</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="px-4 py-3 font-medium text-gray-900">{row.accountName}</td>
+                        <td className="truncate px-4 py-3 font-semibold text-[#1D1D1F]" title={row.accountName}>{row.accountName}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmt.format(row.friends)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmt.format(row.dups)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">
@@ -187,29 +195,30 @@ export default function DuplicatesPage() {
             const pairwise = data.pairwiseOverlap
             return (
             <section>
-              <h2 className="text-lg font-semibold text-gray-900">アカウント間 重複マトリックス</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント間 重複マトリックス</h2>
+              <p className="mt-1 text-xs text-[#8B938D]">
                 行アカウントの友だちのうち、列アカウントにも居る人数 (行アカに対する割合)。
               </p>
-              <div className="mt-3 overflow-x-auto rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+                <table className="w-full table-fixed text-sm">
+                  <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
                     <tr>
                       <th className="px-4 py-3">行 \ 列</th>
                       {data.perAccount.map((col) => (
                         <th
                           key={col.accountId}
-                          className="px-4 py-3 text-right whitespace-nowrap"
+                          title={col.accountName}
+                          className="truncate px-2 py-3 text-right"
                         >
                           {col.accountName}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                        <td title={row.accountName} className="truncate px-2 py-3 font-semibold text-[#1D1D1F]">
                           {row.accountName}
                         </td>
                         {data.perAccount.map((col) => {
@@ -217,7 +226,7 @@ export default function DuplicatesPage() {
                             return (
                               <td
                                 key={col.accountId}
-                                className="px-4 py-3 text-right text-gray-300"
+                                className="px-4 py-3 text-right text-[#B8BCC2]"
                               >
                                 —
                               </td>
@@ -233,10 +242,10 @@ export default function DuplicatesPage() {
                           return (
                             <td
                               key={col.accountId}
-                              className="px-4 py-3 text-right tabular-nums whitespace-nowrap"
+                              className="px-2 py-3 text-right tabular-nums"
                             >
                               {fmt.format(overlap)}{' '}
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-[#8B938D]">
                                 ({(rate * 100).toFixed(0)}%)
                               </span>
                             </td>
@@ -266,10 +275,10 @@ function StatCard({
   hint?: string
 }) {
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-gray-400">{hint}</div> : null}
+    <div className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+      <div className="text-xs font-medium text-[#565F59]">{label}</div>
+      <div className="mt-1 text-2xl font-bold tabular-nums text-[#1D1D1F]">{value}</div>
+      {hint ? <div className="mt-1 text-xs text-[#8B938D]">{hint}</div> : null}
     </div>
   )
 }

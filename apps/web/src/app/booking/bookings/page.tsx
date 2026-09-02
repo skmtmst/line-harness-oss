@@ -1,10 +1,21 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
-import { bookingApi, type BookingRequest } from '@/lib/api'
+import { bookingApi, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+
+/**
+ * 予約管理（設計 V2 8-1 / node EAYvf）。
+ *
+ * 設計は「見出し ＋ 4枚のKPI ＋ 左のメニュー棚 ＋ 検索の帯 ＋ 表 ＋ 注記 ＋ 件数と頁送り」。
+ * 以前は青い帯で予約URLを見せ、状態のタブを上に並べていた。作りとしては
+ * 動いていたが、設計のどこにも無い形だったので組み直した。
+ *
+ * 状態の絞り込みは「よく使う」の並びに移した。設計にある「変更依頼のみ」は
+ * その状態そのものが bookings に無いので、実際にある状態を並べている。
+ */
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '未承認' },
@@ -16,11 +27,11 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
 ]
 
 const statusBadgeColor: Record<string, string> = {
-  requested: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-gray-100 text-gray-700',
-  expired: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-gray-100 text-gray-600',
+  requested: 'bg-warning-bg text-warning',
+  confirmed: 'bg-success-bg text-success',
+  rejected: 'bg-canvas-sunken text-ink-secondary',
+  expired: 'bg-canvas-sunken text-ink-secondary',
+  cancelled: 'bg-canvas-sunken text-ink-secondary',
   completed: 'bg-blue-100 text-blue-800',
   no_show: 'bg-red-100 text-red-800',
 }
@@ -43,6 +54,9 @@ const actionLabel: Record<string, string> = {
   complete: '完了',
 }
 
+/** 1ページに出す件数。設計の「表示 20件」に合わせる。 */
+const PAGE_SIZE = 20
+
 function formatJpDateTime(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
@@ -54,16 +68,61 @@ function formatJpDateTime(iso: string): string {
   })
 }
 
+/** 表の日時。設計は年を出していない（08/18 14:00）。 */
+function formatShort(iso: string): string {
+  return new Date(iso).toLocaleString('ja-JP', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
+function formatJpTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
+/** JSTでの年月（2026-08）。集計の区切りに使う。 */
+function jstMonth(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 7)
+}
+
+function jstDay(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+function monthKey(offset: number): string {
+  const now = new Date(Date.now() + 9 * 3600_000)
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
+  return d.toISOString().slice(0, 7)
+}
+
 export default function BookingsPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [tab, setTab] = useState<string>('requested')
+  /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
+  const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
+  const [menuFilter, setMenuFilter] = useState<string>('all')
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const [items, setItems] = useState<BookingRequest[]>([])
+  /** KPIとメニュー別の件数を出すための全件。タブとは別に取る。 */
+  const [allItems, setAllItems] = useState<BookingRequest[]>([])
+  const [menus, setMenus] = useState<BookingMenu[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
+  // 最新の行を引き直せるので、パネルに古い状態が残らない。
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const liffId = selectedAccount?.liffId ?? null
   // Worker `/o` は ref 解決・追跡なしで liffId を直接受けるラップ URL。
@@ -71,9 +130,10 @@ export default function BookingsPage() {
   // LINE 内配信も SNS 配信もこの 1 本で完結させる。/o は LINE 内 UA でも
   // 「LINEで開く」ボタン経由で Universal Link → LIFF を起動する。
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const shareUrl = workerBase && liffId
-    ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book`
-    : null
+  const shareUrl =
+    workerBase && liffId
+      ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book`
+      : null
   const copied = copiedUrl !== null && copiedUrl === shareUrl
 
   async function copyUrl(url: string | null) {
@@ -110,7 +170,33 @@ export default function BookingsPage() {
     load()
   }, [load])
 
-  async function handleDecide(id: string, action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') {
+  // KPIとメニュー棚は、いま見ているタブに関係なく全件から出す。
+  // タブを切り替えるたびに数が動くと、上の数字が何を指しているか読めない。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let alive = true
+    void (async () => {
+      try {
+        const [all, menuList] = await Promise.all([
+          bookingApi.listRequests(selectedAccountId, 'all'),
+          bookingApi.listMenus(selectedAccountId),
+        ])
+        if (!alive) return
+        setAllItems(all.requests)
+        setMenus(menuList.menus)
+      } catch {
+        // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [selectedAccountId])
+
+  async function handleDecide(
+    id: string,
+    action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete',
+  ) {
     if (!selectedAccountId) return
     if (!confirm(`この予約を「${actionLabel[action]}」しますか？`)) return
     try {
@@ -121,144 +207,548 @@ export default function BookingsPage() {
     }
   }
 
+  const kpi = useMemo(() => {
+    const thisMonth = monthKey(0)
+    const lastMonth = monthKey(-1)
+    const inThis = allItems.filter((b) => jstMonth(b.starts_at) === thisMonth)
+    const inLast = allItems.filter((b) => jstMonth(b.starts_at) === lastMonth)
+    const cancelled = inThis.filter(
+      (b) => b.status === 'cancelled' || b.status === 'rejected' || b.status === 'no_show',
+    ).length
+    return {
+      total: inThis.length,
+      diff: inThis.length - inLast.length,
+      confirmed: inThis.filter((b) => b.status === 'confirmed').length,
+      cancelled,
+      rate: inThis.length > 0 ? Math.round((cancelled / inThis.length) * 100) : null,
+    }
+  }, [allItems])
+
+  const menuCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const b of allItems) counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
+    return counts
+  }, [allItems])
+
+  const filtered = useMemo(() => {
+    const today = jstDay(new Date().toISOString())
+    const weekAhead = jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString())
+    const q = query.trim()
+    return items.filter((b) => {
+      if (menuFilter !== 'all' && b.menu_name !== menuFilter) return false
+      if (q && !(b.friend_name ?? '').includes(q)) return false
+      if (range === 'today' && jstDay(b.starts_at) !== today) return false
+      if (range === 'week') {
+        const d = jstDay(b.starts_at)
+        if (d < today || d > weekAhead) return false
+      }
+      return true
+    })
+  }, [items, menuFilter, query, range])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const current = Math.min(page, pageCount)
+  const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+
+  // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
+  // 「該当なし」に見えてしまう。
+  useEffect(() => {
+    setPage(1)
+  }, [tab, menuFilter, query, range])
+
+  // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
+  // 一覧から消えることがある。その場合はパネルを閉じる。
+  const detail = detailId ? (items.find((b) => b.id === detailId) ?? null) : null
+  useEffect(() => {
+    if (detailId && !items.some((b) => b.id === detailId)) setDetailId(null)
+  }, [items, detailId])
+
   return (
     <div>
-      <Header
-        title="予約管理"
-        description="顧客からの予約リクエストを承認・拒否します"
-      />
-
-      {selectedAccountId && (
-        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-blue-900 mb-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0L10 18.343M10.172 13.828a4 4 0 01-5.656 0L3.1 12.414a4 4 0 010-5.656l3-3a4 4 0 015.656 0L14 5.657"
-              />
-            </svg>
-            お客様向け 予約フォーム LIFF URL
-          </div>
-          {shareUrl ? (
-            <>
-              <div className="flex gap-2 items-center">
-                <input
-                  readOnly
-                  value={shareUrl}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => copyUrl(shareUrl)}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  {copied ? 'コピー済' : 'コピー'}
-                </button>
-              </div>
-              <p className="text-xs text-blue-700 mt-2">
-                LINE / OpenChat / IG DM どこでも貼れます。受信者がタップすると LINE で予約画面が開きます。
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-amber-700">
-              このアカウントには LIFF ID が未設定です。
-              <a href="/accounts" className="underline ml-1">アカウント設定</a> で LIFF ID を登録してください。
-            </p>
-          )}
+      <div data-design="Head">
+        <Header
+          title="予約管理"
+          description="トリミングなどの予約を管理します。友だちが自分で予約履歴を確認できるURLも発行できます。"
+        />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            disabled
+            title="操作マニュアルは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+          >
+            マニュアル
+          </button>
+          <Link
+            href="/booking/staff/shifts"
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
+          >
+            受付時間を設定
+          </Link>
+          <Link
+            href="/booking/bookings/new"
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+          >
+            電話の予約を入れる
+          </Link>
         </div>
-      )}
+      </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {STATUS_TABS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              tab === key ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
-            }`}
-            style={tab === key ? { backgroundColor: '#06C755' } : undefined}
-          >
-            {label}
-          </button>
-        ))}
+      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Kpi
+          title="今月の予約"
+          value={kpi.total}
+          unit="件"
+          detail={`前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+        />
+        <Kpi title="確定" value={kpi.confirmed} unit="件" detail="来店予定" />
+        {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
+            承認待ちを出す。要対応であることは変わらない。 */}
+        <Kpi
+          title="変更依頼"
+          value={allItems.filter((b) => b.status === 'requested').length}
+          unit="件"
+          detail="要対応"
+        />
+        <Kpi
+          title="キャンセル"
+          value={kpi.cancelled}
+          unit="件"
+          detail={kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
+        />
       </div>
 
-      {!selectedAccountId ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
-          サイドバーでアカウントを選択してください
-        </div>
-      ) : loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
-          読み込み中…
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
-          該当する予約はありません
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">日時</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">顧客</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">メニュー</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">担当</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">要望</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">料金</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">状態</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {items.map((b) => (
-                  <tr key={b.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm whitespace-nowrap">{formatJpDateTime(b.starts_at)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <Link
-                        href={`/chats?friend=${b.friend_id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {b.friend_name ?? '-'}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-sm">{b.menu_name}</td>
-                    <td className="px-4 py-3 text-sm">{b.staff_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={b.customer_note ?? ''}>
-                      {b.customer_note ?? '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums">¥{b.price_at_booking.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs ${statusBadgeColor[b.status] ?? 'bg-gray-100'}`}>
-                        {statusLabel[b.status] ?? b.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <ActionButtons status={b.status} onAction={(a) => handleDecide(b.id, a)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
+        <aside
+          data-design="Folders"
+          className="bg-canvas rounded-card border-hairline h-fit shrink-0 border p-3 xl:w-56"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-ink text-xs font-semibold">メニュー</span>
+            <span className="text-ink-faint text-xs">{allItems.length} 件</span>
+          </div>
+          <ul className="space-y-0.5">
+            <li>
+              <FolderRow
+                label="すべて"
+                count={allItems.length}
+                active={menuFilter === 'all'}
+                onClick={() => setMenuFilter('all')}
+              />
+            </li>
+            {menus.map((m) => (
+              <li key={m.id}>
+                <FolderRow
+                  label={m.name}
+                  count={menuCounts.get(m.name) ?? 0}
+                  active={menuFilter === m.name}
+                  onClick={() => setMenuFilter(m.name)}
+                />
+              </li>
+            ))}
+          </ul>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <div
+            data-design="Bar"
+            className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+          >
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="お客さま名で検索"
+              aria-label="お客さま名で検索"
+              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+            <select
+              disabled
+              title="並び替えは準備中です"
+              className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            >
+              <option>日時が近い順</option>
+            </select>
+            <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+            <select
+              disabled
+              title="表示件数の切り替えは準備中です"
+              className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            >
+              <option>20件</option>
+            </select>
+            <button
+              disabled
+              title="保存した条件は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+            >
+              保存した条件
+            </button>
+          </div>
+
+          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-ink-faint text-xs">よく使う</span>
+            {STATUS_TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
+                  tab === key
+                    ? 'bg-accent text-on-accent'
+                    : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <span className="border-hairline mx-1 h-4 border-l" />
+            <button
+              onClick={() => setRange(range === 'today' ? 'all' : 'today')}
+              className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                range === 'today'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+              }`}
+            >
+              今日
+            </button>
+            <button
+              onClick={() => setRange(range === 'week' ? 'all' : 'week')}
+              className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                range === 'week'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+              }`}
+            >
+              今週
+            </button>
+          </div>
+
+          {!selectedAccountId ? (
+            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
+              サイドバーでアカウントを選択してください
+            </div>
+          ) : loading ? (
+            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
+              読み込み中…
+            </div>
+          ) : shown.length === 0 ? (
+            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
+              該当する予約はありません
+            </div>
+          ) : (
+            <div
+              data-design="Table"
+              className="bg-canvas rounded-card border-hairline overflow-hidden border"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px]">
+                  <thead>
+                    <tr className="bg-canvas-sunken border-hairline border-b">
+                      <Th>日時</Th>
+                      <Th>お客さま</Th>
+                      <Th>メニュー</Th>
+                      <Th>担当</Th>
+                      <Th>予約経路</Th>
+                      <Th className="text-right">料金</Th>
+                      <Th>状態</Th>
+                      <Th className="text-right">操作</Th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {shown.map((b) => (
+                      <tr key={b.id} className="hover:bg-canvas-sunken">
+                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                          {formatShort(b.starts_at)}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <Link
+                            href={`/chats?friend=${b.friend_id}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {b.friend_name ?? '-'}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-sm">{b.menu_name}</td>
+                        <td className="px-4 py-3 text-sm">{b.staff_name}</td>
+                        {/* 予約はいまLINE内の予約フォームからしか入らない。
+                            経路の列は bookings に無いので、実態どおり LINE と出す。 */}
+                        <td className="px-4 py-3 text-sm">
+                          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
+                            LINE
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm tabular-nums">
+                          ¥{b.price_at_booking.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`inline-block rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
+                          >
+                            {statusLabel[b.status] ?? b.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => setDetailId(b.id)}
+                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-gray-200"
+                            >
+                              詳細
+                            </button>
+                            <ActionButtons
+                              status={b.status}
+                              onAction={(a) => handleDecide(b.id, a)}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
+            <p className="text-ink-secondary text-xs leading-5">
+              友だち予約URLと、友だちが自分の予約履歴を見るURLをそれぞれ発行できます。予約履歴URLを配ると「自分の予約を確認したい」という問い合わせを減らせます。
+            </p>
+            {shareUrl ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  readOnly
+                  value={shareUrl}
+                  aria-label="友だち予約URL"
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyUrl(shareUrl)}
+                  className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+                >
+                  {copied ? 'コピー済' : 'コピー'}
+                </button>
+                <span className="text-ink-faint text-xs">予約履歴URLは準備中です</span>
+              </div>
+            ) : (
+              <p className="text-warning mt-2 text-xs">
+                このアカウントには LIFF ID が未設定です。
+                <Link href="/accounts" className="ml-1 underline">
+                  アカウント設定
+                </Link>
+                で LIFF ID を登録してください。
+              </p>
+            )}
+          </div>
+
+          <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-ink-faint text-xs">全 {filtered.length} 件</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={current <= 1}
+                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
+              >
+                前へ
+              </button>
+              <span className="text-ink-secondary px-2 text-xs tabular-nums">
+                {current} / {pageCount}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                disabled={current >= pageCount}
+                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
+              >
+                次へ
+              </button>
+            </div>
           </div>
         </div>
+      </div>
+
+      {detail && (
+        <BookingDetailPanel
+          booking={detail}
+          onClose={() => setDetailId(null)}
+          onAction={(a) => handleDecide(detail.id, a)}
+        />
       )}
+    </div>
+  )
+}
+
+function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th className={`text-ink-faint px-4 py-3 text-left text-xs font-semibold ${className}`}>
+      {children}
+    </th>
+  )
+}
+
+function Kpi({
+  title,
+  value,
+  unit,
+  detail,
+}: {
+  title: string
+  value: number
+  unit: string
+  detail: string
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <p className="text-ink-faint text-xs">{title}</p>
+      <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
+        {value}
+        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
+    </div>
+  )
+}
+
+function FolderRow({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
+        active ? 'bg-accent text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+      }`}
+    >
+      <span className="truncate">{label}</span>
+      <span className="shrink-0 tabular-nums">{count}</span>
+    </button>
+  )
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="border-hairline flex gap-4 border-b py-2.5 last:border-b-0">
+      <span className="text-ink-faint w-28 shrink-0 pt-0.5 text-xs font-medium">{label}</span>
+      <div className="text-ink flex-1 text-sm break-words">{children}</div>
+    </div>
+  )
+}
+
+function BookingDetailPanel({
+  booking: b,
+  onClose,
+  onAction,
+}: {
+  booking: BookingRequest
+  onClose: () => void
+  onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button
+        type="button"
+        aria-label="閉じる"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/30"
+      />
+      <aside className="relative h-full w-full max-w-md overflow-y-auto bg-white shadow-xl">
+        <div className="border-hairline sticky top-0 flex items-center justify-between gap-3 border-b bg-white px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-ink-faint text-xs">予約の詳細</p>
+            <h2 className="text-ink truncate text-base font-semibold">{b.menu_name}</h2>
+          </div>
+          <span
+            className={`shrink-0 rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
+          >
+            {statusLabel[b.status] ?? b.status}
+          </span>
+          <button
+            onClick={onClose}
+            className="text-ink-faint hover:bg-canvas-sunken shrink-0 rounded-md px-2 py-1 text-sm"
+          >
+            閉じる
+          </button>
+        </div>
+
+        <div className="px-5 py-4">
+          <section className="mb-6">
+            <h3 className="text-ink mb-1 text-sm font-semibold">予約内容</h3>
+            <DetailRow label="日時">
+              {formatJpDateTime(b.starts_at)} 〜 {formatJpTime(b.ends_at)}
+            </DetailRow>
+            <DetailRow label="担当">{b.staff_name}</DetailRow>
+            <DetailRow label="料金">
+              <span className="tabular-nums">¥{b.price_at_booking.toLocaleString()}</span>
+            </DetailRow>
+            <DetailRow label="予約番号">
+              <span className="text-ink-secondary font-mono text-xs">{b.id}</span>
+            </DetailRow>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="text-ink mb-1 text-sm font-semibold">お客様</h3>
+            <DetailRow label="お名前">
+              <Link href={`/chats?friend=${b.friend_id}`} className="text-blue-600 hover:underline">
+                {b.friend_name ?? '名前未設定'}
+              </Link>
+            </DetailRow>
+            <DetailRow label="ご要望">
+              {b.customer_note ? (
+                <span className="whitespace-pre-wrap">{b.customer_note}</span>
+              ) : (
+                <span className="text-ink-faint">記入なし</span>
+              )}
+            </DetailRow>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="text-ink mb-1 text-sm font-semibold">記録</h3>
+            <DetailRow label="申込日時">{formatJpDateTime(b.requested_at)}</DetailRow>
+            <DetailRow label="決定日時">
+              {b.decided_at ? (
+                formatJpDateTime(b.decided_at)
+              ) : (
+                <span className="text-ink-faint">未決定</span>
+              )}
+            </DetailRow>
+            <DetailRow label="カレンダー">
+              {b.external_event_id ? (
+                <span className="text-green-700">Googleカレンダーに登録済み</span>
+              ) : (
+                <span className="text-ink-faint">未連携</span>
+              )}
+            </DetailRow>
+          </section>
+
+          <div className="border-hairline border-t pt-4">
+            <p className="text-ink-faint mb-2 text-xs">
+              承認するとお客様のLINEに確定のお知らせが届きます。
+            </p>
+            <ActionButtons status={b.status} onAction={onAction} />
+            <Link
+              href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`}
+              className="text-ink-secondary mt-3 inline-block text-xs underline"
+            >
+              予約の詳細ページを開く
+            </Link>
+          </div>
+        </div>
+      </aside>
     </div>
   )
 }
@@ -275,14 +765,13 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('approve')}
-          className="px-3 py-1 text-xs font-medium text-white rounded-md transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#06C755' }}
+          className="rounded-control bg-accent text-on-accent hover:bg-accent-hover px-3 py-1 text-xs font-medium transition-colors"
         >
           承認
         </button>
         <button
           onClick={() => onAction('reject')}
-          className="px-3 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md"
+          className="text-danger bg-danger-bg rounded-md px-3 py-1 text-xs font-medium hover:bg-red-100"
         >
           拒否
         </button>
@@ -294,24 +783,24 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('complete')}
-          className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md"
+          className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
         >
           完了
         </button>
         <button
           onClick={() => onAction('no_show')}
-          className="px-3 py-1 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-md"
+          className="rounded-md bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
         >
           無断
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-gray-200"
         >
           取消
         </button>
       </div>
     )
   }
-  return <span className="text-xs text-gray-400">-</span>
+  return <span className="text-ink-faint text-xs">-</span>
 }

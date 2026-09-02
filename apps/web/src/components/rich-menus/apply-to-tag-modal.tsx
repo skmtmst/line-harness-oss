@@ -142,7 +142,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                   onClick={apply}
                   disabled={mode.kind === 'tag' && !mode.tagId}
                   className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: '#06C755' }}
+                  style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   実行する
                 </button>
@@ -172,7 +172,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 <button
                   onClick={onClose}
                   className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: '#06C755' }}
+                  style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   閉じる
                 </button>
@@ -195,7 +195,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 <button
                   onClick={() => setPhase('config')}
                   className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: '#06C755' }}
+                  style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   やり直す
                 </button>

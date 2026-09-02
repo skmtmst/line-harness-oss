@@ -93,6 +93,7 @@ interface LineAccount {
   id: string;
   liff_id: string;
   is_active: number;
+  tenant_id?: string | null;
   channel_access_token?: string;
 }
 
@@ -110,11 +111,20 @@ function makeEventDb(state: {
   bookings?: BookingRow[];
   accounts?: LineAccount[];
   friends?: FriendRow[];
+  /** [friendId, tagId] の組。公開対象の絞り込みで引かれる */
+  friendTags?: Array<{ friend_id: string; tag_id: string }>;
+  /** タグの名前。一覧の「申込条件」が visible_tag_id から名前を引く */
+  tags?: Array<{ id: string; name: string }>;
+  /** キャンセル待ちの行。INSERT がここへ積まれる */
+  waitlist?: Array<Record<string, unknown>>;
 }): D1Database {
   state.slots ??= [];
   state.bookings ??= [];
   state.accounts ??= [];
   state.friends ??= [];
+  state.friendTags ??= [];
+  state.tags ??= [];
+  state.waitlist ??= [];
   const db = {
     prepare(sql: string) {
       let bound: unknown[] = [];
@@ -138,17 +148,42 @@ function makeEventDb(state: {
             const acc = (state.accounts ?? []).find((a) => a.id === id);
             return (acc ? { channel_access_token: acc.channel_access_token ?? '' } : null) as T | null;
           }
-          // immediate booking notification: SELECT la.channel_access_token, e.confirmation_message_extra
+          // immediate booking notification: SELECT la.channel_access_token,
+          //   la.channel_access_token_encrypted, e.confirmation_message_extra
           //   FROM line_accounts la JOIN events e ON e.id = ? WHERE la.id = ?
-          if (sql.startsWith('SELECT la.channel_access_token, e.confirmation_message_extra')) {
+          if (
+            sql.startsWith('SELECT la.channel_access_token,') &&
+            sql.includes('la.channel_access_token_encrypted') &&
+            sql.includes('e.confirmation_message_extra')
+          ) {
             const [event_id, account_id] = bound as [string, string];
             const acc = (state.accounts ?? []).find((a) => a.id === account_id);
             const ev = state.events.find((x) => x.id === event_id);
             if (!acc || !ev) return null as T | null;
             return {
               channel_access_token: acc.channel_access_token ?? '',
+              channel_access_token_encrypted: null,
               confirmation_message_extra: (ev as Record<string, unknown>).confirmation_message_extra ?? null,
             } as T;
+          }
+          // SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ?
+          // FROM friends より前に置く。詳細画面側の JOIN 版も "FROM friends" を
+          // 含むので、後ろに置くと友だちの検索として拾われてしまう。
+          if (sql.includes('friend_tags')) {
+            if (sql.includes('JOIN friends')) {
+              const [lineUserId, account, tagId] = bound as [string, string, string];
+              const f = (state.friends ?? []).find(
+                (x) => x.line_user_id === lineUserId && x.line_account_id === account,
+              );
+              const hit =
+                f && (state.friendTags ?? []).some((t) => t.friend_id === f.id && t.tag_id === tagId);
+              return (hit ? { 1: 1 } : null) as T | null;
+            }
+            const [friendId, tagId] = bound as [string, string];
+            const hit = (state.friendTags ?? []).some(
+              (t) => t.friend_id === friendId && t.tag_id === tagId,
+            );
+            return (hit ? { 1: 1 } : null) as T | null;
           }
           // SELECT id [, user_id] FROM friends WHERE line_user_id = ? AND line_account_id = ?
           if (sql.includes('FROM friends')) {
@@ -208,6 +243,7 @@ function makeEventDb(state: {
               confirmation_message_extra: (e as Record<string, unknown>).confirmation_message_extra ?? null,
               slot_starts_at: s.starts_at,
               channel_access_token: la.channel_access_token ?? '',
+              channel_access_token_encrypted: null,
               line_user_id: f.line_user_id,
             } as T;
           }
@@ -448,6 +484,9 @@ function makeEventDb(state: {
           return null;
         },
         async all<T>() {
+          if (sql.startsWith('SELECT * FROM line_accounts')) {
+            return { results: state.accounts ?? [] } as { results: T[] };
+          }
           // admin events list (must come before event_slots branch since
           // its sub-queries also reference event_slots s)
           if (sql.startsWith('SELECT\n         e.*') || (sql.includes('FROM events e') && (sql.includes('e.line_account_id') || sql.includes('e.target_type')))) {
@@ -486,12 +525,17 @@ function makeEventDb(state: {
                 const pending_count = (state.bookings ?? []).filter(
                   (b) => b.event_id === e.id && b.status === 'requested',
                 ).length;
+                // 消えたタグを指したままの行は名前が引けず null になる。
+                const visible_tag_name = e.visible_tag_id
+                  ? ((state.tags ?? []).find((t) => t.id === e.visible_tag_id)?.name ?? null)
+                  : null;
                 return {
                   ...e,
                   next_slot_starts_at,
                   total_capacity: cap,
                   total_active,
                   pending_count,
+                  visible_tag_name,
                 };
               })
               .sort((a, b) =>
@@ -585,9 +629,32 @@ function makeEventDb(state: {
               );
             return { results: items as unknown as T[] };
           }
+          if (sql.startsWith('SELECT * FROM event_slots WHERE id IN (')) {
+            const ids = new Set(bound as string[]);
+            return {
+              results: (state.slots ?? []).filter((slot) => ids.has(slot.id)) as unknown as T[],
+            };
+          }
           return { results: [] };
         },
         async run() {
+          if (sql.includes('INSERT OR IGNORE INTO event_waitlist')) {
+            const [id, event_id, slot_id, friend_id, identity_key, created_at] = bound as string[];
+            const dup = (state.waitlist ?? []).some(
+              (w) => w.slot_id === slot_id && w.identity_key === identity_key,
+            );
+            if (dup) return { success: true, meta: { changes: 0 } };
+            (state.waitlist ??= []).push({
+              id,
+              event_id,
+              slot_id,
+              friend_id,
+              identity_key,
+              status: 'waiting',
+              created_at,
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
           if (sql.startsWith('UPDATE event_bookings') && sql.includes('internal_note = COALESCE')) {
             // reject reason append
             const [appended, _updated_at, id] = bound as [string, string, string];
@@ -773,15 +840,18 @@ function makeEventDb(state: {
       };
       return stmt;
     },
+    async batch(statements: D1PreparedStatement[]) {
+      return Promise.all(statements.map((statement) => statement.run()));
+    },
   } as unknown as D1Database;
   return db;
 }
 
-function setupApp(state: { events: EventRow[]; slots?: SlotRow[]; bookings?: BookingRow[] }) {
+function setupApp(state: Parameters<typeof makeEventDb>[0]) {
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', role: 'owner' });
+    c.set('staff', { id: 'staff-1', role: 'owner', tenantId: 'tenant-a' } as never);
     c.env = { DB: db } as TestEnv['Bindings'];
     await next();
   });
@@ -911,7 +981,13 @@ describe('POST /api/events/admin/events', () => {
   });
 
   test('multi-account-dedup creates event with account_ids JSON', async () => {
-    const state = { events: [] as EventRow[] };
+    const state = {
+      events: [] as EventRow[],
+      accounts: [
+        { id: 'la1', liff_id: 'liff1', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'la2', liff_id: 'liff2', is_active: 1, tenant_id: 'tenant-a' },
+      ],
+    };
     const app = setupApp(state);
     const res = await app.request('/api/events/admin/events?account_id=la1', {
       method: 'POST',
@@ -928,6 +1004,27 @@ describe('POST /api/events/admin/events', () => {
     expect(typeof body.account_ids === 'string' ? JSON.parse(body.account_ids) : body.account_ids).toEqual(['la1', 'la2']);
     // sentinel: line_account_id = account_ids[0]
     expect(body.line_account_id).toBe('la1');
+  });
+
+  test('403 when one multi-account body account belongs to another tenant', async () => {
+    const state = {
+      events: [] as EventRow[],
+      accounts: [
+        { id: 'la1', liff_id: 'liff1', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'la2', liff_id: 'liff2', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'other', liff_id: 'liff3', is_active: 1, tenant_id: 'tenant-b' },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'X', target_type: 'multi-account-dedup', account_ids: ['la1', 'other'],
+      }),
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'このLINEアカウントを操作する権限がありません' });
+    expect(state.events).toHaveLength(0);
   });
 
   test('422 invalid_target_type', async () => {
@@ -1013,6 +1110,32 @@ describe('GET /api/events/admin/events', () => {
     expect(body.items.map((e) => e.id)).toEqual(['e2']);
   });
 
+  test('returns the visible tag name for the 申込条件 column', async () => {
+    const state = {
+      events: [
+        baseEvent({ id: 'e1', line_account_id: 'la1', visible_tag_id: 't1' }),
+        baseEvent({ id: 'e2', line_account_id: 'la1', visible_tag_id: null }),
+        baseEvent({ id: 'e3', line_account_id: 'la1', visible_tag_id: 'gone' }),
+      ],
+      slots: [],
+      bookings: [],
+      tags: [{ id: 't1', name: '定期便 契約中' }],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events?account_id=la1');
+    const body = (await res.json()) as {
+      items: Array<EventRow & { visible_tag_name: string | null }>;
+    };
+    const byId = new Map(body.items.map((e) => [e.id, e]));
+    expect(byId.get('e1')?.visible_tag_name).toBe('定期便 契約中');
+    // 絞り込み無しは名前も無い。一覧では「全員」と出る。
+    expect(byId.get('e2')?.visible_tag_name).toBeNull();
+    // タグを消しても events 側の ID は残る。名前が引けない状態＝もう誰にも
+    // 見えないので、「全員」と同じ扱いにしてはいけない。
+    expect(byId.get('e3')?.visible_tag_id).toBe('gone');
+    expect(byId.get('e3')?.visible_tag_name).toBeNull();
+  });
+
   test('returns aggregate columns for each item', async () => {
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
@@ -1078,6 +1201,25 @@ describe('PUT /api/events/admin/events/:id', () => {
       body: JSON.stringify({ name: 'x' }),
     });
     expect(res.status).toBe(404);
+  });
+
+  test('403 when an update adds one account from another tenant', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      accounts: [
+        { id: 'la1', liff_id: 'liff1', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'other', liff_id: 'liff2', is_active: 1, tenant_id: 'tenant-b' },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events/e1?account_id=la1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target_type: 'multi-account-dedup', account_ids: ['la1', 'other'],
+      }),
+    });
+    expect(res.status).toBe(403);
+    expect(state.events[0].target_type).not.toBe('multi-account-dedup');
   });
 
   test('422 invalid description', async () => {
@@ -1162,6 +1304,37 @@ describe('event_slots admin', () => {
     const body = (await res.json()) as { items: SlotRow[] };
     expect(body.items).toHaveLength(2);
     expect(state.slots).toHaveLength(2);
+  });
+
+  test('POST rejects more than 400 slots before inserting any', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la1' })], slots: [] as SlotRow[] };
+    const slots = Array.from({ length: 401 }, (_, index) => ({
+      starts_at: `2099-06-${String((index % 28) + 1).padStart(2, '0')}T10:00:00Z`,
+      ends_at: `2099-06-${String((index % 28) + 1).padStart(2, '0')}T11:00:00Z`,
+      sort_order: index,
+    }));
+    const res = await setupApp(state).request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slots }),
+    });
+    expect(res.status).toBe(422);
+    expect(state.slots).toHaveLength(0);
+  });
+
+  test('POST atomically creates 400 slots and preserves request order', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la1' })], slots: [] as SlotRow[] };
+    const slots = Array.from({ length: 400 }, (_, index) => ({
+      starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
+      ends_at: new Date(Date.UTC(2099, 0, 1, 0, index + 1)).toISOString(),
+      sort_order: index,
+    }));
+    const res = await setupApp(state).request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slots }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { items: SlotRow[] };
+    expect(state.slots).toHaveLength(400);
+    expect(body.items).toHaveLength(400);
+    expect(body.items.map((item) => item.starts_at)).toEqual(slots.map((slot) => slot.starts_at));
   });
 
   test('POST 422 when slots empty', async () => {
@@ -2125,6 +2298,140 @@ function baseEvent(over: Partial<EventRow>): EventRow {
     target_type: 'single',
     account_ids: null,
     dedup_priority: null,
+    // 094。既定はいずれも「これまでと同じ」。
+    visible_tag_id: null,
+    waitlist_enabled: 0,
+    entry_cutoff_hours_before: null,
     ...over,
   };
 }
+
+describe('094 公開対象・申込締切・キャンセル待ち', () => {
+  const account = { id: 'la1', liff_id: 'L1', is_active: 1, channel_access_token: 'tok' };
+  const friend = { id: 'f1', line_account_id: 'la1', line_user_id: 'U1' };
+  const futureSlot = {
+    id: 's1',
+    event_id: 'e1',
+    starts_at: '2099-06-01T10:00:00Z',
+    ends_at: '2099-06-01T12:00:00Z',
+    capacity: 1,
+    is_active: 1,
+    sort_order: 0,
+    deleted_at: null,
+  };
+
+  function book(app: ReturnType<typeof setupApp>) {
+    return app.request('/api/liff/events/e1/bookings?liffId=L1', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'Idempotency-Key': 'k1',
+        Authorization: 'Bearer t',
+      },
+      body: JSON.stringify({ slot_id: 's1' }),
+    });
+  }
+
+  test('公開対象タグを持たない人は申し込めない', async () => {
+    // 一覧や詳細でも隠すが、URL を直接叩けば素通りするので申込でも見る。
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, visible_tag_id: 't1' })],
+      slots: [{ ...futureSlot, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+      friendTags: [],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(409);
+    // 「タグが無い」ではなく「公開されていない」として返す。存在を伝えない。
+    expect((await res.json()) as { error: string }).toEqual({ error: 'event_unpublished' });
+    expect(state.bookings).toHaveLength(0);
+  });
+
+  test('公開対象タグを持つ人は申し込める', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, visible_tag_id: 't1' })],
+      slots: [{ ...futureSlot, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+      friendTags: [{ friend_id: 'f1', tag_id: 't1' }],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(201);
+    expect(state.bookings).toHaveLength(1);
+  });
+
+  test('締め切りを過ぎていれば申し込めない', async () => {
+    const soon = new Date(Date.now() + 30 * 60_000).toISOString(); // 30分後
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, entry_cutoff_hours_before: 1 })],
+      slots: [{ ...futureSlot, starts_at: soon, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(410);
+    expect((await res.json()) as { error: string }).toEqual({ error: 'entry_closed' });
+  });
+
+  test('締め切りより前なら申し込める', async () => {
+    const later = new Date(Date.now() + 5 * 3600_000).toISOString(); // 5時間後
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, entry_cutoff_hours_before: 1 })],
+      slots: [{ ...futureSlot, starts_at: later, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(201);
+  });
+
+  test('満席かつキャンセル待ちが無効なら、これまでどおり締め切る', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, waitlist_enabled: 0 })],
+      slots: [futureSlot],
+      bookings: [{ id: 'b0', event_id: 'e1', slot_id: 's1', status: 'confirmed' }],
+      accounts: [account],
+      friends: [friend],
+      waitlist: [],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(409);
+    expect((await res.json()) as { error: string }).toEqual({ error: 'slot_full' });
+    expect(state.waitlist).toHaveLength(0);
+  });
+
+  test('満席でキャンセル待ちが有効なら、待ちとして受ける', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, waitlist_enabled: 1 })],
+      slots: [futureSlot],
+      bookings: [{ id: 'b0', event_id: 'e1', slot_id: 's1', status: 'confirmed' }],
+      accounts: [account],
+      friends: [friend],
+      waitlist: [],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    // 409 だと画面側は失敗として扱い、「待ちに入りました」を出せない。
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { waitlisted: boolean }).toMatchObject({ waitlisted: true });
+    expect(state.waitlist).toHaveLength(1);
+    // 待ちは予約に入れない。定員の数え方に手を入れずに済ませるため。
+    expect(state.bookings).toHaveLength(1);
+  });
+});

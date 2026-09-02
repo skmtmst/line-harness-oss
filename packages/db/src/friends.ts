@@ -6,6 +6,11 @@ export interface Friend {
   picture_url: string | null;
   status_message: string | null;
   is_following: number;
+  first_followed_at?: string | null;
+  current_follow_started_at?: string | null;
+  last_followed_at?: string | null;
+  last_unfollowed_at?: string | null;
+  unfollow_count?: number;
   user_id: string | null;
   line_account_id: string | null;
   metadata: string;
@@ -90,6 +95,38 @@ export async function getFollowingLineUserIdsByTag(
   return (result.results ?? []).map((r) => r.line_user_id);
 }
 
+/**
+ * アカウントスコープ優先の friend 解決。同一プロバイダー配下の複数アカウント
+ * では line_user_id が同一になるため、無指定の先頭一致だと別アカウントの
+ * friend 行に吸われて通知アカウントがズレる。指定アカウントの行を優先し、
+ * 無ければ従来どおり先頭一致にフォールバックする。
+ */
+export async function getFriendByLineUserIdForAccount(
+  db: D1Database,
+  lineUserId: string,
+  lineAccountId: string | null,
+): Promise<Friend | null> {
+  if (lineAccountId) {
+    const scoped = await db
+      .prepare(`SELECT * FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
+      .bind(lineUserId, lineAccountId)
+      .first<Friend>();
+    if (scoped) return scoped;
+  }
+  // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、この無指定
+  // フォールバックを削除する。移行前は既存の未割当行を見失わないために残す。
+  const fallback = await getFriendByLineUserId(db, lineUserId);
+  if (fallback && lineAccountId) {
+    console.warn({
+      event: 'friend_lookup_account_fallback',
+      line_account_id: lineAccountId,
+      found_line_account_id: fallback.line_account_id,
+      path: 'getFriendByLineUserIdForAccount',
+    });
+  }
+  return fallback;
+}
+
 export async function getFriendByLineUserId(
   db: D1Database,
   lineUserId: string,
@@ -136,9 +173,16 @@ export async function setFriendFirstTrackedLinkIfNull(
 
 export interface UpsertFriendInput {
   lineUserId: string;
+  /** 検索対象のLINE公式アカウント。C-2bまでは未割当行へのフォールバックを残す。 */
+  lineAccountId?: string | null;
   displayName?: string | null;
   pictureUrl?: string | null;
   statusMessage?: string | null;
+}
+
+function isMissingFollowLifecycleColumn(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:no such column:|has no column named) (first_followed_at|current_follow_started_at|last_followed_at|last_unfollowed_at|unfollow_count)/i.test(message);
 }
 
 export async function upsertFriend(
@@ -146,47 +190,101 @@ export async function upsertFriend(
   input: UpsertFriendInput,
 ): Promise<Friend> {
   const now = jstNow();
-  const existing = await getFriendByLineUserId(db, input.lineUserId);
+  const existing = await getFriendByLineUserIdForAccount(
+    db,
+    input.lineUserId,
+    input.lineAccountId ?? null,
+  );
 
   if (existing) {
-    await db
-      .prepare(
+    try {
+      await db.prepare(
         `UPDATE friends
          SET display_name = ?,
              picture_url = ?,
              status_message = ?,
+             first_followed_at = COALESCE(first_followed_at, created_at),
+             current_follow_started_at = CASE
+               WHEN is_following = 0 OR current_follow_started_at IS NULL THEN ?
+               ELSE current_follow_started_at
+             END,
+             last_followed_at = CASE
+               WHEN is_following = 0 THEN ?
+               ELSE COALESCE(last_followed_at, created_at)
+             END,
              is_following = 1,
              updated_at = ?
-         WHERE line_user_id = ?`,
-      )
-      .bind(
+         WHERE id = ?`,
+      ).bind(
         'displayName' in input ? (input.displayName ?? null) : existing.display_name,
         'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
         'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
         now,
-        input.lineUserId,
-      )
-      .run();
+        now,
+        now,
+        existing.id,
+      ).run();
+    } catch (error) {
+      if (!isMissingFollowLifecycleColumn(error)) throw error;
+      // Deployments can briefly run newer Worker code before migration 065 is
+      // applied. Preserve the friend-add/OAuth path using the legacy columns;
+      // the lifecycle fields are backfilled when the migration is applied.
+      await db.prepare(
+        `UPDATE friends
+         SET display_name = ?, picture_url = ?, status_message = ?,
+             is_following = 1, updated_at = ?
+         WHERE id = ?`,
+      ).bind(
+        'displayName' in input ? (input.displayName ?? null) : existing.display_name,
+        'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
+        'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
+        now,
+        existing.id,
+      ).run();
+    }
 
-    return (await getFriendByLineUserId(db, input.lineUserId))!;
+    return (await getFriendById(db, existing.id))!;
   }
 
   const id = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO friends (id, line_user_id, display_name, picture_url, status_message, is_following, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
-    )
-    .bind(
+  try {
+    await db.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
+          first_followed_at, current_follow_started_at, last_followed_at,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+    ).bind(
       id,
       input.lineUserId,
+      input.lineAccountId ?? null,
       input.displayName ?? null,
       input.pictureUrl ?? null,
       input.statusMessage ?? null,
       now,
       now,
-    )
-    .run();
+      now,
+      now,
+      now,
+    ).run();
+  } catch (error) {
+    if (!isMissingFollowLifecycleColumn(error)) throw error;
+    await db.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    ).bind(
+      id,
+      input.lineUserId,
+      input.lineAccountId ?? null,
+      input.displayName ?? null,
+      input.pictureUrl ?? null,
+      input.statusMessage ?? null,
+      now,
+      now,
+    ).run();
+  }
 
   return (await getFriendById(db, id))!;
 }
@@ -195,14 +293,39 @@ export async function updateFriendFollowStatus(
   db: D1Database,
   lineUserId: string,
   isFollowing: boolean,
+  lineAccountId: string | null = null,
 ): Promise<void> {
+  const now = jstNow();
+  const existing = await getFriendByLineUserIdForAccount(db, lineUserId, lineAccountId);
+  if (!existing) return;
+  if (isFollowing) {
+    await db
+      .prepare(
+        `UPDATE friends
+            SET first_followed_at = COALESCE(first_followed_at, created_at),
+                current_follow_started_at = CASE
+                  WHEN is_following = 0 OR current_follow_started_at IS NULL THEN ?
+                  ELSE current_follow_started_at
+                END,
+                last_followed_at = CASE WHEN is_following = 0 THEN ? ELSE last_followed_at END,
+                is_following = 1, updated_at = ?
+          WHERE id = ?`,
+      )
+      .bind(now, now, now, existing.id)
+      .run();
+    return;
+  }
   await db
     .prepare(
       `UPDATE friends
-       SET is_following = ?, updated_at = ?
-       WHERE line_user_id = ?`,
+          SET is_following = 0,
+              current_follow_started_at = NULL,
+              last_unfollowed_at = CASE WHEN is_following = 1 THEN ? ELSE last_unfollowed_at END,
+              unfollow_count = unfollow_count + CASE WHEN is_following = 1 THEN 1 ELSE 0 END,
+              updated_at = ?
+        WHERE id = ?`,
     )
-    .bind(isFollowing ? 1 : 0, jstNow(), lineUserId)
+    .bind(now, now, existing.id)
     .run();
 }
 
@@ -212,7 +335,11 @@ export async function getMergedMetadataByUserId(
   userId: string,
 ): Promise<Record<string, unknown>> {
   const result = await db
-    .prepare(`SELECT metadata FROM friends WHERE user_id = ? AND metadata IS NOT NULL AND metadata != '{}'`)
+    .prepare(
+      `SELECT metadata FROM friends
+       WHERE user_id = ? AND metadata IS NOT NULL AND metadata != '{}'
+       ORDER BY updated_at DESC`,
+    )
     .bind(userId)
     .all<{ metadata: string }>();
   const merged: Record<string, unknown> = {};
@@ -229,9 +356,68 @@ export async function getMergedMetadataByUserId(
   return merged;
 }
 
-export async function getFriendCount(db: D1Database): Promise<number> {
+/**
+ * 直近N日に友だち追加された人を「はじめて」と「以前から」で分けて数える
+ * （設計 V2 4-6）。
+ *
+ * 分ける手がかりは `unfollow_count`。1回でもブロックされたことがあれば、
+ * 今回の追加は「以前からの友だち」による再追加。
+ *
+ * 設計は「初回フォロー日が未記録なら、はじめて」と書いているが、
+ * この基準はこのデータでは使えない。マイグレーション 065 が既存の行すべてに
+ * `first_followed_at = created_at` を埋めたので、未記録の人はもういない。
+ *
+ * これは「以前からのお客さまに『はじめまして』が届いた数」でもある。
+ * 追加時の配信を1本しか持てないうちは、returning の人数がそのまま
+ * 誤って挨拶を送った人数になる。
+ */
+export async function getFriendAddBreakdown(
+  db: D1Database,
+  days: number,
+  scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean } | { allTenants: true },
+): Promise<{ days: number; firstTime: number; returning: number; unblocked: number }> {
+  const allTenants = 'allTenants' in scope;
+  const placeholders = allTenants ? '' : scope.allowedAccountIds.map(() => '?').join(', ');
+  const accountPredicate = allTenants
+    ? '1 = 1'
+    : placeholders
+      ? `(line_account_id IN (${placeholders})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      : scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
+  const accountClause = `AND ${accountPredicate}`;
+  const binds: unknown[] = [days];
+  if (!allTenants) binds.push(...scope.allowedAccountIds);
   const row = await db
-    .prepare(`SELECT COUNT(*) as count FROM friends`)
-    .first<{ count: number }>();
-  return row?.count ?? 0;
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN COALESCE(unfollow_count, 0) = 0 THEN 1 ELSE 0 END) AS first_time,
+         SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning_count
+       FROM friends
+       WHERE julianday('now', '+9 hours') - julianday(created_at) <= ?
+         ${accountClause}`,
+    )
+    .bind(...binds)
+    .first<{ first_time: number | null; returning_count: number | null }>();
+
+  // ブロック解除で戻ってきた人。いまフォロー中で、外れたことがある人。
+  const unblockBinds: unknown[] = [days];
+  if (!allTenants) unblockBinds.push(...scope.allowedAccountIds);
+  const unblockRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM friends
+        WHERE is_following = 1
+          AND COALESCE(unfollow_count, 0) > 0
+          AND last_followed_at IS NOT NULL
+          AND julianday('now', '+9 hours') - julianday(last_followed_at) <= ?
+          ${accountClause}`,
+    )
+    .bind(...unblockBinds)
+    .first<{ count: number | null }>();
+
+  return {
+    days,
+    firstTime: Number(row?.first_time ?? 0),
+    returning: Number(row?.returning_count ?? 0),
+    unblocked: Number(unblockRow?.count ?? 0),
+  };
 }

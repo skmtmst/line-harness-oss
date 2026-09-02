@@ -1,0 +1,110 @@
+name: Deploy scripts CI
+
+# PR gate for the deploy tooling.
+#
+# worker-ci.yml only watches apps/worker and packages/*, so changes under
+# scripts/deploy landed with zero status checks. These scripts decide whether a
+# deploy is allowed to proceed, so they need at least as much checking as the
+# code they guard.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'package.json'
+      - 'vitest.config.ts'
+      - 'tsconfig.base.json'
+      - '.github/workflows/**'
+  push:
+    branches: [codex/development, main]
+    paths:
+      - 'scripts/**'
+      - 'package.json'
+      - 'vitest.config.ts'
+      - 'tsconfig.base.json'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-scripts-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Vitest (scripts)
+        # Includes the git-backed deploy lock integration tests, which drive
+        # real git against a temporary bare repository.
+        run: pnpm test:scripts
+
+      - name: TypeScript typecheck (scripts)
+        # The root workspace intentionally has no @types/node: adding one
+        # rewrites unrelated pnpm-lock entries, because the committed lockfile
+        # was produced by a newer pnpm than `packageManager` pins. Installing
+        # the types into a throwaway prefix keeps the repository untouched.
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
+          pnpm exec tsc -p scripts/tsconfig.json \
+            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
+
+      - name: Shell syntax check
+        run: |
+          failed=0
+          while IFS= read -r script; do
+            echo "bash -n $script"
+            bash -n "$script" || failed=1
+          done < <(find scripts -name '*.sh' -type f)
+          exit "$failed"
+
+      - name: Workflow YAML check
+        # Parses every workflow and asserts the run steps are valid shell, so a
+        # broken heredoc or mis-indented block fails here instead of at 4:17am
+        # in the scheduled upstream import.
+        run: |
+          python3 - <<'PY'
+          import glob, subprocess, sys, tempfile, os
+          try:
+              import yaml
+          except ImportError:
+              subprocess.run([sys.executable, '-m', 'pip', 'install', '--quiet', 'pyyaml'], check=True)
+              import yaml
+
+          failed = False
+          for path in sorted(glob.glob('.github/workflows/*.yml')):
+              try:
+                  doc = yaml.safe_load(open(path))
+              except Exception as exc:
+                  print(f'[NG] {path}: YAML parse failed: {exc}')
+                  failed = True
+                  continue
+              print(f'[OK] {path}: YAML parsed')
+              for job in (doc.get('jobs') or {}).values():
+                  for step in (job.get('steps') or []):
+                      run = step.get('run')
+                      if not run:
+                          continue
+                      # GitHub expressions are not shell; blank them out first.
+                      import re
+                      script = re.sub(r'\$\{\{[^}]*\}\}', 'GH_EXPR', run)
+                      with tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False) as fh:
+                          fh.write(script)
+                          tmp = fh.name
+                      proc = subprocess.run(['bash', '-n', tmp], capture_output=True, text=True)
+                      os.unlink(tmp)
+                      if proc.returncode != 0:
+                          name = step.get('name', '(unnamed step)')
+                          print(f'[NG] {path} / {name}: {proc.stderr.strip()}')
+                          failed = True
+          sys.exit(1 if failed else 0)
+          PY

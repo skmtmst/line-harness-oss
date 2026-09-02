@@ -1,33 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
-import CcPromptButton from '@/components/cc-prompt-button'
 import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import NotificationsPage from '@/app/notifications/page'
+import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import WebhookInteractions from './webhook-interactions'
 
 type Tab = 'incoming' | 'outgoing'
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 const MIN_SECRET_LENGTH = 32
-
-const ccPrompts = [
-  {
-    title: 'Webhook設定ガイド',
-    prompt: `Webhookの設定手順をガイドしてください。
-1. 受信Webhook（Incoming）の作成とエンドポイントURLの設定方法
-2. 送信Webhook（Outgoing）のURL・イベントタイプ・シークレット設定
-3. LINE公式アカウントとのWebhook連携設定手順
-手順を示してください。`,
-  },
-  {
-    title: 'Webhookデバッグ',
-    prompt: `Webhookの動作確認とデバッグをサポートしてください。
-1. 受信・送信Webhookの有効/無効ステータスを確認
-2. Webhookのテスト送信と応答検証の手順
-3. よくあるエラーパターンとトラブルシューティング方法
-手順を示してください。`,
-  },
-]
 
 // Generate a 32-char URL-safe random secret in the browser. 24 random bytes
 // produce exactly 32 base64 characters; remap +/ to -/_ instead of stripping
@@ -48,16 +36,28 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
-export default function WebhooksPage() {
+const MERGED_TABS = [
+  { key: 'webhooks', label: 'Webhook' },
+  { key: 'interactions', label: 'やり取りの記録' },
+  { key: 'notify', label: '未対応の通知' },
+]
+
+function WebhooksPageInner() {
+  const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
+  const loadGenerationRef = useRef(0)
   const [tab, setTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
-  const [loading, setLoading] = useState(true)
+  const [incomingStatus, setIncomingStatus] = useState<LoadStatus>('loading')
+  const [outgoingStatus, setOutgoingStatus] = useState<LoadStatus>('loading')
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
   const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
-  const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '' })
+  const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
 
   // After a successful create the API returns the secret exactly once.
   // Show it to the operator with a copy affordance, then forget it.
@@ -73,60 +73,123 @@ export default function WebhooksPage() {
   const [rotateSecretValue, setRotateSecretValue] = useState('')
 
   const load = useCallback(async () => {
-    setLoading(true)
+    const requestGeneration = ++loadGenerationRef.current
+    const requestAccountId = selectedAccountId
+    setIncoming([])
+    setOutgoing([])
+    setLoadedAccountId(null)
     setError('')
-    try {
-      const [inRes, outRes] = await Promise.all([
-        api.webhooks.incoming.list(),
-        api.webhooks.outgoing.list(),
-      ])
-      if (inRes.success) setIncoming(inRes.data)
-      else setError(inRes.error)
-      if (outRes.success) setOutgoing(outRes.data)
-      else setError(outRes.error)
-    } catch {
-      setError('データの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      setLoading(false)
+    if (!requestAccountId) {
+      setIncomingStatus('ready')
+      setOutgoingStatus('ready')
+      return
     }
-  }, [])
+    setIncomingStatus('loading')
+    setOutgoingStatus('loading')
+    setError('')
+    const [incomingResult, outgoingResult] = await Promise.allSettled([
+      api.webhooks.incoming.list(requestAccountId),
+      api.webhooks.outgoing.list(requestAccountId),
+    ])
+    // アカウント切替後に、前のアカウントの遅い応答で一覧を上書きしない。
+    if (
+      loadGenerationRef.current !== requestGeneration
+      || selectedAccountIdRef.current !== requestAccountId
+    ) return
 
-  useEffect(() => { load() }, [load])
+    if (incomingResult.status === 'fulfilled' && incomingResult.value.success) {
+      setIncoming(incomingResult.value.data)
+      setIncomingStatus('ready')
+    } else {
+      // 前回の一覧を残すと、取得に失敗したあとも古い設定を現在値に見せてしまう。
+      setIncoming([])
+      setIncomingStatus('error')
+    }
+
+    if (outgoingResult.status === 'fulfilled' && outgoingResult.value.success) {
+      setOutgoing(outgoingResult.value.data)
+      setOutgoingStatus('ready')
+    } else {
+      setOutgoing([])
+      setOutgoingStatus('error')
+    }
+    setLoadedAccountId(requestAccountId)
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    loadGenerationRef.current += 1
+    setCreatedSecret(null)
+    setSecretCopied(false)
+    setRotateTarget(null)
+    setRotateSecretValue('')
+    setShowCreate(false)
+    setInForm({ name: '', sourceType: '', secret: '' })
+    setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
+    void load()
+  }, [load, selectedAccountId])
 
   const handleToggleIncoming = async (id: string, currentActive: boolean) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     try {
-      await api.webhooks.incoming.update(id, { isActive: !currentActive })
-      load()
+      const res = await api.webhooks.incoming.update(id, requestAccountId, { isActive: !currentActive })
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('更新に失敗しました')
     }
   }
 
   const handleToggleOutgoing = async (id: string, currentActive: boolean) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     try {
-      await api.webhooks.outgoing.update(id, { isActive: !currentActive })
-      load()
+      const res = await api.webhooks.outgoing.update(id, requestAccountId, { isActive: !currentActive })
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('更新に失敗しました')
     }
   }
 
   const handleDeleteIncoming = async (id: string) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     if (!confirm('この受信Webhookを削除しますか？')) return
     try {
-      await api.webhooks.incoming.delete(id)
-      load()
+      const res = await api.webhooks.incoming.delete(id, requestAccountId)
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('削除に失敗しました')
     }
   }
 
   const handleDeleteOutgoing = async (id: string) => {
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     if (!confirm('この送信Webhookを削除しますか？')) return
     try {
-      await api.webhooks.outgoing.delete(id)
-      load()
+      const res = await api.webhooks.outgoing.delete(id, requestAccountId)
+      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (!res.success) return setError(res.error)
+      if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('削除に失敗しました')
     }
   }
@@ -134,6 +197,8 @@ export default function WebhooksPage() {
   const handleCreateIncoming = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId) return setError('LINEアカウントを選択してください')
     if (!inForm.name) return
     if (inForm.secret.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
@@ -141,20 +206,24 @@ export default function WebhooksPage() {
     }
     try {
       const res = await api.webhooks.incoming.create({
+        lineAccountId: requestAccountId,
         name: inForm.name,
         sourceType: inForm.sourceType || undefined,
         secret: inForm.secret,
       })
       if (!res.success) {
+        if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
         return
       }
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
       setInForm({ name: '', sourceType: '', secret: '' })
       setShowCreate(false)
       load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました')
     }
   }
@@ -162,6 +231,8 @@ export default function WebhooksPage() {
   const handleCreateOutgoing = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId) return setError('LINEアカウントを選択してください')
     if (!outForm.name || !outForm.url) return
     if (!isHttpsUrl(outForm.url)) {
       setError('URLは https:// から始まる必要があります')
@@ -177,21 +248,26 @@ export default function WebhooksPage() {
         .map((s) => s.trim())
         .filter(Boolean)
       const res = await api.webhooks.outgoing.create({
+        lineAccountId: requestAccountId,
         name: outForm.name,
         url: outForm.url,
         eventTypes,
         secret: outForm.secret,
+        maxRetries: Number(outForm.maxRetries) || 0,
       })
       if (!res.success) {
+        if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
         return
       }
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
-      setOutForm({ name: '', url: '', eventTypes: '', secret: '' })
+      setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
       setShowCreate(false)
       load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました')
     }
   }
@@ -208,6 +284,10 @@ export default function WebhooksPage() {
   const handleRotateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const requestAccountId = selectedAccountId
+    if (!requestAccountId || loadedAccountId !== requestAccountId) {
+      return setError('LINEアカウントの一覧を読み直してください')
+    }
     if (!rotateTarget) return
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
@@ -217,8 +297,9 @@ export default function WebhooksPage() {
       const payload = { secret: rotateSecretValue, isActive: rotateTarget.activate || undefined }
       const res =
         rotateTarget.kind === 'incoming'
-          ? await api.webhooks.incoming.update(rotateTarget.id, payload)
-          : await api.webhooks.outgoing.update(rotateTarget.id, payload)
+          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload)
+          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload)
+      if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setError(res.error)
         return
@@ -227,27 +308,29 @@ export default function WebhooksPage() {
       setRotateSecretValue('')
       load()
     } catch {
+      if (selectedAccountIdRef.current !== requestAccountId) return
       setError('シークレットの更新に失敗しました')
     }
   }
 
   const endpointUrl = (id: string) =>
     `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/incoming/${id}/receive`
+  const activeStatus = tab === 'incoming' ? incomingStatus : outgoingStatus
+  const activeLabel = tab === 'incoming' ? 'こちらで受け取る設定' : 'こちらから送る設定'
 
   return (
     <div>
-      <Header
-        title="Webhook管理"
-        action={
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
-          >
-            {showCreate ? 'キャンセル' : '+ 新規Webhook'}
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="外部連携"
+          description="外部サービスから受け取る情報と、外部サービスへ送る通知を設定します。"
+          action={
+            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+              {showCreate ? 'キャンセル' : 'Webhookを追加'}
+            </Button>
+          }
+        />
+      </div>
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
@@ -293,7 +376,7 @@ export default function WebhooksPage() {
               <button
                 type="submit"
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存
               </button>
@@ -330,7 +413,7 @@ export default function WebhooksPage() {
                   setSecretCopied(false)
                 }}
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存しました
               </button>
@@ -356,7 +439,7 @@ export default function WebhooksPage() {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          受信 (Incoming)
+          こちらで受け取る
         </button>
         <button
           onClick={() => { setTab('outgoing'); setShowCreate(false) }}
@@ -366,14 +449,14 @@ export default function WebhooksPage() {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          送信 (Outgoing)
+          こちらから送る
         </button>
       </div>
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
         <form onSubmit={handleCreateIncoming} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">受信Webhook作成</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
@@ -423,7 +506,7 @@ export default function WebhooksPage() {
           <button
             type="submit"
             className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             作成
           </button>
@@ -432,7 +515,7 @@ export default function WebhooksPage() {
 
       {showCreate && tab === 'outgoing' && (
         <form onSubmit={handleCreateOutgoing} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">送信Webhook作成</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">送る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
@@ -490,36 +573,53 @@ export default function WebhooksPage() {
                 送信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名するために使われます。受信側で同じシークレットで検証してください。
               </p>
             </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="wh-retries" className="mb-1 block text-sm font-medium text-gray-700">
+                失敗したときの送り直し
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="wh-retries"
+                  type="number"
+                  min={0}
+                  max={5}
+                  value={outForm.maxRetries}
+                  onChange={(e) => setOutForm({ ...outForm, maxRetries: e.target.value })}
+                  className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
+                />
+                <span className="text-ink-faint text-xs">回まで</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                相手が 5xx を返したときや、つながらなかったときに送り直します。
+                0.5秒・1秒・2秒…と間隔を空け、上限は5回です。
+                相手が 4xx を返した場合は、同じものを送っても結果が変わらないので送り直しません。
+              </p>
+            </div>
           </div>
           <button
             type="submit"
             className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             作成
           </button>
         </form>
       )}
 
-      {/* Loading */}
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 flex items-center gap-4 animate-pulse">
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-gray-100 rounded w-32" />
-              </div>
-              <div className="h-5 bg-gray-100 rounded-full w-16" />
-              <div className="h-3 bg-gray-100 rounded w-24" />
-            </div>
-          ))}
-        </div>
+      {activeStatus === 'loading' ? (
+        <ListState kind="loading" title={`${activeLabel}を読み込んでいます`} />
+      ) : activeStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title={`${activeLabel}を表示できませんでした`}
+          description="登録内容は消えていません。再読み込みしても直らない場合はエラー報告へ。"
+          action={<Button variant="secondary" onClick={() => void load()}>{activeLabel}を再読み込み</Button>}
+        />
       ) : tab === 'incoming' ? (
         /* Incoming table */
         incoming.length === 0 && !showCreate ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">受信Webhookがありません。「新規Webhook」から作成してください。</p>
+            <p className="text-gray-500">こちらで受け取る設定はまだありません。「Webhookを追加」から作成してください。</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -607,12 +707,12 @@ export default function WebhooksPage() {
         /* Outgoing table */
         outgoing.length === 0 && !showCreate ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">送信Webhookがありません。「新規Webhook」から作成してください。</p>
+            <p className="text-gray-500">こちらから送る設定はまだありません。「Webhookを追加」から作成してください。</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="w-full min-w-[880px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
@@ -620,6 +720,7 @@ export default function WebhooksPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">イベントタイプ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">シークレット</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ステータス</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">送信状況</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">作成日</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -685,6 +786,27 @@ export default function WebhooksPage() {
                         {wh.isActive ? '有効' : '無効'}
                       </button>
                     </td>
+                    <td className="px-4 py-3">
+                      {/* 連続失敗があるときだけ出す。自動では止めないので、
+                          ここで気づけないと送られていないことに気づけない。 */}
+                      {(wh.consecutiveFailures ?? 0) > 0 ? (
+                        <div>
+                          <span className="bg-danger-bg text-danger rounded-pill px-2 py-0.5 text-xs font-medium">
+                            {wh.consecutiveFailures}回連続で失敗
+                          </span>
+                          {wh.lastFailedAt && (
+                            <p className="text-ink-faint mt-1 text-[11px]">
+                              最終 {new Date(wh.lastFailedAt).toLocaleString('ja-JP')}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-ink-faint text-xs">—</span>
+                      )}
+                      <p className="text-ink-faint mt-1 text-[11px] tabular-nums">
+                        送り直し {wh.maxRetries ?? 0} 回
+                      </p>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(wh.createdAt).toLocaleDateString('ja-JP')}
                     </td>
@@ -719,7 +841,27 @@ export default function WebhooksPage() {
           </div>
         )
       )}
-      <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function WebhooksPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'webhooks' && <WebhooksPageInner />}
+      {tab === 'interactions' && <WebhookInteractions />}
+      {tab === 'notify' && <NotificationsPage />}
+    </div>
+  )
+}
+
+export default function WebhooksPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <WebhooksPageHost />
+    </Suspense>
   )
 }

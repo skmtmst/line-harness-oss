@@ -3,6 +3,8 @@ import {
   buildAliasId,
   resolveSwitcherActions,
   publishRichMenuGroup,
+  RichMenuValidationError,
+  validateRichMenuGroupForPublish,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
   type LineRichMenuClient,
@@ -96,6 +98,9 @@ function makeMockLineClient(opts: { currentDefault?: string | null } = {}): Mock
     createRichMenuAlias: vi.fn(async () => {
       calls.push('create-alias');
     }),
+    upsertRichMenuAlias: vi.fn(async () => {
+      calls.push('upsert-alias');
+    }),
     deleteRichMenu: vi.fn(async () => {
       calls.push('delete-old');
     }),
@@ -122,7 +127,257 @@ function makeMockR2(): R2Like {
 }
 
 describe('publishRichMenuGroup', () => {
-  it('1 page: create → upload → alias upsert → 旧削除', async () => {
+  it('空の message action は LINE API を呼ぶ前に分かりやすく拒否する', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await expect(
+      publishRichMenuGroup(
+        {
+          id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+          pages: [{
+            id: 'p1', orderIndex: 0, name: '基本メニュー',
+            imageR2Key: 'a.png', imageContentType: 'image/png',
+            lineRichMenuId: null,
+            areas: [{
+              bounds: { x: 0, y: 0, width: 100, height: 100 },
+              actionType: 'message',
+              actionData: { text: '' },
+            }],
+          }],
+        },
+        line,
+        r2,
+      ),
+    ).rejects.toThrow('ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください');
+    expect(line.calls).toEqual([]);
+  });
+
+  it('アクション必須値を publish 前に検証する', () => {
+    const group = {
+      id: 'gid12345-aaaa',
+      size: 'large' as const,
+      chatBarText: 'm',
+      isDefaultForAll: false,
+      pages: [{
+        id: 'p1', orderIndex: 0, name: 'p1',
+        imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: null,
+        areas: [{
+          bounds: { x: 0, y: 0, width: 100, height: 100 },
+          actionType: 'uri' as const,
+          actionData: { uri: '   ' },
+        }],
+      }],
+    };
+    expect(() => validateRichMenuGroupForPublish(group))
+      .toThrowError(RichMenuValidationError);
+    expect(() => validateRichMenuGroupForPublish(group))
+      .toThrow('URLを入力してください');
+  });
+});
+
+/**
+ * Per-action-type validation. These run before any LINE call, so a mistake in
+ * the editor is reported as something the operator can fix rather than as an
+ * upstream 400 surfaced as a generic failure.
+ */
+describe('validateRichMenuGroupForPublish', () => {
+  const groupWith = (
+    actionType: 'message' | 'uri' | 'postback' | 'richmenuswitch',
+    actionData: Record<string, unknown>,
+    pageName = '基本メニュー',
+  ) => ({
+    id: 'gid12345-aaaa',
+    size: 'large' as const,
+    chatBarText: 'm',
+    isDefaultForAll: false,
+    pages: [{
+      id: 'p1', orderIndex: 0, name: pageName,
+      imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: null,
+      areas: [{
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        actionType,
+        actionData,
+      }],
+    }],
+  });
+
+  const rejects = (group: ReturnType<typeof groupWith>, fragment: string) => {
+    expect(() => validateRichMenuGroupForPublish(group)).toThrowError(RichMenuValidationError);
+    expect(() => validateRichMenuGroupForPublish(group)).toThrow(fragment);
+  };
+
+  const accepts = (group: ReturnType<typeof groupWith>) => {
+    expect(() => validateRichMenuGroupForPublish(group)).not.toThrow();
+  };
+
+  describe('message', () => {
+    it.each([
+      ['未設定', {}],
+      ['空文字', { text: '' }],
+      ['空白のみ', { text: '   ' }],
+    ])('%s は拒否する', (_label, data) => {
+      rejects(groupWith('message', data), '送信テキストを入力してください');
+    });
+
+    it('300文字を超えたら拒否する', () => {
+      rejects(groupWith('message', { text: 'あ'.repeat(301) }), '300文字以内');
+    });
+
+    it('300文字ちょうどは許可する', () => {
+      accepts(groupWith('message', { text: 'あ'.repeat(300) }));
+    });
+  });
+
+  describe('uri', () => {
+    it.each([
+      ['未設定', {}],
+      ['空文字', { uri: '' }],
+      ['空白のみ', { uri: '   ' }],
+    ])('%s は拒否する', (_label, data) => {
+      rejects(groupWith('uri', data), 'URLを入力してください');
+    });
+
+    it('1000文字を超えたら拒否する', () => {
+      rejects(groupWith('uri', { uri: `https://x.example/${'a'.repeat(1000)}` }), '1000文字以内');
+    });
+
+    it('1000文字ちょうどは許可する', () => {
+      accepts(groupWith('uri', { uri: `https://x.example/${'a'.repeat(981)}` }));
+    });
+  });
+
+  describe('postback', () => {
+    it.each([
+      ['未設定', {}],
+      ['空文字', { data: '' }],
+      ['空白のみ', { data: '   ' }],
+    ])('data が %s なら拒否する', (_label, data) => {
+      rejects(groupWith('postback', data), 'postback dataを入力してください');
+    });
+
+    it('data が300文字を超えたら拒否する', () => {
+      rejects(groupWith('postback', { data: 'a'.repeat(301) }), 'postback dataは300文字以内');
+    });
+
+    it('displayText が300文字を超えたら拒否する', () => {
+      rejects(
+        groupWith('postback', { data: 'ok', displayText: 'あ'.repeat(301) }),
+        'displayTextは300文字以内',
+      );
+    });
+
+    it('displayText は任意なので未設定でも許可する', () => {
+      accepts(groupWith('postback', { data: 'ok' }));
+    });
+  });
+
+  describe('richmenuswitch', () => {
+    it.each([
+      ['どちらも無い', {}],
+      ['alias が無い', { data: 'switch-to-p2' }],
+      ['data が無い', { richMenuAliasId: 'lhx-gid12345-1' }],
+    ])('%s なら拒否する', (_label, data) => {
+      rejects(groupWith('richmenuswitch', data), '遷移先ページを選択してください');
+    });
+
+    it('alias と data が揃っていれば許可する', () => {
+      accepts(
+        groupWith('richmenuswitch', { richMenuAliasId: 'lhx-gid12345-1', data: 'switch-to-p2' }),
+      );
+    });
+  });
+
+  it('どのページのどの領域かをメッセージに含める', () => {
+    const group = groupWith('message', { text: '' }, 'クーポン');
+    expect(() => validateRichMenuGroupForPublish(group))
+      .toThrow('ページ「クーポン」のタップ領域1: 送信テキストを入力してください');
+  });
+});
+
+describe('publishRichMenuGroup', () => {
+  it('入力不備なら LINE API を一度も呼ばない', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await expect(
+      publishRichMenuGroup(
+        {
+          id: 'gid12345-aaaa', size: 'large', chatBarText: 'menu', isDefaultForAll: false,
+          pages: [{
+            id: 'p1', orderIndex: 0, name: '基本メニュー',
+            imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
+            lineRichMenuId: null,
+            areas: [{
+              bounds: { x: 0, y: 0, width: 100, height: 100 },
+              actionType: 'message',
+              actionData: { text: '' },
+            }],
+          }],
+        },
+        line,
+        r2,
+      ),
+    ).rejects.toThrowError(RichMenuValidationError);
+    expect(line.calls).toEqual([]);
+  });
+
+  it('空の displayText は LINE へ送らない', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'menu', isDefaultForAll: false,
+        pages: [{
+          id: 'p1', orderIndex: 0, name: 'p1',
+          imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [{
+            bounds: { x: 0, y: 0, width: 100, height: 100 },
+            actionType: 'postback',
+            actionData: { data: 'go', displayText: '' },
+          }],
+        }],
+      },
+      line,
+      r2,
+    );
+    const payload = (line.createRichMenu as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      areas: { action: Record<string, unknown> }[];
+    };
+    expect(payload.areas[0].action).toEqual({ type: 'postback', data: 'go' });
+    expect(payload.areas[0].action).not.toHaveProperty('displayText');
+  });
+
+  it('displayText が入力されていれば LINE へ送る', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'menu', isDefaultForAll: false,
+        pages: [{
+          id: 'p1', orderIndex: 0, name: 'p1',
+          imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [{
+            bounds: { x: 0, y: 0, width: 100, height: 100 },
+            actionType: 'postback',
+            actionData: { data: 'go', displayText: '受付しました' },
+          }],
+        }],
+      },
+      line,
+      r2,
+    );
+    const payload = (line.createRichMenu as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      areas: { action: Record<string, unknown> }[];
+    };
+    expect(payload.areas[0].action).toEqual({
+      type: 'postback',
+      data: 'go',
+      displayText: '受付しました',
+    });
+  });
+
+  it('1 page: create → upload → alias update → 旧削除', async () => {
     const line = makeMockLineClient();
     const r2 = makeMockR2();
     const result = await publishRichMenuGroup(
@@ -140,13 +395,13 @@ describe('publishRichMenuGroup', () => {
     );
     // isDefaultForAll=false かつ LINE current default なし → clear-default は呼ばない (Round 2 修正)
     expect(line.calls).toEqual([
-      'create', 'upload', 'delete-alias', 'create-alias', 'delete-old', 'get-default',
+      'create', 'upload', 'upsert-alias', 'get-default', 'delete-old',
     ]);
     expect(line.calls).not.toContain('clear-default');
     expect(result.pages).toEqual([{ pageId: 'p1', newRichMenuId: 'lm-1' }]);
   });
 
-  it('2 page: 各ページについて順序実行', async () => {
+  it('2 page: 全ページの画像準備後に alias を切り替える', async () => {
     const line = makeMockLineClient();
     const r2 = makeMockR2();
     const result = await publishRichMenuGroup(
@@ -161,6 +416,9 @@ describe('publishRichMenuGroup', () => {
       r2,
     );
     expect(result.pages.map((p) => p.newRichMenuId)).toEqual(['lm-1', 'lm-2']);
+    expect(line.calls.slice(0, 6)).toEqual([
+      'create', 'upload', 'create', 'upload', 'upsert-alias', 'upsert-alias',
+    ]);
     // 旧 ID なしなので delete-old は呼ばれない
     expect(line.calls.filter((c) => c === 'delete-old')).toHaveLength(0);
   });
@@ -267,6 +525,116 @@ describe('publishRichMenuGroup', () => {
     ).rejects.toThrow(/R2 image missing/);
   });
 
+  it('2ページ目の画像が無ければ LINE 側を一切変更しない', async () => {
+    const line = makeMockLineClient();
+    const r2: R2Like = {
+      get: vi.fn(async (key: string) => key === 'missing.png'
+        ? null
+        : { body: new Uint8Array([1, 2, 3]) }),
+    };
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'missing.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      r2,
+    )).rejects.toThrow(/R2 image missing/);
+    expect(line.calls).toEqual([]);
+  });
+
+  it('全画像準備後の upload 失敗は alias を切り替えず新規メニューを片付ける', async () => {
+    const line = makeMockLineClient();
+    line.uploadRichMenuImage = vi.fn(async (richMenuId: string) => {
+      line.calls.push('upload');
+      if (richMenuId === 'lm-2') throw new Error('upload failed');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('upload failed');
+    expect(line.calls).not.toContain('upsert-alias');
+    expect(line.calls.filter((call) => call === 'delete-old')).toHaveLength(2);
+  });
+
+  it('alias 切替の途中失敗は切替済みページを旧IDへ戻す', async () => {
+    const line = makeMockLineClient();
+    let aliasCalls = 0;
+    line.upsertRichMenuAlias = vi.fn(async () => {
+      aliasCalls++;
+      line.calls.push(`upsert-alias-${aliasCalls}`);
+      if (aliasCalls === 2) throw new Error('alias failed');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('alias failed');
+    expect(aliasCalls).toBe(4);
+    expect(line.calls.filter((call) => call === 'delete-old')).toHaveLength(2);
+  });
+
+  it('default 設定に失敗したら alias を旧IDへ戻して新規メニューを片付ける', async () => {
+    const line = makeMockLineClient();
+    line.setDefaultRichMenu = vi.fn(async () => {
+      line.calls.push('set-default');
+      throw new Error('default failed');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: true,
+        pages: [{
+          id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png',
+          imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [],
+        }],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('default failed');
+    expect(line.calls).toEqual([
+      'create', 'upload', 'upsert-alias', 'set-default', 'upsert-alias', 'delete-old',
+    ]);
+  });
+
+  it('alias の復旧も失敗したページは新メニューを消さずリンク切れを避ける', async () => {
+    const line = makeMockLineClient();
+    let aliasCalls = 0;
+    line.upsertRichMenuAlias = vi.fn(async () => {
+      aliasCalls++;
+      line.calls.push(`upsert-alias-${aliasCalls}`);
+      if (aliasCalls === 2 || aliasCalls === 3) throw new Error('alias unavailable');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('alias unavailable');
+    // p1 は旧IDへ戻せたため新メニューを削除。p2 は復旧不明なので削除しない。
+    expect(line.calls.filter((call) => call === 'delete-old')).toHaveLength(1);
+  });
+
   it('image_r2_key が null だと throw (画像未設定 page)', async () => {
     const line = makeMockLineClient();
     const r2 = makeMockR2();
@@ -367,5 +735,283 @@ describe('linkRichMenuBulkChunked', () => {
     const result = await linkRichMenuBulkChunked(line, 'lm-1', []);
     expect(result).toEqual({ chunks: 0, total: 0 });
     expect(line.calls).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 147: 運用者から見た「何をするボタンか」(intent) を LINE の action へ変換する
+// ---------------------------------------------------------------------------
+
+/** publish して、LINE に送られた areas の action だけを取り出す。 */
+async function publishAndReadActions(
+  group: Parameters<typeof publishRichMenuGroup>[0],
+): Promise<Record<string, unknown>[]> {
+  const line = makeMockLineClient();
+  const r2 = makeMockR2();
+  await publishRichMenuGroup(group, line, r2);
+  const payload = (line.createRichMenu as unknown as { mock: { calls: unknown[][] } }).mock
+    .calls[0][0] as { areas: { action: Record<string, unknown> }[] };
+  return payload.areas.map((a) => a.action);
+}
+
+/** areas だけ差し替えた、publish できる最小の group を作る。 */
+function groupWithAreas(
+  areas: Parameters<typeof publishRichMenuGroup>[0]['pages'][number]['areas'],
+  extra: { formBaseUrl?: string | null } = {},
+): Parameters<typeof publishRichMenuGroup>[0] {
+  return {
+    id: 'gid12345-aaaa',
+    size: 'large',
+    chatBarText: 'menu',
+    isDefaultForAll: false,
+    ...extra,
+    pages: [
+      {
+        id: 'p1',
+        orderIndex: 0,
+        name: '基本メニュー',
+        imageR2Key: 'rich-menus/test/p1.png',
+        imageContentType: 'image/png',
+        lineRichMenuId: null,
+        areas,
+      },
+    ],
+  };
+}
+
+const BOUNDS = { x: 0, y: 0, width: 100, height: 100 };
+
+describe('intent から LINE の action への変換', () => {
+  it('電話をかける → tel: の uri。ハイフンや括弧は落とす', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: { tel: '03-1234-5678' },
+          intent: 'tel',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'uri', uri: 'tel:0312345678' });
+  });
+
+  it('回答フォームを開く → アカウントの LIFF に form を付けた uri', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas(
+        [
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: {},
+            intent: 'form',
+            formId: 'form-9',
+          },
+        ],
+        { formBaseUrl: 'https://liff.line.me/1234-abcd' },
+      ),
+    );
+    expect(action).toEqual({ type: 'uri', uri: 'https://liff.line.me/1234-abcd?form=form-9' });
+  });
+
+  it('テンプレートを送る → 押されたことが届く postback', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'postback',
+          actionData: {},
+          intent: 'template',
+          templateId: 'tpl-1',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'postback', data: 'rma=a1' });
+  });
+
+  it('URLを開く → 計測リンクを選んでいればそちらを開く', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: { uri: 'https://example.com/original' },
+          intent: 'url',
+          trackedLinkUrl: 'https://short.example/t/abc123',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'uri', uri: 'https://short.example/t/abc123' });
+  });
+
+  it('テキストを送る（追加の動きなし）→ メッセージ送信のまま', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'message',
+          actionData: { text: 'こんにちは' },
+          intent: 'text',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'message', text: 'こんにちは' });
+  });
+
+  it('テキストを送る（タグ付きの場合）→ 見え方はそのままに postback へ寄せる', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'message',
+          actionData: { text: '資料がほしい' },
+          intent: 'text',
+          tagIds: ['tag-1'],
+        },
+      ]),
+    );
+    expect(action).toEqual({
+      type: 'postback',
+      data: 'rma=a1&d=%E8%B3%87%E6%96%99%E3%81%8C%E3%81%BB%E3%81%97%E3%81%84',
+      // displayText があるので、トークの見え方はメッセージ送信と変わらない
+      displayText: '資料がほしい',
+    });
+  });
+
+  it('スコアだけ設定した場合も postback へ寄せる', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'message',
+          actionData: { text: 'はい' },
+          intent: 'text',
+          scoreChange: 10,
+        },
+      ]),
+    );
+    expect(action.type).toBe('postback');
+  });
+
+  it('intent が無い昔のボタンは、今までどおりそのまま送る', async () => {
+    const actions = await publishAndReadActions(
+      groupWithAreas([
+        { id: 'a1', bounds: BOUNDS, actionType: 'message', actionData: { text: 'hi' } },
+        {
+          id: 'a2',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: { uri: 'https://example.com' },
+        },
+      ]),
+    );
+    expect(actions).toEqual([
+      { type: 'message', text: 'hi' },
+      { type: 'uri', uri: 'https://example.com' },
+    ]);
+  });
+
+  it('メニューを切り替える（intent あり）→ 押されたことが届く目印を data に載せる', async () => {
+    const group = {
+      id: 'gid12345-aaaa',
+      size: 'large' as const,
+      chatBarText: 'menu',
+      isDefaultForAll: false,
+      pages: [
+        {
+          id: 'p1',
+          orderIndex: 0,
+          name: 'p1',
+          imageR2Key: 'rich-menus/test/p1.png',
+          imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [
+            {
+              id: 'a1',
+              bounds: BOUNDS,
+              actionType: 'richmenuswitch' as const,
+              actionData: { targetPageId: 'p2' },
+              intent: 'switch' as const,
+            },
+          ],
+        },
+        {
+          id: 'p2',
+          orderIndex: 1,
+          name: 'p2',
+          imageR2Key: 'rich-menus/test/p2.png',
+          imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [],
+        },
+      ],
+    };
+    const [action] = await publishAndReadActions(group);
+    expect(action).toEqual({
+      type: 'richmenuswitch',
+      richMenuAliasId: 'lhx-gid12345-1',
+      data: 'rma=a1&d=switch-to-p2',
+    });
+  });
+});
+
+describe('intent の入力チェック', () => {
+  const r2 = makeMockR2();
+
+  it('電話番号が空なら、LINE を呼ぶ前に日本語で止める', async () => {
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: { tel: '' },
+            intent: 'tel',
+            label: '電話する',
+          },
+        ]),
+        makeMockLineClient(),
+        r2,
+      ),
+    ).rejects.toThrowError(/「電話する」: 電話番号を入力してください/);
+  });
+
+  it('LIFF が無いアカウントでは、回答フォームのボタンを publish させない', async () => {
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: {},
+            intent: 'form',
+            formId: 'form-1',
+          },
+        ]),
+        makeMockLineClient(),
+        r2,
+      ),
+    ).rejects.toThrowError(/LIFFが設定されていない/);
+  });
+
+  it('テンプレート未選択なら止める', async () => {
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          { id: 'a1', bounds: BOUNDS, actionType: 'postback', actionData: {}, intent: 'template' },
+        ]),
+        makeMockLineClient(),
+        r2,
+      ),
+    ).rejects.toThrowError(/送るテンプレートを選んでください/);
   });
 });

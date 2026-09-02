@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   createAffiliateOffer,
   updateAffiliateOffer,
@@ -7,6 +8,9 @@ import {
   type AffiliateOffer,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 /**
  * Admin-side affiliate offer (案件) CRUD. Mounted under `/api/affiliate-offers`,
@@ -17,12 +21,26 @@ import type { Env } from '../index.js';
  */
 const affiliateOffers = new Hono<Env>();
 
+async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise<void>) {
+  const item = await getAffiliateOfferById(c.env.DB, c.req.param('id')!);
+  if (!item || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [item.line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Offer not found' }, 404);
+  }
+  await next();
+}
+
 function serializeOffer(row: AffiliateOffer) {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     rewardAmount: row.reward_amount,
+    rewardMiles: row.reward_miles ?? 0,
+    mileageProgramId: row.mileage_program_id ?? 'default',
     lineAccountId: row.line_account_id,
     tagId: row.tag_id,
     scenarioId: row.scenario_id,
@@ -49,6 +67,8 @@ affiliateOffers.get('/api/affiliate-offers', async (c) => {
 });
 
 // GET /api/affiliate-offers/:id - get single
+affiliateOffers.use('/api/affiliate-offers/:id', requireVisibleAffiliateOffer);
+affiliateOffers.use('/api/affiliate-offers/:id/*', requireVisibleAffiliateOffer);
 affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
   try {
     const item = await getAffiliateOfferById(c.env.DB, c.req.param('id'));
@@ -63,13 +83,15 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
 });
 
 // POST /api/affiliate-offers - create
-affiliateOffers.post('/api/affiliate-offers', async (c) => {
+affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.offer.create', { kind: 'affiliate_offer' });
   try {
     const body = await c.req
       .json<{
         name?: string;
         description?: string | null;
         rewardAmount?: number;
+        rewardMiles?: number;
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
@@ -86,11 +108,23 @@ affiliateOffers.post('/api/affiliate-offers', async (c) => {
         400,
       );
     }
+    if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
+      return c.json(
+        { success: false, error: 'rewardMiles must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const offer = await createAffiliateOffer(c.env.DB, {
       name,
       description: body.description ?? null,
       rewardAmount: body.rewardAmount,
+      rewardMiles: body.rewardMiles,
       lineAccountId: body.lineAccountId ?? null,
       tagId: body.tagId ?? null,
       scenarioId: body.scenarioId ?? null,
@@ -103,7 +137,8 @@ affiliateOffers.post('/api/affiliate-offers', async (c) => {
 });
 
 // PUT /api/affiliate-offers/:id - update
-affiliateOffers.put('/api/affiliate-offers/:id', async (c) => {
+affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.offer.update', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const body = await c.req
@@ -111,6 +146,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', async (c) => {
         name?: string;
         description?: string | null;
         rewardAmount?: number;
+        rewardMiles?: number;
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
@@ -127,6 +163,17 @@ affiliateOffers.put('/api/affiliate-offers/:id', async (c) => {
         400,
       );
     }
+    if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
+      return c.json(
+        { success: false, error: 'rewardMiles must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const existing = await getAffiliateOfferById(c.env.DB, id);
     if (!existing) {
@@ -137,6 +184,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', async (c) => {
       name: body.name !== undefined ? body.name.trim() : undefined,
       description: body.description,
       reward_amount: body.rewardAmount,
+      reward_miles: body.rewardMiles,
       line_account_id: body.lineAccountId,
       tag_id: body.tagId,
       scenario_id: body.scenarioId,

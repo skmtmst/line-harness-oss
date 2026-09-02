@@ -3,6 +3,7 @@ import {
   getRichMenuGroups,
   getRichMenuGroupById,
   getRichMenuGroupWithPages,
+  getRichMenuDeleteImpact,
   createRichMenuGroup,
   updateRichMenuGroupMeta,
   replaceRichMenuPages,
@@ -16,19 +17,28 @@ import {
   markRichMenuGroupUnpublished,
   getLineAccountById,
   getFollowingLineUserIdsByTag,
+  getTrackedLinkById,
+  getRichMenuTapStats,
+  jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
   type RichMenuPageInput,
   type RichMenuAreaInput,
+  type RichMenuAreaIntent,
   type CreateRichMenuGroupInput,
   type UpdateRichMenuGroupMetaInput,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
+import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
+import { currentMonthRange } from '../lib/jst-range.js';
 import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
+  RichMenuValidationError,
   type LineRichMenuClient,
   type R2Like,
   type GroupInput,
@@ -49,6 +59,11 @@ function serializeGroup(row: RichMenuGroup) {
     isDefaultForAll: row.is_default_for_all === 1,
     status: row.status,
     publishingAt: row.publishing_at,
+    targetingCondition: row.targeting_condition,
+    targetingPriority: row.targeting_priority,
+    targetingEnabled: row.targeting_enabled === 1,
+    folderId: row.folder_id,
+    displayOrder: row.display_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -73,6 +88,13 @@ function serializeGroupWithPages(row: RichMenuGroupWithPages) {
         boundsHeight: a.bounds_height,
         actionType: a.action_type,
         actionData: a.actionData,
+        intent: a.intent,
+        label: a.label,
+        tagIds: a.tagIds,
+        scoreChange: a.score_change,
+        templateId: a.template_id,
+        formId: a.form_id,
+        trackedLinkId: a.tracked_link_id,
       })),
     })),
   };
@@ -82,6 +104,20 @@ function serializeGroupWithPages(row: RichMenuGroupWithPages) {
 
 const VALID_SIZES = new Set(['large', 'compact']);
 const VALID_ACTION_TYPES = new Set(['uri', 'message', 'postback', 'richmenuswitch']);
+// intent が決まれば、LINE に登録するときの種類も決まる。
+// 取りこぼしがあればここでコンパイルが落ちる。
+// （db 側の定数をそのまま使わないのは、この経路を試験するとき db 全体を
+//   差し替えることがあり、実行時の値が消えるため）
+const ACTION_TYPE_BY_INTENT: Record<RichMenuAreaIntent, RichMenuAreaInput['actionType']> = {
+  url: 'uri',
+  tel: 'uri',
+  form: 'uri',
+  text: 'message',
+  template: 'postback',
+  switch: 'richmenuswitch',
+  postback: 'postback',
+};
+const VALID_INTENTS = new Set<string>(Object.keys(ACTION_TYPE_BY_INTENT));
 
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -103,15 +139,68 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
   if (!r.actionData || typeof r.actionData !== 'object') {
     return { ok: false, error: 'area.actionData must be object' };
   }
+  if (r.id !== undefined && r.id !== null && (typeof r.id !== 'string' || r.id.length === 0)) {
+    return { ok: false, error: 'area.id must be non-empty string when present' };
+  }
+  if (
+    r.intent !== undefined &&
+    r.intent !== null &&
+    (typeof r.intent !== 'string' || !VALID_INTENTS.has(r.intent))
+  ) {
+    return { ok: false, error: `area.intent must be one of ${[...VALID_INTENTS].join('/')}` };
+  }
+  if (r.label !== undefined && r.label !== null && typeof r.label !== 'string') {
+    return { ok: false, error: 'area.label must be string' };
+  }
+  if (typeof r.label === 'string' && [...r.label].length > 60) {
+    return { ok: false, error: 'area.label must be 60 characters or fewer' };
+  }
+  if (r.tagIds !== undefined && r.tagIds !== null) {
+    if (!Array.isArray(r.tagIds) || r.tagIds.some((t) => typeof t !== 'string' || t.length === 0)) {
+      return { ok: false, error: 'area.tagIds must be an array of non-empty strings' };
+    }
+    if (r.tagIds.length > 20) {
+      return { ok: false, error: 'area.tagIds must be 20 items or fewer' };
+    }
+  }
+  if (
+    r.scoreChange !== undefined &&
+    r.scoreChange !== null &&
+    (typeof r.scoreChange !== 'number' || !Number.isInteger(r.scoreChange))
+  ) {
+    return { ok: false, error: 'area.scoreChange must be an integer' };
+  }
+  for (const key of ['templateId', 'formId', 'trackedLinkId'] as const) {
+    const v = r[key];
+    if (v !== undefined && v !== null && (typeof v !== 'string' || v.length === 0)) {
+      return { ok: false, error: `area.${key} must be non-empty string when present` };
+    }
+  }
+  // intent が来ているなら、LINE に登録するときの種類は intent から決め直す。
+  // 画面が送ってくる actionType とずれていると、publish の途中で
+  // 「切り替え先の解決」などが素通りして LINE 側が 400 を返す。
+  const intent = (typeof r.intent === 'string' ? r.intent : null) as RichMenuAreaIntent | null;
+  const actionType = intent
+    ? ACTION_TYPE_BY_INTENT[intent]
+    : (r.actionType as RichMenuAreaInput['actionType']);
+
   return {
     ok: true,
     value: {
+      id: typeof r.id === 'string' ? r.id : undefined,
       boundsX: r.boundsX as number,
       boundsY: r.boundsY as number,
       boundsWidth: r.boundsWidth as number,
       boundsHeight: r.boundsHeight as number,
-      actionType: r.actionType as RichMenuAreaInput['actionType'],
+      actionType,
       actionData: r.actionData as Record<string, unknown>,
+      intent,
+      label: typeof r.label === 'string' ? r.label : null,
+      tagIds: Array.isArray(r.tagIds) ? (r.tagIds as string[]) : null,
+      scoreChange: typeof r.scoreChange === 'number' ? r.scoreChange : null,
+      templateId: typeof r.templateId === 'string' ? r.templateId : null,
+      formId: typeof r.formId === 'string' ? r.formId : null,
+      trackedLinkId: typeof r.trackedLinkId === 'string' ? r.trackedLinkId : null,
     },
   };
 }
@@ -228,6 +317,49 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
     if (typeof r.isDefaultForAll !== 'boolean') return { ok: false, error: 'isDefaultForAll must be boolean' };
     meta.isDefaultForAll = r.isDefaultForAll;
   }
+  if (r.targetingCondition !== undefined) {
+    if (r.targetingCondition === null) {
+      meta.targetingCondition = null;
+    } else if (typeof r.targetingCondition !== 'string') {
+      return { ok: false, error: 'targetingCondition must be a JSON string or null' };
+    } else {
+      // 読めない JSON をそのまま保存すると、出し分けのたびに黙って飛ばされる。
+      // 入り口で断る。
+      try {
+        JSON.parse(r.targetingCondition);
+      } catch {
+        return { ok: false, error: 'targetingCondition must be valid JSON' };
+      }
+      meta.targetingCondition = r.targetingCondition;
+    }
+  }
+  if (r.targetingPriority !== undefined) {
+    if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
+      return { ok: false, error: 'targetingPriority must be an integer' };
+    }
+    meta.targetingPriority = r.targetingPriority;
+  }
+  if (r.targetingEnabled !== undefined) {
+    if (typeof r.targetingEnabled !== 'boolean') {
+      return { ok: false, error: 'targetingEnabled must be boolean' };
+    }
+    meta.targetingEnabled = r.targetingEnabled;
+  }
+  if (r.folderId !== undefined) {
+    if (r.folderId === null || r.folderId === '') {
+      meta.folderId = null;
+    } else if (typeof r.folderId !== 'string') {
+      return { ok: false, error: 'folderId must be a string' };
+    } else {
+      meta.folderId = r.folderId;
+    }
+  }
+  if (r.displayOrder !== undefined) {
+    if (typeof r.displayOrder !== 'number' || !Number.isInteger(r.displayOrder)) {
+      return { ok: false, error: 'displayOrder must be an integer' };
+    }
+    meta.displayOrder = r.displayOrder;
+  }
   let pages: RichMenuPageInput[] | undefined;
   if (r.pages !== undefined) {
     const p = parsePages(r.pages);
@@ -245,6 +377,9 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
   const res = await fetch(
@@ -269,11 +404,14 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
 // 取り込み後は通常の編集画面で操作できる。
 //
 // query: { accountId, richMenuId }
-richMenuGroups.post('/api/rich-menu-groups/import', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'), async (c) => {
   const accountId = c.req.query('accountId');
   const richMenuId = c.req.query('richMenuId');
   if (!accountId || !richMenuId) {
     return c.json({ success: false, error: 'accountId and richMenuId query params required' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
   }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
@@ -452,6 +590,9 @@ richMenuGroups.post('/api/rich-menu-groups/import', async (c) => {
 richMenuGroups.get('/api/rich-menu-groups/external', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
   const auth = `Bearer ${account.channel_access_token}`;
@@ -538,10 +679,13 @@ richMenuGroups.get('/api/rich-menu-groups/external', async (c) => {
 // LINE 上の rich menu を直接削除する (admin 管理外の orphan を片付ける用)。
 // admin 管理されている richMenuId を渡された場合は 409 で拒否
 // (Unpublish 経由で消すべき)。
-richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', async (c) => {
+richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole('owner', 'admin'), async (c) => {
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
 
@@ -578,9 +722,32 @@ richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', async (c) =>
   return c.json({ success: true });
 });
 
+// 押された回数。既定はその月（日本時間）。from / to を渡せば任意の期間。
+// ルートの並び順に注意 — `/:groupId` より前に置かないと "tap-stats" が
+// リッチメニューの id として拾われる。
+richMenuGroups.get('/api/rich-menu-groups/tap-stats', async (c) => {
+  const accountId = c.req.query('accountId');
+  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
+  const range = currentMonthRange(jstNow());
+  const from = c.req.query('from') || range.from;
+  const to = c.req.query('to') || range.to;
+  try {
+    const stats = await getRichMenuTapStats(c.env.DB, accountId, from, to);
+    return c.json({ success: true, data: stats });
+  } catch (e) {
+    return c.json({ success: false, error: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
+
 richMenuGroups.get('/api/rich-menu-groups', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const groups = await getRichMenuGroups(c.env.DB, accountId);
   // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
   // 一覧カードでサムネを出すために 1 クエリで JOIN する。
@@ -622,14 +789,39 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
   });
 });
 
+richMenuGroups.get(
+  '/api/rich-menu-groups/:groupId/delete-impact',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const impact = await getRichMenuDeleteImpact(c.env.DB, c.req.param('groupId'));
+      if (
+        !impact
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])
+      ) {
+        return c.json({ success: false, error: 'not found' }, 404);
+      }
+      return c.json({ success: true, data: impact });
+    } catch (error) {
+      console.error('GET /api/rich-menu-groups/:groupId/delete-impact error:', error);
+      return c.json(
+        { success: false, error: '削除したときの影響を確認できませんでした' },
+        503,
+      );
+    }
+  },
+);
+
 richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   return c.json({ success: true, data: serializeGroupWithPages(group) });
 });
 
-richMenuGroups.post('/api/rich-menu-groups', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -638,16 +830,21 @@ richMenuGroups.post('/api/rich-menu-groups', async (c) => {
   }
   const parsed = parseCreateBody(body);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const switcherRejection = rejectRichmenuswitchInCreate(parsed.value.pages);
   if (switcherRejection) return c.json({ success: false, error: switcherRejection }, 400);
   const created = await createRichMenuGroup(c.env.DB, parsed.value);
   return c.json({ success: true, data: serializeGroupWithPages(created) });
 });
 
-richMenuGroups.patch('/api/rich-menu-groups/:groupId', async (c) => {
+richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   const existing = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!existing) return c.json({ success: false, error: 'not found' }, 404);
+  if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
 
   let body: unknown;
   try {
@@ -667,19 +864,33 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', async (c) => {
   return c.json({ success: true, data: serializeGroupWithPages(refreshed) });
 });
 
-richMenuGroups.delete('/api/rich-menu-groups/:groupId', async (c) => {
+richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
-  // 公開中の group をいきなり削除すると LINE 上に richmenu / alias / default が
-  // 残って復旧不能になる。デフォルトでは status='published' を 409 で reject し、
-  // ?force=true (確信を持って残骸を残してもよい) でだけ進める。
-  const force = c.req.query('force') === 'true';
-  const existing = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!existing) return c.json({ success: false, error: 'not found' }, 404);
-  if (existing.status === 'published' && !force) {
+  let impact: Awaited<ReturnType<typeof getRichMenuDeleteImpact>>;
+  try {
+    impact = await getRichMenuDeleteImpact(c.env.DB, groupId);
+  } catch (error) {
+    console.error('DELETE /api/rich-menu-groups/:groupId impact error:', error);
+    return c.json(
+      { success: false, error: '削除したときの影響を確認できませんでした' },
+      503,
+    );
+  }
+  if (
+    !impact
+    || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])
+  ) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
+  // query に force=true が残っていても、影響確認を迂回させない。公開中、LINE上に
+  // 実体が残る、別設定から参照される、のどれかなら必ず止める。
+  if (!impact.canDelete) {
     return c.json(
       {
         success: false,
-        error: 'group is published. Unpublish (POST /unpublish) first, or pass ?force=true to delete D1 row anyway (LINE 側に残骸が残る点に注意)',
+        code: 'rich_menu_delete_blocked',
+        error: '削除する前に、公開状態と使われている場所を確認してください',
+        data: impact,
       },
       409,
     );
@@ -691,8 +902,12 @@ richMenuGroups.delete('/api/rich-menu-groups/:groupId', async (c) => {
 
 // ----- Image upload -----
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requireRole('owner', 'admin'), async (c) => {
   const { groupId, pageId } = c.req.param();
+  const group = await getRichMenuGroupById(c.env.DB, groupId);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'group not found' }, 404);
+  }
   const contentType = c.req.header('content-type') ?? '';
   if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
     return c.json({ success: false, error: 'content-type must be image/png or image/jpeg' }, 400);
@@ -704,9 +919,6 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', async 
   const buf = new Uint8Array(await c.req.arrayBuffer());
   const validation = validateRichMenuImage(buf, buf.byteLength);
   if (!validation.ok) return c.json({ success: false, error: validation.error }, 400);
-
-  const group = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'group not found' }, 404);
 
   // group.size と画像サイズが一致してないと publish 時に LINE API でコンテンツアップロードが
   // 弾かれる (richmenu の宣言サイズと content の dimensions は一致必須)。事前に拒否する。
@@ -734,6 +946,14 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', async 
 // 画像取得 — エディタからの <img src="..."> 用。private cache でアクセス制御は auth に委ねる。
 richMenuGroups.get('/api/rich-menu-images/:key{.+}', async (c) => {
   const key = c.req.param('key');
+  const [root, accountId] = key.split('/');
+  if (
+    root !== 'rich-menus'
+    || !accountId
+    || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])
+  ) {
+    return c.notFound();
+  }
   const obj = await c.env.IMAGES.get(key);
   if (!obj) return c.notFound();
   return new Response(obj.body, {
@@ -745,6 +965,36 @@ richMenuGroups.get('/api/rich-menu-images/:key{.+}', async (c) => {
 });
 
 // ----- Publish -----
+
+/**
+ * 「URLを開く」で計測リンクを選んだボタンの、実際の飛び先を引く。
+ *
+ * 計測リンクは押された回数を数え、設定されていればタグ付けやシナリオ開始まで
+ * やってくれる。リッチメニュー側で同じ仕組みを作り直さず、そのまま乗せる。
+ */
+async function resolveTrackedLinkUrls(
+  db: D1Database,
+  resolveBaseUrl: () => Promise<string>,
+  group: RichMenuGroupWithPages,
+): Promise<Map<string, string>> {
+  const ids = new Set<string>();
+  for (const page of group.pages) {
+    for (const area of page.areas) {
+      if (area.tracked_link_id) ids.add(area.tracked_link_id);
+    }
+  }
+  const urls = new Map<string, string>();
+  // 計測リンクを使うボタンが1つも無ければ、ベースURLを引く必要もない。
+  if (ids.size === 0) return urls;
+  const baseUrl = await resolveBaseUrl();
+  for (const id of ids) {
+    const link = await getTrackedLinkById(db, id);
+    if (!link) continue;
+    // 短縮コードがあればそちらを使う (baseUrl が独自の短縮ドメインのことがある)。
+    urls.set(id, `${baseUrl}/t/${link.short_code ?? link.id}`);
+  }
+  return urls;
+}
 
 function createLineClient(channelAccessToken: string): LineRichMenuClient {
   const auth = `Bearer ${channelAccessToken}`;
@@ -782,6 +1032,24 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
         body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
       });
       if (!res.ok) throw new Error(`LINE createRichMenuAlias failed: ${res.status} ${await res.text()}`);
+    },
+    async upsertRichMenuAlias(aliasId, richMenuId) {
+      const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ richMenuId }),
+      });
+      if (res.ok) return;
+      if (res.status === 404) {
+        const createRes = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+        });
+        if (createRes.ok) return;
+        throw new Error(`LINE createRichMenuAlias failed: ${createRes.status} ${await createRes.text()}`);
+      }
+      throw new Error(`LINE updateRichMenuAlias failed: ${res.status} ${await res.text()}`);
     },
     async deleteRichMenu(richMenuId) {
       const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
@@ -836,10 +1104,12 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
   };
 }
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   if (group.publishing_at) return c.json({ success: false, error: 'already publishing' }, 409);
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
@@ -857,11 +1127,25 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', async (c) => {
         return { body: obj.body as ReadableStream };
       },
     };
+    // 「URLを開く」で計測リンクを選んでいるボタンの、実際の飛び先をまとめて引く。
+    const trackedLinkUrls = await resolveTrackedLinkUrls(
+      c.env.DB,
+      () =>
+        resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
+      group,
+    );
+    // 「回答フォームを開く」の飛び先。アカウント固有の LIFF を優先する
+    // (共通 LIFF に飛ばすと、未同意のチャネルで同意画面が出てしまう)。
+    const formBaseUrl = account.liff_id
+      ? `https://liff.line.me/${account.liff_id}`
+      : (c.env.LIFF_URL ?? null);
+
     const groupInput: GroupInput = {
       id: group.id,
       size: group.size,
       chatBarText: group.chat_bar_text,
       isDefaultForAll: group.is_default_for_all === 1,
+      formBaseUrl,
       pages: group.pages.map((p) => ({
         id: p.id,
         orderIndex: p.order_index,
@@ -870,9 +1154,19 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', async (c) => {
         imageContentType: p.image_content_type,
         lineRichMenuId: p.line_richmenu_id,
         areas: p.areas.map((a) => ({
+          id: a.id,
           bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
           actionType: a.action_type,
           actionData: a.actionData,
+          intent: a.intent,
+          label: a.label,
+          tagIds: a.tagIds,
+          scoreChange: a.score_change,
+          templateId: a.template_id,
+          formId: a.form_id,
+          trackedLinkUrl: a.tracked_link_id
+            ? (trackedLinkUrls.get(a.tracked_link_id) ?? null)
+            : null,
         })),
       })),
     };
@@ -885,6 +1179,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', async (c) => {
   } catch (e) {
     await releasePublishLock(c.env.DB, groupId);
     const message = e instanceof Error ? e.message : String(e);
+    if (e instanceof RichMenuValidationError) {
+      return c.json({ success: false, error: message }, 400);
+    }
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -894,10 +1191,12 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', async (c) => {
 // LINE 上の alias / richmenu / default を全削除して draft に戻す。
 // 削除フローや、別 group を default にしたい時に使う。idempotent (既に消えてる
 // alias / richmenu は 404 を許容)。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
@@ -941,7 +1240,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', async (c) => {
 //     同 account 内の他 group の is_default_for_all は 0 にリセット。
 //
 // 前提: group が published かつ default_page に line_richmenu_id がセット済み。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   let body: unknown;
   try {
@@ -962,7 +1261,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', async (c) => 
   const tagId = (r.tagId as string | null | undefined) ?? null;
 
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   if (group.status !== 'published') {
     return c.json(
       { success: false, error: 'group must be published before applying to friends' },

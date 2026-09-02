@@ -7,6 +7,7 @@ on:
     paths:
       - 'apps/web/**'
       - 'packages/shared/**'
+      - 'packages/update-engine/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-cloudflare-admin.yml'
@@ -26,7 +27,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @line-crm/shared build
+      - run: pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
 
       - name: Capture build metadata
         id: build-meta
@@ -36,6 +37,7 @@ jobs:
         run: pnpm --filter web build
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'false'
           APP_BUILD_TIME: ${{ steps.build-meta.outputs.build_time }}
 
       - name: Deploy to Cloudflare Pages

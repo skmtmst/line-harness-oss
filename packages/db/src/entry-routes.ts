@@ -1,7 +1,10 @@
 import { jstNow } from './utils.js';
+import { ensureEntryRouteGenre } from './entry-route-genres.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export interface EntryRoute {
   id: string;
   ref_code: string;
+  genre: string | null;
   name: string;
   tag_id: string | null;
   scenario_id: string | null;
@@ -10,6 +13,7 @@ export interface EntryRoute {
   intro_template_id: string | null;
   run_account_friend_add_scenarios: number;
   is_active: number;
+  tenant_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +38,7 @@ export interface RefTracking {
 
 export interface CreateEntryRouteInput {
   refCode: string;
+  genre?: string | null;
   name: string;
   tagId?: string | null;
   scenarioId?: string | null;
@@ -42,6 +47,7 @@ export interface CreateEntryRouteInput {
   introTemplateId?: string | null;
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
+  tenantId?: string;
 }
 
 export interface EntryRouteFunnel {
@@ -51,9 +57,12 @@ export interface EntryRouteFunnel {
   cv_count: number;
 }
 
-export async function getEntryRoutes(db: D1Database): Promise<EntryRoute[]> {
+export async function getEntryRoutes(db: D1Database, tenantId: string): Promise<EntryRoute[]> {
   const result = await db
-    .prepare(`SELECT * FROM entry_routes ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM entry_routes
+      WHERE tenant_id = ? OR (tenant_id IS NULL AND ? = ?)
+      ORDER BY created_at DESC`)
+    .bind(tenantId, tenantId, DEFAULT_TENANT_ID)
     .all<EntryRoute>();
   return result.results;
 }
@@ -78,17 +87,20 @@ export async function createEntryRoute(
 
   const runAccount = input.runAccountFriendAddScenarios !== false ? 1 : 0;
 
+  if (input.genre) await ensureEntryRouteGenre(db, input.genre);
+
   await db
     .prepare(
       `INSERT INTO entry_routes
-         (id, ref_code, name, tag_id, scenario_id, redirect_url,
+         (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
-          is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_active, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.refCode,
+      input.genre?.trim() || null,
       input.name,
       input.tagId ?? null,
       input.scenarioId ?? null,
@@ -97,6 +109,7 @@ export async function createEntryRoute(
       input.introTemplateId ?? null,
       runAccount,
       isActive,
+      input.tenantId ?? DEFAULT_TENANT_ID,
       now,
       now,
     )
@@ -134,7 +147,10 @@ export async function updateEntryRoute(
   const fields: string[] = ['updated_at = ?'];
   const values: unknown[] = [now];
 
+  if (input.genre) await ensureEntryRouteGenre(db, input.genre);
+
   if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
+  if (input.genre !== undefined) { fields.push('genre = ?'); values.push(input.genre?.trim() || null); }
   if (input.refCode !== undefined) { fields.push('ref_code = ?'); values.push(input.refCode); }
   if (input.tagId !== undefined) { fields.push('tag_id = ?'); values.push(input.tagId ?? null); }
   if (input.scenarioId !== undefined) { fields.push('scenario_id = ?'); values.push(input.scenarioId ?? null); }
@@ -215,6 +231,73 @@ export async function getEntryRouteFunnel(
   return (
     row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0 }
   );
+}
+
+export interface EntryRouteSource {
+  /** 画面に出す名前。utm_source か、参照元URLのホスト名 */
+  label: string;
+  count: number;
+}
+
+/**
+ * そのリンクのクリックが「どこから来ているか」。
+ *
+ * 優先するのは utm_source。広告やSNSの投稿ごとに付け分けられるので、
+ * 参照元URLより細かく分けられる（「Instagram アプリ」と
+ * 「Instagram ストーリーズ」を分けたいのはこの理由）。
+ *
+ * utm_source が無いときは参照元URLのホスト名を使う。どちらも無いクリックは
+ * 「直接アクセス」。QRコードや、紙に印刷したURLを打ち込んだ場合がこれになる。
+ */
+export async function getEntryRouteSources(
+  db: D1Database,
+  entryRouteId: string,
+  top = 5,
+): Promise<EntryRouteSource[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT
+         COALESCE(
+           NULLIF(TRIM(utm_source), ''),
+           NULLIF(TRIM(source_url), ''),
+           '直接アクセス'
+         ) AS label,
+         COUNT(*) AS count
+       FROM ref_tracking
+       WHERE entry_route_id = ?
+       GROUP BY label
+       ORDER BY count DESC, label ASC`,
+    )
+    .bind(entryRouteId)
+    .all<{ label: string; count: number }>();
+
+  // source_url はURLのまま入っている。画面に出すのはホスト名だけでよい。
+  // 同じホストが utm_source 有り・無しで別行になることがあるので、
+  // ホスト名にしてから足し直す。
+  const merged = new Map<string, number>();
+  for (const r of results ?? []) {
+    const label = hostOf(r.label);
+    merged.set(label, (merged.get(label) ?? 0) + r.count);
+  }
+  const sorted = [...merged.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => (b.count - a.count) || a.label.localeCompare(b.label));
+
+  // 上位だけ出して残りを黙って捨てると、合計が合わずに「どこから来たか
+  // 分からない分」が消える。残りは「その他」にまとめる。
+  if (sorted.length <= top) return sorted;
+  const rest = sorted.slice(top).reduce((sum, r) => sum + r.count, 0);
+  return [...sorted.slice(0, top), { label: 'その他', count: rest }];
+}
+
+/** URLならホスト名、そうでなければそのまま返す。 */
+function hostOf(value: string): string {
+  if (!value.includes('://')) return value;
+  try {
+    return new URL(value).host || value;
+  } catch {
+    return value;
+  }
 }
 
 export async function recordRefTracking(

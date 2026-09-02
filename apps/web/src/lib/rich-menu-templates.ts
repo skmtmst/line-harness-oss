@@ -1,8 +1,14 @@
-// LINE リッチメニュー の作成テンプレ。areas は元画像ピクセル座標。
-// クライアントは選択したテンプレを `templateToAreas()` で AreaInput[] に変換し
-// 新規 page の初期 areas として送る。
+// リッチメニューの「土台のレイアウト」。areas は元画像のピクセル座標。
 //
-// v1 サポートサイズ: Large (2500x1686) / Compact (2500x843)。
+// クライアントは選んだテンプレを `templateToAreas()` で AreaInput[] に変換し、
+// 新規作成の初期 areas として送る。
+//
+// サイズは LINE の2種類だけ:
+//   大 (large)   2500 × 1686 … 画面をしっかり使う。6分割まで載る
+//   小 (compact) 2500 × 843  … トークが隠れにくい。横並び中心
+//
+// ここに無い形にしたいときは「自由に配置」を選び、編集画面で画像の上を
+// ドラッグして区切る。ボタンは1ページあたり20個まで置ける。
 
 export type RichMenuTemplate = {
   key: string;
@@ -15,48 +21,45 @@ export type RichMenuTemplate = {
 const LARGE = { width: 2500, height: 1686 };
 const COMPACT = { width: 2500, height: 843 };
 
+export const SIZE_DIMENSIONS = { large: LARGE, compact: COMPACT } as const;
+
+/** 縦 rows × 横 cols の等分割。 */
+function grid(
+  size: { width: number; height: number },
+  rows: number,
+  cols: number,
+): RichMenuTemplate['areas'] {
+  const w = size.width / cols;
+  const h = size.height / rows;
+  return Array.from({ length: rows * cols }, (_, i) => ({
+    x: (i % cols) * w,
+    y: Math.floor(i / cols) * h,
+    w,
+    h,
+  }));
+}
+
 export const TEMPLATES: RichMenuTemplate[] = [
+  // ---- 大サイズ ----
   {
     key: 'large-2x3',
-    label: '2x3 (大画像 6 ボタン)',
+    label: '6分割（3列 × 2段）',
     size: 'large',
-    description: '2 行 × 3 列の標準レイアウト',
-    areas: Array.from({ length: 6 }, (_, i) => ({
-      x: (i % 3) * (LARGE.width / 3),
-      y: Math.floor(i / 3) * (LARGE.height / 2),
-      w: LARGE.width / 3,
-      h: LARGE.height / 2,
-    })),
-  },
-  {
-    key: 'large-3x1',
-    label: '3x1 (横 3 分割)',
-    size: 'large',
-    description: '横並び 3 ボタン (画像全高)',
-    areas: [0, 1, 2].map((i) => ({
-      x: i * (LARGE.width / 3),
-      y: 0,
-      w: LARGE.width / 3,
-      h: LARGE.height,
-    })),
+    description: 'いちばんよく使う形。項目が多いときに',
+    areas: grid(LARGE, 2, 3),
   },
   {
     key: 'large-2x2',
-    label: '2x2',
+    label: '4分割（2列 × 2段）',
     size: 'large',
-    description: '2 行 × 2 列',
-    areas: Array.from({ length: 4 }, (_, i) => ({
-      x: (i % 2) * (LARGE.width / 2),
-      y: Math.floor(i / 2) * (LARGE.height / 2),
-      w: LARGE.width / 2,
-      h: LARGE.height / 2,
-    })),
+    description: '1つずつが大きく、押し間違えにくい',
+    areas: grid(LARGE, 2, 2),
   },
   {
     key: 'large-1plus2',
-    label: '1+2 (上 1 / 下 2)',
+    label: '3分割（上に大きく1つ、下に2つ）',
     size: 'large',
-    description: '上段に大ボタン 1、下段に 2 ボタン',
+    description: '一番押してほしいものを上に置く',
     areas: [
       { x: 0, y: 0, w: LARGE.width, h: LARGE.height / 2 },
       { x: 0, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
@@ -64,29 +67,97 @@ export const TEMPLATES: RichMenuTemplate[] = [
     ],
   },
   {
-    key: 'large-empty',
-    label: '空白 (自由配置)',
+    key: 'large-2plus1',
+    label: '3分割（上に2つ、下に大きく1つ）',
     size: 'large',
-    description: 'areas なしで開始 (エディタで自由に追加)',
+    description: '下は親指が届きやすい。予約や購入を置く形',
+    areas: [
+      { x: 0, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: LARGE.width / 2, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: 0, y: LARGE.height / 2, w: LARGE.width, h: LARGE.height / 2 },
+    ],
+  },
+  {
+    key: 'large-left1right2',
+    label: '3分割（左に大きく1つ、右に2つ）',
+    size: 'large',
+    description: '左の1つを主役にする形',
+    areas: [
+      { x: 0, y: 0, w: LARGE.width / 2, h: LARGE.height },
+      { x: LARGE.width / 2, y: 0, w: LARGE.width / 2, h: LARGE.height / 2 },
+      { x: LARGE.width / 2, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
+    ],
+  },
+  {
+    key: 'large-3x1',
+    label: '横3分割',
+    size: 'large',
+    description: '縦に長いボタンが3つ並ぶ',
+    areas: grid(LARGE, 1, 3),
+  },
+  {
+    key: 'large-1x2-v',
+    label: '上下2分割',
+    size: 'large',
+    description: '横長のボタンが2つ',
+    areas: grid(LARGE, 2, 1),
+  },
+  {
+    key: 'large-1x2-h',
+    label: '左右2分割',
+    size: 'large',
+    description: '大きなボタンが2つ',
+    areas: grid(LARGE, 1, 2),
+  },
+  {
+    key: 'large-full',
+    label: '分割なし（全面1つ）',
+    size: 'large',
+    description: '画像全体が1つのボタンになる',
+    areas: grid(LARGE, 1, 1),
+  },
+  {
+    key: 'large-empty',
+    label: '自由に配置',
+    size: 'large',
+    description: '区切りなしで始めて、編集画面で好きな形に区切る',
     areas: [],
+  },
+
+  // ---- 小サイズ ----
+  {
+    key: 'compact-4x1',
+    label: '横4分割',
+    size: 'compact',
+    description: '小さめのボタンが4つ',
+    areas: grid(COMPACT, 1, 4),
   },
   {
     key: 'compact-3x1',
-    label: 'Compact 3x1',
+    label: '横3分割',
     size: 'compact',
-    description: '低高画像で横 3 分割',
-    areas: [0, 1, 2].map((i) => ({
-      x: i * (COMPACT.width / 3),
-      y: 0,
-      w: COMPACT.width / 3,
-      h: COMPACT.height,
-    })),
+    description: 'トークを隠さず、3つ並べる',
+    areas: grid(COMPACT, 1, 3),
+  },
+  {
+    key: 'compact-2x1',
+    label: '左右2分割',
+    size: 'compact',
+    description: '2つだけ置く',
+    areas: grid(COMPACT, 1, 2),
+  },
+  {
+    key: 'compact-full',
+    label: '分割なし（全面1つ）',
+    size: 'compact',
+    description: '細長い1つのボタン',
+    areas: grid(COMPACT, 1, 1),
   },
   {
     key: 'compact-empty',
-    label: 'Compact 空白',
+    label: '自由に配置',
     size: 'compact',
-    description: '低高画像で areas なし',
+    description: '区切りなしで始めて、編集画面で好きな形に区切る',
     areas: [],
   },
 ];
@@ -99,5 +170,7 @@ export function templateToAreas(t: RichMenuTemplate) {
     boundsHeight: Math.round(a.h),
     actionType: 'message' as const,
     actionData: { text: '' },
+    // 作った直後は「メッセージを送る」。編集画面で変えられる。
+    intent: 'text' as const,
   }));
 }

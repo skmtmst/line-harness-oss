@@ -12,18 +12,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const dbMocks = {
   // eager module-load deps
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000' },
+  ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // /auth/callback deps
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
   getUserByEmail: vi.fn().mockResolvedValue(null),
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
+  recordFriendAddAttributionCandidate: vi.fn().mockResolvedValue({ status: 'pending' }),
   getTrackedLinkById: vi.fn().mockResolvedValue(null),
   getMessageTemplateById: vi.fn().mockResolvedValue(null),
   getAffiliateLinkByRefCode: vi.fn().mockResolvedValue(null),
@@ -122,7 +125,7 @@ beforeEach(() => {
 
 describe('GET /auth/callback — affiliate friend-add notification', () => {
   it('notifies the affiliate for a new friend via an offer affiliate link', async () => {
-    dbMocks.getFriendByLineUserId.mockResolvedValue(null); // brand-new friend
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue({
       id: 'AL-1',
       affiliate_id: 'AFF-1',
@@ -146,10 +149,19 @@ describe('GET /auth/callback — affiliate friend-add notification', () => {
       'AFF-1',
       '案件A',
     );
+    expect(dbMocks.recordFriendAddAttributionCandidate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-main',
+        friendId: 'F-new',
+        refCode: 'aff-ref',
+        source: 'line_login',
+      }),
+    );
   });
 
   it('notifies with null offer name for a generic (offer-less) affiliate link', async () => {
-    dbMocks.getFriendByLineUserId.mockResolvedValue(null);
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue({
       id: 'AL-2',
       affiliate_id: 'AFF-1',
@@ -169,7 +181,7 @@ describe('GET /auth/callback — affiliate friend-add notification', () => {
   });
 
   it('does NOT notify on a self-click (affiliate adds their own bot)', async () => {
-    dbMocks.getFriendByLineUserId.mockResolvedValue(null);
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue({
       id: 'AL-3',
       affiliate_id: 'AFF-1',
@@ -193,7 +205,7 @@ describe('GET /auth/callback — affiliate friend-add notification', () => {
 
   it('does NOT notify when the friend already existed (re-touch)', async () => {
     // Pre-existing friend → isNewFriend is false.
-    dbMocks.getFriendByLineUserId.mockResolvedValue({
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'F-new',
       line_user_id: 'U-new-friend',
       line_account_id: null,

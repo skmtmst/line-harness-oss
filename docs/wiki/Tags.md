@@ -140,6 +140,11 @@ curl -s "https://your-worker.your-subdomain.workers.dev/api/tags" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq
 ```
 
+管理画面では `?withCounts=1` を付けると、付与人数・使用先に加えて
+`cleanupReasons` が返ります。`unused` は友だちへの付与と18種類の運用設定への
+参照がどちらも0件、`duplicate_name` は全角・空白・大文字小文字をそろえると
+同じ名前になるタグです。両方に当てはまっても、タグID単位では1件として数えます。
+
 レスポンス:
 
 ```json
@@ -190,6 +195,43 @@ curl -X POST "https://your-worker.your-subdomain.workers.dev/api/tags" \
 }
 ```
 
+### POST /api/tags/import/preview — CSV一括登録の事前確認
+
+画面でCSVを読み取り、1行目の見出しを除いた行をJSONで送ります。保存はしません。
+一度に確認できるのは500行までです。
+
+```json
+{
+  "rows": [
+    { "line": 2, "name": "購入済み", "folderName": "販売" },
+    { "line": 3, "name": "VIP", "folderName": "会員" }
+  ]
+}
+```
+
+既存タグ、CSV内の重複、空欄、60文字を超える名前、改行・制御文字、存在しないフォルダを行ごとに返します。
+名前の重複は、全角・前後空白・連続空白・大文字小文字をそろえて判定します。
+フォルダ名が空、または存在しない行は未分類として登録対象にし、確認画面に理由を返します。
+同名フォルダが複数ある場合だけ、所属先を決められないため入力不備として止めます。
+
+### POST /api/tags/import — CSVから一括登録
+
+事前確認と同じ形式で送ります。保存直前にもう一度現在のタグとフォルダを確認し、
+登録できる行だけを25件ずつまとめて登録します。500行でもD1への登録は最大20回です。
+一部のまとまりで失敗しても、残りの行は続行します。
+
+結果の `outcome` は次の3種類です。
+
+| 値 | 意味 |
+|---|---|
+| `success` | 登録または重複による見送りだけで完了 |
+| `partial` | 登録できた行と、入力不備・登録失敗の行が混在 |
+| `failed` | 1件も登録できず、入力不備または登録失敗がある |
+
+各行の `status` と `code` が返るため、画面では登録できなかった行だけを一覧表示し、
+再修正用CSVへ書き出せます。重複はエラーではなく `skipped` です。同じCSVを再送しても、
+すでに作成済みのタグは見送られます。
+
 ### DELETE /api/tags/:id — タグ削除
 
 ```bash
@@ -203,7 +245,9 @@ curl -X DELETE "https://your-worker.your-subdomain.workers.dev/api/tags/TAG_UUID
 { "success": true, "data": null }
 ```
 
-注意: タグを削除すると、friend_tags テーブルの関連レコードも削除されます。
+タグが配信や自動化などの運用設定から参照されている場合は削除されず、`409 TAG_IN_USE` が返ります。
+友だちに付いているだけのタグは削除でき、その友だちとの紐づきも削除されます。削除前に
+`GET /api/tags/:id/delete-impact` で影響を確認してください。
 
 ### POST /api/friends/:id/tags — 友だちにタグ付与
 

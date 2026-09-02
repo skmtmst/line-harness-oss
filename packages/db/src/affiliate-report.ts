@@ -675,8 +675,16 @@ export interface ConversionApprovalRow {
   friendName: string | null;
   affiliateId: string;
   affiliateName: string | null;
-  /** Offer name resolved via attributed_ref_code → link.offer_id, if any. */
+  /**
+   * Offer resolved via attributed_ref_code → link.offer_id, if any.
+   *
+   * 名前だけだと、同じ名前の案件を作られたときに別の案件と取り違える。
+   * マイルの合計を出すために id と reward_miles も返す。
+   */
+  offerId: string | null;
   offerName: string | null;
+  /** 案件の付与マイル。案件に結びつかない成果は null。 */
+  offerRewardMiles: number | null;
   conversionPointName: string | null;
   /** Conversion point value at report time (fixed reward is offer-side; this is the CV point value). */
   value: number | null;
@@ -703,6 +711,7 @@ export interface ConversionApprovalRow {
 export async function getConversionApprovalQueue(
   db: D1Database,
   opts: {
+    scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean };
     status: 'pending' | 'approved' | 'rejected';
     identityKeySql: string;
     limit?: number;
@@ -712,6 +721,9 @@ export async function getConversionApprovalQueue(
   const { status, identityKeySql } = opts;
   const limit = opts.limit ?? 200;
   const offset = opts.offset ?? 0;
+  const scopeCondition = opts.scope.allowedAccountIds.length > 0
+    ? `(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
+    : opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0';
 
   // dup_keys: identity_keys shared by >=2 distinct attributed-conversion friends
   // WITHIN the same affiliate. Computed over the whole attributed-CV set (not
@@ -740,7 +752,9 @@ export async function getConversionApprovalQueue(
          friends.display_name AS friend_name,
          ce.affiliate_id AS affiliate_id,
          a.name AS affiliate_name,
+         off.id AS offer_id,
          off.name AS offer_name,
+         off.reward_miles AS offer_reward_miles,
          cp.name AS conversion_point_name,
          cp.value AS value,
          ce.approval_status AS approval_status,
@@ -749,7 +763,7 @@ export async function getConversionApprovalQueue(
        FROM conversion_events ce
        JOIN friends ON friends.id = ce.friend_id
        LEFT JOIN affiliates a ON a.id = ce.affiliate_id
-       LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
        LEFT JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
        LEFT JOIN dup_keys dk
@@ -757,10 +771,11 @@ export async function getConversionApprovalQueue(
              AND dk.identity_key = (${identityKeySql})
       WHERE ce.affiliate_id IS NOT NULL
         AND ce.approval_status = ?
+        AND ${scopeCondition}
       ORDER BY julianday(ce.created_at) DESC, ce.id DESC
       LIMIT ? OFFSET ?`,
     )
-    .bind(status, limit, offset)
+    .bind(status, ...opts.scope.allowedAccountIds, limit, offset)
     .all<{
       event_id: string;
       created_at: string;
@@ -768,7 +783,9 @@ export async function getConversionApprovalQueue(
       friend_name: string | null;
       affiliate_id: string;
       affiliate_name: string | null;
+      offer_id: string | null;
       offer_name: string | null;
+      offer_reward_miles: number | null;
       conversion_point_name: string | null;
       value: number | null;
       approval_status: 'pending' | 'approved' | 'rejected';
@@ -782,7 +799,9 @@ export async function getConversionApprovalQueue(
     friendName: r.friend_name,
     affiliateId: r.affiliate_id,
     affiliateName: r.affiliate_name,
+    offerId: r.offer_id,
     offerName: r.offer_name,
+    offerRewardMiles: r.offer_reward_miles,
     conversionPointName: r.conversion_point_name,
     value: r.value,
     approvalStatus: r.approval_status,

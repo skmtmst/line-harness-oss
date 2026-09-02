@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import type { Env } from '../index.js';
 
 const dedupPreview = new Hono<Env>();
@@ -26,6 +27,10 @@ dedupPreview.post(
     const accountIds = body.accountIds as string[];
     const dedupPriority = body.dedupPriority as string[];
     const targetTagId = (body.targetTagId as string | null | undefined) ?? null;
+
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accountIds)) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const preview = await computeDedupBroadcastPreview(
       c.env.DB,

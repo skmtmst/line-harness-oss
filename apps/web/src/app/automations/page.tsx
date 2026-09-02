@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
-import CcPromptButton from '@/components/cc-prompt-button'
+import Button from '@/components/shared/button'
 
-type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "calendar_booked"
+type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
 interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu"
@@ -35,7 +35,13 @@ const eventTypeOptions: { value: AutomationEventType; label: string }[] = [
   { value: 'score_threshold', label: 'スコア閾値' },
   { value: 'cv_fire', label: 'CV発火' },
   { value: 'message_received', label: 'メッセージ受信' },
+  { value: 'postback_received', label: 'ポストバック受信（リッチメニュー等）' },
   { value: 'calendar_booked', label: 'カレンダー予約' },
+  { value: 'ec.order.confirmed', label: 'EC：注文確定' },
+  { value: 'ec.order.shipped', label: 'EC：発送完了' },
+  { value: 'ec.subscription.upcoming', label: 'EC：定期便の次回予定' },
+  { value: 'ec.subscription.payment_failed', label: 'EC：定期便の決済失敗' },
+  { value: 'ec.subscription.cancelled', label: 'EC：定期便の解約' },
 ]
 
 const eventTypeLabelMap: Record<AutomationEventType, string> = {
@@ -44,16 +50,28 @@ const eventTypeLabelMap: Record<AutomationEventType, string> = {
   score_threshold: 'スコア閾値',
   cv_fire: 'CV発火',
   message_received: 'メッセージ受信',
+  postback_received: 'ポストバック受信',
   calendar_booked: 'カレンダー予約',
+  'ec.order.confirmed': 'EC注文確定',
+  'ec.order.shipped': 'EC発送完了',
+  'ec.subscription.upcoming': '定期便予定',
+  'ec.subscription.payment_failed': '定期便決済失敗',
+  'ec.subscription.cancelled': '定期便解約',
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
-  friend_add: 'bg-green-100 text-green-700',
+  friend_add: 'bg-success-bg text-green-700',
   tag_change: 'bg-blue-100 text-blue-700',
-  score_threshold: 'bg-yellow-100 text-yellow-700',
-  cv_fire: 'bg-red-100 text-red-700',
+  score_threshold: 'bg-warning-bg text-yellow-700',
+  cv_fire: 'bg-red-100 text-danger',
   message_received: 'bg-purple-100 text-purple-700',
+  postback_received: 'bg-pink-100 text-pink-700',
   calendar_booked: 'bg-indigo-100 text-indigo-700',
+  'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
+  'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
+  'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
+  'ec.subscription.payment_failed': 'bg-orange-100 text-orange-700',
+  'ec.subscription.cancelled': 'bg-slate-100 text-slate-700',
 }
 
 interface CreateFormState {
@@ -73,25 +91,6 @@ const initialForm: CreateFormState = {
   conditionsJson: '{}',
   priority: 0,
 }
-
-const ccPrompts = [
-  {
-    title: 'オートメーションルール作成',
-    prompt: `新しいオートメーションルールを作成するサポートをしてください。
-1. 利用可能なイベントタイプ（友だち追加、タグ変更、スコア閾値等）の説明
-2. アクション設定のJSON形式テンプレートを提供
-3. 条件設定と優先度の推奨値を提案
-手順を示してください。`,
-  },
-  {
-    title: 'オートメーション効果分析',
-    prompt: `現在のオートメーションルールの効果を分析してください。
-1. 各ルールの発火回数と成功率を確認
-2. イベントタイプ別の自動化カバレッジを評価
-3. 効果の低いルールの改善提案と新規ルールの推奨
-結果をレポートしてください。`,
-  },
-]
 
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -233,33 +232,65 @@ export default function AutomationsPage() {
 
   return (
     <div>
-      <Header
-        title="オートメーション"
-        action={
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
-          >
-            + 新規ルール
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="オートメーション"
+          description="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button href="/common-actions">共通アクションを見る</Button>
+              <Button variant="primary" onClick={() => setShowCreate(true)}>
+                ルールを作成
+              </Button>
+              <Button href="/support">マニュアル</Button>
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">ルール</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {automations.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            稼働中 {automations.filter((a) => a.isActive).length}
+          </p>
+        </div>
+        {/* 実行の記録を残していない。何回動いたか、失敗したかが分からない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月の実行</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">失敗</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">手動実行</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">友だち一覧から</p>
+        </div>
+      </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
           <h2 className="text-sm font-semibold text-gray-800 mb-4">新規オートメーションを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">ルール名 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">ルール名 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -269,7 +300,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">説明</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">説明</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                 rows={2}
@@ -279,7 +310,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">イベントタイプ</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">イベントタイプ</label>
               <select
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 value={form.eventType}
@@ -291,7 +322,7 @@ export default function AutomationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">アクション (JSON)</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">アクション (JSON)</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                 rows={6}
@@ -301,7 +332,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">条件 (JSON)</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">条件 (JSON)</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                 rows={3}
@@ -311,7 +342,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">優先度</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">優先度</label>
               <input
                 type="number"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -326,14 +357,13 @@ export default function AutomationsPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: '#06C755' }}
+                className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium disabled:opacity-50"
               >
                 {saving ? '作成中...' : '作成'}
               </button>
               <button
                 onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
               >
                 キャンセル
               </button>
@@ -346,30 +376,30 @@ export default function AutomationsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-5 animate-pulse space-y-3">
+            <div key={i} className="bg-canvas rounded-card border border-hairline p-5 animate-pulse space-y-3">
               <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-full" />
+              <div className="h-3 bg-canvas-sunken rounded w-full" />
               <div className="flex gap-4">
-                <div className="h-3 bg-gray-100 rounded w-24" />
-                <div className="h-3 bg-gray-100 rounded w-16" />
+                <div className="h-3 bg-canvas-sunken rounded w-24" />
+                <div className="h-3 bg-canvas-sunken rounded w-16" />
               </div>
             </div>
           ))}
         </div>
       ) : automations.length === 0 && !showCreate ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">オートメーションがありません。「新規ルール」から作成してください。</p>
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
+          <p className="text-ink-faint">オートメーションがありません。「新規ルール」から作成してください。</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {automations.map((automation) => (
             <div
               key={automation.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow"
+              className="bg-canvas rounded-card border border-hairline p-5 hover:shadow-md transition-shadow"
             >
               {/* Header row */}
               <div className="flex items-start justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-900 leading-tight">{automation.name}</h3>
+                <h3 className="text-sm font-semibold text-ink leading-tight">{automation.name}</h3>
                 <button
                   onClick={() => handleToggleActive(automation.id, automation.isActive)}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -387,7 +417,7 @@ export default function AutomationsPage() {
 
               {/* Description */}
               {automation.description && (
-                <p className="text-xs text-gray-500 mb-3 line-clamp-2">{automation.description}</p>
+                <p className="text-xs text-ink-faint mb-3 line-clamp-2">{automation.description}</p>
               )}
 
               {/* Event type badge */}
@@ -396,7 +426,7 @@ export default function AutomationsPage() {
                   {eventTypeLabelMap[automation.eventType]}
                 </span>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  automation.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                  automation.isActive ? 'bg-green-50 text-green-700' : 'bg-canvas-sunken text-ink-faint'
                 }`}>
                   {automation.isActive ? '有効' : '無効'}
                 </span>
@@ -418,11 +448,11 @@ export default function AutomationsPage() {
                   (a) => a.type === 'send_message' && (a.params as { template_id?: string }).template_id,
                 ).length
                 return (
-                  <div className="flex items-center gap-4 text-xs text-gray-400 mb-3">
+                  <div className="flex items-center gap-4 text-xs text-ink-faint mb-3">
                     <span>アクション: {automation.actions.length}件</span>
                     {sendMsgWithTpl > 0 && (
                       <a href="/templates" className="text-blue-600 hover:underline" title="template_id 参照を含む send_message action あり">
-                        🔗 template×{sendMsgWithTpl}
+                        template×{sendMsgWithTpl}
                       </a>
                     )}
                     <span>優先度: {automation.priority}</span>
@@ -431,10 +461,10 @@ export default function AutomationsPage() {
               })()}
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
                 <button
                   onClick={() => handleDelete(automation.id)}
-                  className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                  className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
                 >
                   削除
                 </button>
@@ -443,7 +473,6 @@ export default function AutomationsPage() {
           ))}
         </div>
       )}
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }

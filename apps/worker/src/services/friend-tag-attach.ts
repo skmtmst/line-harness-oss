@@ -1,4 +1,9 @@
-import { getScenarios, enrollFriendInScenario, jstNow } from '@line-crm/db';
+import {
+  enrollFriendInScenario,
+  jstNow,
+  enqueueMileageEvent,
+  getTagAddedScenarioIds,
+} from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
 import { pushImmediateFirstStep, type ImmediatePushContext } from './immediate-first-step.js';
 
@@ -21,36 +26,67 @@ export async function attachTagAndFireSideEffects(
   tagId: string,
   push?: ImmediatePushContext,
 ): Promise<{ added: boolean }> {
+  const assignedAt = jstNow();
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO friend_tags (friend_id, tag_id, assigned_at)
        VALUES (?, ?, ?)`,
     )
-    .bind(friendId, tagId, jstNow())
+    .bind(friendId, tagId, assignedAt)
     .run();
   const added = (result.meta?.changes ?? 0) > 0;
   if (!added) return { added: false };
 
-  const scenarios = await getScenarios(db);
-  for (const scenario of scenarios) {
-    if (
-      scenario.trigger_type === 'tag_added' &&
-      scenario.is_active &&
-      scenario.trigger_tag_id === tagId
-    ) {
-      const existing = await db
-        .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
-        .bind(friendId, scenario.id)
-        .first();
-      if (!existing) {
-        const enrollment = await enrollFriendInScenario(db, friendId, scenario.id);
-        if (push) {
-          await pushImmediateFirstStep(db, friendId, scenario.id, push, { enrollment });
-        }
+  try {
+    await enqueueMileageEvent(db, {
+      eventType: 'tag_added',
+      source: 'tag',
+      sourceEventId: `${friendId}:${tagId}:${assignedAt}`,
+      friendId,
+      subjectKey: tagId,
+      metadata: { tagId },
+      occurredAt: assignedAt,
+    });
+  } catch (error) {
+    console.error('tag mileage enqueue failed:', error);
+  }
+
+  /*
+   * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
+   * 1本のシナリオを複数のタグから始められるようにしたため、
+   * scenarios.trigger_tag_id は判断に使わない。
+   */
+  for (const scenarioId of await getTagAddedScenarioIds(db, tagId)) {
+    const existing = await db
+      .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
+      .bind(friendId, scenarioId)
+      .first();
+    if (!existing) {
+      const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
+      if (push) {
+        await pushImmediateFirstStep(db, friendId, scenarioId, push, { enrollment });
       }
     }
   }
 
   await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'add' } });
   return { added: true };
+}
+
+// 自動判定から外れたタグを解除し、付与時と同じく automation / webhook / scoring に
+// 状態変化を知らせる。DELETE の changes を見ることで再同期を冪等に保つ。
+export async function detachTagAndFireSideEffects(
+  db: D1Database,
+  friendId: string,
+  tagId: string,
+): Promise<{ removed: boolean }> {
+  const result = await db
+    .prepare(`DELETE FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)
+    .bind(friendId, tagId)
+    .run();
+  const removed = (result.meta?.changes ?? 0) > 0;
+  if (!removed) return { removed: false };
+
+  await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'remove' } });
+  return { removed: true };
 }

@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { resolveLineCredential } from './line-accounts.js';
 // =============================================================================
 // Traffic Pools — instant account switching via /pool/:slug
 // =============================================================================
@@ -19,6 +20,7 @@ export interface TrafficPoolWithAccount extends TrafficPool {
   login_channel_id: string | null;
   login_channel_secret: string | null;
   channel_access_token: string | null;
+  channel_access_token_encrypted?: string | null;
   channel_id: string | null;
 }
 
@@ -27,43 +29,45 @@ export interface TrafficPoolWithAccount extends TrafficPool {
 export async function getTrafficPools(db: D1Database): Promise<TrafficPoolWithAccount[]> {
   const result = await db
     .prepare(
-      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_id
+      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
        FROM traffic_pools tp
        JOIN line_accounts la ON la.id = tp.active_account_id
        ORDER BY tp.created_at DESC`,
     )
     .all<TrafficPoolWithAccount>();
-  return result.results;
+  return Promise.all(result.results.map(hydratePoolCredential));
 }
 
 export async function getTrafficPoolById(
   db: D1Database,
   id: string,
 ): Promise<TrafficPoolWithAccount | null> {
-  return db
+  const row = await db
     .prepare(
-      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_id
+      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
        FROM traffic_pools tp
        JOIN line_accounts la ON la.id = tp.active_account_id
        WHERE tp.id = ?`,
     )
     .bind(id)
     .first<TrafficPoolWithAccount>();
+  return row ? hydratePoolCredential(row) : null;
 }
 
 export async function getTrafficPoolBySlug(
   db: D1Database,
   slug: string,
 ): Promise<TrafficPoolWithAccount | null> {
-  return db
+  const row = await db
     .prepare(
-      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_id
+      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
        FROM traffic_pools tp
        JOIN line_accounts la ON la.id = tp.active_account_id
        WHERE tp.slug = ? AND tp.is_active = 1`,
     )
     .bind(slug)
     .first<TrafficPoolWithAccount>();
+  return row ? hydratePoolCredential(row) : null;
 }
 
 // ── Mutations ───────────────────────────────────────────────────────────────
@@ -167,11 +171,12 @@ export interface PoolAccountWithDetails extends PoolAccount {
   login_channel_id: string | null;
   login_channel_secret: string | null;
   channel_access_token: string | null;
+  channel_access_token_encrypted?: string | null;
   channel_id: string | null;
 }
 
 const POOL_ACCOUNT_JOIN = `
-  SELECT pa.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_id
+  SELECT pa.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
   FROM pool_accounts pa
   JOIN line_accounts la ON la.id = pa.line_account_id`;
 
@@ -180,14 +185,37 @@ export async function getPoolAccounts(db: D1Database, poolId: string): Promise<P
     .prepare(`${POOL_ACCOUNT_JOIN} WHERE pa.pool_id = ? ORDER BY pa.created_at ASC`)
     .bind(poolId)
     .all<PoolAccountWithDetails>();
-  return result.results;
+  return Promise.all(result.results.map(hydratePoolCredential));
 }
 
 export async function getRandomPoolAccount(db: D1Database, poolId: string): Promise<PoolAccountWithDetails | null> {
-  return db
+  const row = await db
     .prepare(`${POOL_ACCOUNT_JOIN} WHERE pa.pool_id = ? AND pa.is_active = 1 ORDER BY RANDOM() LIMIT 1`)
     .bind(poolId)
     .first<PoolAccountWithDetails>();
+  return row ? hydratePoolCredential(row) : null;
+}
+
+async function hydratePoolCredential<
+  T extends {
+    channel_access_token: string | null;
+    channel_access_token_encrypted?: string | null;
+  } & ({ active_account_id: string } | { line_account_id: string }),
+>(
+  row: T,
+): Promise<T> {
+  if (!row.channel_access_token && !row.channel_access_token_encrypted) return row;
+  const lineAccountId = 'line_account_id' in row
+    ? row.line_account_id
+    : row.active_account_id;
+  return {
+    ...row,
+    channel_access_token: await resolveLineCredential(
+      row.channel_access_token_encrypted,
+      row.channel_access_token,
+      { lineAccountId, field: 'channel_access_token' },
+    ),
+  };
 }
 
 export async function addPoolAccount(db: D1Database, poolId: string, lineAccountId: string): Promise<PoolAccount> {

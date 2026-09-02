@@ -1,0 +1,489 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// 管理画面から誰も入れなくなる操作を、サーバー側で断れているか。
+// 一度これが通ると画面からは復旧できない（無効化された人を有効に戻せる人が
+// いなくなる）ので、db層はモックにして経路だけを厳密に見る。
+const dbMocks = {
+  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getStaffByApiKey: vi.fn(),
+  recoverStalledBroadcasts: vi.fn(),
+  recoverStuckDeliveries: vi.fn(),
+  getStaffMembers: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffByInviteTokenHash: vi.fn(),
+  createStaffMember: vi.fn(),
+  updateStaffMember: vi.fn(),
+  deleteStaffMember: vi.fn(),
+  countLoginAudit: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
+  replaceStaffAccountScopes: vi.fn(),
+  revokeStaffAuthentication: vi.fn(),
+};
+vi.mock('@line-crm/db', () => dbMocks);
+
+const inviteMocks = {
+  sendStaffInviteEmail: vi.fn(),
+  sendStaffLineLinkEmail: vi.fn(),
+};
+vi.mock('../services/staff-invite.js', () => inviteMocks);
+
+const worker = (await import('../index.js')).default;
+
+const API_KEY = 'test-owner-key';
+const env = {
+  DB: {} as D1Database,
+  API_KEY,
+} as unknown as import('../index.js').Env['Bindings'];
+
+type Row = {
+  id: string;
+  name: string;
+  role: 'owner' | 'admin' | 'staff';
+  access_level: 'full' | 'read_only';
+  is_active: number;
+  line_user_id: string | null;
+  tenant_id?: string | null;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: number;
+  account_scope?: 'all' | 'accounts';
+};
+
+function row(over: Partial<Row> & { id: string }): Row {
+  return {
+    name: over.id, role: 'admin', access_level: 'full', is_active: 1, line_user_id: null,
+    ...over,
+  };
+}
+
+function send(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown, apiKey = API_KEY) {
+  return worker.fetch(
+    new Request(`https://worker.example.com${path}`, {
+      method,
+      headers: new Headers({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+    env,
+    { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
+  );
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  dbMocks.updateStaffMember.mockImplementation(async (_db: unknown, id: string) => row({ id }));
+  dbMocks.deleteStaffMember.mockResolvedValue(undefined);
+  dbMocks.countLoginAudit.mockResolvedValue(0);
+  dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
+  dbMocks.replaceStaffAccountScopes.mockResolvedValue(undefined);
+  dbMocks.revokeStaffAuthentication.mockResolvedValue(undefined);
+  dbMocks.getStaffByApiKey.mockResolvedValue(null);
+  dbMocks.getLineAccounts.mockResolvedValue([]);
+  inviteMocks.sendStaffInviteEmail.mockResolvedValue(undefined);
+  inviteMocks.sendStaffLineLinkEmail.mockResolvedValue(undefined);
+});
+
+describe('スタッフの店舗権限範囲', () => {
+  const accounts = [
+    { id: 'line-1', tenant_id: 'tenant-a', parent_line_account_id: null, is_active: 1 },
+    { id: 'line-2', tenant_id: 'tenant-a', parent_line_account_id: null, is_active: 1 },
+    { id: 'line-other', tenant_id: 'tenant-b', parent_line_account_id: null, is_active: 1 },
+  ];
+
+  beforeEach(() => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a' }));
+    dbMocks.getLineAccounts.mockResolvedValue(accounts);
+    dbMocks.getStaffMembers.mockResolvedValue([]);
+    dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-staff', role: 'staff', is_active: 0, tenant_id: 'tenant-a', account_scope: 'all' }));
+  });
+
+  const invitation = (scope: 'all' | 'accounts', ids: string[]) => ({
+    name: '新しい担当者', email: 'scope@example.test', role: 'staff', assignedLineAccountId: 'line-1',
+    accountScope: scope, scopedLineAccountIds: ids,
+  });
+
+  it('担当範囲を省略すると400で拒否する', async () => {
+    const res = await send('/api/staff', 'POST', { name: '新しい担当者', email: 'scope@example.test', role: 'staff', assignedLineAccountId: 'line-1' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: '担当範囲を選んでください' });
+  });
+
+  it('全店舗では紐付けを空にして保存する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('all', ['line-1']));
+    expect(res.status).toBe(201);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'new-staff', []);
+  });
+
+  it('指定店舗を2つ保存する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-1', 'line-2']));
+    expect(res.status).toBe(201);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'new-staff', ['line-1', 'line-2']);
+  });
+
+  it('呼び出した人の範囲外の店舗を拒否する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-other']));
+    expect(res.status).toBe(403);
+    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('指定店舗が空なら拒否する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', []));
+    expect(res.status).toBe(400);
+  });
+
+  it('限定された管理者は自分の範囲内だけ付与できる', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['line-1']);
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-2']));
+    expect(res.status).toBe(403);
+  });
+
+  it('限定された管理者は統括側の追加を実行できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff', 'POST', { ...invitation('accounts', ['line-1']), managementContext: 'hq' });
+    expect(res.status).toBe(403);
+  });
+
+  it('限定された管理者は統括側の担当範囲変更を実行できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff/target', 'PATCH', { accountScope: 'accounts', scopedLineAccountIds: ['line-1'], managementContext: 'hq' });
+    expect(res.status).toBe(403);
+  });
+
+  it('限定された管理者は新規スタッフに全店舗の範囲を付与できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff', 'POST', invitation('all', []));
+    expect(res.status).toBe(403);
+    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('限定された管理者は自分自身を全店舗の範囲に変更できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff/owner-a', 'PATCH', { accountScope: 'all' });
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('PATCHで全店舗に戻すと紐付けを消す', async () => {
+    dbMocks.getStaffById.mockImplementation(async (_db: unknown, id: string) => row({
+      id,
+      role: id === 'owner-a' ? 'owner' : 'staff',
+      tenant_id: 'tenant-a',
+      account_scope: id === 'owner-a' ? 'all' : 'accounts',
+    }));
+    dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'all' }));
+    const res = await send('/api/staff/target', 'PATCH', { accountScope: 'all', scopedLineAccountIds: ['line-1'] });
+    expect(res.status).toBe(200);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'target', []);
+  });
+
+  it('PATCHで指定店舗の組み合わせを置き換える', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'all' }));
+    dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['line-1', 'line-2']);
+    const res = await send('/api/staff/target', 'PATCH', { accountScope: 'accounts', scopedLineAccountIds: ['line-2', 'line-1'] });
+    expect(res.status).toBe(200);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'target', ['line-2', 'line-1']);
+  });
+
+  it('一般スタッフは自分自身の範囲も変更できない', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'staff-a', role: 'staff', tenant_id: 'tenant-a' }));
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'staff-a', role: 'staff', tenant_id: 'tenant-a' }));
+    const res = await send('/api/staff/staff-a', 'PATCH', { accountScope: 'all' });
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+});
+
+describe('スタッフ招待の統括', () => {
+  it('招待者と同じtenant_idを新規スタッフへ渡す', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({
+      id: 'inviter',
+      role: 'owner',
+      tenant_id: 'tenant-inviter',
+    }));
+    dbMocks.getLineAccounts.mockResolvedValue([{
+      id: 'line-1',
+      parent_line_account_id: null,
+      is_active: 1,
+      tenant_id: 'tenant-inviter',
+    }]);
+    dbMocks.getStaffMembers.mockResolvedValue([]);
+    dbMocks.createStaffMember.mockResolvedValue(row({
+      id: 'invited',
+      role: 'staff',
+      is_active: 0,
+      tenant_id: 'tenant-inviter',
+    }));
+
+    const res = await send('/api/staff', 'POST', {
+      name: '招待する担当者',
+      email: 'invitee@example.test',
+      role: 'staff',
+      assignedLineAccountId: 'line-1', accountScope: 'all', scopedLineAccountIds: [],
+    }, 'inviter-key');
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.createStaffMember).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ tenant_id: 'tenant-inviter' }),
+    );
+  });
+
+  it('別統括と同じメールアドレスでも招待できる', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'tenant-b-owner', role: 'owner', tenant_id: 'tenant-b' }));
+    dbMocks.getLineAccounts.mockResolvedValue([{
+      id: 'line-b', parent_line_account_id: null, is_active: 1, tenant_id: 'tenant-b',
+    }]);
+    dbMocks.getStaffMembers.mockResolvedValue([]);
+    dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-b', role: 'staff', is_active: 0, tenant_id: 'tenant-b' }));
+
+    const res = await send('/api/staff', 'POST', {
+      name: '統括Bの担当者', email: 'shared@example.test', role: 'staff', assignedLineAccountId: 'line-b', accountScope: 'all', scopedLineAccountIds: [],
+    }, 'tenant-b-key');
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.getStaffMembers).toHaveBeenCalledWith(env.DB, 'tenant-b');
+  });
+});
+
+describe('スタッフ経路の統括分離', () => {
+  const tenantAStaff = row({ id: 'tenant-a-staff', role: 'staff', tenant_id: 'tenant-a' });
+
+  beforeEach(() => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'tenant-b-owner', role: 'owner', tenant_id: 'tenant-b' }));
+    dbMocks.getStaffById.mockResolvedValue(tenantAStaff);
+    dbMocks.getStaffMembers.mockResolvedValue([row({ id: 'tenant-b-owner', role: 'owner', tenant_id: 'tenant-b' })]);
+  });
+
+  it('一覧をログイン中の統括だけで取得する', async () => {
+    const res = await send('/api/staff', 'GET', undefined, 'tenant-b-key');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getStaffMembers).toHaveBeenCalledWith(env.DB, 'tenant-b');
+    expect((await res.json() as { data: Array<{ id: string }> }).data).toEqual([expect.objectContaining({
+      id: 'tenant-b-owner', accountScope: 'all', scopedLineAccountIds: [],
+    })]);
+  });
+
+  it.each([
+    ['GET', '/api/staff/tenant-a-staff'],
+    ['GET', '/api/staff/tenant-a-staff/login-summary'],
+    ['PATCH', '/api/staff/tenant-a-staff'],
+    ['DELETE', '/api/staff/tenant-a-staff'],
+    ['POST', '/api/staff/tenant-a-staff/two-factor/setup'],
+    ['POST', '/api/staff/tenant-a-staff/two-factor/confirm'],
+    ['DELETE', '/api/staff/tenant-a-staff/two-factor'],
+  ] as const)('%s %s は別統括の職員を404にする', async (method, path) => {
+    const body = method === 'PATCH' ? { name: '書き換え後' } : method === 'POST' && path.endsWith('/confirm') ? { code: '123456' } : undefined;
+    const res = await send(path, method, body, 'tenant-b-key');
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).not.toHaveProperty('data.manualKey');
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.countLoginAudit).not.toHaveBeenCalled();
+  });
+
+  it('自分自身の設定変更はこれまでどおり許可する', async () => {
+    const self = row({ id: 'tenant-b-staff', role: 'staff', tenant_id: 'tenant-b' });
+    dbMocks.getStaffByApiKey.mockResolvedValue(self);
+    dbMocks.getStaffById.mockResolvedValue(self);
+
+    const res = await send('/api/staff/tenant-b-staff', 'PATCH', {
+      email: 'self@example.test', notificationPreferences: { login: { email: true, line: false } },
+    }, 'tenant-b-staff-key');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
+      env.DB,
+      'tenant-b-staff',
+      expect.objectContaining({ email: 'self@example.test' }),
+    );
+  });
+});
+
+describe('最後の管理者を締め出さない', () => {
+  it('他に有効な管理者がいなければ無効化を断る', async () => {
+    const only = row({ id: 'only-admin' });
+    dbMocks.getStaffById.mockResolvedValue(only);
+    dbMocks.getStaffMembers.mockResolvedValue([
+      only,
+      row({ id: 'viewer', access_level: 'read_only' }),
+      row({ id: 'staff', role: 'staff' }),
+      row({ id: 'disabled', is_active: 0 }),
+    ]);
+
+    const res = await send('/api/staff/only-admin', 'PATCH', { isActive: false });
+
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toContain('管理者が一人もいなくなります');
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('他に有効な管理者がいれば無効化できる', async () => {
+    const target = row({ id: 'admin-a' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+
+    const res = await send('/api/staff/admin-a', 'PATCH', { isActive: false });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
+      env.DB, 'admin-a', expect.objectContaining({ is_active: 0 }),
+    );
+  });
+
+  it('役割の格下げでも最後の管理者は守る', async () => {
+    const only = row({ id: 'only-admin' });
+    dbMocks.getStaffById.mockResolvedValue(only);
+    dbMocks.getStaffMembers.mockResolvedValue([only]);
+
+    const res = await send('/api/staff/only-admin', 'PATCH', { role: 'viewer' });
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.getStaffMembers).toHaveBeenCalledWith(env.DB, '00000000-0000-4000-8000-000000000001');
+  });
+
+  it('最後の管理者は利用停止もできない', async () => {
+    const only = row({ id: 'only-admin' });
+    dbMocks.getStaffById.mockResolvedValue(only);
+    dbMocks.getStaffMembers.mockResolvedValue([only]);
+
+    const res = await send('/api/staff/only-admin', 'DELETE');
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.revokeStaffAuthentication).not.toHaveBeenCalled();
+  });
+
+  it('自分自身は利用停止できない', async () => {
+    const res = await send('/api/staff/env-owner', 'DELETE');
+
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toContain('自分自身は利用停止できません');
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('閲覧のみの利用者は利用停止できない', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'viewer', role: 'staff', access_level: 'read_only' }));
+
+    const res = await send('/api/staff/staff-a', 'DELETE', undefined, 'viewer-key');
+
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('DELETE互換口は物理削除せず利用停止し、全認証を失効する', async () => {
+    const target = row({ id: 'staff-a', role: 'staff' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'staff-a', role: 'staff', is_active: 0 }));
+
+    const res = await send('/api/staff/staff-a', 'DELETE');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(env.DB, 'staff-a', { is_active: 0 });
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'staff-a');
+  });
+
+  it('管理者でない人の無効化は素通しする', async () => {
+    const target = row({ id: 'staff-a', role: 'staff' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target]);
+
+    const res = await send('/api/staff/staff-a', 'PATCH', { isActive: false });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getStaffMembers).not.toHaveBeenCalled();
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'staff-a');
+  });
+});
+
+describe('LINE連携の解除', () => {
+  it('lineLinked:false で連携だけ外す', async () => {
+    const target = row({ id: 'admin-a', line_user_id: 'U1' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+
+    const res = await send('/api/staff/admin-a', 'PATCH', { lineLinked: false });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
+      env.DB, 'admin-a', expect.objectContaining({ line_user_id: null, line_linked_at: null }),
+    );
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'admin-a');
+  });
+
+  it('連携に触れない更新では line_user_id を送らない', async () => {
+    const target = row({ id: 'admin-a', line_user_id: 'U1' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+
+    await send('/api/staff/admin-a', 'PATCH', { name: '新しい名前' });
+
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
+      env.DB, 'admin-a', expect.objectContaining({ line_user_id: undefined }),
+    );
+    expect(dbMocks.revokeStaffAuthentication).not.toHaveBeenCalled();
+  });
+});
+
+describe('権限変更後の認証失効', () => {
+  it.each([
+    [{ role: 'staff' }],
+    [{ permissionKeys: ['/friends'] }],
+    [{ assignedLineAccountId: 'line-1' }],
+    [{ canAccessDescendantAccounts: false }],
+    [{ accountScope: 'all' }],
+  ])('認証に関わる変更 %o は既存sessionとchallengeを失効する', async (change) => {
+    const target = row({ id: 'admin-a' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+    dbMocks.getLineAccounts.mockResolvedValue([{ id: 'line-1', tenant_id: '00000000-0000-4000-8000-000000000001', parent_line_account_id: null, is_active: 1 }]);
+
+    const res = await send('/api/staff/admin-a', 'PATCH', change);
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'admin-a');
+  });
+
+  it('通知設定だけの変更では現在のsessionを失効しない', async () => {
+    const target = row({ id: 'admin-a' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+
+    const res = await send('/api/staff/admin-a', 'PATCH', {
+      notificationPreferences: { security: { email: true, line: false } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.revokeStaffAuthentication).not.toHaveBeenCalled();
+  });
+});
+
+describe('存在しない相手', () => {
+  it('404を返し、更新はしない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(null);
+
+    const res = await send('/api/staff/missing', 'PATCH', { isActive: true });
+
+    expect(res.status).toBe(404);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+});
+
+describe('ログイン履歴件数', () => {
+  it('対象ユーザーのログインだけを正確に数える', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'staff-a', role: 'staff' }));
+    dbMocks.countLoginAudit.mockResolvedValue(37);
+
+    const res = await send('/api/staff/staff-a/login-summary', 'GET');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { loginCount: 37 } });
+    expect(dbMocks.countLoginAudit).toHaveBeenCalledWith(
+      env.DB,
+      { adminUserId: 'staff-a', action: 'login' },
+    );
+  });
+});

@@ -112,6 +112,10 @@ interface UploadEntry {
   base64: true;
 }
 
+// Wrangler also uploads Pages assets in bounded batches. Keeping each
+// request small avoids oversized JSON/base64 payloads causing the Pages
+// upload Worker to fail, while sequential batches keep memory and API load
+// predictable for the CLI and Worker-side updater.
 const ASSET_UPLOAD_BATCH_SIZE = 50;
 const ASSET_UPLOAD_MAX_ATTEMPTS = 3;
 const ASSET_UPLOAD_RETRY_BASE_MS = 250;
@@ -147,12 +151,16 @@ async function uploadAssets(
       },
     );
     if (res.ok) return;
+
     if (
       !isRetryableUploadStatus(res.status) ||
       attempt === ASSET_UPLOAD_MAX_ATTEMPTS
     ) {
       await throwHttpError('POST pages assets upload failed', res);
     }
+
+    // Drain the failed response before retrying so its connection can be
+    // reused. The body is only diagnostic; failure to read it is harmless.
     try {
       await res.text();
     } catch {

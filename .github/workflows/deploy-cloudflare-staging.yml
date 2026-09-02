@@ -1,0 +1,138 @@
+name: Deploy Cloudflare Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry-run はビルドと設定確認だけ
+        type: choice
+        required: true
+        default: dry-run
+        options:
+          - dry-run
+          - apply
+      target:
+        description: 反映対象。権限を分けてWorkerまたは管理画面だけにもできます
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - worker
+          - admin
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository != 'Shudesu/line-harness-oss' && github.ref == 'refs/heads/codex/development'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
+      STAGING_API_URL: https://nen-line-stg.skmtmst.workers.dev
+      STAGING_PAGES_PROJECT: nen-line-stg-admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify staging boundary and deploy lock
+        env:
+          MODE: ${{ inputs.mode }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/codex/development"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          if [ "$TARGET" != "admin" ]; then
+            test -n "$WORKER_API_TOKEN"
+          fi
+          if [ "$TARGET" != "worker" ]; then
+            test -n "$PAGES_API_TOKEN"
+          fi
+          grep -q '^name = "nen-line-stg"$' apps/worker/wrangler.staging.toml
+          grep -q 'database_name = "nen-line-stg"' apps/worker/wrangler.staging.toml
+          if grep -q '^\[triggers\]' apps/worker/wrangler.staging.toml; then
+            echo "::error::検証Workerでcronが有効です。通知事故を防ぐため中止します。"
+            exit 1
+          fi
+          if [ "$MODE" = "apply" ]; then
+            pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
+          fi
+
+      - name: Bind the staging Cloudflare account
+        run: |
+          sed -i -E \
+            "s/^account_id[[:space:]]*=.*/account_id = \"$CLOUDFLARE_ACCOUNT_ID\"/" \
+            apps/worker/wrangler.staging.toml
+          grep -q "^account_id = \"$CLOUDFLARE_ACCOUNT_ID\"$" \
+            apps/worker/wrangler.staging.toml
+
+      - name: Build Worker and LIFF assets
+        if: inputs.target != 'admin'
+        run: pnpm --filter worker build
+
+      - name: Check Worker bundle without publishing
+        if: inputs.mode == 'dry-run' && inputs.target != 'admin'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+        run: npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run
+
+      - name: Deploy Worker to staging
+        if: inputs.mode == 'apply' && inputs.target != 'admin'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+        run: npx wrangler deploy --config apps/worker/wrangler.staging.toml
+
+      - name: Build Admin Panel dependencies
+        if: inputs.target != 'worker'
+        run: pnpm --filter @line-harness/update-engine build
+
+      - name: Build Admin Panel for staging
+        if: inputs.target != 'worker'
+        run: pnpm --filter web build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}
+          NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+
+      - name: Deploy Admin Panel to staging
+        if: inputs.mode == 'apply' && inputs.target != 'worker'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}
+        run: |
+          npx wrangler pages deploy apps/web/out \
+            --project-name "$STAGING_PAGES_PROJECT" \
+            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "staging deploy $GITHUB_SHA"
+
+      - name: Summarize
+        if: always()
+        env:
+          MODE: ${{ inputs.mode }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          {
+            echo "## 検証環境デプロイ"
+            echo
+            echo "- mode: \`$MODE\`"
+            echo "- target: \`$TARGET\`"
+            echo "- commit: \`$GITHUB_SHA\`"
+            echo "- Worker: \`nen-line-stg\`"
+            echo "- Admin: \`nen-line-stg-admin\`"
+            echo "- D1 migration: このWorkflowでは実行しません"
+          } >> "$GITHUB_STEP_SUMMARY"

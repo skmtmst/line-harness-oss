@@ -4,16 +4,19 @@
 
 import type { BookingNotificationSender, NotificationKind } from './booking-notifier.js';
 import { REMINDER_MAX_RETRY } from './booking-types.js';
+import { resolveLineCredential } from '@line-crm/db';
 
 interface DueRow {
   id: string;
   booking_id: string;
+  line_account_id: string;
   kind: 'day_before' | 'hours_before';
   retry_count: number;
   starts_at: string;
   menu_name: string;
   staff_name: string;
   channel_access_token: string;
+  channel_access_token_encrypted: string | null;
   line_user_id: string;
 }
 
@@ -39,10 +42,11 @@ export async function processDueReminders(
   const due = await db
     .prepare(
       `SELECT r.id, r.booking_id, r.kind, r.retry_count,
-              b.starts_at,
+              b.line_account_id, b.starts_at,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
+              la.channel_access_token_encrypted,
               f.line_user_id
          FROM booking_reminders r
          INNER JOIN bookings b ON b.id = r.booking_id
@@ -64,8 +68,13 @@ export async function processDueReminders(
   for (const row of due.results) {
     const kind: NotificationKind = row.kind;
     try {
+      const accessToken = await resolveLineCredential(
+        row.channel_access_token_encrypted,
+        row.channel_access_token,
+        { lineAccountId: row.line_account_id, field: 'channel_access_token' },
+      );
       await params.sender({
-        channelAccessToken: row.channel_access_token,
+        channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
         kind,
         ctx: {

@@ -6,24 +6,124 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  getCarouselTapTotals,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { validateCarousel } from '../services/carousel-validation.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
+import { validateTemplateMessage } from '../services/template-message-validation.js';
 
 const templates = new Hono<Env>();
+
+const QUESTION_BEHAVIORS = new Set([
+  'none',
+  'url',
+  'tel',
+  'add_friend',
+  'mail',
+  'form',
+  'scenario',
+]);
+
+function readQuestionPayload(body: Record<string, unknown>):
+  | { ok: true; question: ScenarioQuestion | null; questionJson?: string | null }
+  | { ok: false; error: string } {
+  if (!('question' in body)) return { ok: true, question: null };
+  if (body.question === null) return { ok: true, question: null, questionJson: null };
+  if (!body.question || typeof body.question !== 'object' || Array.isArray(body.question)) {
+    return { ok: false, error: '質問の内容を読み取れません' };
+  }
+  const raw = JSON.stringify(body.question);
+  const question = parseQuestion(raw);
+  if (!question) return { ok: false, error: '質問文と選択肢を入力してください' };
+  if (question.text.length > 160) return { ok: false, error: '質問文は160文字以内で入力してください' };
+  if (question.choices.length > 13) return { ok: false, error: '選択肢は13件以内で入力してください' };
+  if (question.choices.some((choice) => !choice || typeof choice !== 'object' || typeof choice.label !== 'string')) {
+    return { ok: false, error: 'すべての選択肢に文字を入力してください' };
+  }
+  if (question.choices.some((choice) => !choice.label.trim())) {
+    return { ok: false, error: 'すべての選択肢に文字を入力してください' };
+  }
+  if (question.choices.some((choice) => choice.label.length > 20)) {
+    return { ok: false, error: '選択肢の文字は20文字以内で入力してください' };
+  }
+  if (question.choices.some((choice) => typeof choice.behavior !== 'string' || !QUESTION_BEHAVIORS.has(choice.behavior))) {
+    return { ok: false, error: '選択後の動きを確認してください' };
+  }
+  return { ok: true, question, questionJson: raw };
+}
+
+function questionValue(raw: string | null): ScenarioQuestion | null {
+  return parseQuestion(raw);
+}
+
+/**
+ * カルーセルなら中身を確かめる。
+ *
+ * 送ってから「400 が返りました」では、どのパネルが悪いのか分からない。
+ * 保存の時点で、何枚目の何が問題かを返す。
+ */
+function checkCarousel(
+  messageType: string | undefined,
+  messageContent: string | undefined,
+): { ok: true } | { ok: false; error: string } {
+  if (messageType !== 'carousel') return { ok: true };
+  if (!messageContent) return { ok: false, error: 'カルーセルの中身がありません' };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(messageContent);
+  } catch {
+    return { ok: false, error: 'カルーセルの中身が読み取れません' };
+  }
+  // { columns: [...] } でも [...] でも受ける。書き方の違いで弾かない。
+  const columns =
+    Array.isArray(parsed)
+      ? parsed
+      : (parsed as { columns?: unknown })?.columns;
+  const errors = validateCarousel(columns);
+  if (errors.length === 0) return { ok: true };
+  return { ok: false, error: errors.map((e) => e.message).join(' / ') };
+}
+
 
 templates.get('/api/templates', async (c) => {
   try {
     const category = c.req.query('category') ?? undefined;
-    const items = await getTemplatesWithUsageCount(c.env.DB, category);
+    const requestedAccountId = c.req.query('account_id');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
+    const items = await getTemplatesWithUsageCount(c.env.DB, category, {
+      accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+      includeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
+    });
+    // 押された回数は1回のクエリでまとめて取る。1件ずつ引くと、
+    // 20件並べば20回叩くことになる。
+    let taps = new Map<string, number>();
+    try {
+      taps = await getCarouselTapTotals(c.env.DB);
+    } catch (err) {
+      // 数が出ないだけ。一覧そのものは出す。
+      console.error('GET /api/templates — failed to count carousel taps', err);
+    }
     return c.json({
       success: true,
       data: items.map((t) => ({
         id: t.id,
+        accountId: t.line_account_id,
         name: t.name,
         category: t.category,
         messageType: t.message_type,
         messageContent: t.message_content,
+        question: questionValue(t.question_json),
+        questionStatus: t.question_status,
+        folderId: t.folder_id ?? null,
         usageCount: t.usage_count,
+        /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+        tapCount: taps.get(t.id) ?? 0,
         createdAt: t.created_at,
         updatedAt: t.updated_at,
       })),
@@ -38,16 +138,26 @@ templates.get('/api/templates/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const item = await getTemplateById(c.env.DB, id);
-    if (!item) return c.json({ success: false, error: 'Template not found' }, 404);
+    if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
     const usedBy = await getTemplateUsage(c.env.DB, id);
     return c.json({
       success: true,
       data: {
         id: item.id,
+        accountId: item.line_account_id,
         name: item.name,
         category: item.category,
         messageType: item.message_type,
         messageContent: item.message_content,
+        question: questionValue(item.question_json),
+        questionStatus: item.question_status,
+        carouselActions: item.carousel_actions_json
+          ? JSON.parse(item.carousel_actions_json)
+          : null,
+        carouselTapLimitMode: item.carousel_tap_limit_mode ?? 'none',
+        carouselTapLimitText: item.carousel_tap_limit_text,
         usedBy,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
@@ -59,89 +169,177 @@ templates.get('/api/templates/:id', async (c) => {
   }
 });
 
-// GET /api/templates/:id/usages — auto_replies + scenario_steps での使用箇所
+function templateUsageCount(usage: Awaited<ReturnType<typeof getTemplateUsage>>): number {
+  return Object.values(usage).reduce((total, items) => total + items.length, 0);
+}
+
+// GET /api/templates/:id/usages — 現行 templates.id を参照する設定をまとめて返す
 templates.get('/api/templates/:id/usages', async (c) => {
   try {
     const templateId = c.req.param('id');
 
-    const tpl = await c.env.DB
-      .prepare(`SELECT id FROM templates WHERE id = ?`)
-      .bind(templateId)
-      .first<{ id: string }>();
-    if (!tpl) {
+    const tpl = await getTemplateById(c.env.DB, templateId);
+    if (!tpl || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [tpl.line_account_id])) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
 
-    const autoRepliesResult = await c.env.DB
-      .prepare(
-        `SELECT id, keyword, line_account_id FROM auto_replies WHERE template_id = ?`,
-      )
-      .bind(templateId)
-      .all<{ id: string; keyword: string; line_account_id: string | null }>();
-
-    const scenarioStepsResult = await c.env.DB
-      .prepare(
-        `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id,
-                s.name AS scenario_name
-         FROM scenario_steps ss
-         JOIN scenarios s ON ss.scenario_id = s.id
-         WHERE ss.template_id = ?
-         ORDER BY s.name, ss.step_order`,
-      )
-      .bind(templateId)
-      .all<{
-        step_id: string;
-        step_order: number;
-        scenario_id: string;
-        scenario_name: string;
-      }>();
-
-    return c.json({
-      success: true,
-      data: {
-        autoReplies: autoRepliesResult.results.map((r) => ({
-          id: r.id,
-          keyword: r.keyword,
-          lineAccountId: r.line_account_id ?? null,
-        })),
-        scenarioSteps: scenarioStepsResult.results.map((r) => ({
-          scenarioId: r.scenario_id,
-          scenarioName: r.scenario_name,
-          stepId: r.step_id,
-          stepOrder: r.step_order,
-        })),
-      },
-    });
+    return c.json({ success: true, data: await getTemplateUsage(c.env.DB, templateId) });
   } catch (err) {
     console.error('GET /api/templates/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-templates.post('/api/templates', async (c) => {
+/** 162: カルーセルの選択肢まわりの設定を読む。 */
+function readCarouselOptions(body: Record<string, unknown>):
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; error: string } {
+  const value: Record<string, unknown> = {};
+  if ('carouselActions' in body) {
+    const raw = body.carouselActions;
+    if (raw === null) {
+      value.carouselActions = null;
+    } else if (typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, error: 'carouselActions must be an object keyed by column index' };
+    } else {
+      value.carouselActions = raw;
+    }
+  }
+  if ('carouselTapLimitMode' in body) {
+    if (body.carouselTapLimitMode !== 'none' && body.carouselTapLimitMode !== 'once') {
+      return { ok: false, error: "carouselTapLimitMode must be 'none' or 'once'" };
+    }
+    value.carouselTapLimitMode = body.carouselTapLimitMode;
+  }
+  if ('carouselTapLimitText' in body) {
+    const raw = body.carouselTapLimitText;
+    if (raw === null || raw === '') {
+      value.carouselTapLimitText = null;
+    } else if (typeof raw !== 'string') {
+      return { ok: false, error: 'carouselTapLimitText must be a string' };
+    } else if ([...raw].length > 300) {
+      return { ok: false, error: 'carouselTapLimitText must be 300 characters or fewer' };
+    } else {
+      value.carouselTapLimitText = raw;
+    }
+  }
+  return { ok: true, value };
+}
+
+templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; category?: string; messageType: string; messageContent: string }>();
+    const body = await c.req.json<{
+      accountId?: string;
+      name: string;
+      category?: string;
+      messageType: string;
+      messageContent: string;
+      question?: unknown;
+      questionStatus?: 'draft' | 'published';
+    }>();
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
     if (!body.name || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
-    const item = await createTemplate(c.env.DB, body);
-    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, createdAt: item.created_at } }, 201);
+    const message = validateTemplateMessage(body.messageType, body.messageContent);
+    if (!message.ok) {
+      const { ok: _ok, ...failure } = message;
+      return c.json({ success: false, ...failure }, 422);
+    }
+    const carousel = checkCarousel(body.messageType, body.messageContent);
+    if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    const options = readCarouselOptions(body as unknown as Record<string, unknown>);
+    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    const question = readQuestionPayload(body as unknown as Record<string, unknown>);
+    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
+      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+    }
+    const item = await createTemplate(c.env.DB, {
+      ...body,
+      lineAccountId: body.accountId,
+      ...options.value,
+      questionJson: question.questionJson,
+      questionStatus: body.questionStatus,
+      // 質問を扱わない利用先で選ばれても、壊れたFlexを送らず質問文を送る。
+      ...(question.question
+        ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text }
+        : {}),
+    });
+    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, question: questionValue(item.question_json), questionStatus: item.question_status, createdAt: item.created_at } }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-templates.put('/api/templates/:id', async (c) => {
+templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json();
-    await updateTemplate(c.env.DB, id, body);
+    const body = await c.req.json<{ messageType?: string; messageContent?: string; question?: unknown; questionStatus?: 'draft' | 'published' }>();
+    // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
+    const existing = await getTemplateById(c.env.DB, id);
+    if (!existing || !await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [existing.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const changesMessage = body.messageType !== undefined || body.messageContent !== undefined;
+    const message = changesMessage
+      ? validateTemplateMessage(
+          body.messageType ?? existing.message_type,
+          body.messageContent ?? existing.message_content,
+        )
+      : { ok: true as const };
+    if (!message.ok) {
+      const { ok: _ok, ...failure } = message;
+      return c.json({ success: false, ...failure }, 422);
+    }
+    const carousel = checkCarousel(
+      body.messageType ?? existing?.message_type,
+      body.messageContent ?? existing?.message_content,
+    );
+    if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    const options = readCarouselOptions(body as unknown as Record<string, unknown>);
+    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    const question = readQuestionPayload(body as unknown as Record<string, unknown>);
+    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
+      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+    }
+    await updateTemplate(c.env.DB, id, {
+      ...body,
+      ...options.value,
+      questionJson: question.questionJson,
+      questionStatus: body.questionStatus,
+      ...(question.question
+        ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text }
+        : {}),
+    });
     const updated = await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
-      data: { id: updated.id, name: updated.name, category: updated.category, messageType: updated.message_type, messageContent: updated.message_content },
+      data: {
+        id: updated.id,
+        accountId: updated.line_account_id,
+        name: updated.name,
+        category: updated.category,
+        messageType: updated.message_type,
+        messageContent: updated.message_content,
+        question: questionValue(updated.question_json),
+        questionStatus: updated.question_status,
+        carouselActions: updated.carousel_actions_json
+          ? JSON.parse(updated.carousel_actions_json)
+          : null,
+        carouselTapLimitMode: updated.carousel_tap_limit_mode ?? 'none',
+        carouselTapLimitText: updated.carousel_tap_limit_text,
+      },
     });
   } catch (err) {
     console.error('PUT /api/templates/:id error:', err);
@@ -149,18 +347,25 @@ templates.put('/api/templates/:id', async (c) => {
   }
 });
 
-templates.delete('/api/templates/:id', async (c) => {
+templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    // automations.actions JSON には FK が無いので、削除すると orphan な template_id が
-    // 残って実行時に空メッセージ送信→partial fail を引き起こす。auto_replies は
-    // ON DELETE SET NULL + inline fallback (responseContent snapshot) で大丈夫だが、
-    // automations は安全な fallback パスがないので、参照があれば削除を拒否する。
+    const existing = await getTemplateById(c.env.DB, id);
+    if (!existing || !await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [existing.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // ON DELETE SET NULL や本文の控えがあっても、参照中の設定を運用者に知らせず
+    // 切ることはしない。すべての利用先を先に差し替えてもらう。
     const usage = await getTemplateUsage(c.env.DB, id);
-    if (usage.automations.length > 0) {
+    const usageCount = templateUsageCount(usage);
+    if (usageCount > 0) {
       return c.json({
         success: false,
-        error: `automation rule (${usage.automations.length} 件) でこのテンプレートを参照しています。先にそちらの参照を解除してください。`,
+        code: 'IN_USE',
+        usageCount,
+        error: `${usageCount}件の設定で使用中です。先に使用先を差し替えてください。`,
         usedBy: usage,
       }, 409);
     }

@@ -2,8 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LINE CRM</title>
+  <!-- maximum-scale=1: iOS が input フォーカスで自動ズームし、解除後も拡大が
+       残る問題の防止 (LIFF はアプリ的 UI なのでピンチズーム不要)。 -->
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <title>然-NEN-</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }

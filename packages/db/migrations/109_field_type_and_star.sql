@@ -1,0 +1,20 @@
+-- 何もしない。
+--
+-- もともとは friend_fields に field_type と is_starred を足すつもりだった。
+-- しかし 099 で既に入っている。
+--
+--   type        text / textarea / number / date / select /
+--               multi_select / checkbox / url / tel / email
+--   is_starred  INTEGER NOT NULL DEFAULT 0
+--
+-- つまり docs/v025-open-questions.md の「§D 友だち情報欄に型が無い」は
+-- 誤りだった。突き合わせ表を書いたときに実物を確かめず、
+-- 「型が無い」と決めつけていた。
+--
+-- このファイルはどの環境にも当たっていない。migrate.ts が
+-- 「一部だけ入っている」と判定して止めたため（is_starred は 099 由来で
+-- 既にあり、field_type は無い、という状態を部分適用と読んだ）。
+--
+-- 番号を空けたまま消すと、次に読む人が「抜けている」と誤解する。
+-- 何もしない形で残し、なぜ空なのかを書いておく。
+SELECT 1;

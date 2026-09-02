@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
+import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -10,7 +12,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    if (pathname === '/login') {
+    if (pathname === '/login' || pathname === '/login/two-factor') {
       setChecked(true)
       return () => { cancelled = true }
     }
@@ -20,14 +22,20 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const checkSession = async () => {
       try {
         localStorage.removeItem('lh_api_key')
+        captureAdminSessionHandoff()
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
-        const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include' })
+        const res = await fetch(`${apiUrl}/api/auth/session`, {
+          credentials: 'include',
+          headers: adminSessionHeaders(),
+        })
         if (!res.ok) throw new Error('unauthenticated')
         const data = await res.json()
         if (!data?.success || !data?.data) throw new Error('unauthenticated')
         if (data.data.name) localStorage.setItem('lh_staff_name', data.data.name)
         if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
+        localStorage.setItem('lh_staff_permissions', JSON.stringify(data.data.permissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
+        clearSelectionAfterAuthentication(localStorage, sessionStorage)
         if (!cancelled) setChecked(true)
       } catch {
         if (!cancelled) router.replace('/login')

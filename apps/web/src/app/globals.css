@@ -1,1 +1,250 @@
 @import "tailwindcss";
+
+/**
+ * デザイントークン。
+ *
+ * これまで色や角丸を各画面へ直接書いていた。実測すると #06c755 が99か所、
+ * グレーは gray と slate の2系統が混在し、text-gray-500 だけで479か所あった。
+ * この状態だと「アクセント色を変える」が50ページの一括置換になり、
+ * 見落としが必ず出る。
+ *
+ * ここで名前を与えて、以後は名前で参照する。値を変えるときは1か所で済む。
+ *
+ * 使い方（Tailwind v4 は @theme の変数からユーティリティを自動生成する）:
+ *   bg-accent / text-ink / border-hairline / rounded-card ...
+ *
+ * 既存のクラス（text-gray-500 など）はそのまま動く。置き換えは画面を
+ * 作り直すタイミングで順に行い、一度に全部は触らない。
+ */
+@theme {
+  /* --- 色 ---------------------------------------------------------------
+   * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
+   * 役割が別で、アクセントを状態表示に使わない。
+   */
+  --color-accent: #06c755;
+  --color-accent-hover: #05b34c;
+  --color-accent-soft: #e8f8ee;
+  --color-accent-deep: #087a3e;
+  --color-on-accent: #ffffff;
+
+  /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
+  --color-action: #0b63ce;
+  --color-action-hover: #0957b7;
+  --color-action-soft: #eaf4ff;
+  --color-on-action: #ffffff;
+
+  /* 文字。Pencil V5を共通基盤とし、V6でも同じ変数を使う。
+   * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
+  --color-ink: #1d1d1f;
+  --color-ink-secondary: #4a5565;
+  --color-ink-faint: #6e7781;
+
+  /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
+  --color-canvas: #ffffff;
+  --color-canvas-sunken: #f7f7f5;
+  --color-surface-pearl: #fafafc;
+  --color-shell: #f5f5f7;
+  --color-hairline: #dadde2;
+
+  /* 状態。アクセントと混ぜない。 */
+  --color-success: #05913e;
+  --color-success-bg: #e8f8ee;
+  --color-warning: #94600a;
+  --color-warning-bg: #faf0dc;
+  --color-danger: #b3261e;
+  --color-danger-bg: #fce9e7;
+  --color-info: #0a6e80;
+  --color-info-bg: #e2f2f5;
+
+  /* Pencilの状態バッジ。既存画面の状態色は移行時にこの語彙へ寄せる。 */
+  --color-status-info: #175cd3;
+  --color-status-info-soft: #e9f1ff;
+  --color-status-warn: #f5c56b;
+  --color-status-warn-soft: #fff7e6;
+  --color-status-warn-deep: #a15c00;
+  --color-status-warning: #a15c00;
+  --color-status-warning-soft: #fff7e6;
+  --color-status-danger: #e5484d;
+  --color-status-danger-soft: #fef0f0;
+  --color-step-idle: #eef0f3;
+  --color-surface-chrome: #ebedf1;
+
+  /* ★V6で実測した一覧・操作の色。既存V5画面へ波及させないため、
+   * 共通色を上書きせずV6の意味名で固定する。 */
+  --color-v6-accent: #07c653;
+  --color-v6-accent-hover: #079b45;
+  --color-v6-accent-soft: #e9f9ef;
+  --color-v6-accent-border: #a8e9c1;
+  --color-v6-action: #0067d9;
+  --color-v6-action-soft: #f3f8ff;
+  --color-v6-ink: #1d1d1f;
+  --color-v6-ink-secondary: #565f59;
+  --color-v6-ink-faint: #8b938d;
+  --color-v6-ink-disabled: #b8bcc2;
+  --color-v6-divider: #eaebed;
+  --color-v6-surface: #f9fafa;
+  --color-v6-surface-strong: #f6f6f8;
+  --color-v6-danger: #d34851;
+  --color-v6-danger-bg: #fff1f2;
+  --color-v6-danger-selected: #ffe4e7;
+  --color-v6-danger-text: #b4232b;
+  --color-v6-danger-border: #f3b8bb;
+  --color-v6-warning: #a66a00;
+  --color-v6-warning-strong: #d99017;
+  --color-v6-warning-bg: #fff7e8;
+  --color-v6-purple: #7651c9;
+  --color-v6-purple-bg: #f0ebff;
+  --color-v6-avatar-bg: #eef0f2;
+  --color-v6-avatar-indigo: #5545e6;
+  --color-v6-avatar-blue: #1260c9;
+  --color-v6-avatar-slate: #536170;
+  --color-v6-avatar-green: #079b45;
+
+  /* LINEトークのプレビュー。実画面の青いトーク面と回答操作の緑。 */
+  --color-line-preview: #789bc5;
+  --color-line-preview-label: #5579a8;
+  --color-line-choice: #00a947;
+  --color-line-answer-bg: #e6f7ed;
+  --color-line-answer: #08783b;
+
+  /* 然-NEN- のLINEカード。Pen V2の必要な高級感を、生の色値ではなく共通語彙にする。 */
+  --color-nen-ivory: #fbf8f1;
+  --color-nen-green: #1b3a31;
+  --color-nen-gold: #b08d57;
+  --color-nen-gold-soft: #e6ded0;
+  --color-nen-border: #ded5c5;
+  --color-nen-copy: #4b5b55;
+  --color-nen-ink: #25352f;
+  --color-nen-muted: #6e7773;
+  --color-nen-label: #9a8060;
+  --color-nen-chip: #6e5d48;
+
+  /* --- 角丸 -------------------------------------------------------------
+   * 大きさで役割を分ける。カードは card、押せるものは control、
+   * 丸いものは pill。すべて rounded-lg で済ませない。
+   */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+  --radius-tile: 10px;
+  --radius-panel: 12px;
+  --radius-icon: 3px;
+  /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
+  --radius-mini: 6px;
+  --radius-tiny: 3px;
+  /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
+     保存条件チップ用。Tailwind 既定の `rounded-lg` を上書きすると、
+     既存85ファイルの角丸まで8pxから18pxへ変わるため、V6専用名にする。 */
+  --radius-v6-large: 18px;
+  --radius-pill: 9999px;
+  /*
+   * V6の4つ。**以前は 7 / 9 / 14 / 16 だったが、設計にその値は無い。**
+   * 設計の角丸は 3 / 6 / 8 / 10 / 12 / 18 / 9999 の7段だけで、
+   * この4つには由来の記録も無かった（他は「Pencil `$radius-xs`(6px)」の
+   * ように書いてある）。**多数決ではなく、実装がその class を貼っている
+   * 場所の正本Nodeを1つずつ測って**合わせた。
+   *
+   *   option  7 → 8px  表示項目パネルの行。`sMpET`「表示項目 基本情報」
+   *                    (h=46, `$radius-sm`)。使用1箇所も同じ行。
+   *                    ※チェック枠(`$radius-xs` 6)と取り違えない。
+   *   control 9 → 8px  `Gfsb4`「プルダウン開状態」(`$radius-sm`)。
+   *                    使用39箇所は 操作(select/input/button 19) と
+   *                    注記(p/div/span 20) に割れるが、**注記の正本である
+   *                    案内バーも `$radius-sm`** で、別々に確かめて同値。
+   *   card   14 → 10px 容器。`pRHvc`「検索と絞り込み」(h=132)、
+   *                    `k4Hz0X`「友だち一覧カード」、`eHPwj`「一括操作バー」
+   *                    (h=56) がいずれも `$radius-md`。使用18箇所も全て容器。
+   *   dialog 16 → 12px `z7O873`「友だち 詳細検索モーダル」(w=760 h=936,
+   *                    `$radius-panel`)。使用3箇所はその窓と保存検索の窓。
+   */
+  --radius-v6-option: 8px;
+  --radius-v6-control: 8px;
+  --radius-v6-card: 10px;
+  --radius-v6-dialog: 12px;
+
+  /* --- 文字サイズ ---------------------------------------------------------
+   * V5/V6の共通部品が使う意味名。既存のTailwind組み込みサイズは残し、
+   * 画面移行時にこの語彙へ寄せる。 */
+  --text-caption: 12px;
+  --text-label: 13px;
+  --text-body: 14px;
+  --text-lead: 16px;
+  /*
+   * Pencil `$size-title`(20)/`$size-heading`(18)。
+   * 2026-08-26 に足した。共通トップバーの画面名が `var(--text-title)` を
+   * 読んでいたが未定義で、16px に落ちていた（4-1 の画像比較で発覚）。
+   */
+  --text-heading: 18px;
+  --text-title: 20px;
+  --text-display: 30px;
+  --text-metric: 22px;
+  --text-micro: 11px;
+  --text-nano: 10px;
+
+  /* --- 本体の幅 ---------------------------------------------------------
+   * 設計のフレームは幅1920pxで描かれている。そこから常時表示のサイドバー
+   * `w-64`（256px）を引いた 1664px = 104rem が、本体が取れる幅。
+   *
+   * `max-w-shell` をV4共通レイアウトに当て、左右40pxの余白を引いた
+   * 1584pxを1920px表示時の実コンテンツ幅にする。
+   *
+   * 注意: 一度 74rem（1184px）で入れて間違えた。`docs/admin-ui-design-guidelines.md`
+   * の「幅1440pxと1920pxの両方で確認」をフレーム幅と読み違えたため。あれは
+   * 確認する幅の指示であって、設計フレームの幅ではない。絵を実測すると
+   * サイドバー256px＋本体1664pxで、右端まで使い切っている。
+   */
+  --container-shell: 104rem;
+
+  --shadow-v6-card: 1px 1px 2px #1d1d1f21;
+}
+
+/*
+ * Tailwindは影の値をユーティリティへ直接埋め込むため、共通部品から
+ * var()で参照できるよう、影だけは@themeの外に置く。
+ */
+:root {
+  --shadow-card: 1px 1px 2px #1920261a;
+  --shadow-float: 0 6px 18px #19202626;
+}
+
+/*
+ * 友だち属性V2は、Pen.devの1920px画像をそのまま検証する移行面。
+ * 旧画面のNoto Sans JPと256pxサイドバーを継承すると、本文だけ合わせても
+ * 全体座標と文字幅がずれるため、この画面に限って設計値を固定する。
+ */
+.friend-attributes-v2-shell {
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color: #1d1d1f;
+}
+
+@media (min-width: 1280px) {
+  .friend-attributes-v2-shell > aside {
+    width: 260px !important;
+    flex: 0 0 260px;
+  }
+}
+
+/*
+ * 素の `select` の矢印。
+ *
+ * ブラウザが描く三角は右端ぎりぎりに出るので、枠にくっついて
+ * はみ出して見える。矢印を自前で描き、右に余白を確保する。
+ * 4-1（友だち属性）の画像比較で見つかった（2026-08-26）。
+ */
+.v6-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234A5565' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+/*
+ * 幅が設計で決まっている絞り込み（★V6 4-1 `XchZz` の 129px・116px など）。
+ * 既定の左右あわせて 42px は、その幅では文字を食う。実際
+ * 「使用状態：すべて」が「使用状態：すべ」で切れて、矢印に重なった。
+ */
+.v6-select-tight {
+  background-position: right 6px center;
+  padding-left: 8px;
+  padding-right: 22px;
+}

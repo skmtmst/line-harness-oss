@@ -1,0 +1,271 @@
+/*
+ * Pencil `cBSCb`（V6s 共通トップバー）の実測値。
+ * 数字を変えるときは Pencil を先に直す。ここだけ変えると絵と割れる。
+ */
+.root {
+  display: flex;
+  height: 56px;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-surface-chrome);
+}
+
+/* `cBSCb/wgtL5`。画面名とマニュアルは左。あきで右操作を押し出す。 */
+.titleGroup {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+}
+
+/* `cBSCb/Y6lRn`。$size-title 20 / 700。 */
+.title {
+  max-width: 420px;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * `cBSCb/kOaQz` と `cBSCb/IXvCj`。**白い枠つきのボタン**。
+ * 高さ36・角丸 radius-control・枠 hairline・padding [0,12]・gap 7。
+ * 文字リンクにしない（設計では押せる箱）。
+ */
+.manual,
+.manualDisabled,
+.logout {
+  display: inline-flex;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  /* 設計 `LoVfp` `B8gqJ` は $ink（黒）。青いリンク色にしない。 */
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.manual:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.logout:hover {
+  border-color: var(--color-accent);
+}
+
+.manual:focus-visible,
+.logout:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/*
+ * ログアウトだけ枠を残す。押すと画面から出るので、
+ * ほかの操作と同じ見た目にしない。
+ */
+.logout {
+  border-color: var(--color-hairline);
+  cursor: pointer;
+}
+
+/*
+ * URLが決まっていない間。**文字は黒のまま太字**（設計 `LoVfp` は $ink / 700）。
+ * 文字まで薄くすると、URLが入ったあとと見た目が変わってしまう。
+ * 押せないことはカーソルで示す。
+ */
+.manualDisabled {
+  cursor: default;
+}
+
+/* ボタンの中の絵。`$ink-secondary` の線画16px。 */
+.icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+
+/* `cBSCb/d2TQgJ`。右側の一群。 */
+.actions {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+/* `cBSCb/VQGk7`。「LINEアカウント」の見出しと切替の札。 */
+.accountField {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* `cBSCb/xvrTI`。白い札に「印 ＋ 名前 ＋ ▾」。 */
+.accountPill {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 0 10px;
+}
+
+/* `cBSCb/KZ9W9`。22px・radius-mini・accent-soft。 */
+.accountMark {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-mini);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-nano);
+  font-weight: 700;
+}
+
+/* `cBSCb/q6d8jk`。$size-label 13 / 700。 */
+.accountName {
+  max-width: 148px;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 札の上に敷く。見た目は札が持ち、操作と読み上げは select が持つ。 */
+.accountSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.accountPill:focus-within {
+  border-color: var(--color-status-info);
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* `cBSCb/ENVf3`。1×24 の縦線。 */
+.separator {
+  width: 1px;
+  height: 24px;
+  flex-shrink: 0;
+  background: var(--color-hairline);
+}
+
+/* `cBSCb/x2OIJ`。 */
+.identity {
+  display: flex;
+  min-width: 0;
+  max-width: 240px;
+  align-items: center;
+  gap: 8px;
+}
+
+/* `cBSCb/LSU87`。高さ24・radius-pill・accent-soft・padding [0,10]。 */
+.role,
+.roleButton {
+  display: inline-flex;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  padding: 0 10px;
+}
+
+/* 押せるときだけ。見た目は印のまま、押せることは形で示す。 */
+.roleButton {
+  border: 0;
+  cursor: pointer;
+}
+
+.roleButton:hover {
+  background: var(--color-accent);
+  color: var(--color-canvas);
+}
+
+.roleButton:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* `cBSCb/e0tcb`。$size-label 13 / 600 / ink-secondary。 */
+.user {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * 1440px 未満。設計は1920で描いてあるので、狭いところは削る順を決める。
+ * 消す順は「軸の名前 → 画面名の幅 → 人の名前の幅」。
+ * ボタンそのものは消さない（押せるものが黙って消えると探せなくなる）。
+ */
+@media (max-width: 1439px) {
+  .root {
+    gap: 10px;
+    padding: 0 16px;
+  }
+
+  .title {
+    max-width: 260px;
+  }
+
+  .accountField > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .identity {
+    max-width: 170px;
+  }
+
+  .accountName {
+    max-width: 120px;
+  }
+}

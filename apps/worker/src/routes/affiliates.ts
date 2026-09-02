@@ -7,7 +7,6 @@ import {
   createAffiliateWithRandomCode,
   createAffiliateLink,
   updateAffiliate,
-  deleteAffiliate,
   recordAffiliateClick,
   getAffiliateReport,
   getAffiliateReportV2,
@@ -21,10 +20,24 @@ import {
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const affiliates = new Hono<Env>();
 
-function serializeAffiliate(row: { id: string; name: string; code: string; commission_rate: number; is_active: number; created_at: string; friend_id?: string | null }) {
+function serializeAffiliate(row: {
+  id: string;
+  name: string;
+  code: string;
+  commission_rate: number;
+  is_active: number;
+  created_at: string;
+  friend_id?: string | null;
+  email?: string | null;
+  hold_days?: number | null;
+  payout_cycle?: string | null;
+  notify_on_conversion?: number;
+}) {
   return {
     id: row.id,
     name: row.name,
@@ -33,7 +46,62 @@ function serializeAffiliate(row: { id: string; name: string; code: string; commi
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     friendId: row.friend_id ?? null,
+    email: row.email ?? null,
+    holdDays: row.hold_days ?? null,
+    payoutCycle: row.payout_cycle ?? null,
+    notifyOnConversion: Boolean(row.notify_on_conversion),
   };
+}
+
+/**
+ * 支払いの取り決めを検証して取り出す。送られた項目だけを含める。
+ *
+ * メールアドレスの形は「@ が1つある」程度しか見ない。厳密に弾こうとすると
+ * 正しいアドレスまで弾く方が起きやすく、ここでの目的は打ち間違いに
+ * 気づかせることだから。
+ */
+function readAffiliateSettlement(
+  body: Record<string, unknown>,
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+  const out: Record<string, unknown> = {};
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+
+  if (has('email')) {
+    const raw = body.email;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.email = null;
+    } else if (typeof raw !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
+      return { ok: false, error: 'email must be a valid address' };
+    } else {
+      out.email = raw.trim();
+    }
+  }
+  if (has('holdDays')) {
+    const raw = body.holdDays;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.hold_days = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0 || n > 365) {
+        return { ok: false, error: 'holdDays must be an integer between 0 and 365' };
+      }
+      out.hold_days = n;
+    }
+  }
+  if (has('payoutCycle')) {
+    const raw = body.payoutCycle;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.payout_cycle = null;
+    } else if (typeof raw !== 'string' || raw.length > 100) {
+      return { ok: false, error: 'payoutCycle must be 100 characters or fewer' };
+    } else {
+      out.payout_cycle = raw.trim();
+    }
+  }
+  if (has('notifyOnConversion')) {
+    out.notify_on_conversion = body.notifyOnConversion === true ? 1 : 0;
+  }
+  return { ok: true, value: out };
 }
 
 // GET /api/affiliates - list all
@@ -74,7 +142,8 @@ affiliates.get('/api/affiliates/:id', async (c) => {
 //        - OSS back-compat. `code` must be >= 4 chars, alphanumeric only.
 const CODE_RE = /^[A-Za-z0-9]{4,}$/;
 
-affiliates.post('/api/affiliates', async (c) => {
+affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.create', { kind: 'affiliate' });
   try {
     const body = await c.req.json<{
       name?: string;
@@ -195,19 +264,24 @@ affiliates.post('/api/affiliates', async (c) => {
 });
 
 // PUT /api/affiliates/:id - update
-affiliates.put('/api/affiliates/:id', async (c) => {
+affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.update', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
       name?: string;
       commissionRate?: number;
       isActive?: boolean;
-    }>();
+    } & Record<string, unknown>>();
+
+    const settlement = readAffiliateSettlement(body);
+    if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
       commission_rate: body.commissionRate,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
+      ...settlement.value,
     });
 
     if (!updated) {
@@ -220,16 +294,17 @@ affiliates.put('/api/affiliates/:id', async (c) => {
   }
 });
 
-// DELETE /api/affiliates/:id - delete
-affiliates.delete('/api/affiliates/:id', async (c) => {
-  try {
-    await deleteAffiliate(c.env.DB, c.req.param('id'));
-    return c.json({ success: true, data: null });
-  } catch (err) {
-    console.error('DELETE /api/affiliates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
-});
+// 紹介者は成果・承認・支払いの監査元になるため物理削除しない。
+// 停止は PUT { isActive: false } で行い、過去記録を残す。
+affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), (c) =>
+  c.json(
+    {
+      success: false,
+      code: 'PHYSICAL_DELETE_DISABLED',
+      error: '紹介者は削除できません。紹介を止める操作を使ってください。過去の成果と支払い記録は残ります。',
+    },
+    405,
+  ));
 
 // GET /api/affiliates/:id/report - affiliate performance report (v2)
 // Extends the legacy report with ref_tracking-based clicks, add-time friendAdds,
@@ -320,7 +395,7 @@ affiliates.post('/api/affiliates/click', async (c) => {
     }
 
     const affiliate = await getAffiliateByCode(c.env.DB, body.code);
-    if (!affiliate) {
+    if (!affiliate || affiliate.is_active !== 1) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
 
@@ -334,7 +409,7 @@ affiliates.post('/api/affiliates/click', async (c) => {
 });
 
 // GET /api/affiliates/report - all affiliates report
-affiliates.get('/api/affiliates-report', async (c) => {
+affiliates.get('/api/affiliates-report', requireRole('owner', 'admin'), async (c) => {
   try {
     const report = await getAffiliateReport(c.env.DB, undefined, {
       startDate: c.req.query('startDate'),

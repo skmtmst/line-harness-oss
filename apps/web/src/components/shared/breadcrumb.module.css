@@ -1,0 +1,40 @@
+/*
+ * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。
+ *
+ * 途中の階層はリンク（`$status-info`）、いま開いている場所は
+ * リンクではない（`$ink`）。区切りは `chevron-right` 13px。
+ */
+
+.list {
+  display: flex;
+  align-items: center; /* alignItems: center */
+  gap: 8px; /* gap: 8 */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  font-weight: 600; /* fontWeight: 600 */
+}
+
+.link {
+  color: var(--color-status-info); /* fill: $status-info */
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* いま開いている場所。押せない。 */
+.current {
+  color: var(--color-ink); /* fill: $ink */
+  font-weight: 700;
+}
+
+.separator {
+  width: 13px; /* width: 13 */
+  height: 13px; /* height: 13 */
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  flex: none;
+}

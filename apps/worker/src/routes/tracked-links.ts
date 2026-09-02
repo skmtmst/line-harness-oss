@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getTrackedLinks,
   getTrackedLinkById,
@@ -8,18 +8,40 @@ import {
   deleteTrackedLink,
   recordLinkClick,
   getLinkClicks,
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
 } from '@line-crm/db';
-import { enrollFriendInScenario } from '@line-crm/db';
+import { enrollFriendInScenario, getUrlReachConversionPoints, trackConversion } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import type { TrackedLink } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { isLinkPreviewBot } from '../lib/og-bot.js';
 import { buildOgHtml } from '../lib/og-html.js';
 import { resolveOgForTrackedLink } from '../lib/og-resolver.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
+import { awardActivityMileage } from '../services/activity-mileage.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 
 const trackedLinks = new Hono<Env>();
+
+async function adminAccountScope(c: Context<Env>) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = scope.allowedAccountIds.length
+    ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'line_account_id IS NULL'
+      : '1 = 0';
+  return { scope, where };
+}
+
+const requireVisibleTrackedLink: MiddlewareHandler<Env> = async (c, next) => {
+  const link = await getTrackedLinkById(c.env.DB, c.req.param('id') ?? '');
+  if (!link || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [link.line_account_id])) {
+    return c.json({ success: false, error: 'Tracked link not found' }, 404);
+  }
+  await next();
+};
 
 function serializeTrackedLink(row: TrackedLink, baseUrl: string) {
   // Prefer the short code (baseUrl may be a branded short domain).
@@ -64,6 +86,18 @@ async function resolveLinkAccount(
   db: D1Database,
   link: TrackedLink,
 ): Promise<Record<string, unknown> | null> {
+  const accountId = await resolveLinkAccountId(db, link);
+  if (!accountId) return null;
+  return db
+    .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
+    .bind(accountId)
+    .first<Record<string, unknown>>();
+}
+
+async function resolveLinkAccountId(
+  db: D1Database,
+  link: TrackedLink,
+): Promise<string | null> {
   let accountId: string | null = link.line_account_id ?? null;
   if (!accountId && link.scenario_id) {
     const scRow = await db
@@ -72,17 +106,25 @@ async function resolveLinkAccount(
       .first<{ line_account_id: string | null }>();
     accountId = scRow?.line_account_id ?? null;
   }
-  if (!accountId) return null;
-  return db
-    .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
-    .bind(accountId)
-    .first<Record<string, unknown>>();
+  return accountId;
 }
 
 // GET /api/tracked-links — list all
 trackedLinks.get('/api/tracked-links', async (c) => {
   try {
-    const items = await getTrackedLinks(c.env.DB);
+    const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    let items = await getTrackedLinks(c.env.DB);
+    if (lineAccountId) {
+      items = items.filter((item) => item.line_account_id === lineAccountId);
+    } else {
+      const { scope } = await adminAccountScope(c);
+      items = items.filter((item) => item.line_account_id === null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(item.line_account_id));
+    }
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: items.map((item) => serializeTrackedLink(item, base)) });
   } catch (err) {
@@ -92,7 +134,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
 });
 
 // GET /api/tracked-links/:id — get single with click details
-trackedLinks.get('/api/tracked-links/:id', async (c) => {
+trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);
@@ -120,7 +162,7 @@ trackedLinks.get('/api/tracked-links/:id', async (c) => {
 });
 
 // POST /api/tracked-links — create
-trackedLinks.post('/api/tracked-links', async (c) => {
+trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -137,6 +179,9 @@ trackedLinks.post('/api/tracked-links', async (c) => {
 
     if (!body.name || !body.originalUrl) {
       return c.json({ success: false, error: 'name and originalUrl are required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
     const link = await createTrackedLink(c.env.DB, {
@@ -161,7 +206,7 @@ trackedLinks.post('/api/tracked-links', async (c) => {
 });
 
 // PATCH /api/tracked-links/:id — update mutable fields
-trackedLinks.patch('/api/tracked-links/:id', async (c) => {
+trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -177,6 +222,11 @@ trackedLinks.patch('/api/tracked-links/:id', async (c) => {
       ogImageUrl?: string | null;
     }>();
 
+    if ('lineAccountId' in body
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+
     const link = await updateTrackedLink(c.env.DB, id, body);
     if (!link) {
       return c.json({ success: false, error: 'Tracked link not found' }, 404);
@@ -190,7 +240,7 @@ trackedLinks.patch('/api/tracked-links/:id', async (c) => {
 });
 
 // DELETE /api/tracked-links/:id
-trackedLinks.delete('/api/tracked-links/:id', async (c) => {
+trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);
@@ -327,7 +377,12 @@ trackedLinks.get('/t/:linkId', async (c) => {
 
   // Resolve friendId from LINE user ID if provided
   if (!friendId && lineUserId) {
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    const accountId = await resolveLinkAccountId(c.env.DB, link);
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      lineUserId,
+      accountId,
+    );
     if (friend) {
       friendId = friend.id;
     }
@@ -339,11 +394,59 @@ trackedLinks.get('/t/:linkId', async (c) => {
     (async () => {
       try {
         // Record the click (link.id, not the raw param — it may be a short code)
-        await recordLinkClick(c.env.DB, link.id, friendId);
+        const click = await recordLinkClick(c.env.DB, link.id, friendId);
+
+        if (friendId) {
+          await awardActivityMileage(c.env.DB, {
+            eventType: 'link_clicked',
+            source: 'tracked_link',
+            sourceEventId: click.id,
+            friendId,
+            subjectKey: link.id,
+            metadata: { trackedLinkId: link.id, linkName: link.name },
+            occurredAt: click.clicked_at,
+          });
+          const accountId = await resolveLinkAccountId(c.env.DB, link);
+          if (accountId) {
+            await dispatchAutomationEventWithLogging(c.env.DB, {
+              lineAccountId: accountId,
+              eventType: 'link_clicked',
+              sourceEventId: click.id,
+              friendId,
+              eventData: { trackedLinkId: link.id, clickId: click.id },
+            });
+          }
+        }
 
         // Run automatic actions if a friend is identified
         if (friendId) {
           const actions: Promise<unknown>[] = [];
+
+          // 「このURLに着いたら成果」と決めてある地点があれば数える。
+          // 判定は転送先URL（link.original_url）に対して行う。/t/ 自体は
+          // 短縮URLで、成果地点の設定には出てこないため。
+          //
+          // ここで数えるのは、リンクを踏んだ人が確実に分かるのがこの経路だけ
+          // だから。転送先のページに計測を仕込む方法だと、そのページを
+          // こちらで触れる必要がある。
+          actions.push(
+            (async () => {
+              const points = await getUrlReachConversionPoints(
+                c.env.DB,
+                link.original_url,
+                link.line_account_id ?? null,
+              );
+              for (const point of points) {
+                // 一人一回の地点で二度目のときは trackConversion 側が
+                // 既存の1件を返すので、ここでは重複を気にしなくてよい。
+                await trackConversion(c.env.DB, {
+                  conversionPointId: point.id,
+                  friendId: friendId!,
+                  metadata: JSON.stringify({ via: 'tracked_link', trackedLinkId: link.id }),
+                });
+              }
+            })(),
+          );
 
           if (link.tag_id) {
             // Guarded attach: fires tag_added scenario enrollment only when

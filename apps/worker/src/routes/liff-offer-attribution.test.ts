@@ -10,12 +10,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // witness of which source won.
 const dbMocks = {
   // eager module-load deps (mirror affiliate-links-redirect.test.ts)
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000' },
+  ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // /api/liff/link + applyRefAttribution helpers
   getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   getTrackedLinkById: vi.fn().mockResolvedValue(null),
   getAffiliateLinkByRefCode: vi.fn().mockResolvedValue(null),
@@ -23,6 +26,7 @@ const dbMocks = {
   getAffiliateById: vi.fn().mockResolvedValue(null),
   addTagToFriend: vi.fn().mockResolvedValue(undefined),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
+  recordFriendAddAttributionCandidate: vi.fn().mockResolvedValue({ status: 'pending' }),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
   getLineAccountById: vi.fn().mockResolvedValue(null),
 };
@@ -93,6 +97,9 @@ function link(ref: string) {
 
 describe('POST /api/liff/link — offer tag/scenario on affiliate-link friend add', () => {
   beforeEach(() => {
+  dbMocks.getFriendByLineUserIdForAccount.mockImplementation(
+    (...args: unknown[]) => dbMocks.getFriendByLineUserId(...(args as [unknown, unknown])),
+  );
     vi.clearAllMocks();
     installVerifyMock();
     // Already-linked friend: user_id set so applyRefAttribution runs without

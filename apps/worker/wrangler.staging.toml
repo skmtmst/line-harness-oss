@@ -1,0 +1,78 @@
+# Validation environment only. Production uses wrangler.toml.
+#
+# Safety invariants:
+# - Uses dedicated D1/R2 resources.
+# - Intentionally has no [triggers] section, so scheduled delivery cannot run.
+# - LINE credentials must come from a dedicated validation LINE channel.
+#   Never copy the production LINE secrets into this Worker.
+name = "nen-line-stg"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+account_id = "55f40f5577bd68828d67716f8d900642"
+
+[assets]
+directory = "dist/client"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nen-line-stg"
+database_id = "00bd7aca-950b-4d67-b865-fd7427b9c43f"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "nen-line-stg-images"
+
+[[r2_buckets]]
+binding = "RAW_MAIL"
+bucket_name = "musubo-raw-mail-stg"
+
+[ai]
+binding = "AI"
+
+[[queues.producers]]
+binding = "CODEX_MENTION_QUEUE"
+queue = "nen-codex-mentions-stg"
+
+[[queues.consumers]]
+queue = "nen-codex-mentions-stg"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+retry_delay = 60
+
+[vars]
+RESTAURANT_TEST_ENABLED = "true"
+WORKER_NAME = "nen-line-stg"
+ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
+LIFF_PAGES_PROJECT = ""
+D1_DATABASE_ID = "00bd7aca-950b-4d67-b865-fd7427b9c43f"
+MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
+WORKER_PUBLIC_URL = "https://nen-line-stg.skmtmst.workers.dev"
+WORKER_URL = "https://nen-line-stg.skmtmst.workers.dev"
+ADMIN_PUBLIC_URL = "https://nen-line-stg-admin.pages.dev"
+ADMIN_ORIGIN = "https://nen-line-stg-admin.pages.dev"
+ADMIN_ALLOW_CROSS_SITE = "true"
+LIFF_PUBLIC_URL = "https://nen-line-stg.skmtmst.workers.dev"
+CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
+NEN_EC_BASE_URL = "https://stg.nen-petfood.com"
+NEN_RICH_MENU_STORE_URL = "https://stg.nen-petfood.com"
+CONTACT_EMAIL = "test-shed@stg.nen-petfood.com"
+SUPPORT_INBOUND_EMAIL = "test-shed@stg.nen-petfood.com"
+XSERVER_RELAY_URL = "https://stg.nen-petfood.com/_system/support-mail-relay.php"
+SEARCH_CONSOLE_SITE_URL = "sc-domain:nen-petfood.com"
+RESTAURANT_INTAKE_DOMAIN = "rs.musubo.jp"
+RAW_MAIL_RETENTION_DAYS = "90"
+CODEX_SLACK_USER_ID = "U0BRUBQMV9Q"
+CODEX_ALLOWED_TEAM_IDS = "T0BRCRVDDGF"
+CODEX_ALLOWED_CHANNEL_IDS = "C0BS5QFJ6LA"
+CODEX_ALLOWED_CHANNEL_NAME_PREFIXES = "line-harness-pr-"
+CODEX_RELAY_SOURCE_USER_IDS = "U0BSP754G2C"
+CODEX_RELAY_ENABLED = "true"
+CODEX_AUTO_MERGE_ENABLED = "true"
+CODEX_AUTO_MERGE_REPOSITORY = "skmtmst/line-harness-oss"
+CODEX_QUEUE_MAX_ATTEMPTS = "5"
+CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS = "30"

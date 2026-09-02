@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const images = new Hono<Env>();
 
 // POST /api/images — upload image (base64 or binary)
-images.post('/api/images', async (c) => {
+images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const contentType = c.req.header('Content-Type') || '';
 
@@ -73,8 +74,13 @@ images.post('/api/images', async (c) => {
 });
 
 // GET /images/:key — serve image (public, no auth)
-images.get('/images/:key', async (c) => {
-  const key = c.req.param('key');
+images.get('/images/*', async (c) => {
+  // NENのペット写真は `nen-pets/{friendId}/{file}` の階層キーで保存する。
+  // `:key` では最初の `/` までしか一致せず404になっていたため、全パスを受け取る。
+  const key = c.req.path.slice('/images/'.length);
+  if (!key || key.includes('..')) {
+    return c.json({ success: false, error: 'Invalid image key' }, 400);
+  }
   const object = await c.env.IMAGES.get(key);
 
   if (!object) {
@@ -90,7 +96,7 @@ images.get('/images/:key', async (c) => {
 });
 
 // DELETE /api/images/:key — delete image
-images.delete('/api/images/:key', async (c) => {
+images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const key = c.req.param('key');
     await c.env.IMAGES.delete(key);

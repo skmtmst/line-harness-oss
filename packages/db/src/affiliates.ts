@@ -13,6 +13,14 @@ export interface Affiliate {
   is_active: number;
   created_at: string;
   friend_id: string | null;
+  /** 連絡先。報酬の連絡に使う。NULL なら未登録 */
+  email: string | null;
+  /** 成果が確定するまでの保留日数。NULL なら即確定 */
+  hold_days: number | null;
+  /** 支払いサイクルの覚書。計算には使わない */
+  payout_cycle: string | null;
+  /** 成果が出たときに本人へ知らせるか */
+  notify_on_conversion: number;
 }
 
 export interface AffiliateClick {
@@ -138,7 +146,16 @@ export async function createAffiliateWithRandomCode(
 }
 
 export type UpdateAffiliateInput = Partial<
-  Pick<Affiliate, 'name' | 'commission_rate' | 'is_active'>
+  Pick<
+    Affiliate,
+    | 'name'
+    | 'commission_rate'
+    | 'is_active'
+    | 'email'
+    | 'hold_days'
+    | 'payout_cycle'
+    | 'notify_on_conversion'
+  >
 >;
 
 export async function updateAffiliate(
@@ -160,6 +177,24 @@ export async function updateAffiliate(
   if (updates.is_active !== undefined) {
     fields.push('is_active = ?');
     values.push(updates.is_active);
+  }
+  // 支払いの取り決めは、送られたときだけ触る。空文字は「消す」意味で
+  // NULL に寄せる。画面の入力欄を空にした = 未登録に戻す、と読める形にする。
+  if ('email' in updates) {
+    fields.push('email = ?');
+    values.push(updates.email || null);
+  }
+  if ('hold_days' in updates) {
+    fields.push('hold_days = ?');
+    values.push(updates.hold_days ?? null);
+  }
+  if ('payout_cycle' in updates) {
+    fields.push('payout_cycle = ?');
+    values.push(updates.payout_cycle || null);
+  }
+  if (updates.notify_on_conversion !== undefined) {
+    fields.push('notify_on_conversion = ?');
+    values.push(updates.notify_on_conversion);
   }
 
   if (fields.length === 0) return getAffiliateById(db, id);
@@ -226,6 +261,12 @@ export interface AffiliateReport {
    */
   totalConversions: number;
   totalRevenue: number;
+  /**
+   * Approved conversions paid at the fixed amount configured on each offer.
+   * Percentage-based affiliates continue to calculate their reward in the web
+   * layer from totalRevenue and commissionRate.
+   */
+  confirmedReward: number;
   /** Number of affiliate_links (ref_codes) belonging to this affiliate. */
   linkCount: number;
   /** Friends whose add-time last-touch attribution is this affiliate. */
@@ -302,10 +343,12 @@ export async function getAffiliateReport(
   // supply them for each subquery occurrence (clicks, conversions, revenue),
   // followed by the friend_adds CTE and finally the outer WHERE clause.
   const dateBindsForRevenue = [...cvDateBinds]; // revenue subquery reuses cv date conditions
+  const dateBindsForConfirmedReward = [...cvDateBinds];
   const allBinds = [
     ...clickDateBinds,   // for total_clicks subquery
     ...cvDateBinds,      // for total_conversions subquery
     ...dateBindsForRevenue, // for total_revenue subquery
+    ...dateBindsForConfirmedReward, // for confirmed_reward subquery
     ...friendAddBinds,   // for the friend_adds CTE date window
     ...values,           // for the outer WHERE clause
   ];
@@ -327,6 +370,14 @@ export async function getAffiliateReport(
          (SELECT COALESCE(SUM(cp.value), 0) FROM conversion_events ce
           JOIN conversion_points cp ON cp.id = ce.conversion_point_id
           WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)${cvDateCond}) as total_revenue,
+         (SELECT COALESCE(SUM(off.reward_amount), 0)
+            FROM conversion_events ce
+            JOIN affiliate_links al
+              ON al.ref_code = ce.attributed_ref_code
+             AND al.affiliate_id = a.id
+            JOIN affiliate_offers off ON off.id = al.offer_id
+           WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
+             AND COALESCE(ce.approval_status, 'pending') = 'approved'${cvDateCond}) as confirmed_reward,
          (SELECT COUNT(*) FROM affiliate_links al WHERE al.affiliate_id = a.id) as link_count,
          COALESCE(fa.friend_adds, 0) as friend_adds
        FROM affiliates a
@@ -343,6 +394,7 @@ export async function getAffiliateReport(
       total_clicks: number;
       total_conversions: number;
       total_revenue: number;
+      confirmed_reward: number;
       link_count: number;
       friend_adds: number;
     }>();
@@ -355,6 +407,7 @@ export async function getAffiliateReport(
     totalClicks: r.total_clicks,
     totalConversions: r.total_conversions,
     totalRevenue: r.total_revenue,
+    confirmedReward: r.confirmed_reward,
     linkCount: r.link_count,
     friendAdds: r.friend_adds,
   }));

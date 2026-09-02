@@ -19,12 +19,29 @@ import {
   enrollFriendInScenario,
   jstNow,
   getFriendScore,
+  recordAnalyticsEvent,
+  createWebhookInteraction,
+  finishWebhookInteraction,
+  type WebhookInteractionFailureReason,
 } from '@line-crm/db';
+import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
+import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
+
+import {
+  applyRichMenuTargeting,
+  isTargetingTrigger,
+} from './rich-menu-targeting.js';
 
 export interface EventPayload {
+  /** 再配達されても同じ出来事と判定できる、発生元の不変ID。 */
+  sourceEventId?: string;
+  /** 発生元の台帳名。分析の冪等キーに使う。 */
+  sourceKind?: string;
+  /** 推測せず、発生元が持つタイムゾーン付き時刻を渡す。 */
+  occurredAt?: string;
   friendId?: string;
   eventData?: Record<string, unknown>;
   conversionEventName?: string;
@@ -48,9 +65,18 @@ export async function fireEvent(
   lineAccessToken?: string,
   lineAccountId?: string | null,
 ): Promise<void> {
+  let outgoingWebhookLineAccountId = lineAccountId;
+  if (outgoingWebhookLineAccountId === undefined && payload.friendId) {
+    const friend = await db
+      .prepare('SELECT line_account_id FROM friends WHERE id = ?')
+      .bind(payload.friendId)
+      .first<{ line_account_id: string | null }>();
+    outgoingWebhookLineAccountId = friend?.line_account_id;
+  }
+
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
   const phase1: Promise<unknown>[] = [
-    fireOutgoingWebhooks(db, eventType, payload),
+    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
     processScoring(db, eventType, payload),
   ];
   if (payload.friendId && payload.conversionEventName) {
@@ -69,10 +95,82 @@ export async function fireEvent(
           currentScore: await getFriendScore(db, payload.friendId),
         },
       }
-    : payload;
+      : payload;
+
+  // 業務の正本は既存台帳のまま。発生元ID・時刻・アカウントがそろった事実だけを
+  // 分析用の追記台帳へ写す。失敗しても送信やタグ処理は巻き添えにしない。
+  if (lineAccountId && enrichedPayload.sourceEventId && enrichedPayload.occurredAt) {
+    const mappedType = eventType === 'cv_fire'
+      ? 'conversion_created'
+      : eventType === 'calendar_booked'
+        ? 'booking_confirmed'
+        : eventType;
+    try {
+      await recordAnalyticsEvent(db, {
+        lineAccountId,
+        friendId: enrichedPayload.friendId,
+        eventType: mappedType,
+        sourceKind: enrichedPayload.sourceKind ?? 'event_bus',
+        sourceId: enrichedPayload.sourceEventId,
+        occurredAt: enrichedPayload.occurredAt,
+        dimensions: enrichedPayload.eventData,
+        numericValue: enrichedPayload.conversionValue,
+      });
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: 'analytics_event_record_failed',
+        line_account_id: lineAccountId,
+        event_type: mappedType,
+        reason: error instanceof Error ? error.message : 'unknown',
+      }));
+    }
+  }
 
   // Phase 2: evaluate automations.
   await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+
+  // V6は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
+  // 旧イベントの時刻などからIDを推測すると再配達で二重実行になるため、
+  // 接続元が明示していないイベントは移行PRで接続するまで実行しない。
+  if (lineAccountId && enrichedPayload.sourceEventId) {
+    await dispatchAutomationEventWithLogging(db, {
+      lineAccountId,
+      eventType,
+      sourceEventId: enrichedPayload.sourceEventId,
+      friendId: enrichedPayload.friendId,
+      eventData: enrichedPayload.eventData,
+      lineAccessToken,
+    });
+  }
+
+  // Phase 3: リッチメニューの出し分けを見直す。
+  //
+  // オートメーションの後に置くのは、オートメーションでタグを付ける構成が
+  // 多いため。先に見直すと、いま付いたばかりのタグが条件に反映されない。
+  await reevaluateRichMenuTargeting(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+}
+
+/**
+ * 友だちごとに出すメニューを選び直す。
+ *
+ * 失敗しても呼び出し元には投げ返さない。メニューの出し分けは、そのとき
+ * 起きていること（メッセージへの返信やタグ付け）の付随処理なので、
+ * ここで転ぶと本体まで巻き添えになる。
+ */
+async function reevaluateRichMenuTargeting(
+  db: D1Database,
+  eventType: string,
+  payload: EventPayload,
+  lineAccessToken?: string,
+  lineAccountId?: string | null,
+): Promise<void> {
+  if (!isTargetingTrigger(eventType)) return;
+  if (!payload.friendId || !lineAccessToken || !lineAccountId) return;
+  try {
+    await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
+  } catch (err) {
+    console.error('[eventBus] rich menu targeting failed:', err);
+  }
 }
 
 /** 送信Webhookへの通知 */
@@ -80,44 +178,104 @@ async function fireOutgoingWebhooks(
   db: D1Database,
   eventType: string,
   payload: EventPayload,
+  lineAccountId?: string | null,
 ): Promise<void> {
   try {
-    const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType);
+    if (lineAccountId == null) {
+      console.log(JSON.stringify({
+        event: 'outgoing_webhook_line_account_unknown',
+        eventType,
+        hasFriendId: Boolean(payload.friendId),
+      }));
+    }
+    const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
+      let interactionId: string | null = null;
+      const started = Date.now();
       try {
         const body = JSON.stringify({
           event: eventType,
           timestamp: jstNow(),
           data: payload,
         });
-
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-        // HMAC署名（シークレットがある場合）
-        if (wh.secret) {
-          const encoder = new TextEncoder();
-          const key = await crypto.subtle.importKey(
-            'raw',
-            encoder.encode(wh.secret),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign'],
-          );
-          const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-          const hexSignature = Array.from(new Uint8Array(signature))
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join('');
-          headers['X-Webhook-Signature'] = hexSignature;
+        const idempotencyKey = payload.sourceEventId
+          ? `outgoing_webhook:${wh.id}:${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
+          : crypto.randomUUID();
+        if (lineAccountId) {
+          try {
+            const interaction = await createWebhookInteraction(db, {
+              lineAccountId,
+              direction: 'outgoing',
+              webhookId: wh.id,
+              webhookName: wh.name,
+              eventType,
+              triggerSummary: eventType,
+              requestBodyJson: body,
+              idempotencyKey,
+            });
+            interactionId = interaction.id;
+          } catch (logError) {
+            // 記録の一時障害で、本体の外部通知まで止めない。
+            console.error(`送信Webhook ${wh.id} の記録開始に失敗:`, logError);
+          }
         }
-
-        await fetch(wh.url, { method: 'POST', headers, body });
+        // 以前は fetch を投げっぱなしにしていて、相手が 500 を返しても
+        // 成功として扱っていた（例外にならないため）。deliverWebhook は
+        // 応答の状態まで見て、必要なら送り直す。
+        const result = await deliverWebhook(wh, body, { idempotencyKey });
+        if (!result.ok) {
+          console.error(
+            `送信Webhook ${wh.id} 失敗 (${result.attempts}回試行, 最後の応答=${result.lastStatus ?? '接続不可'})`,
+          );
+        }
+        if (interactionId && lineAccountId) {
+          try {
+            await finishWebhookInteraction(db, interactionId, lineAccountId, {
+              status: result.ok ? 'succeeded' : 'failed',
+              responseStatus: result.lastStatus,
+              attemptCount: result.attempts,
+              durationMs: Date.now() - started,
+              failureReason: result.ok ? null : outgoingFailureReason(result.lastStatus),
+            });
+          } catch (logError) {
+            // 届いた通知を、台帳更新の失敗だけで「送信失敗」とは扱わない。
+            console.error(`送信Webhook ${wh.id} の結果記録に失敗:`, logError);
+          }
+        }
+        try {
+          await recordDeliveryOutcome(db, wh.id, result.ok);
+        } catch (outcomeError) {
+          // 連続失敗数の更新は補助情報。配送結果そのものを巻き戻さない。
+          console.error(`送信Webhook ${wh.id} の連続失敗数を更新できませんでした:`, outcomeError);
+        }
       } catch (err) {
+        if (interactionId && lineAccountId) {
+          try {
+            await finishWebhookInteraction(db, interactionId, lineAccountId, {
+              status: 'failed',
+              responseStatus: null,
+              attemptCount: 1,
+              durationMs: Date.now() - started,
+              failureReason: 'unknown',
+            });
+          } catch (logError) {
+            console.error(`送信Webhook ${wh.id} の失敗記録に失敗:`, logError);
+          }
+        }
         console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
       }
     }
   } catch (err) {
     console.error('fireOutgoingWebhooks error:', err);
   }
+}
+
+function outgoingFailureReason(status: number | null): WebhookInteractionFailureReason {
+  if (status === null) return 'connection_failed';
+  if (status === 429) return 'response_429';
+  if (status >= 500) return 'response_5xx';
+  if (status >= 400) return 'response_4xx';
+  return 'unknown';
 }
 
 /** スコアリングルール適用 */
@@ -205,7 +363,7 @@ function matchConditions(
     if (payload.eventData.tagId !== conditions.tag_id) return false;
   }
 
-  // keyword チェック（message_received イベント用）
+  // keyword チェック（message_received / postback_received イベント用）
   if (conditions.keyword !== undefined && payload.eventData) {
     const text = payload.eventData.text as string | undefined;
     if (!text || !text.includes(conditions.keyword as string)) return false;
@@ -402,7 +560,7 @@ async function executeAction(
 }
 
 /** 送信メッセージを messages_log に記録（失敗しても例外を上げない） */
-async function logOutgoingMessage(
+export async function logOutgoingMessage(
   db: D1Database,
   params: {
     friendId: string;

@@ -1,0 +1,19 @@
+{
+  // Typecheck-only config for the repository scripts. They are executed with
+  // tsx (never compiled), so this exists purely so CI can catch type errors
+  // in scripts/ the way each package does for its own source.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    // No rootDir: nothing is emitted, and some scripts legitimately import
+    // package sources from outside this directory.
+    "rootDir": null,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["**/*.ts"]
+}

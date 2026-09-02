@@ -7,12 +7,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // without a real D1 binding.
 const dbMocks = {
   // eager module-load deps (mirror affiliate-links-redirect.test.ts)
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000' },
+  ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // self-serve affiliate helpers
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   getAffiliateByFriendId: vi.fn(),
   createAffiliate: vi.fn(),
   createAffiliateLink: vi.fn(),
@@ -22,6 +24,10 @@ const dbMocks = {
   // offer-name enrichment on link responses (loadOfferNames)
   listAffiliateOffers: vi.fn().mockResolvedValue([]),
   enrollAffiliateInOffer: vi.fn(),
+  getMileageSummaryForFriend: vi.fn(),
+  getMileageHistoryForFriend: vi.fn(),
+  getMileageSelfInsights: vi.fn(),
+  getMileageEarningOpportunitiesForFriend: vi.fn(),
   generateRefSlug: vi.fn(() => 'slug00'),
   // account-settings helpers (used by resolveLinkBaseUrl via @line-crm/db)
   getLinkBaseUrl: vi.fn().mockResolvedValue(null),
@@ -43,6 +49,7 @@ const env = {
   LIFF_URL: 'https://liff.line.me/1000000000-DefaultAA',
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: LOGIN_CHANNEL_ID,
+  LINE_CHANNEL_SECRET: 'wallet-link-secret',
 } as unknown as import('../index.js').Env['Bindings'];
 
 function call(path: string, init?: RequestInit) {
@@ -102,9 +109,9 @@ let linksByAffiliate: Map<string, LinkRow[]>;
 let statsByAffiliate: Map<string, Map<string, { friendAdds: number; conversions: number; conversionsPending: number; conversionsApproved: number }>>;
 let slugCounter: number;
 
-const FRIENDS: Record<string, { id: string; display_name: string }> = {
-  'U-alice': { id: 'friend-alice', display_name: 'Alice' },
-  'U-bob': { id: 'friend-bob', display_name: 'Bob' },
+const FRIENDS: Record<string, { id: string; display_name: string; user_id: string }> = {
+  'U-alice': { id: 'friend-alice', display_name: 'Alice', user_id: 'user-alice' },
+  'U-bob': { id: 'friend-bob', display_name: 'Bob', user_id: 'user-bob' },
 };
 
 function installStore() {
@@ -119,7 +126,7 @@ function installStore() {
     return statsByAffiliate.get(affiliateId) ?? new Map();
   });
 
-  dbMocks.getFriendByLineUserId.mockImplementation(async (_db: unknown, lineUserId: string) => {
+  dbMocks.getFriendByLineUserIdForAccount.mockImplementation(async (_db: unknown, lineUserId: string) => {
     return FRIENDS[lineUserId] ?? null;
   });
 
@@ -178,9 +185,40 @@ function installStore() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID },
+  ]);
   // No offers by default → serializeLink emits offerId/offerName = null.
   dbMocks.listAffiliateOffers.mockResolvedValue([]);
+  dbMocks.getMileageSummaryForFriend.mockResolvedValue({
+    programId: 'default',
+    programName: 'Harnessマイル',
+    available: 500,
+    pending: 0,
+    lifetimeEarned: 500,
+    spent: 0,
+  });
+  dbMocks.getMileageHistoryForFriend.mockResolvedValue([]);
+  dbMocks.getMileageSelfInsights.mockResolvedValue({
+    accountCount: 2,
+    rewardedActions: 12,
+    referralMiles: 180,
+    qualityReferralCount: 3,
+    lastEarnedAt: '2026-08-09T20:00:00+09:00',
+  });
+  dbMocks.getMileageEarningOpportunitiesForFriend.mockResolvedValue([
+    {
+      id: 'webinar:webinar-1',
+      type: 'webinar',
+      title: 'AI活用ウェビナー',
+      description: 'まず5分視聴で +5 mile',
+      rewardMiles: 55,
+      nextRewardMiles: 5,
+      progressPercent: 0,
+      ctaLabel: '今すぐ参加する',
+      url: 'https://liff.line.me/123/?page=webinar&slug=ai',
+    },
+  ]);
   installLineFetchMock();
   installStore();
 });
@@ -195,6 +233,11 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
     expect(res1.status).toBe(200);
     const body1 = (await res1.json()) as { affiliate: { id: string; name: string }; links: unknown[] };
     expect(body1.affiliate.name).toBe('Alice');
+    expect(dbMocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
+      DB,
+      'U-alice',
+      'account-main',
+    );
     // Registration auto-issues exactly one link.
     expect(body1.links).toHaveLength(1);
 
@@ -209,6 +252,65 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
     expect(body2.affiliate.id).toBe(body1.affiliate.id);
     // createAffiliate called exactly once across both registrations.
     expect(dbMocks.createAffiliate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GET /api/liff/mileage/me — generic wallet', () => {
+  it('returns mileage without requiring affiliate registration', async () => {
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice&limit=10');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      mileage: { available: number };
+      history: unknown[];
+      insights: { accountCount: number; referralMiles: number; qualityReferralCount: number };
+      opportunities: Array<{ type: string; rewardMiles: number; ctaLabel: string }>;
+    };
+    expect(body.mileage.available).toBe(500);
+    expect(body.insights).toMatchObject({
+      accountCount: 2,
+      referralMiles: 180,
+      qualityReferralCount: 3,
+    });
+    expect(body.opportunities[0]).toMatchObject({
+      type: 'webinar',
+      rewardMiles: 55,
+      ctaLabel: '今すぐ参加する',
+    });
+    expect(dbMocks.getMileageSummaryForFriend).toHaveBeenCalledWith(DB, 'friend-alice');
+    expect(dbMocks.getMileageHistoryForFriend).toHaveBeenCalledWith(
+      DB,
+      'friend-alice',
+      { limit: 10 },
+    );
+    expect(dbMocks.getMileageSelfInsights).toHaveBeenCalledWith(DB, 'friend-alice');
+    expect(dbMocks.getMileageEarningOpportunitiesForFriend).toHaveBeenCalledWith(
+      DB,
+      'friend-alice',
+    );
+    expect(dbMocks.getAffiliateByFriendId).not.toHaveBeenCalled();
+  });
+
+  it('signs cross-account friend-add missions for the verified wallet owner', async () => {
+    dbMocks.getMileageEarningOpportunitiesForFriend.mockResolvedValueOnce([
+      {
+        id: 'friend-add:account-2',
+        type: 'friend_add',
+        title: '公式②を友だち追加',
+        description: '友だち追加で +5 mile',
+        rewardMiles: 5,
+        nextRewardMiles: 5,
+        progressPercent: 0,
+        ctaLabel: '友だち追加する',
+        url: 'https://liff.line.me/2000000000-Second/?page=affiliate',
+        targetAccountId: 'account-2',
+      },
+    ]);
+
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { opportunities: Array<{ url: string }> };
+    const missionUrl = new URL(body.opportunities[0].url);
+    expect(missionUrl.searchParams.get('crossAccountToken')).toMatch(/^v1\./u);
   });
 });
 
@@ -335,7 +437,7 @@ describe('LINE token verification', () => {
 
     // A friend that never added the bot (verified but no friend row) → 404,
     // and crucially never creates an affiliate.
-    dbMocks.getFriendByLineUserId.mockImplementationOnce(async () => null);
+    dbMocks.getFriendByLineUserIdForAccount.mockImplementationOnce(async () => null);
     const ghost = await call('/api/liff/affiliate/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

@@ -1,14 +1,17 @@
 {
   "name": "worker",
-  "version": "0.17.0",
+  "version": "0.24.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build",
     "test": "vitest run",
+    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && wrangler deploy",
+    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build",
     "typecheck": "tsc --noEmit",
     "inject-version": "tsx scripts/inject-version.ts"
   },
@@ -16,23 +19,27 @@
     "@line-crm/db": "workspace:*",
     "@line-crm/line-sdk": "workspace:*",
     "@line-crm/shared": "workspace:*",
+    "@line-harness/update-engine": "workspace:*",
+    "hls.js": "^1.6.16",
     "hono": "^4.6.0",
+    "postal-mime": "^2.7.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@line-harness/update-engine": "workspace:*"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",
     "@cloudflare/workers-types": "^4.20241205.0",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "better-sqlite3": "^12.9.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^2.0.0",
-    "wrangler": "^4.0.0",
-    "tsx": "^4.21.0"
+    "wrangler": "^4.0.0"
   }
 }

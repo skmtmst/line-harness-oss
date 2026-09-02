@@ -1,3 +1,4 @@
+import type { FormLayout } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -50,7 +51,15 @@ async function get<T>(path: string): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
   const res = await fetch(url.toString(), { headers: authHeaders() });
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
+    const err = new Error(`API ${res.status}: ${text}`) as Error & { status: number; body: unknown };
+    err.status = res.status;
+    err.body = parsed ?? text;
+    throw err;
+  }
   return res.json();
 }
 
@@ -61,6 +70,28 @@ async function post<T>(path: string, body: unknown, headers: Record<string, stri
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json', ...headers }),
     body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
+    const err = new Error(`API ${res.status}`) as Error & { status: number; body: unknown };
+    err.status = res.status;
+    err.body = parsed ?? text;
+    throw err;
+  }
+  return res.json();
+}
+
+async function postBinary<T>(path: string, file: Blob): Promise<T> {
+  const url = new URL(`${BASE}${path}`, window.location.origin);
+  url.searchParams.set('liffId', getLiffId());
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    // ファイルの中身をそのまま送る。multipart にすると、境界の組み立てを
+    // 自前で持つことになり、得るものが無い。
+    headers: authHeaders({ 'Content-Type': file.type || 'application/octet-stream' }),
+    body: file,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -116,6 +147,47 @@ export interface EventBookingMine {
   slot_ends_at: string;
 }
 
+// ===== Webinar =====
+
+export interface WebinarCta {
+  label: string;
+  url: string;
+  showAtSeconds: number;
+}
+
+export interface WebinarSakuraComment {
+  atSeconds: number;
+  authorName: string;
+  body: string;
+}
+
+export type WebinarState =
+  | {
+      live: true;
+      title: string;
+      durationSeconds: number;
+      sessionStartAt: number;
+      offsetSeconds: number;
+      playlistUrl: string;
+      cta: WebinarCta | null;
+      comments: WebinarSakuraComment[];
+    }
+  | { live: false; title: string; nextSessionAt: number | null };
+
+
+// ============================================================
+// 回答フォーム
+// ============================================================
+
+/** 公開して良い範囲だけを返した回答フォーム。 */
+export interface PublicForm {
+  id: string;
+  name: string;
+  description: string | null;
+  layout: FormLayout;
+  isActive: boolean;
+}
+
 export const api = {
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
   staffOf: (menuId: string) =>
@@ -154,4 +226,31 @@ export const api = {
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
+
+  // ===== 回答フォーム =====
+  getForm: (id: string) => get<PublicForm>(`/api/forms/${id}`),
+  /** 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る */
+  getMyLatestFormAnswer: (id: string) =>
+    get<{ answers: Record<string, unknown>; createdAt: string } | null>(
+      `/api/forms/${id}/my-latest`,
+    ),
+  submitForm: (
+    id: string,
+    body: { data: Record<string, unknown>; trackedLinkId?: string },
+  ) => post<{ id: string }>(`/api/forms/${id}/submit`, body),
+  /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
+  uploadFormFile: (id: string, file: File) =>
+    postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
+      `/api/forms/${id}/files`,
+      file,
+    ),
+
+  // ===== Webinar =====
+  webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
+  webinarHeartbeat: (slug: string, sessionStartAt: number, positionSeconds: number) =>
+    post<{ ok: true }>(`/api/liff/webinars/${slug}/heartbeat`, { sessionStartAt, positionSeconds }),
+  webinarComment: (slug: string, sessionStartAt: number, atSeconds: number, body: string) =>
+    post<{ ok: true }>(`/api/liff/webinars/${slug}/comments`, { sessionStartAt, atSeconds, body }),
+  webinarCtaClick: (slug: string, sessionStartAt: number) =>
+    post<{ ok: true }>(`/api/liff/webinars/${slug}/cta-click`, { sessionStartAt }),
 };

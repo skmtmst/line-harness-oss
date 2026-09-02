@@ -190,13 +190,46 @@ export interface ImageMapMessageType {
   actions: Record<string, unknown>[];
 }
 
+/** 位置情報。LINE上では地図の吹き出しになる。 */
+export interface LocationMessage {
+  type: 'location';
+  /** 吹き出しの見出し。店名など。 */
+  title: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * スタンプ。
+ *
+ * packageId と stickerId の組でしか送れない（画像URLでは送れない）。
+ * 送れるのは LINE が公開している基本スタンプだけで、購入したスタンプや
+ * クリエイターズスタンプは Messaging API から送れない。
+ */
+export interface StickerMessage {
+  type: 'sticker';
+  packageId: string;
+  stickerId: string;
+}
+
+/** 音声。m4a のみ。duration はミリ秒。 */
+export interface AudioMessage {
+  type: 'audio';
+  originalContentUrl: string;
+  duration: number;
+}
+
 export type Message =
   | TextMessage
   | ImageMessage
   | FlexMessage
   | VideoMessage
   | TemplateMessage
-  | ImageMapMessageType;
+  | ImageMapMessageType
+  | LocationMessage
+  | StickerMessage
+  | AudioMessage;
 
 // ─── Rich Menu types ──────────────────────────────────────────────────────────
 
@@ -271,6 +304,7 @@ export interface RichMenuObject {
 export interface PushMessageRequest {
   to: string;
   messages: Message[];
+  customAggregationUnits?: string[];
 }
 
 export interface MulticastRequest {

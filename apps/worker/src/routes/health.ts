@@ -8,6 +8,8 @@ import {
   updateAccountMigration,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const health = new Hono<Env>();
 
@@ -27,6 +29,10 @@ health.get('/api/health', (c) => c.json(LIVENESS_BODY));
 health.get('/api/accounts/:id/health', async (c) => {
   try {
     const lineAccountId = c.req.param('id');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.ids.includes(lineAccountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     const [riskLevel, logs] = await Promise.all([
       getLatestRiskLevel(c.env.DB, lineAccountId),
       getAccountHealthLogs(c.env.DB, lineAccountId),
@@ -57,9 +63,14 @@ health.get('/api/accounts/:id/health', async (c) => {
 health.get('/api/accounts/migrations', async (c) => {
   try {
     const items = await getAccountMigrations(c.env.DB);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const visible = items.filter(
+      (item) => scope.allowedAccountIds.includes(item.from_account_id)
+        && scope.allowedAccountIds.includes(item.to_account_id),
+    );
     return c.json({
       success: true,
-      data: items.map((m) => ({
+      data: visible.map((m) => ({
         id: m.id,
         fromAccountId: m.from_account_id,
         toAccountId: m.to_account_id,
@@ -76,7 +87,7 @@ health.get('/api/accounts/migrations', async (c) => {
   }
 });
 
-health.post('/api/accounts/:id/migrate', async (c) => {
+health.post('/api/accounts/:id/migrate', requireRole('owner'), async (c) => {
   try {
     const fromAccountId = c.req.param('id');
     const body = await c.req.json<{ toAccountId: string }>();
@@ -123,6 +134,11 @@ health.get('/api/accounts/migrations/:migrationId', async (c) => {
   try {
     const item = await getAccountMigrationById(c.env.DB, c.req.param('migrationId'));
     if (!item) return c.json({ success: false, error: 'Migration not found' }, 404);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(item.from_account_id)
+      || !scope.allowedAccountIds.includes(item.to_account_id)) {
+      return c.json({ success: false, error: 'Migration not found' }, 404);
+    }
     return c.json({
       success: true,
       data: {

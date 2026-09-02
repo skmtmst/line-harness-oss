@@ -1,108 +1,105 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useBrand } from '@/lib/use-brand'
+import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
+
+/** 看板が取れないときに出す名前。 */
+const FALLBACK_NAME = '然-NEN- LINE管理システム'
 
 export default function LoginPage() {
-  const [apiKey, setApiKey] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [error, setError] = useState('')
+  const brand = useBrand()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        setError('NEXT_PUBLIC_API_URL is not set in build env')
-        setLoading(false)
-        return
-      }
-      // Exchange the API key for an HttpOnly session cookie. The key is never
-      // stored in localStorage (removes the XSS-exposed credential).
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
-      })
-
-      if (res.ok) {
-        localStorage.removeItem('lh_api_key')
-        try {
-          const loginData = await res.json()
-          if (loginData.success && loginData.data) {
-            localStorage.setItem('lh_staff_name', loginData.data.name)
-            localStorage.setItem('lh_staff_role', loginData.data.role)
-          }
-          // Cache the CSRF token for mutating requests (double-submit).
-          if (loginData.csrfToken) {
-            localStorage.setItem('lh_csrf', loginData.csrfToken)
-          }
-        } catch {
-          // Profile / CSRF caching is best-effort.
-        }
-        router.push('/')
-      } else if (res.status === 401) {
-        setError('APIキーが正しくありません')
-      } else {
-        // Surface topology / configuration errors (e.g. cross-site cookie guard).
-        let message = 'ログインに失敗しました'
-        try {
-          const data = await res.json()
-          if (data?.error) message = data.error
-        } catch {
-          // keep default message
-        }
-        setError(message)
-      }
-    } catch {
-      setError('接続に失敗しました')
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    const errorCode = new URLSearchParams(window.location.search).get('error')
+    if (errorCode === 'not_authorized') {
+      setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
+    } else if (errorCode) {
+      setError('LINEログインを完了できませんでした。もう一度お試しください。')
     }
+  }, [])
+
+  const handleLogin = () => {
+    setLoading(true)
+    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    if (!apiUrl) return setLoading(false)
+    window.location.assign(`${apiUrl}/api/auth/line`)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#06C755' }}>
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-3" style={{ backgroundColor: '#06C755' }}>
-            H
-          </div>
-          <h1 className="text-xl font-bold text-gray-900">L Harness</h1>
-          <p className="text-sm text-gray-500 mt-1">管理画面にログイン</p>
+    // 地は沈んだ面。緑ベタの上に白カードを浮かせていたが、設計では
+    // 薄いグレーの上に置く。緑はボタンとロゴだけに残す。
+    <main className="flex min-h-[100svh] flex-col items-center justify-center bg-canvas-sunken px-4 py-8 sm:px-6 sm:py-12">
+      <section className="w-full max-w-lg rounded-card bg-canvas px-6 py-10 shadow-sm sm:px-12">
+        <div className="text-center">
+          {/* 設定したアイコンを出す。無いときだけ「然」の字に落ちる。
+              画像を出す先が公式アカウントなので、alt は名前をそのまま使う。 */}
+          {brand.iconUrl ? (
+            <img
+              src={brand.iconUrl}
+              alt={brand.name ?? FALLBACK_NAME}
+              className="mx-auto h-16 w-16 rounded-card object-cover"
+            />
+          ) : (
+            <div
+              className="mx-auto flex h-16 w-16 items-center justify-center rounded-card bg-accent-soft text-2xl font-bold text-accent"
+              aria-hidden="true"
+            >
+              然
+            </div>
+          )}
+          {/* 公式アカウントの表示名。友だちに見えているのはこちらで、
+              DB 側の呼び名（「本番」「テスト」など）ではない。 */}
+          <h1 className="mx-auto mt-5 max-w-sm text-xl font-bold leading-snug text-ink">
+            {brand.name ?? FALLBACK_NAME}
+          </h1>
+          <p className="mt-2 text-sm text-ink-secondary">管理画面にログイン</p>
         </div>
 
-        <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="APIキーを入力"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              autoFocus
-            />
-          </div>
-
+        <div className="mt-7">
           {error && (
-            <p className="text-sm text-red-600 mb-4">{error}</p>
+            <p className="mb-4 rounded-control bg-danger-bg px-4 py-3 text-sm text-danger">{error}</p>
           )}
 
           <button
-            type="submit"
-            disabled={loading || !apiKey}
-            className="w-full py-3 text-white font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: '#06C755' }}
+            type="button"
+            onClick={handleLogin}
+            disabled={loading}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-control bg-accent px-4 text-base font-bold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
-            {loading ? 'ログイン中...' : 'ログイン'}
+            {/* 白い四角の中に緑のアイコンを入れていたが、設計は白の線画そのまま。 */}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5 shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+            </svg>
+            <span>{loading ? 'LINEへ移動中…' : 'LINEでログイン'}</span>
           </button>
-        </form>
-      </div>
-    </div>
+          <p className="mt-5 text-center text-xs leading-relaxed text-ink-faint">
+            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントだけが
+            ログインできます。
+          </p>
+        </div>
+
+        <div className="mt-6 border-t border-hairline pt-6 text-center">
+          <p className="text-sm font-bold text-ink">ログインできない場合</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+            管理者にアカウントの登録を依頼してください。
+          </p>
+        </div>
+      </section>
+
+      {/* 著作表示はカードの中ではなく、カードの外の下。 */}
+      <p className="mt-10 text-center text-xs text-ink-faint">© 然-NEN-</p>
+    </main>
   )
 }

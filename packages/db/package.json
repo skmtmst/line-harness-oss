@@ -1,6 +1,6 @@
 {
   "name": "@line-crm/db",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "D1 database query helpers for LINE CRM",
   "license": "MIT",
   "main": "./src/index.ts",
@@ -13,9 +13,15 @@
     "bootstrap.sql"
   ],
   "scripts": {
+    "pretest": "pnpm --filter @line-crm/shared build",
     "test": "vitest run",
+    "pretypecheck": "pnpm --filter @line-crm/shared build",
     "typecheck": "tsc --noEmit",
-    "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs"
+    "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs",
+    "check:bootstrap": "node ./scripts/generate-bootstrap.mjs --check"
+  },
+  "dependencies": {
+    "@line-crm/shared": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241205.0",

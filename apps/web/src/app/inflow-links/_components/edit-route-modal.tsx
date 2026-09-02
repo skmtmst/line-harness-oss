@@ -23,10 +23,12 @@ interface Props {
   scenarios: Scenario[]
   templates: MessageTemplate[]
   tags: Tag[]
+  existingGenres: string[]
+  initialGenre?: string
   /** Pre-filled ref_code for "register an unregistered inflow ref" flow. */
   initialRefCode?: string
   onClose: () => void
-  onSaved: () => void
+  onSaved: (savedRoute: EntryRoute, created: boolean) => void
 }
 
 export default function EditRouteModal({
@@ -35,6 +37,8 @@ export default function EditRouteModal({
   scenarios,
   templates,
   tags,
+  existingGenres,
+  initialGenre,
   initialRefCode,
   onClose,
   onSaved,
@@ -64,8 +68,10 @@ export default function EditRouteModal({
   // that has already been seen in inflow), so we lock the input to prevent
   // the user from accidentally renaming the ref and orphaning the prior stats.
   const refCodeLocked = isNew && !!initialRefCode
+  const genreLocked = isNew && !!initialGenre
   const [form, setForm] = useState<CreateEntryRouteInput>(() => ({
     refCode: route?.refCode ?? initialRefCode ?? '',
+    genre: route?.genre ?? initialGenre ?? '',
     name: route?.name ?? '',
     tagId: route?.tagId ?? null,
     poolId: route?.poolId ?? mainPool?.id ?? null,
@@ -98,7 +104,7 @@ export default function EditRouteModal({
       ? await api.entryRoutes.create(form)
       : await api.entryRoutes.update(route!.id, form)
     setSubmitting(false)
-    if (res.success) onSaved()
+    if (res.success) onSaved(res.data, isNew)
     else setError(res.error ?? '保存に失敗しました')
   }
 
@@ -123,12 +129,33 @@ export default function EditRouteModal({
           </div>
         )}
 
-        <Field label="名前（運用用ラベル）">
+        <Field label="ジャンル（協力会社・グループ）">
+          <input
+            list={genreLocked ? undefined : 'referral-genre-options'}
+            value={form.genre ?? ''}
+            onChange={(e) => setForm({ ...form, genre: e.target.value })}
+            readOnly={genreLocked}
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm read-only:bg-emerald-50 read-only:border-emerald-200 read-only:text-emerald-800 read-only:font-medium"
+            placeholder="例: A店"
+            maxLength={80}
+          />
+          <datalist id="referral-genre-options">
+            {existingGenres.map((genre) => <option key={genre} value={genre} />)}
+          </datalist>
+          <p className="text-xs text-gray-500 mt-1">
+            {genreLocked
+              ? '左側で選択したジャンルへ登録されます。'
+              : '同じ協力会社や媒体を同じジャンル名にすると、一覧でまとめて管理できます。'}
+          </p>
+        </Field>
+
+        <Field label="名前（ジャンル内の流入経路）">
           <input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-            placeholder="例: YouTube 動画概要欄"
+            placeholder="例: Instagram プロフィール"
+            maxLength={120}
           />
         </Field>
 
@@ -259,7 +286,7 @@ export default function EditRouteModal({
           </button>
           <button
             onClick={onSubmit}
-            disabled={submitting || !form.name || !form.refCode}
+            disabled={submitting || !form.genre?.trim() || !form.name.trim() || !form.refCode.trim()}
             className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
           >
             {submitting ? '保存中…' : isNew ? '作成' : '保存'}
