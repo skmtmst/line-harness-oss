@@ -65,8 +65,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 旧枝の6個（うち主要3個）が消え、V4本体の5個（うち主要3個）が入る。
     // 2026-09-02: #433 の使用先確認と質問作成は development 側で増えている。
     // **片方を選ぶともう片方の増減が数から消える**ので、統合後の木で数え直した。
+    // 2026-09-02: テンプレート一覧の取得失敗は主要操作ではなく、状態表示の
+    // 「再読み込み」として副次操作へ寄せた。統合後の木で主要16個を実測した。
     expect(openings).toHaveLength(41)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(17)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {

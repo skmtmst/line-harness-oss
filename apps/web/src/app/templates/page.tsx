@@ -7,8 +7,16 @@ import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
+import {
+  createBlockedReason,
+  failureOf,
+  failureOfResponse,
+  listView,
+  type TemplatesFailure,
+} from './list-state-kind'
 import { templateDeleteDescription } from './template-delete-message'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
@@ -90,8 +98,10 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
+  /** 一覧を読み込めなかった理由。**取得失敗と権限不足を分ける。** */
+  const [failure, setFailure] = useState<TemplatesFailure | null>(null)
+  /** 操作（更新・削除）が失敗したときの帯。一覧の読み込み失敗とは別。 */
   const [error, setError] = useState('')
-  const [loadError, setLoadError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
   const [nameQuery, setNameQuery] = useState('')
@@ -132,25 +142,28 @@ export default function TemplatesPage() {
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setTemplates([])
-      setLoadError('')
+      setFailure(null)
       setLoading(false)
       return
     }
     const accountId = selectedAccountId
     setLoading(true)
+    setError('')
+    setFailure(null)
+    // アカウントを切り替えたとき、前のアカウントの行を残さない。
     setTemplates([])
-    setLoadError('')
     try {
       const res = await api.templates.list(undefined, accountId)
       if (activeAccountRef.current !== accountId) return
       if (res.success) {
         setTemplates(res.data)
       } else {
-        setLoadError('テンプレートを読み込めませんでした。もう一度お試しください。')
+        setFailure(failureOfResponse())
       }
-    } catch {
+    } catch (e) {
       if (activeAccountRef.current === accountId) {
-        setLoadError('テンプレートの読み込みに失敗しました。')
+        // 権限不足を「読み込めませんでした」に混ぜない。
+        setFailure(failureOf(e))
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
@@ -307,6 +320,15 @@ export default function TemplatesPage() {
     }
   }
 
+  // 一覧に何を出すか。**読込中・取得失敗・権限不足・空・0件を混ぜない。**
+  const view = listView({
+    loading,
+    failure,
+    total: templates.length,
+    matched: filteredTemplates.length,
+  })
+  const createBlocked = createBlockedReason({ loading, failure })
+
   const scenarioStepUsages = drawerData?.usedBy.scenarioSteps ?? []
   const reminderStepUsages = drawerData?.usedBy.reminderSteps ?? []
   const richMenuAreaUsages = drawerData?.usedBy.richMenuAreas ?? []
@@ -321,7 +343,7 @@ export default function TemplatesPage() {
     : 0
 
   return (
-    <div>
+    <div data-design-node="W7LBc">
       <div data-design="TypeTabs" data-design-node="W7LBc kcmGB">
         <Tabs
           items={[
@@ -366,6 +388,7 @@ export default function TemplatesPage() {
           data-design-node="W7LBc FuBeQ"
         >
           <div className="flex items-center gap-2">
+            {/* 押せない理由は本文に出す。押せないボタンを黙って置かない。 */}
             <Button
               onClick={() => {
                 if (!selectedAccountId) {
@@ -375,12 +398,19 @@ export default function TemplatesPage() {
                 setShowCreate(true)
               }}
               variant="primary"
+              disabled={createBlocked !== null}
+              aria-describedby={createBlocked ? 'tpl-create-blocked' : undefined}
             >
               テンプレートを作る
             </Button>
             <Button href="/templates/questions/new" variant="secondary">
               質問を作る
             </Button>
+            {createBlocked && (
+              <p id="tpl-create-blocked" className="text-ink-faint text-xs">
+                {createBlocked}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -417,8 +447,12 @@ export default function TemplatesPage() {
       </aside>
       <div className="min-w-0 flex-1">
 
+      {/*
+        案内帯（V6 §2-3）。**できないことを「できます」と書かない。**
+        送信数はまだ口が無いので、表では `—` のままになる。
+      */}
       <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
-        一覧からテンプレートの中身・使われている場所・送信数を確認できます。
+        一覧からテンプレートの中身と、使われている場所を確認できます。送信数はまだ繋がっていません。テンプレート別の送信集計が接続されると表示されます。
       </div>
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
@@ -435,7 +469,10 @@ export default function TemplatesPage() {
 
 
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <div
+          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -561,41 +598,49 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* Table */}
-      {accountLoading || loading ? (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
-              <div className="h-5 bg-canvas-sunken rounded w-12" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-canvas-sunken rounded w-32" />
-              </div>
-              <div className="h-3 bg-canvas-sunken rounded w-12" />
-              <div className="h-3 bg-canvas-sunken rounded w-24" />
-            </div>
-          ))}
-        </div>
+      {/*
+        一覧の状態。**「まだ1件も無い」「絞り込みに合わない」「読み込めない」
+        「権限がない」を言い分ける。** 以前は4つとも同じ1文だったので、
+        読み込みに失敗したときも、登録したものが消えたように見えていた。
+        アカウント未選択は development が足した5つ目の言い分け。**同じ文へ
+        まとめない。** 選ぶまでは読みに行っていないので、失敗ではない。
+      */}
+      {accountLoading || view === 'loading' ? (
+        <ListState kind="loading" title="読み込んでいます" />
       ) : !selectedAccountId ? (
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <p className="text-ink font-medium">
-            {accounts.length > 0
+        <ListState
+          kind="empty"
+          title={
+            accounts.length > 0
               ? '上のバーでLINE公式アカウントを選んでください'
-              : 'LINE公式アカウントが登録されていません'}
-          </p>
-        </div>
-      ) : loadError ? (
-        <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
-          <p className="text-danger font-medium">テンプレートを読み込めませんでした</p>
-          <p className="text-ink-secondary mt-2 text-sm">{loadError}</p>
-          <Button className="mt-4" variant="primary" onClick={() => void load()}>
-            もう一度読み込む
-          </Button>
-        </div>
-      ) : filteredTemplates.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">該当するテンプレートがありません</p>
-        </div>
+              : 'LINE公式アカウントが登録されていません'
+          }
+        />
+      ) : view === 'forbidden' ? (
+        <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
+      ) : view === 'error' ? (
+        <ListState
+          kind="error"
+          title={failure?.title}
+          description={failure?.description}
+          action={
+            <Button onClick={() => void load()} variant="secondary">
+              再読み込み
+            </Button>
+          }
+        />
+      ) : view === 'empty' ? (
+        <ListState
+          kind="empty"
+          title="まだテンプレートがありません"
+          description="よく送る文を登録しておくと、配信・自動応答から選べます。"
+        />
+      ) : view === 'no-match' ? (
+        <ListState
+          kind="empty"
+          title="条件に合うテンプレートはありません"
+          description={`${templates.length}件のうち0件が一致しました。検索語か絞り込みを変えてください。`}
+        />
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
@@ -635,7 +680,12 @@ export default function TemplatesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-ink-faint text-sm" title="テンプレート別の送信数はまだ取得できません">—</span>
+                      <span
+                        className="text-ink-faint text-sm"
+                        title="まだ繋がっていません。テンプレート別の送信集計が接続されると表示されます。"
+                      >
+                        —
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
