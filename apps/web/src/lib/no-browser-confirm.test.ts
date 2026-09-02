@@ -40,30 +40,36 @@ const NOT_YET_MIGRATED = [
   'app/booking/staff/page.tsx',
   'app/booking/staff/shifts/page.tsx',
   'app/broadcasts/page.tsx',
-  'app/contents/vars/edit/page.tsx',
   'app/conversions/page.tsx',
   'app/events/bookings/page.tsx',
   'app/pools/page.tsx',
-  'app/reminders/edit/page.tsx',
   'app/reminders/page.tsx',
   'app/restaurant-test/restaurant-console.tsx',
-  'app/rich-menus/edit/page.tsx',
   'app/staff/page.tsx',
   'app/templates/detail/page.tsx',
   'app/templates/page.tsx',
   'app/webhooks/page.tsx',
-  'components/broadcasts/broadcast-asset-manager.tsx',
   'components/events/event-form.tsx',
   'components/events/event-wizard.tsx',
   'components/rich-menus/apply-to-tag-modal.tsx',
   'components/scenarios/scenario-list.tsx',
 ]
 
+/**
+ * ブラウザの `confirm` の呼び出し。
+ *
+ * **`window.confirm(` を見落としていた。** `[^.\w]` で「点の直前」を外して
+ * いたので、`confirm(` は捕まえるのに `window.confirm(` は素通りしていた。
+ * `app/form-submissions/edit/page.tsx` はそれで一覧にも載らないまま残って
+ * いた。受け側（`window` / `globalThis` / `self`）を明示して捕まえる。
+ */
+const BROWSER_CONFIRM = /(?:^|[^.\w])confirm\(|\b(?:window|globalThis|self)\.confirm\(/
+
 describe('ブラウザのconfirmを使わない', () => {
   it('confirm を使うファイルを増やさない', () => {
     const offenders = walk(SRC)
       .filter((f) => !/confirm-dialog/.test(f))
-      .filter((f) => /(?:^|[^.\w])confirm\(/.test(code(fs.readFileSync(f, 'utf8'))))
+      .filter((f) => BROWSER_CONFIRM.test(code(fs.readFileSync(f, 'utf8'))))
       .map((f) => path.relative(SRC, f))
       .sort()
     const unexpected = offenders.filter((f) => !NOT_YET_MIGRATED.includes(f))
