@@ -377,9 +377,8 @@
     "arbitrary-value": 2
   },
   "app/templates/detail/page.tsx": {
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1,
-    "arbitrary-value": 2
+    "arbitrary-value": 2,
+    "direct-secondary-button": 1
   },
   "app/templates/edit/page.tsx": {
     "direct-secondary-button": 4,

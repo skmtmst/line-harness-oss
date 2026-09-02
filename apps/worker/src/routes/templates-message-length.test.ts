@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => mocks);
 
+const accountAccess = vi.hoisted(() => ({
+  canAccessAllLineAccounts: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(),
+}));
+vi.mock('../services/account-access.js', () => accountAccess);
+
 import { templates } from './templates.js';
 
 function app() {
@@ -43,12 +49,18 @@ function storedTemplate(messageContent: string) {
     folder_id: null,
     created_at: '2026-09-01T00:00:00+09:00',
     updated_at: '2026-09-01T00:00:00+09:00',
+    line_account_id: 'account-1',
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+  accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
+  accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: false,
+  });
   mocks.createTemplate.mockImplementation(async (_db, input) => storedTemplate(input.messageContent));
 });
 
@@ -58,6 +70,7 @@ describe('テキストテンプレートの本文上限', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
+        accountId: 'account-1',
         name: '長すぎる本文',
         messageType: 'text',
         messageContent: 'あ'.repeat(5_001),
@@ -113,6 +126,7 @@ describe('テキストテンプレートの本文上限', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
+        accountId: 'account-1',
         name: '上限ちょうど',
         messageType: 'text',
         messageContent: 'あ'.repeat(5_000),

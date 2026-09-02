@@ -14,7 +14,7 @@ describe('共通部品の影響範囲', () => {
   // 表示は `components/friend-fields/tags-page-v4.tsx` が正本で、
   // 入口のpageは共通Button・共通ページ送りを使わなくなった。
   // development 側も別に増減しているので、統合後の実数へ合わせる。
-  it('共通Buttonを直接importする80ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする81ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -66,6 +66,7 @@ describe('共通部品の影響範囲', () => {
       'app/tags/fields/new/page.tsx',
       'app/tags/folders/new/page.tsx',
       'app/tags/searches/edit/page.tsx',
+      'app/templates/detail/page.tsx',
       'app/templates/page.tsx',
       'app/templates/questions/new/page.tsx',
       'app/webhooks/page.tsx',

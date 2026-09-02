@@ -41,7 +41,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作39個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作41個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -62,10 +62,11 @@ describe('標準ボタンの第1段階移行', () => {
     // 同日: 案件タブのCSV・再読み込み・空状態からの作成を統合し、
     // 実際の7ルートを再計測して40個・主要16個へ締め直した。
     // 2026-09-02: /tags の見張り先を、描かれない旧V5の枝からV4本体へ移した。
-    // 旧枝の6個（うち主要3個）が消え、V4本体の5個（うち主要3個）が入って
-    // 40→39。主要は16のまま。**減ったので締め直す。**
-    expect(openings).toHaveLength(39)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
+    // 旧枝の6個（うち主要3個）が消え、V4本体の5個（うち主要3個）が入る。
+    // 2026-09-02: #433 の使用先確認と質問作成は development 側で増えている。
+    // **片方を選ぶともう片方の増減が数から消える**ので、統合後の木で数え直した。
+    expect(openings).toHaveLength(41)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(17)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -127,8 +128,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-09-01: #462 が予約メニュー一覧の作成操作を共通Buttonへ寄せたため、
     // 最新 development と統合した木を再計測して134へ締め直す。
     // 2026-09-02: /tags の描かれない旧V5枝を消したが、あの枝に直書きの
-    // 主要操作は無かったため134のまま。
-    expect(debt['direct-primary-button']).toBe(134)
+    // 主要操作は無かったため、この枝だけでは134のまま。
+    // 2026-09-02: #433 がテンプレート詳細の編集操作を共通Buttonへ寄せたため、
+    // development 側では134から1つ減っている。統合後の実測へ合わせる。
+    expect(debt['direct-primary-button']).toBe(133)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
     //
@@ -185,10 +188,12 @@ describe('標準ボタンの第1段階移行', () => {
     // 寄せず、統合後の木で1つ増える。担当・対応は最新の専用プルダウンを保つ。
     // 2026-09-02: /tags の描かれない旧V5枝ごと、直書きの副次操作3つ
     // （並び替えの切り替え・フォルダ削除・タグ削除）が消えた。
-    // 2026-09-02: #432 がウェビナー一覧から動かない並び替え・フォルダ操作を外した。
+    // 2026-09-02: #432 がウェビナー一覧から動かない並び替え・フォルダ操作を
+    // 外し、#433 がテンプレート詳細の戻る操作を共通Buttonへ寄せたため、
+    // development 側では239から3つ減っている。
     // 2026-09-02: この枝と development の両方が別々に減らしていた。
     // **片方を選ぶとどちらかの成果が数から消える**ので、統合後の木で数え直した。
-    expect(debt['direct-secondary-button']).toBe(234)
+    expect(debt['direct-secondary-button']).toBe(233)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
