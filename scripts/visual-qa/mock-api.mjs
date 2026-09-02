@@ -458,7 +458,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
     // `undefined` になり `friendName.charAt(0)` で落ちる。
     const row = CHATS.find((c) => c.id === chat[1])
-    if (row) return { success: true, data: { ...row, messages: FRIEND_MESSAGES[row.friendId] ?? [] } }
+    if (row) {
+      const friend = FRIEND_DETAILS[row.friendId]
+      return {
+        success: true,
+        data: {
+          ...row,
+          friendRealName: friend?.realName ?? null,
+          isAttention: friend?.metadata?.__attention === '1',
+          messages: FRIEND_MESSAGES[row.friendId] ?? [],
+        },
+      }
+    }
   }
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }

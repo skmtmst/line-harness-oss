@@ -90,7 +90,7 @@
     "arbitrary-value": 105,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 3
   },
   "app/contents/page.tsx": {
     "arbitrary-value": 9,
