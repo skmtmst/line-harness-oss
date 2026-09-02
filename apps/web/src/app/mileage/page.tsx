@@ -14,6 +14,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
 import { formatMileageDate } from './mileage-display'
+import { mileagePaginationTotal } from './mileage-response-state'
 import {
   RULE_FILTERS,
   RULE_SORTS,
@@ -104,6 +105,7 @@ function MileagePageInner() {
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
   const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
   const [ruleSort, setRuleSort] = useState<RuleSort>('newest')
+  const overviewTotal = mileagePaginationTotal(overview)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -435,7 +437,7 @@ function MileagePageInner() {
             <h2 className="text-sm font-semibold text-gray-900">マイル・コミットランキング</h2>
             <p className="mt-1 text-xs text-gray-500">同じ人が複数アカウントにいる場合は1人にまとめています。</p>
           </div>
-          <span className="text-xs text-gray-400">{formatNumber(overview?.pagination.total ?? 0)}人</span>
+          <span className="text-xs text-gray-400">{overviewTotal === null ? '—' : `${formatNumber(overviewTotal)}人`}</span>
         </div>
 
         {members.length === 0 ? (
