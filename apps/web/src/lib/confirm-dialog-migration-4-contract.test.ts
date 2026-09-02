@@ -88,7 +88,13 @@ function dialog(src: string, marker: string): string {
   return hit[0]
 }
 
-/** 直したファイルすべてに共通で当てる。 */
+/*
+  直したファイルすべてに共通で当てる。
+
+  `app/templates/page.tsx` と `app/templates/detail/page.tsx` は入っていない。
+  取り込み中に別のPRが先に確認窓へ移し、使用先も6種類まで数えるようになったので、
+  この本では手を引いた（`no-browser-confirm.test.ts` の一覧からは消えている）。
+*/
 const MIGRATED = [
   'app/automations/page.tsx',
   'app/broadcasts/page.tsx',
@@ -100,8 +106,6 @@ const MIGRATED = [
   'app/reminders/edit/page.tsx',
   'app/rich-menus/edit/page.tsx',
   'app/staff/page.tsx',
-  'app/templates/detail/page.tsx',
-  'app/templates/page.tsx',
   'app/webhooks/page.tsx',
   'components/broadcasts/broadcast-asset-manager.tsx',
   'components/events/event-form.tsx',
@@ -190,47 +194,6 @@ describe('成果地点の削除', () => {
   it('レポートが引けていないときに 0件 と書かない', () => {
     expect(win).toContain('reportAvailable')
     expect(win).toContain('いま何件記録されているかは読み込めていません')
-  })
-})
-
-describe('テンプレートの削除（一覧）', () => {
-  const src = read('app/templates/page.tsx')
-  const fn = body(src, 'const confirmDelete = async ()')
-  const win = dialog(src, 'テンプレート「')
-
-  it('二度押しを止め、失敗を握りつぶさない', () => {
-    expect(fn).toContain('if (!deleteTarget || deleting) return')
-    expect(fn).toContain('if (!res.success) throw new Error(res.error)')
-    expect(fn).toContain('テンプレートを削除できませんでした。')
-    expect(win).toContain('busy={deleting}')
-    expect(win).toContain('error={deleteError}')
-  })
-
-  it('数えられている参照だけを数として出し、数えていないものは断る', () => {
-    expect(win).toContain('deleteTarget?.usageCount ?? 0')
-    expect(win).toContain('リマインダとリッチメニューからの参照は数えられていません')
-    expect(win).toContain('destructive')
-  })
-})
-
-describe('テンプレートの削除（詳細）', () => {
-  const src = read('app/templates/detail/page.tsx')
-  const fn = body(src, 'const remove = async ()')
-  const win = dialog(src, 'テンプレート「')
-
-  it('二度押しを止め、失敗を握りつぶさない', () => {
-    expect(fn).toContain('if (deleting) return')
-    expect(fn).toContain('if (!res.success) throw new Error(res.error)')
-    expect(fn).toContain('テンプレートを削除できませんでした。')
-    expect(win).toContain('busy={deleting}')
-    expect(win).toContain('error={deleteError}')
-  })
-
-  it('使用先が引けていないときに 0か所 と書かない', () => {
-    expect(win).toContain('usageLoaded')
-    expect(win).toContain('使用先を読み込めていないので')
-    expect(win).toContain('数えられていません')
-    expect(win).toContain('destructive')
   })
 })
 
