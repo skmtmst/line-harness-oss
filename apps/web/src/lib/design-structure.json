@@ -2388,13 +2388,17 @@
       "node": "Qu6Vk",
       "name": "V6 22-1 写真審査一覧",
       "sections": [
-        "KPIs"
+        "KPIs",
+        "Right"
       ],
       "parts": [
         "未審査",
         "通したもの",
         "戻したもの",
-        "投稿の合計"
+        "投稿の合計",
+        "自動で戻す条件",
+        "戻す理由の内訳",
+        "つながる先"
       ]
     },
     "/ec-commerce": {
@@ -2477,12 +2481,11 @@
       }
     },
     "/automations/new": {
-      "node": "kwnUH",
-      "name": "V2 7-1-1 ルールを作る（一部）",
+      "node": "Rv8Jv",
+      "name": "V6 25-1-A ルールを作る",
       "sections": [
         "Body",
         "Crumb",
-        "Head",
         "Left",
         "Right"
       ],
