@@ -200,7 +200,9 @@ export default function NewReminderPage() {
           label="フォルダ"
           note={foldersLoadState === 'error'
             ? 'フォルダを読み込めませんでした。未取得と0件を区別するため、選択を止めています。'
-            : '一覧で作ったリマインダ用フォルダから選べます。'}
+            : foldersLoadState === 'ready' && folders.length === 0
+              ? 'フォルダはまだありません。一覧から追加できます。'
+              : '一覧で作ったリマインダ用フォルダから選べます。'}
         >
           <div className="flex items-center gap-2">
             <select

@@ -381,9 +381,8 @@
     "arbitrary-value": 2
   },
   "app/templates/detail/page.tsx": {
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1,
-    "arbitrary-value": 2
+    "arbitrary-value": 2,
+    "direct-secondary-button": 1
   },
   "app/templates/edit/page.tsx": {
     "direct-secondary-button": 4,
@@ -421,8 +420,8 @@
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
-    "direct-secondary-button": 4,
     "direct-primary-button": 1,
+    "direct-secondary-button": 2,
     "unresolved-classname": 1,
     "arbitrary-value": 2
   },

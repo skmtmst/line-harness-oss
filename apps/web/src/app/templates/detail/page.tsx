@@ -4,14 +4,18 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { templateDeleteDescription } from '../template-delete-message'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string }>
+  automations: Array<{ id: string; name: string; eventType: string }>
   scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepOrder: number }>
+  reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
+  richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
+  trackedLinks: Array<{ id: string; name: string }>
 }
 
 function TemplateDetailInner() {
@@ -28,9 +32,10 @@ function TemplateDetailInner() {
   const [usage, setUsage] = useState<Usage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  usePageTitle(template?.name ?? null)
 
   useEffect(() => {
     if (!id) {
@@ -39,19 +44,29 @@ function TemplateDetailInner() {
     }
     void (async () => {
       try {
-        const [detail, usages] = await Promise.all([
-          api.templates.get(id),
-          api.templates.usages(id).catch(() => null),
-        ])
-        if (detail.success) setTemplate(detail.data)
-        if (usages?.success) setUsage(usages.data)
+        const detail = await api.templates.get(id)
+        if (detail.success) {
+          setTemplate(detail.data)
+          setUsage(detail.data.usedBy)
+        } else {
+          setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+        }
+      } catch {
+        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
       } finally {
         setLoading(false)
       }
     })()
   }, [id])
 
-  const usageCount = (usage?.autoReplies.length ?? 0) + (usage?.scenarioSteps.length ?? 0)
+  const usageCount = usage
+    ? usage.autoReplies.length
+      + usage.automations.length
+      + usage.scenarioSteps.length
+      + usage.reminderSteps.length
+      + usage.richMenuAreas.length
+      + usage.trackedLinks.length
+    : 0
 
   /**
    * 削除の確認。ブラウザの `confirm()` では、何が止まり・何が残り・
@@ -62,13 +77,15 @@ function TemplateDetailInner() {
     // 押している間は受け付けない。二度押しの2回目は404になり、
     // 消えているのに「削除できませんでした」と出る。
     if (deleting) return
+    // 使用中は消さない。使用先を差し替えてからにする。
+    if (usageCount > 0 || !template) return
     setDeleting(true)
     setDeleteError('')
     setError('')
     try {
       const res = await api.templates.delete(id)
       if (!res.success) throw new Error(res.error)
-      setConfirmOpen(false)
+      setDeleteOpen(false)
       router.push('/templates')
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
@@ -81,7 +98,6 @@ function TemplateDetailInner() {
   if (!id) {
     return (
       <div>
-
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           テンプレートが指定されていません。
           <Link href="/templates" className="text-accent ml-1 hover:underline">
@@ -106,41 +122,41 @@ function TemplateDetailInner() {
       name: `${u.scenarioName} ／ ステップ${u.stepOrder}`,
       href: '/scenarios',
     })),
+    ...(usage?.automations ?? []).map((u) => ({
+      kind: 'オートメーション',
+      name: u.name,
+      href: '/automations',
+    })),
+    ...(usage?.reminderSteps ?? []).map((u) => ({
+      kind: 'リマインダ',
+      name: u.reminderName,
+      href: `/reminders/edit?id=${u.reminderId}`,
+    })),
+    ...(usage?.richMenuAreas ?? []).map((u) => ({
+      kind: 'リッチメニュー',
+      name: `${u.groupName} ／ ${u.pageName}${u.label ? ` ／ ${u.label}` : ''}`,
+      href: `/rich-menus/edit?id=${u.groupId}`,
+    })),
+    ...(usage?.trackedLinks ?? []).map((u) => ({
+      kind: '流入リンク',
+      name: u.name,
+      href: `/inflow-links/detail?id=${u.id}`,
+    })),
   ]
 
   return (
     <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/templates" className="hover:underline">
-          テンプレート
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>詳細</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title={template?.name ?? 'テンプレートの詳細'}
-          description="本文と、このテンプレートがどこで使われているかを確認できます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {/* 既存を種にして新しく作る口が無い。 */}
-              <button
-                disabled
-                title="複製は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                複製
-              </button>
-              <Link
-                href={`/templates/edit?id=${id}`}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-              >
-                編集
-              </Link>
-            </div>
-          }
-        />
+      <div data-design="Head" className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <nav data-design="Crumb" className="text-ink-faint text-xs">
+          <Link href="/templates" className="hover:underline">
+            テンプレート
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>詳細</span>
+        </nav>
+        <Button href={`/templates/edit?id=${id}`} variant="primary">
+          テンプレートを編集
+        </Button>
       </div>
 
       {error && <p className="text-danger mb-3 text-sm">{error}</p>}
@@ -195,9 +211,8 @@ function TemplateDetailInner() {
                   ))}
                 </ul>
               )}
-              {/* 一斉配信とリマインダからの参照は、usages API が返さない。 */}
               <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-                一斉配信・リマインダからの参照は、まだ数えられません。ここに出るのは自動応答とシナリオ配信だけです。
+                送信済みの履歴は削除を止める使用先には含めません。送信時の内容は履歴側に残ります。
               </p>
             </section>
 
@@ -205,14 +220,16 @@ function TemplateDetailInner() {
               <p className="text-danger text-sm font-semibold">このテンプレートを削除する</p>
               <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                 {usageCount > 0
-                  ? `${usageCount}か所で使われています。削除すると、その箇所の本文が空になります。`
+                  ? `${usageCount}か所で使われています。先に上の使用先を差し替えてください。`
                   : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
               </p>
               <button
-                onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
-                className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium"
+                onClick={() => { setDeleteError(''); setDeleteOpen(true) }}
+                disabled={usageCount > 0}
+                title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
+                className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
               >
-                削除する
+                {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除'}
               </button>
             </section>
           </div>
@@ -255,27 +272,29 @@ function TemplateDetailInner() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={confirmOpen}
-        title={`テンプレート「${template?.name ?? ''}」を削除しますか？`}
-        description={templateDeleteDescription(usageCount)}
-        confirmLabel="削除する"
-        destructive
-        busy={deleting}
-        error={deleteError}
-        onConfirm={() => void remove()}
-        onCancel={() => {
-          if (deleting) return
-          setConfirmOpen(false)
-          setDeleteError('')
-        }}
-      >
-        {/* 使用箇所は自動応答とシナリオ配信しか数えられていない。
-            0か所と出ていても「どこからも使われていない」とは言い切れない。 */}
-        <p className="text-ink-faint text-xs leading-relaxed">
-          一斉配信・リマインダからの参照は、まだ数えられません。上の数に入っていません。
-        </p>
-      </ConfirmDialog>
+      <div data-design-node="M9cij">
+        <ConfirmDialog
+          open={deleteOpen && usageCount === 0}
+          title={`テンプレート「${template?.name ?? ''}」を削除しますか？`}
+          description={templateDeleteDescription(usageCount)}
+          confirmLabel="削除する"
+          destructive
+          busy={deleting}
+          error={deleteError}
+          onConfirm={() => void remove()}
+          onCancel={() => {
+            if (deleting) return
+            setDeleteOpen(false)
+            setDeleteError('')
+          }}
+        >
+          {/* 使用箇所は自動応答とシナリオ配信しか数えられていない。
+              0か所と出ていても「どこからも使われていない」とは言い切れない。 */}
+          <p className="text-ink-faint text-xs leading-relaxed">
+            一斉配信・リマインダからの参照は、まだ数えられません。上の数に入っていません。
+          </p>
+        </ConfirmDialog>
+      </div>
     </div>
   )
 }
@@ -290,7 +309,6 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function TemplateDetailPage() {
-  usePageTitle('テンプレートの詳細')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

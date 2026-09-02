@@ -46,29 +46,32 @@ describe('テンプレート一覧の削除確認', () => {
       .not.toMatch(/[^.\w]confirm\(/)
   })
 
+  // 2026-09-02: development (#433) が「使用中は消さず使用先へ送る」を足し、
+  // 覚えの名前が deleteTarget → pendingDelete、押した先が
+  // handleDelete → confirmDelete になった。**見張る中身は変えていない。**
   it('削除の処理が二度押しを受け付けない', () => {
-    const body = fnBody(PAGE, 'const handleDelete = async ()')
-    expect(body, '押している間の二度押しを止めていない').toContain('if (!deleteTarget || deleting) return')
+    const body = fnBody(PAGE, 'const confirmDelete = async ()')
+    expect(body, '押している間の二度押しを止めていない').toContain('if (!pendingDelete || deleting) return')
     expect(body, '処理中の印を立てていない').toContain('setDeleting(true)')
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setDeleting\(false\)/)
   })
 
   it('削除の失敗を握りつぶさず、窓の中に運用の言葉で出す', () => {
-    const body = fnBody(PAGE, 'const handleDelete = async ()')
+    const body = fnBody(PAGE, 'const confirmDelete = async ()')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を窓に出していない').toContain(
       "setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')",
     )
     expect(body, '生のAPIエラーをそのまま出している').not.toMatch(/setDeleteError\(\s*(res\.error|String\(|e\b)/)
     expect(body, '成功していないのに閉じている').toMatch(
-      /throw new Error\(res\.error\)[\s\S]*setDeleteTarget\(null\)/,
+      /throw new Error\(res\.error\)[\s\S]*setPendingDelete\(null\)/,
     )
   })
 
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
     const jsx = dialog(PAGE, '/>')
-    expect(jsx, '対象の名前を読ませていない').toContain('deleteTarget?.name')
-    expect(jsx, '何が起きるかを本文で読ませていない').toContain('templateDeleteDescription(deleteTarget?.usageCount ?? 0)')
+    expect(jsx, '対象の名前を読ませていない').toContain('pendingDelete?.name')
+    expect(jsx, '何が起きるかを本文で読ませていない').toContain('templateDeleteDescription(pendingDelete?.usageCount ?? 0)')
     expect(jsx, '取り消せない操作の色になっていない').toContain('destructive')
     expect(jsx).toContain('confirmLabel="削除する"')
     expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
@@ -77,7 +80,18 @@ describe('テンプレート一覧の削除確認', () => {
   })
 
   it('削除を押しただけでは消えず、窓を開くだけにする', () => {
-    expect(PAGE).toContain("setDeleteTarget({ id: t.id, name: t.name, usageCount: t.usageCount })")
+    const body = fnBody(PAGE, 'const handleDelete = (template:')
+    expect(body, '押した時点で消しにいっている').not.toContain('api.templates.delete')
+    expect(body, '窓を開いていない').toContain('setPendingDelete({ id, name, usageCount })')
+  })
+
+  // development (#433) が足した「使用中は消さない」も一緒に見張る。
+  it('使用中は消さず、使用先へ送る', () => {
+    const body = fnBody(PAGE, 'const handleDelete = (template:')
+    expect(body, '使用中でも窓を開いてしまう').toMatch(
+      /if \(usageCount > 0\)[\s\S]*setDrawerId\(id\)[\s\S]*return/,
+    )
+    expect(PAGE, '使用中の行から使用先へ行けない').toContain('使用先を見る')
   })
 })
 

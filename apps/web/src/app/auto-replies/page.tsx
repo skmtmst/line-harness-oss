@@ -747,6 +747,7 @@ export default function AutoRepliesPage() {
                         編集
                       </button>
                       <button
+                        aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を削除`}
                         onClick={() => {
                           setDeleteError('')
                           setPendingDelete({ item: r, accountId: selectedAccountId })

@@ -23,6 +23,7 @@ function setup() {
       carousel_actions_json TEXT,
       carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
       carousel_tap_limit_text TEXT,
+      line_account_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );

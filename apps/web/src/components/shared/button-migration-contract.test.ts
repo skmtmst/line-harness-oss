@@ -57,8 +57,10 @@ describe('標準ボタンの第1段階移行', () => {
     //     この1つが primary なので 14 → 15。
     // 同日: 案件タブのCSV・再読み込み・空状態からの作成を統合し、
     // 実際の7ルートを再計測して40個・主要16個へ締め直した。
-    expect(openings).toHaveLength(40)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
+    // 2026-09-02: #433 の使用先確認と質問作成を最新 development に統合し、
+    // 実際の7ルートを再計測して42個へ更新した。
+    expect(openings).toHaveLength(42)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(17)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -119,7 +121,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 最新 development と統合した木を再計測して135へ締め直す。
     // 2026-09-01: #462 が予約メニュー一覧の作成操作を共通Buttonへ寄せたため、
     // 最新 development と統合した木を再計測して134へ締め直す。
-    expect(debt['direct-primary-button']).toBe(134)
+    // 2026-09-02: #433 がテンプレート詳細の編集操作を共通Buttonへ寄せたため、
+    // 最新 development の134から1つ減る。統合後の実測へ合わせる。
+    expect(debt['direct-primary-button']).toBe(133)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
     //
@@ -174,7 +178,11 @@ describe('標準ボタンの第1段階移行', () => {
     // 両側を統合した木を再計測し、238へ締め直す。
     // 2026-09-02: #425 の注目操作は設計固有の星形トグルなので共通Buttonへ
     // 寄せず、統合後の木で1つ増える。担当・対応は最新の専用プルダウンを保つ。
-    expect(debt['direct-secondary-button']).toBe(239)
+    // 2026-09-02: #432 がウェビナー一覧から動かない並び替え・フォルダ操作を
+    // 外したため、最新 development の239から2つ減る。
+    // 2026-09-02: #433 がテンプレート詳細の戻る操作を共通Buttonへ寄せたため、
+    // 最新 development の237から1つ減る。統合後の実測へ合わせる。
+    expect(debt['direct-secondary-button']).toBe(236)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

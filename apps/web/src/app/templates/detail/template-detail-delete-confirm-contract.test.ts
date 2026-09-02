@@ -74,7 +74,17 @@ describe('テンプレート詳細の削除確認', () => {
     )
   })
 
+  // 2026-09-02: development (#433) が覚えの名前を confirmOpen → deleteOpen に
+  // し、使用中は削除させない形にした。**見張る中身は変えていない。**
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    expect(PAGE).toContain("onClick={() => { setDeleteError(''); setConfirmOpen(true) }}")
+    expect(PAGE).toContain("onClick={() => { setDeleteError(''); setDeleteOpen(true) }}")
+  })
+
+  // development (#433) が足した「使用中は消さない」も一緒に見張る。
+  it('使用中は削除の口を開かない', () => {
+    const body = fnBody(PAGE, 'const remove = async ()')
+    expect(body, '使用中でも消しにいく').toContain('if (usageCount > 0 || !template) return')
+    expect(PAGE, '使用中でもボタンが押せる').toContain('disabled={usageCount > 0}')
+    expect(PAGE, '使用中の窓が開いてしまう').toContain('open={deleteOpen && usageCount === 0}')
   })
 })
