@@ -40,9 +40,6 @@ const NOT_YET_MIGRATED = [
   'app/booking/staff/shifts/page.tsx',
   'app/reminders/page.tsx',
   'app/restaurant-test/restaurant-console.tsx',
-  'components/events/event-form.tsx',
-  'components/events/event-wizard.tsx',
-  'components/rich-menus/apply-to-tag-modal.tsx',
 ]
 
 /**
