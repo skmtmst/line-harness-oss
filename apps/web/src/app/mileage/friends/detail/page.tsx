@@ -23,6 +23,7 @@ import {
   formatMileageDate,
   mileageEntryTypeLabel,
   mileageSourceLabel,
+  mileageSourceNoteText,
   mileageStatusLabel,
 } from '../../mileage-display'
 import MileageAdjustmentDialog from './mileage-adjustment-dialog'
@@ -155,8 +156,8 @@ function FriendMileageInner() {
                   <Td><p className="max-w-56 truncate font-medium text-v6-ink" title={item.reason}>{item.reason}</p></Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
-                    <p className="mt-1 max-w-44 truncate text-xs text-v6-ink-faint" title={item.sourceReferenceId ?? undefined}>
-                      {item.sourceReferenceId ? `調整元ID: ${item.sourceReferenceId}` : item.sourceEventId ? '元の記録あり' : '元の記録なし'}
+                    <p className="mt-1 text-xs text-v6-ink-faint">
+                      {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.sourceEventId != null })}
                     </p>
                   </Td>
                   <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>
