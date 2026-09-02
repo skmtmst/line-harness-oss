@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { TextField } from './text-field'
 import {
   isEmptyCondition,
   pruneCondition,
@@ -48,6 +49,7 @@ const RULE_KINDS: { type: string; label: string; make: () => SegmentRule }[] = [
   { type: 'form_answered', label: '回答フォーム', make: () => ({ type: 'form_answered', value: '' }) },
   { type: 'last_reaction_at', label: '最終反応日', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
   { type: 'reaction_state', label: '反応状態', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
+  { type: 'score_range', label: '行動スコア', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
   { type: 'is_following', label: 'ブロック状態', make: () => ({ type: 'is_following', value: true }) },
   { type: 'is_hidden', label: '表示状態', make: () => ({ type: 'is_hidden', value: false }) },
 ]
@@ -127,7 +129,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
         api.tags.list(),
-        api.friendFields.list(),
+        api.friendFields.list(selectedAccountId),
         api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
       ])
@@ -694,6 +696,29 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               </option>
             ))}
           </select>
+        </div>
+      )
+
+    case 'score_range':
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-medium">行動スコア</span>
+          <TextField
+            type="number"
+            step={1}
+            value={typeof v.min === 'number' ? v.min : ''}
+            onChange={(e) => onChange({ type: rule.type, value: { ...v, min: e.target.value === '' ? null : Number(e.target.value) } })}
+            placeholder="下限なし"
+          />
+          <span className="text-ink-faint text-sm">点以上〜</span>
+          <TextField
+            type="number"
+            step={1}
+            value={typeof v.max === 'number' ? v.max : ''}
+            onChange={(e) => onChange({ type: rule.type, value: { ...v, max: e.target.value === '' ? null : Number(e.target.value) } })}
+            placeholder="上限なし"
+          />
+          <span className="text-ink-faint text-sm">点以下</span>
         </div>
       )
 

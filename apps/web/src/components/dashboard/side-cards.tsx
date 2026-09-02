@@ -130,9 +130,9 @@ export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview[
  * 現在の対応マーク（設計 `vUXKb` の右カラム）。
  *
  * 未対応と対応済みは `/api/dashboard/overview` の `inbox` から出る。
- * **「メッセージ受信時の自動変更」は、まだ取れる口が無い。**
- * 「有効」と決め打ちで書かず、`—`（未取得）のままにする。
- * 本物らしく見えるぶん、無い数より悪い。
+ * 「メッセージ受信時の自動変更」は、選択中のLINEアカウントの
+ * 対応マーク一覧を読み、1件でも自動変更があれば「有効」とする。
+ * 一覧を取得できなかったときだけ `—`（未取得）にする。
  */
 export function SupportMarkStatusCard({
   inbox,

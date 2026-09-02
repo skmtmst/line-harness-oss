@@ -16,6 +16,9 @@ const dbMocks = {
   deleteLineAccount: vi.fn(),
   getAccountSetting: vi.fn(),
   setAccountSetting: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
+  CredentialEncryptionKeyError: class CredentialEncryptionKeyError extends Error {},
   jstNow: vi.fn(() => '2026-08-10T12:00:00.000+09:00'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -83,10 +86,14 @@ const fakeAccount = {
 };
 
 beforeEach(() => {
-  for (const fn of Object.values(dbMocks)) fn.mockReset();
+  for (const fn of Object.values(dbMocks)) {
+    if ('mockReset' in fn) fn.mockReset();
+  }
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
   dbMocks.getLineAccountCredentialHealth.mockResolvedValue(null);
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
@@ -374,6 +381,22 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
 });
 
 describe('GET /api/line-accounts', () => {
+  test('担当店舗だけを返し、担当外店舗を一覧から除外する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      fakeAccount,
+      { ...fakeAccount, id: 'acc-2', channel_id: '987654321', name: '担当外' },
+    ]);
+    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
+
+    const res = await setupApp('staff').request('/api/line-accounts?live=0');
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      data: [{ id: 'acc-1' }],
+    });
+  });
+
   test('Webhook URLの照合結果を秘密情報なしで返す', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
     const app = setupApp('owner');

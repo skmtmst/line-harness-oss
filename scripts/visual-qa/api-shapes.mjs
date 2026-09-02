@@ -85,9 +85,21 @@ export function readArrayGetPaths(source = readFileSync(API_TS, 'utf8')) {
     // `method:` が書いてなければ GET。一覧はどれも GET。
     if (/method:\s*'(?!GET)/.test(args)) continue
 
-    const wrapped = /^ApiResponse<(.*)>$/.exec(type)
-    if (!wrapped) continue
-    const inner = wrapped[1].trim()
+    /*
+      `ApiResponse<X[]>` のほかに、**交差型**で書かれた口がある:
+        fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: … }>('/api/ec-commerce/events')
+      末尾が `}` になるので `^ApiResponse<…>$` には当たらず、この口だけ黙って
+      一覧から抜けていた。抜けると `EMPTY_PAGE`（`{items:[],total:0}`）が返り、
+      `/ec-commerce` が描画の途中で `events.map is not a function` を投げて
+      **本文が丸ごと「画面を表示できませんでした」に置き換わる**。撮ると空の絵になる。
+      `ApiResponse<` の対になる `>` を数えて中身を取り、その先が `&` で続くのは許す。
+    */
+    if (!type.startsWith('ApiResponse<')) continue
+    const innerEnd = matchEnd(type, 'ApiResponse<'.length, '<', '>')
+    const inner = type.slice('ApiResponse<'.length, innerEnd - 1).trim()
+    const rest = type.slice(innerEnd).trim()
+    // 交差型（`& { … }`）だけを許す。知らない続きは形が決められないので見送る。
+    if (rest && !rest.startsWith('&')) continue
     if (!inner.endsWith('[]') && !inner.startsWith('Array<')) continue
 
     const base = staticPath(literal[1])

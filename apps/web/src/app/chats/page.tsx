@@ -7,7 +7,7 @@ import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
-import SavedViewDialog from '@/components/chats/saved-view-dialog'
+import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import { Link2, Star } from 'lucide-react'
 
 interface Chat {
   id: string
@@ -56,7 +57,9 @@ interface ChatMessage {
 
 interface ChatDetail extends Chat {
   friendName: string
+  friendRealName: string | null
   friendPictureUrl: string | null
+  isAttention: boolean
   messages?: ChatMessage[]
 }
 
@@ -152,6 +155,16 @@ function formatDatetime(iso: string | null): string {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatInboxDatetime(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('ja-JP', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -468,6 +481,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreChats, setHasMoreChats] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [attentionSaving, setAttentionSaving] = useState(false)
   const [error, setError] = useState('')
   const [messageContent, setMessageContent] = useState('')
   const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
@@ -483,6 +497,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
   // (offset 方式だと新着で行が押し下げられた分が欠落する)。
   const nextCursorRef = useRef<{ at: string; id: string } | null>(null)
+  // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
+  // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
+  const detailRequestIdRef = useRef(0)
+  const detailAccountRef = useRef(selectedAccountId)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedNameQuery(nameQuery.trim()), 250)
@@ -633,38 +651,41 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sort: 'newest',
   })
 
-  const createSavedView = async (nameOverride?: string) => {
-    if (savingView) return
+  const createSavedView = async (nameOverride?: string): Promise<SavedViewSaveResult> => {
+    if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
     // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
     // 状態の更新を待つと、1回目の保存が空の名前で走る。
     const name = (nameOverride ?? savedViewName).trim()
     if (!name) {
-      setSavedViewError('名前を入力してください')
-      return
+      const message = '名前を入力してください'
+      setSavedViewError(message)
+      return { success: false, error: message }
     }
     setSavingView(true)
     setSavedViewError('')
     try {
       if (!selectedAccountId) {
-        setSavedViewError('LINE公式アカウントを選んでください')
-        return
+        const message = 'LINE公式アカウントを選んでください'
+        setSavedViewError(message)
+        return { success: false, error: message }
       }
       const response = await api.chats.savedViews.create(selectedAccountId, {
         name,
         conditions: currentSavedViewConditions(),
       })
       if (!response.success) {
-        setSavedViewError(response.error || '保存できませんでした')
-        return
+        const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+        setSavedViewError(message)
+        return { success: false, error: message }
       }
       setSavedViewName('')
       await loadSavedViews()
-    } catch (savedViewCreateError) {
-      setSavedViewError(
-        savedViewCreateError instanceof Error
-          ? savedViewCreateError.message
-          : '保存できませんでした',
-      )
+      return { success: true }
+    } catch {
+      // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
+      const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+      setSavedViewError(message)
+      return { success: false, error: message }
     } finally {
       setSavingView(false)
     }
@@ -685,25 +706,39 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }, [sendMode])
 
   const loadChatDetail = useCallback(async (chatId: string) => {
+    const requestId = ++detailRequestIdRef.current
     setDetailLoading(true)
     setError('')
     try {
       const res = await api.chats.get(chatId)
+      if (requestId !== detailRequestIdRef.current) return
       if (res.success) {
         setChatDetail(res.data as unknown as ChatDetail)
       } else {
-        // API は 200 で success:false を返す可能性 (例: 404 lookup)。詳細を画面に出す。
-        const errMsg = (res as { error?: string }).error ?? '不明なエラー'
-        setError(`チャット詳細の読み込みに失敗しました: ${errMsg}`)
+        setChatDetail(null)
+        setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
       }
-    } catch (err) {
-      // ネットワーク / parse / auth fail などの例外。empty catch だと原因不明だったので詳細を出す。
-      const msg = err instanceof Error ? err.message : String(err)
-      setError(`チャット詳細の読み込みに失敗しました: ${msg}`)
+    } catch {
+      if (requestId !== detailRequestIdRef.current) return
+      setChatDetail(null)
+      setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
-      setDetailLoading(false)
+      if (requestId === detailRequestIdRef.current) setDetailLoading(false)
     }
   }, [])
+
+  // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
+  // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
+  useEffect(() => {
+    if (detailAccountRef.current === selectedAccountId) return
+    detailAccountRef.current = selectedAccountId
+    detailRequestIdRef.current += 1
+    setSelectedChatId(null)
+    setSelectedFriendId(null)
+    setChatDetail(null)
+    setDetailLoading(false)
+    setAttentionSaving(false)
+  }, [selectedAccountId])
 
   useEffect(() => {
     loadChats()
@@ -740,7 +775,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (selectedChatId) {
       loadChatDetail(selectedChatId)
     } else {
+      detailRequestIdRef.current += 1
       setChatDetail(null)
+      setDetailLoading(false)
     }
   }, [selectedChatId, loadChatDetail])
 
@@ -1020,6 +1057,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
+  const handleAttentionUpdate = async () => {
+    if (!chatDetail || attentionSaving) return
+    const updatingChatId = chatDetail.id
+    const next = !chatDetail.isAttention
+    setAttentionSaving(true)
+    setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: next } : current)
+    try {
+      await api.friends.updateMetadata(chatDetail.friendId, { __attention: next ? '1' : null })
+    } catch {
+      setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: !next } : current)
+      setError('注目の変更に失敗しました。')
+    } finally {
+      setAttentionSaving(false)
+    }
+  }
+
   const handleSaveMemo = async () => {
     if (!selectedChatId || memoSaving) return
     setMemoSaving(true)
@@ -1073,7 +1127,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
     ?? null
-
   return (
     <div className="space-y-3">
       {/* Error */}
@@ -1190,7 +1243,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           saving={savingView}
           onSave={async (name) => {
             setSavedViewName(name)
-            await createSavedView(name)
+            return createSavedView(name)
           }}
           onClose={() => setSaveDialogOpen(false)}
         />
@@ -1598,14 +1651,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <p className="text-sm font-medium text-ink truncate">
                       {chatDetail.friendName}
                     </p>
-                    <p className="text-ink-faint mt-0.5 text-xs">
-                      {/*
-                        設計はここに本名も置く（「河野 健太・LINE・最終受信…」）。
-                        **この部品は友だちの詳細を持っていない**ので、いまは
-                        出していない。右の顧客情報とは別の口が要る。
-                        取れていないものを空欄で出すと「本名が無い人」に見える。
-                      */}
-                      LINE ・ 最終受信 {formatDatetime(chatDetail.lastMessageAt)}
+                    <p className="mt-0.5 truncate text-xs text-ink-faint">
+                      {chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 {formatInboxDatetime(chatDetail.lastMessageAt)}
                     </p>
                   </div>
                 </div>
@@ -1617,7 +1664,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   同じ場所に置く。
                 */}
                 {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    aria-label={chatDetail.isAttention ? '注目から外す' : '注目にする'}
+                    aria-pressed={chatDetail.isAttention}
+                    disabled={attentionSaving}
+                    onClick={() => void handleAttentionUpdate()}
+                    className={`flex h-9 w-9 items-center justify-center rounded-control border disabled:cursor-wait disabled:opacity-60 ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
+                  >
+                    <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
+                  </button>
                   {/*
                     素の `<select>` から専用のプルダウンへ替えた。
                     **開いた中身がブラウザ任せだと画像に写らない。** 設計の
@@ -1704,10 +1761,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               </span>
                             </div>
                           )}
-                          <div className="my-2 flex justify-center">
-                            <span className="bg-canvas/90 text-action rounded-full px-3 py-1 text-[11px] font-medium shadow-sm">
-                              シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始 ・ {startedAt}
+                          <div className="my-2 flex items-center justify-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-[11px] font-semibold text-action shadow-sm">
+                              <Link2 aria-hidden="true" size={13} />
+                              シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
+                            <time className="text-micro text-ink-faint">{startedAt}</time>
                           </div>
                         </div>
                       )
@@ -1730,7 +1789,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             chatDetail.friendPictureUrl ? (
                               <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
                             ) : (
-                              <div className="bg-hairline h-8 w-8 flex-shrink-0 rounded-full" />
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-v6-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
+                                {chatDetail.friendName.charAt(0)}
+                              </div>
                             )
                           )}
 
@@ -1740,7 +1801,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               className={`max-w-[320px] px-3 py-2 text-sm break-words whitespace-pre-wrap ${
                                 isOutgoing
                                   ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-on-accent'
-                                  : 'rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
+                                  : 'min-w-64 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
                               }`}
                               style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
                             >

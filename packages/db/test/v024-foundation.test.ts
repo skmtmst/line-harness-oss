@@ -18,12 +18,14 @@ import {
   updateSupportMark,
   getDefaultSupportMark,
   getSupportMarks,
+  getSupportMarksWithUsage,
   setFriendSupportMarkBulk,
   applyInboundSupportMark,
-  replaceAndDeleteSupportMark,
+  replaceAndArchiveSupportMark,
 } from '../src/support-marks.js';
 import {
   validateSearchConditions,
+  validateSavedSegmentConditions,
   createSavedSearch,
   getSavedSearches,
   updateSavedSearch,
@@ -364,7 +366,7 @@ describe('対応マーク', () => {
     await setFriendSupportMarkBulk(db, ['f-account-1'], account1Mark.id, SCOPE);
 
     expect(
-      await replaceAndDeleteSupportMark(db, account1Mark.id, account2Mark.id, SCOPE, 'staff-1'),
+      await replaceAndArchiveSupportMark(db, account1Mark.id, account2Mark.id, SCOPE, 'staff-1'),
     ).toBe(0);
     expect(
       sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-account-1'`).get(),
@@ -379,7 +381,22 @@ describe('対応マーク', () => {
     expect(n).toBe(2);
   });
 
-  test('使用中マークは初期値へ置換し、友だちごとの履歴を残してから削除する', async () => {
+  test('一覧の使用先を固定文言ではなく実参照から数える', async () => {
+    const working = (await getSupportMarks(db, SCOPE)).find((mark) => mark.name === '対応中')!;
+    insertFriend('f-1');
+    await setFriendSupportMarkBulk(db, ['f-1'], working.id, SCOPE);
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES ('search-mark', '対応中の人', 'friends', ?, 'staff-1', 'account-1', 1, 0, '2026-08-27')`,
+    ).run(JSON.stringify({ all: [{ type: 'support_mark', value: { markIds: [working.id] } }] }));
+
+    const mark = (await getSupportMarksWithUsage(db, SCOPE)).find((row) => row.id === working.id);
+    expect(mark).toMatchObject({ friend_count: 1, saved_searches: 1 });
+    expect(mark?.broadcasts).toBe(0);
+  });
+
+  test('設定参照が無いときだけ、友だちを置換して履歴を残して保管する', async () => {
     await getSupportMarks(db, SCOPE);
     insertFriend('f-1');
     insertFriend('f-2');
@@ -387,13 +404,25 @@ describe('対応マーク', () => {
     const replacementMark = await getDefaultSupportMark(db, SCOPE);
     expect(replacementMark).not.toBeNull();
     await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], accountMark.id, SCOPE);
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES ('search-archive', '保管対象', 'friends', ?, 'staff-1', 'account-1', 1, 0, '2026-08-27')`,
+    ).run(JSON.stringify({ all: [{ type: 'support_mark', value: { markIds: [accountMark.id] } }] }));
 
-    const replaced = await replaceAndDeleteSupportMark(
-      db,
-      accountMark.id,
-      replacementMark!.id,
-      SCOPE,
-      'staff-1',
+    await expect(replaceAndArchiveSupportMark(
+      db, accountMark.id, replacementMark!.id, SCOPE, 'staff-1',
+    )).rejects.toThrow('Referenced support mark cannot be archived');
+    expect(
+      sqlite.prepare(`SELECT archived_at FROM support_marks WHERE id = ?`).get(accountMark.id),
+    ).toEqual({ archived_at: null });
+    expect(
+      sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
+    ).toEqual([{ support_mark_id: accountMark.id }]);
+
+    sqlite.prepare(`DELETE FROM saved_searches WHERE id = 'search-archive'`).run();
+    const replaced = await replaceAndArchiveSupportMark(
+      db, accountMark.id, replacementMark!.id, SCOPE, 'staff-1',
     );
 
     expect(replaced).toBe(2);
@@ -401,8 +430,9 @@ describe('対応マーク', () => {
       sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
     ).toEqual([{ support_mark_id: replacementMark!.id }]);
     expect(
-      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = ?`).get(accountMark.id),
-    ).toEqual({ c: 0 });
+      sqlite.prepare(`SELECT archived_at IS NOT NULL AS archived FROM support_marks WHERE id = ?`).get(accountMark.id),
+    ).toEqual({ archived: 1 });
+    expect((await getSupportMarks(db, SCOPE)).some((mark) => mark.id === accountMark.id)).toBe(false);
     expect(
       sqlite
         .prepare(
@@ -428,6 +458,17 @@ describe('対応マーク', () => {
           `{"previousMarkId":"${accountMark.id}","replacementMarkId":"${replacementMark!.id}","reason":"deleted_mark_replacement"}`,
       },
     ]);
+    expect(
+      sqlite.prepare(
+        `SELECT action, target_id, actor_id, detail_json
+           FROM operation_audit WHERE action = 'archived'`,
+      ).get(),
+    ).toEqual({
+      action: 'archived',
+      target_id: accountMark.id,
+      actor_id: 'staff-1',
+      detail_json: `{"replacementMarkId":"${replacementMark!.id}","reason":"stop_new_use"}`,
+    });
   });
 
   test('空の配列ではクエリを投げない', async () => {
@@ -521,6 +562,65 @@ describe('保存した検索の条件', () => {
   });
 });
 
+describe('保存した配信対象条件', () => {
+  const valid = {
+    version: 1,
+    condition: {
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: 'tag-1' }],
+      groups: [{ operator: 'OR', rules: [{ type: 'reaction_state', value: 'reply' }] }],
+    },
+  };
+
+  test('版つきの共通条件を保存できる', async () => {
+    const checked = validateSavedSegmentConditions(valid);
+    expect(checked.ok).toBe(true);
+    if (!checked.ok) return;
+    const saved = await createSavedSearch(db, {
+      name: '返信したVIP',
+      scope: 'friends',
+      conditionFormat: 'segment_v1',
+      lineAccountId: 'account-1',
+      conditions: checked.value,
+    });
+    expect(saved.scope).toBe('friends');
+    expect(saved.condition_format).toBe('segment_v1');
+    expect(JSON.parse(saved.conditions_json)).toEqual(checked.value);
+    const access = { lineAccountId: 'account-1', staffId: 'staff-1', canManageAll: true };
+    expect((await getSavedSearches(db, 'friends', access)).map((row) => row.id)).not.toContain(saved.id);
+    expect((await getSavedSearches(db, 'friends', access, 'segment_v1')).map((row) => row.id)).toContain(saved.id);
+  });
+
+  test('版なし・空・知らない種類は保存条件として通さない', () => {
+    expect(validateSavedSegmentConditions({ condition: valid.condition }).ok).toBe(false);
+    expect(validateSavedSegmentConditions({ version: 1, condition: { operator: 'AND', rules: [] } }).ok).toBe(false);
+    expect(validateSavedSegmentConditions({
+      version: 1,
+      condition: { operator: 'AND', rules: [{ type: 'horoscope', value: 'leo' }] },
+    }).ok).toBe(false);
+  });
+
+  test('深すぎる条件と51件の条件は通さない', () => {
+    expect(validateSavedSegmentConditions({
+      version: 1,
+      condition: {
+        operator: 'AND', rules: [{ type: 'is_following', value: true }], groups: [{
+          operator: 'AND', rules: [], groups: [{
+            operator: 'AND', rules: [], groups: [{ operator: 'AND', rules: [{ type: 'is_hidden', value: false }] }],
+          }],
+        }],
+      },
+    }).ok).toBe(false);
+    expect(validateSavedSegmentConditions({
+      version: 1,
+      condition: {
+        operator: 'AND',
+        rules: Array.from({ length: 51 }, () => ({ type: 'is_following', value: true })),
+      },
+    }).ok).toBe(false);
+  });
+});
+
 describe('サイトの記録', () => {
   test('URLのクエリ文字列を落とす', () => {
     // ?email=... や ?token=... が入る事故は必ず起きるので、通す判断はしない。
@@ -562,7 +662,7 @@ describe('サイトの記録', () => {
 
 describe('共通情報の日付切り替え', () => {
   test('時刻を過ぎた予約だけ反映する', async () => {
-    const v = await createCommonVar(db, { name: '営業時間', varKey: 'shop_hours', value: '10-19' });
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: '営業時間', varKey: 'shop_hours', value: '10-19' });
     await createCommonVarSchedule(db, {
       varId: v.id,
       effectiveFrom: '2026-08-01T00:00:00.000',
@@ -575,11 +675,11 @@ describe('共通情報の日付切り替え', () => {
     });
     const applied = await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000');
     expect(applied).toBe(1);
-    expect((await getCommonVarById(db, v.id))?.value).toBe('11-20');
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('11-20');
   });
 
   test('二度反映されない', async () => {
-    const v = await createCommonVar(db, { name: 'x', varKey: 'x', value: 'A' });
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: 'x', varKey: 'x', value: 'A' });
     await createCommonVarSchedule(db, {
       varId: v.id,
       effectiveFrom: '2026-08-01T00:00:00.000',
@@ -590,7 +690,7 @@ describe('共通情報の日付切り替え', () => {
   });
 
   test('溜まった予約は古い順に当て、最後のものが残る', async () => {
-    const v = await createCommonVar(db, { name: 'x', varKey: 'x', value: 'A' });
+    const v = await createCommonVar(db, { lineAccountId: 'account-1', name: 'x', varKey: 'x', value: 'A' });
     await createCommonVarSchedule(db, {
       varId: v.id,
       effectiveFrom: '2026-08-10T00:00:00.000',
@@ -602,7 +702,7 @@ describe('共通情報の日付切り替え', () => {
       value: 'C',
     });
     expect(await applyDueCommonVarSchedules(db, '2026-08-16T00:00:00.000')).toBe(2);
-    expect((await getCommonVarById(db, v.id))?.value).toBe('C');
+    expect((await getCommonVarById(db, v.id, 'account-1'))?.value).toBe('C');
   });
 });
 

@@ -50,7 +50,13 @@ function sizeFromHtml(src) {
 }
 
 /** 画面が落ちたときに出る文言。出ていたら撮らない。 */
-const FAILURE_TEXTS = ['画面を表示できませんでした', '店舗が選ばれていません', 'Application error']
+const FAILURE_TEXTS = [
+  '画面を表示できませんでした',
+  '店舗が選ばれていません',
+  'Application error',
+  'Runtime TypeError',
+  'Runtime Error',
+]
 
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(`--${name}`)

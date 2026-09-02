@@ -5,7 +5,6 @@ import {
   getDashboardPreference,
   getListStats,
   getLineAccountById,
-  getLineAccounts,
   deleteDashboardPreference,
   saveDashboardDefaultPreference,
   saveDashboardPreference,
@@ -13,7 +12,7 @@ import {
   type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { canAccessLineAccount, getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 
@@ -85,8 +84,7 @@ async function requireVisibleAccount(c: {
   if (!accountId) {
     return { response: Response.json({ success: false, error: 'LINEアカウントを選択してください' }, { status: 400 }) };
   }
-  const accounts = await getLineAccounts(c.env.DB);
-  if (!canAccessLineAccount(accounts, c.get('staff'), accountId)) {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return { response: Response.json({ success: false, error: 'LINE account not found' }, { status: 404 }) };
   }
   return { accountId };
@@ -286,10 +284,17 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async 
 dashboard.get('/api/list-stats', async (c) => {
   try {
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    return c.json({ success: true as const, data: await getListStats(c.env.DB, {
-      allowedAccountIds: accountScope.allowedAccountIds,
-      includeUnassigned: accountScope.canSeeUnassigned,
-    }) });
+    const selectedAccountId = readAccountId(c);
+    if (selectedAccountId && !accountScope.allowedAccountIds.includes(selectedAccountId)) {
+      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+    }
+    const scope = selectedAccountId
+      ? { allowedAccountIds: [selectedAccountId], includeUnassigned: false }
+      : {
+          allowedAccountIds: accountScope.allowedAccountIds,
+          includeUnassigned: accountScope.canSeeUnassigned,
+        };
+    return c.json({ success: true as const, data: await getListStats(c.env.DB, scope) });
   } catch (err) {
     console.error('GET /api/list-stats error:', err);
     return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);
