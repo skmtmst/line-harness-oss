@@ -1586,6 +1586,14 @@ export const SCREENS = [
     states: { apis: ['**/api/affiliate-payments*'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'match', verdictNote: '**#585 `3857365b` で、前に挙げたP0（取得に失敗したとき帯が「0円」と出る）が解消した。4状態を撮り直して確かめた。** ルート `/conversions?tab=payment`（正本）。旧ルート `/affiliates?tab=payment` は `router.replace` で正本へ送られる（`affiliates/page.tsx:20`）。通常・読込・0件・取得失敗の4状態を1440・1920で撮った（計8枚、**すべて横スクロール0**）。 **P0の直り方**：`summaryUnavailable = error && !loading` を足し、帯3枚の `value` を `null`、`detail` を「読み込めませんでした」に切り替える（`payment-tab.tsx:74`）。「一部未取得」の札も失敗のときは出さない。 **失敗と0件が見分けられる。** 失敗＝「承認済み報酬の合計 **—円**／読み込めませんでした」「保留期間内 **—円**／読み込めませんでした」「支払い条件の覚書 **—人**／読み込めませんでした」。0件＝「**0円**／0人分・支払済みかは未取得」「**0円**／承認日時と保留日数から集計」「**0人**／計算には使わないメモ」。**数えて0と、数えられないが別の言葉になった。** 表の下の「承認済み報酬を0円とは扱っていません。状態を読み直してください。」とも食い違わなくなった。 **通常に後退は無い**：承認済み報酬の合計 111,000円（3人分）、保留期間内 12,000円＋**「一部未取得」の札**（確認できた分・2件は承認日時未取得）。 **前回確認した8条件は維持**：①承認済みだけを集計し pending / rejected を含めない（Workerの `AND COALESCE(ce.approval_status,\'pending\') = \'approved\'`。試験も `pending` と `rejected` を入れたうえで `approvedConversions: 1` を要求し、走らせて3件とも通過）②割合方式＝`cp.value * rate / 100`／定額方式＝`off.reward_amount` ③実値0は `0円` ④保留期間内と `approved_at` 未取得を分ける ⑤「未払い残高」「支払済み」「今年払った合計」を値として出さない ⑥次の締め・振込先は `—`／未接続 ⑦支払い確定・振込CSVの操作を出さない（数えて0件）⑧`undefined` `NaN` `Invalid Date` 内部ID `API error` `Failed to fetch` は**4状態とも0件**（`affiliateId` の `aff-1` は出ず、運用者が使う「コード tanaka」だけ）。 **P2 残る差（この判定は変えない）**：「現在の紹介者データは、すべてのLINEアカウントで共通です。」と断っている。`affiliates` 表に `line_account_id` が無いためで、**穴を隠していないのは良い**が、店舗ごとに紹介者を分ける段では作り直しが要る。**推奨修正**：`GqFTV`（支払いを確定する）が同じ帯を使うなら、**この `summaryUnavailable` の形をそのまま持っていく**。取得元：`affiliates-v6/njLGA-normal.txt` ＋ `-loading` `-empty` `-error` ＋ `payment-tab.tsx:74`',
     verdictSource: 'affiliates-v6/njLGA-normal.txt + njLGA-error.txt + payment-tab.tsx:74', verdictHead: '7b509106',
+    // ---- 2026-09-02 `7d830282` で撮った。**絵を見て確かめた範囲だけ書く。** ----
+    // 解決：名前が取れない行が **「名前を取得できませんでした」** と出ている。IDの断片は出ていない。
+    // 解決：表のどこにも内部IDが無い。案件・金額・フラグの空きは `—`。
+    // 解決：重複の行に `⚠` が付き、行が淡く塗られている。`重複 identity_key 検出` のような内部語は無い。
+    // 確認：CVポイントは「購入完了」「資料請求」と日本語。内部の記号のままではない。
+    // 取得元：`affiliates-v6/n5VVTb-1440.png`（`7d830282`）
+    // **この画面は直前まで撮れなかった。** 撮影の口 `/api/conversions/approvals` が無く、
+    // 既定の器が返って `items.map is not a function` で落ちていた（実装ではなく撮影側の欠け）。
   },
   { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**P2 アフィリエイターを追加する。#558 で報酬の決め方が直り、作りは設計に近い。** ルート `/affiliates/new`。段は 1 どなたを登録するか（名前・屋号／連絡先メール／紹介コード）→ 報酬の決め方。**#558 で「報酬が売上×率でしか出ない」が直った**——**成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。**良い点**：紹介コードに「空欄にすると、推測されにくいコードを自動で作ります（そのほうが、他の人にコードを当てられにくくなります）」と**なぜ自動が良いか**まで書く。連絡先メールに「報酬の確定連絡に使います。」と用途を書く。**P2 残る差**：設計 16-1-D は 支払い条件（締め日・支払サイクル・振込先）もこの段で決めるが、実装は名前・連絡先・コード・報酬まで。**振込先は `njLGA` の決めごと（銀行・支店・種別・末尾4桁だけ）に沿って足す。** 取得元：`affiliates-v6/xqT1Z.txt`。1440・1920とも横スクロール0 **推奨修正**：支払い条件（締め日・支払サイクル・振込先）をこの段に足す。**振込先は `njLGA` の決めごと（銀行・支店・種別・末尾4桁だけ）に沿う**——口座番号の全桁と名義は画面に出さない。', verdictSource: 'affiliates-v6/xqT1Z.txt' , verdictHead: '6a3eb22b' },
   {
@@ -1646,6 +1654,17 @@ export const SCREENS = [
     route: '/mileage?tab=history', mode: 'page',
     verdict: 'needs_fix', verdictNote: 'P1 「だれが」の列が無く、手で動かした記録を誰がやったか追えない（設計は自動／本人／担当者名を出す）。残高の列も無い。帯4つ（この30日の記録・手で動かした分・取り消し・反映を待っている）が無い。「マイルを手で増やす・減らす」と「履歴をCSVで書き出す」の導線が無い。P2 絞り込みが設計のチップ（すべて/付いた/使った/手で動かした/取り消し）でなくセレクト6つ。ページ送りが無い。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖 **ルート**：`/mileage?tab=history`。**取得元**：`mileage-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**「だれが」の列を先に足す**。手で動かしたマイルを誰がやったか追えないのは、金額を動かす記録として危ない。`mileage_history` に操作者を持つ列が要るかを先に確かめる。日付欄が `mm/dd/yyyy` になるのは**撮影側のブラウザ言語の癖で、実装の不具合ではない**。',
     verdictSource: 'mileage-v6/MvZm5-1920.png', verdictHead: '6a3eb22b',
+    // ---- 2026-09-02 `7d830282` で撮った ----
+    // **機能17の4ルートが、口の返事に入れ子が無いだけで画面ごと死ぬ。**
+    //   /mileage?tab=history       `result?.pagination.total`  → Cannot read properties of undefined
+    //   /mileage?tab=score         `overview?.pagination.total`
+    //   /mileage/friends/detail    `insights.rewardedActions`
+    //   /conversions?tab=approvals `items.map is not a function`
+    // `?.` が1つ手前の名前にしか掛かっていないため、`—` に落ちずに
+    // 「画面を表示できませんでした」になる。該当箇所：
+    //   mileage-history-tab.tsx:84,141,187,189 ／ action-score-tab.tsx:124 ／ mileage/page.tsx:438
+    // （`mileage/page.tsx:185` だけは `overview?.pagination?.total` と正しく書けている）
+    // **今回は撮影側の口と固定データを足して撮れるようにしただけで、実装は直していない。**
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 構造は設計とそろっており、残るのは実データの接続', verdictSource: 'mileage-v6/BmoGY.txt + mileage-v6/design-qa.md' , verdictHead: '6a3eb22b' },
   {
@@ -1759,6 +1778,14 @@ export const SCREENS = [
     verdictNote: '#627で3点直した。①**「今月の追加」は常に `—人` だった**——今月ぶんに絞る術が無いのに「今月」と名乗っていた。「友だちになった」に改めて累計で出し、**経路が分かる人の数**（`friendsWithRef`。設計の「そのうち経路が分かる人 289人」）を副文に出した。②設計の説明帯（「友だち追加」だけでは経路が分からない）。③「CSVで書き出す」——画面に出ている行をそのまま書き出し、取れていない日時は `—` で0件と混ぜない。残る差：**タブの件数**（件数は各タブの中で読んでおり、外側からは見えない。開いていないタブだけ出ないのは出さないより悪いので、外側で数を取れるようにしてから）、「まとめて操作」、絞り込みチップ、ページ送り',
     verdictSource: 'Claude実装',
     verdictHead: 'd80ef8ce',
+    // ---- 2026-09-02 `7d830282` で撮った。**絵を見て確かめた範囲だけ書く。** ----
+    // 解決：今月の追加 `—人`／「前月比は出せません」、クリック `—回`／「取得できません」、
+    //       平均の追加率 `—%`／「クリックのうち」。**読めていない数を0件と書いていない。**
+    // 解決：流入元は実値0なので `0件`／稼働中 0。`—` と `0` を撃ち分けている。
+    // 解決：保存した条件が `—`＋「まだ繋がっていません。条件の保存が接続されると表示されます。」
+    // 要確認：`—` に単位が付いている（`—人` `—回`）。手順書は「単位を付けない」と書いているが、
+    //         設計のどちらが正かはこの絵から決められないので判定は据え置く。
+    // 取得元：`inflow-v6/Q4bkTg-1440.png`（`7d830282`）
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
@@ -2611,6 +2638,12 @@ export const CAPTURED_AT = {
         + '`VjXGX`（遡及反映の確認ダイアログ）と `zGZMA`（対応マーク削除の確認）は、固定データにボタンが出ず撮れなかった。'
         + '**#670 の主対象 `rIhbN`・`QKx8Q`・`hqrOv` は撮っていない** — 本流 `codex/development` の台帳は95行しかなく、この3件の行が無いため。'
         + '撮影は内蔵SSDのクローンで実施（外付けドライブが障害のため）' },
+    { pr: 670, head: '7d830282', on: '2026-09-02',
+      screens: ['l25rlp', 'tP0RW', 'LfrQs', 'ee0sk', 'VjXGX', 'byqIW', 'A1ZYeP', 'KoT6c', 'HBTk0', 'yKEdO', 'dKlkz', 'hqrOv', 'rIhbN', 'QKx8Q', 'XBkiQ', 'H374MR', 'sfTEW', 'op1rh', 'QzRsJ'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '19 Node が撮れた（前回は本流の台帳が95行で `rIhbN`・`QKx8Q`・`hqrOv` の行が無く撮れなかった）。'
+        + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
@@ -2654,6 +2687,15 @@ export const CAPTURED_AT = {
         + '`cPk8A`（保存した条件から選ぶ）と `sqFXf`（この条件を保存）は押せる形になっておらず撮れていない。'
         + '`TmHjF`（一覧の状態）は口の返事を差し替える手順が仕組みに無く撮れない。'
         + '撮影は内蔵SSDのクローンで実施（外付けドライブが障害のため）' },
+    { pr: 674, head: '7d830282', on: '2026-09-02',
+      screens: ['q76C35', 'zZ9fA', 'XQfMD', 'p97Tf', 'Bw0zt', 'h0kahp', 'vW4Es', 'FpgxH', 'bPF0s', 'u6gHt', 'EGMb1', 'xkRDb', 'TmHjF'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '`TmHjF`（一覧の状態）が今回は撮れた。'
+        + '**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、'
+        + '原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、'
+        + '台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。'
+        + '`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。' },
   ],
   12: [
     { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },
@@ -2671,6 +2713,12 @@ export const CAPTURED_AT = {
     { pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['WuKzU', 'gBtaK'], note: 'development そのもので撮った' },
       { pr: 619, head: '31b44202', on: '2026-08-31', screens: ['yPkWe'], note: 'Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち' },
+    { pr: 668, head: '7d830282', on: '2026-09-02',
+      screens: ['gBtaK', 'yPkWe', 'WuKzU'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '`uNBlA`（変える前に影響を見る）は `#cv-value` が見つからず撮れていない。'
+        + '`fill` の選択子を読むように直したあとも残ったので、**その id の欄が画面に無い**（ルートは200を返す）。' },
   ],
   26: [
     { pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' },
@@ -2683,6 +2731,11 @@ export const CAPTURED_AT = {
     { pr: 560, head: '7c1acd0f', on: '2026-08-29', screens: ['g89Tc'], note: '寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eXAJP'], note: 'development そのもので撮った' },
       { pr: 617, head: 'b7e58a51', on: '2026-08-31', screens: ['YfTfJ'], note: 'Claude実装。使われている場所と確認時刻を表示。差し替えAPI待ちに加え、アカウント切替の遅延応答P1を監査で記録' },
+    { pr: 667, head: '7d830282', on: '2026-09-02',
+      screens: ['g89Tc', 'eXAJP', 'YfTfJ', 'h8pBZr'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '`voJtX`（詳細と差し替え）は「夏の定番セット.jpgの使用箇所」が見つからず撮れていない。' },
   ],
   16: [
     { pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' },
@@ -2691,6 +2744,12 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['PouPn', 'GH8VL', 'n5VVTb', 'xqT1Z', 'GPWzq'], note: '同上' },
     { pr: 585, head: '75d6eb9a', on: '2026-08-30', screens: ['njLGA'], note: '支払いのタブ。承認済みだけを集計し、保留期間内と承認日時未取得を分ける。通常・読込・0件・取得失敗の4状態' },
     { pr: 585, head: '3857365b', on: '2026-08-30', screens: ['njLGA'], note: '取得失敗のとき帯を — にする直し。0円と見分けがつくようになった' },
+    { pr: 667, head: '7d830282', on: '2026-09-02',
+      screens: ['n5VVTb', 'PouPn', 'GH8VL', 'njLGA', 'GPWzq', 'xqT1Z'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '**`n5VVTb`（成果承認）が撮れるようになった。** 撮影の口（`/api/conversions/approvals`）を足したため。'
+        + '`jwrbf`（成果内訳）は「田中 明」が見つからず撮れていない。' },
   ],
   27: [
     { pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' },
@@ -2715,6 +2774,12 @@ export const CAPTURED_AT = {
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['s98Vfw', 'N46cQ', 'BmoGY', 'k8VCU'], note: 'development そのもので撮った' },
     { pr: 582, head: '78e2f065', on: '2026-08-30', screens: ['vz0Ji'], note: '手で調整したときの失敗を日本語に。405を実際に起こして確かめた' },
     { pr: 624, head: '5e8f32d3', on: '2026-08-31', screens: ['z3PB2', 'p9CcEB', 's98Vfw', 'MvZm5', 'HIU5O', 'N46cQ', 'qlVLJ'], note: 'Claudeが実装して撮った。#549 の上。**`z3PB2` の「層の境目が違う」は誤りで、40は撮影用の固定データの誤り**（`DEFAULT_BANDS` は 30 / 70 で設計と一致）。固定データを直して撮り直した' },
+    { pr: 667, head: '7d830282', on: '2026-09-02',
+      screens: ['MvZm5', 'HIU5O', 'z3PB2', 'k8VCU', 's98Vfw', 'N46cQ', 'qlVLJ', 'BmoGY'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '**機能17は直前まで4枚とも「画面を表示できませんでした」で1枚も撮れなかった。** 撮影の口と固定データを直して8 Node が撮れた。'
+        + '`vz0Ji` は「マイルを手で増やす・減らす」が見つからず撮れていない。' },
   ],
   7: [
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
@@ -2831,6 +2896,11 @@ export const CAPTURED_AT = {
     { pr: 574, head: '0906b8fa', on: '2026-08-30', screens: ['JupxW', 'BMmxU', 'UIaM7'], note: 'refの初期選択、一覧の4状態、削除確認の窓。撮影モックに詳細・ファネル・流入元の口を足した' },
     { pr: 589, head: '45b3efc5', on: '2026-08-30', screens: ['TEVk8'], note: 'Claudeが直した。タグをフォルダで束ねる。直した本人が比較している' },
     { pr: 627, head: 'd80ef8ce', on: '2026-08-31', screens: ['Q4bkTg', 'IhSBB', 'v0HaI', 'BuVDB', 'Im2b1', 'BMmxU', 'UIaM7'], note: 'Claudeが実装して撮った。#574 の上（#574 は #443 を含む）' },
+    { pr: 666, head: '7d830282', on: '2026-09-02',
+      screens: ['Q4bkTg', 'BMmxU', 'IhSBB', 'v0HaI', 'BuVDB', 'Im2b1', 'TEVk8', 'JupxW', 'UIaM7'],
+      note: '最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と'
+        + '第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。'
+        + '9 Node すべて撮れた。' },
   ],
   19: [
     { pr: 444, head: 'ccbd0975', on: '2026-08-28' },
