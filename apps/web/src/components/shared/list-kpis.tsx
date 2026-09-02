@@ -27,6 +27,7 @@ export default function ListKpis({
   build,
   titles,
   variant = 'v5',
+  accountId,
 }: {
   build: (stats: ListStats) => KpiSpec[]
   /**
@@ -38,6 +39,8 @@ export default function ListKpis({
    */
   titles?: [string, string, string, string]
   variant?: NonNullable<SummaryCardProps['variant']>
+  /** 渡した画面では、選択中のLINE公式アカウントだけを集計する。 */
+  accountId?: string | null
 }) {
   const [stats, setStats] = useState<ListStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,9 +48,17 @@ export default function ListKpis({
 
   useEffect(() => {
     let cancelled = false
+    setStats(null)
+    setLoading(true)
+    setFailed(false)
+    if (accountId === null) {
+      setFailed(true)
+      setLoading(false)
+      return () => { cancelled = true }
+    }
     ;(async () => {
       try {
-        const res = await api.listStats.get()
+        const res = await api.listStats.get(accountId)
         if (cancelled) return
         if (res.success) setStats(res.data)
         else setFailed(true)
@@ -61,7 +72,7 @@ export default function ListKpis({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accountId])
 
   // 読み込み中は枠だけ4つ出す。中身が入ってから高さが変わると、
   // 下の一覧を読んでいる途中で位置がずれる。

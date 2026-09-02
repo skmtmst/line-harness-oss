@@ -16,6 +16,7 @@ import {
   type WebinarAnalytics,
   type WebinarUserComment,
 } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 function fmtSec(sec: number): string {
   // 負 = 開始前 (待機ルーム) の相対時刻。-330 → -5:30
@@ -840,7 +841,7 @@ type TabKey = (typeof TABS)[number][0]
 
 function EditWebinarInner() {
   const id = useSearchParams().get('id')
-  const { accounts } = useAccount()
+  const { accounts, loading: accountsLoading } = useAccount()
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -859,7 +860,7 @@ function EditWebinarInner() {
   if (!id) {
     return (
       <>
-        <Header title="ウェビナー編集" />
+
         <div className="p-6 text-red-700">id クエリが必要です</div>
       </>
     )
@@ -867,7 +868,7 @@ function EditWebinarInner() {
   if (loading) {
     return (
       <>
-        <Header title="ウェビナー編集" />
+
         <div className="p-6 text-gray-500">読み込み中...</div>
       </>
     )
@@ -875,7 +876,7 @@ function EditWebinarInner() {
   if (loadError || !webinar) {
     return (
       <>
-        <Header title="ウェビナー編集" />
+
         <div className="p-6 text-red-700">{loadError ?? '見つかりませんでした'}</div>
       </>
     )
@@ -889,7 +890,11 @@ function EditWebinarInner() {
     : null
   const previewUnavailableReason = webinar.status !== 'active'
     ? '公開すると、友だちが見るページを確認できます'
-    : 'このLINE公式アカウントにはLIFF IDが設定されていません'
+    : accountsLoading
+      ? 'LINE公式アカウントを確認しています'
+      : !webinar.accountId || !webinarAccount
+        ? 'このウェビナーのLINE公式アカウントを確認できません'
+        : 'このLINE公式アカウントにはLIFF IDが設定されていません'
 
   return (
     <>
@@ -975,11 +980,12 @@ function EditWebinarInner() {
 }
 
 export default function EditWebinarPage() {
+  usePageTitle('ウェビナー編集')
   return (
     <Suspense
       fallback={
         <>
-          <Header title="ウェビナー編集" />
+
           <div className="p-6 text-gray-500">読み込み中...</div>
         </>
       }

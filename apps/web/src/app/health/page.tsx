@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface LineAccount {
   id: string
@@ -48,6 +48,7 @@ const statusConfig: Record<AccountMigration['status'], { label: string; textColo
 }
 
 export default function HealthPage() {
+  usePageTitle('BAN検知ダッシュボード')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
   const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthLog['riskLevel']>>({})
@@ -142,7 +143,6 @@ export default function HealthPage() {
 
   return (
     <div>
-      <Header title="BAN検知ダッシュボード" />
 
       {/* Error */}
       {error && (

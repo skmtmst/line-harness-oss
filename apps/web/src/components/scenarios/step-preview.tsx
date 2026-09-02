@@ -1,17 +1,18 @@
 'use client'
 
 /*
- * 1通目のプレビュー。
+ * 1通目の下見（設計 `V6 5 kk8dz 1通目設定` の右側）。
  *
- * 出すのは2つ。
- *   1. **いつ届くか**を具体的な日時で（「1日後の10:00」だけでは、いつなのか
- *      すぐに分からない。購読開始を今とみなして実際の日時に直す）
- *   2. **何が届くか**をトーク画面に近い形で
+ * 設計は1枚。トーク画面と同じ並びで、**いつ届くか**を帯で出し、その下に
+ * **何が届くか**を吹き出しで出す。2枚に割ると、時刻と中身を別々に見ることになり、
+ * 「この文面がこの時刻に届く」という1つの絵にならない。
  *
  * 「1日後 10:00」のような書き方は、設定としては正しいが、読む側は毎回
  * 頭の中で今日の日付に足し算することになる。ここで足しておく。
  */
 
+import { Clock } from 'lucide-react'
+import styles from './step-preview.module.css'
 import type { DeliveryMode } from '@line-crm/shared'
 import type { ScenarioQuestion } from './question-editor'
 import type { StepMessageKind } from './message-type-tabs'
@@ -135,190 +136,183 @@ export default function StepPreview({
   const rolled = rolledToNextDay(start, at, deliveryMode, offsetDays)
 
   return (
-    <aside className="space-y-3" aria-label="プレビュー">
-      <div className="bg-canvas rounded-card border-hairline border p-4">
-        <h3 className="text-ink text-sm font-bold">いつ届くか</h3>
-        <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
-          いま購読が始まったとして計算しています。実際は、その人が購読を始めた時刻が起点です。
+    <aside
+      aria-label="1通目の下見"
+      className={`${styles.preview} border-hairline bg-canvas border p-4`}
+    >
+      <h3 className="text-ink text-sm font-bold">配信の流れ</h3>
+      <p className="text-ink-faint mt-0.5 text-micro leading-relaxed">
+        いま購読が始まったとして計算しています（購読開始 {formatJst(start)}）。
+        実際は、その人が購読を始めた時刻が起点です。
+      </p>
+      <p className="text-ink-secondary mt-1.5 text-micro leading-relaxed">
+        送る相手：{audienceLabel}
+      </p>
+
+      {/* トーク画面に近い形。実物と同じ見た目にはしない（別物と分かるように）。 */}
+      <div className="bg-canvas-sunken rounded-card mt-3 space-y-2 p-3">
+        {/* 届く日時の帯（設計 h=26 r=full 11/600 アイコン13）。 */}
+        <p className="flex justify-center">
+          <span className={`${styles.band} bg-accent-soft text-accent rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
+            <Clock aria-hidden size={13} strokeWidth={1.75} />
+            {words}・{formatJst(at)}
+          </span>
         </p>
 
-        {/* 購読開始 → 1通目 の並び。時刻を縦に並べると、間隔が目で分かる。 */}
-        <ol className="mt-3 space-y-0">
-          <li className="flex gap-3">
-            <span className="flex flex-col items-center">
-              <span className="border-hairline mt-1.5 h-2.5 w-2.5 shrink-0 rounded-pill border-2" />
-              <span className="border-hairline min-h-8 w-px flex-1 border-l" />
-            </span>
-            <span className="min-w-0 pb-3">
-              <span className="text-ink-secondary block text-xs">購読開始</span>
-              <span className="text-ink-faint block text-xs">{formatJst(start)}</span>
-            </span>
-          </li>
-          <li className="flex gap-3">
-            <span className="bg-accent mt-1.5 h-2.5 w-2.5 shrink-0 rounded-pill" />
-            <span className="min-w-0">
-              <span className="text-ink-secondary block text-xs">1通目（{words}）</span>
-              <span className="text-ink block text-sm font-bold">{formatJst(at)}</span>
-              {rolled && (
-                <span className="text-warning bg-warning-bg rounded-control mt-1.5 block px-2 py-1 text-xs leading-relaxed">
-                  いまはもう {deliveryTime} を過ぎているため、翌日になります。
-                  購読開始が {deliveryTime} より前なら、その日のうちに届きます。
+        {templateName ? (
+          <Bubble>
+            <span className="text-ink-faint text-micro">テンプレート</span>
+            <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+          </Bubble>
+        ) : kind === 'image' ? (
+          imageUrl ? (
+            // 中身が何かを見せるだけなので、次の最適化には載せない。
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt="送る画像"
+              className="rounded-card max-h-48 w-auto max-w-full object-contain"
+            />
+          ) : (
+            <Placeholder>画像を選ぶと、ここに出ます</Placeholder>
+          )
+        ) : kind === 'question' && question ? (
+          <>
+            {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
+            <Bubble>
+              <span className="text-ink block text-label font-bold">
+                {question.text.trim() || '（質問文がまだ空です）'}
+              </span>
+              <span className="mt-2 block space-y-1.5">
+                {question.choices.map((choice, i) => (
+                  <span
+                    key={i}
+                    className={`rounded-control block px-3 py-2 text-center text-label font-bold ${
+                      i === 0
+                        ? 'bg-accent text-on-accent'
+                        : 'border-hairline text-ink-secondary border'
+                    }`}
+                  >
+                    {choice.label.trim() || `選択肢${i + 1}`}
+                  </span>
+                ))}
+              </span>
+            </Bubble>
+          </>
+        ) : kind === 'carousel' ? (
+          templateName ? (
+            <Bubble>
+              <span className="text-ink-faint text-micro">カルーセル</span>
+              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink-faint mt-1 block text-micro">
+                実際の見た目は、カルーセルの編集画面で確かめられます。
+              </span>
+            </Bubble>
+          ) : (
+            <Placeholder>カルーセルを選ぶと、ここに出ます</Placeholder>
+          )
+        ) : kind === 'location' ? (
+          kindState?.location.latitude && kindState.location.longitude ? (
+            <Bubble>
+              <span className="text-ink block text-label font-bold">
+                {kindState.location.title.trim() || '場所'}
+              </span>
+              {kindState.location.address.trim() && (
+                <span className="text-ink-secondary mt-0.5 block text-micro">
+                  {kindState.location.address}
                 </span>
               )}
-            </span>
-          </li>
-        </ol>
-
-        <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-xs leading-relaxed">
-          2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
-        </p>
-      </div>
-
-      <div className="bg-canvas rounded-card border-hairline border p-4">
-        <h3 className="text-ink text-sm font-bold">何が届くか</h3>
-        <p className="text-ink-faint mt-0.5 text-xs">送る相手：{audienceLabel}</p>
-
-        {/* トーク画面に近い形。実物と同じ見た目にはしない（別物と分かるように）。 */}
-        <div className="bg-canvas-sunken rounded-card mt-3 space-y-2 p-3">
-          {templateName ? (
-            <Bubble>
-              <span className="text-ink-faint text-xs">テンプレート</span>
-              <span className="text-ink mt-0.5 block text-sm font-bold">{templateName}</span>
+              {/* 地図そのものは出さない。ここで別の地図を出すと、
+                  実際にLINEで開く地図と違うものを見せることになる。 */}
+              <span className="bg-canvas-sunken text-ink-faint rounded-control mt-2 block px-3 py-4 text-center text-micro">
+                地図（{kindState.location.latitude}, {kindState.location.longitude}）
+              </span>
             </Bubble>
-          ) : kind === 'image' ? (
-            imageUrl ? (
-              // 中身が何かを見せるだけなので、次の最適化には載せない。
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imageUrl}
-                alt="送る画像"
-                className="rounded-card max-h-48 w-auto max-w-full object-contain"
-              />
-            ) : (
-              <Placeholder>画像を選ぶと、ここに出ます</Placeholder>
-            )
-          ) : kind === 'question' && question ? (
-            <>
-              {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
-              <Bubble>
-                <span className="text-ink block text-sm font-bold">
-                  {question.text.trim() || '（質問文がまだ空です）'}
-                </span>
-                <span className="mt-2 block space-y-1.5">
-                  {question.choices.map((choice, i) => (
-                    <span
-                      key={i}
-                      className={`rounded-control block px-3 py-2 text-center text-sm font-bold ${
-                        i === 0
-                          ? 'bg-accent text-on-accent'
-                          : 'border-hairline text-ink-secondary border'
-                      }`}
-                    >
-                      {choice.label.trim() || `選択肢${i + 1}`}
-                    </span>
-                  ))}
-                </span>
-              </Bubble>
-            </>
-          ) : kind === 'carousel' ? (
-            templateName ? (
-              <Bubble>
-                <span className="text-ink-faint text-xs">カルーセル</span>
-                <span className="text-ink mt-0.5 block text-sm font-bold">{templateName}</span>
-                <span className="text-ink-faint mt-1 block text-xs">
-                  実際の見た目は、カルーセルの編集画面で確かめられます。
-                </span>
-              </Bubble>
-            ) : (
-              <Placeholder>カルーセルを選ぶと、ここに出ます</Placeholder>
-            )
-          ) : kind === 'location' ? (
-            kindState?.location.latitude && kindState.location.longitude ? (
-              <Bubble>
-                <span className="text-ink block text-sm font-bold">
-                  {kindState.location.title.trim() || '場所'}
-                </span>
-                {kindState.location.address.trim() && (
-                  <span className="text-ink-secondary mt-0.5 block text-xs">
-                    {kindState.location.address}
-                  </span>
-                )}
-                {/* 地図そのものは出さない。ここで別の地図を出すと、
-                    実際にLINEで開く地図と違うものを見せることになる。 */}
-                <span className="bg-canvas-sunken text-ink-faint rounded-control mt-2 block px-3 py-4 text-center text-xs">
-                  地図（{kindState.location.latitude}, {kindState.location.longitude}）
-                </span>
-              </Bubble>
-            ) : (
-              <Placeholder>緯度と経度を入れると、ここに出ます</Placeholder>
-            )
-          ) : kind === 'sticker' ? (
-            kindState?.sticker.stickerId ? (
-              <Bubble>
-                {/* 目印なので次の最適化には載せない。 */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${kindState.sticker.stickerId}/android/sticker.png`}
-                  alt="スタンプ"
-                  className="h-20 w-20"
-                />
-              </Bubble>
-            ) : (
-              <Placeholder>スタンプを選ぶと、ここに出ます</Placeholder>
-            )
-          ) : kind === 'video' ? (
-            kindState?.video.previewImageUrl ? (
-              <Bubble>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={kindState.video.previewImageUrl}
-                  alt="動画のサムネイル"
-                  className="rounded-card max-h-40 w-auto max-w-full object-contain"
-                />
-                <span className="text-ink-faint mt-1 block text-xs">動画</span>
-              </Bubble>
-            ) : (
-              <Placeholder>動画とサムネイルのURLを入れると、ここに出ます</Placeholder>
-            )
-          ) : kind === 'audio' ? (
-            kindState?.audio.originalContentUrl ? (
-              <Bubble>
-                <span className="text-ink block text-sm">音声</span>
-                <span className="text-ink-faint mt-0.5 block text-xs">
-                  {kindState.audio.duration ? `${kindState.audio.duration} 秒` : '長さが未設定'}
-                </span>
-              </Bubble>
-            ) : (
-              <Placeholder>音声のURLを入れると、ここに出ます</Placeholder>
-            )
-          ) : body.trim() ? (
-            <Bubble>{body}</Bubble>
           ) : (
-            <Placeholder>本文を書くと、ここに出ます</Placeholder>
-          )}
-        </div>
-
-        {/*
-          差し込みの注意書き。
-          日付は届く日時が決まっているのでここで実物にできるが、名前や
-          友だち情報は相手ごとに変わるので置き換えられない。混ぜて出すと
-          「置き換わるもの／置き換わらないもの」が分からなくなるため、
-          どちらも書いたまま出して、そのことを書く。
-        */}
-        {/\{\{[a-z_.+:0-9-]+\}\}/.test(body) && (
-          <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-            差し込み（{'{{name}}'} や {'{{date}}'} など）は、送るときに実際の値へ置き換わります。
-            ここでは書いたまま出しています。
-          </p>
+            <Placeholder>緯度と経度を入れると、ここに出ます</Placeholder>
+          )
+        ) : kind === 'sticker' ? (
+          kindState?.sticker.stickerId ? (
+            <Bubble>
+              {/* 目印なので次の最適化には載せない。 */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${kindState.sticker.stickerId}/android/sticker.png`}
+                alt="スタンプ"
+                className="h-20 w-20"
+              />
+            </Bubble>
+          ) : (
+            <Placeholder>スタンプを選ぶと、ここに出ます</Placeholder>
+          )
+        ) : kind === 'video' ? (
+          kindState?.video.previewImageUrl ? (
+            <Bubble>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={kindState.video.previewImageUrl}
+                alt="動画のサムネイル"
+                className="rounded-card max-h-40 w-auto max-w-full object-contain"
+              />
+              <span className="text-ink-faint mt-1 block text-micro">動画</span>
+            </Bubble>
+          ) : (
+            <Placeholder>動画とサムネイルのURLを入れると、ここに出ます</Placeholder>
+          )
+        ) : kind === 'audio' ? (
+          kindState?.audio.originalContentUrl ? (
+            <Bubble>
+              <span className="text-ink block text-label">音声</span>
+              <span className="text-ink-faint mt-0.5 block text-micro">
+                {kindState.audio.duration ? `${kindState.audio.duration} 秒` : '長さが未設定'}
+              </span>
+            </Bubble>
+          ) : (
+            <Placeholder>音声のURLを入れると、ここに出ます</Placeholder>
+          )
+        ) : body.trim() ? (
+          <Bubble>{body}</Bubble>
+        ) : (
+          <Placeholder>本文を書くと、ここに出ます</Placeholder>
         )}
       </div>
+
+      {/*
+        「当日の10:00」と書いてあるのに日付が翌日になると、設定を間違えたのかと
+        疑うことになる。理由をその場に出す。
+      */}
+      {rolled && (
+        <p className="text-warning bg-warning-bg rounded-control mt-2 px-2 py-1.5 text-micro leading-relaxed">
+          いまはもう {deliveryTime} を過ぎているため、翌日になります。
+          購読開始が {deliveryTime} より前なら、その日のうちに届きます。
+        </p>
+      )}
+
+      {/*
+        差し込みの注意書き。
+        日付は届く日時が決まっているのでここで実物にできるが、名前や
+        友だち情報は相手ごとに変わるので置き換えられない。混ぜて出すと
+        「置き換わるもの／置き換わらないもの」が分からなくなるため、
+        どちらも書いたまま出して、そのことを書く。
+      */}
+      {/\{\{[a-z_.+:0-9-]+\}\}/.test(body) && (
+        <p className="text-ink-faint mt-2 text-micro leading-relaxed">
+          差し込み（{'{{name}}'} や {'{{date}}'} など）は、送るときに実際の値へ置き換わります。
+          ここでは書いたまま出しています。
+        </p>
+      )}
+
+      <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-micro leading-relaxed">
+        2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
+      </p>
     </aside>
   )
 }
 
+/** 吹き出し。設計は左下だけ角を落とす（r=14,14,14,4）。 */
 function Bubble({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-canvas rounded-card border-hairline max-w-full border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-ink">
+    <div className={`${styles.bubble} bg-canvas border-hairline text-ink max-w-full border px-3 py-2 text-label leading-relaxed font-medium whitespace-pre-wrap`}>
       {children}
     </div>
   )
@@ -326,7 +320,7 @@ function Bubble({ children }: { children: React.ReactNode }) {
 
 function Placeholder({ children }: { children: React.ReactNode }) {
   return (
-    <p className="border-hairline rounded-card text-ink-faint border border-dashed px-3 py-6 text-center text-xs">
+    <p className="border-hairline rounded-card text-ink-faint border border-dashed px-3 py-6 text-center text-micro">
       {children}
     </p>
   )

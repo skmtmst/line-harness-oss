@@ -98,6 +98,9 @@ function makeMockLineClient(opts: { currentDefault?: string | null } = {}): Mock
     createRichMenuAlias: vi.fn(async () => {
       calls.push('create-alias');
     }),
+    upsertRichMenuAlias: vi.fn(async () => {
+      calls.push('upsert-alias');
+    }),
     deleteRichMenu: vi.fn(async () => {
       calls.push('delete-old');
     }),
@@ -374,7 +377,7 @@ describe('publishRichMenuGroup', () => {
     });
   });
 
-  it('1 page: create → upload → alias upsert → 旧削除', async () => {
+  it('1 page: create → upload → alias update → 旧削除', async () => {
     const line = makeMockLineClient();
     const r2 = makeMockR2();
     const result = await publishRichMenuGroup(
@@ -392,13 +395,13 @@ describe('publishRichMenuGroup', () => {
     );
     // isDefaultForAll=false かつ LINE current default なし → clear-default は呼ばない (Round 2 修正)
     expect(line.calls).toEqual([
-      'create', 'upload', 'delete-alias', 'create-alias', 'delete-old', 'get-default',
+      'create', 'upload', 'upsert-alias', 'get-default', 'delete-old',
     ]);
     expect(line.calls).not.toContain('clear-default');
     expect(result.pages).toEqual([{ pageId: 'p1', newRichMenuId: 'lm-1' }]);
   });
 
-  it('2 page: 各ページについて順序実行', async () => {
+  it('2 page: 全ページの画像準備後に alias を切り替える', async () => {
     const line = makeMockLineClient();
     const r2 = makeMockR2();
     const result = await publishRichMenuGroup(
@@ -413,6 +416,9 @@ describe('publishRichMenuGroup', () => {
       r2,
     );
     expect(result.pages.map((p) => p.newRichMenuId)).toEqual(['lm-1', 'lm-2']);
+    expect(line.calls.slice(0, 6)).toEqual([
+      'create', 'upload', 'create', 'upload', 'upsert-alias', 'upsert-alias',
+    ]);
     // 旧 ID なしなので delete-old は呼ばれない
     expect(line.calls.filter((c) => c === 'delete-old')).toHaveLength(0);
   });
@@ -517,6 +523,116 @@ describe('publishRichMenuGroup', () => {
         r2,
       ),
     ).rejects.toThrow(/R2 image missing/);
+  });
+
+  it('2ページ目の画像が無ければ LINE 側を一切変更しない', async () => {
+    const line = makeMockLineClient();
+    const r2: R2Like = {
+      get: vi.fn(async (key: string) => key === 'missing.png'
+        ? null
+        : { body: new Uint8Array([1, 2, 3]) }),
+    };
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'missing.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      r2,
+    )).rejects.toThrow(/R2 image missing/);
+    expect(line.calls).toEqual([]);
+  });
+
+  it('全画像準備後の upload 失敗は alias を切り替えず新規メニューを片付ける', async () => {
+    const line = makeMockLineClient();
+    line.uploadRichMenuImage = vi.fn(async (richMenuId: string) => {
+      line.calls.push('upload');
+      if (richMenuId === 'lm-2') throw new Error('upload failed');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('upload failed');
+    expect(line.calls).not.toContain('upsert-alias');
+    expect(line.calls.filter((call) => call === 'delete-old')).toHaveLength(2);
+  });
+
+  it('alias 切替の途中失敗は切替済みページを旧IDへ戻す', async () => {
+    const line = makeMockLineClient();
+    let aliasCalls = 0;
+    line.upsertRichMenuAlias = vi.fn(async () => {
+      aliasCalls++;
+      line.calls.push(`upsert-alias-${aliasCalls}`);
+      if (aliasCalls === 2) throw new Error('alias failed');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('alias failed');
+    expect(aliasCalls).toBe(4);
+    expect(line.calls.filter((call) => call === 'delete-old')).toHaveLength(2);
+  });
+
+  it('default 設定に失敗したら alias を旧IDへ戻して新規メニューを片付ける', async () => {
+    const line = makeMockLineClient();
+    line.setDefaultRichMenu = vi.fn(async () => {
+      line.calls.push('set-default');
+      throw new Error('default failed');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: true,
+        pages: [{
+          id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png',
+          imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [],
+        }],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('default failed');
+    expect(line.calls).toEqual([
+      'create', 'upload', 'upsert-alias', 'set-default', 'upsert-alias', 'delete-old',
+    ]);
+  });
+
+  it('alias の復旧も失敗したページは新メニューを消さずリンク切れを避ける', async () => {
+    const line = makeMockLineClient();
+    let aliasCalls = 0;
+    line.upsertRichMenuAlias = vi.fn(async () => {
+      aliasCalls++;
+      line.calls.push(`upsert-alias-${aliasCalls}`);
+      if (aliasCalls === 2 || aliasCalls === 3) throw new Error('alias unavailable');
+    });
+    await expect(publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+        pages: [
+          { id: 'p1', orderIndex: 0, name: 'p1', imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: 'old-1', areas: [] },
+          { id: 'p2', orderIndex: 1, name: 'p2', imageR2Key: 'b.png', imageContentType: 'image/png', lineRichMenuId: 'old-2', areas: [] },
+        ],
+      },
+      line,
+      makeMockR2(),
+    )).rejects.toThrow('alias unavailable');
+    // p1 は旧IDへ戻せたため新メニューを削除。p2 は復旧不明なので削除しない。
+    expect(line.calls.filter((call) => call === 'delete-old')).toHaveLength(1);
   });
 
   it('image_r2_key が null だと throw (画像未設定 page)', async () => {
