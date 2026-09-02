@@ -8,6 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 
 const statusStyle: Record<EcCommerceEvent['status'], { label: string; className: string }> = {
   received: { label: '受信済み', className: 'bg-blue-50 text-blue-700' },
+  identity_pending: { label: '会員の確認待ち', className: 'bg-warning-bg text-warning' },
   processing: { label: '処理中', className: 'bg-amber-50 text-amber-700' },
   processed: { label: '送信完了', className: 'bg-emerald-50 text-emerald-700' },
   skipped: { label: '送信なし', className: 'bg-canvas-sunken text-ink-secondary' },
@@ -45,14 +46,30 @@ export default function EcCommercePage() {
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
   const load = useCallback(async () => {
+    if (!selectedAccountId) {
+      setOverview(null)
+      setEvents([])
+      setSettings([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const [overviewRes, eventRes, settingRes] = await Promise.all([
-        api.ecCommerce.overview(),
-        api.ecCommerce.events({ limit: 30 }),
+        api.ecCommerce.overview(selectedAccountId),
+        api.ecCommerce.events({ lineAccountId: selectedAccountId, limit: 30 }),
         api.ecCommerce.settings(),
       ])
       if (!overviewRes.success || !eventRes.success || !settingRes.success) throw new Error('API error')
+      /*
+        **一覧の形を確かめてから state に入れる。**
+        `success` が真でも中身が配列とはかぎらない（口が想定と違う形を返すと
+        `{items:[],total:0}` のような物が入る）。そのまま入れると描画の途中で
+        `events.map is not a function` を投げ、エラー境界が本文を丸ごと
+        「画面を表示できませんでした」に置き換える。**1つの一覧が読めないだけで
+        画面が消える。** 読めなかったこととして扱い、理由を本文の帯に出す。
+      */
+      if (!Array.isArray(eventRes.data) || !Array.isArray(settingRes.data)) throw new Error('API error')
       setOverview(overviewRes.data)
       setEvents(eventRes.data)
       const subscriptionSettings = settingRes.data.filter((setting) =>
@@ -65,7 +82,7 @@ export default function EcCommercePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { void load() }, [load])
 
@@ -204,7 +221,7 @@ export default function EcCommercePage() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="24時間の受信" value={overview?.last24h ?? 0} note="ECから受け取ったイベント" />
               <MetricCard label="LINE送信完了" value={overview?.processed ?? 0} note={`累計 ${overview?.total ?? 0}件中`} />
-              <MetricCard label="送信なし" value={overview?.skipped ?? 0} note="未連携・通知OFFを含む" tone="gray" />
+              <MetricCard label="会員の確認待ち" value={overview?.identityPending ?? 0} note="LINEとのつき合わせが必要" tone="gray" />
               <MetricCard label="要確認" value={overview?.failed ?? 0} note={`最終受信 ${dateTime(overview?.lastReceivedAt ?? null)}`} tone="red" />
             </div>
           </section>

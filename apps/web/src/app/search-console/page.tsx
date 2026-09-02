@@ -10,6 +10,7 @@ import type {
   SearchConsolePerformance,
   SearchConsoleSetup,
 } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * Google検索の分析画面（設計 V2 6-11）。タブ表記は利用者指定のGoogle Analytics。
@@ -174,6 +175,7 @@ function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null
 }
 
 export default function SearchConsolePage() {
+  usePageTitle('分析')
   const [days, setDays] = useState<RangeDays>(28)
   const [data, setData] = useState<SearchConsolePerformance | null>(null)
   const [setup, setSetup] = useState<SearchConsoleSetup | null>(null)
@@ -211,7 +213,6 @@ export default function SearchConsolePage() {
     <div>
       <div data-design="Head">
         <Header
-          title="分析"
           description="Google検索でサイトがどれだけ表示され、どれだけ押されたかを見ます。Search Console から取り込んでいます。"
           action={
             <div className="flex flex-wrap items-center gap-2">

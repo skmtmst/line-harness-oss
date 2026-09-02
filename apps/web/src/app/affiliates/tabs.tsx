@@ -1,12 +1,30 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import Header from '@/components/layout/header'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
+import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import { calculateAffiliateReward } from './affiliate-reward'
+import {
+  OFFER_FILTERS,
+  OFFER_PAGE_SIZES,
+  OFFER_SORTS,
+  offersCsv,
+  pageCountOf,
+  pageOf,
+  selectOffers,
+  type OfferFilter,
+  type OfferSort,
+} from './offer-list-view'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -39,6 +57,7 @@ interface AffiliateReportRow {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
+  confirmedReward: number
   linkCount: number
   friendAdds: number
 }
@@ -48,7 +67,7 @@ interface AffiliateListRow extends AffiliateItem {
   totalClicks: number
   totalConversions: number
   totalRevenue: number
-  estimatedCommission: number
+  rewardAmount: number
   linkCount: number
   friendAdds: number
 }
@@ -110,7 +129,9 @@ interface JourneySummary {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 function formatYen(n: number): string {
@@ -190,7 +211,11 @@ export function AffiliatorsTab() {
           totalClicks: rep?.totalClicks ?? 0,
           totalConversions: rep?.totalConversions ?? 0,
           totalRevenue: rep?.totalRevenue ?? 0,
-          estimatedCommission: ((rep?.totalRevenue ?? 0) * a.commissionRate) / 100,
+          rewardAmount: calculateAffiliateReward({
+            commissionRate: a.commissionRate,
+            totalRevenue: rep?.totalRevenue ?? 0,
+            confirmedFixedReward: rep?.confirmedReward ?? 0,
+          }),
           linkCount: rep?.linkCount ?? 0,
           friendAdds: rep?.friendAdds ?? 0,
         }
@@ -278,14 +303,14 @@ export function AffiliatorsTab() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div data-design-node="PouPn" data-affiliate-design="v6">
       <div className="mb-4 flex justify-end">
-        <button
+        <Button
+          variant="primary"
           onClick={() => setCreateOpen(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
         >
-          + 新規作成
-        </button>
+          アフィリエイターを追加
+        </Button>
       </div>
 
       {createOpen && (
@@ -295,20 +320,22 @@ export function AffiliatorsTab() {
         />
       )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
+      {error ? (
+        <ListState
+          kind="error"
+          title="紹介者を表示できませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button onClick={() => void loadList()}>紹介者を再読み込み</Button>}
+        />
+      ) : loading ? (
+        <ListState kind="loading" title="紹介者を読み込んでいます" />
       ) : rows.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          アフィリエイターがまだ登録されていません
-        </div>
+        <ListState
+          kind="empty"
+          title="紹介者はまだ登録されていません"
+          description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
+          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
+        />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full min-w-[900px]">
@@ -322,8 +349,7 @@ export function AffiliatorsTab() {
                 <Th align="right">友だち追加</Th>
                 <Th align="right">CV</Th>
                 <Th align="right">売上</Th>
-                <Th align="right">参考報酬</Th>
-                <Th align="right">率</Th>
+                <Th align="right">報酬</Th>
                 <Th>状態</Th>
               </TableHeadRow>
             </thead>
@@ -350,8 +376,7 @@ export function AffiliatorsTab() {
                       <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">{row.friendAdds.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{row.totalConversions.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">{formatYen(row.totalRevenue)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.estimatedCommission)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-500">{row.commissionRate}%</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.rewardAmount)}</td>
                       <td className="px-4 py-3 text-sm">
                         {row.isActive
                           ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">有効</span>
@@ -363,7 +388,7 @@ export function AffiliatorsTab() {
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={11} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
+                        <td colSpan={10} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (
@@ -1295,116 +1320,119 @@ export function ApprovalQueue() {
 
 function OffersList({
   offers,
-  accounts,
-  tags,
-  scenarios,
+  accountMap,
+  tagMap,
+  scenarioMap,
   loading,
   error,
+  filtered,
   onEdit,
   onRefresh,
 }: {
   offers: AffiliateOffer[]
-  accounts: LineAccount[]
-  tags: Tag[]
-  scenarios: (Scenario & { stepCount?: number })[]
+  accountMap: Map<string, string>
+  tagMap: Map<string, string>
+  scenarioMap: Map<string, string>
   loading: boolean
   error: string | null
+  /** 案件はあるが、絞り込みに合う行が無い。 */
+  filtered: boolean
   onEdit: (offer: AffiliateOffer) => void
   onRefresh: () => void
 }) {
-  const accountMap = new Map(accounts.map((a) => [a.id, a.name]))
-  const tagMap = new Map(tags.map((t) => [t.id, t.name]))
-  const scenarioMap = new Map(scenarios.map((s) => [s.id, s.name]))
+  if (error) {
+    return (
+      <ListState
+        kind="error"
+        title="案件を読み込めませんでした"
+        description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+        action={<Button onClick={onRefresh}>案件を再読み込み</Button>}
+      />
+    )
+  }
+
+  if (loading) {
+    return <ListState kind="loading" title="案件を読み込んでいます" />
+  }
+
+  if (offers.length === 0) {
+    return filtered ? (
+      <ListState
+        kind="empty"
+        title="絞り込みに合う案件がありません"
+        description="検索語を変えるか、絞り込みの札を外すと表示されます。"
+      />
+    ) : (
+      <ListState
+        kind="empty"
+        title="案件はまだ登録されていません"
+        description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
+        action={<Button href="/affiliate-offers/new" variant="primary">案件を作る</Button>}
+      />
+    )
+  }
 
   return (
-    <div>
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
-      ) : offers.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          案件がまだ登録されていません。右上の「案件を作る」から作成してください。
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <TableHeadRow>
-                <Th>案件名</Th>
-                <Th>説明</Th>
-                <Th align="right">報酬</Th>
-                <Th align="right">マイル</Th>
-                <Th>対象アカウント</Th>
-                <Th>成果時のタグ</Th>
-                <Th>開始するシナリオ</Th>
-                <Th align="center">状態</Th>
-                <Th align="center">操作</Th>
-              </TableHeadRow>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {offers.map((offer) => (
-                <tr key={offer.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{offer.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate">
-                    {offer.description ?? <span className="italic text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-700">
-                    {formatYenNullable(offer.rewardAmount)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-semibold text-amber-600">
-                    {offer.rewardMiles.toLocaleString()} mile
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    {offer.lineAccountId ? accountMap.get(offer.lineAccountId) ?? offer.lineAccountId : '（なし）'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    {offer.tagId ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                        {tagMap.get(offer.tagId) ?? offer.tagId}
-                      </span>
-                    ) : '（なし）'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? offer.scenarioId : '（なし）'}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {/* 「有効 / 無効」だと何が有効なのか読めない。設計は
-                        アフィリエイターが紹介できる状態かどうかを書いている。 */}
-                    {offer.isActive ? (
-                      <span className="bg-success-bg text-success inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">公開中</span>
-                    ) : (
-                      <span className="bg-canvas-sunken text-ink-faint inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">下書き</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => onEdit(offer)}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      編集
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="mt-2 text-right">
-        <button
-          onClick={onRefresh}
-          className="text-xs text-gray-400 hover:text-gray-600"
-        >
-          更新
-        </button>
-      </div>
+    <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+      <table className="w-full min-w-[800px]">
+        <thead>
+          <TableHeadRow>
+            <Th>案件名</Th>
+            <Th>説明</Th>
+            <Th align="right">報酬</Th>
+            <Th align="right">マイル</Th>
+            <Th>対象アカウント</Th>
+            <Th>成果時のタグ</Th>
+            <Th>開始するシナリオ</Th>
+            <Th align="center">状態</Th>
+            <Th align="center">操作</Th>
+          </TableHeadRow>
+        </thead>
+        <tbody className="divide-hairline divide-y">
+          {offers.map((offer) => (
+            <tr key={offer.id} className="hover:bg-canvas-sunken">
+              <td className="text-ink px-4 py-3 text-sm font-medium">{offer.name}</td>
+              <td className="text-ink-faint max-w-[200px] truncate px-4 py-3 text-sm">
+                {offer.description ?? '—'}
+              </td>
+              <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                {formatYenNullable(offer.rewardAmount)}
+              </td>
+              <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                {offer.rewardMiles.toLocaleString()} mile
+              </td>
+              <td className="text-ink-secondary px-4 py-3 text-sm">
+                {offer.lineAccountId
+                  ? accountMap.get(offer.lineAccountId) ?? '—（名前を確認できません）'
+                  : '（なし）'}
+              </td>
+              <td className="text-ink-secondary px-4 py-3 text-sm">
+                {offer.tagId ? (
+                  <Chip tone="info">{tagMap.get(offer.tagId) ?? '—（名前を確認できません）'}</Chip>
+                ) : (
+                  '（なし）'
+                )}
+              </td>
+              <td className="text-ink-secondary px-4 py-3 text-sm">
+                {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? '—（名前を確認できません）' : '（なし）'}
+              </td>
+              <td className="px-4 py-3 text-center">
+                {/* 「有効 / 無効」だと何が有効なのか読めない。設計は
+                    アフィリエイターが紹介できる状態かどうかを書いている。 */}
+                {offer.isActive ? <Chip tone="ok">公開中</Chip> : <Chip>下書き</Chip>}
+              </td>
+              <td className="px-4 py-3 text-center">
+                <button
+                  onClick={() => onEdit(offer)}
+                  className="text-action text-xs font-medium hover:underline"
+                >
+                  編集
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -1423,18 +1451,27 @@ export function OffersTab() {
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AffiliateOffer | null>(null)
 
+  // 一覧の見せ方。どれも読み込んだ行から数えられるので、画面の中で動かす。
+  const [query, setQuery] = useState('')
+  const [filters, setFilters] = useState<OfferFilter[]>([])
+  const [sort, setSort] = useState<OfferSort>('newest')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
+
   const loadOffers = useCallback(async () => {
     setOffersLoading(true)
     setOffersError(null)
     try {
       const res = await api.affiliateOffers.list()
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setOffers(res.data)
       } else {
-        setOffersError('案件の読み込みに失敗しました')
+        setOffers([])
+        setOffersError('案件を読み込めませんでした')
       }
-    } catch (e) {
-      setOffersError(e instanceof Error ? e.message : '読み込みエラー')
+    } catch {
+      setOffers([])
+      setOffersError('案件を読み込めませんでした')
     } finally {
       setOffersLoading(false)
     }
@@ -1447,9 +1484,9 @@ export function OffersTab() {
         api.tags.list(),
         api.scenarios.list(),
       ])
-      if (accountsRes.success) setAccounts(accountsRes.data as unknown as LineAccount[])
-      if (tagsRes.success) setTags(tagsRes.data as unknown as Tag[])
-      if (scenariosRes.success) setScenarios(scenariosRes.data as unknown as (Scenario & { stepCount?: number })[])
+      if (accountsRes.success && Array.isArray(accountsRes.data)) setAccounts(accountsRes.data as unknown as LineAccount[])
+      if (tagsRes.success && Array.isArray(tagsRes.data)) setTags(tagsRes.data as unknown as Tag[])
+      if (scenariosRes.success && Array.isArray(scenariosRes.data)) setScenarios(scenariosRes.data as unknown as (Scenario & { stepCount?: number })[])
     } catch { /* silent */ }
   }, [])
 
@@ -1466,7 +1503,7 @@ export function OffersTab() {
     void api.conversionApprovals
       .list({ status: 'approved', limit: 200 })
       .then((res) => {
-        if (cancelled || !res.success) return
+        if (cancelled || !res.success || !Array.isArray(res.data)) return
         const month = new Date().toISOString().slice(0, 7)
         setApprovedThisMonth(res.data.filter((a) => a.createdAt.slice(0, 7) === month))
       })
@@ -1483,6 +1520,19 @@ export function OffersTab() {
     setFormOpen(true)
   }
 
+  const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
+  const tagMap = useMemo(() => new Map(tags.map((t) => [t.id, t.name])), [tags])
+  const scenarioMap = useMemo(() => new Map(scenarios.map((sc) => [sc.id, sc.name])), [scenarios])
+
+  const shown = useMemo(
+    () => selectOffers(offers, { filters, query, sort }),
+    [offers, filters, query, sort],
+  )
+
+  const pageCount = pageCountOf(shown.length, pageSize)
+  const currentPage = Math.min(page, pageCount)
+  const paged = pageOf(shown, currentPage, pageSize)
+
   // 設計のKPI。案件そのものと、そこから出た成果の両方を見る。
   const openCount = offers.filter((o) => o.isActive).length
   const confirmedCount = approvedThisMonth.length
@@ -1490,24 +1540,28 @@ export function OffersTab() {
   // 案件に結びつかない成果（ref から案件を辿れないもの）はマイルが付かない。
   const confirmedMiles = approvedThisMonth.reduce((sum, a) => sum + (a.offerRewardMiles ?? 0), 0)
 
+  const exportCsv = () => {
+    const csv = offersCsv(shown, {
+      account: (id) => accountMap.get(id),
+      tag: (id) => tagMap.get(id),
+      scenario: (id) => scenarioMap.get(id),
+      date: formatDate,
+    })
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }),
+    )
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-ink text-base font-semibold">案件</h2>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
-          </p>
-        </div>
-        {/* 作るのは 6-1-3 の独立した画面。同じフォームがモーダルにもあると、
-            片方だけ直しても気づけない。モーダルは編集のときだけ開く。 */}
-        <Button
-          href="/affiliate-offers/new"
-          variant="primary"
-        >
-          案件を作る
-        </Button>
-      </div>
+    <div data-design-node="GH8VL" data-affiliate-offers-design="v6">
+      <NoteBar>
+        案件は「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
+      </NoteBar>
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="公開中の案件" value={openCount} unit="件" detail="紹介できる案件の数" />
@@ -1521,18 +1575,81 @@ export function OffersTab() {
         />
       </div>
 
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        <SearchField
+          placeholder="案件名・説明で検索"
+          aria-label="案件名・説明で検索"
+          value={query}
+          onChange={(value) => { setQuery(value); setPage(1) }}
+          onClear={() => { setQuery(''); setPage(1) }}
+          className="w-[460px] max-w-full"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <Select
+          aria-label="並び順"
+          value={sort}
+          options={OFFER_SORTS.map((o) => ({ value: o.value, label: o.label }))}
+          onChange={(value) => { setSort(value as OfferSort); setPage(1) }}
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+        <Select
+          aria-label="表示件数"
+          value={String(pageSize)}
+          options={OFFER_PAGE_SIZES.map((n) => ({ value: String(n), label: `${n}件表示` }))}
+          onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
+          size="page-size"
+        />
+        {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
+        <Button onClick={exportCsv} disabled={shown.length === 0} className="ml-auto">
+          CSVで書き出す
+        </Button>
+        <Button href="/affiliate-offers/new" variant="primary">
+          案件を作る
+        </Button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {OFFER_FILTERS.map((f) => (
+          <FilterChip
+            key={f.key}
+            selected={filters.includes(f.key)}
+            onChange={(selected) => {
+              setFilters((current) =>
+                selected ? [...current, f.key] : current.filter((k) => k !== f.key),
+              )
+              setPage(1)
+            }}
+          >
+            {f.label}
+          </FilterChip>
+        ))}
+      </div>
+
       <OffersList
-        offers={offers}
-        accounts={accounts}
-        tags={tags}
-        scenarios={scenarios}
+        offers={paged}
+        accountMap={accountMap}
+        tagMap={tagMap}
+        scenarioMap={scenarioMap}
         loading={offersLoading}
         error={offersError}
+        filtered={offers.length > 0 && shown.length === 0}
         onEdit={handleEdit}
         onRefresh={loadOffers}
       />
 
-      <p className="text-ink-faint mt-3 text-right text-xs tabular-nums">全 {offers.length} 件</p>
+      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-ink-faint text-xs font-semibold tabular-nums">
+          {shown.length === offers.length
+            ? `全 ${offers.length}件`
+            : `${shown.length}件 / 全 ${offers.length}件`}
+        </p>
+        {pageCount > 1 && (
+          <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+        )}
+      </div>
 
       <section className="bg-canvas rounded-card border-hairline mt-4 border p-4">
         <h3 className="text-ink text-sm font-semibold">アフィリエイターと案件のちがい</h3>

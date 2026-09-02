@@ -6,6 +6,8 @@ import { api, type NenCampaignSetting } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
+import { formatCampaignTiming } from '../campaign-display'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * NENコラムを編集する（設計 V2 9-1-1）。
@@ -26,7 +28,21 @@ const CATEGORY_LABEL: Record<NenCampaignSetting['category'], string> = {
   birthday: '誕生日',
 }
 
+const TRIGGER_LABEL: Record<string, string> = {
+  'ec.order.confirmed': '注文を受け付けたとき',
+  'ec.order.shipped': '商品を発送したとき',
+  'ec.order.delivered': '商品が届いたとき',
+  'pet.birthday': 'ペットの誕生日',
+}
+
+function triggerLabel(setting: NenCampaignSetting): string {
+  if (setting.campaignKey === 'birthday_coupon') return 'ペットの誕生日'
+  if (!setting.triggerEvent) return '手動で送る'
+  return TRIGGER_LABEL[setting.triggerEvent] ?? '登録済みのきっかけ'
+}
+
 export default function CampaignEditor({ campaignKey }: { campaignKey: string }) {
+  usePageTitle('NEN配信を編集する')
   const [setting, setSetting] = useState<NenCampaignSetting | null>(null)
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
   const [loading, setLoading] = useState(true)
@@ -40,10 +56,15 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   const { selectedAccountId } = useAccount()
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setLoading(false)
+      setError('LINEアカウントを選んでください')
+      return
+    }
     let cancelled = false
     void (async () => {
       try {
-        const res = await api.nenCampaigns.settings()
+        const res = await api.nenCampaigns.settings(selectedAccountId)
         if (cancelled) return
         if (res.success) {
           const found = res.data.find((s) => s.campaignKey === campaignKey) ?? null
@@ -60,7 +81,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     return () => {
       cancelled = true
     }
-  }, [campaignKey])
+  }, [campaignKey, selectedAccountId])
 
   useEffect(() => {
     setTestLoginUsers([])
@@ -117,7 +138,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   }
 
   const save = async () => {
-    if (!setting) return
+    if (!setting || !selectedAccountId) return
     if (!merged.title?.trim()) {
       setError('タイトルを入力してください')
       return
@@ -126,7 +147,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     setError('')
     setNotice('')
     try {
-      const res = await api.nenCampaigns.updateSetting(setting.campaignKey, {
+      const res = await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, {
         isEnabled: merged.isEnabled,
         title: merged.title,
         bodyText: merged.bodyText,
@@ -142,8 +163,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       }
       setSetting(merged)
       setNotice('保存しました')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+    } catch {
+      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -160,11 +181,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   if (!setting) {
     return (
       <div>
-        <Header title="フォロー配信を編集する" />
+
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           {error || 'この配信が見つかりませんでした。'}
           <Link href="/nen-campaigns" className="text-accent ml-1 hover:underline">
-            フォロー配信へ戻る
+            NEN配信へ戻る
           </Link>
         </p>
       </div>
@@ -175,7 +196,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     <div>
       <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
         <Link href="/nen-campaigns" className="hover:underline">
-          フォロー配信
+          NEN配信
         </Link>
         <span className="mx-1.5">/</span>
         <span>編集</span>
@@ -287,34 +308,52 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
               いつ届けるか
             </h2>
             <p className="text-ink-faint text-xs leading-relaxed">
-              この配信は「きっかけが起きたあと、指定した日数が経った日の指定時刻」に届きます。
-              毎週きまった曜日・毎月きまった日で送る形は、まだ保存する場所がありません。
+              {setting.campaignKey === 'birthday_coupon'
+                ? 'ペットの誕生日の3日前、10:00に届きます。この日時は誕生日配信の実行処理で固定されています。'
+                : 'この配信は「きっかけが起きたあと、指定した日数が経った日の指定時刻」に届きます。毎週きまった曜日・毎月きまった日で送る形は、まだ保存する場所がありません。'}
             </p>
             <Field label="きっかけ">
               <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
-                {setting.triggerEvent ?? '手動で送る'}
+                {triggerLabel(setting)}
               </p>
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="何日後に送るか" htmlFor="nc-delay" note="0 なら当日です。">
-                <input
-                  id="nc-delay"
-                  type="number"
-                  min={0}
-                  value={merged.delayDays ?? 0}
-                  onChange={(e) => setDraft((p) => ({ ...p, delayDays: Number(e.target.value) }))}
-                  className={`${inputClass} w-32 tabular-nums`}
-                />
-              </Field>
-              <Field label="時刻" htmlFor="nc-time">
-                <input
-                  id="nc-time"
-                  type="time"
-                  value={(merged.deliveryTime ?? '10:00').slice(0, 5)}
-                  onChange={(e) => setDraft((p) => ({ ...p, deliveryTime: e.target.value }))}
-                  className={`${inputClass} w-40`}
-                />
-              </Field>
+              {setting.campaignKey === 'birthday_coupon' ? (
+                <>
+                  <Field label="送る日">
+                    <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
+                      誕生日の3日前
+                    </p>
+                  </Field>
+                  <Field label="時刻">
+                    <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
+                      10:00（固定）
+                    </p>
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="何日後に送るか" htmlFor="nc-delay" note="0 なら当日です。">
+                    <input
+                      id="nc-delay"
+                      type="number"
+                      min={0}
+                      value={merged.delayDays ?? 0}
+                      onChange={(e) => setDraft((p) => ({ ...p, delayDays: Number(e.target.value) }))}
+                      className={`${inputClass} w-32 tabular-nums`}
+                    />
+                  </Field>
+                  <Field label="時刻" htmlFor="nc-time">
+                    <input
+                      id="nc-time"
+                      type="time"
+                      value={(merged.deliveryTime ?? '10:00').slice(0, 5)}
+                      onChange={(e) => setDraft((p) => ({ ...p, deliveryTime: e.target.value }))}
+                      className={`${inputClass} w-40`}
+                    />
+                  </Field>
+                </>
+              )}
             </div>
           </section>
 
@@ -421,7 +460,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <h2 className="text-ink mb-2 text-sm font-bold">届き方のプレビュー</h2>
             <p className="text-ink-faint mb-2 text-xs">
-              きっかけの{merged.delayDays ?? 0}日後 {(merged.deliveryTime ?? '10:00').slice(0, 5)}
+              {formatCampaignTiming(merged)}
             </p>
             <div className="bg-canvas-sunken rounded-card space-y-2 p-3">
               {merged.imageUrl && (

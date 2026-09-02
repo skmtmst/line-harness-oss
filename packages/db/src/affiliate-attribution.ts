@@ -11,8 +11,8 @@ import { jstNow } from './utils.js';
 //  - window: touches older than ATTRIBUTION_WINDOW_DAYS are ignored
 //  - only touches whose ref_code maps to an affiliate_link count
 //  - self-clicks (the friend is the affiliate's own friend_id) are excluded
-//  - is_active=0 links STILL attribute here; the report layer distinguishes
-//    paused links, not this resolver.
+//  - stopped links and stopped affiliates do not create NEW attribution.
+//    Existing conversion rows keep their affiliate_id snapshot.
 
 export const ATTRIBUTION_WINDOW_DAYS = 90;
 
@@ -58,6 +58,8 @@ export async function resolveAffiliateAttribution(
         WHERE rt.friend_id = ?
           AND julianday(rt.created_at) >= julianday(?) - ${windowDays}
           AND julianday(rt.created_at) <= julianday(?)
+          AND al.is_active = 1
+          AND a.is_active = 1
           AND (a.friend_id IS NULL OR a.friend_id != rt.friend_id)  -- 自己クリック除外
         ORDER BY julianday(rt.created_at) DESC
         LIMIT 1`,

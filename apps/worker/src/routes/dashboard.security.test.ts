@@ -11,13 +11,13 @@ const dbMocks = vi.hoisted(() => ({
   saveDashboardPreference: vi.fn(),
   deleteDashboardPreference: vi.fn(),
   saveDashboardDefaultPreference: vi.fn(),
+  getListStats: vi.fn(),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
   ...dbMocks,
-  getListStats: vi.fn(),
 }));
 
 import { dashboard } from './dashboard.js';
@@ -91,6 +91,21 @@ describe('dashboard organization account policy', () => {
     const response = await app().request('/api/dashboard/overview', {}, env());
     expect(response.status).toBe(400);
     expect(dbMocks.getDashboardOverview).not.toHaveBeenCalled();
+  });
+
+  test('list stats can be limited to the explicitly selected visible account', async () => {
+    dbMocks.getListStats.mockResolvedValue({});
+    const response = await app().request('/api/list-stats?accountId=account-1', {}, env());
+    expect(response.status).toBe(200);
+    expect(dbMocks.getListStats).toHaveBeenCalledWith(expect.anything(), {
+      allowedAccountIds: ['account-1'], includeUnassigned: false,
+    });
+  });
+
+  test('list stats reject an account outside the visible account scope', async () => {
+    const response = await app().request('/api/list-stats?accountId=account-missing', {}, env());
+    expect(response.status).toBe(404);
+    expect(dbMocks.getListStats).not.toHaveBeenCalled();
   });
 
   test('non-default tenant uses only the explicitly selected account token for quota', async () => {
