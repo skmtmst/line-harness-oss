@@ -51,6 +51,8 @@ permission = domain.resource.action
     affiliate.payout.export
 ```
 
+- 権限モデルの正本は[30 ログインユーザー](./v6-30-login-users-requirements-draft.md) §7〜§8の三段階(`edit` / `view` / `none`)＋重要操作permission＋項目マスク。上の`domain.resource.action`は重要操作permissionの命名規則である
+- 機能別要件のowner / admin / staff表は役割bundleの既定値であり、表中の「個別権限」「指定者のみ」はpermission keyの個別付与を指す
 - 未分類endpointは拒否
 - menu非表示、button非表示、API拒否を分ける
 - permissionはorganization role＋account role＋個人overrideを合成
@@ -108,19 +110,15 @@ permission = domain.resource.action
 
 ### 6-1. Action catalog
 
-初期action:
+正本は[25 接続契約](./v6-25-automation-action-contract.md)の「共通アクションのカタログ」である。ここでは再掲せず、段だけ引用する。
 
-- LINE message/template送信
-- tag追加/解除、field更新
-- scenario開始/停止
-- rich menu切替
-- mileage credit/debit、score change
-- conversion record/adjust
-- operator notification
-- webhook/API delivery
-- booking/calendar operation
+| 段 | 内容 | 依存 |
+|---|---|---|
+| 第1期 | タグ、友だち情報、シナリオ、LINE送信、外部Webhook、リッチメニュー | 接続契約あり |
+| 第2期 | 対応マーク、担当者、マイル、通知、待つ、条件で分ける、別の共通アクションを呼ぶ | 17、24 の台帳 |
+| 第3期 | コンバージョンの記録・訂正、予約・カレンダー操作 | 19、27 の API |
 
-任意code/SQL/JSON式を実行しない。各action adapterが入力schema、権限、副作用、冪等性を持つ。
+処理名は接続契約の表記をそのまま使い、機能別要件で別名を作らない。任意code/SQL/JSON式を実行しない。各action adapterが入力schema、権限、副作用、冪等性を持つ。
 
 ### 6-2. Execution
 
@@ -131,6 +129,15 @@ permission = domain.resource.action
 - provider request/reference ID
 - next retry、attempts、lease expires
 - manual retryは新しいattempt。成功済みactionを再実行しない
+
+再試行の既定は次の1表とし、機能別要件は回数を独自に書かず「共通基盤 §6-2 の既定に従う」と参照する。
+
+| 分類 | 既定 | 備考 |
+|---|---|---|
+| 外部APIの一時失敗(LINE、EC、カレンダー、決済) | 1分・5分・30分の最大3回(初回含め4回) | `429`は`Retry-After`を優先 |
+| 送信Webhook(26) | 最大8回・24時間 | 相手サーバの長時間停止に備える。26だけの例外 |
+| 内部処理(入力不備、権限不一致、宛先なし) | 再試行しない。恒久失敗 | skip reasonを残す |
+| 手動再試行 | 新しいattempt | 成功済みは再実行しない |
 
 ### 6-3. Runtime gate
 
@@ -193,7 +200,31 @@ permission = domain.resource.action
 - 保存した分析はdefinition version＋結果snapshot
 - aggregate再計算は元の業務recordを変更しない
 
-## 10. API応答契約
+未取得の表示文言は1種に固定する。
+
+| 状態 | 画面の値 | 画面のラベル | API |
+|---|---|---|---|
+| 取得できていない(理由不明) | `—` | 未取得 | `unavailable` |
+| 取得に失敗した | `—` | 取得失敗 | `unavailable` + error code |
+| 権限がない | `—` | 権限不足 | 403 |
+| 接続していない | `—` | 未接続 | `unavailable` + `not_connected` |
+| 一部だけ取得 | 値 | 一部(as_of) | `partial` |
+| 古い | 値 | as_of を併記 | `stale` |
+
+「取得できません」「unavailable」を画面文言に使わない。数えて0だったものは`0`と表示し、`—`にしない。
+
+## 10. 工程ゲート
+
+設計との画像比較、実Node ID、対象状態一覧は**工程の条件**であり、各機能の要件の完了条件には含めない。理由は、Pencilの画像書き出しが不安定な期間に「原理的に満たせない完了条件」を32本へ埋め込まないためである。工程ゲートは次で担保する。
+
+- PRテンプレートのVisual Parity欄(対象ルート、Pencilファイル、実Node ID、1920px設計画像、1920px・1440px実装画像、並べて比較した結果)
+- `scripts/visual-qa/screens.mjs`を正本とする画面台帳と、`docs/design-qa/v6-progress-ledger.md`(機械生成)
+- 「一致」は文言一致・寸法一致・全状態撮影済みのときだけ。撮れなかった画面は空欄のまま残す
+- Pencilを直したら書き出しHTMLを置き直し、その画面の判定を未判定へ戻す
+
+各要件書の完了条件には「設計との画像比較は共通工程ゲート(§10)に従う。要件の完了条件には含めない」の1行だけを置く。
+
+## 11. API応答契約
 
 ### 成功
 
@@ -229,7 +260,7 @@ permission = domain.resource.action
 - 202: 非同期受付
 - 503: 一時的外部依存失敗。成功扱いにしない
 
-## 11. Observability
+## 12. Observability
 
 - request ID、trace ID、job ID、execution IDを連結
 - SLI: receipt遅延、Queue滞留、success/retry/permanent failure、reconcile未解決
@@ -238,7 +269,7 @@ permission = domain.resource.action
 - operator向けerrorは原因と次の行動を表示
 - kill switch発動、解除、drift、再開結果を監査
 
-## 12. 完了条件
+## 13. 完了条件
 
 - scopeなしrepository callを型・testで防ぐ
 - 未分類APIが403になる
@@ -252,7 +283,7 @@ permission = domain.resource.action
 - auditから誰が何を変えたか再現できる
 - migration shadow modeで外部送信しない
 
-## 13. 実装を分ける単位
+## 14. 実装を分ける単位
 
 1. Scope＋authorization
 2. Versioning＋audit
