@@ -83,7 +83,7 @@
     "direct-secondary-button": 7,
     "direct-primary-button": 1,
     "arbitrary-value": 5,
-    "direct-th": 8,
+    "direct-th": 6,
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
@@ -370,10 +370,6 @@
     "arbitrary-value": 3,
     "unresolved-classname": 6
   },
-  "app/tags/page.tsx": {
-    "arbitrary-value": 3,
-    "direct-secondary-button": 3
-  },
   "app/templates/carousel/page.tsx": {
     "direct-secondary-button": 4,
     "unresolved-classname": 7,
@@ -602,7 +598,7 @@
     "arbitrary-value": 7
   },
   "components/friend-fields/tag-csv-import-dialog.tsx": {
-    "unresolved-classname": 51
+    "unresolved-classname": 55
   },
   "components/friend-fields/tag-editor-v4.tsx": {
     "direct-primary-button": 3,

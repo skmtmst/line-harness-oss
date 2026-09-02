@@ -6,7 +6,7 @@
  * 気づく手がかりが画面のどこにも無い。
  */
 import { describe, it, expect } from 'vitest'
-import { messageTypeLabel, contentExcerpt, audienceSummary } from './broadcast-summary'
+import { messageTypeLabel, contentExcerpt, audienceSummary, rowExcerpt } from './broadcast-summary'
 
 describe('送るものの種別', () => {
   it('種別ごとの名前を出す', () => {
@@ -127,5 +127,28 @@ describe('宛先の要約', () => {
 
   it('条件が残っていなければ、その旨を出す', () => {
     expect(audienceSummary({ targetType: 'segment', segmentConditions: null }, tagName)).toBe('条件なし')
+  })
+})
+
+describe('一覧の1行目に出す「内容／種別」', () => {
+  it('本文があれば「本文／種別」でつなぐ', () => {
+    expect(rowExcerpt('text', '8月のキャンペーンをお知らせします')).toBe(
+      '8月のキャンペーンをお知らせします／テキスト',
+    )
+  })
+
+  /**
+   * `contentExcerpt` は読めない中身のとき種別の名前をそのまま返す。
+   * 素直につなぐと「写真／写真」になり、同じ語を2度読ませることになる。
+   */
+  it('抜粋が種別の名前と同じなら、種別だけを出す', () => {
+    expect(rowExcerpt('image', '読めない中身')).toBe('写真')
+    expect(rowExcerpt('image', '')).toBe('写真')
+  })
+
+  it('本文が空でも「—」や undefined を出さない', () => {
+    const value = rowExcerpt('text', '')
+    expect(value).toBe('テキスト')
+    expect(value).not.toContain('undefined')
   })
 })

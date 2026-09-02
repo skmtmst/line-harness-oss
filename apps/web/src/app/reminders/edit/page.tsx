@@ -7,6 +7,7 @@ import type { Reminder, ReminderStep, Tag } from '@line-crm/shared'
 import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * リマインダの編集。
@@ -60,6 +61,11 @@ function ReminderEditInner() {
   const [sendAtTime, setSendAtTime] = useState('')
   const [newStep, setNewStep] = useState<StepDraft>(emptyStep('countdown'))
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
+
+  /** 押した時点の通を掴んでおく。一覧が読み直されても、窓の対象は動かさない。 */
+  const [deleteStep, setDeleteStep] = useState<ReminderStep | null>(null)
+  const [deletingStep, setDeletingStep] = useState(false)
+  const [deleteStepError, setDeleteStepError] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -150,14 +156,27 @@ function ReminderEditInner() {
     }
   }
 
-  async function handleDeleteStep(stepId: string) {
-    if (!confirm('この通を削除します。よろしいですか。')) return
+  /*
+   * 通の削除。**ブラウザの `confirm()` は使わない。**
+   * 「よろしいですか」だけでは、何が消えて何が残るのかが読めなかった。
+   * 見た目もブラウザ任せで、画像比較にも写らない。
+   */
+  async function handleDeleteStep() {
+    // 二度押しを受け付けない。押している間は窓も閉じない。
+    if (!deleteStep || deletingStep) return
+    setDeletingStep(true)
+    setDeleteStepError('')
     try {
-      const res = await api.reminders.deleteStep(id, stepId)
+      const res = await api.reminders.deleteStep(id, deleteStep.id)
+      // 返事を見ずに読み直すと、消えていないのに消えたように見える。
       if (!res.success) throw new Error(res.error)
+      setDeleteStep(null)
       await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '削除に失敗しました')
+    } catch {
+      // 生のAPIエラーは出さない。運用者が次にすることだけを書く。
+      setDeleteStepError('この通を削除できませんでした。読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingStep(false)
     }
   }
 
@@ -326,7 +345,10 @@ function ReminderEditInner() {
                       </p>
                     </div>
                     <button
-                      onClick={() => void handleDeleteStep(step.id)}
+                      onClick={() => {
+                        setDeleteStepError('')
+                        setDeleteStep(step)
+                      }}
                       className="shrink-0 text-xs text-red-600 hover:underline"
                     >
                       削除
@@ -447,6 +469,56 @@ function ReminderEditInner() {
           </div>
         </div>
       )}
+
+      {/*
+        取り消せないので `destructive` を付ける。通を消すと
+        `reminder_steps` の行が消え、`friend_reminder_deliveries` は
+        `reminder_step_id ... ON DELETE CASCADE` なので、この通を届けた
+        記録も一緒に消える（`packages/db/schema.sql`）。
+      */}
+      <ConfirmDialog
+        open={deleteStep !== null}
+        title="この通を削除しますか？"
+        description="この1通だけを削除します。リマインダ本体と、ほかの通は残ります。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deletingStep}
+        error={deleteStepError}
+        onConfirm={() => void handleDeleteStep()}
+        onCancel={() => {
+          if (deletingStep) return
+          setDeleteStep(null)
+          setDeleteStepError('')
+        }}
+      >
+        {deleteStep && (
+          <div className="space-y-2 text-xs leading-5">
+            <p className="text-ink font-semibold">
+              {describeReminderTiming(
+                {
+                  offsetDays: deleteStep.offsetDays,
+                  sendAtTime: deleteStep.sendAtTime,
+                  offsetMinutes: deleteStep.offsetMinutes,
+                },
+                mode,
+              )}
+            </p>
+            <p className="text-ink-secondary line-clamp-3 whitespace-pre-wrap">
+              {deleteStep.messageContent}
+            </p>
+            <ul className="text-ink-secondary space-y-1">
+              <li>・止まること: このタイミングの配信は、これから誰にも届きません。</li>
+              <li>・消えること: この通を届けた記録も一緒に消えます。</li>
+              <li>・残ること: 登録済みの人と、ほかの通の予定はそのままです。</li>
+              {reminder?.steps.length === 1 && (
+                <li className="text-warning">
+                  ・これが最後の1通です。消すと、対象に加わっても何も届かなくなります。
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </ConfirmDialog>
     </main>
   )
 }

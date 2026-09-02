@@ -23,6 +23,10 @@ describe('Webhook画面のLINEアカウント境界', () => {
   })
 
   test('更新と削除はAPIの失敗を成功扱いしない', () => {
-    expect(source.match(/if \(!res\.success\) return setError\(res\.error\)/g)).toHaveLength(4)
+    // 有効・無効の切替は今までどおり画面の上に理由を出す（受信・送信の2つ）。
+    expect(source.match(/if \(!res\.success\) return setError\(res\.error\)/g)).toHaveLength(2)
+    // 削除はブラウザのconfirmをやめて共通の確認窓へ移したので、
+    // 失敗は窓の中に出す。ここも成功扱いにはしない。
+    expect(source).toContain('if (!res.success) throw new Error(res.error)')
   })
 })

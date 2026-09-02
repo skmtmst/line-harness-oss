@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
@@ -74,6 +75,19 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   'ec.subscription.cancelled': 'bg-slate-100 text-slate-700',
 }
 
+/**
+ * 確認窓が預かっている操作。
+ *
+ * `accountId` は**押した時点で選んでいたLINEアカウント**。窓を開けたまま
+ * ヘッダーでアカウントを切り替えられるので、切り替わったことを窓の中で
+ * 知らせて選び直させる。黙って閉じると「押したのに何も起きない」になる。
+ */
+type PendingAction = {
+  kind: 'toggle' | 'delete'
+  automation: Automation
+  accountId: string | null
+}
+
 interface CreateFormState {
   name: string
   description: string
@@ -101,6 +115,19 @@ export default function AutomationsPage() {
   const [form, setForm] = useState<CreateFormState>({ ...initialForm })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  /*
+   * **ブラウザの `confirm()` を使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
+   * 画像比較にも写らないので、確認の絵をそもそも撮れない。何が止まり・
+   * 何が残り・戻せるのかを本文で読ませたいので、共通の `ConfirmDialog`
+   * へ移した。
+   */
+  const [pending, setPending] = useState<PendingAction | null>(null)
+  const [working, setWorking] = useState(false)
+  const [actionError, setActionError] = useState('')
+  /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
+  const accountChanged = pending !== null && pending.accountId !== selectedAccountId
 
   const loadAutomations = useCallback(async () => {
     setLoading(true)
@@ -198,35 +225,62 @@ export default function AutomationsPage() {
     }
   }
 
-  const handleToggleActive = async (id: string, current: boolean) => {
-    // Globals fire for every account; flipping one from an account-scoped view
-    // would silently affect all accounts, so warn first.
-    const target = automations.find((a) => a.id === id)
-    if (target?.lineAccountId === null) {
-      const ok = confirm(
-        `「${target.name}」は全アカウント共通のオートメーションです。${current ? '無効化' : '有効化'}するとすべてのアカウントに影響します。続行しますか?`,
-      )
-      if (!ok) return
+  /** 稼働の入れ替えそのもの。返事を確かめてから呼び出し元に戻す。 */
+  const applyToggle = async (target: Automation) => {
+    const res = await api.automations.update(target.id, { isActive: !target.isActive })
+    if (!res.success) throw new Error(res.error)
+  }
+
+  const handleToggleActive = async (target: Automation) => {
+    // 全アカウント共通のルールは、1つのアカウントの画面から触っても
+    // すべてのアカウントに効く。ここだけ確認を挟む。
+    if (target.lineAccountId === null) {
+      setActionError('')
+      setPending({ kind: 'toggle', automation: target, accountId: selectedAccountId })
+      return
     }
     try {
-      await api.automations.update(id, { isActive: !current })
-      loadAutomations()
+      await applyToggle(target)
+      await loadAutomations()
     } catch {
-      setError('ステータスの変更に失敗しました')
+      setError('稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 
-  const handleDelete = async (id: string) => {
-    const target = automations.find((a) => a.id === id)
-    const message = target?.lineAccountId === null
-      ? `「${target.name}」は全アカウント共通のオートメーションです。削除するとすべてのアカウントから消えます。本当に削除しますか?`
-      : 'このオートメーションを削除してもよいですか？'
-    if (!confirm(message)) return
+  const handleDelete = (target: Automation) => {
+    setActionError('')
+    setPending({ kind: 'delete', automation: target, accountId: selectedAccountId })
+  }
+
+  /**
+   * 窓の中の「実行する」。
+   *
+   * 処理中は受け付けない（二度押しで2回消えると、消えたことに気づけない）。
+   * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。生のAPIエラーは
+   * 「Internal server error」のように、運用者が次に何をすればよいか
+   * 読み取れない。
+   */
+  const runPending = async () => {
+    if (!pending || working || accountChanged) return
+    setWorking(true)
+    setActionError('')
     try {
-      await api.automations.delete(id)
-      loadAutomations()
+      if (pending.kind === 'delete') {
+        const res = await api.automations.delete(pending.automation.id)
+        if (!res.success) throw new Error(res.error)
+      } else {
+        await applyToggle(pending.automation)
+      }
+      setPending(null)
+      await loadAutomations()
     } catch {
-      setError('削除に失敗しました')
+      setActionError(
+        pending.kind === 'delete'
+          ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+          : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
+      )
+    } finally {
+      setWorking(false)
     }
   }
 
@@ -401,7 +455,7 @@ export default function AutomationsPage() {
               <div className="flex items-start justify-between mb-2">
                 <h3 className="text-sm font-semibold text-ink leading-tight">{automation.name}</h3>
                 <button
-                  onClick={() => handleToggleActive(automation.id, automation.isActive)}
+                  onClick={() => void handleToggleActive(automation)}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                     automation.isActive ? 'bg-green-500' : 'bg-gray-300'
                   }`}
@@ -463,7 +517,7 @@ export default function AutomationsPage() {
               {/* Actions */}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
                 <button
-                  onClick={() => handleDelete(automation.id)}
+                  onClick={() => handleDelete(automation)}
                   className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
                 >
                   削除
@@ -473,6 +527,77 @@ export default function AutomationsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pending !== null}
+        title={
+          pending === null
+            ? ''
+            : pending.kind === 'delete'
+              ? `「${pending.automation.name}」を削除しますか？`
+              : pending.automation.isActive
+                ? `「${pending.automation.name}」を止めますか？`
+                : `「${pending.automation.name}」を動かしますか？`
+        }
+        description={
+          pending === null
+            ? ''
+            : pending.kind === 'delete'
+              ? 'このルールの設定が消えます。すでに動いたぶん（付けたタグ・送ったメッセージ）はそのまま残り、取り消せません。この操作は取り消せません。'
+              : pending.automation.isActive
+                ? '止めているあいだ、このきっかけでは何も動きません。ルールの設定は残るので、あとから動かし直せます。'
+                : 'これから起きるきっかけで動き始めます。止めているあいだに起きたぶんは、さかのぼって動きません。あとから止められます。'
+        }
+        confirmLabel={
+          pending === null
+            ? '実行する'
+            : pending.kind === 'delete'
+              ? '削除する'
+              : pending.automation.isActive
+                ? '止める'
+                : '動かす'
+        }
+        /* 取り消せるのは稼働の切り替えだけ。赤は本当に戻せない削除に取っておく。
+           戻せる操作にも赤を付けると、赤が「危ない」を意味しなくなる。 */
+        destructive={pending?.kind === 'delete'}
+        busy={working}
+        error={actionError}
+        /* アカウントが変わっているあいだは実行のボタンそのものを出さない
+           （`ConfirmDialog` は `onConfirm` が `undefined` だとボタンを出さない）。 */
+        onConfirm={accountChanged ? undefined : () => void runPending()}
+        onCancel={() => {
+          if (working) return
+          setPending(null)
+          setActionError('')
+        }}
+      >
+        {pending !== null && (
+          <div className="text-ink-secondary space-y-2 text-sm">
+            <p>
+              きっかけ：{eventTypeLabelMap[pending.automation.eventType]} ／ アクション{' '}
+              {pending.automation.actions.length}件
+            </p>
+            {pending.automation.lineAccountId === null && (
+              <p className="text-warning font-medium">
+                全アカウント共通のルールです。
+                {pending.kind === 'delete'
+                  ? 'すべてのアカウントから消えます。'
+                  : 'すべてのアカウントに効きます。'}
+              </p>
+            )}
+            {/* 実行の記録を持っていない。「0回」と書くと、動いていないのか
+                数えていないのか区別が付かなくなる。 */}
+            <p className="text-ink-faint text-xs">
+              このルールが何回動いたかは記録していないため、ここには出せません。
+            </p>
+            {accountChanged && (
+              <p className="text-warning font-medium">
+                押したあとにLINEアカウントが切り替わりました。この窓を閉じて、いまのアカウントの一覧から選び直してください。
+              </p>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

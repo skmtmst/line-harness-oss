@@ -59,8 +59,15 @@
       "name": "V4 ダッシュボード（編集・QRコードを含む）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["hmBzC", "kuTR2", "QEThZ"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "hmBzC",
+          "kuTR2",
+          "QEThZ"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "同じ状態・同じ横幅の設計画像と実装画像をPR証拠として再登録するまで未検証"
       },
       "sections": [
@@ -117,8 +124,15 @@
       "name": "V4 受信箱（テンプレート選択・顧客情報表示切替を含む）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["hSLxG", "eSOQd", "yluhx"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "hSLxG",
+          "eSOQd",
+          "yluhx"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "通常・テンプレート・顧客情報の全状態を同条件で比較した証拠が未登録"
       },
       "sections": [
@@ -153,8 +167,13 @@
       "name": "V6 3-1 友だち（1920）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["PhxG6"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "PhxG6"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "Pencilと実装を同寸法で目視比較済み。ただしシェルの例示データと現在地表示に意図した差があるため、完全一致とは扱わない",
         "referenceScreenshots": [
           "docs/design-reference/friends-v6/PhxG6-1920.png"
@@ -221,13 +240,12 @@
         "並び順",
         "配信日が新しい順",
         "保存した条件",
-        "タイトル",
-        "配信日時",
+        "タイトル・内容",
+        "状態",
         "配信条件",
-        "内容",
-        "配信数",
-        "開封（率）",
-        "状態"
+        "配信日時",
+        "配信・開封・クリック",
+        "操作"
       ]
     },
     "/tags-v2": {
@@ -235,8 +253,13 @@
       "name": "V4 4-1 友だち属性・タグ（移行確認用V2）",
       "visualVerification": {
         "status": "verified",
-        "referenceNodeIds": ["xn98K"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "xn98K"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "referenceScreenshots": [
           "docs/design-reference/friend-attributes-v2/xn98K-1920.png/xn98K.png"
         ],
@@ -296,12 +319,20 @@
       "name": "V6 4 友だち属性（4タブ）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["hqrOv", "HBTk0", "rIhbN", "QKx8Q"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "hqrOv",
+          "HBTk0",
+          "rIhbN",
+          "QKx8Q"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "referenceScreenshots": [],
         "implementationScreenshots": [],
         "checkedAt": "2026-08-27T12:50:00+09:00",
-        "reason": "V6実装と1440px・1920pxの比較証拠はClaude側のVisual QAで作成中"
+        "reason": "2026-09-02: 2026-08-21 の verified は、描かれない旧V5コードを見ていた可能性が高い。節の印がすべて死んだ枝側にあり、正本の `tags-page-v4.tsx` には1つも付いていなかった。設計の4タブと実装を突き合わせ直したので、撮り直すまで verified に戻さない。"
       },
       "sections": [
         "Body",
@@ -309,26 +340,24 @@
         "Head",
         "KPIs"
       ],
+      "implementationGaps": {
+        "parts": [
+          "AND群とOR群、友だち情報の10演算子を組み合わせ、保存した条件からコピーして再利用します。軸は呼び出し元で変わります（友だち一覧14軸・配信15軸）。"
+        ],
+        "reason": "2026-09-02: 以前ここには20語あったが、**そのうち19語は設計にも無かった。** `app/tags/page.tsx` に残っていた描かれない旧V5コードにしか無い語で、その枝を消して初めて分かった。設計の4タブ（`hqrOv` `HBTk0` `rIhbN` `QKx8Q`）の実物と1語ずつ突き合わせた結果、6語は言い方が変わっていただけ（「CSV出力」→「CSVで一括登録」、「タグ名で検索」→「タグ名・用途で検索」、「回答フォームの登録先」→「回答フォーム」、「友だち詳細のタブ」→「表示先」、「該当者が0人」→「該当者0人」、長い説明文→1行の帯）で、いずれも実装に実在するので `parts` へ移した。残り13語（並び順・条件の組み方・使える条件・注意書き7行ほか）は**設計にも無い**ので削除した。ここに残る1語は、設計 `QKx8Q` の説明帯で実装だけが持っていない。"
+      },
       "parts": [
         "タグ数",
         "付与済み友だち",
         "今月の付与",
-        "CSV出力",
         "並び替え",
         "フォルダを追加",
         "フォルダ",
-        "タグ名で検索",
         "並び順",
-        "付与人数が多い順",
         "保存した条件",
         "項目を追加",
-        "回答フォームの登録先",
-        "友だち詳細のタブ",
         "テンプレートの差し込み",
         "気をつけること",
-        "条件の組み方",
-        "使える条件",
-        "「愛犬のお名前」「便の状態」など、友だちごとに記録したい項目を定義します。ここで作った項目が、回答フォームの登録先・友だち詳細のタブ・テンプレートの差し込みに使えます。",
         "タグ",
         "友だち情報欄",
         "対応マーク",
@@ -340,7 +369,6 @@
         "—",
         "電話番号",
         "選択",
-        "問い合わせの状態を表すマークを作ります。ここで決めた選択肢が、受信箱・友だち一覧・友だち詳細で使われます。",
         "マークを追加",
         "マークの種類",
         "未対応",
@@ -354,22 +382,18 @@
         "初期値",
         "編集",
         "有効",
-        "・使用中のマークを削除すると、そのマークが付いている友だちは「未対応」に戻ります",
-        "・初期値のマークは1つだけ選べます。新しい友だちにはこれが付きます",
-        "・並び順は、受信箱や一覧の絞り込みボタンの並びに反映されます",
-        "友だちの絞り込み条件に名前を付けて保存します。保存した条件は、友だち一覧・配信の宛先・オートメーションの対象から呼び出せます。",
         "配信で使用中",
-        "該当者が0人",
         "今月の呼び出し",
         "すべて満たす",
         "いずれか1つ以上",
         "OR",
-        "・「すべて満たす」と「いずれか1つ以上満たす」の2つのグループに分けて指定します",
-        "・両方に条件を入れると、すべて満たす かつ いずれか1つ以上満たす、という意味になります",
-        "・保存できるのは50件までです",
-        "・タグ ／ 友だち情報欄 ／ 対応マーク ／ 流入経路 ／ 購読中のシナリオ",
-        "・最終接触日 ／ 友だち追加日 ／ 最終購入日 ／ 誕生日",
-        "・フォームの回答内容 ／ サイトの行動 ／ 購入履歴 ／ マイル残高"
+        "CSVで一括登録",
+        "タグ名・用途で検索",
+        "表示先",
+        "該当者0人",
+        "既定値は友だち情報が空欄のときの送信値です。種類は新規登録後に変更せず、回答フォーム・友だち詳細・変数挿入で同じ定義を使います。",
+        "受信箱・友だち一覧・友だち詳細で共通利用し、メッセージ受信時の自動変更と初期値を同じ画面で設定します。",
+        "AND群とOR群、友だち情報の10演算子を組み合わせ、保存した条件からコピーして再利用します。軸は呼び出し元で変わります（友だち一覧14軸・配信15軸）。"
       ]
     },
     "/templates": {
@@ -1150,7 +1174,10 @@
     "/inflow-links": {
       "node": "tiKvb qb9Es Ioxcm",
       "implementationGaps": {
-        "parts": ["追加率が高い", "計測停止中"],
+        "parts": [
+          "追加率が高い",
+          "計測停止中"
+        ],
         "reason": "条件を保存する口が無い。作り物の札を押せない形で置くと「保存したのに効かない」と読めるので、札を作らず本文で「まだ繋がっていません」と言う。"
       },
       "name": "V2 6-2 流入経路（6-6 サイトスクリプト・6-8 広告連携を含む）",
@@ -2175,8 +2202,17 @@
       "name": "V4 4-1-A タグを作る",
       "visualVerification": {
         "status": "blocked",
-        "referenceNodeIds": ["X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "X79IHW",
+          "t7Mhgl",
+          "lNGcs",
+          "NU4N2",
+          "FORVU"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "blockingIssues": [
           "V4タグ作成の実ノードIDが未記録",
           "右側パネルと連動アクションを含む同条件比較が未完了"
@@ -2212,8 +2248,13 @@
       "name": "V6 4-2-A 友だち情報欄を追加",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["A1ZYeP"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "A1ZYeP"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "V6へ実装済み。Claudeの同条件画像比較待ち"
       },
       "sections": [
@@ -2245,8 +2286,13 @@
       "name": "V6 4-2-B 友だち情報欄を移行",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["KoT6c"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "KoT6c"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "データを変更しない事前確認まで実装済み。Claudeの同条件画像比較待ち"
       },
       "sections": [
@@ -2700,8 +2746,13 @@
       "name": "V4 3-1-D 友だち詳細（1920）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["hsWaL"],
-        "requiredViewports": [1440, 1920],
+        "referenceNodeIds": [
+          "hsWaL"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
         "reason": "詳細の全タブと空・読込中・エラー状態を同条件で比較した証拠が未登録"
       },
       "sections": [

@@ -663,6 +663,13 @@ export default function TagsPageV4({
         ヘッダー操作は独立した行にせず、タブ行の右端へ寄せる
         （docs/v6-common-rules.md §1-4、Pencil `aToSv` は space_between）。
       */}
+      {/*
+        設計の節の印。`design-structure.json` の `/tags` と突き合わせる。
+        V6では見出し操作（`Head`）と4タブ（`GroupTabs`）が1行に同居するので、
+        `Head` の中に `GroupTabs` を入れる。**印だけで、見た目は持たない。**
+      */}
+      <div data-design="Head">
+        <div data-design="GroupTabs">
       <Tabs
         className="mb-4"
         items={TABS.map(([key, label]) => ({
@@ -683,6 +690,8 @@ export default function TagsPageV4({
           <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button>
         ) : undefined}
       />
+        </div>
+      </div>
 
       {csvOpen ? (
         <TagCsvImportDialog
@@ -692,6 +701,11 @@ export default function TagsPageV4({
         />
       ) : null}
 
+      {/*
+        設計の `Body`。タブごとに中身が入れ替わるので、4つ分をまとめて包む。
+        `KPIs` はタブごとに数が変わるため、この中に入る。
+      */}
+      <div data-design="Body">
       {tab === 'tags' ? <>
         {/*
           一覧の数は **サーバーが数えて返す**（`/api/list-stats`）。
@@ -709,6 +723,7 @@ export default function TagsPageV4({
           整理候補 = 未使用 ∪ 重複名で、両方に当たっても**タグ1つ**と数える。
           `cleanupReasons` がタグごとに返るので、重複除外は自動で効く。
         */}
+        <div data-design="KPIs">
         <ListKpis
           titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
@@ -724,6 +739,7 @@ export default function TagsPageV4({
             { title: '整理候補', value: cleanupCount, unit: cleanupCount === null ? '' : '件', detail: '未使用・重複名' },
           ]}
         />
+        </div>
 
         {/*
           設計 `HWP5R`。作る操作はここ。左に置く（`v6-common-rules.md` §1-5）。
@@ -900,6 +916,7 @@ export default function TagsPageV4({
           </div>
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
+      </div>
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
     </div>
   )
