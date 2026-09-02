@@ -200,17 +200,28 @@ export default function TagCsvImportDialog({
         {phase === 'preview' || phase === 'saving' ? <>
           <header className={styles.header}>
             <h2 id="tag-csv-title" className={styles.title}>取り込む内容の確認</h2>
-            <p className={styles.description}>登録できる行だけを登録します。入力確認の行は、直してからもう一度取り込めます。</p>
+            {/*
+              設計 `sfTEW` は見出しの下に**どのファイルの何行か**を出す。
+              確認画面を開いたまま別のCSVを選び直せるので、いま見ている数が
+              どのファイルのものか分からないと確かめようがない。
+            */}
+            <p className={styles.description}>
+              {preview ? `${fileName || '選んだCSV'} ／ ${preview.summary.total}行を読み込みました。` : null}
+              登録できる行だけを登録します。入力確認の行は、直してからもう一度取り込めます。
+            </p>
           </header>
           {preview ? <>
+            {/* 設計 `sfTEW` は4枚とも「その数が何なのか」を1行添える。 */}
             <div className={styles.summary}>
-              {[
-                ['読み込んだ行', preview.summary.total],
-                ['新しく登録', preview.summary.ready],
-                ['重複で見送り', preview.summary.skipped],
-                ['入力確認', preview.summary.invalid],
-              ].map(([label, value]) => <div className={styles.summaryItem} key={label}>
-                <span className={styles.summaryLabel}>{label}</span><strong className={styles.summaryValue}>{value}件</strong>
+              {([
+                ['読み込んだ行', preview.summary.total, 'ファイルの行数', undefined],
+                ['新しく登録', preview.summary.ready, 'そのまま登録されます', styles.summaryReady],
+                ['重複で見送り', preview.summary.skipped, '同じ名前のタグがあります', undefined],
+                ['入力確認', preview.summary.invalid, '直すまで登録されません', preview.summary.invalid > 0 ? styles.summaryInvalid : undefined],
+              ] as Array<[string, number, string, string | undefined]>).map(([label, value, detail, tone]) => <div className={styles.summaryItem} key={label}>
+                <span className={styles.summaryLabel}>{label}</span>
+                <strong className={`${styles.summaryValue} ${tone ?? ''}`}>{value}件</strong>
+                <span className={styles.summaryDetail}>{detail}</span>
               </div>)}
             </div>
             <div className={styles.filters}>
@@ -239,6 +250,25 @@ export default function TagCsvImportDialog({
                   <td>{row.message ?? '登録できます'}</td>
                 </tr>)}</tbody>
               </table>
+            </div>
+            {/*
+              設計 `sfTEW` の注意帯。**押す前に、押したらどうなるかを言う。**
+              とくに「同じ名前のタグは上書きしない」は、CSVでフォルダを
+              直そうとして見送られたときに、どこへ行けばよいか分からなくなる。
+            */}
+            <div className={styles.warnBar}>
+              <TriangleAlert aria-hidden="true" size={18} />
+              <div>
+                <p className={styles.warnTitle}>
+                  {preview.summary.invalid > 0
+                    ? `入力確認の${preview.summary.invalid}行は登録されません`
+                    : '登録できる行だけを登録します'}
+                </p>
+                <p className={styles.warnBody}>
+                  通る{preview.summary.ready}行はそのまま登録します。
+                  同じ名前のタグは上書きしません。フォルダを変えたいときは、タグ一覧から編集してください。
+                </p>
+              </div>
             </div>
           </> : null}
           {error ? <p className={styles.error} role="alert">{error}</p> : null}

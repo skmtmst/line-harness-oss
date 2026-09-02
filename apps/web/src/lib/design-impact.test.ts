@@ -10,7 +10,11 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする78ファイルだけを利用先に数える', () => {
+  // 2026-09-02: /tags の旧V5画面（`app/tags/page.tsx` の描かれない枝）を消した。
+  // 表示は `components/friend-fields/tags-page-v4.tsx` が正本で、
+  // 入口のpageは共通Button・共通ページ送りを使わなくなった。
+  // development 側も別に増減しているので、統合後の実数へ合わせる。
+  it('共通Buttonを直接importする81ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -61,7 +65,6 @@ describe('共通部品の影響範囲', () => {
       'app/tags/fields/migrate/page.tsx',
       'app/tags/fields/new/page.tsx',
       'app/tags/folders/new/page.tsx',
-      'app/tags/page.tsx',
       'app/tags/searches/edit/page.tsx',
       'app/templates/detail/page.tsx',
       'app/templates/page.tsx',
@@ -74,6 +77,7 @@ describe('共通部品の影響範囲', () => {
       'components/automations/common-action-editor.tsx',
       'components/broadcasts/broadcast-asset-manager.tsx',
       'components/broadcasts/segment-preset-controls.tsx',
+      'components/chats/friend-info-sidebar.tsx',
       'components/chats/template-folder-select.tsx',
       'components/friend-fields/field-list.tsx',
       'components/friend-fields/mark-list.tsx',
@@ -104,7 +108,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする20ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする19ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -122,7 +126,6 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/page.tsx',
       'app/reminders/page.tsx',
       'app/rich-menus/page.tsx',
-      'app/tags/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
