@@ -83,7 +83,7 @@
     "direct-secondary-button": 7,
     "direct-primary-button": 1,
     "arbitrary-value": 5,
-    "direct-th": 8,
+    "direct-th": 6,
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
