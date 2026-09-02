@@ -42,6 +42,9 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
  */
 const NOT_YET: Array<{ label: string; why: string }> = [
   { label: '個別メモ', why: 'メモを検索する口がありません' },
+  // 下のOR節は `'対応マーク'` を並べる側に書いているのに、この一覧に項目が無かった。
+  // そのため **設計にあるORの軸が1つ、黙って描かれないまま**だった。
+  { label: '対応マーク', why: '対応マークで絞る口がありません' },
   { label: 'シナリオ', why: '購読中のシナリオで絞る口がありません' },
   { label: 'イベント予約', why: '予約から友だちを引く口がありません' },
   { label: 'カレンダー予約', why: '同上' },
@@ -399,11 +402,21 @@ export default function AdvancedSearchDialog({
               <span className="rounded-full bg-[#0067D9] px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
               <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/*
+              **押せない理由を `title` に隠さない。**
+
+              以前は `title={item.why}` だけで、マウスを乗せた人にしか読めなかった。
+              押せない札が理由なしに5つ並ぶと、壊れているのか、まだ無いのか分からない。
+              `NOT_YET` は理由の文をもう持っているので、札の下に出す。
+            */}
+            <div className="mt-3 flex flex-wrap gap-3">
               {NOT_YET.filter((item) => ['対応マーク', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
-                <button key={item.label} type="button" disabled title={item.why} className="rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
-                  ＋ {item.label === 'イベント予約' ? '予約' : item.label}
-                </button>
+                <div key={item.label} className="flex max-w-[14rem] flex-col gap-1">
+                  <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
+                    ＋ {item.label === 'イベント予約' ? '予約' : item.label}
+                  </button>
+                  <span className="text-[10px] leading-tight text-[#8B938D]">{item.why}</span>
+                </div>
               ))}
             </div>
           </section>
