@@ -17,6 +17,28 @@ const categories = [
 ] as const
 type Category = typeof categories[number][0]
 
+/**
+ * 見出しの下に、**内部のイベントキーを出さない**。
+ *
+ * ここは `ec_order.confirmed` のような値をそのまま描き、全文を `title` にも
+ * 入れていた。設計 `Q55bb` の言う「運用者に伝わる言葉」ではないし、
+ * V6の「内部IDを画面に出さない」にも反する。
+ * 区分の言葉は上の絞り込みが既に持っているので、それを使う。
+ */
+function categoryLabel(value: EcNotificationSetting['category']): string {
+  return categories.find(([key]) => key === value)?.[1] ?? '区分なし'
+}
+
+/** 「いつ直したか」。取れないときは数を作らず `—`。 */
+function formatUpdatedAt(iso: string | null | undefined): string {
+  if (!iso) return '最終更新 —'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '最終更新 —'
+  return `最終更新 ${date.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  })}`
+}
+
 const TABS = [
   { key: 'customer', label: '顧客へのお知らせ' },
   { key: 'operator', label: '運用者へのお知らせ' },
@@ -173,7 +195,7 @@ export default function LineNotificationsPage() {
         {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
         {loading ? <div className="bg-canvas rounded-tile border-hairline border p-12 text-center text-sm text-ink-faint">読み込み中...</div> : visible.map((setting) => <article key={setting.eventType} className="bg-canvas rounded-tile border-hairline overflow-hidden border">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-ink">{setting.label}</h2><span className={`rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '通知ON' : '通知OFF'}</span></div><p className="mt-0.5 truncate text-xs text-ink-faint" title={setting.eventType}>{setting.eventType}</p></div></div>
+            <div className="flex min-w-0 items-center gap-3"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-ink">{setting.label}</h2><span className={`rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '通知ON' : '通知OFF'}</span></div><p className="mt-0.5 truncate text-xs text-ink-faint">{categoryLabel(setting.category)}・{formatUpdatedAt(setting.updatedAt)}</p></div></div>
             <button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className={styles.rowAction}>{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button>
           </div>
           {expanded === setting.eventType && <div className="border-hairline bg-canvas-sunken/60 grid gap-5 border-t p-4 xl:grid-cols-[minmax(0,1fr)_380px]">
