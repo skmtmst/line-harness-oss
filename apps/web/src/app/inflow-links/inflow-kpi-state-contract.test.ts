@@ -25,7 +25,11 @@ describe('流入と計測の帯は、読めていない数を0件と書かない
   it('流入元の数は読めたときだけ出す', () => {
     const card = kpiCard('流入元')
     expect(card, '帯が見つからない').not.toBe('')
-    expect(card, '読めていなくても件数を出している').toContain('routeCountAvailable ? sortedRows.length : null')
+    // ここは「読めていないときに数を出さない」ことだけを見る。
+    // **何を数えるか**は別の主題なので `inflow-kpi-scope-contract.test.ts` が見る。
+    // 式の字面ごと固定していたため、数える対象を直したときに
+    // 意図は保たれているのにこの試験だけが落ちていた。
+    expect(card, '読めていなくても件数を出している').toMatch(/value=\{routeCountAvailable \? \w+ : null\}/)
   })
 
   it('読込中と取得失敗を言い分ける', () => {
