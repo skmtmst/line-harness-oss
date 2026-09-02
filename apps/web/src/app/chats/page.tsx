@@ -1668,6 +1668,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             /* メールの往復。LINEのトークと同じ場所に出す。 */
             <EmailThread
               threadId={selectedThreadId}
+              onBack={() => setSelectedThreadId(null)}
               customerInfoOpen={showFriendInfo}
               onOpenCustomerInfo={() => setShowFriendInfo(true)}
               onChanged={() => {
