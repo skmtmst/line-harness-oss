@@ -161,6 +161,7 @@ beforeEach(() => {
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
+    RESTAURANT_TEST_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -170,6 +171,12 @@ beforeEach(() => {
 });
 
 describe('飲食店向けテストAPI', () => {
+  it('無効な環境では専用APIを404にする', async () => {
+    env.RESTAURANT_TEST_ENABLED = 'false';
+    const response = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect(response.status).toBe(404);
+  });
+
   it('既存領域と分離したテストデータを準備してR-1〜R-8の読取モデルを返す', async () => {
     seedRestaurantFixture({ name: '飲食店LAB' });
 
