@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -43,12 +43,15 @@ function TemplateDetailInner() {
     }
     void (async () => {
       try {
-        const [detail, usages] = await Promise.all([
-          api.templates.get(id),
-          api.templates.usages(id).catch(() => null),
-        ])
-        if (detail.success) setTemplate(detail.data)
-        if (usages?.success) setUsage(usages.data)
+        const detail = await api.templates.get(id)
+        if (detail.success) {
+          setTemplate(detail.data)
+          setUsage(detail.data.usedBy)
+        } else {
+          setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+        }
+      } catch {
+        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
       } finally {
         setLoading(false)
       }
@@ -71,12 +74,12 @@ function TemplateDetailInner() {
     try {
       const result = await api.templates.delete(id)
       if (!result.success) {
-        setDeleteError(result.error)
+        setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
         return
       }
       router.push('/templates')
-    } catch (e) {
-      setDeleteError(e instanceof ApiError ? e.message : '削除に失敗しました')
+    } catch {
+      setDeleteError('削除できませんでした。使用先を確認して、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }

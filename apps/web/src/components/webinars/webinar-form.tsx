@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -36,6 +37,7 @@ export interface WebinarFormProps {
 
 export default function WebinarForm({ initial }: WebinarFormProps) {
   const router = useRouter()
+  const { selectedAccountId } = useAccount()
   const [title, setTitle] = useState(initial?.title ?? '')
   const [slug, setSlug] = useState(initial?.slug ?? '')
   const [status, setStatus] = useState<Webinar['status']>(initial?.status ?? 'draft')
@@ -80,6 +82,10 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   const nonDailyCount = rules.length - dailyRules.length
 
   const save = async () => {
+    if (!initial && !selectedAccountId) {
+      setError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
     setSaving(true)
     setError(null)
     const input: WebinarInput = {
@@ -89,6 +95,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
       videoPrefix: videoPrefix.trim() || null,
       durationSeconds: durationMinutes * 60,
       schedule: rules,
+      ...(!initial ? { accountId: selectedAccountId } : {}),
       cta: ctaEnabled
         ? { label: ctaLabel, url: ctaUrl, showAtSeconds: ctaShowMinutes * 60 }
         : null,

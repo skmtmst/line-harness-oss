@@ -8,9 +8,16 @@ import {
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
 import { hasInboundSupportMark, summarizeTwoFactor } from './live-summary'
+import {
+  dashboardNotificationDestination,
+  dashboardNotificationFilters,
+  dashboardNotificationItems,
+  isDashboardNotificationData,
+  markDashboardNotificationRead,
+} from './notification-summary'
 import { formatTrendSources } from './friend-trend-table'
 import type { BookingRequest } from '@/lib/api'
-import type { StaffMember } from '@line-crm/shared'
+import type { NotificationCenterData, StaffMember } from '@line-crm/shared'
 
 function booking(id: string, startsAt: string, status = 'confirmed'): BookingRequest {
   return {
@@ -58,6 +65,21 @@ describe('ダッシュボードV4の初期表示', () => {
       full: '広告 2',
       compact: '広告 2',
     })
+  })
+
+  it('通知は選択中アカウントの取得・1件既読・全件既読へ接続する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('api.notifications.center.list(selectedAccountId')
+    expect(source).toContain('api.notifications.center.markRead(item.id, accountId)')
+    expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
+    expect(source).toContain('通知を読み込めませんでした。もう一度お試しください。')
+  })
+
+  it('アカウントや絞り込みを切り替えた後は、遅れて届いた既読処理を反映しない', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('selectedAccountIdRef.current !== accountId')
+    expect(source).toContain('notificationFilterRef.current !== filter')
+    expect(source).toContain('notificationAccountId === selectedAccountId ? notificationData : null')
   })
 
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
@@ -162,5 +184,92 @@ describe('既存データを使う運用状況', () => {
   it('受信時に自動変更する対応マークが1つでもあれば有効とする', () => {
     expect(hasInboundSupportMark([{ autoOnInbound: false }, { autoOnInbound: true }])).toBe(true)
     expect(hasInboundSupportMark([{ autoOnInbound: false }])).toBe(false)
+  })
+})
+
+describe('ダッシュボード通知', () => {
+  const data: NotificationCenterData = {
+    items: [
+      {
+        id: 'danger',
+        eventType: 'account_health_danger',
+        category: 'error',
+        title: '接続を確認してください',
+        body: '運用状態から確認してください。',
+        metadata: null,
+        isRead: false,
+        createdAt: '2026-08-27T01:30:00.000Z',
+      },
+      {
+        id: 'recovered',
+        eventType: 'account_health_recovered',
+        category: 'update',
+        title: '正常に戻りました',
+        body: '接続が正常に戻りました。',
+        metadata: null,
+        isRead: false,
+        createdAt: '2026-08-27T02:30:00.000Z',
+      },
+    ],
+    counts: { all: 2, error: 1, update: 1, unread: 2 },
+    unreadCount: 2,
+  }
+
+  it('APIの件数を通知タブへそのまま出す', () => {
+    expect(dashboardNotificationFilters(data)).toEqual([
+      { id: 'all', label: 'すべて', count: 2 },
+      { id: 'error', label: 'エラー', count: 1 },
+      { id: 'update', label: 'アップデート', count: 1 },
+    ])
+    expect(dashboardNotificationFilters(null).map((filter) => filter.count)).toEqual([null, null, null])
+    expect(dashboardNotificationFilters({} as NotificationCenterData).map((filter) => filter.count)).toEqual([null, null, null])
+  })
+
+  it('不完全な返事は0件として扱わず、取得失敗へ分ける', () => {
+    expect(isDashboardNotificationData(data)).toBe(true)
+    expect(isDashboardNotificationData({})).toBe(false)
+    expect(isDashboardNotificationData({ ...data, counts: undefined })).toBe(false)
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('!isDashboardNotificationData(response.data)')
+  })
+
+  it('本文と日本時間を表示し、種類と未読状態を保つ', () => {
+    const selected: string[] = []
+    const items = dashboardNotificationItems(data.items, (item) => selected.push(item.id))
+    expect(items[0]).toMatchObject({
+      id: 'danger',
+      filterId: 'error',
+      unread: true,
+      meta: '運用状態から確認してください。｜8/27 10:30',
+    })
+    items[0].onSelect?.()
+    expect(selected).toEqual(['danger'])
+  })
+
+  it('1件既読は未読数だけを1減らし、二重操作では減らさない', () => {
+    const once = markDashboardNotificationRead(data, 'danger')
+    expect(once.unreadCount).toBe(1)
+    expect(once.counts).toEqual({ all: 2, error: 1, update: 1, unread: 1 })
+    expect(once.items.find((item) => item.id === 'danger')?.isRead).toBe(true)
+    expect(markDashboardNotificationRead(once, 'danger')).toBe(once)
+  })
+
+  it('まとめて既読にした後はAPIの総対象数を引かず、未読数を再取得する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
+    expect(source).toContain('await loadNotificationCenter()')
+    expect(source).not.toContain('markDashboardNotificationsRead')
+  })
+
+  it('通知種類ごとに安全な管理画面へ送る', () => {
+    expect(dashboardNotificationDestination(data.items[0])).toBe('/emergency')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'release',
+    })).toBe('/updates')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'unknown',
+    })).toBeNull()
   })
 })
