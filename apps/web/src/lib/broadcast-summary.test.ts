@@ -12,6 +12,7 @@ describe('送るものの種別', () => {
   it('種別ごとの名前を出す', () => {
     expect(messageTypeLabel('sticker')).toBe('スタンプ')
     expect(messageTypeLabel('carousel')).toBe('カルーセル')
+    expect(messageTypeLabel('flex')).toBe('カード型')
     expect(messageTypeLabel('location')).toBe('位置情報')
   })
 

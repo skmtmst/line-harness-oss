@@ -1,25 +1,31 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getFriendFields,
+  getFriendFieldsForScope,
   getFriendFieldById,
-  createFriendField,
+  getFriendFieldByIdForScope,
+  createFriendFieldForScope,
   updateFriendField,
   deleteFriendField,
-  countFriendFieldValues,
+  countFriendFieldValuesForScope,
+  getFriendFieldListSummary,
+  getFriendFieldValuesForMigration,
   getFriendFieldsWithValues,
   setFriendFieldValue,
   validateFieldKey,
   FRIEND_FIELD_TYPES,
   type FriendField,
+  type FriendFieldScope,
   type FriendFieldType,
 } from '@line-crm/db';
 import { recordLoginAudit } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const friendFields = new Hono<Env>();
 
-function serialize(row: FriendField & { value?: string | null; updated_by?: string | null }) {
+function serialize(row: FriendField & { value?: string | null; updated_by?: string | null; is_inherited?: number }) {
   return {
     id: row.id,
     folderId: row.folder_id,
@@ -36,8 +42,25 @@ function serialize(row: FriendField & { value?: string | null; updated_by?: stri
     displayOrder: row.display_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ...(row.is_inherited !== undefined ? { isInherited: Boolean(row.is_inherited) } : {}),
     ...(row.value !== undefined ? { value: row.value, updatedBy: row.updated_by ?? null } : {}),
   };
+}
+
+async function friendFieldAccess(c: Context<Env>): Promise<FriendFieldScope | Response> {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const staff = c.get('staff');
+  if (!staff.tenantId) {
+    return c.json({ success: false, error: '所属を確認できません' }, 403);
+  }
+  const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
+  if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
+    return c.json({ success: false, error: '友だち情報欄が見つかりません' }, 404);
+  }
+  return { tenantId: staff.tenantId, lineAccountId };
 }
 
 /** 選択肢は文字列の配列。空の配列も許す（あとから足す前提で作ることがある）。 */
@@ -48,11 +71,79 @@ function parseOptions(raw: unknown): { ok: true; value: string | null } | { ok: 
   return { ok: true, value: JSON.stringify(raw) };
 }
 
+type MigrationPreviewRow = {
+  friendId: string;
+  sourceValue: string;
+  convertedValue: string | null;
+  status: 'convertible' | 'review' | 'invalid';
+  reason: string | null;
+};
+
+function convertMigrationValue(value: string, targetType: FriendFieldType): Omit<MigrationPreviewRow, 'friendId' | 'sourceValue'> {
+  const trimmed = value.trim();
+  if (!trimmed) return { convertedValue: null, status: 'invalid', reason: '空欄です' };
+  if (targetType === 'number') {
+    const normalized = trimmed.replace(/,/g, '');
+    return Number.isFinite(Number(normalized))
+      ? { convertedValue: normalized, status: 'convertible', reason: null }
+      : { convertedValue: null, status: 'review', reason: '数値として確認できません' };
+  }
+  if (targetType === 'date') {
+    const normalized = trimmed.replace(/[./年]/g, '-').replace(/月/g, '-').replace(/日/g, '');
+    const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!match) return { convertedValue: null, status: 'review', reason: '日付の形を確認してください' };
+    const result = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+    const date = new Date(`${result}T00:00:00Z`);
+    const isExactDate = !Number.isNaN(date.getTime())
+      && date.getUTCFullYear() === Number(match[1])
+      && date.getUTCMonth() + 1 === Number(match[2])
+      && date.getUTCDate() === Number(match[3]);
+    return !isExactDate
+      ? { convertedValue: null, status: 'review', reason: '存在する日付か確認してください' }
+      : { convertedValue: result, status: 'convertible', reason: null };
+  }
+  if (targetType === 'tel') {
+    const normalized = trimmed.replace(/[^0-9+]/g, '');
+    return /^\+?\d{10,15}$/.test(normalized)
+      ? { convertedValue: normalized, status: 'convertible', reason: null }
+      : { convertedValue: null, status: 'review', reason: '電話番号の桁数を確認してください' };
+  }
+  if (targetType === 'email') {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+      ? { convertedValue: trimmed.toLowerCase(), status: 'convertible', reason: null }
+      : { convertedValue: null, status: 'review', reason: 'メールアドレスの形を確認してください' };
+  }
+  if (targetType === 'url') {
+    try {
+      const parsed = new URL(trimmed);
+      return ['http:', 'https:'].includes(parsed.protocol)
+        ? { convertedValue: parsed.toString(), status: 'convertible', reason: null }
+        : { convertedValue: null, status: 'review', reason: 'httpまたはhttpsのURLではありません' };
+    } catch {
+      return { convertedValue: null, status: 'review', reason: 'URLの形を確認してください' };
+    }
+  }
+  if (targetType === 'checkbox') {
+    const yes = new Set(['1', 'true', 'yes', 'on', 'はい']);
+    const no = new Set(['0', 'false', 'no', 'off', 'いいえ']);
+    const lowered = trimmed.toLowerCase();
+    if (yes.has(lowered)) return { convertedValue: '1', status: 'convertible', reason: null };
+    if (no.has(lowered)) return { convertedValue: '0', status: 'convertible', reason: null };
+    return { convertedValue: null, status: 'review', reason: 'はい・いいえを確認してください' };
+  }
+  if (targetType === 'select' || targetType === 'multi_select') {
+    return { convertedValue: trimmed, status: 'review', reason: '新しい選択肢との対応を確認してください' };
+  }
+  return { convertedValue: trimmed, status: 'convertible', reason: null };
+}
+
 // GET /api/friend-fields
 friendFields.get('/api/friend-fields', async (c) => {
   try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
     const folderId = c.req.query('folderId') || undefined;
-    const items = await getFriendFields(c.env.DB, { folderId });
+    const items = await getFriendFieldsForScope(c.env.DB, scope, { folderId });
 
     // ?withUsage=1 で「何人に値が入っているか」を付ける。削除の前に見る画面用。
     // 項目ごとに1クエリなので、既定では引かない。
@@ -61,7 +152,7 @@ friendFields.get('/api/friend-fields', async (c) => {
       for (const item of items) {
         withUsage.push({
           ...serialize(item),
-          usageCount: await countFriendFieldValues(c.env.DB, item.id),
+          usageCount: await countFriendFieldValuesForScope(c.env.DB, item.id, scope),
         });
       }
       return c.json({ success: true, data: withUsage });
@@ -73,9 +164,59 @@ friendFields.get('/api/friend-fields', async (c) => {
   }
 });
 
+// GET /api/friend-fields-stats
+//
+// 一覧上部の数を選択中アカウントだけで返す。フォーム定義はまだアカウント
+// 所属を持たないため、その件数だけは null（未取得）として返す。
+friendFields.get('/api/friend-fields-stats', async (c) => {
+  try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
+    return c.json({ success: true, data: await getFriendFieldListSummary(c.env.DB, scope) });
+  } catch (err) {
+    console.error('GET /api/friend-fields-stats error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/friend-fields/:id/migration-preview
+//
+// 値を1件も変更せず、変換可能・要確認・変換不可を返す。型の違う自由入力を
+// 黙って捨てないため、確認が要る行は友だちIDと理由まで残す。
+friendFields.post('/api/friend-fields/:id/migration-preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
+    const source = await getFriendFieldByIdForScope(c.env.DB, c.req.param('id'), scope);
+    if (!source) return c.json({ success: false, error: '項目が見つかりません' }, 404);
+    const body = await c.req.json<{ targetType?: unknown }>();
+    const targetType = String(body.targetType ?? '');
+    if (!(FRIEND_FIELD_TYPES as readonly string[]).includes(targetType)) {
+      return c.json({ success: false, error: '移行先の種類が正しくありません' }, 422);
+    }
+    const values = await getFriendFieldValuesForMigration(c.env.DB, source.id, scope);
+    const rows: MigrationPreviewRow[] = values.map((item) => ({
+      friendId: item.friend_id,
+      sourceValue: item.value,
+      ...convertMigrationValue(item.value, targetType as FriendFieldType),
+    }));
+    const count = (status: MigrationPreviewRow['status']) => rows.filter((row) => row.status === status).length;
+    return c.json({ success: true, data: {
+      source: serialize(source),
+      summary: { total: rows.length, convertible: count('convertible'), review: count('review'), invalid: count('invalid') },
+      rows: rows.filter((row) => row.status !== 'convertible').slice(0, 100),
+    } });
+  } catch (err) {
+    console.error('POST /api/friend-fields/:id/migration-preview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // POST /api/friend-fields
 friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
     const body = await c.req.json<Record<string, unknown>>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -93,7 +234,7 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
       return c.json({ success: false, error: '選択肢は文字列の配列で指定してください' }, 422);
     }
 
-    const field = await createFriendField(c.env.DB, {
+    const field = await createFriendFieldForScope(c.env.DB, scope, {
       name,
       fieldKey: String(body.fieldKey),
       type: String(body.type) as FriendFieldType,
@@ -124,9 +265,17 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
 // テンプレートの差し込みが黙って空になる。どちらも作り直してもらう。
 friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
     const id = c.req.param('id');
-    const existing = await getFriendFieldById(c.env.DB, id);
+    const existing = await getFriendFieldByIdForScope(c.env.DB, id, scope);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.is_inherited === 1) {
+      return c.json({
+        success: false,
+        error: '共通項目は直接変更できません。新しい項目へ安全に移行してください。',
+      }, 409);
+    }
 
     const body = await c.req.json<Record<string, unknown>>();
 
@@ -190,16 +339,21 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
 // 何人ぶん消えるのかを見てから決めてもらう。
 friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
     const id = c.req.param('id');
-    const existing = await getFriendFieldById(c.env.DB, id);
+    const existing = await getFriendFieldByIdForScope(c.env.DB, id, scope);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.is_inherited === 1) {
+      return c.json({ success: false, error: '共通項目は削除できません' }, 409);
+    }
 
-    const usage = await countFriendFieldValues(c.env.DB, id);
-    if (usage > 0 && c.req.query('force') !== '1') {
+    const usage = await countFriendFieldValuesForScope(c.env.DB, id, scope);
+    if (usage > 0) {
       return c.json(
         {
           success: false,
-          error: `この項目は ${usage} 人に値が入っています。削除するとその値も消えます。`,
+          error: `この項目は ${usage} 人に値が入っています。削除せず、新しい項目へ移行してください。`,
           code: 'IN_USE',
           usageCount: usage,
         },

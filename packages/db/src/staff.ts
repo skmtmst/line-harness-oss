@@ -304,6 +304,20 @@ export async function deleteExpiredAdminSessions(db: D1Database, now: string): P
   await db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
 }
 
+/**
+ * 権限・利用状態・MFAの変更後に、対象者が古い認証状態を使い続けないようにする。
+ *
+ * staff_members は毎リクエスト読み直すため権限そのものは即時反映されるが、
+ * 変更前に発行したセッションと二段階認証の途中状態は残る。両方を同じ処理で
+ * 消し、次の操作では必ず新しい設定でログインし直してもらう。
+ */
+export async function revokeStaffAuthentication(db: D1Database, staffId: string): Promise<void> {
+  await db.batch([
+    db.prepare('DELETE FROM admin_sessions WHERE staff_id = ?').bind(staffId),
+    db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId),
+  ]);
+}
+
 export interface TwoFactorChallenge {
   token_hash: string;
   staff_id: string;

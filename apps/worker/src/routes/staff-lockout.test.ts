@@ -17,6 +17,7 @@ const dbMocks = {
   countLoginAudit: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
   replaceStaffAccountScopes: vi.fn(),
+  revokeStaffAuthentication: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -73,6 +74,7 @@ beforeEach(() => {
   dbMocks.countLoginAudit.mockResolvedValue(0);
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.replaceStaffAccountScopes.mockResolvedValue(undefined);
+  dbMocks.revokeStaffAuthentication.mockResolvedValue(undefined);
   dbMocks.getStaffByApiKey.mockResolvedValue(null);
   dbMocks.getLineAccounts.mockResolvedValue([]);
   inviteMocks.sendStaffInviteEmail.mockResolvedValue(undefined);
@@ -342,7 +344,7 @@ describe('最後の管理者を締め出さない', () => {
     expect(dbMocks.getStaffMembers).toHaveBeenCalledWith(env.DB, '00000000-0000-4000-8000-000000000001');
   });
 
-  it('最後の管理者は削除もできない', async () => {
+  it('最後の管理者は利用停止もできない', async () => {
     const only = row({ id: 'only-admin' });
     dbMocks.getStaffById.mockResolvedValue(only);
     dbMocks.getStaffMembers.mockResolvedValue([only]);
@@ -350,24 +352,38 @@ describe('最後の管理者を締め出さない', () => {
     const res = await send('/api/staff/only-admin', 'DELETE');
 
     expect(res.status).toBe(400);
-    expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.revokeStaffAuthentication).not.toHaveBeenCalled();
   });
 
-  it('自分自身は削除できない', async () => {
+  it('自分自身は利用停止できない', async () => {
     const res = await send('/api/staff/env-owner', 'DELETE');
 
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('自分自身は削除できません');
-    expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+    expect((await res.json() as { error: string }).error).toContain('自分自身は利用停止できません');
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
   });
 
-  it('閲覧のみの利用者は削除できない', async () => {
+  it('閲覧のみの利用者は利用停止できない', async () => {
     dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'viewer', role: 'staff', access_level: 'read_only' }));
 
     const res = await send('/api/staff/staff-a', 'DELETE', undefined, 'viewer-key');
 
     expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('DELETE互換口は物理削除せず利用停止し、全認証を失効する', async () => {
+    const target = row({ id: 'staff-a', role: 'staff' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'staff-a', role: 'staff', is_active: 0 }));
+
+    const res = await send('/api/staff/staff-a', 'DELETE');
+
+    expect(res.status).toBe(200);
     expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(env.DB, 'staff-a', { is_active: 0 });
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'staff-a');
   });
 
   it('管理者でない人の無効化は素通しする', async () => {
@@ -379,6 +395,7 @@ describe('最後の管理者を締め出さない', () => {
 
     expect(res.status).toBe(200);
     expect(dbMocks.getStaffMembers).not.toHaveBeenCalled();
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'staff-a');
   });
 });
 
@@ -394,6 +411,7 @@ describe('LINE連携の解除', () => {
     expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
       env.DB, 'admin-a', expect.objectContaining({ line_user_id: null, line_linked_at: null }),
     );
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'admin-a');
   });
 
   it('連携に触れない更新では line_user_id を送らない', async () => {
@@ -406,6 +424,40 @@ describe('LINE連携の解除', () => {
     expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
       env.DB, 'admin-a', expect.objectContaining({ line_user_id: undefined }),
     );
+    expect(dbMocks.revokeStaffAuthentication).not.toHaveBeenCalled();
+  });
+});
+
+describe('権限変更後の認証失効', () => {
+  it.each([
+    [{ role: 'staff' }],
+    [{ permissionKeys: ['/friends'] }],
+    [{ assignedLineAccountId: 'line-1' }],
+    [{ canAccessDescendantAccounts: false }],
+    [{ accountScope: 'all' }],
+  ])('認証に関わる変更 %o は既存sessionとchallengeを失効する', async (change) => {
+    const target = row({ id: 'admin-a' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+    dbMocks.getLineAccounts.mockResolvedValue([{ id: 'line-1', tenant_id: '00000000-0000-4000-8000-000000000001', parent_line_account_id: null, is_active: 1 }]);
+
+    const res = await send('/api/staff/admin-a', 'PATCH', change);
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.revokeStaffAuthentication).toHaveBeenCalledWith(env.DB, 'admin-a');
+  });
+
+  it('通知設定だけの変更では現在のsessionを失効しない', async () => {
+    const target = row({ id: 'admin-a' });
+    dbMocks.getStaffById.mockResolvedValue(target);
+    dbMocks.getStaffMembers.mockResolvedValue([target, row({ id: 'admin-b' })]);
+
+    const res = await send('/api/staff/admin-a', 'PATCH', {
+      notificationPreferences: { security: { email: true, line: false } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.revokeStaffAuthentication).not.toHaveBeenCalled();
   });
 });
 

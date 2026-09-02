@@ -42,6 +42,7 @@
  * CLI:
  *   tsx scripts/deploy/deploy-lock.ts status  <env> [--remote <name>]
  *   tsx scripts/deploy/deploy-lock.ts acquire <env> [--note "..."] [--remote <name>]
+ *   tsx scripts/deploy/deploy-lock.ts verify  <env> [--sha <commit>] [--remote <name>]
  *   tsx scripts/deploy/deploy-lock.ts release <env> [--force] [--remote <name>]
  *
  * `<env>` is `staging` or `production`. Exit code 0 = success, 1 = failure.
@@ -242,6 +243,28 @@ export interface ReadLock {
   sha: string;
 }
 
+export type VerifyLockResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing' | 'environment-mismatch' | 'sha-mismatch' };
+
+/**
+ * Prove that a deployment lock protects this exact environment and commit.
+ *
+ * The holder is deliberately not part of this check. A developer acquires the
+ * lock locally, while GitHub Actions performs the deployment as a bot. What
+ * must never differ is the environment or the immutable commit being deployed.
+ */
+export function evaluateLockForDeploy(
+  lock: LockPayload | null,
+  env: DeployEnv,
+  sha: string,
+): VerifyLockResult {
+  if (!lock) return { ok: false, reason: 'missing' };
+  if (lock.env !== env) return { ok: false, reason: 'environment-mismatch' };
+  if (lock.sha !== sha) return { ok: false, reason: 'sha-mismatch' };
+  return { ok: true };
+}
+
 /** Read the remote lock, or null when the ref does not exist. */
 export function readLock(env: DeployEnv, gitEnv: GitEnv): ReadLock | null {
   const ref = lockRef(env);
@@ -347,6 +370,7 @@ function usage(): never {
       '使い方:',
       '  tsx scripts/deploy/deploy-lock.ts status  <staging|production> [--remote <name>]',
       '  tsx scripts/deploy/deploy-lock.ts acquire <staging|production> [--note "変更範囲"] [--remote <name>]',
+      '  tsx scripts/deploy/deploy-lock.ts verify  <staging|production> [--sha <commit>] [--remote <name>]',
       '  tsx scripts/deploy/deploy-lock.ts release <staging|production> [--force] [--remote <name>]',
       '',
       `remote は --remote / ${REMOTE_ENV_VAR} / ${DEFAULT_REMOTE} の順で解決し、実在を確認します。`,
@@ -399,6 +423,29 @@ function main(): void {
     stdout.write(
       `${env} のロックを取得しました（${holder} / ${payload.sha.slice(0, 7)} / ${payload.note}）。\n` +
         '終了後は必ず release してください。\n',
+    );
+    return;
+  }
+
+  if (command === 'verify') {
+    const expectedSha = readFlag(args, '--sha') ?? git(['rev-parse', 'HEAD']);
+    const current = readLock(env, gitEnv);
+    const result = evaluateLockForDeploy(current?.payload ?? null, env, expectedSha);
+    if (!result.ok) {
+      if (result.reason === 'missing') {
+        throw new Error(`${env} のデプロイロックがありません。先に acquire してください。`);
+      }
+      if (result.reason === 'environment-mismatch') {
+        throw new Error(`ロックの対象環境が ${env} と一致しません。`);
+      }
+      throw new Error(
+        `ロックの対象コミット ${current?.payload.sha ?? '(不明)'} が ` +
+          `デプロイ対象 ${expectedSha} と一致しません。`,
+      );
+    }
+    stdout.write(
+      `${env} のロックはデプロイ対象 ${expectedSha} と一致しています` +
+        `（保持者: ${current?.payload.holder}）。\n`,
     );
     return;
   }
