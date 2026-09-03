@@ -84,6 +84,7 @@ Issue の本文に、同じ行数のチェックボックスを 2 組持つ。
 
 - **司令塔だけが Issue を作る**(品質チェック lane:qa は例外として、検査結果の Issue を自分で作ってよい)(担当が必要になったものは「依頼」として司令塔に Slack で投げ、司令塔が Issue にする)。
 - 担当は着手時にカードを「作業中」へ、PR が CLEAN になったら「マージ待ち」へ動かす。PR は本体リポジトリに出し、PR 本文に台帳の番号を `kentavndng/line-harness-board#123` の形で書く。ブランチ名には `b123` のように番号を入れる。
+- **PR を作ったら、その場で Issue の題名の末尾に ` (PR #番号)` を足す**(例: `[s1] 友だち一覧の未取得表示 (PR #712)`)。看板のカードは題名しか見えないので、番号が題名に無いと人が PR を探せない。PR を作り直したら番号も差し替える。
 - 司令塔はマージ後にカードを完了列へ(= Issue が閉じる)。
 - 「停止」に置くときは本文に理由と、誰の判断が要るかを書く。人は「停止」列だけ見ればよい。
 
@@ -131,6 +132,13 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 4. 各グループのエージェントノードを起動する(Claude Code は `claude`、Codex は `codex`)。Opus 5 のモデル指定はノードのモデル選択で行う。承認待ち(NEEDS YOU)の通知を自分の端末に出す。
 
 worktree のパスは絶対パスで project.json に入っているので、別のマシンで開く場合はグループの worktree を「Unbind」してから自分のパスで作り直す。
+
+### 追記(2026-09-03): 起動前の 2 つの確認
+
+- 各 worktree で `pnpm install --frozen-lockfile` を済ませておく。無いと Slack フック・テスト・型検査が全部落ちる。
+- Codex は自動承認で動かす。`~/.codex/config.toml` に `approval_policy = "never"`、`sandbox_mode = "workspace-write"`、`[sandbox_workspace_write] network_access = true` と `writable_roots = ["<本体の .git>", "<lh-work>"]`。本番 DB の更新と本番(main)への配備の禁止は AGENTS.md の指示で守る(砂場ではなく約束で止める)。
+- Codex ノードを再起動するときは `codex resume <セッション id>` で会話を引き継ぐ。同じ作業ツリーを共有する qa 4 本は `--last` が別ノードのセッションを拾って失敗するので、id を指定するか新規に起動する。
+
 
 ## 7. 司令塔(Fable 5.1)がこの設計で実際にできること・できないこと
 
