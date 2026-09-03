@@ -4,7 +4,7 @@ import {
   getConversionPointById,
   createConversionPoint,
   updateConversionPoint,
-  deleteConversionPoint,
+  stopConversionPoint,
   trackConversion,
   getConversionEvents,
   getConversionReport,
@@ -76,6 +76,8 @@ function serializeConversionPoint(p: ConversionPoint) {
     countRepeat: p.count_repeat !== 0,
     attributionDays: p.attribution_days,
     lineAccountId: p.line_account_id,
+    status: p.status,
+    stoppedAt: p.stopped_at,
     createdAt: p.created_at,
   };
 }
@@ -233,10 +235,10 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
   }
 });
 
-// DELETE /api/conversions/points/:id - delete
+// DELETE /api/conversions/points/:id - stop tracking and preserve history
 conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
-    await deleteConversionPoint(c.env.DB, c.req.param('id'));
+    await stopConversionPoint(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/conversions/points/:id error:', err);
@@ -255,6 +257,7 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       userId?: string | null;
       affiliateCode?: string | null;
       metadata?: Record<string, unknown> | null;
+      idempotencyKey?: string | null;
     }>();
 
     if (!body.conversionPointId || !body.friendId) {
@@ -265,8 +268,8 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     }
 
     const [pointAccount, friendAccount] = await Promise.all([
-      c.env.DB.prepare('SELECT line_account_id FROM conversion_points WHERE id = ?')
-        .bind(body.conversionPointId).first<{ line_account_id: string | null }>(),
+      c.env.DB.prepare('SELECT line_account_id, status FROM conversion_points WHERE id = ?')
+        .bind(body.conversionPointId).first<{ line_account_id: string | null; status: string }>(),
       c.env.DB.prepare('SELECT line_account_id FROM friends WHERE id = ?')
         .bind(body.friendId).first<{ line_account_id: string | null }>(),
     ]);
@@ -277,6 +280,17 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     )) {
       return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
     }
+    if (pointAccount.status === 'stopped') {
+      return c.json({ success: false, error: 'この成果地点は計測を停止しています' }, 409);
+    }
+    if (
+      body.idempotencyKey !== undefined
+      && (typeof body.idempotencyKey !== 'string'
+        || body.idempotencyKey.length < 1
+        || body.idempotencyKey.length > 200)
+    ) {
+      return c.json({ success: false, error: 'idempotencyKey must be 1 to 200 characters' }, 400);
+    }
 
     const event = await trackConversion(c.env.DB, {
       conversionPointId: body.conversionPointId,
@@ -284,6 +298,7 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       userId: body.userId,
       affiliateCode: body.affiliateCode,
       metadata: body.metadata ? JSON.stringify(body.metadata) : null,
+      idempotencyKey: body.idempotencyKey ?? null,
     });
 
     return c.json({

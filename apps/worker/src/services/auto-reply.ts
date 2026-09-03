@@ -1,9 +1,23 @@
 import type { LineClient } from '@line-crm/line-sdk';
-import { getTemplateById } from '@line-crm/db';
+import {
+  ensureAutoReplyPublishedVersion,
+  finishAutoReplyActionRun,
+  getTemplateById,
+  markAutoReplyEvaluationFinished,
+  markAutoReplyEvaluationMatched,
+  markAutoReplyEvaluationSkipped,
+  recordAutoReplyEvaluationDetail,
+  reserveAutoReplyActionRun,
+  reserveAutoReplyEvaluation,
+} from '@line-crm/db';
 import type { AutoReply, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
-import { shouldReply } from './auto-reply-conditions.js';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { evaluateAutoReplyConditions } from './auto-reply-conditions.js';
+import {
+  runActionRows,
+  type RunActionsResult,
+  type ScenarioActionRow,
+} from './scenario-actions.js';
 import { recordAutoReplyHit } from '@line-crm/db';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import {
@@ -232,6 +246,74 @@ export interface MatchAndReplyResult {
   replyTokenConsumed: boolean;
 }
 
+function normalizedInput(text: string): string {
+  return text.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+async function sha256(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 履歴一覧へ生の個人情報を残さない。本文は messages_log で権限付き表示する。 */
+function maskedInputPreview(text: string): string {
+  const masked = text
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[メールアドレス]')
+    .replace(/(?:\+?81[-\s]?)?(?:0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{3,4})/g, '[電話番号]')
+    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, '[識別子]');
+  return [...masked].slice(0, 80).join('');
+}
+
+function matchedKeywordLabel(rule: AutoReply, text: string): string {
+  if (rule.respond_to_all === 1) return 'すべてのメッセージ';
+  return resolveKeywordRules(rule)
+    .filter((keyword) => keywordRuleMatches(keyword, text))
+    .map((keyword) => keyword.keyword)
+    .join('・') || rule.keyword;
+}
+
+function addActionResult(total: RunActionsResult, current: RunActionsResult): void {
+  total.executed += current.executed;
+  total.skippedByCondition += current.skippedByCondition;
+  total.skippedByOnce += current.skippedByOnce;
+  total.failed += current.failed;
+  total.skippedIncomplete += current.skippedIncomplete;
+  total.scenarioTouched ||= current.scenarioTouched;
+}
+
+function emptyActionResult(): RunActionsResult {
+  return {
+    executed: 0,
+    skippedByCondition: 0,
+    skippedByOnce: 0,
+    failed: 0,
+    skippedIncomplete: 0,
+    scenarioTouched: false,
+  };
+}
+
+function actionResultStatus(result: RunActionsResult): 'succeeded' | 'skipped' | 'permanent_failed' {
+  if (result.failed > 0) return 'permanent_failed';
+  if (result.executed > 0) return 'succeeded';
+  return 'skipped';
+}
+
+function actionCounts(result: RunActionsResult): Record<string, number> {
+  return {
+    executed: result.executed,
+    skippedByCondition: result.skippedByCondition,
+    skippedByOnce: result.skippedByOnce,
+    failed: result.failed,
+    skippedIncomplete: result.skippedIncomplete,
+  };
+}
+
+function safeErrorCode(error: unknown): string {
+  if (error instanceof Error && error.name) return error.name.slice(0, 80);
+  return 'unknown_error';
+}
+
 /**
  * incomingText を auto_replies (このアカウントのルール + グローバルルール) に
  * マッチさせ、最初にマッチしたルールで replyMessage を送って messages_log に
@@ -257,9 +339,43 @@ export async function matchAndReply(
     logContext?: string;
     /** 受け取ったメッセージの種別。省略時は text として扱う */
     messageKind?: string;
-  } = {},
+    /** LINE webhook の event ID。二重返信を防ぐため、省略不可。 */
+    incomingEventId: string;
+    /** 受信本文へ権限付きで辿るための messages_log ID。 */
+    incomingMessageLogId?: string | null;
+    /** LINE が付けた発生日時。 */
+    occurredAt: string;
+  },
 ): Promise<MatchAndReplyResult> {
-  const { lineAccountId = null, workerUrl, logContext } = opts;
+  const {
+    lineAccountId = null,
+    workerUrl,
+    logContext,
+    incomingEventId,
+    incomingMessageLogId = null,
+    occurredAt,
+  } = opts;
+
+  // 台帳を確保できない状態で返信すると、Webhook再送時の二重実行を止められない。
+  // 返信より先に必ず受信イベントを1行だけ確保する。
+  const reservation = await reserveAutoReplyEvaluation(db, {
+    incomingEventId,
+    incomingMessageLogId,
+    lineAccountId,
+    friendId: friend.id,
+    messageKind: opts.messageKind ?? 'text',
+    normalizedTextHash: await sha256(normalizedInput(incomingText)),
+    inputPreviewMasked: maskedInputPreview(incomingText),
+    occurredAt,
+  });
+  if (!reservation.created) {
+    // 同じイベントは再評価も再送もしない。進行中も下流の自動返信へ渡さない。
+    if (reservation.row.status === 'skipped') {
+      return { matched: false, replyTokenConsumed: false };
+    }
+    return { matched: true, replyTokenConsumed: true };
+  }
+  const evaluationId = reservation.row.id;
 
   // グローバルルール (line_account_id IS NULL) + このアカウントのルール。
   // lineAccountId が null のときは `= NULL` が偽になるのでグローバルのみ残る。
@@ -280,55 +396,146 @@ export async function matchAndReply(
   const autoReplies = await db
     .prepare(
       `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
-        ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
+        ORDER BY CASE WHEN line_account_id = ? THEN 0 ELSE 1 END,
+                 priority ASC, respond_to_all ASC, created_at ASC`,
     )
-    .bind(lineAccountId)
+    .bind(lineAccountId, lineAccountId)
     .all<AutoReply>();
 
   // キーワードが合っても、時間帯・連投抑制・有人対応で返さないことがある。
   // 合ったものを1件だけ見るのではなく、条件まで通る最初の1件を探す。
   // 「営業時間内はAで返し、時間外はBで返す」を2行で書けるようにするため。
-  const now = new Date();
+  const now = new Date(occurredAt);
   let rule: AutoReply | undefined;
+  let ruleVersionId = '';
+  let evaluationOrder = 0;
   for (const candidate of autoReplies.results) {
-    if (!matchesMessageKind(candidate, opts.messageKind)) continue;
-    if (!keywordMatches(candidate, incomingText)) continue;
-    if (await shouldReply(db, candidate, friend.id, now)) {
-      rule = candidate;
-      break;
+    evaluationOrder += 1;
+    const version = await ensureAutoReplyPublishedVersion(db, candidate);
+    if (!matchesMessageKind(candidate, opts.messageKind)) {
+      await recordAutoReplyEvaluationDetail(db, {
+        evaluationId,
+        autoReplyId: candidate.id,
+        ruleVersionId: version.id,
+        order: evaluationOrder,
+        result: 'not_matched',
+        reasonCodes: ['message_kind_not_matched'],
+      });
+      continue;
     }
-  }
-  if (!rule) return { matched: false, replyTokenConsumed: false };
-
-  // 当たった記録。一覧のヒット数と「1人につき1回だけ」の判定がこれを見る。
-  // 返信より先に残すのは、返信に失敗しても当たった事実は変わらないため。
-  try {
-    await recordAutoReplyHit(db, {
-      autoReplyId: rule.id,
-      friendId: friend.id,
-      lineAccountId,
-      matchedKeyword: rule.keyword,
+    if (!keywordMatches(candidate, incomingText)) {
+      await recordAutoReplyEvaluationDetail(db, {
+        evaluationId,
+        autoReplyId: candidate.id,
+        ruleVersionId: version.id,
+        order: evaluationOrder,
+        result: 'not_matched',
+        reasonCodes: ['keyword_not_matched'],
+      });
+      continue;
+    }
+    const condition = await evaluateAutoReplyConditions(db, candidate, friend.id, now);
+    if (!condition.matches) {
+      await recordAutoReplyEvaluationDetail(db, {
+        evaluationId,
+        autoReplyId: candidate.id,
+        ruleVersionId: version.id,
+        order: evaluationOrder,
+        result: 'skipped',
+        reasonCodes: condition.reasonCodes,
+      });
+      continue;
+    }
+    await recordAutoReplyEvaluationDetail(db, {
+      evaluationId,
+      autoReplyId: candidate.id,
+      ruleVersionId: version.id,
+      order: evaluationOrder,
+      result: 'won',
+      reasonCodes: [],
     });
-  } catch (err) {
-    console.error('[auto-reply] failed to record hit', err);
+    rule = candidate;
+    ruleVersionId = version.id;
+    break;
   }
+  if (!rule) {
+    await markAutoReplyEvaluationSkipped(db, evaluationId, 'no_matching_rule');
+    return { matched: false, replyTokenConsumed: false };
+  }
+
+  const matchedKeyword = matchedKeywordLabel(rule, incomingText);
+  await markAutoReplyEvaluationMatched(db, {
+    evaluationId,
+    autoReplyId: rule.id,
+    versionId: ruleVersionId,
+    matchedKeyword,
+  });
 
   // 設定されたアクション（タグ付け・友だち情報・対応マーク・シナリオ・共通情報）を
   // 並べた順に実行する。返信より先に動かすのは、「タグを付けてから、そのタグで
   // 差し込む文面を作る」書き方ができるようにするため。
   const actions = parseAutoReplyActions(rule.actions_json);
+  const actionSummary = emptyActionResult();
   if (actions.length > 0) {
-    try {
-      await runActionRows(db, actions, friend.id);
-    } catch (err) {
-      // アクションが転んでも返信は返す。何も返らないほうが困る。
-      console.error('[auto-reply] failed to run actions', err);
+    for (const action of actions) {
+      const reserved = await reserveAutoReplyActionRun(db, {
+        evaluationId,
+        actionStableId: action.id,
+        actionType: action.action_type,
+        actionSnapshot: JSON.stringify(action),
+        idempotencyKey: `${incomingEventId}:${action.id}`,
+      });
+      if (!reserved.acquired) continue;
+      try {
+        const result = await runActionRows(db, [action], friend.id);
+        addActionResult(actionSummary, result);
+        await finishAutoReplyActionRun(db, {
+          id: reserved.id,
+          status: actionResultStatus(result),
+          errorCode: result.failed > 0 ? 'action_failed' : null,
+          result: { ...result },
+        });
+      } catch (err) {
+        actionSummary.failed += 1;
+        await finishAutoReplyActionRun(db, {
+          id: reserved.id,
+          status: 'permanent_failed',
+          errorCode: safeErrorCode(err),
+        });
+        console.error('[auto-reply] failed to run action', err);
+      }
     }
   }
 
-  if (rule.response_type === 'silent') return { matched: true, replyTokenConsumed: false };
+  if (rule.response_type === 'silent') {
+    const allActionsSucceeded = actions.length > 0
+      && actionSummary.executed === actions.length
+      && actionSummary.failed === 0
+      && actionSummary.skippedByCondition === 0
+      && actionSummary.skippedByOnce === 0
+      && actionSummary.skippedIncomplete === 0;
+    await markAutoReplyEvaluationFinished(db, {
+      evaluationId,
+      status: allActionsSucceeded ? 'completed' : 'partial_failed',
+      replyStatus: 'not_attempted',
+      actionSummary: actionCounts(actionSummary),
+      errorCode: allActionsSucceeded ? null : actions.length === 0 ? 'silent_without_actions' : 'action_incomplete',
+    });
+    if (allActionsSucceeded) {
+      await recordAutoReplyHit(db, {
+        autoReplyId: rule.id,
+        friendId: friend.id,
+        lineAccountId,
+        matchedKeyword,
+      });
+    }
+    return { matched: true, replyTokenConsumed: false };
+  }
 
   let replyTokenConsumed = false;
+  let lineRequestId: string | null = null;
+  let messageLogId: string | null = null;
+  let replyError: unknown = null;
   try {
     const resolvedMeta = await resolveMetadata(db, friend);
     const resolved = await resolveAutoReplyContent(db, rule);
@@ -341,14 +548,15 @@ export async function matchAndReply(
       extra,
     );
     const replyMsg = buildMessage(resolved.messageType, expandedContent);
-    await lineClient.replyMessage(replyToken, [replyMsg]);
+    const response = await lineClient.replyMessageWithRequestId(replyToken, [replyMsg]);
     replyTokenConsumed = true;
+    lineRequestId = response.requestId;
 
     // 送信ログ（replyMessage = 無料）— derive content from the built reply
     // message so any cleanEmptyNodes / parse-failure fallback is reflected
     // in the dashboard.
     const replyPayload = messageToLogPayload(replyMsg);
-    await logOutgoingMessage(db, {
+    messageLogId = await logOutgoingMessage(db, {
       friendId: friend.id,
       messageType: replyPayload.messageType,
       content: replyPayload.content,
@@ -357,7 +565,41 @@ export async function matchAndReply(
       lineAccountId,
     });
   } catch (err) {
+    replyError = err;
     console.error(`Failed to send auto-reply${logContext ? ` (${logContext})` : ''}`, err);
+  }
+
+  if (replyTokenConsumed) {
+    await markAutoReplyEvaluationFinished(db, {
+      evaluationId,
+      status: actionSummary.failed > 0 ? 'partial_failed' : 'completed',
+      replyStatus: 'accepted',
+      lineRequestId,
+      messageLogId,
+      actionSummary: actionCounts(actionSummary),
+      errorCode: actionSummary.failed > 0 ? 'action_failed' : null,
+    });
+    try {
+      await recordAutoReplyHit(db, {
+        autoReplyId: rule.id,
+        friendId: friend.id,
+        lineAccountId,
+        matchedKeyword,
+      });
+    } catch (error) {
+      // LINEへの返信は既に成功している。集計の失敗を「返信失敗」へ書き換えない。
+      console.error('[auto-reply] failed to record successful hit', error);
+    }
+  } else {
+    await markAutoReplyEvaluationFinished(db, {
+      evaluationId,
+      status: actionSummary.executed > 0 ? 'partial_failed' : 'reply_failed',
+      replyStatus: 'failed',
+      lineRequestId,
+      messageLogId,
+      actionSummary: actionCounts(actionSummary),
+      errorCode: safeErrorCode(replyError),
+    });
   }
 
   return { matched: true, replyTokenConsumed };
