@@ -15,7 +15,7 @@ const dbMocks = {
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),
-  deleteConversionPoint: vi.fn(),
+  stopConversionPoint: vi.fn(),
   trackConversion: vi.fn(),
   getConversionEvents: vi.fn(),
   getConversionReport: vi.fn(),

@@ -364,7 +364,10 @@ CREATE TABLE IF NOT EXISTS conversion_points (
   name       TEXT NOT NULL,
   event_type TEXT NOT NULL,
   value      REAL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'stopped')),
+  stopped_at TEXT,
+  updated_at TEXT
 );
 
 -- ============================================================
@@ -381,6 +384,10 @@ CREATE TABLE IF NOT EXISTS conversion_events (
   attributed_ref_code  TEXT,
   approval_status      TEXT CHECK (approval_status IN ('pending','approved','rejected')),
   approved_at          TEXT,
+  point_name_snapshot  TEXT,
+  event_type_snapshot  TEXT,
+  value_snapshot       REAL,
+  idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -388,6 +395,14 @@ CREATE INDEX IF NOT EXISTS idx_conversion_events_point ON conversion_events (con
 CREATE INDEX IF NOT EXISTS idx_conversion_events_friend ON conversion_events (friend_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events (affiliate_code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversion_events_point_idempotency
+  ON conversion_events(conversion_point_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_conversion_points_status ON conversion_points(status, created_at DESC);
+
+CREATE TRIGGER IF NOT EXISTS conversion_points_prevent_delete
+BEFORE DELETE ON conversion_points
+BEGIN SELECT RAISE(ABORT, 'conversion_points must be stopped, not deleted'); END;
 
 -- ============================================================
 -- Round 2: Affiliates
