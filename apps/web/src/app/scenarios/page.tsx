@@ -349,7 +349,7 @@ export default function ScenariosPage() {
         <button
           onClick={() => void handleCreate()}
           disabled={creating}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         >
           {creating ? '作成中…' : '＋ シナリオを作成'}
         </button>
