@@ -40,7 +40,6 @@
  * 文字リンクにしない（設計では押せる箱）。
  */
 .manual,
-.manualDisabled,
 .logout {
   display: inline-flex;
   height: 36px;
@@ -80,15 +79,6 @@
 .logout {
   border-color: var(--color-hairline);
   cursor: pointer;
-}
-
-/*
- * URLが決まっていない間。**文字は黒のまま太字**（設計 `LoVfp` は $ink / 700）。
- * 文字まで薄くすると、URLが入ったあとと見た目が変わってしまう。
- * 押せないことはカーソルで示す。
- */
-.manualDisabled {
-  cursor: default;
 }
 
 /* ボタンの中の絵。`$ink-secondary` の線画16px。 */
