@@ -56,9 +56,9 @@ const RULE_KINDS: { type: string; label: string; make: () => SegmentRule }[] = [
 
 const TAG_OPS: { value: string; label: string }[] = [
   { value: 'tag_exists', label: '選択したタグのいずれか1つ以上を含む人' },
-  { value: 'tag_all', label: '選択したタグを全て含む人' },
+  { value: 'tag_all', label: '選択したタグをすべて含む人' },
   { value: 'tag_not_exists', label: '選択したタグを1つ以上含む人を除外' },
-  { value: 'tag_not_all', label: '選択したタグを全て含む人を除外' },
+  { value: 'tag_not_all', label: '選択したタグをすべて含む人を除外' },
 ]
 
 const FIELD_OPS: { value: FieldOperator; label: string }[] = [

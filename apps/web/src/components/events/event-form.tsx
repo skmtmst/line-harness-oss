@@ -167,7 +167,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         accountIdsArr = [accountId, ...accountIdsArr]
       }
       if (targetType === 'multi-account-dedup' && accountIdsArr.length === 0) {
-        throw new Error('複数アカウント横断の場合は対象アカを 1 件以上選択してください')
+        throw new Error('複数アカウント横断の場合は対象アカウントを 1 件以上選んでください')
       }
       const payload: Partial<EventDetail> = {
         name: draft.name,
@@ -310,14 +310,14 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 </div>
                 <p className="text-xs text-blue-700 mt-2">
                   broadcast 編集で「リンクするイベント」から選ぶと自動挿入。
-                  {'{{liff_id}}'} は配信時に各友だちのアカに対応した値に置換されます。
+                  {'{{liff_id}}'} は配信時に各友だちのアカウントに対応した値に置換されます。
                 </p>
               </div>
               <div>
-                <div className="text-sm font-medium text-blue-900 mb-2">各アカ固定 URL (QR・LP 直貼り用)</div>
+                <div className="text-sm font-medium text-blue-900 mb-2">アカウントごとの固定 URL (QR・LP 直貼り用)</div>
                 <div className="space-y-1.5">
                   {targetAccounts.length === 0 && (
-                    <div className="text-xs text-amber-700">対象アカが選択されていません</div>
+                    <div className="text-xs text-amber-700">対象アカウントが選ばれていません</div>
                   )}
                   {targetAccounts.map((a) => {
                     const acct = a as unknown as { liffId?: string | null; name: string; country: string | null }
@@ -594,7 +594,7 @@ function OverviewTab({
             }`}
           >
             <div className="text-sm font-bold">単一アカウント</div>
-            <div className="text-xs text-gray-600">1 つの LINE アカで運用</div>
+            <div className="text-xs text-gray-600">1 つの LINE アカウントで運用</div>
           </button>
           <button
             type="button"
@@ -622,7 +622,7 @@ function OverviewTab({
 
         {targetType === 'multi-account-dedup' && (
           <div className="space-y-1.5">
-            <div className="text-xs text-gray-600">対象アカ（重複なし配信）</div>
+            <div className="text-xs text-gray-600">対象アカウント（重複なし配信）</div>
             {activeAccounts.length === 0 && (
               <div className="text-sm text-gray-500 italic p-2">アクティブなアカウントがありません</div>
             )}
@@ -653,7 +653,7 @@ function OverviewTab({
                   />
                   <span className="text-sm">
                     {a.country ? a.country + ' ' : ''}{a.name}
-                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">(現アカ・必須)</span>}
+                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">（今のアカウント・必須）</span>}
                   </span>
                 </label>
               )

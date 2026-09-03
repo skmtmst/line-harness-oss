@@ -63,7 +63,7 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
   unread: { label: '未対応', className: 'bg-red-100 text-red-700' },
   in_progress: { label: '対応中', className: 'bg-yellow-100 text-yellow-700' },
   on_hold: { label: '保留', className: 'bg-action-soft text-action' },
-  resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+  resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
 }
 
 /** Render a metadata value safely as text. Objects/arrays → JSON, primitives → as-is. */
@@ -454,7 +454,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-2 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
               <div className="flex justify-between items-center">
-                <span className="text-[11px] text-gray-500">対応マーク</span>
+                <span className="text-[11px] text-gray-500">対応状況</span>
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
                     {statusLabels[chatStatus.status].label}

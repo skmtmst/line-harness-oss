@@ -251,7 +251,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   </span>
                   {!search.lineAccountId && (
                     <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
-                      対象アカウント未割当
+                      対象アカウント未割り当て
                     </span>
                   )}
                   {note && (

@@ -188,25 +188,25 @@ export default function MultiAccountDedupSection({
 
       <div className={`text-xs ${isSingleAccount ? 'text-gray-400' : 'text-gray-700'}`}>
         ☑ 重複除外モード
-        {isSingleAccount && '（1 アカ選択時は無効）'}
+        {isSingleAccount && '（アカウントが1つのときは使えません）'}
       </div>
 
       {/* Optional tag filter — narrows the recipient population to friends
           who carry the selected tag, then dedup runs on that narrowed set. */}
       <div>
-        <p className="text-xs font-medium text-gray-700 mb-2">タグ絞込 (任意)</p>
+        <p className="text-xs font-medium text-gray-700 mb-2">タグで絞り込む（任意）</p>
         <select
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
           value={targetTagId ?? ''}
           onChange={(e) => onTargetTagIdChange(e.target.value || null)}
         >
-          <option value="">タグ絞込なし (選択アカの全友達)</option>
+          <option value="">絞り込まない（選んだアカウントのすべての友だち）</option>
           {tags.map((tag) => (
             <option key={tag.id} value={tag.id}>{tag.name}</option>
           ))}
         </select>
         <p className="mt-1 text-[11px] text-gray-500">
-          タグを選ぶと、そのタグが付いた友達だけ対象に重複除外する。空なら全員対象。
+          タグを選ぶと、そのタグが付いた友だちだけ対象に重複除外する。空なら全員対象。
         </p>
       </div>
 

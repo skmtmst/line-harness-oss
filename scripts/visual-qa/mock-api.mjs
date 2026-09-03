@@ -17,7 +17,13 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { fileURLToPath } from 'node:url'
+
+/** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
+const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
   FORM_DELETE_IMPACT_FIXTURES,
@@ -873,6 +879,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
   }
+  if (pathname === '/api/friend-fields-stats') {
+    /*
+      友だち情報欄の帯。**口が無いと既定の器（`{items,total,page,limit}`）が返り、
+      `summary.inUse` が `undefined` になって画面に「使用中 undefined件」と出ていた。**
+      設計 `HBTk0` と文字を並べて初めて分かった。
+      画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
+    */
+    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 1_284, formLinks: 3, updatedThisMonth: 4 } }
+  }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
   }
@@ -900,6 +915,23 @@ const server = createServer((req, res) => {
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
+    return
+  }
+
+  /*
+    **いま動いているモックが、いまのファイルかを言う。**
+
+    直したはずの返事が反映されず、しかもどこにも出ない、というのを
+    何度かやった。直近では `/api/friend-fields-stats` を足したのに
+    古いモックが動いたままで、画面に `undefined` が出続けた。
+    さらに前には、口が足りない古いモックのせいで7画面が
+    「画面を表示できませんでした」で落ち、実装の不具合に見えていた。
+
+    ここが自分の中身の指紋を返し、`capture-screens.mjs` が
+    ディスク上のファイルと突き合わせて、違えば撮影に入る前に止まる。
+  */
+  if (url.pathname === '/__mock-fingerprint') {
+    res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
     return
   }
 

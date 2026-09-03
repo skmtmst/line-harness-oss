@@ -33,7 +33,7 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   field: '友だち情報',
   status_message: 'ステータスメッセージ',
   created_at: '友だち登録日',
-  chat_status: '対応マーク',
+  chat_status: '対応状況',
 }
 
 /**
@@ -42,9 +42,9 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
  */
 const NOT_YET: Array<{ label: string; why: string }> = [
   { label: '個別メモ', why: 'メモを検索する口がありません' },
-  // 下のOR節は `'対応マーク'` を並べる側に書いているのに、この一覧に項目が無かった。
+  // 下のOR節は `'対応状況'` を並べる側に書いているのに、この一覧に項目が無かった。
   // そのため **設計にあるORの軸が1つ、黙って描かれないまま**だった。
-  { label: '対応マーク', why: '対応マークで絞る口がありません' },
+  { label: '対応状況', why: '対応状況で絞る口がありません' },
   { label: 'シナリオ', why: '購読中のシナリオで絞る口がありません' },
   { label: 'イベント予約', why: '予約から友だちを引く口がありません' },
   { label: 'カレンダー予約', why: '同上' },
@@ -148,7 +148,7 @@ export default function AdvancedSearchDialog({
     }
     if (params.chatStatus) {
       out.push(
-        `対応マーク ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済' }[params.chatStatus]}`,
+        `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[params.chatStatus]}`,
       )
     }
     if (params.visibility === 'blocked') out.push('ブロックした人')
@@ -377,7 +377,7 @@ export default function AdvancedSearchDialog({
                 >
                   <option value="unread">未対応</option>
                   <option value="in_progress">対応中</option>
-                  <option value="resolved">対応済</option>
+                  <option value="resolved">対応済み</option>
                 </select>
               )}
             </section>
@@ -410,7 +410,7 @@ export default function AdvancedSearchDialog({
               `NOT_YET` は理由の文をもう持っているので、札の下に出す。
             */}
             <div className="mt-3 flex flex-wrap gap-3">
-              {NOT_YET.filter((item) => ['対応マーク', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
+              {NOT_YET.filter((item) => ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
                 <div key={item.label} className="flex max-w-xs flex-col gap-1">
                   <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
                     ＋ {item.label === 'イベント予約' ? '予約' : item.label}
