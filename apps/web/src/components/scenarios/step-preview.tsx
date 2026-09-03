@@ -189,7 +189,7 @@ export default function StepPreview({
                     key={i}
                     className={`rounded-control block px-3 py-2 text-center text-label font-bold ${
                       i === 0
-                        ? 'bg-accent text-on-accent'
+                        ? 'bg-accent-deep text-on-accent'
                         : 'border-hairline text-ink-secondary border'
                     }`}
                   >

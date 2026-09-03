@@ -19,6 +19,7 @@ import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { listLimit, listOffset } from './list-pagination.js';
 
 import type { ConversionPoint, ConversionMeasureMethod } from '@line-crm/db';
 
@@ -330,8 +331,8 @@ conversions.get('/api/conversions/events', async (c) => {
       affiliateCode: c.req.query('affiliateCode'),
       startDate: c.req.query('startDate'),
       endDate: c.req.query('endDate'),
-      limit: Number(c.req.query('limit') ?? '100'),
-      offset: Number(c.req.query('offset') ?? '0'),
+      limit: listLimit(c.req.query('limit'), 100),
+      offset: listOffset(c.req.query('offset')),
     });
 
     return c.json({
@@ -385,8 +386,8 @@ conversions.get('/api/conversions/approvals', async (c) => {
       );
     }
 
-    const limit = Math.min(500, Math.max(1, Number.parseInt(c.req.query('limit') ?? '', 10) || 200));
-    const offset = Math.max(0, Number.parseInt(c.req.query('offset') ?? '', 10) || 0);
+    const limit = listLimit(c.req.query('limit'), 200);
+    const offset = listOffset(c.req.query('offset'));
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const rows = await getConversionApprovalQueue(c.env.DB, {
