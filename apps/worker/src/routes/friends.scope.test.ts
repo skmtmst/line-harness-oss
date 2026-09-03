@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   canAccess: vi.fn(),
   getScope: vi.fn(),
   getFriendById: vi.fn(),
+  getFriendTagsByFriendIds: vi.fn(),
   getSavedSearchById: vi.fn(),
   pushMessage: vi.fn(),
 }));
@@ -16,6 +17,7 @@ vi.mock('../services/account-access.js', () => ({
 vi.mock('@line-crm/db', async (importOriginal) => ({
   ...await importOriginal<typeof import('@line-crm/db')>(),
   getFriendById: mocks.getFriendById,
+  getFriendTagsByFriendIds: mocks.getFriendTagsByFriendIds,
   getSavedSearchById: mocks.getSavedSearchById,
 }));
 vi.mock('@line-crm/line-sdk', () => ({
@@ -67,6 +69,7 @@ beforeEach(() => {
   mocks.getScope.mockResolvedValue({ allowedAccountIds: ['own'], canSeeUnassigned: false, ids: ['own'], accounts: [] });
   mocks.getFriendById.mockResolvedValue({ id: 'friend', line_account_id: 'other', metadata: '{}', line_user_id: 'U-test' });
   mocks.getSavedSearchById.mockResolvedValue(null);
+  mocks.getFriendTagsByFriendIds.mockResolvedValue(new Map());
   mocks.canAccess.mockResolvedValue(false);
 });
 
@@ -151,6 +154,29 @@ describe('A-8 friends tenant scope', () => {
     expect(response.status).toBe(200);
     expect(prepared.filter(({ sql }) => sql.includes('friend_tags'))).toHaveLength(0);
     expect(prepared.length).toBeLessThan(10);
+  });
+
+  test('200人のタグを1回の一括問い合わせで取得する', async () => {
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const rows = Array.from({ length: 200 }, (_, index) => ({
+      id: `friend-${index}`,
+      display_name: `Friend ${index}`,
+      line_user_id: `U${index}`,
+    }));
+    mocks.getFriendTagsByFriendIds.mockResolvedValueOnce(new Map([
+      ['friend-0', [{ id: 'tag-1', name: '重要', color: '#ff0000', created_at: '2026-09-01' }]],
+    ]));
+
+    const response = await createApp(prepared, rows).request('/api/friends?limit=200');
+
+    expect(response.status).toBe(200);
+    expect(mocks.getFriendTagsByFriendIds).toHaveBeenCalledTimes(1);
+    expect(mocks.getFriendTagsByFriendIds.mock.calls[0][1]).toHaveLength(200);
+    const body = await response.json() as { data: { items: unknown[] } };
+    expect(body.data.items).toHaveLength(200);
+    expect(body.data.items[0]).toMatchObject({
+      id: 'friend-0', tags: [{ id: 'tag-1', name: '重要' }],
+    });
   });
 
   test('an explicit hidden LINE account cannot bypass the visible-account scope', async () => {
