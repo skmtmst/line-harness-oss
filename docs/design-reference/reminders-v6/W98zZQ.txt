@@ -92,13 +92,13 @@ Kenta Kawano
 変数
 テストで使う値
 本番での取得元
-{{name}}
+名前
 Kenta
 友だちのLINE表示名
-{{meet_datetime}}
+相談の日時
 8/24（月）18:00
 予約管理の予約日時
-{{meet_url}}
+参加URL
 meet.google.com/test-0000
 予約ごとに発行されるMeet URL
 テスト送信の履歴
