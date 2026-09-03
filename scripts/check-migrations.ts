@@ -183,6 +183,12 @@ const GRANDFATHERED_REBUILDS = new Set([
   '135_step_message_kinds_rename.sql',
   '139_step_carousel_swap.sql',
   '140_step_carousel_rename.sql',
+  // 2026-09-03 に棚卸しで見つけた4本。いずれも印が付く前に検証・本番へ当てた
+  // 作り直しで、release.yml の安全検査を毎回落としていた。
+  '189_analytics_cross.sql',
+  '192_inbox_v6_foundation.sql',
+  '202_ec_event_account_and_identity.sql',
+  '265_nen_shared_friend_add_coupon.sql',
 ]);
 
 export function checkMigration(sql: string, fileName?: string): CheckResult {
