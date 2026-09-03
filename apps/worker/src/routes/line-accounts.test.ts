@@ -424,6 +424,16 @@ describe('GET /api/line-accounts', () => {
     expect(body.data[1].stats.friendCount).toBe(0);
   });
 
+  test('一括集計に失敗したときは全件0と偽らず500を返す', async () => {
+    dbMocks.getLineAccountListStats.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+    const res = await setupApp('owner').request('/api/line-accounts');
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   test('live=1のときだけWebhook URLとプランを秘密情報なしで返す', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
     const app = setupApp('owner');
