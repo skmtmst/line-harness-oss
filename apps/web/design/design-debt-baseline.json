@@ -750,7 +750,7 @@
     "unresolved-classname": 14
   },
   "components/shared/sticky-bar.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 4
   },
   "components/shared/tabs.tsx": {
     "unresolved-classname": 6
