@@ -22,6 +22,11 @@
 <!-- ここから下に追記。最新を上に。 -->
 
 ## 2026-09-03
+- やらかし: Pencil MCP で `Insert` した空フレームへ `Move` や `Copy` で中身を入れたら、そのフレームだけ絵に出なくなった。`ctx.bounds` は親の高さを正しく返すのに子の y だけ古い値のままで、`Print` の数字を信じて「入った」と判断しかけた
+- 原因: 構造を変える操作(Move / Copy / Delete)のあと、Pencil のレイアウト計算が更新されないまま残る
+- 再発防止: Pencil で節を組み替えたら **必ず `get_screenshot` で見る**(`bounds` の数字だけで判断しない)。絵に出ていなければ、その親を `Replace(parentId, Get(parentId))` で丸ごと作り直す。これで位置が正しくなる(子の id は振り直される)
+
+## 2026-09-03
 - やらかし: NodeTerm を司令塔(Claude Code)のシェルから `open -a` で再起動したため、Claude Code の環境変数(CLAUDECODE、ANTHROPIC_BASE_URL、CLAUDE_CODE_CHILD_SESSION など)が NodeTerm と全ノードに引き継がれ、Claude のノードが子セッション扱い・API 課金表示・未ログインになった
 - 原因: `open` は呼び出し元の環境を起動するアプリに渡す。エージェントのシェルは Claude Code の環境を持っている
 - 再発防止: GUI アプリをエージェントから起動するときは `env -i HOME=… USER=… PATH=… open -a <app>` で素の環境にする。起動後に `ps eww` で CLAUDE / ANTHROPIC 変数が 0 件であることを確認する
