@@ -18,6 +18,9 @@
 | S2 | 機能 6〜13(一斉配信、リマインダ、自動応答、友だち追加時配信、ウェビナー、テンプレート、リッチメニュー、回答フォーム。86 画面) | apps/web/src/app/{broadcasts, reminders, auto-replies, friend-add-settings, webinars, templates, rich-menus, forms}、対応する components、design-qa と design-reference の同名 -v6、screens.mjs の該当区画 |
 | S3 | 機能 14〜32(共通情報、メディア、成果、マイル、流入、コンバージョン、分析、NEN、写真審査、EC、LINE 通知、オートメーション、外部連携、予約 3 種、ログインユーザー、機能設定、運用状態。108 画面) | apps/web/src/app/{contents, media, affiliates, conversions, mileage, inflow-links, analytics, nen, photo-review, ec-commerce, line-notifications, automations, webhooks, booking, events, staff, settings, emergency}、対応する components、同名 -v6、screens.mjs の該当区画 |
 | Codex | API・性能・段取り | apps/worker、packages/db、.github、ツール設定 |
+| pen(Pencil デザイン修正、Opus 5 + Pencil MCP) | Pencil ★V6 の修正 50 件と設計画像の書き出し | Pencil の .pen、docs/design-reference/*-v6、docs/v6-requirements/v6-32-feature-cross-review.md §7 の反映日 |
+| fix(Codex エラー修正) | 品質チェックとステージングで見つかった不具合を 1 件 1 PR で直す | 指摘されたファイル(所有パスの例外。司令塔が Issue で承認) |
+| qa(品質チェック ×4、Codex、読み取り専用) | エラー / コード / 速度 / セキュリティの定時検査。直さず起票する | 読み取りのみ。書くのは line-harness-board の Issue だけ |
 
 - `scripts/visual-qa/screens.mjs` は 1 ファイルだが、各セッションは自分の機能の区画だけを編集する。区画をまたぐ変更(共通の定数や関数)は S0 だけが行う。
 - `docs/design-qa/v6-progress-ledger.md` と `v6-progress.json` は生成物。**手で直さず、PR の最後に `node scripts/visual-qa/ledger.mjs` で再生成する。** 競合したら相手の変更を取り込んでからもう一度生成する。

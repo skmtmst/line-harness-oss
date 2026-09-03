@@ -14,7 +14,10 @@ body:
         - s1(機能 1〜5)
         - s2(機能 6〜13)
         - s3(機能 14〜32)
+        - pen(Pencil デザイン修正)
         - codex(API・性能・段取り)
+        - fix(エラー修正)
+        - qa(品質チェック: エラー・コード・速度・セキュリティ)
     validations:
       required: true
   - type: input
@@ -22,7 +25,6 @@ body:
     attributes:
       label: 対象
       description: 機能番号と画面 Node ID、または API 名
-      placeholder: "機能 2 受信箱 xGLVe / GET /api/notifications/rules"
     validations:
       required: true
   - type: textarea
@@ -30,24 +32,31 @@ body:
     attributes:
       label: 所有パス
       description: 触るパス。docs/v6-parallel-plan.md §2 の表の範囲外なら理由を書き、司令塔の承認を待つ
-      placeholder: "apps/web/src/app/chats、apps/web/src/components/chats、docs/design-qa/inbox-v6"
     validations:
       required: true
   - type: textarea
     id: done
     attributes:
-      label: 完了条件
-      description: 要件書の完了条件から写す。検証できる文だけ(「動く」「分かる」は不可)
+      label: 完了条件(担当が更新。終えたら `- [x] ~~文~~` にする)
+      description: 要件書の完了条件から写す。1 行 1 チェックボックス。検証できる文だけ
+      value: |
+        - [ ]
     validations:
       required: true
+  - type: textarea
+    id: human
+    attributes:
+      label: 人の確認(人がチェックしたら司令塔が閉じる)
+      description: 完了条件と同じ行数。担当は触らない
+      value: |
+        - [ ] 確認:
   - type: input
     id: deps
     attributes:
       label: 依存
       description: 先に終わっていないといけない Issue 番号
-      placeholder: "#123"
   - type: input
     id: pr
     attributes:
       label: PR
-      description: 採番後に書く(先取りしない)
+      description: 採番後に skmtmst/line-harness-oss#番号 を書く(先取りしない)
