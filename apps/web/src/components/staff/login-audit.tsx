@@ -26,7 +26,7 @@ const ACTION_OPTIONS = [
   ...Object.entries(ACTIONS).map(([value, label]) => ({ value, label })),
 ]
 const PERIOD_OPTIONS = [
-  { value: '30', label: '過去30日' },
+  { value: '30', label: 'この30日' },
   { value: '90', label: '過去90日' },
   { value: 'all', label: 'すべての期間' },
 ]
@@ -62,7 +62,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 
   return <>
     <div className="mb-4 grid gap-4 md:grid-cols-3">
-      <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">過去30日の操作</p><p className="mt-2 text-3xl font-bold text-ink">{rows.length}<span className="ml-1 text-sm font-normal text-ink-faint">件</span></p></div>
+      <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">この30日の操作</p><p className="mt-2 text-3xl font-bold text-ink">{rows.length}<span className="ml-1 text-sm font-normal text-ink-faint">件</span></p></div>
       <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">直近のログイン</p><p className="mt-2 text-lg font-bold text-ink">{loginRows[0]?.createdAt?.replace('T', ' ').slice(0, 16) ?? '—'}</p></div>
       <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">無効の操作</p><p className="mt-2 text-3xl font-bold text-ink">{rows.filter((r) => !r.isActive || r.result !== 'ok').length}<span className="ml-1 text-sm font-normal text-ink-faint">件</span></p></div>
     </div>
