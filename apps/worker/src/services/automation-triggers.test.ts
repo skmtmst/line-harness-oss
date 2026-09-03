@@ -4,6 +4,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import type { ActionDefinition, AutomationActionExecutor } from './automation-engine';
 import {
   dispatchAutomationEvent,
+  processOverdueSupportMarkTriggers,
   processScheduledAutomationTriggers,
 } from './automation-triggers';
 
@@ -34,6 +35,7 @@ function addAutomation(
     triggerConfig?: Record<string, unknown>;
     conditionConfig?: Record<string, unknown>;
     action?: ActionDefinition;
+    priority?: number;
   },
 ): void {
   const accountId = input.accountId ?? 'account-1';
@@ -41,8 +43,8 @@ function addAutomation(
   raw.prepare(
     `INSERT INTO automation_definitions
        (id, line_account_id, name, status, priority)
-     VALUES (?, ?, ?, 'active', 0)`,
-  ).run(input.id, accountId, input.id);
+     VALUES (?, ?, ?, 'active', ?)`,
+  ).run(input.id, accountId, input.id, input.priority ?? 0);
   raw.prepare(
     `INSERT INTO automation_versions
        (id, automation_id, version_number, status, trigger_type, trigger_config,
@@ -128,6 +130,51 @@ describe('V6オートメーションのきっかけ接続', () => {
     }]);
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
       .toEqual({ count: 0 });
+  });
+
+  it('対応マークの自動変更は条件に合う最優先の1本だけを実行する', async () => {
+    addAutomation(testDb.raw, {
+      id: 'mark-low', triggerType: 'support_mark_change', priority: 10,
+      triggerConfig: { kind: 'support_mark_rule', event: 'message_received' },
+    });
+    addAutomation(testDb.raw, {
+      id: 'mark-high', triggerType: 'support_mark_change', priority: 100,
+      triggerConfig: { kind: 'support_mark_rule', event: 'message_received' },
+    });
+
+    const result = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId: 'account-1', eventType: 'message_received', sourceEventId: 'webhook-mark-1',
+      friendId: 'friend-1', eventData: {},
+    }, { now: NOW, executors });
+
+    expect(result).toMatchObject([{ automationId: 'mark-high', status: 'success' }]);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(`SELECT automation_id FROM automation_runs`).all())
+      .toEqual([{ automation_id: 'mark-high' }]);
+  });
+
+  it('返信期限超過は期限時刻を不変IDにして同じ会話を二重実行しない', async () => {
+    addAutomation(testDb.raw, {
+      id: 'mark-overdue', triggerType: 'support_mark_change', priority: 100,
+      triggerConfig: { kind: 'support_mark_rule', event: 'response_overdue' },
+    });
+    testDb.raw.prepare(
+      `INSERT INTO chats
+         (id, friend_id, status, line_account_id, next_response_due_at, created_at, updated_at)
+       VALUES ('chat-1', 'friend-1', 'unread', 'account-1',
+               '2026-08-25T00:00:00.000Z', ?, ?)`,
+    ).run(NOW, NOW);
+
+    const first = await processOverdueSupportMarkTriggers(testDb.db, {
+      now: NOW, executors, limit: 10,
+    });
+    const second = await processOverdueSupportMarkTriggers(testDb.db, {
+      now: NOW, executors, limit: 10,
+    });
+
+    expect(first).toMatchObject([{ automationId: 'mark-overdue', kind: 'created' }]);
+    expect(second).toMatchObject([{ automationId: 'mark-overdue', kind: 'existing' }]);
+    expect(record).toHaveBeenCalledTimes(1);
   });
 
   it('不明なきっかけ設定を全員一致として扱わない', async () => {
