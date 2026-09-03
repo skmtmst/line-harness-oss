@@ -111,7 +111,7 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
       LINE
     </span>
   ) : (
@@ -335,7 +335,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
             <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                 msg.direction === 'outgoing'
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : 'bg-canvas-sunken text-ink'
               }`}>
                 <div className="text-sm whitespace-pre-wrap break-words">{renderContent(msg)}</div>
@@ -369,7 +369,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
           <button
             onClick={handleSend}
             disabled={!message.trim() || sending}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
           >
             {sending ? '...' : '送信'}
           </button>
