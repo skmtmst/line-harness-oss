@@ -19,7 +19,11 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(storesPage).toContain("redirect('/hq')")
     expect(stores).toContain("router.replace('/hq')")
     expect(accountsPage).toContain("redirect('/hq')")
-    expect(accountsNewPage).toContain("redirect('/restaurant-test/stores/new')")
+    /*
+      2026-09-04: `/accounts/new` の転送はやめた。**店舗を作ることと、
+      LINE公式アカウントを登録することは別**（要件 §5-3）。
+    */
+    expect(accountsNewPage).not.toContain("redirect('/restaurant-test/stores/new')")
   })
 
   it('デモ作成UIと公開bootstrap呼出しを持たず、空組織を統括へ案内する', () => {

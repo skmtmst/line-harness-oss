@@ -46,7 +46,6 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  * 2026-09-04 時点で 24 画面。
  */
 const NOT_YET = [
-  'accounts/new/page.tsx',
   'auto-replies/edit/page.tsx',
   'booking/bookings/new/page.tsx',
   'broadcasts/new/page.tsx',

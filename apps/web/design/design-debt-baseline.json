@@ -2,6 +2,9 @@
   "app/accounts/migration.tsx": {
     "direct-secondary-button": 2
   },
+  "app/accounts/new/page.tsx": {
+    "arbitrary-value": 1
+  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 8
   },

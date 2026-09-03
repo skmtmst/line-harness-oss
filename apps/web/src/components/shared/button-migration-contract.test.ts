@@ -273,7 +273,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 11px の指定が1つ増えた。**増えたぶんの理由が書けるものだけ足す。**
     // 2026-09-04: /settings の見出しを共通 PageHeader へ寄せたので、
     // text-[30px] / text-[#202020] / text-[#777] の3つが減って 1180。
-    expect(debt['arbitrary-value']).toBe(1180)
+    // 2026-09-04: LINEアカウントの登録（★V6 33-2）を作った。
+    // 右の欄の幅 `xl:grid-cols-[minmax(0,1fr)_22rem]` の1つぶんで 1181。
+    expect(debt['arbitrary-value']).toBe(1181)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
