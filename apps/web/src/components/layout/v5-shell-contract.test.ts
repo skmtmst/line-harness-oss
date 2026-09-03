@@ -25,7 +25,7 @@ describe('Pen.dev V6の共通画面枠', () => {
     expect(sidebarCss).toContain('width: 256px')
     expect(sidebarCss).toContain('flex: 0 0 256px')
     expect(shellCss).toContain('max-width: var(--container-shell)')
-    // 上14px は ★V6 260枚すべてで例外がなかった値（docs/v6-shell-contract.md §4）。
+    // 上14px は ★V6 260枚すべてで例外がなかった値（docs/v6-common-rules.md §1）。
     expect(shellCss).toContain('padding: 14px 40px 32px')
   })
 
@@ -108,7 +108,7 @@ describe('共通部品への移管実証', () => {
     ['受信箱', chats],
     ['友だち', friends],
     // 2026-09-02: 友だち属性もこちら側。V4 はタイトルと説明を共通トップバーへ
-    // 預けている（docs/v6-shell-contract.md §2）。旧V5だけが本文にHeaderを
+    // 預けている（docs/v6-common-rules.md §1）。旧V5だけが本文にHeaderを
     // 置いていて、その死んだコードがここを「共通Headerを使う」側に見せていた。
     ['友だち属性', tags],
     ['友だち属性の入口', tagEntry],

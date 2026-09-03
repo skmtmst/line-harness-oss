@@ -257,7 +257,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-09-02: /tags の描かれない旧V5枝が持っていた任意値3か所も消えて1215。
     // **減ったので締め直す。**
     // 両方を統合した木を再計測し、片側の古い値へ戻さない。
-    expect(debt['arbitrary-value']).toBe(1212)
+    // 2026-09-03: どこからも使われていない部品9本(prompt-modal、multi-account-dedup-section、
+    // friend-table、step-editor、support-alert-panel、accounts の4本)を消して1192。
+    expect(debt['arbitrary-value']).toBe(1192)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

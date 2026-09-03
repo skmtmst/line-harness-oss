@@ -278,6 +278,6 @@ v0.24.0 / v0.25.0 ではスコープ外。機能としては作るがメニュ�
 
 | 文書 | 内容 |
 |---|---|
-| `docs/sidebar-v2-spec.md` | サイドバー9区分30項目の実装仕様（v0.25.0 第1段階） |
-| `docs/requirements-v0.24.md` | 裏側の要件定義。テーブル・API・画面遷移・エラーの扱い |
-| `docs/v1-to-v2-inventory.md` | V1→V2の棚卸し、統合の由来、レスポンシブ変換規則 |
+| `docs/archive/sidebar-v2-spec.md` | サイドバー9区分30項目の実装仕様（v0.25.0 第1段階） |
+| `docs/archive/requirements-v0.24.md` | 裏側の要件定義。テーブル・API・画面遷移・エラーの扱い |
+| `docs/archive/v1-to-v2-inventory.md` | V1→V2の棚卸し、統合の由来、レスポンシブ変換規則 |
