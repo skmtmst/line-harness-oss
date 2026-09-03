@@ -857,6 +857,15 @@ export const INBOX_STATS = {
   mine: 0,
   todayInbound: 0,
   todayByChannel: { line: 0, email: 0 },
+  /*
+    担当者ごとの未読数（設計 `YZaDK`）。**0件の担当者はここに載らない**
+    契約なので、`Masato` はわざと入れない——画面が実値0として描くところを
+    確かめるため。担当がまだ決まっていない会話は `operatorId` が `null`。
+  */
+  assigneeUnread: [
+    { operatorId: null, operatorName: null, unread: 2 },
+    { operatorId: 'operator-kenta', operatorName: 'Kenta', unread: 3 },
+  ],
 }
 
 /**
@@ -1044,15 +1053,25 @@ const INBOX_VIEW_CONDITIONS = {
   sort: 'newest',
 }
 
+/*
+  **1件だけ古い形のまま残す。**
+
+  保存した検索の仕組みは受信箱より前からあり、古い行は友だち側と同じ
+  `{ all: [], any: [] }` の形で入っている。3件とも新しい形にすると、
+  **古い行を開くと受信箱ごと落ちる**という起きた不具合を二度と踏めない。
+  画面はこれを「絞り込みなし」として開く。
+*/
+const LEGACY_VIEW_CONDITIONS = { all: [], any: [] }
+
 export const INBOX_SAVED_VIEWS = [
   ['未対応・期限超過', true, { statuses: ['unread'], sort: 'waiting_desc' }],
   ['河野担当の未対応', true, { statuses: ['unread'], assignees: ['operator-kenta'] }],
-  ['LINEからの新着', false, { channels: ['line'], unread: 'mine' }],
+  ['LINEからの新着', false, null],
 ].map(([name, isShared, patch], index) => ({
   id: `inbox-view-${index}`,
   name: String(name),
   scope: 'chats',
-  conditions: { ...INBOX_VIEW_CONDITIONS, ...patch },
+  conditions: patch ? { ...INBOX_VIEW_CONDITIONS, ...patch } : LEGACY_VIEW_CONDITIONS,
   createdBy: 'Kenta',
   lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
