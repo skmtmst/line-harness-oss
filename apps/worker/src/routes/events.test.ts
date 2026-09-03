@@ -848,6 +848,18 @@ function makeEventDb(state: {
 }
 
 function setupApp(state: Parameters<typeof makeEventDb>[0]) {
+  state.accounts ??= [];
+  for (const account of state.accounts) {
+    account.tenant_id ??= 'tenant-a';
+  }
+  if (!state.accounts.some((account) => account.id === 'la1')) {
+    state.accounts.push({
+      id: 'la1',
+      liff_id: 'liff-default',
+      is_active: 1,
+      tenant_id: 'tenant-a',
+    });
+  }
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
   app.use('*', async (c, next) => {
@@ -867,6 +879,29 @@ beforeEach(() => {
   for (const fn of Object.values(reminderMocks)) fn.mockReset();
   for (const fn of Object.values(notifierMocks)) fn.mockReset();
   reminderMocks.computeRemindersForBooking.mockReturnValue([]);
+});
+
+describe('admin account scope', () => {
+  test('rejects an account outside the signed-in staff scope', async () => {
+    const app = setupApp({
+      events: [],
+      accounts: [
+        {
+          id: 'other-account',
+          liff_id: 'other-liff',
+          is_active: 1,
+          tenant_id: 'tenant-b',
+        },
+      ],
+    });
+
+    const res = await app.request('/api/events/admin/events?account_id=other-account');
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: 'このLINEアカウントを操作する権限がありません',
+    });
+  });
 });
 
 describe('POST /api/events/admin/events', () => {
