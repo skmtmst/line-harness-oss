@@ -120,7 +120,7 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
           <button
             type="button"
             onClick={() => onAdd({ id: crypto.randomUUID(), type: selected[1], label: selected[0] === 'テキスト送信' ? message : selected[0], timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後` })}
-            className="rounded-control bg-accent px-5 py-2.5 text-sm font-bold text-on-accent hover:bg-accent-hover"
+            className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-bold text-on-accent hover:brightness-92"
           >
             このアクションを追加
           </button>
@@ -206,7 +206,7 @@ function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = f
         <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />内容を確認し、既存の友だちへ反映することを了承しました</label>
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
-          <button type="button" disabled={!accepted} onClick={onSave} className="rounded-control bg-accent px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">さかのぼって反映して保存</button>
+          <button type="button" disabled={!accepted} onClick={onSave} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">さかのぼって反映して保存</button>
         </div>
       </section>
     </div>
