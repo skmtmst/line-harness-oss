@@ -239,7 +239,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Verify D1, delivery batches, and notification rules
-        run: pnpm tsx scripts/verify-staging-operational-path.ts | tee "$RUNNER_TEMP/staging-verification.json"
+        run: |
+          set -o pipefail
+          pnpm tsx scripts/verify-staging-operational-path.ts \
+            | tee "$RUNNER_TEMP/staging-verification.json"
 
       - name: Publish aggregate-only result
         if: always()

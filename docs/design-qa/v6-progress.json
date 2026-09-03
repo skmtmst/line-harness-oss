@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 228,
-  "unimplemented": 30,
+  "compared": 230,
+  "unimplemented": 28,
   "unconfirmed": 0,
-  "elsewhere": 4,
-  "missing": 0,
+  "elsewhere": 0,
+  "missing": 4,
   "match": 0,
   "structureMatchDataPending": 23,
-  "needsFix": 59,
-  "unjudged": 146,
+  "needsFix": 62,
+  "unjudged": 145,
   "remaining": 258,
   "features": [
     {
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 17,
+      "needsFix": 2,
+      "unjudged": 15,
       "remaining": 17,
       "capturedAt": [
         {
@@ -252,8 +252,8 @@
       "compared": 17,
       "unimplemented": 0,
       "unconfirmed": 0,
-      "elsewhere": 4,
-      "missing": 0,
+      "elsewhere": 0,
+      "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -586,15 +586,15 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 14,
-      "unimplemented": 1,
+      "compared": 15,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 14,
+      "unjudged": 15,
       "remaining": 15,
       "capturedAt": [
         {
@@ -1881,14 +1881,14 @@
       "feature": 21,
       "name": "NEN配信",
       "total": 7,
-      "compared": 6,
-      "unimplemented": 1,
+      "compared": 7,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 2,
+      "needsFix": 3,
       "unjudged": 1,
       "remaining": 7,
       "capturedAt": [
@@ -2466,13 +2466,6 @@
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
     },
     {
-      "feature": 6,
-      "node": "bPF0s",
-      "name": "6-1-I 一斉配信・予約完了",
-      "gap": "pending",
-      "gapNote": "画面 `/broadcasts/reserved` が development に無い。判定は未マージ枝 `51827fe1` で書かれたもの"
-    },
-    {
       "feature": 7,
       "node": "GC4St",
       "name": "7-1-H 実行結果",
@@ -2625,13 +2618,6 @@
       "name": "20-1-D 定期レポートをつくる",
       "gap": "api",
       "gapNote": "決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る"
-    },
-    {
-      "feature": 21,
-      "node": "ymXJK",
-      "name": "21-1-E コラムを書く",
-      "gap": "pending",
-      "gapNote": "画面 `/nen-campaigns/columns/new` が development に無い。判定は未マージ枝 `ed5c0932` で書かれたもの"
     },
     {
       "feature": 22,
