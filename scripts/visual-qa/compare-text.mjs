@@ -63,8 +63,33 @@ for (const s of SCREENS) {
   if (s.status === 'unimplemented') continue
   if (only !== null && s.feature !== only) continue
   const design = words(join(ROOT, 'docs', 'design-reference', s.dir, `${s.node}.txt`))
-  const impl = words(join(ROOT, 'docs', 'design-qa', s.dir, `${s.node}.txt`))
-  if (design && impl) pairs.push({ s, design, impl })
+
+  /*
+    **設計は状態を1枚にまとめて描く。実装は状態ごとに分かれる。**
+
+    `bzDn6` 友だち一覧の状態は、設計だと1枚の中に
+    「読み込んでいます」「表示できませんでした」「もう一度読み込む」が
+    並んでいる。実装は `-loading` `-error` `-empty` と別の絵になる。
+    素の1枚だけと比べると、**設計にある言葉が全部「実装に無い」と出て**、
+    本当の違いが埋もれる。状態を持つ画面は、実装側をまとめて見る。
+  */
+  const implFiles = [join(ROOT, 'docs', 'design-qa', s.dir, `${s.node}.txt`)]
+  for (const kind of s.states?.kinds ?? []) {
+    implFiles.push(join(ROOT, 'docs', 'design-qa', s.dir, `${s.node}-${kind}.txt`))
+  }
+  for (const variant of s.variants ?? []) {
+    const suffix = variant.suffix.startsWith('-') ? variant.suffix : `-${variant.suffix}`
+    implFiles.push(join(ROOT, 'docs', 'design-qa', s.dir, `${s.node}${suffix}.txt`))
+  }
+  const impl = new Set()
+  let found = false
+  for (const file of implFiles) {
+    const part = words(file)
+    if (!part) continue
+    found = true
+    for (const w of part) impl.add(w)
+  }
+  if (design && found) pairs.push({ s, design, impl })
 }
 
 /**
@@ -82,13 +107,59 @@ const implChrome = chromeOf('impl')
 
 let differing = 0
 for (const { s, design, impl } of pairs) {
-  const missing = [...design].filter((w) => !impl.has(w) && !designChrome.has(w))
-  const extra = [...impl].filter((w) => !design.has(w) && !implChrome.has(w))
-  if (missing.length === 0 && extra.length === 0) continue
+  /*
+    **空白の入り方だけの違いを、語の違いと混ぜない。**
+    `innerText` は行内要素の継ぎ目に空白を入れるので、
+    設計「相手から 12・自分から 5」が実装では「相手から 12 ・ 自分から 5」になる。
+    語としては同じなので、別立てにして数える。消しはしない。
+  */
+  const squash = (w) => w.replace(/\s+/g, '')
+  const implSquashed = new Map([...impl].map((w) => [squash(w), w]))
+  const designSquashed = new Set([...design].map(squash))
+
+  const missing = []
+  const spacing = []
+  for (const w of design) {
+    if (impl.has(w) || designChrome.has(w)) continue
+    const same = implSquashed.get(squash(w))
+    if (same) spacing.push(`${w} ／ 実装は ${same}`)
+    else missing.push(w)
+  }
+  const extra = [...impl].filter(
+    (w) => !design.has(w) && !implChrome.has(w) && !designSquashed.has(squash(w)),
+  )
+  if (missing.length === 0 && extra.length === 0 && spacing.length === 0) continue
   differing += 1
   console.log(`\n=== ${s.node} ${s.name} ===`)
   if (missing.length) console.log('  設計にあって実装に無い :', missing.join(' / '))
   if (extra.length) console.log('  実装にあって設計に無い :', extra.join(' / '))
+  if (spacing.length) console.log('  空白の入り方だけが違う :', spacing.join(' / '))
+}
+
+/*
+  **同じ語が何枚で欠けているかを出す。**
+  1枚ずつ見ていると「この画面だけの話」に見えるが、まとめると
+  「設計は12枚にCSV書き出しを置いているが実装は3枚だけ」のような、
+  機能をまたぐ話が見える。直す順番はこちらで決まる。
+*/
+if (process.argv.includes('--rollup')) {
+  const count = new Map()
+  for (const { s, design, impl } of pairs) {
+    // 空白の入り方だけの違いは、語の欠落ではない。まとめから外す。
+    const squashed = new Set([...impl].map((w) => w.replace(/\s+/g, '')))
+    for (const w of design) {
+      if (impl.has(w) || designChrome.has(w)) continue
+      if (squashed.has(w.replace(/\s+/g, ''))) continue
+      if (!count.has(w)) count.set(w, [])
+      count.get(w).push(s.node)
+    }
+  }
+  const rows = [...count].filter(([, nodes]) => nodes.length >= 3).sort((a, b) => b[1].length - a[1].length)
+  console.log('\n=== 設計にあって実装に無い語（3枚以上で欠けているもの） ===')
+  for (const [word, nodes] of rows) {
+    console.log(`  ${String(nodes.length).padStart(3)}枚  ${word}`)
+    console.log(`        ${nodes.join(' ')}`)
+  }
 }
 
 if (showChrome) {
