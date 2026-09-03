@@ -114,7 +114,9 @@ describe('V6 リマインダの公開版', () => {
       sourceEventId: 'booking:booking-1',
     })
 
-    const draft2 = await saveReminderDraftVersion(db, created.reminder.id, settings('明後日のご予約です'))
+    const nextSettings = settings('明後日のご予約です')
+    nextSettings.deliveryMode = 'countdown'
+    const draft2 = await saveReminderDraftVersion(db, created.reminder.id, nextSettings)
     expect(draft2.version_number).toBe(2)
     expect((await getReminderPublishedVersion(db, created.reminder.id))?.id).toBe(version1.id)
     expect(parseReminderVersionSettings(draft2).steps[0].messageContent).toBe('明後日のご予約です')
@@ -135,6 +137,8 @@ describe('V6 リマインダの公開版', () => {
     const pending = await getPendingReminderDeliveries(db)
     expect(pending.find((row) => row.id === first.id)?.steps[0].message_content).toBe('明日のご予約です')
     expect(pending.find((row) => row.id === second.id)?.steps[0].message_content).toBe('明後日のご予約です')
+    expect(pending.find((row) => row.id === first.id)?.delivery_mode).toBe('time')
+    expect(pending.find((row) => row.id === second.id)?.delivery_mode).toBe('countdown')
   })
 
   it('公開済みの設定・通知・状態を後戻りさせない', async () => {

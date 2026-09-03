@@ -790,7 +790,9 @@ export async function getPendingReminderDeliveries(
   // activeなリマインダ登録を取得
   // 配信方式（153）も一緒に引く。通ごとに引き直すと、通の数だけ問い合わせが増える。
   const activeReminders = await db
-    .prepare(`SELECT fr.*, r.delivery_mode AS delivery_mode, r.line_account_id AS line_account_id,
+    .prepare(`SELECT fr.*,
+                     COALESCE(json_extract(rv.settings_snapshot, '$.deliveryMode'), r.delivery_mode) AS delivery_mode,
+                     COALESCE(json_extract(rv.settings_snapshot, '$.lineAccountId'), r.line_account_id) AS line_account_id,
                      rv.settings_snapshot AS version_settings_snapshot
                 FROM friend_reminders fr
                 INNER JOIN reminders r ON r.id = fr.reminder_id
