@@ -1,3 +1,5 @@
+> **完了済みの引き継ぎ・経緯メモ(2026-09-03 に archive へ移動)。判断に使わない。** 現在の正本は `docs/v6-requirements/v6-requirements-master-index.md` と `docs/v6-common-rules.md`。
+
 # V6 機能15 登録メディア削除・影響確認の引き継ぎ
 
 対象Nodeは `YfTfJ`、画面は `/contents` です。この枝は確認窓を作らず、

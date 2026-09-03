@@ -1,3 +1,5 @@
+> **完了済みの引き継ぎ・経緯メモ(2026-09-03 に archive へ移動)。判断に使わない。** 現在の正本は `docs/v6-requirements/v6-requirements-master-index.md` と `docs/v6-common-rules.md`。
+
 # 検証環境で確かめること（リッチメニュー・自動応答・リマインダ）
 
 このファイルは、**人が実際に触らないと確かめられないもの**を並べたものです。

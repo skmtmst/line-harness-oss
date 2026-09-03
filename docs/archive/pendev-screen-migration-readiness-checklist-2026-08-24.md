@@ -1,3 +1,5 @@
+> **完了済みの引き継ぎ・経緯メモ(2026-09-03 に archive へ移動)。判断に使わない。** 現在の正本は `docs/v6-requirements/v6-requirements-master-index.md` と `docs/v6-common-rules.md`。
+
 # Pen.dev V5/V6 画面移行の準備状況と開始チェックリスト
 
 作成日: 2026-08-24

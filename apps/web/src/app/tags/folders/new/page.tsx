@@ -33,7 +33,7 @@ function FolderEditor() {
     editId ? 'loading' : 'ready',
   )
 
-  // 画面名は共通トップバーだけに置く（`docs/v6-shell-contract.md` §3）。
+  // 画面名は共通トップバーだけに置く（`docs/v6-common-rules.md` §1）。
   // 本文に大見出しを戻すと、上部バーと同じ文字が2つ並ぶ。
   usePageTitle(editId ? 'フォルダを編集' : 'フォルダを追加')
 

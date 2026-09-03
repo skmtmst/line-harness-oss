@@ -1,3 +1,5 @@
+> **完了済みの引き継ぎ・経緯メモ(2026-09-03 に archive へ移動)。判断に使わない。** 現在の正本は `docs/v6-requirements/v6-requirements-master-index.md` と `docs/v6-common-rules.md`。
+
 # Fork + Cloudflare 運用ガイド
 
 LINE Harness は、fork した repo を自分の本番環境として育てる運用を推奨します。

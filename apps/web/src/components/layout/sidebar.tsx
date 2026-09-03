@@ -406,7 +406,7 @@ export default function Sidebar({
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
-        ここに残すと二重に出る（`docs/v6-shell-contract.md` §8）。
+        ここに残すと二重に出る（`docs/v6-common-rules.md` §1）。
         枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
       */}
       <div className={styles.footer} />

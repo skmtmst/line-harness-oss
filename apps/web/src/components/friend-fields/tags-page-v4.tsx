@@ -659,7 +659,7 @@ export default function TagsPageV4({
     <div>
       {/*
         タイトルと説明は共通トップバーが持つ。本文には置かない
-        （docs/v6-shell-contract.md §2）。
+        （docs/v6-common-rules.md §1）。
         ヘッダー操作は独立した行にせず、タブ行の右端へ寄せる
         （docs/v6-common-rules.md §1-4、Pencil `aToSv` は space_between）。
       */}
