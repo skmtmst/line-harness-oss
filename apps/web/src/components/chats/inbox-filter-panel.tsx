@@ -186,7 +186,7 @@ export default function InboxFilterPanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-control bg-accent text-on-accent hover:bg-accent-hover px-5 py-2 text-sm font-bold"
+            className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-5 py-2 text-sm font-bold"
           >
             この条件で絞り込む
           </button>

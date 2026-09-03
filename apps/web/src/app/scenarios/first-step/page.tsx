@@ -571,7 +571,7 @@ function FirstStepContent() {
           type="button"
           onClick={() => void submit()}
           disabled={saving || bodyOverLimit}
-          className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+          className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
         >
           {saving ? '保存中…' : '作成して編集へ →'}
         </button>
@@ -615,7 +615,7 @@ function StepMark({
       <span
         className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-bold ${
           state === 'done'
-            ? 'bg-accent text-on-accent'
+            ? 'bg-accent-deep text-on-accent'
             : state === 'current'
               ? 'border-accent text-accent border-2'
               : 'border-hairline text-ink-faint border'

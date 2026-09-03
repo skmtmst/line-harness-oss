@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import { api, ApiError, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi, type InboxStats } from '@/lib/api'
 import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -97,18 +98,8 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'resolved', label: '対応済み' },
 ]
 
-type InboxSavedViewConditions = {
-  version: 1
-  query: string
-  channels: Array<'line' | 'email'>
-  statuses: Array<'unread' | 'in_progress' | 'on_hold' | 'resolved'>
-  assignees: string[]
-  unread: 'all' | 'mine'
-  messageTypes: string[]
-  receivedFrom: string | null
-  receivedTo: string | null
-  sort: 'newest' | 'waiting_desc'
-}
+import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
+import { savedViewSummary } from './saved-view-summary'
 
 type InboxSavedView = {
   id: string
@@ -120,7 +111,7 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
       LINE
     </span>
   ) : (
@@ -344,7 +335,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
             <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                 msg.direction === 'outgoing'
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : 'bg-canvas-sunken text-ink'
               }`}>
                 <div className="text-sm whitespace-pre-wrap break-words">{renderContent(msg)}</div>
@@ -378,7 +369,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
           <button
             onClick={handleSend}
             disabled={!message.trim() || sending}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
           >
             {sending ? '...' : '送信'}
           </button>
@@ -434,6 +425,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [savingView, setSavingView] = useState(false)
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  /*
+    保存した検索の要約で、担当者IDを名前にするための対応表。
+    **引けないときは名前を作らない**——`savedViewSummary` が人数で言う。
+  */
+  const operatorNames = useMemo(
+    () => new Map(operators.map((operator) => [operator.id, operator.name])),
+    [operators],
+  )
+
+  /*
+    担当者ごとの未読数（設計 `YZaDK`）。**画面に見えている行から数えない**——
+    一覧はページ送りされるので、2ページ目の未読が落ちる。
+    `null` は「まだ読めていない」。**実値0とは別。**
+  */
+  const [assigneeUnread, setAssigneeUnread] = useState<InboxStats['assigneeUnread'] | null>(null)
   /*
    * 友だち詳細を出すか。既定は閉じる。
    *
@@ -712,7 +718,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   const applySavedView = (view: InboxSavedView) => {
-    const conditions = view.conditions
+    /*
+      **形を確かめてから読む。** 受信箱より前に作られた行は
+      `{ all: [], any: [] }` の形で入っていて、`conditions.statuses.length` を
+      そのまま読むと受信箱ごと真っ白になる。
+    */
+    const conditions = normalizeSavedViewConditions(view.conditions)
     setNameQuery(conditions.query ?? '')
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
@@ -1064,6 +1075,38 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    /*
+      **アカウントを切り替えたら、前の集計をその場で捨てる。**
+      読み終わるまで残すと、別のアカウントの未読数を見たまま担当者を選ぶ。
+    */
+    setAssigneeUnread(null)
+    ;(async () => {
+      try {
+        /*
+          この口はアカウント引数を取らない（担当者の見える範囲で絞る作り）。
+          **新しい契約は足さない。** 切り替えのたびに読み直して、
+          前のアカウントの数を残さないことだけを守る。
+        */
+        const res = await api.chatStats.get()
+        if (cancelled) return
+        /* 失敗の返事を成功として読まない。`—` のままにする。 */
+        if (!res.success) throw new Error('failed')
+        setAssigneeUnread(res.data.assigneeUnread)
+      } catch {
+        /*
+          **集計の失敗を0件と扱わない。** `null` のままにして数だけ `—` にする。
+          担当者一覧そのものは `/api/operators` の結果を保つ。
+        */
+        if (!cancelled) setAssigneeUnread(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId])
+
   const handleStatusUpdate = async (newStatus: Chat['status']) => {
     if (!selectedChatId || !chatDetail) return
     try {
@@ -1228,6 +1271,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       title={view.name}
                     >
                       {view.name}{view.isShared ? '（共有）' : ''}
+                      {/*
+                        **名前の下に、何で絞ったかを出す。**
+                        設計 `ASsb3` は「対応マーク：未対応／期限：超過」のように書く。
+                        名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
+                        どちらを押せばいいのかが、名前の付け方頼みになる。
+                      */}
+                      <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal">
+                        {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -1327,12 +1379,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
               <span className="shrink-0">担当者</span>
               <span className="min-w-0 flex-1">
+                {/*
+                  未読数は集計の口から渡す。**画面に見えている行から数えない**
+                  ——一覧はページ送りされるので、2ページ目の未読が落ちる。
+                  0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
+                */}
                 <OperatorDropdown
                   value={assigneeFilter}
                   operators={operators}
                   onChange={setAssigneeFilter}
                   label="担当者"
                   ariaLabel="担当者で絞り込む"
+                  unreadOf={unreadLookup(assigneeUnread)}
                 />
               </span>
             </label>
@@ -2152,7 +2210,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <button
                     onClick={handleSendMessage}
                     disabled={sending || (!messageContent.trim() && !pendingImage)}
-                    className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {sending ? '送信中...' : '送信'}
                   </button>

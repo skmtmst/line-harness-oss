@@ -302,7 +302,7 @@ export default function NewCommonVarPage() {
         <button
           onClick={() => void save()}
           disabled={saving}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
         >
           {saving ? '登録中...' : '登録'}
         </button>
