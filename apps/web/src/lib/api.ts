@@ -226,6 +226,131 @@ export type AffiliateOffer = {
   createdAt: string
 }
 
+export type OperationCapability =
+  | 'broadcast_dispatch'
+  | 'scenario_dispatch'
+  | 'reminder_dispatch'
+  | 'automation_actions'
+  | 'auto_reply_dispatch'
+  | 'webhook_outgoing'
+  | 'ad_postback'
+
+export type OperationImpactMetric = {
+  itemCount: number
+  friendCount: number | null
+  pendingCount?: number
+  nearestScheduledAt?: string | null
+}
+
+export type OperationImpactPreview = Record<
+  Extract<OperationCapability,
+    | 'broadcast_dispatch'
+    | 'scenario_dispatch'
+    | 'reminder_dispatch'
+    | 'automation_actions'
+    | 'auto_reply_dispatch'>,
+  OperationImpactMetric
+>
+
+export type OperationControl = {
+  scopeKey: string
+  lineAccountId: string | null
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  updatedAt: string | null
+}
+
+export type OperationIncident = {
+  id: string
+  scopeKey: string
+  lineAccountId: string | null
+  status: 'preparing' | 'stopped' | 'resolved' | 'failed'
+  capabilities: OperationCapability[]
+  reason: string
+  detail: string | null
+  actorId: string
+  resolvedByActorId: string | null
+  controlVersion: number | null
+  errorMessage: string | null
+  stoppedAt: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
+  targetCounts?: {
+    held: number
+    skippedDueToEmergency: number
+    inFlight: number
+    failed: number
+  }
+}
+
+export type OperationTargetResult = {
+  id: string
+  incidentId: string
+  lineAccountId: string | null
+  capability: OperationCapability
+  targetType: string
+  targetId: string
+  result: 'held' | 'skipped_due_to_emergency' | 'in_flight' | 'failed'
+  reason: string | null
+  occurredAt: string
+}
+
+export type OperationRestorePreview = {
+  incidentId: string
+  controlVersion: number
+  blockers: Partial<Record<OperationCapability, number>>
+  definitions: {
+    available: boolean
+    error: string | null
+    drift: Array<{
+      key: string
+      capability: OperationCapability
+      kind: string
+      id: string
+      name: string
+      change: 'deleted' | 'disabled' | 'edited' | 'enabled' | 'added'
+    }>
+    previewHash: string | null
+  }
+  canRestore: boolean
+  calculatedAt: string
+}
+
+export type OperationHealthResult = {
+  checkKey: 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
+  severity: 'normal' | 'warning' | 'danger' | 'unknown'
+  detail: string
+  metrics: Record<string, unknown>
+  checkedAt: string
+}
+
+export type OperationHealthSnapshot = {
+  runId: string
+  status: 'completed' | 'failed'
+  checkedAt: string
+  isStale: boolean
+  results: OperationHealthResult[]
+}
+
+export type OperationHealthAlert = {
+  id: string
+  checkKey: OperationHealthResult['checkKey']
+  status: 'open' | 'acknowledged' | 'resolved'
+  severity: 'warning' | 'danger'
+  detail: string
+  firstDetectedAt: string
+  lastDetectedAt: string
+  acknowledgedBy: string | null
+  acknowledgedAt: string | null
+  resolvedAt: string | null
+  updatedAt: string
+}
+
 /** Approval queue row as returned by /api/conversions/approvals */
 export type ConversionApprovalItem = {
   eventId: string
@@ -1560,6 +1685,19 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 }
 
 export const api = {
+  auth: {
+    stepUp: (data: {
+      code: string
+      purpose: 'operation-stop' | 'operation-restore'
+    }) => fetchApi<ApiResponse<{
+      stepUpToken: string
+      purpose: 'operation-stop' | 'operation-restore'
+      expiresAt: string
+    }>>('/api/auth/step-up', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  },
   system: {
     health: () =>
       fetchApi<ApiResponse<{ status: 'ok' }>>('/api/health'),
@@ -4243,7 +4381,12 @@ export const api = {
     accounts: () =>
       fetchApi<ApiResponse<LineAccount[]>>('/api/line-accounts'),
     getHealth: (accountId: string) =>
-      fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
+      fetchApi<ApiResponse<{
+        riskLevel: string | null
+        lastCheckedAt: string | null
+        isStale: boolean
+        logs: AccountHealthLog[]
+      }>>(
         `/api/accounts/${accountId}/health`,
       ),
     migrations: () =>
@@ -4255,6 +4398,80 @@ export const api = {
       }),
     getMigration: (migrationId: string) =>
       fetchApi<ApiResponse<AccountMigration>>(`/api/accounts/migrations/${migrationId}`),
+  },
+  operations: {
+    health: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>('/api/operations/health'),
+    runHealthCheck: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>(
+      '/api/operations/health/runs', { method: 'POST' },
+    ),
+    alerts: (includeResolved = false) => fetchApi<ApiResponse<OperationHealthAlert[]>>(
+      `/api/operations/alerts${includeResolved ? '?include_resolved=1' : ''}`,
+    ),
+    acknowledgeAlert: (alertId: string) => fetchApi<ApiResponse<OperationHealthAlert>>(
+      `/api/operations/alerts/${encodeURIComponent(alertId)}/ack`, { method: 'POST' },
+    ),
+    control: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<OperationControl>>(`/api/operations/control${query}`)
+    },
+    preview: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<{
+        control: OperationControl
+        counts: Partial<Record<OperationCapability, number>>
+        impact: OperationImpactPreview
+        permissions: { canControl: boolean }
+        calculatedAt: string
+      }>>(`/api/operations/control/preview${query}`)
+    },
+    stop: (data: {
+      lineAccountId: string | null
+      capabilities: OperationCapability[]
+      reason: string
+      detail?: string
+      expectedVersion: number
+      confirmation: '停止'
+    }, stepUpToken: string) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      '/api/operations/incidents',
+      {
+        method: 'POST',
+        headers: {
+          'X-Confirm-Irreversible': 'operation-stop',
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify(data),
+      },
+    ),
+    restore: (
+      incidentId: string,
+      data: { expectedVersion: number; confirmation: '復旧'; previewHash: string },
+      stepUpToken: string,
+    ) =>
+      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+        `/api/operations/incidents/${incidentId}/restore`,
+        {
+          method: 'POST',
+          headers: {
+            'X-Confirm-Irreversible': 'operation-restore',
+            'X-Step-Up-Token': stepUpToken,
+            'Idempotency-Key': crypto.randomUUID(),
+          },
+          body: JSON.stringify(data),
+        },
+      ),
+    restorePreview: (incidentId: string) =>
+      fetchApi<ApiResponse<OperationRestorePreview>>(
+        `/api/operations/incidents/${incidentId}/restore-preview`,
+        { method: 'POST' },
+      ),
+    history: (limit = 100) => fetchApi<ApiResponse<OperationIncident[]>>(
+      `/api/operations/history?limit=${encodeURIComponent(String(limit))}`,
+    ),
+    incident: (incidentId: string) => fetchApi<ApiResponse<{
+      incident: OperationIncident
+      targetResults: OperationTargetResult[]
+    }>>(`/api/operations/incidents/${encodeURIComponent(incidentId)}`),
   },
   staff: {
     list: () =>
