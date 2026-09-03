@@ -121,7 +121,7 @@ export default function BlockEditor({
     >
       <div className="mb-3 flex items-start gap-3">
         <div className="shrink-0 text-center">
-          <span className="bg-accent text-on-accent rounded-control inline-block px-2 py-0.5 text-xs font-bold tabular-nums">
+          <span className="bg-accent-deep text-on-accent rounded-control inline-block px-2 py-0.5 text-xs font-bold tabular-nums">
             {index + 1}
           </span>
           <span className="text-ink-faint mt-1 block text-[11px] leading-tight whitespace-nowrap">
