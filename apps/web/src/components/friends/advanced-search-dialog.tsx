@@ -264,7 +264,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
-            <span className="bg-accent text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
+            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
               AND
             </span>
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
