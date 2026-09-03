@@ -30,6 +30,7 @@ import { processDueAutomationRuns } from './services/automation-engine.js';
 import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
 import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
+import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -1112,6 +1113,19 @@ async function runFrequentHeavyJobs(
           executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
         });
         if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
+      },
+    },
+    {
+      name: 'mileage reward delivery retry',
+      run: async () => {
+        const result = await processDueMileageRewardDeliveries(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+          limit: 50,
+        });
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'mileage_reward_delivery_retry', ...result }));
+        }
       },
     },
     {
