@@ -286,7 +286,7 @@ export default function BookingsPage() {
           </Link>
           <Link
             href="/booking/bookings/new"
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
           >
             電話の予約を入れる
           </Link>
@@ -400,7 +400,7 @@ export default function BookingsPage() {
                 onClick={() => setTab(key)}
                 className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
                   tab === key
-                    ? 'bg-accent text-on-accent'
+                    ? 'bg-accent-deep text-on-accent'
                     : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
                 }`}
               >
@@ -412,7 +412,7 @@ export default function BookingsPage() {
               onClick={() => setRange(range === 'today' ? 'all' : 'today')}
               className={`rounded-pill px-3 py-1 text-xs font-medium ${
                 range === 'today'
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
               }`}
             >
@@ -422,7 +422,7 @@ export default function BookingsPage() {
               onClick={() => setRange(range === 'week' ? 'all' : 'week')}
               className={`rounded-pill px-3 py-1 text-xs font-medium ${
                 range === 'week'
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
               }`}
             >
@@ -532,7 +532,7 @@ export default function BookingsPage() {
                 <button
                   type="button"
                   onClick={() => copyUrl(shareUrl)}
-                  className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+                  className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
                 >
                   {copied ? 'コピー済' : 'コピー'}
                 </button>
@@ -631,7 +631,7 @@ function FolderRow({
     <button
       onClick={onClick}
       className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
-        active ? 'bg-accent text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+        active ? 'bg-accent-deep text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
       }`}
     >
       <span className="truncate">{label}</span>
@@ -765,7 +765,7 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('approve')}
-          className="rounded-control bg-accent text-on-accent hover:bg-accent-hover px-3 py-1 text-xs font-medium transition-colors"
+          className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-3 py-1 text-xs font-medium transition-colors"
         >
           承認
         </button>

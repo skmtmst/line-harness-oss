@@ -61,7 +61,7 @@ export function AccountSwitchDialog({
       <p className="mt-4 text-xs leading-5 text-ink-secondary">移動すると、ダッシュボードや友だち・配信などの表示対象がこのLINE公式アカウントに切り替わります。</p>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onClose} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink hover:bg-canvas-sunken">キャンセル</button>
-        <button type="button" onClick={onConfirm} className="rounded-control bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover">このアカウントへ移動</button>
+        <button type="button" onClick={onConfirm} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-semibold text-on-accent hover:brightness-92">このアカウントへ移動</button>
       </div>
     </div>
   </div>
