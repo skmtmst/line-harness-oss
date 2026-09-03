@@ -13,6 +13,7 @@ import {
 
 const CONFIG_PATH = 'apps/worker/wrangler.staging.toml';
 const SESSION_TTL_MINUTES = 15;
+const D1_MAX_ATTEMPTS = 3;
 const DEFAULT_TENANT_ID = '00000000-0000-4000-8000-000000000001';
 
 type D1Envelope<T> = {
@@ -68,23 +69,41 @@ export function readVerificationTarget(config: string): VerificationTarget {
 
 export function createD1Query(target: VerificationTarget, apiToken: string): QueryD1 {
   return async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(target.accountId)}/d1/database/${encodeURIComponent(target.databaseId)}/query`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sql, params }),
-      },
-    );
-    const body = await response.json() as D1Envelope<T>;
-    const result = body.result?.[0];
-    if (!response.ok || !body.success || !result?.success) {
-      throw new Error('Staging D1 query failed');
+    for (let attempt = 1; attempt <= D1_MAX_ATTEMPTS; attempt++) {
+      let response: Response | null = null;
+      try {
+        response = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(target.accountId)}/d1/database/${encodeURIComponent(target.databaseId)}/query`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sql, params }),
+          },
+        );
+      } catch {
+        // Network details are intentionally not forwarded to logs.
+      }
+      let body: D1Envelope<T> | null = null;
+      if (response) {
+        try {
+          body = await response.json() as D1Envelope<T>;
+        } catch {
+          // A provider error page is not forwarded to logs. It is safe to retry
+          // because every verification mutation is idempotent.
+        }
+      }
+      const result = body?.result?.[0];
+      if (response?.ok && body?.success && result?.success) {
+        return result.results ?? [];
+      }
+      if (attempt < D1_MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (2 ** (attempt - 1))));
+      }
     }
-    return result.results ?? [];
+    throw new Error(`Staging D1 query failed after ${D1_MAX_ATTEMPTS} attempts`);
   };
 }
 
@@ -118,7 +137,7 @@ async function insertSyntheticDeliveryRows(
   dueAt: string,
 ): Promise<void> {
   await query(
-    `INSERT INTO scenarios
+    `INSERT OR IGNORE INTO scenarios
        (id, name, description, trigger_type, is_active, delivery_mode, line_account_id, created_at, updated_at)
      VALUES (?, ?, ?, 'manual', 1, 'relative', ?, ?, ?)`,
     [`verify-b88-scenario-${runId}`, 'staging verification', 'synthetic; no message steps', lineAccountId, now, now],
@@ -126,13 +145,13 @@ async function insertSyntheticDeliveryRows(
   for (let index = 0; index < 41; index++) {
     const suffix = String(index).padStart(2, '0');
     await query(
-      `INSERT INTO friends
+      `INSERT OR IGNORE INTO friends
          (id, line_user_id, display_name, is_following, line_account_id, created_at, updated_at)
        VALUES (?, ?, 'staging verification', 1, ?, ?, ?)`,
       [`verify-b88-friend-${runId}-${suffix}`, `verify-b88-line-${runId}-${suffix}`, lineAccountId, now, now],
     );
     await query(
-      `INSERT INTO friend_scenarios
+      `INSERT OR IGNORE INTO friend_scenarios
          (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, updated_at)
        VALUES (?, ?, ?, -1, 'active', ?, ?, ?)`,
       [
@@ -166,10 +185,32 @@ async function main(): Promise<void> {
 
   let notificationRuleId: string | null = null;
   let apiDeletedRule = false;
-  let cleanupFailures = 0;
+  const cleanupFailures: string[] = [];
   let report: Record<string, unknown> | null = null;
+  let verificationError: unknown = null;
 
   try {
+    // A previously interrupted run can leave only synthetic records. The
+    // concurrency key prevents another verification from running in parallel.
+    // Expired admin sessions are already unusable and are normal housekeeping.
+    await query(
+      `DELETE FROM notification_rules
+       WHERE name = 'staging verification'
+         AND event_type = 'staging_verification'
+         AND conditions = '{"synthetic":true}'
+         AND is_active = 0`,
+    );
+    await query(
+      `DELETE FROM friend_scenarios WHERE scenario_id LIKE 'verify-b88-scenario-%'`,
+    );
+    await query(
+      `DELETE FROM scenarios WHERE id LIKE 'verify-b88-scenario-%'`,
+    );
+    await query(
+      `DELETE FROM friends WHERE line_user_id LIKE 'verify-b88-line-%'`,
+    );
+    await query('DELETE FROM admin_sessions WHERE expires_at <= ?', [new Date().toISOString()]);
+
     const timestampRows = await query<ScenarioDeliveryTimestampRow>(
       `SELECT id, next_delivery_at FROM friend_scenarios
        WHERE next_delivery_at IS NOT NULL ORDER BY id`,
@@ -233,7 +274,7 @@ async function main(): Promise<void> {
     if (secondBatch.length !== 1) throw new Error(`Expected second batch 1; found ${secondBatch.length}`);
 
     await query(
-      'INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
+      'INSERT OR IGNORE INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
       [sessionHash, verificationTarget.staff_id, expiresAt],
     );
     const created = await notificationRequest<{ id: string }>(
@@ -286,46 +327,58 @@ async function main(): Promise<void> {
       notificationRuleDeleted: true,
       legacyUnscopedNotificationRules: legacyUnscopedRules,
       temporarySessionTtlMinutes: SESSION_TTL_MINUTES,
+      staleVerificationCleanupCompleted: true,
       lineMessagesSent: 0,
     };
+  } catch (error) {
+    verificationError = error;
   } finally {
-    const cleanups: Array<() => Promise<unknown>> = [
-      () => notificationRuleId
+    const cleanups: Array<{ name: string; run: () => Promise<unknown> }> = [
+      { name: 'notification-rule', run: () => notificationRuleId
         ? query('DELETE FROM notification_rules WHERE id = ?', [notificationRuleId])
-        : Promise.resolve(),
-      () => query('DELETE FROM admin_sessions WHERE token_hash = ?', [sessionHash]),
-      () => query('DELETE FROM friend_scenarios WHERE scenario_id = ?', [`verify-b88-scenario-${runId}`]),
-      () => query('DELETE FROM scenarios WHERE id = ?', [`verify-b88-scenario-${runId}`]),
-      () => query('DELETE FROM friends WHERE line_user_id LIKE ?', [`verify-b88-line-${runId}-%`]),
+        : Promise.resolve() },
+      { name: 'admin-session', run: () => query('DELETE FROM admin_sessions WHERE token_hash = ?', [sessionHash]) },
+      { name: 'enrollments', run: () => query('DELETE FROM friend_scenarios WHERE scenario_id = ?', [`verify-b88-scenario-${runId}`]) },
+      { name: 'scenario', run: () => query('DELETE FROM scenarios WHERE id = ?', [`verify-b88-scenario-${runId}`]) },
+      { name: 'friends', run: () => query('DELETE FROM friends WHERE line_user_id LIKE ?', [`verify-b88-line-${runId}-%`]) },
     ];
     for (const cleanup of cleanups) {
       try {
-        await cleanup();
+        await cleanup.run();
       } catch {
-        cleanupFailures++;
+        cleanupFailures.push(cleanup.name);
       }
     }
   }
 
-  if (cleanupFailures !== 0) throw new Error(`Staging cleanup failed ${cleanupFailures} time(s)`);
+  let leftoverCount = -1;
+  try {
+    const leftovers = await query<{ count: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM admin_sessions WHERE token_hash = ?) +
+         (SELECT COUNT(*) FROM scenarios WHERE id = ?) +
+         (SELECT COUNT(*) FROM friends WHERE line_user_id LIKE ?) +
+         (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id = ?) +
+         (SELECT COUNT(*) FROM notification_rules WHERE id = ?) AS count`,
+      [
+        sessionHash,
+        `verify-b88-scenario-${runId}`,
+        `verify-b88-line-${runId}-%`,
+        `verify-b88-scenario-${runId}`,
+        notificationRuleId,
+      ],
+    );
+    leftoverCount = Number(leftovers[0]?.count ?? 0);
+  } catch {
+    cleanupFailures.push('leftover-check');
+  }
+  if (cleanupFailures.length !== 0 || leftoverCount !== 0) {
+    throw new Error(
+      `Staging cleanup incomplete: stages=${cleanupFailures.join(',') || 'none'}, leftovers=${leftoverCount}`,
+    );
+  }
+  if (verificationError) throw verificationError;
   if (!apiDeletedRule) throw new Error('Notification rule was not deleted through the API');
-  const leftovers = await query<{ count: number }>(
-    `SELECT
-       (SELECT COUNT(*) FROM admin_sessions WHERE token_hash = ?) +
-       (SELECT COUNT(*) FROM scenarios WHERE id = ?) +
-       (SELECT COUNT(*) FROM friends WHERE line_user_id LIKE ?) +
-       (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id = ?) +
-       (SELECT COUNT(*) FROM notification_rules WHERE id = ?) AS count`,
-    [
-      sessionHash,
-      `verify-b88-scenario-${runId}`,
-      `verify-b88-line-${runId}-%`,
-      `verify-b88-scenario-${runId}`,
-      notificationRuleId,
-    ],
-  );
-  const leftoverCount = Number(leftovers[0]?.count ?? 0);
-  if (leftoverCount !== 0) throw new Error(`Expected 0 verification leftovers; found ${leftoverCount}`);
   console.log(JSON.stringify({ ...report, temporarySessionDeleted: true, verificationRowsDeleted: true }));
 }
 
