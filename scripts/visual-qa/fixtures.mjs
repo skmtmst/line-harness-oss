@@ -1022,6 +1022,22 @@ export const TEMPLATES = (() => {
  * すでにある名前を打ったときの絵なので、既存が0件だと「保存しました」に
  * なってしまう。実際そうなった。
  */
+/*
+  保存した検索（設計 `ASsb3` 2-13）。
+
+  **3件とも古い形にしない。** 保存した検索の仕組みは受信箱より前からあり、
+  古い行は `{ all: [], any: [] }` の形で入っている。3件ともそれにすると
+  **受信箱がいま保存する形を一度も通らず**、条件の要約が出る道が撮れない。
+  逆に3件とも新しい形にすると、**古い行を開くと落ちる**という起きた不具合を
+  二度と踏めなくなる。**2件を新しい形、1件を古い形のまま残す。**
+*/
+const SAVED_VIEW_CONDITIONS = [
+  { query: '', channels: ['line'], statuses: ['unread', 'on_hold'], assignees: [], unread: 'all', messageTypes: [], receivedFrom: null, receivedTo: null },
+  { query: '', channels: [], statuses: ['unread'], assignees: ['unassigned'], unread: 'all', messageTypes: [], receivedFrom: null, receivedTo: null },
+  /** 受信箱より前に作られた行。**画面はこれを「すべての会話」として扱う。** */
+  { all: [], any: [] },
+]
+
 export const INBOX_SAVED_VIEWS = [
   ['VIPかつ未契約', true],
   ['未対応・担当なし', true],
@@ -1030,7 +1046,7 @@ export const INBOX_SAVED_VIEWS = [
   id: `inbox-view-${index}`,
   name: String(name),
   scope: 'chats',
-  conditions: { all: [], any: [] },
+  conditions: SAVED_VIEW_CONDITIONS[index],
   createdBy: 'Kenta',
   lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
