@@ -72,7 +72,7 @@ export async function enrollByTrigger(
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id
          FROM reminders
-        WHERE is_active = 1 AND trigger_type = ?`,
+        WHERE is_active = 1 AND deleted_at IS NULL AND trigger_type = ?`,
     )
     .bind(input.triggerType)
     .all<ReminderTriggerRow>();
