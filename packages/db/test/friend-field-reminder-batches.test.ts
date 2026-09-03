@@ -55,7 +55,7 @@ describe('友だち情報欄リマインダの分割走査', () => {
   afterEach(() => sqlite.close());
 
   it('保存した友だちIDの続きから、指定件数だけ読む', async () => {
-    const first = await getFriendsWithFieldValuePage(db, 'field-birthday', null, 10);
+    const first = await getFriendsWithFieldValuePage(db, 'field-birthday', 'account-1', null, 10);
     expect(first).toHaveLength(10);
     expect(first[0]?.friend_id).toBe('friend-001');
     expect(first.at(-1)?.friend_id).toBe('friend-010');
@@ -67,11 +67,35 @@ describe('友だち情報欄リマインダの分割走査', () => {
     const second = await getFriendsWithFieldValuePage(
       db,
       'field-birthday',
+      'account-1',
       reminders[0]?.scan_cursor ?? null,
       10,
     );
     expect(second[0]?.friend_id).toBe('friend-011');
     expect(second.at(-1)?.friend_id).toBe('friend-020');
+  });
+
+  it('共通の情報欄でも選択したLINEアカウントの友だちだけを読む', async () => {
+    sqlite.exec(`
+      INSERT INTO line_accounts
+        (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-2', 'channel-2', '支店', 'token-2', 'secret-2');
+      INSERT INTO friends (id, line_user_id, line_account_id)
+      VALUES ('friend-other', 'U999', 'account-2');
+      INSERT INTO friend_field_values (friend_id, field_id, value)
+      VALUES ('friend-other', 'field-birthday', '1990-05-03');
+    `);
+
+    const friends = await getFriendsWithFieldValuePage(
+      db,
+      'field-birthday',
+      'account-1',
+      null,
+      100,
+    );
+
+    expect(friends).toHaveLength(35);
+    expect(friends.some((friend) => friend.friend_id === 'friend-other')).toBe(false);
   });
 
   it('30件を超える候補もbind上限内で登録し、同じ候補の再実行では増やさない', async () => {

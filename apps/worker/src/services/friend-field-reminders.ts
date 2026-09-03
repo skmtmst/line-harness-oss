@@ -51,6 +51,7 @@ export async function processFriendFieldReminders(
       const friends = await getFriendsWithFieldValuePage(
         db,
         reminder.trigger_field_id,
+        reminder.line_account_id,
         reminder.scan_cursor,
         limit,
       );

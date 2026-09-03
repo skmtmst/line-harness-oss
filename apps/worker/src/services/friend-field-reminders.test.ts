@@ -157,11 +157,17 @@ describe('processFriendFieldReminders', () => {
 describe('分割と再開', () => {
   it('4,000人の走査枠を複数リマインダへ均等に割り当てる', async () => {
     getFriendFieldReminders.mockResolvedValue([
-      reminder({ id: 'rem-a', trigger_field_id: 'field-a' }),
-      reminder({ id: 'rem-b', trigger_field_id: 'field-b' }),
+      reminder({ id: 'rem-a', trigger_field_id: 'field-a', line_account_id: 'account-a' }),
+      reminder({ id: 'rem-b', trigger_field_id: 'field-b', line_account_id: 'account-b' }),
     ]);
     getFriendsWithFieldValuePage.mockImplementation(
-      async (_db: D1Database, fieldId: string, _after: string | null, limit: number) => (
+      async (
+        _db: D1Database,
+        fieldId: string,
+        _lineAccountId: string | null,
+        _after: string | null,
+        limit: number,
+      ) => (
         Array.from({ length: limit }, (_, index) => ({
           friend_id: `${fieldId}-friend-${index + 1}`,
           value: '1990-05-03',
@@ -173,10 +179,10 @@ describe('分割と再開', () => {
 
     expect(result).toEqual({ enrolled: 4_000, skipped: 0, scanned: 4_000, hasMore: true });
     expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
-      1, db, 'field-a', null, 2_000,
+      1, db, 'field-a', 'account-a', null, 2_000,
     );
     expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
-      2, db, 'field-b', null, 2_000,
+      2, db, 'field-b', 'account-b', null, 2_000,
     );
   });
 
@@ -188,7 +194,13 @@ describe('分割と再開', () => {
     let cursor: string | null = null;
     getFriendFieldReminders.mockImplementation(async () => [reminder({ scan_cursor: cursor })]);
     getFriendsWithFieldValuePage.mockImplementation(
-      async (_db: D1Database, _fieldId: string, after: string | null, limit: number) => {
+      async (
+        _db: D1Database,
+        _fieldId: string,
+        _lineAccountId: string | null,
+        after: string | null,
+        limit: number,
+      ) => {
         const start = after === null
           ? 0
           : friends.findIndex((friend) => friend.friend_id === after) + 1;
@@ -210,6 +222,7 @@ describe('分割と再開', () => {
       2,
       db,
       'field-birthday',
+      null,
       'f-04000',
       4_000,
     );

@@ -1238,6 +1238,7 @@ export async function getFriendFieldReminders(
 export async function getFriendsWithFieldValuePage(
   db: D1Database,
   fieldId: string,
+  lineAccountId: string | null,
   afterFriendId: string | null,
   limit: number,
 ): Promise<Array<{ friend_id: string; value: string }>> {
@@ -1250,11 +1251,12 @@ export async function getFriendsWithFieldValuePage(
         WHERE v.field_id = ?
           AND v.value IS NOT NULL AND v.value != ''
           AND f.is_following = 1
+          AND (? IS NULL OR f.line_account_id = ?)
           AND (? IS NULL OR v.friend_id > ?)
         ORDER BY v.friend_id ASC
         LIMIT ?`,
     )
-    .bind(fieldId, afterFriendId, afterFriendId, limit)
+    .bind(fieldId, lineAccountId, lineAccountId, afterFriendId, afterFriendId, limit)
     .all<{ friend_id: string; value: string }>();
   return rows.results ?? [];
 }
