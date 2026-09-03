@@ -42,6 +42,15 @@
 - 文書変更などDB更新・配備が不要なタスクでは不要な工程を実行しないでください。本番統合・本番配備はこの自動フローに含めません。
 - `GitHub PR Slack Sync` は参考チェックです。失敗をActionsの警告として残して再照合しますが、PRの統合を止める必須ゲートにはしません。
 
+## Claude / Codex のファイル所有
+
+| 担当 | 所有する領域 |
+| --- | --- |
+| Claude | `docs/v6-requirements/`、`scripts/visual-qa/`、`docs/design-qa/`、`docs/design-reference/`、`apps/web/src/components/shared/`、Pencil |
+| Codex | `apps/worker/src/routes/`、`apps/worker/src/services/`、`packages/db/`、`.github/`、`apps/web/src/lib/api.ts` の分割 |
+
+- 相手の所有領域を変更するときは、作業前にSlackの対象スレッドで宣言してください。
+
 ## `codex/development` 同時更新防止ゲート
 
 - `codex/development` への直接コミット・直接pushは禁止し、専用ブランチからのPull Requestだけで更新してください。
@@ -68,7 +77,9 @@
 
 ## 反映履歴に必ず1行足す（毎回）
 
-- **PRを出すときは必ず `docs/release-log/unreleased.md` に1行足してください。** 例外はありません。
+- **PRを出すときは必ず `docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md` を1ファイル作ってください。** 例外はありません。
+- PR作成前はPR番号を省いた仮のファイル名で構いません。採番後にファイル名と本文へPR番号を足してpushしてください。
+- 既存の `docs/release-log/unreleased.md` は残しますが、新しい行は追加しないでください。
 - 書く場所は `## 追加` / `## 変更` / `## 修正` のどれか。この3つ以外の見出しは作らないでください。
 - 行の形は `- 内容 @担当 #PR番号 YYYY-MM-DD HH:MM`。順番は問わず、どれも省略できます。
   - `@担当` は `kenta` / `masato` のように書きます
@@ -79,7 +90,7 @@
   - 良い例: `予約した絞り込み配信が全員に届いていたのを直した`
 - 中身は管理画面の **運用状態 → 更新履歴 → 変更内容** にそのまま出ます。読む人は画面を触っている人です。
 - 書き方の詳細は `docs/release-log/README.md`、設計の背景は `docs/change-log-design.md` にあります。
-- リリース時は `unreleased.md` を `<version>.md` に改名し、`released: YYYY-MM-DD` を入れ、空の `unreleased.md` を作り直してください。
+- リリース時は `docs/release-log/unreleased/` の各PRファイルを、`docs/release-log/README.md` の手順でバージョン別の履歴へまとめてください。
 
 ## 管理画面のデザイン設計ルール
 
