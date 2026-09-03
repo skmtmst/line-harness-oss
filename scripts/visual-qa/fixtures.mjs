@@ -1876,3 +1876,78 @@ export const EVENT_BOOKINGS = [
   { /* キャンセル待ち。全部が確定だと、その札が撮れない。 */ id: 'eb-4', event_id: 'ev-1', friend_id: 'friend-4', friend_name: '中村 彩', status: 'waitlist', companion_count: 1, companion_note: 'ぷりんちゃん（うさぎ・3歳）', is_first_time: 1, created_at: '2026-09-02T01:00:00.000Z' },
   { /* 取り消した1件。 */ id: 'eb-5', event_id: 'ev-1', friend_id: 'friend-5', friend_name: '石田 未来', status: 'cancelled', companion_count: 1, companion_note: 'レオくん（犬・1歳）', is_first_time: 0, created_at: '2026-09-01T05:00:00.000Z' },
 ]
+
+/*
+  写真審査。設計 `Qu6Vk` の格子。
+
+  **状態を4つとも混ぜる。** 設計の札は 審査待ち／通したもの／戻したもの／すべて。
+  全部が審査待ちだと、残り3つの札が撮れない。
+  戻したものには**理由**を入れる（`N2J629`「写真を戻す理由をえらぶ」の元）。
+  `image_url` は作り物の SVG。外の絵を読みに行かないので、撮るたびに同じになる。
+*/
+const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = null) => ({
+  id, owner_name: owner, pet_name: pet, caption,
+  image_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="%23eef6f0"/></svg>',
+  status,
+  created_at: new Date(Date.parse('2026-08-25T09:00:00.000Z') - hours * 3600 * 1000).toISOString(),
+  publication_consent_at: '2026-08-20T00:00:00.000Z',
+  publication_withdrawn_at: null,
+  review_reason_code: reason, review_reason_note: note,
+  review_notification_status: status === 'rejected' ? 'sent' : null,
+})
+
+/*
+  **名前に「ちゃん」を入れない。** 画面が `{pet_name}ちゃん` と後ろに付けるので、
+  ここにも入れると「ももちゃんちゃん」になる。
+  なお設計 `Qu6Vk` は「そらくん」「レオくん」と**子によって呼び方を変えている**が、
+  実装は全員に「ちゃん」を付ける。呼び方は画面ではなく飼い主が決めるものなので、
+  そこは別に直す（板 #739 の判定に書いた）。
+*/
+export const NEN_PHOTOS = [
+  petPhoto('ph-1', '高橋 直人', 'もも', '朝のおさんぽ', 'pending', 48),
+  petPhoto('ph-2', '前田 さくら', 'そら', 'はじめてのトリミング', 'pending', 44),
+  petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
+  petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'approved', 14),
+  petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'approved', 8),
+  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。** */
+  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'other_person', '人の顔が写っています'),
+]
+
+/*
+  ECの取り込み記録。設計 `eI3gs` の一覧。
+
+  **成功だけにしない。** 設計の札は 送信完了／処理中／送信なし／失敗。
+  `identity_pending`（LINEの友だちが見つからない）と `failed` を混ぜないと、
+  「LINEとのつき合わせが必要」の行と失敗の行が撮れない。
+*/
+const ecEvent = (id, type, label, order, friendId, friendName, status, minutes, error = null) => ({
+  id, externalEventId: `ext-${id}`, eventType: type, eventLabel: label,
+  customerId: `cus-${id}`, friendId, friendName, orderNumber: order, status,
+  errorMessage: error,
+  receivedAt: new Date(Date.parse('2026-08-25T09:00:00.000Z') - minutes * 60 * 1000).toISOString(),
+  processedAt: status === 'processed'
+    ? new Date(Date.parse('2026-08-25T09:00:00.000Z') - (minutes - 1) * 60 * 1000).toISOString()
+    : null,
+})
+
+export const EC_EVENTS = [
+  ecEvent('ece-1', 'ec_order.confirmed', '注文が確定した', 'NEN-12492', 'friend-1', '高橋 直人', 'processed', 12),
+  ecEvent('ece-2', 'ec_payment.received', '入金を確認した', 'NEN-12488', 'friend-2', '前田 さくら', 'processed', 40),
+  ecEvent('ece-3', 'ec_shipping.shipped', '発送した', 'NEN-12471', 'friend-3', '木村 亮', 'processed', 90),
+  /* LINEの友だちが見つからない。**取り込めたが送れていない**、を分けて出すため。 */
+  ecEvent('ece-4', 'ec_order.confirmed', '注文が確定した', 'NEN-12486', null, null, 'identity_pending', 20),
+  ecEvent('ece-5', 'ec_subscription.renewed', '定期便が続いた', 'NEN-12480', 'friend-4', '中村 彩', 'processing', 5),
+  /* 失敗。理由を空にしない。 */
+  ecEvent('ece-6', 'ec_support.refunded', '返金した', 'NEN-12402', 'friend-5', '石田 未来', 'failed', 180, 'LINEへの送信が拒否されました（ブロック済み）'),
+]
+
+/** 取り込みの帯。設計 `eI3gs` の「注文96・入金32・発送20」。 */
+export const EC_OVERVIEW = {
+  total: 2486, processed: 2412, identityPending: 24, failed: 2, skipped: 48,
+  last24h: 148, lastReceivedAt: '2026-08-25T08:48:00.000Z',
+  byType: [
+    { eventType: 'ec_order.confirmed', label: '注文', count: 96 },
+    { eventType: 'ec_payment.received', label: '入金', count: 32 },
+    { eventType: 'ec_shipping.shipped', label: '発送', count: 20 },
+  ],
+}

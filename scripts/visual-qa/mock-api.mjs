@@ -52,7 +52,7 @@ import {
   TAGS, TAG_GROUPS,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, MILEAGE_RULES, CONVERSION_POINTS,
+  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -537,7 +537,7 @@ const SHAPES = {
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
-  '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 1, members: 0, consultations: 0 },
+  '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
   /*
    * 一斉配信の帯（設計 `q76C35`）。**型どおりに返す。**
    * ここが無かったせいで、一覧の帯が「予約中 undefined」「失敗 undefined」
@@ -897,6 +897,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
   if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
+  if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
+  if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
+  /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
+  if (pathname === '/api/ec-commerce/events') {
+    return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
+  }
   if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
