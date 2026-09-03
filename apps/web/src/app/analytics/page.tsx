@@ -442,7 +442,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             </select>
           </div>
           <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
-            {loading ? '集計中' : '直近30日を集計'}
+            {loading ? '集計中' : 'この30日を集計'}
           </Button>
         </div>
         <p className="text-ink-faint mt-2 text-xs">
@@ -479,7 +479,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         </div>
       ) : !crossResult ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          たて・よこの軸を選び、「直近30日を集計」を押してください。
+          たて・よこの軸を選び、「この30日を集計」を押してください。
         </div>
       ) : cells.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -831,7 +831,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => void runNow()} disabled={running} variant="secondary">
-                  {running ? '再集計中' : '直近30日を再集計'}
+                  {running ? '再集計中' : 'この30日を再集計'}
                 </Button>
                 {canManage && (
                   <button
