@@ -11,6 +11,8 @@ const mocks = {
   getMediaUsages: vi.fn(),
   countMediaUsages: vi.fn(),
   getMediaDeleteImpact: vi.fn(),
+  getMediaReplacementPlan: vi.fn(),
+  applyMediaReplacementPlan: vi.fn(),
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
   getCommonVarById: vi.fn(),
@@ -94,6 +96,41 @@ const DELETE_IMPACT = {
   recommendedAction: 'delete',
 };
 
+const REPLACEMENT_PLAN = {
+  source: MEDIA,
+  replacement: {
+    ...MEDIA,
+    id: 'md-2',
+    filename: 'b.png',
+    r2_key: 'media/yyy.png',
+  },
+  usages: [{
+    media_id: 'md-1',
+    ref_kind: 'template',
+    ref_id: 'template-1',
+    scanned_at: '2026-08-31T10:00:00.000',
+  }],
+  impact: {
+    source: { id: 'md-1', filename: 'a.png', kind: 'image' },
+    replacement: { id: 'md-2', filename: 'b.png', kind: 'image' },
+    usageCount: 1,
+    replaceableCount: 1,
+    references: [{
+      kind: 'template',
+      name: '来店後のご案内',
+      href: '/templates/edit?id=template-1',
+      state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000',
+      replaceable: true,
+      blocker: null,
+      reason: null,
+    }],
+    blockers: [],
+    canReplace: true,
+    checkedAt: '2026-08-31T10:00:00.000+09:00',
+  },
+};
+
 const VAR = {
   id: 'cv-1',
   line_account_id: 'account-1',
@@ -139,6 +176,8 @@ beforeEach(() => {
   mocks.countMediaUsages.mockResolvedValue(0);
   mocks.getMediaUsages.mockResolvedValue([]);
   mocks.getMediaDeleteImpact.mockResolvedValue(DELETE_IMPACT);
+  mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
+  mocks.applyMediaReplacementPlan.mockResolvedValue(1);
   mocks.getCommonVars.mockResolvedValue([VAR]);
   mocks.getCommonVarById.mockResolvedValue(VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
@@ -345,6 +384,115 @@ describe('メディアの削除', () => {
     // 孤児のファイルが残るだけで、画面には出てこない。
     await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(mocks.deleteMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
+  });
+});
+
+describe('メディア使用先の一括差し替え', () => {
+  async function currentRevision(): Promise<string> {
+    const response = await req(
+      '/api/media/md-1/replacement-impact?accountId=account-1&replacementId=md-2',
+      'GET',
+    );
+    const body = (await response.json()) as { data: { revision: string } };
+    return body.data.revision;
+  }
+
+  it('内部IDを返さず、差し替え可否と改版値を返す', async () => {
+    const response = await req(
+      '/api/media/md-1/replacement-impact?accountId=account-1&replacementId=md-2',
+      'GET',
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { data: { revision: string; references: unknown[] } };
+    expect(body.data.revision).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.data.references).toEqual([
+      expect.objectContaining({ name: '来店後のご案内', replaceable: true }),
+    ]);
+    expect(body.data.references[0]).not.toHaveProperty('refId');
+  });
+
+  it('影響確認後に使用先が変わったら409で最新の影響を返す', async () => {
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: 'old',
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: 'media_replacement_changed',
+      data: { usageCount: 1 },
+    });
+    expect(mocks.applyMediaReplacementPlan).not.toHaveBeenCalled();
+  });
+
+  it('共有など差し替え不能の使用先が1件でもあれば全体を止める', async () => {
+    mocks.getMediaReplacementPlan.mockResolvedValueOnce({
+      ...REPLACEMENT_PLAN,
+      impact: {
+        ...REPLACEMENT_PLAN.impact,
+        canReplace: false,
+        replaceableCount: 0,
+        blockers: ['shared_reference'],
+      },
+    });
+    const revision = await currentRevision();
+    mocks.getMediaReplacementPlan.mockResolvedValueOnce({
+      ...REPLACEMENT_PLAN,
+      impact: {
+        ...REPLACEMENT_PLAN.impact,
+        canReplace: false,
+        replaceableCount: 0,
+        blockers: ['shared_reference'],
+      },
+    });
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: revision,
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'media_replacement_blocked' });
+    expect(mocks.applyMediaReplacementPlan).not.toHaveBeenCalled();
+  });
+
+  it('実行直前に同じ改版値を照合してからD1の差し替えを呼ぶ', async () => {
+    const revision = await currentRevision();
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: revision,
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.applyMediaReplacementPlan).toHaveBeenCalledWith(env.DB, REPLACEMENT_PLAN, 'account-1');
+    expect(await response.json()).toMatchObject({
+      data: {
+        replacedUsageCount: 1,
+        remainingUsageCount: 0,
+        verification: 'verified',
+      },
+    });
+  });
+
+  it('本文が16KiBを超えたら読む前後の両方で413', async () => {
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: 'x'.repeat(17 * 1024),
+    });
+    expect(response.status).toBe(413);
+    expect(mocks.getMediaReplacementPlan).not.toHaveBeenCalled();
+  });
+
+  it('確認の再走査に失敗したとき0件を作らない', async () => {
+    const revision = await currentRevision();
+    scanMocks.scanSingleMediaUsage
+      .mockResolvedValueOnce({ scanned: 1, matched: 1, pruned: 0 })
+      .mockRejectedValueOnce(new Error('D1 unavailable'))
+      .mockResolvedValueOnce({ scanned: 1, matched: 1, pruned: 0 });
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: revision,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { remainingUsageCount: null, verification: 'unavailable' },
+    });
   });
 });
 

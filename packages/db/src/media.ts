@@ -2,6 +2,9 @@ import type {
   MediaDeleteImpact,
   MediaDeleteImpactReference,
   MediaDeleteImpactReferenceKind,
+  MediaReplacementBlocker,
+  MediaReplacementImpact,
+  MediaReplacementReference,
 } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
@@ -52,6 +55,13 @@ export interface MediaUsage {
   ref_kind: string;
   ref_id: string;
   scanned_at: string;
+}
+
+export interface MediaReplacementPlan {
+  source: Media;
+  replacement: Media;
+  usages: MediaUsage[];
+  impact: Omit<MediaReplacementImpact, 'revision'>;
 }
 
 export async function getMedia(
@@ -207,6 +217,21 @@ function belongsToAccount(row: NamedReference, lineAccountId: string): boolean {
   }
 }
 
+function accountIdsOf(row: NamedReference): string[] {
+  const result = new Set<string>();
+  if (row.account_id) result.add(row.account_id);
+  if (!row.account_ids) return [...result];
+  try {
+    const ids = JSON.parse(row.account_ids) as unknown;
+    if (Array.isArray(ids)) {
+      for (const value of ids) if (typeof value === 'string') result.add(value);
+    }
+  } catch {
+    // 壊れたJSONはaccount_idだけを残す。describe側で正本不明として止める。
+  }
+  return [...result];
+}
+
 async function describeMediaUsage(
   db: D1Database,
   usage: MediaUsage,
@@ -334,6 +359,152 @@ export async function getMediaDeleteImpact(
     canDelete: references.length === 0,
     recommendedAction: references.length === 0 ? 'delete' : 'review_references',
   };
+}
+
+async function describeMediaReplacementUsage(
+  db: D1Database,
+  usage: MediaUsage,
+  lineAccountId: string,
+): Promise<MediaReplacementReference> {
+  const described = await describeMediaUsage(db, usage, lineAccountId);
+  if (described.state === 'unavailable') {
+    return {
+      ...described,
+      replaceable: false,
+      blocker: 'unavailable_reference',
+      reason: '使用先の正本を確認できないため、一括では差し替えられません。',
+    };
+  }
+  if (usage.ref_kind === 'webinar') {
+    return {
+      ...described,
+      replaceable: false,
+      blocker: 'unsupported_reference',
+      reason: 'ウェビナー動画は配信用の一式を持つため、このファイルだけを差し替えられません。',
+    };
+  }
+  if (usage.ref_kind === 'broadcast' || usage.ref_kind === 'event') {
+    const table = usage.ref_kind === 'broadcast' ? 'broadcasts' : 'events';
+    const row = await db.prepare(
+      `SELECT line_account_id AS account_id, account_ids, '' AS name FROM ${table} WHERE id = ?`,
+    ).bind(usage.ref_id).first<NamedReference>();
+    const accounts = row ? accountIdsOf(row) : [];
+    if (accounts.some((id) => id !== lineAccountId)) {
+      return {
+        ...described,
+        replaceable: false,
+        blocker: 'shared_reference',
+        reason: '複数のLINEアカウントで共有しているため、この画面からは差し替えません。',
+      };
+    }
+  }
+  return { ...described, replaceable: true, blocker: null, reason: null };
+}
+
+/**
+ * 使用中メディアを別の登録メディアへ差し替える前の計画。
+ *
+ * source / replacement は同じLINEアカウントで引き、参照不明・共有参照・
+ * ウェビナー動画を1件でも含むと全体を止める。途中だけ変えると、利用者が
+ * 「全部替わった」と誤認するためである。
+ */
+export async function getMediaReplacementPlan(
+  db: D1Database,
+  input: {
+    sourceId: string;
+    replacementId: string;
+    lineAccountId: string;
+    checkedAt: string;
+  },
+): Promise<MediaReplacementPlan | null> {
+  const [source, replacement] = await Promise.all([
+    getMediaById(db, input.sourceId, input.lineAccountId),
+    getMediaById(db, input.replacementId, input.lineAccountId),
+  ]);
+  if (!source || !replacement) return null;
+
+  const usages = await getMediaUsages(db, source.id);
+  const references = await Promise.all(
+    usages.map((usage) => describeMediaReplacementUsage(db, usage, input.lineAccountId)),
+  );
+  const blockers = new Set<MediaReplacementBlocker>();
+  if (source.id === replacement.id) blockers.add('same_media');
+  if (source.kind !== replacement.kind) blockers.add('different_kind');
+  for (const reference of references) if (reference.blocker) blockers.add(reference.blocker);
+
+  const mediaSummary = (media: Media): MediaReplacementImpact['source'] => ({
+    id: media.id,
+    filename: media.filename,
+    kind: media.kind as MediaReplacementImpact['source']['kind'],
+  });
+  return {
+    source,
+    replacement,
+    usages,
+    impact: {
+      source: mediaSummary(source),
+      replacement: mediaSummary(replacement),
+      usageCount: references.length,
+      replaceableCount: references.filter((reference) => reference.replaceable).length,
+      references,
+      blockers: [...blockers],
+      canReplace: blockers.size === 0,
+      checkedAt: input.checkedAt,
+    },
+  };
+}
+
+/** 影響確認済みの使用先をD1の1回のbatchで差し替える。 */
+export async function applyMediaReplacementPlan(
+  db: D1Database,
+  plan: MediaReplacementPlan,
+  lineAccountId: string,
+): Promise<number> {
+  if (!plan.impact.canReplace) throw new Error('media_replacement_blocked');
+  const oldKey = plan.source.r2_key;
+  const newKey = plan.replacement.r2_key;
+  const sourceId = plan.source.id;
+  const usageIds = (kind: MediaRefKind) =>
+    `SELECT ref_id FROM media_usages WHERE media_id = ? AND ref_kind = '${kind}'`;
+  const statements: D1PreparedStatement[] = [
+    db.prepare(`UPDATE templates SET message_content = REPLACE(message_content, ?, ?)
+      WHERE line_account_id = ? AND id IN (${usageIds('template')})`)
+      .bind(oldKey, newKey, lineAccountId, sourceId),
+    db.prepare(`UPDATE broadcasts
+      SET message_content = REPLACE(message_content, ?, ?),
+          message_bubbles_json = REPLACE(message_bubbles_json, ?, ?)
+      WHERE line_account_id = ?
+        AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)
+        AND id IN (${usageIds('broadcast')})`)
+      .bind(oldKey, newKey, oldKey, newKey, lineAccountId, sourceId),
+    db.prepare(`UPDATE rich_menu_pages SET image_r2_key = REPLACE(image_r2_key, ?, ?)
+      WHERE EXISTS (SELECT 1 FROM rich_menu_groups g
+        WHERE g.id = rich_menu_pages.group_id AND g.account_id = ?)
+        AND id IN (${usageIds('rich_menu')})`)
+      .bind(oldKey, newKey, lineAccountId, sourceId),
+    db.prepare(`UPDATE scenario_steps
+      SET message_content = REPLACE(message_content, ?, ?),
+          message_bubbles_json = REPLACE(message_bubbles_json, ?, ?)
+      WHERE EXISTS (SELECT 1 FROM scenarios s
+        WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)
+        AND id IN (${usageIds('scenario_step')})`)
+      .bind(oldKey, newKey, oldKey, newKey, lineAccountId, sourceId),
+    db.prepare(`UPDATE nen_columns SET image_url = REPLACE(image_url, ?, ?)
+      WHERE line_account_id = ? AND id IN (${usageIds('nen_column')})`)
+      .bind(oldKey, newKey, lineAccountId, sourceId),
+    db.prepare(`UPDATE events
+      SET image_url = REPLACE(image_url, ?, ?), og_image_url = REPLACE(og_image_url, ?, ?)
+      WHERE line_account_id = ?
+        AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)
+        AND id IN (${usageIds('event')})`)
+      .bind(oldKey, newKey, oldKey, newKey, lineAccountId, sourceId),
+    db.prepare(`INSERT OR IGNORE INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+      SELECT ?, ref_kind, ref_id, ? FROM media_usages WHERE media_id = ?`)
+      .bind(plan.replacement.id, plan.impact.checkedAt, sourceId),
+    db.prepare(`DELETE FROM media_usages WHERE media_id = ?`).bind(sourceId),
+  ];
+  const results = await db.batch(statements);
+  return results.slice(0, 6).reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
 }
 
 export async function recordMediaUsage(
