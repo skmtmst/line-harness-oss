@@ -139,9 +139,13 @@
   background: var(--color-canvas);
 }
 
+/*
+ * 選んでいる行。**白文字が乗るので `$accent-deep`。**
+ * `$accent`(#06c755) に白文字は 2.26:1 で読めない。枠は緑のまま。
+ */
 .checked {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
