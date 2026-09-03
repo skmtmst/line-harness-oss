@@ -320,6 +320,24 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     expect(dbMocks.deleteBroadcast).not.toHaveBeenCalled();
   });
 
+  test('取消UPDATEのD1障害を成功として返さない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+    const app = setupApp();
+    d1Prepare.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        run: vi.fn(async () => { throw new Error('db unavailable'); }),
+      })),
+    }));
+
+    const response = await app.request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ success: false });
+    expect(dbMocks.getBroadcastById).toHaveBeenCalledTimes(1);
+  });
+
   test('予約中ではない配信は更新しない', async () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
 
