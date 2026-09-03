@@ -84,7 +84,12 @@ export default function NewCommonActionPage() {
   if (canManage === null) return <div className="text-ink-faint p-6 text-sm">権限を確認しています</div>
   if (!canManage) return (
     <div className="border-hairline rounded-card border bg-canvas p-6">
-      <h1 className="text-ink text-lg font-semibold">共通アクションは閲覧のみです</h1>
+      {/*
+        **画面名はトップバーが出すので、ここで `<h1>` を作らない。**
+        権限不足は「この画面が何か」ではなく「いまどの状態か」なので、
+        見出しの階層を1つ下げて `<h2>` にする。
+      */}
+      <h2 className="text-ink text-lg font-semibold">共通アクションは閲覧のみです</h2>
       <p className="text-ink-secondary mt-2 text-sm">作成するには、オーナーまたは管理者の権限が必要です。</p>
       <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
     </div>
