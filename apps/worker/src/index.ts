@@ -1294,8 +1294,8 @@ async function scheduled(
   }
 
   // クロス分析は最大50×20・15条件を扱うため、HTTP要求の中では計算しない。
-  // 毎分1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
-  if (event.cron === '* * * * *') {
+  // 5分ごとに1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
+  if (event.cron === '*/5 * * * *') {
     try {
       const {
         processPendingAnalyticsCrossRuns,
@@ -1427,10 +1427,10 @@ async function scheduled(
    * ゴール日から逆算して送る。分けているのは、「3日前に送る」通を届けるには
    * ゴール日がその3日以上前に立っている必要があるため。
    *
-   * 毎分の cron に相乗りしている。専用の Cron Trigger を増やさずに済む
+   * 5分ごとの cron に相乗りしている。専用の Cron Trigger を増やさずに済む
    * （マイルの処理と同じやり方）。
    */
-  if (event.cron === '* * * * *') {
+  if (event.cron === '*/5 * * * *') {
     const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
     if (jstMinutes === 5) {
       jobs.push(
@@ -1446,12 +1446,9 @@ async function scheduled(
   }
 
   // Mileage is an eventually-consistent projection. Reuse the existing
-  // minute cron invocation, but drain only every five minutes and at most 100
+  // five-minute cron invocation and drain at most 100
   // actions per batch so it adds no extra Cron Trigger and keeps D1 load flat.
-  if (
-    event.cron === '* * * * *'
-    && new Date(event.scheduledTime).getUTCMinutes() % 5 === 0
-  ) {
+  if (event.cron === '*/5 * * * *') {
     jobs.push(
       processPendingMileageEvents(env.DB, { limit: 100 }).then((result) => {
         if (result.claimed > 0) {
