@@ -1,5 +1,9 @@
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
+import {
+  normalizeScenarioDeliveryTimestamp,
+  SCENARIO_DELIVERY_BATCH_LIMIT,
+} from './scenario-delivery-timestamps.js';
 export type ScenarioTriggerType = 'friend_add' | 'tag_added' | 'manual';
 export type MessageType = 'text' | 'image' | 'flex' | 'location' | 'video' | 'audio' | 'sticker' | 'carousel';
 export type FriendScenarioStatus = 'active' | 'paused' | 'completed' | 'delivering';
@@ -591,22 +595,24 @@ export async function enrollFriendInScenario(
 export async function getFriendScenariosDueForDelivery(
   db: D1Database,
   now: string,
+  limit = SCENARIO_DELIVERY_BATCH_LIMIT,
 ): Promise<FriendScenario[]> {
-  // Fetch all active scenarios with a delivery time, then filter by epoch comparison
-  // to handle mixed timestamp formats (Z and +09:00) during migration
+  const dueBefore = normalizeScenarioDeliveryTimestamp(now);
+  if (dueBefore === null) throw new Error(`Invalid due-delivery timestamp: ${now}`);
+  const batchLimit = Math.max(1, Math.floor(limit));
   const result = await db
     .prepare(
       `SELECT fs.* FROM friend_scenarios fs
        INNER JOIN scenarios s ON fs.scenario_id = s.id
        WHERE fs.status = 'active'
          AND s.is_active = 1
-         AND fs.next_delivery_at IS NOT NULL`,
+         AND fs.next_delivery_at <= ?
+       ORDER BY fs.next_delivery_at ASC, fs.id ASC
+       LIMIT ?`,
     )
+    .bind(dueBefore, batchLimit)
     .all<FriendScenario>();
-  const nowMs = new Date(now).getTime();
-  return result.results
-    .filter((fs) => new Date(fs.next_delivery_at!).getTime() <= nowMs)
-    .sort((a, b) => new Date(a.next_delivery_at!).getTime() - new Date(b.next_delivery_at!).getTime());
+  return result.results;
 }
 
 /**
@@ -672,6 +678,12 @@ export async function advanceFriendScenario(
   nextDeliveryAt?: string | null,
 ): Promise<void> {
   const now = jstNow();
+  const normalizedNextDeliveryAt = nextDeliveryAt
+    ? normalizeScenarioDeliveryTimestamp(nextDeliveryAt)
+    : null;
+  if (nextDeliveryAt && normalizedNextDeliveryAt === null) {
+    throw new Error(`Invalid scenario delivery timestamp: ${nextDeliveryAt}`);
+  }
   await db
     .prepare(
       `UPDATE friend_scenarios
@@ -681,7 +693,7 @@ export async function advanceFriendScenario(
            updated_at = ?
        WHERE id = ?`,
     )
-    .bind(nextStepOrder, nextDeliveryAt ?? null, now, id)
+    .bind(nextStepOrder, normalizedNextDeliveryAt, now, id)
     .run();
 }
 
