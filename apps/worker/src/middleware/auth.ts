@@ -162,7 +162,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
   ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'],
-  ['/api/automations', '/automations'], ['/api/common-actions', '/automations'], ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'], ['/api/common-actions', '/automations'], ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
 ];
 
