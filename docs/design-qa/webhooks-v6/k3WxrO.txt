@@ -51,7 +51,6 @@ Ver. 0.0.0-dev
 機能設定
 運用状態
 外部連携
-マニュアル
 LINEアカウント
 画
 画面確認アカウント
@@ -69,5 +68,49 @@ Webhook
 Webhookを追加
 こちらで受け取る
 こちらから送る
+名前	URL	イベントタイプ	シークレット	ステータス	送信状況	作成日
+Slack ／ #注文チャンネル	https://hooks.slack.com/services/T0XXXXXXXXX/BXXXXXXXXX/visual-qa
+conversion.confirmed
+	設定済	有効
+2回連続で失敗
 
-こちらから送る設定はまだありません。「Webhookを追加」から作成してください。
+最終 2026/8/24 14:12:00
+
+送り直し 3 回
+
+	2026/4/1	シークレット更新削除
+Googleスプレッドシート ／ 顧客台帳	https://script.google.com/macros/s/visual-qa/exec
+friend.added
+	設定済	有効	—
+
+送り直し 3 回
+
+	2026/3/10	シークレット更新削除
+kintone ／ 案件アプリ	https://visual-qa.cybozu.com/k/v1/record.json
+form.submitted
+	設定済	有効	—
+
+送り直し 3 回
+
+	2026/2/1	シークレット更新削除
+Chatwork ／ 店舗連絡	https://api.chatwork.com/v2/rooms/000000/messages
+booking.created
+	設定済	有効	—
+
+送り直し 3 回
+
+	2026/5/20	シークレット更新削除
+Zapier ／ 申込のふり分け	https://hooks.zapier.com/hooks/catch/000000/visual-qa/
+form.submitted
+	設定済	有効	—
+
+送り直し 3 回
+
+	2026/6/2	シークレット更新削除
+テスト用の受け口 ／ 検証中	https://example.com/hook/visual-qa
+friend.added
+	未設定	無効	—
+
+送り直し 0 回
+
+	2026/7/15	シークレット設定削除
