@@ -67,8 +67,12 @@
   cursor: pointer;
 }
 
+/*
+ * 選んでいる区分の札。**白文字が乗るので `$accent-deep`。**
+ * `$accent`(#06c755) に白文字は 2.26:1 で読めない。
+ */
 .selected {
-  background: var(--color-accent);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 

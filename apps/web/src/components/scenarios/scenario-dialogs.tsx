@@ -95,7 +95,7 @@ export function ConditionDialog({
               setSaving(false)
               onClose()
             }}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
             {saving ? '保存中…' : 'この条件にする'}
           </button>
@@ -177,7 +177,7 @@ export function OnCompleteDialog({
               }
               onClose()
             }}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
             {saving ? '保存中…' : '変更する'}
           </button>
@@ -369,7 +369,7 @@ export function TestSendDialog({
                 setSending(false)
               }
             }}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
             {sending ? '送信中…' : '送る'}
           </button>
