@@ -12,9 +12,15 @@ const switcherSource = readFileSync(join(directory, '../../components/accounts/a
 const editModalSource = readFileSync(join(directory, '../../components/accounts/account-edit-modal.tsx'), 'utf8')
 
 describe('D-3 店舗追加・一覧の統括集約', () => {
-  it('旧アカウントURLを消さず、一覧と追加の正本へ転送する', () => {
-    // 既存ブックマークを壊さず、同じ操作ができる入口を1つに限定する。
-    expect(accountsSource).toContain("redirect('/hq')")
+  it('LINEアカウントの設定は /accounts に置く（/hq へ転送しない）', () => {
+    /*
+      2026-09-04: 転送をやめた。**統括の店舗管理と、LINE公式アカウントの
+      設定は別のもの**（要件 `v6-33-account-settings` §5-3）。`/hq` は
+      統括向けの店舗管理として残し、`/accounts` は設計 ★V6 33-1 の一覧にする。
+    */
+    expect(accountsSource).not.toContain("redirect('/hq')")
+    expect(accountsSource).toContain('data-design-node="QT91v"')
+    // 登録はまだ店舗ウィザードへ転送したまま（33-2 は次の PR）。
     expect(setupSource).toContain("redirect('/restaurant-test/stores/new')")
   })
 

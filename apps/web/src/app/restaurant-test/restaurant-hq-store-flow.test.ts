@@ -18,7 +18,13 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(index).toContain("redirect('/hq')")
     expect(storesPage).toContain("redirect('/hq')")
     expect(stores).toContain("router.replace('/hq')")
-    expect(accountsPage).toContain("redirect('/hq')")
+    /*
+      2026-09-04: `/accounts` の転送はやめた。**統括の店舗管理と、
+      LINE公式アカウントの設定は別のもの**（要件
+      `v6-33-account-settings` §5-3）。店舗の入口はここで見張るが、
+      `/accounts` は設計 ★V6 33-1 の一覧になった。
+    */
+    expect(accountsPage).not.toContain("redirect('/hq')")
     expect(accountsNewPage).toContain("redirect('/restaurant-test/stores/new')")
   })
 
