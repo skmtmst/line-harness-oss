@@ -491,7 +491,7 @@ export default function TemplatesPage() {
             key={key}
             onClick={() => setTypeFilter(key)}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              typeFilter === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+              typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
             style={typeFilter === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
           >
@@ -843,7 +843,7 @@ export default function TemplatesPage() {
                     <button
                       onClick={handleSaveEdit}
                       disabled={savingEdit}
-                      className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                      className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                     >
                       {savingEdit ? '保存中...' : '保存'}
                     </button>
