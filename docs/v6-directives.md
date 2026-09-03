@@ -22,6 +22,8 @@
 
 ## 2. 撮影側の Claude へ
 
+> 2026-09-03 追記: 撮影側は 4 セッション並列(S0 共通部品 + S1〜S3 機能担当、Opus 5)に分ける。担当分けと各セッションに貼る指示は `docs/v6-parallel-plan.md`、Pencil の AI に貼る修正指示は `docs/v6-pencil-fix-prompt.md`。以下の単独セッション向けの指示は、並列計画に置き換わる。
+
 ```
 目的: Pencil ★V6 と実装を一致させる第 2 ラウンド。担当は「PNG の整理 → 実装画像の比較 → 画面側の直し」。
 所有: docs/design-qa、docs/design-reference、scripts/visual-qa、apps/web(画面と共通部品)、Pencil。apps/worker と packages/db は Codex。
