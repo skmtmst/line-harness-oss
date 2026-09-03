@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
+import { SCHEDULED_CRONS } from './services/scheduled-job-isolation.js';
+
 describe('Cron Trigger設定', () => {
   it('Workerが判定するCron式がwrangler.tomlにすべて登録されている', () => {
     const workerSource = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
@@ -11,11 +13,7 @@ describe('Cron Trigger設定', () => {
     expect(configuredCronList).toBeDefined();
 
     const configuredCrons = new Set<string>(JSON.parse(configuredCronList ?? '[]'));
-    const guardedCrons = new Set(
-      [...workerSource.matchAll(/event\.cron\s*===\s*'([^']+)'/g)].map((match) => match[1]),
-    );
-    const missingCrons = [...guardedCrons].filter((cron) => !configuredCrons.has(cron));
-
-    expect(missingCrons).toEqual([]);
+    expect(workerSource).toContain('scheduledLane(event.cron)');
+    expect(configuredCrons).toEqual(new Set(Object.values(SCHEDULED_CRONS)));
   });
 });
