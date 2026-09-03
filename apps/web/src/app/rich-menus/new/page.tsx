@@ -31,7 +31,7 @@ const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint
 ]
 
 /**
- * 分割の形を図で見せる。
+ * 面の分けかたを図で見せる。
  *
  * テンプレートごとに絵を用意せず、areas からそのまま描く。
  * テンプレートを足したときに絵を描き忘れることがない。
@@ -45,7 +45,7 @@ function TemplatePreview({ template }: { template: RichMenuTemplate }) {
       viewBox={`0 0 ${dims.width} ${dims.height}`}
       className="border-hairline bg-canvas-sunken w-full rounded border"
       role="img"
-      aria-label={`${template.label} の分割イメージ`}
+      aria-label={`${template.label} の面の分けかた`}
     >
       {template.areas.length === 0 ? (
         <text
@@ -225,7 +225,7 @@ export default function NewRichMenuPage() {
             土台のレイアウト
           </span>
           <p className="text-ink-faint mb-3 text-xs">
-            あとから編集画面で区切り直せます。迷ったら6分割で始めてください。
+            あとから編集画面で区切り直せます。迷ったら6面で始めてください。
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {shownTemplates.map((t) => {
