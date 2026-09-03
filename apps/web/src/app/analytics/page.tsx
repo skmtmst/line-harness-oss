@@ -61,7 +61,7 @@ function RangePicker({ days, onChange }: { days: number; onChange: (d: number) =
           onClick={() => onChange(r.days)}
           className={`rounded-pill px-3 py-1 text-sm transition-colors ${
             days === r.days
-              ? 'bg-accent text-on-accent'
+              ? 'bg-accent-deep text-on-accent'
               : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
           }`}
         >
