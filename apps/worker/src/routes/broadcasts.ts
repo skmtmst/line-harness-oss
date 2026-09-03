@@ -1102,7 +1102,11 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     // target_type='tag' で対象が多い場合はキュー方式
     if (existing.target_type === 'tag' && existing.target_tag_id) {
       const { getFriendsByTag } = await import('@line-crm/db');
-      const friends = await getFriendsByTag(c.env.DB, existing.target_tag_id);
+      const friends = await getFriendsByTag(
+        c.env.DB,
+        existing.target_tag_id,
+        existing.line_account_id ?? null,
+      );
       const followingCount = friends.filter(f => f.is_following).length;
 
       if (followingCount > 500) {
