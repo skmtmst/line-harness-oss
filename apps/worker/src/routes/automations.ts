@@ -13,6 +13,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { listLimit } from './list-pagination.js';
 
 const automations = new Hono<Env>();
 
@@ -424,7 +425,7 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
 automations.get('/api/automations/:id/logs', async (c) => {
   try {
     const automationId = c.req.param('id');
-    const limit = Number(c.req.query('limit') ?? '100');
+    const limit = listLimit(c.req.query('limit'), 100);
     const logs = await getAutomationLogs(c.env.DB, automationId, limit);
     return c.json({
       success: true,
