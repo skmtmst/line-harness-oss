@@ -22,6 +22,16 @@
 <!-- ここから下に追記。最新を上に。 -->
 
 ## 2026-09-03
+- やらかし: 担当ごとの worktree(lh-work/lh-*)を作っただけで依存を入れず、Slack フック(pnpm exec tsx)・テスト・型検査が全ノードで落ちていた
+- 原因: worktree は node_modules を共有しない
+- 再発防止: worktree を作ったら必ず `pnpm install --frozen-lockfile` を回してから起動する(docs/v6-orchestration-nodeterm.md §6 に追記)
+
+## 2026-09-03
+- やらかし: Codex を自動承認(workspace-write)にしたら、worktree の git 管理領域(本体の .git/worktrees/ 配下)に書けず fetch/merge が失敗した
+- 原因: 砂場の書き込み範囲が作業ツリーだけで、git の管理領域は本体リポジトリ側にある
+- 再発防止: `~/.codex/config.toml` の `[sandbox_workspace_write] writable_roots` に本体の `.git` と `lh-work` を入れる。設定変更後は Codex を再起動する(起動時にしか読まない)
+
+## 2026-09-03
 - やらかし: NodeTerm を司令塔(Claude Code)のシェルから `open -a` で再起動したため、Claude Code の環境変数(CLAUDECODE、ANTHROPIC_BASE_URL、CLAUDE_CODE_CHILD_SESSION など)が NodeTerm と全ノードに引き継がれ、Claude のノードが子セッション扱い・API 課金表示・未ログインになった
 - 原因: `open` は呼び出し元の環境を起動するアプリに渡す。エージェントのシェルは Claude Code の環境を持っている
 - 再発防止: GUI アプリをエージェントから起動するときは `env -i HOME=… USER=… PATH=… open -a <app>` で素の環境にする。起動後に `ps eww` で CLAUDE / ANTHROPIC 変数が 0 件であることを確認する
