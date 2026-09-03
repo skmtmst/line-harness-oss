@@ -76,6 +76,7 @@ export function OperatorDropdown({
   onChange,
   label = '担当者',
   ariaLabel = '担当者を選ぶ',
+  unreadOf,
 }: {
   /** `all` すべて / `unassigned` 未割り当て / それ以外は担当者ID */
   value: string
@@ -83,6 +84,12 @@ export function OperatorDropdown({
   onChange: (next: string) => void
   label?: string
   ariaLabel?: string
+  /**
+   * 行に添える未読数。**渡さなければ数を出さない**（担当を変える口など、
+   * 未読数が要らない場面で使うため）。
+   * `null` を返したら**未取得**で、`—` を出す。**0とは別。**
+   */
+  unreadOf?: (value: string) => number | null
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -129,6 +136,12 @@ export function OperatorDropdown({
             <p className="text-ink-faint px-3 py-3 text-xs">見つかりません</p>
           ) : shown.map((row) => {
             const selected = row.id === value
+            /*
+              **「すべて」には数を付けない**（担当者ではないため）。
+              未取得は `—`。0と同じ文字にすると、**誰にも未読が無いのか
+              読めていないのかが見分けられなくなる。**
+            */
+            const unread = unreadOf && row.id !== 'all' ? unreadOf(row.id) : undefined
             return (
               <button
                 key={row.id}
@@ -141,7 +154,12 @@ export function OperatorDropdown({
                 <span className={selected ? 'text-accent' : 'text-ink-faint'}>
                   {selected ? <Check /> : <span className="block h-3.5 w-3.5" />}
                 </span>
-                <span className="truncate">{row.name}</span>
+                <span className="min-w-0 flex-1 truncate text-left">{row.name}</span>
+                {unread === undefined ? null : (
+                  <span className={`shrink-0 tabular-nums ${selected ? 'text-accent' : 'text-ink-faint'}`}>
+                    {unread === null ? '—' : unread}
+                  </span>
+                )}
               </button>
             )
           })}
