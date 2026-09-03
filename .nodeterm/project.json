@@ -1,0 +1,652 @@
+{
+  "version": 1,
+  "rev": 1,
+  "savedAt": "2026-09-03T10:06:51.852643Z",
+  "id": "project-g431t5",
+  "name": "LINE Harness V6",
+  "color": "#1f8a4c",
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 0.5
+  },
+  "nodes": [
+    {
+      "id": "grp-hq",
+      "kind": "group",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "司令塔 Fable 5.1",
+      "color": "#5319e7",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-hq",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-hq",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-hq",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "司令塔 Fable 5.1",
+      "titleAuto": false,
+      "color": "#5319e7",
+      "group": null,
+      "parentId": "grp-hq",
+      "agentId": "claude",
+      "tags": [
+        "lane:hq"
+      ]
+    },
+    {
+      "id": "note-hq",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-hq",
+      "text": "あなたは司令塔(Fable 5.1)。まず docs/brain/Home.md を読み、docs/v6-orchestration-nodeterm.md §4 の流れで台帳(GitHub Issues)を回す。"
+    },
+    {
+      "id": "grp-s0",
+      "kind": "group",
+      "position": {
+        "x": 0,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S0 共通部品 (Opus 5)",
+      "color": "#1f8a4c",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s0",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s0",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-s0",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S0 共通部品 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "parentId": "grp-s0",
+      "agentId": "claude",
+      "tags": [
+        "lane:s0"
+      ]
+    },
+    {
+      "id": "note-s0",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-s0",
+      "text": "あなたは S0(共通部品)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S0 共通部品」の指示で動く。lane:s0 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "grp-s1",
+      "kind": "group",
+      "position": {
+        "x": 840,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S1 機能1〜5 (Opus 5)",
+      "color": "#1f8a4c",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s1",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s1",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-s1",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S1 機能1〜5 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "parentId": "grp-s1",
+      "agentId": "claude",
+      "tags": [
+        "lane:s1"
+      ]
+    },
+    {
+      "id": "note-s1",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-s1",
+      "text": "あなたは S1(機能 1〜5)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s1 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "grp-s2",
+      "kind": "group",
+      "position": {
+        "x": 1680,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S2 機能6〜13 (Opus 5)",
+      "color": "#1f8a4c",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s2",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s2",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-s2",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S2 機能6〜13 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "parentId": "grp-s2",
+      "agentId": "claude",
+      "tags": [
+        "lane:s2"
+      ]
+    },
+    {
+      "id": "note-s2",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-s2",
+      "text": "あなたは S2(機能 6〜13)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s2 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "grp-s3",
+      "kind": "group",
+      "position": {
+        "x": 2520,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "S3 機能14〜32 (Opus 5)",
+      "color": "#1f8a4c",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-s3",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-s3",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-s3",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "S3 機能14〜32 (Opus 5)",
+      "titleAuto": false,
+      "color": "#1f8a4c",
+      "group": null,
+      "parentId": "grp-s3",
+      "agentId": "claude",
+      "tags": [
+        "lane:s3"
+      ]
+    },
+    {
+      "id": "note-s3",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-s3",
+      "text": "あなたは S3(機能 14〜32)。まず docs/brain/Home.md を読み、docs/v6-parallel-plan.md §4「S1〜S3」の指示で動く。lane:s3 の todo を 1 件取って始める。"
+    },
+    {
+      "id": "grp-codex",
+      "kind": "group",
+      "position": {
+        "x": 3360,
+        "y": 520
+      },
+      "size": {
+        "width": 780,
+        "height": 380
+      },
+      "title": "実装 Codex",
+      "color": "#0052cc",
+      "group": null,
+      "worktree": {
+        "repoPath": "/Volumes/My Passport/Github/line-harness-nen",
+        "branch": "codex/kenta-r2-codex",
+        "baseRef": "codex/development",
+        "path": "/Volumes/My Passport/Github/lh-work/lh-codex",
+        "createdByApp": false
+      }
+    },
+    {
+      "id": "agent-codex",
+      "kind": "terminal",
+      "position": {
+        "x": 20,
+        "y": 60
+      },
+      "size": {
+        "width": 500,
+        "height": 300
+      },
+      "title": "実装 Codex",
+      "titleAuto": false,
+      "color": "#0052cc",
+      "group": null,
+      "parentId": "grp-codex",
+      "agentId": "codex",
+      "tags": [
+        "lane:codex"
+      ]
+    },
+    {
+      "id": "note-codex",
+      "kind": "sticky",
+      "position": {
+        "x": 540,
+        "y": 60
+      },
+      "size": {
+        "width": 220,
+        "height": 160
+      },
+      "title": "指示",
+      "color": "#f6ecd3",
+      "group": null,
+      "parentId": "grp-codex",
+      "text": "あなたは実装(Codex)。まず docs/brain/Home.md を読み、docs/v6-directives.md §3 の指示で動く。lane:codex の todo を 1 件取って始める。"
+    },
+    {
+      "id": "trigger-morning",
+      "kind": "trigger",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "size": {
+        "width": 300,
+        "height": 180
+      },
+      "title": "朝の割り当て 09:00",
+      "color": "#b07a1c",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "0 9 * * 1-5"
+        },
+        "payload": "朝の割り当てをする。gh で lane ラベル別に open Issue を読み、各担当の今日の分(1〜2 件)を todo → doing の順に並べ、依存が未完のものは blocked にする。オープン PR 数と、昨日マージした数を Slack の指令塔チャンネルに 1 行で書く。相手の領域への依頼が Slack に来ていたら Issue にする。",
+        "target": "agent-hq",
+        "note": "平日 9:00 に司令塔へ"
+      }
+    },
+    {
+      "id": "trigger-evening",
+      "kind": "trigger",
+      "position": {
+        "x": 1180,
+        "y": 0
+      },
+      "size": {
+        "width": 300,
+        "height": 180
+      },
+      "title": "夕方のまとめ 18:00",
+      "color": "#b07a1c",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "cron",
+          "expr": "0 18 * * 1-5"
+        },
+        "payload": "review 列の PR を順に確認する: base が最新か、必須ゲート成功か、変更パスが lane の範囲内か。満たすものをマージして Issue を閉じる。満たさないものは理由を Issue にコメントして doing に戻す。オープン PR 数、一致画面数(docs/design-qa/v6-progress-ledger.md)、blocked の件数を Slack に 1 行で書く。docs/brain/Memory.md の「進行中」を更新する。",
+        "target": "agent-hq",
+        "note": "平日 18:00 に司令塔へ"
+      }
+    },
+    {
+      "id": "trigger-pull-s0",
+      "kind": "trigger",
+      "position": {
+        "x": 840,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s0 の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s0",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-s1",
+      "kind": "trigger",
+      "position": {
+        "x": 1160,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s1 の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s1",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-s2",
+      "kind": "trigger",
+      "position": {
+        "x": 1480,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s2 の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s2",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-s3",
+      "kind": "trigger",
+      "position": {
+        "x": 1800,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "s3 の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-s3",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    },
+    {
+      "id": "trigger-pull-codex",
+      "kind": "trigger",
+      "position": {
+        "x": 2120,
+        "y": 220
+      },
+      "size": {
+        "width": 300,
+        "height": 160
+      },
+      "title": "codex の次を取る(30分ごと)",
+      "color": "#8a938d",
+      "group": null,
+      "trigger": {
+        "schedule": {
+          "kind": "interval",
+          "everyMinutes": 30
+        },
+        "payload": "自分の lane の todo を 1 件取って doing にし、着手する。作業中なら何もしない。todo が無ければ何もしない。",
+        "target": "agent-codex",
+        "note": "手が空いたら台帳から次を取る"
+      }
+    }
+  ],
+  "bridges": [
+    {
+      "id": "link-note-hq-agent-hq",
+      "source": "note-hq",
+      "target": "agent-hq"
+    },
+    {
+      "id": "link-note-s0-agent-s0",
+      "source": "note-s0",
+      "target": "agent-s0"
+    },
+    {
+      "id": "link-agent-hq-agent-s0",
+      "source": "agent-hq",
+      "target": "agent-s0"
+    },
+    {
+      "id": "link-note-s1-agent-s1",
+      "source": "note-s1",
+      "target": "agent-s1"
+    },
+    {
+      "id": "link-agent-hq-agent-s1",
+      "source": "agent-hq",
+      "target": "agent-s1"
+    },
+    {
+      "id": "link-note-s2-agent-s2",
+      "source": "note-s2",
+      "target": "agent-s2"
+    },
+    {
+      "id": "link-agent-hq-agent-s2",
+      "source": "agent-hq",
+      "target": "agent-s2"
+    },
+    {
+      "id": "link-note-s3-agent-s3",
+      "source": "note-s3",
+      "target": "agent-s3"
+    },
+    {
+      "id": "link-agent-hq-agent-s3",
+      "source": "agent-hq",
+      "target": "agent-s3"
+    },
+    {
+      "id": "link-note-codex-agent-codex",
+      "source": "note-codex",
+      "target": "agent-codex"
+    },
+    {
+      "id": "link-agent-hq-agent-codex",
+      "source": "agent-hq",
+      "target": "agent-codex"
+    }
+  ],
+  "kanban": {
+    "columns": [
+      {
+        "id": "todo",
+        "title": "未着手",
+        "color": "#8a938d"
+      },
+      {
+        "id": "doing",
+        "title": "作業中",
+        "color": "#b07a1c"
+      },
+      {
+        "id": "review",
+        "title": "マージ待ち",
+        "color": "#1d76db"
+      },
+      {
+        "id": "blocked",
+        "title": "停止",
+        "color": "#b23a3a"
+      },
+      {
+        "id": "done",
+        "title": "完了",
+        "color": "#1f8a4c"
+      }
+    ],
+    "assignments": [],
+    "github": {
+      "repository": "skmtmst/line-harness-oss",
+      "columnMappings": [
+        {
+          "columnId": "todo",
+          "label": "todo"
+        },
+        {
+          "columnId": "doing",
+          "label": "doing"
+        },
+        {
+          "columnId": "review",
+          "label": "review"
+        },
+        {
+          "columnId": "blocked",
+          "label": "blocked"
+        }
+      ],
+      "completionColumnId": "done"
+    }
+  }
+}

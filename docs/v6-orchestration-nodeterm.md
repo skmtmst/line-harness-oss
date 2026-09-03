@@ -104,13 +104,14 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 
 ## 6. 人がやること(NodeTerm 側の初期設定、1 回)
 
-1. NodeTerm でこのリポジトリをプロジェクトとして開き、Kanban を作る。
-2. Settings → GitHub Issues: リポジトリ `skmtmst/line-harness-oss`、認証は `gh auth login` 済みの GitHub CLI、列とラベルを §2 の表のとおり対応、完了列 = 完了。
-3. GitHub にラベルを作る: `todo` `doing` `review` `blocked` `lane:hq` `lane:s0` `lane:s1` `lane:s2` `lane:s3` `lane:codex`(NodeTerm の「Create missing labels」でもよい)。
-4. グループを 6 つ作り、それぞれ worktree を紐づける(§1)。各グループに 1 行の付箋(担当名と「まず docs/brain/Home.md を読む」)を置き、エージェントにリンクする。
-5. 司令塔ノードと各担当ノードをコンテキストリンクで結ぶ(5 本)。
-6. トリガーを 2 つ作り、arm する(§4)。
-7. 承認待ち(NEEDS YOU)の通知を自分の端末に出す。承認は人が答える。
+`.nodeterm/project.json` と `.nodeterm/settings.json` はこのリポジトリに **生成済み**(2026-09-03)。グループ 6 つ(worktree は `/Volumes/My Passport/Github/lh-work/lh-<担当>` に作成済み)、エージェントノード 6 つ、付箋 6 枚、コンテキストリンク 11 本、トリガー 7 つ(朝・夕・各担当の 30 分ごとの取得)、Kanban の 5 列と GitHub ラベル対応が入っている。GitHub のラベル 10 個も作成済み。残りは NodeTerm の画面でしかできない 4 手順。
+
+1. NodeTerm(v0.3.4、macOS arm64 の dmg)を入れて起動し、「Open folder…」でこのリポジトリのフォルダを開く。`.nodeterm/project.json` が読み込まれ、キャンバスと Kanban が出る。
+2. Settings → GitHub Issues: 「Include GitHub issues」を on、リポジトリは `skmtmst/line-harness-oss`、認証は GitHub CLI(`gh auth login` 済み)、このプロジェクトのアクセスを承認する。列とラベルの対応は project.json に入っているので確認だけ。
+3. トリガー 7 つを arm する(カードの ARMED を押す)。定義は共有されるが、発火の同意はこのマシンで人が行う。最初の 1〜2 日は arm せず、朝夕の文面を司令塔に手で貼って動きを見るのがよい。
+4. 各グループのエージェントノードを起動する(Claude Code は `claude`、Codex は `codex`)。Opus 5 のモデル指定はノードのモデル選択で行う。承認待ち(NEEDS YOU)の通知を自分の端末に出す。
+
+worktree のパスは絶対パスで project.json に入っているので、別のマシンで開く場合はグループの worktree を「Unbind」してから自分のパスで作り直す。
 
 ## 7. 司令塔(Fable 5.1)がこの設計で実際にできること・できないこと
 
@@ -133,6 +134,24 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 - **起動時の必読順**(AGENTS.md に追記済み): `AGENTS.md` → `docs/brain/Memory.md` → `docs/brain/rules/corrections.md` → `docs/brain/rules/mistakes.md` → 担当の指示書。
 - NodeTerm の各グループの付箋には、指示書のコピーではなく **「まず docs/brain/Home.md を読む」の 1 行と、そのグループの担当名**だけを書く。指示の正本はリポジトリ側に置き、付箋を更新し忘れて古い指示で動くことを防ぐ。
 - Obsidian で開きたい場合は `docs/brain/` を Vault として開けば、`[[wikilink]]` と frontmatter はそのまま使える。キットの `second-brain` スキルを各エージェントに入れると、訂正時の追記が自動になる(任意)。
+
+## 8.5 モデルの交代(利用制限で止まったとき)
+
+役割はレーン(グループ + worktree + lane ラベル + docs/brain)に固定し、**モデルは差し替え可能**にする。Fable 5.1 が制限で止まれば Codex が司令塔を代行し、Opus 5 が止まれば Codex が S1 を代行し、復帰したら戻す。
+
+| 段 | 誰が | やること |
+|---|---|---|
+| 止まる | 止まったノード(可能なら) | いま `doing` の Issue に「引き継ぎ」コメントを書く: 状態、次の一手、触ったファイル、未 push の有無。ブランチを push する。Issue は `doing` のまま |
+| 代行を立てる | 人(または司令塔が `open-agent --dry-run` → 実行) | **同じグループの中**に代行ノードを開く(例: `agent-s1-sub`、agentId `codex`)。同じ worktree で動くので、続きの木がそのままある。元ノードとコンテキストリンクで結び、記録を読めるようにする |
+| 代行が続ける | 代行ノード | Home.md → Issue の引き継ぎコメント → `git log -5` の順に読み、同じ Issue を続ける。**新しい Issue を取らない**(元が戻ったときに 2 本並走しないため) |
+| 復帰 | 元ノード | 代行に「止まって」と伝え(司令塔経由)、代行は最後の状態を Issue にコメントして停止。元ノードが引き継ぐ。代行ノードは閉じずに残してよい(次の制限時に再利用) |
+
+決めごと:
+
+- **同じグループに 2 つの動くノードを置かない。** 同じ worktree を 2 つのエージェントが同時に触ると、どちらの変更か分からなくなる。代行が動く間、元は必ず停止している。
+- **マージ権限は常に 1 ノードだけ。** 司令塔を Codex が代行する間、Fable 5.1 のノードはマージしない。
+- **司令塔の交代前後で `docs/brain/Memory.md` の「進行中」を更新する。** 交代先が読むのはここ。
+- 交代は台帳に残す: 引き継ぎコメントと復帰コメントが Issue に並ぶので、誰がどこまでやったかが後から追える。
 
 ## 9. 関連文書
 
