@@ -6,12 +6,12 @@ import { useEffect, useRef, useState } from 'react'
  * 受信箱のプルダウン。
  *
  * **共通の `Select` は使えない。** 設計（Pencil `lJ1CF` 担当者プルダウン
- * 開状態、`k6lHgo` ヘッダー対応マークプルダウン開状態）は、共通部品
+ * 開状態、`k6lHgo` ヘッダー対応状況プルダウン開状態）は、共通部品
  * （`Gfsb4`）と作りが違う。
  *
  * - 担当者 … 選択肢の上に**名前で絞る入力欄**がある。担当が増えるほど
  *   縦に伸びるので、探す手段が要る
- * - 対応マーク … 1件ずつに**色の丸と色付きの札**が付く。未対応が赤、
+ * - 対応状況 … 1件ずつに**色の丸と色付きの札**が付く。未対応が赤、
  *   対応中が黄、対応済みが緑。文字だけだと、一覧の札と目で結びつかない
  *
  * 素の `<select>` にしていたころは、開いた中身がブラウザ任せで
@@ -152,7 +152,7 @@ export function OperatorDropdown({
 }
 
 // ─────────────────────────────────────────────────────────────
-// 対応マーク
+// 対応状況
 // ─────────────────────────────────────────────────────────────
 
 export type ChatStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -173,7 +173,7 @@ const STATUS_ORDER: ChatStatus[] = ['unread', 'in_progress', 'on_hold', 'resolve
 export function StatusDropdown({
   value,
   onChange,
-  ariaLabel = '対応マークを変える',
+  ariaLabel = '対応状況を変える',
 }: {
   value: ChatStatus
   onChange: (next: ChatStatus) => void

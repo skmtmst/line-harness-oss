@@ -36,7 +36,7 @@ interface Chat {
   lastMessageContent: string | null
   lastMessageDirection: 'incoming' | 'outgoing' | null
   lastMessageType: string | null
-  /** ログイン中の担当者だけの未読。対応状態とは別。 */
+  /** ログイン中の担当者だけの未読。対応状況とは別。 */
   isUnread: boolean
   createdAt: string
   updatedAt: string
@@ -163,7 +163,7 @@ function formatInboxDatetime(iso: string | null): string {
 
 /**
  * 設計 `xGLVe` の一覧は日付だけの `08/18`。年まで出すと桁が伸びて、
- * 同じ行の右に並ぶ対応マークの札を押し出す。年は見出し側で出す。
+ * 同じ行の右に並ぶ対応状況の札を押し出す。年は見出し側で出す。
  */
 function formatInboxListDate(iso: string | null): string {
   if (!iso) return '—'
@@ -416,7 +416,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [assigneeFilter, setAssigneeFilter] = useState('all')
   /*
     設計 `f0zn6` の「自分の未読」。`isUnread` は
-    **ログイン中の担当者だけの未読**で、対応マークとは別の値。
+    **ログイン中の担当者だけの未読**で、対応状況とは別の値。
     札の数は「いま一覧に出ている自分の未読」で、新しい口は要らない。
   */
   const [mineUnreadOnly, setMineUnreadOnly] = useState(false)
@@ -882,7 +882,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId)
-    // 既読はログイン中の担当者だけに反映する。対応状態は変えない。
+    // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
     setChats((prev) => prev.map((chat) => (
       chat.id === chatId ? { ...chat, isUnread: false } : chat
     )))
@@ -1193,8 +1193,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
 
-          以前は `<details>` の小さな箱（208px）で、中身は対応状態だけだった。
-          設計は 対応マーク・担当者・受信経路・期限・メッセージ種別・未読だけ の
+          以前は `<details>` の小さな箱（208px）で、中身は対応状況だけだった。
+          設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
         <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
@@ -1262,7 +1262,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         <SavedViewDialog
           open={saveDialogOpen}
           conditions={[
-            { label: '対応マーク', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
+            { label: '対応状況', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
             { label: '担当者', value: assigneeFilter === 'all' ? 'すべて' : assigneeFilter === 'unassigned' ? '未割り当て' : (operators.find((o) => o.id === assigneeFilter)?.name ?? 'すべて') },
             { label: '受信経路', value: channel === 'all' ? 'LINE・MAIL' : channel === 'line' ? 'LINE' : 'MAIL' },
           ]}
@@ -1361,7 +1361,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </select>
               {/*
                 設計 `f0zn6` の「自分の未読」。担当ではなく**自分が読んだか**で
-                絞る。対応マークの絞り込み（下の帯）とは別の物差しなので、
+                絞る。対応状況の絞り込み（下の帯）とは別の物差しなので、
                 同じ帯には混ぜない。
               */}
               <button
@@ -1752,9 +1752,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
                   */}
                   {/*
-                    設計 `xGLVe` / `H3lAOB` の並びは 担当 → 対応マーク。
+                    設計 `xGLVe` / `H3lAOB` の並びは 担当 → 対応状況。
                     先に「誰が」を決めてから「どうなっている」を動かす順で、
-                    一覧の行の並び（担当の札 → 対応マークの札）とも向きがそろう。
+                    一覧の行の並び（担当の札 → 対応状況の札）とも向きがそろう。
                   */}
                   <OperatorDropdown
                     value={chatDetail.operatorId ?? 'unassigned'}
@@ -1766,7 +1766,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <StatusDropdown
                     value={chatDetail.status as ChatStatus}
                     onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
-                    ariaLabel="対応マークを変える"
+                    ariaLabel="対応状況を変える"
                   />
                   {/*
                     設計 `H3lAOB` は、閉じているときも開いているときも

@@ -454,7 +454,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-2 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
               <div className="flex justify-between items-center">
-                <span className="text-[11px] text-gray-500">対応マーク</span>
+                <span className="text-[11px] text-gray-500">対応状況</span>
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
                     {statusLabels[chatStatus.status].label}

@@ -55,7 +55,7 @@ function isUsed(mark: MarkRow): boolean {
 /**
  * ★V6 `rIhbN` 対応マーク一覧。
  *
- * 固定の対応状況（未対応・対応中・解決済）と、友だちに付ける対応マークは
+ * 固定の対応状況（未対応・対応中・保留・対応済み）と、友だちに付ける対応マークは
  * 別の概念。ここは後者の設定だけを扱い、人数のKPIは既存の受信箱集計から読む。
  */
 export default function SupportMarkList({ accountId }: { accountId: string | null }) {

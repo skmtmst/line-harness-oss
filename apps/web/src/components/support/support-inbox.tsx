@@ -150,7 +150,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       if (detail) setDetail({ ...detail, thread: { ...detail.thread, status: next } })
       await loadInbox(true)
     } catch {
-      setError('対応状態を更新できませんでした')
+      setError('対応状況を更新できませんでした')
     }
   }
 

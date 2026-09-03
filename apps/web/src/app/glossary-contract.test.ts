@@ -50,6 +50,45 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     })
   }
 
+  /**
+   * **固定の4状態と、自由分類のマークは別物。**
+   *
+   * 要件書 `v6-02-inbox-requirements-draft.md:77`
+   *   「V6画面の『対応マーク』は、実装時に『対応状況』へ変更する。
+   *     友だち属性の対応マークは右パネル内の別項目として表示する。」
+   *
+   * 見分け方は API の形。`chatStatus` / `status` が
+   * unread・in_progress・on_hold・resolved を取るものは**対応状況**。
+   * `support_mark` / `markId` を扱うものが**対応マーク**。
+   */
+  it('固定4状態を「対応マーク」と呼ばない', () => {
+    const FIXED_STATE = [
+      'app/chats/page.tsx',
+      'app/friends/detail/page.tsx',
+      'components/chats/inbox-dropdown.tsx',
+      'components/chats/inbox-filter-panel.tsx',
+      'components/chats/friend-info-sidebar.tsx',
+      'components/friends/single-friend-actions.tsx',
+      'components/friends/advanced-search-dialog.tsx',
+      'components/dashboard/side-cards.tsx',
+      'components/dashboard/dashboard-editor.tsx',
+    ]
+    for (const rel of FIXED_STATE) {
+      const f = FILES.find((x) => x.p === rel)
+      expect(f, `${rel} が見つからない`).toBeDefined()
+      // side-cards は「自動変更する対応マークがあるか」を読むので、その一語だけ許す。
+      const body = rel === 'components/dashboard/side-cards.tsx'
+        ? f!.s.replace(/対応マーク一覧/g, '')
+        : f!.s
+      expect(body.includes('対応マーク'), `${rel}: 固定4状態は「対応状況」と呼ぶ`).toBe(false)
+    }
+  })
+
+  it('同じものを「対応状態」とも呼ばない', () => {
+    const hits = FILES.filter((f) => f.s.includes('対応状態')).map((f) => f.p)
+    expect(hits, '「対応状況」に寄せる').toEqual([])
+  })
+
   it('対応状況の4つは、要件書と同じ順に並べる', () => {
     const inbox = FILES.find((f) => f.p === 'components/chats/inbox-filter-panel.tsx')
     expect(inbox).toBeDefined()

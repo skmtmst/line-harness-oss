@@ -133,7 +133,7 @@ describe('受信箱V4の画面契約', () => {
   it('担当と対応をV6専用プルダウンで操作し、開状態も確認できる', () => {
     expect(PAGE).toContain('import { OperatorDropdown, StatusDropdown')
     expect(PAGE).toContain('ariaLabel="担当者を変える"')
-    expect(PAGE).toContain('ariaLabel="対応マークを変える"')
+    expect(PAGE).toContain('ariaLabel="対応状況を変える"')
     expect(INBOX_DROPDOWN).toContain('role="listbox"')
     expect(INBOX_DROPDOWN).toContain('担当者名を検索')
   })

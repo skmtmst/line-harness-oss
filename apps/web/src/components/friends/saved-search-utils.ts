@@ -86,7 +86,7 @@ export function describeSavedCondition(
   if (condition.kind === 'status_message') return `ステータスメッセージに「${value || '未指定'}」を含む`
   if (condition.kind === 'mark') return `対応マークが「${labels.marks?.[raw] ?? (raw ? '選択済みの対応マーク' : '未指定')}」`
   if (condition.kind === 'scenario') return `シナリオが「${labels.scenarios?.[raw] ?? (raw ? '選択済みのシナリオ' : '未指定')}」`
-  if (condition.kind === 'chat_status') return `対応状態が「${CHAT_STATUS_LABELS[raw] ?? (raw ? '選択済みの状態' : '未指定')}」`
+  if (condition.kind === 'chat_status') return `対応状況が「${CHAT_STATUS_LABELS[raw] ?? (raw ? '選択済みの状態' : '未指定')}」`
   if (condition.kind === 'following') return condition.value === true ? '友だち中' : 'ブロック済み'
   if (condition.kind === 'created_at') {
     const range = condition.value && typeof condition.value === 'object'

@@ -15,7 +15,7 @@ function SideCard({
   children,
 }: {
   title: string
-  /** 設計に右上のリンクが無いカードもある（現在の対応マーク）。 */
+  /** 設計に右上のリンクが無いカードもある（現在の対応状況）。 */
   action?: { label: string; href: string }
   children: ReactNode
 }) {
@@ -127,11 +127,13 @@ export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview[
 }
 
 /**
- * 現在の対応マーク（設計 `vUXKb` の右カラム）。
+ * 現在の対応状況（設計 `vUXKb` の右カラム）。
  *
  * 未対応と対応済みは `/api/dashboard/overview` の `inbox` から出る。
  * 「メッセージ受信時の自動変更」は、選択中のLINEアカウントの
  * 対応マーク一覧を読み、1件でも自動変更があれば「有効」とする。
+ * **「対応マーク」は自由分類のほう。**このカードが並べる未対応・対応済みは
+ * 固定4状態の「対応状況」で、別物（要件書 `v6-02-inbox-requirements-draft.md:77`）。
  * 一覧を取得できなかったときだけ `—`（未取得）にする。
  */
 export function SupportMarkStatusCard({
@@ -143,7 +145,7 @@ export function SupportMarkStatusCard({
   autoOnInbound: boolean | null
 }) {
   return (
-    <SideCard title="現在の対応マーク">
+    <SideCard title="現在の対応状況">
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
         {[
           { label: '未対応', value: inbox?.unanswered ?? null },
