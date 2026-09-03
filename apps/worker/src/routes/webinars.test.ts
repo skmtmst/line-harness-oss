@@ -916,6 +916,34 @@ describe('webinar notification settings', () => {
     expect(invalid.status).toBe(400);
   });
 
+  test.each(['invalid_time', 'invalid_hour_before'])(
+    'PUT は設定値エラー %s を 400 で返す',
+    async (message) => {
+      dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+      webinarNotificationMocks.saveWebinarNotificationSettings.mockRejectedValueOnce(
+        new Error(message),
+      );
+      const input = {
+        registrationEnabled: true,
+        dayBeforeEnabled: true,
+        dayBeforeTime: '20:00',
+        hourBeforeEnabled: true,
+        hourBeforeMinutes: 60,
+        startEnabled: true,
+        missedEnabled: true,
+        missedTime: '10:00',
+        completedEnabled: true,
+      };
+
+      const res = await adminReq('/api/webinars/w1/notifications', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ success: false, error: message });
+    },
+  );
+
   test('テスト送信は次の実在セッションと所属アカウントを使う', async () => {
     vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
@@ -929,6 +957,29 @@ describe('webinar notification settings', () => {
       SESSION_START,
       expect.objectContaining({ defaultLiffId: '999-test' }),
     );
+  });
+
+  test('存在しないウェビナーへのテスト送信は 404', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(null);
+
+    const res = await adminReq('/api/webinars/missing/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'Not found' });
+    expect(webinarNotificationMocks.sendWebinarNotificationTest).not.toHaveBeenCalled();
+  });
+
+  test('次回開催がないウェビナーへのテスト送信は 400', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({
+      account_id: 'account-a',
+      schedule_json: '[]',
+    }));
+
+    const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error: 'no_upcoming_session' });
+    expect(webinarNotificationMocks.sendWebinarNotificationTest).not.toHaveBeenCalled();
   });
 
   test.each([
