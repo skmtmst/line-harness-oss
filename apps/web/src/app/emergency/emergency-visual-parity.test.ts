@@ -5,9 +5,19 @@ import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
+/** 注釈を落とす。**「なぜ h1 をやめたか」を書いた注釈が見張りに当たらないように。** */
+const visible = source
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '')
+
 describe('V3 10-4 運用状態の表示確認', () => {
   it('確定済み画面と同じ小さな文字階層を3タブで共通利用する', () => {
-    expect(source).toContain('text-ink text-xl leading-tight font-bold')
+    // 2026-09-04: 画面名の見出しは共通 `PageHeader` へ寄せた。
+    // トップバーが「運用状態」を出しているので、本文では出さない
+    // （題は `sr-only` で残る）。見出しの文字階層はこの下の節から。
+    expect(source).toContain('<PageHeader')
+    expect(visible).not.toMatch(/<h1[\s>]/)
     expect(source).toContain('text-base font-bold text-gray-900">チェック結果')
     expect(source).toContain('text-base font-bold text-gray-900">緊急停止')
     expect(source).toContain('text-base font-bold text-blue-900">復旧')
