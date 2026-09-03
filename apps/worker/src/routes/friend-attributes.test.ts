@@ -455,6 +455,29 @@ describe('対応マーク', () => {
     expect(await res.json()).toMatchObject({ code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT' });
   });
 
+  it('読み込んだ版を指定して自動変更ルールを更新する', async () => {
+    const input = {
+      name: '担当者が決まったら対応中へ', event: 'staff_assigned', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true,
+    };
+
+    const res = await req('/api/support-mark-rules/rule-1?lineAccountId=account-1', 'PATCH', {
+      ...input,
+      expectedVersion: 1,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { id: 'rule-1', version: 2 } });
+    expect(supportMarkAutomation.updateSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'rule-1',
+      'u-1',
+      1,
+      input,
+    );
+  });
+
   it('スタッフは自動変更ルールを作れない', async () => {
     const res = await req('/api/support-marks/m-1/automation-rules?lineAccountId=account-1', 'POST', {
       name: '受信で未対応へ', event: 'message_received', condition: null,
@@ -480,6 +503,23 @@ describe('対応マーク', () => {
     );
     expect(conflict.status).toBe(409);
     expect(await conflict.json()).toMatchObject({ code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT' });
+    expect(supportMarkAutomation.archiveSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'rule-1',
+      2,
+    );
+  });
+
+  it('読み込んだ版を指定して自動変更ルールを停止する', async () => {
+    const res = await req(
+      '/api/support-mark-rules/rule-1?lineAccountId=account-1',
+      'DELETE',
+      { expectedVersion: 2 },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: null });
     expect(supportMarkAutomation.archiveSupportMarkAutomationRule).toHaveBeenCalledWith(
       env.DB,
       { tenantId: 'tenant-1', lineAccountId: 'account-1' },
