@@ -80,7 +80,7 @@ export default function TermsConsent({ onAgree }: { onAgree: () => Promise<void>
         type="button"
         disabled={!canSubmitTerms(readToEnd, checked) || saving}
         onClick={() => void agree()}
-        className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40"
       >{saving ? '同意を記録中…' : '同意して次へ進む'}</button>
     </div>
   </div>

@@ -86,7 +86,7 @@ export default function SingleFriendActions({
             aria-pressed={open === a}
             className={`rounded-control border px-2.5 py-1 text-xs ${
               open === a
-                ? 'border-accent bg-accent text-on-accent'
+                ? 'border-accent bg-accent-deep text-on-accent'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
             }`}
           >
@@ -130,7 +130,7 @@ function Go({ busy, onClick, label = '実行' }: { busy: boolean; onClick: () =>
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+      className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-3 py-1.5 text-xs font-bold disabled:opacity-50"
     >
       {busy ? '実行中…' : label}
     </button>
