@@ -192,7 +192,11 @@ export async function processStepDeliveries(
   }
 
   const now = jstNow();
-  const dueFriendScenarios = await getFriendScenariosDueForDelivery(db, now);
+  const dueFriendScenarios = await getFriendScenariosDueForDelivery(
+    db,
+    now,
+    MAX_ATTEMPTS_PER_CRON,
+  );
 
   let sendCount = 0;
   let attemptCount = 0;

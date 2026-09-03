@@ -66,7 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
  *
  * `PageChromeProvider` の中でしか使えない（`usePageChrome` を読むため）。
  * 本文の幅は既定で `--container-shell` までにし、**ページが明示したときだけ**外す。
- * ルート名で自動判定しない（`docs/v6-shell-contract.md` §11-3）。
+ * ルート名で自動判定しない（`docs/v6-common-rules.md` §1）。
  */
 function Workspace({ children }: { children: React.ReactNode }) {
   const { fullWidth } = usePageChrome()

@@ -28,7 +28,7 @@ const STATUS_OPTIONS: { value: InboxFilterValue['status']; label: string }[] = [
   { value: 'unread', label: '未対応' },
   { value: 'in_progress', label: '対応中' },
   { value: 'on_hold', label: '保留' },
-  { value: 'resolved', label: '対応済' },
+  { value: 'resolved', label: '対応済み' },
 ]
 
 const CHANNEL_OPTIONS: { value: InboxFilterValue['channel']; label: string }[] = [
@@ -100,9 +100,9 @@ export default function InboxFilterPanel({
 
         <div className="flex-1 space-y-5 overflow-y-auto p-5">
           <div>
-            <span className={labelClass}>対応マーク</span>
+            <span className={labelClass}>対応状況</span>
             <select
-              aria-label="対応マークで絞り込む"
+              aria-label="対応状況で絞り込む"
               value={value.status}
               onChange={(event) => set({ status: event.target.value as InboxFilterValue['status'] })}
               className={fieldClass}

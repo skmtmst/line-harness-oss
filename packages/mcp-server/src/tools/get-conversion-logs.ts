@@ -25,8 +25,8 @@ export function registerGetConversionLogs(server: McpServer): void {
 
         const summary = {
           total: logs.length,
-          sent: logs.filter((l) => l.status === "sent").length,
-          failed: logs.filter((l) => l.status === "failed").length,
+          sent: logs.filter((l: { status?: string }) => l.status === "sent").length,
+          failed: logs.filter((l: { status?: string }) => l.status === "failed").length,
         };
 
         return {

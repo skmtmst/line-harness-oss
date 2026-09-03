@@ -147,7 +147,7 @@ export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
      json_tree(CASE WHEN json_valid(r.${column}) THEN r.${column} ELSE 'null' END) j WHERE j.type = 'text'`),
   'SELECT tag_on_attend AS tag_id FROM webinars WHERE tag_on_attend IS NOT NULL',
   'SELECT tag_on_cta_click AS tag_id FROM webinars WHERE tag_on_cta_click IS NOT NULL',
-  'SELECT target_tag_id AS tag_id FROM reminders WHERE target_tag_id IS NOT NULL',
+  'SELECT target_tag_id AS tag_id FROM reminders WHERE target_tag_id IS NOT NULL AND deleted_at IS NULL',
   'SELECT tag_id FROM entry_routes WHERE tag_id IS NOT NULL',
   'SELECT tag_id FROM tracked_links WHERE tag_id IS NOT NULL',
   'SELECT auto_tag_id AS tag_id FROM menus WHERE auto_tag_id IS NOT NULL',
@@ -651,7 +651,7 @@ export async function getTagDeleteImpact(
             )) AS templates,
             (SELECT COUNT(*) FROM webinars w
               WHERE w.tag_on_attend = t.id OR w.tag_on_cta_click = t.id) AS webinars,
-            (SELECT COUNT(*) FROM reminders r WHERE r.target_tag_id = t.id) AS reminders,
+            (SELECT COUNT(*) FROM reminders r WHERE r.target_tag_id = t.id AND r.deleted_at IS NULL) AS reminders,
             (SELECT COUNT(*) FROM entry_routes er WHERE er.tag_id = t.id) AS entry_routes,
             (SELECT COUNT(*) FROM tracked_links tl WHERE tl.tag_id = t.id) AS tracked_links,
             (SELECT COUNT(*) FROM menus m WHERE m.auto_tag_id = t.id) AS booking_menus,

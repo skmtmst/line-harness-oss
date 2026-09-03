@@ -116,7 +116,14 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
   }
 
   const cards = [
-    { title: '項目数', value: summary?.total ?? null, unit: '件', detail: summary ? `使用中 ${summary.inUse}件` : '' },
+    /*
+      **`undefined` を画面に出さない。**
+      `summary` があるかどうかだけ見ていたので、器はあるが `inUse` が
+      入っていないとき「使用中 undefined件」と出ていた。
+      型は `inUse: number` だが、返事が形どおりとは限らない。
+      値が無いなら数を語らず、取れていないことを言う。
+    */
+    { title: '項目数', value: summary?.total ?? null, unit: '件', detail: typeof summary?.inUse === 'number' ? `使用中 ${summary.inUse}件` : '使用中の数は取得できません' },
     { title: '登録済み友だち', value: summary?.registeredFriends ?? null, unit: '人', detail: '1項目以上を登録' },
     { title: 'フォーム連携', value: summary?.formLinks ?? null, unit: summary?.formLinks === null ? '' : '件', detail: summary?.formLinks === null ? '未取得' : '回答の登録先' },
     { title: '今月の更新', value: summary?.updatedThisMonth ?? null, unit: '件', detail: '追加・編集' },

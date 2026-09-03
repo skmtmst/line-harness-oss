@@ -21,6 +21,9 @@ export interface ConversionPoint {
   attribution_days: number | null;
   /** 集計対象を1アカウントに絞る場合。NULL なら全アカウント */
   line_account_id: string | null;
+  status: 'active' | 'stopped';
+  stopped_at: string | null;
+  updated_at: string;
   created_at: string;
 }
 
@@ -37,6 +40,10 @@ export interface ConversionEvent {
   /** Approval state for affiliate-attributed CVs (ASP Phase 2). NULL if non-attributed. */
   approval_status: 'pending' | 'approved' | 'rejected' | null;
   approved_at: string | null;
+  point_name_snapshot: string | null;
+  event_type_snapshot: string | null;
+  value_snapshot: number | null;
+  idempotency_key: string | null;
 }
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
@@ -83,8 +90,8 @@ export async function createConversionPoint(
     .prepare(
       `INSERT INTO conversion_points
          (id, name, event_type, value, measure_method, target_url,
-          count_repeat, attribution_days, line_account_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          count_repeat, attribution_days, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -96,6 +103,7 @@ export async function createConversionPoint(
       input.countRepeat === false ? 0 : 1,
       input.attributionDays ?? null,
       input.lineAccountId ?? null,
+      now,
       now,
     )
     .run();
@@ -136,6 +144,7 @@ export async function updateConversionPoint(
   if ('attributionDays' in input) put('attribution_days', input.attributionDays ?? null);
   if ('lineAccountId' in input) put('line_account_id', input.lineAccountId ?? null);
   if (sets.length === 0) return getConversionPointById(db, id);
+  put('updated_at', jstNow());
   values.push(id);
   await db
     .prepare(`UPDATE conversion_points SET ${sets.join(', ')} WHERE id = ?`)
@@ -163,6 +172,7 @@ export async function getUrlReachConversionPoints(
     .prepare(
       `SELECT * FROM conversion_points
         WHERE measure_method = 'url_reach'
+          AND status = 'active'
           AND target_url IS NOT NULL
           AND target_url != ''
           AND ? LIKE target_url || '%'
@@ -173,11 +183,15 @@ export async function getUrlReachConversionPoints(
   return result.results;
 }
 
-export async function deleteConversionPoint(
+export async function stopConversionPoint(
   db: D1Database,
   id: string,
 ): Promise<void> {
-  await db.prepare(`DELETE FROM conversion_points WHERE id = ?`).bind(id).run();
+  const now = jstNow();
+  await db
+    .prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?, updated_at = ? WHERE id = ?`)
+    .bind(now, now, id)
+    .run();
 }
 
 // ── Conversion Events ───────────────────────────────────────────────────────
@@ -188,6 +202,7 @@ export interface TrackConversionInput {
   userId?: string | null;
   affiliateCode?: string | null;
   metadata?: string | null;
+  idempotencyKey?: string | null;
 }
 
 /**
@@ -207,11 +222,21 @@ export async function trackConversion(
   const now = jstNow();
 
   const point = await getConversionPointById(db, input.conversionPointId);
+  if (!point) throw new Error('conversion_point_not_found');
+  if (point.status === 'stopped') throw new Error('conversion_point_stopped');
+
+  if (input.idempotencyKey) {
+    const existing = await db
+      .prepare(`SELECT * FROM conversion_events WHERE conversion_point_id = ? AND idempotency_key = ?`)
+      .bind(input.conversionPointId, input.idempotencyKey)
+      .first<ConversionEvent>();
+    if (existing) return existing;
+  }
 
   // 一人一回だけ数える地点で、すでに記録があるなら、それを返して終わる。
   // 例外にしないのは、二重に踏むのは利用者にとって普通の行動で、
   // 呼び出し側に異常として扱わせるとログが埋まるため。
-  if (point && point.count_repeat === 0) {
+  if (point.count_repeat === 0) {
     const existing = await db
       .prepare(
         `SELECT * FROM conversion_events
@@ -227,36 +252,56 @@ export async function trackConversion(
   // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
   // （NULL なら全体の既定 90 日）。
   const attr = await resolveAffiliateAttribution(db, input.friendId, undefined, {
-    windowDays: point?.attribution_days ?? undefined,
+    windowDays: point.attribution_days ?? undefined,
   });
 
   // Affiliate-attributed CVs enter the approval queue as 'pending'; non-attributed
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).
   const approvalStatus = attr ? 'pending' : null;
 
-  await db
-    .prepare(
-      `INSERT INTO conversion_events (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at, affiliate_id, attributed_ref_code, approval_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      input.conversionPointId,
-      input.friendId,
-      input.userId ?? null,
-      input.affiliateCode ?? null,
-      input.metadata ?? null,
-      now,
-      attr?.affiliateId ?? null,
-      attr?.refCode ?? null,
-      approvalStatus,
-    )
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO conversion_events
+       (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
+        affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
+        event_type_snapshot, value_snapshot, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.conversionPointId,
+        input.friendId,
+        input.userId ?? null,
+        input.affiliateCode ?? null,
+        input.metadata ?? null,
+        now,
+        attr?.affiliateId ?? null,
+        attr?.refCode ?? null,
+        approvalStatus,
+        point.name,
+        point.event_type,
+        point.value,
+        input.idempotencyKey ?? null,
+      )
+      .run();
+  } catch (error) {
+    if (input.idempotencyKey) {
+      const existing = await db
+        .prepare(`SELECT * FROM conversion_events WHERE conversion_point_id = ? AND idempotency_key = ?`)
+        .bind(input.conversionPointId, input.idempotencyKey)
+        .first<ConversionEvent>();
+      if (existing) return existing;
+    }
+    throw error;
+  }
 
-  return (await db
+  const created = await db
     .prepare(`SELECT * FROM conversion_events WHERE id = ?`)
     .bind(id)
-    .first<ConversionEvent>())!;
+    .first<ConversionEvent>();
+  if (!created) throw new Error('conversion_event_insert_failed');
+  return created;
 }
 
 export async function getConversionEvents(
@@ -353,7 +398,7 @@ export async function getConversionReport(
          cp.name as conversion_point_name,
          cp.event_type,
          COUNT(ce.id) as total_count,
-         COALESCE(SUM(cp.value), 0) as total_value
+         COALESCE(SUM(CASE WHEN ce.id IS NULL THEN 0 ELSE COALESCE(ce.value_snapshot, cp.value, 0) END), 0) as total_value
        FROM conversion_points cp
        LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id ${conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : ''}
        GROUP BY cp.id

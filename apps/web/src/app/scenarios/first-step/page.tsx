@@ -145,7 +145,7 @@ function FirstStepContent() {
    * 本文が上限を超えているか。
    *
    * 超えたまま保存を押せると、LINEに渡してから弾かれる。押せない形にして、
-   * 理由を操作のそばに出す（`docs/v6-shell-contract.md` の言葉の決まり）。
+   * 理由を操作のそばに出す（`docs/v6-common-rules.md` §1 の言葉の決まり）。
    */
   const bodyLength = countTemplateTextCharacters(body)
   const bodyOverLimit =

@@ -42,6 +42,15 @@
 - 文書変更などDB更新・配備が不要なタスクでは不要な工程を実行しないでください。本番統合・本番配備はこの自動フローに含めません。
 - `GitHub PR Slack Sync` は参考チェックです。失敗をActionsの警告として残して再照合しますが、PRの統合を止める必須ゲートにはしません。
 
+## Claude / Codex のファイル所有
+
+| 担当 | 所有する領域 |
+| --- | --- |
+| Claude | `docs/v6-requirements/`、`scripts/visual-qa/`、`docs/design-qa/`、`docs/design-reference/`、`apps/web/src/components/shared/`、Pencil |
+| Codex | `apps/worker/src/routes/`、`apps/worker/src/services/`、`packages/db/`、`.github/`、`apps/web/src/lib/api.ts` の分割 |
+
+- 相手の所有領域を変更するときは、作業前にSlackの対象スレッドで宣言してください。
+
 ## `codex/development` 同時更新防止ゲート
 
 - `codex/development` への直接コミット・直接pushは禁止し、専用ブランチからのPull Requestだけで更新してください。
@@ -68,7 +77,9 @@
 
 ## 反映履歴に必ず1行足す（毎回）
 
-- **PRを出すときは必ず `docs/release-log/unreleased.md` に1行足してください。** 例外はありません。
+- **PRを出すときは必ず `docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md` を1ファイル作ってください。** 例外はありません。
+- PR作成前はPR番号を省いた仮のファイル名で構いません。採番後にファイル名と本文へPR番号を足してpushしてください。
+- 既存の `docs/release-log/unreleased.md` は残しますが、新しい行は追加しないでください。
 - 書く場所は `## 追加` / `## 変更` / `## 修正` のどれか。この3つ以外の見出しは作らないでください。
 - 行の形は `- 内容 @担当 #PR番号 YYYY-MM-DD HH:MM`。順番は問わず、どれも省略できます。
   - `@担当` は `kenta` / `masato` のように書きます
@@ -79,7 +90,7 @@
   - 良い例: `予約した絞り込み配信が全員に届いていたのを直した`
 - 中身は管理画面の **運用状態 → 更新履歴 → 変更内容** にそのまま出ます。読む人は画面を触っている人です。
 - 書き方の詳細は `docs/release-log/README.md`、設計の背景は `docs/change-log-design.md` にあります。
-- リリース時は `unreleased.md` を `<version>.md` に改名し、`released: YYYY-MM-DD` を入れ、空の `unreleased.md` を作り直してください。
+- リリース時は `docs/release-log/unreleased/` の各PRファイルを、`docs/release-log/README.md` の手順でバージョン別の履歴へまとめてください。
 
 ## 管理画面のデザイン設計ルール
 
@@ -99,3 +110,18 @@
 - PCの確認基準は幅1440pxと1920pxとし、主要な一覧画面でページ全体または表だけの横スクロールが発生しないことを確認してください。
 - スマートフォン、長いURL・秘密値の詳細表示、比較上すべての列が必須の表など、情報欠落を避ける必要がある場合だけ横スクロールまたは安全な折り返しを許可します。
 - 詳細な判断基準は `docs/admin-ui-design-guidelines.md` に従ってください。
+
+## 古い要件定義は読まない
+
+- 要件の正本は `docs/v6-requirements/v6-requirements-master-index.md` が指す 34 本と、その §5 の横断契約だけです。それ以外を要件として読まないでください。
+- `docs/archive/` 配下は V2〜V5 世代の廃止文書です。開かない・引用しない・実装の根拠にしないでください。git 履歴の確認だけに使います。
+- `docs/lstep-feature-parity-matrix.md` と `docs/lstep-gap-analysis.md` は 2026-08-15 時点の調査で、半分が既に実装済みと判明しています。「無い機能」の一覧として使わず、比較の根拠には `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使ってください。
+- `docs/design-reference/` と `docs/design-qa/` の `-v2` `-v3` `-v4` `-v5` が付くフォルダは旧設計の画像です。設計一致の比較には `-v6` だけを使ってください。
+- `docs/pendev-v4-implementation-runbook.md` は V3/V4 の積み残しにだけ使い、新しい画面の根拠にしないでください。
+- `docs/v6-requirements/v6-32-feature-requirements-progress.md` の実装・画像確認の状況は廃止済みです。実装の進捗は `docs/design-qa/v6-progress-ledger.md` を見てください。
+
+## 起動時の必読(全エージェント共通)
+
+- 新しいセッションを始めたら、回答の前にこの順で読んでください: `AGENTS.md` → `docs/brain/Memory.md`(この仕事の事実と判断基準) → `docs/brain/rules/corrections.md`(受けた修正指示。恒久的に守る) → `docs/brain/rules/mistakes.md`(やらかしと再発防止) → 自分の担当の指示書(`docs/v6-directives.md`、`docs/v6-parallel-plan.md`)。
+- 利用者に訂正・要望を言われたら、その場で `docs/brain/rules/corrections.md` に 3 行(日付 / 指摘 / 今後)で追記してください。同じ失敗を 2 回指摘されたら `docs/brain/rules/mistakes.md` に追記してください。
+- `docs/brain/Memory.md` の「進行中」が実態とずれていたら、気づいた人が直してください。

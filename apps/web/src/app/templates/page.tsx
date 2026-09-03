@@ -480,7 +480,7 @@ export default function TemplatesPage() {
       {/* Type filter */}
       <div className="mb-4 flex flex-wrap gap-2">
         {([
-          { key: 'all', label: '全て' },
+          { key: 'all', label: 'すべて' },
           { key: 'text', label: 'テキスト' },
           { key: 'flex', label: 'Flex' },
           { key: 'image', label: '画像' },

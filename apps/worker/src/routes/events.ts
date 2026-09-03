@@ -64,6 +64,19 @@ function bad(c: Context<Env>, code: string, status = 422): Response {
   return c.json({ error: code }, status as 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429);
 }
 
+// account_id is supplied by the admin client, so validate it once at the
+// route boundary before any event or booking data is read or changed.
+events.use('/api/events/admin/*', async (c, next) => {
+  const accountId = c.req.query('account_id');
+  if (
+    accountId
+    && !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]))
+  ) {
+    return bad(c, ACCOUNT_ACCESS_ERROR, 403);
+  }
+  await next();
+});
+
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
 }

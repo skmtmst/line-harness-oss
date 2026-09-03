@@ -177,7 +177,7 @@ function BroadcastList() {
     return tags.find((t) => t.id === tagId)?.name ?? null
   }
 
-  // タブで分類: 単アカ配信 (multi-account-dedup 以外) と 複アカ重複除外配信 を分ける。
+  // タブで分類: 1アカウントへの配信 (multi-account-dedup 以外) と 複数アカウントの重複除外配信 を分ける。
   // 全件タブは未フィルタ。サイドバー account context のフィルタは API 側で済んでる。
   const dedupCount = broadcasts.filter((b) => b.targetType === 'multi-account-dedup').length
   const singleCount = broadcasts.length - dedupCount
@@ -396,8 +396,8 @@ function BroadcastList() {
         <div className="mb-4 flex gap-1 border-b border-hairline">
           {([
             { id: 'all', label: '全部', count: broadcasts.length },
-            { id: 'single', label: '単アカ配信', count: singleCount },
-            { id: 'dedup', label: '複アカ重複除外', count: dedupCount },
+            { id: 'single', label: '1アカウント配信', count: singleCount },
+            { id: 'dedup', label: '複数アカウント重複除外', count: dedupCount },
           ] as const).map((tab) => (
             <button
               key={tab.id}
@@ -444,7 +444,7 @@ function BroadcastList() {
       ) : visibleBroadcasts.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
           <p className="text-ink-faint">
-            {activeTab === 'dedup' ? '複数アカ重複除外配信はまだありません。' : 'このタブに該当する配信はありません。'}
+            {activeTab === 'dedup' ? '複数アカウントの重複除外配信はまだありません。' : 'このタブに該当する配信はありません。'}
           </p>
         </div>
       ) : (
@@ -507,7 +507,7 @@ function BroadcastList() {
                         </a>
                         {isDedup && (
                           <span className="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
-                            複アカ
+                            複数アカウント
                           </span>
                         )}
                       </div>

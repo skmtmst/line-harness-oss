@@ -3,7 +3,7 @@
  * どのファイルに何か所あるかを数えて、`src/lib/raw-color-baseline.json` に書く。
  *
  * 数える理由は `src/lib/raw-colors.test.ts` に書いてある。
- * 減らしたとき・ファイルを消したときは、このスクリプトを流して基準を更新する。
+ * 意図して基準を増やすときだけ、このスクリプトを流して基準を更新する。
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'

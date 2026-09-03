@@ -111,7 +111,7 @@ export default function AppTopBar() {
   return (
     <TopBar
       title={shownTitle}
-      // Masato の確定待ち。空のうちは押せない見た目にする（`v6-shell-contract.md` §11-2）。
+      // Masato の確定待ち。空のうちは押せない見た目にする（`docs/v6-common-rules.md` §11-2）。
       manualHref={null}
       accounts={options}
       selectedAccountId={selectedAccountId ?? ''}

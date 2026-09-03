@@ -45,6 +45,93 @@ export async function setAccountSetting(
     .run();
 }
 
+export interface VersionedAccountSetting<T> {
+  version: number;
+  data: T;
+}
+
+export type SaveVersionedAccountSettingResult<T> =
+  | { status: 'saved'; setting: VersionedAccountSetting<T> }
+  | { status: 'conflict'; current: VersionedAccountSetting<T> | null };
+
+/**
+ * Save one logical settings bundle with optimistic locking.
+ *
+ * Keeping the version in the same row lets D1 reject a stale writer with one
+ * conditional UPDATE instead of partially saving several independent keys.
+ */
+export async function saveVersionedAccountSetting<T>(
+  db: D1Database,
+  input: {
+    accountId: string;
+    key: string;
+    expectedVersion: number;
+    data: T;
+  },
+): Promise<SaveVersionedAccountSettingResult<T>> {
+  const current = await getVersionedAccountSetting<T>(db, input.accountId, input.key);
+  if ((current?.version ?? 0) !== input.expectedVersion) {
+    return { status: 'conflict', current };
+  }
+
+  const next: VersionedAccountSetting<T> = {
+    version: input.expectedVersion + 1,
+    data: input.data,
+  };
+  const value = JSON.stringify(next);
+  const now = new Date(Date.now() + 9 * 60 * 60_000)
+    .toISOString()
+    .replace('Z', '+09:00');
+
+  if (current) {
+    const updated = await db.prepare(
+      `UPDATE account_settings
+          SET value = ?, updated_at = ?
+        WHERE line_account_id = ? AND key = ?
+          AND json_valid(value)
+          AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,
+    ).bind(value, now, input.accountId, input.key, input.expectedVersion).run();
+    if ((updated.meta?.changes ?? 0) !== 1) {
+      return {
+        status: 'conflict',
+        current: await getVersionedAccountSetting<T>(db, input.accountId, input.key),
+      };
+    }
+  } else {
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO account_settings
+        (id, line_account_id, key, value, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(crypto.randomUUID(), input.accountId, input.key, value, now, now).run();
+    if ((inserted.meta?.changes ?? 0) !== 1) {
+      return {
+        status: 'conflict',
+        current: await getVersionedAccountSetting<T>(db, input.accountId, input.key),
+      };
+    }
+  }
+
+  return { status: 'saved', setting: next };
+}
+
+export async function getVersionedAccountSetting<T>(
+  db: D1Database,
+  accountId: string,
+  key: string,
+): Promise<VersionedAccountSetting<T> | null> {
+  const raw = await getAccountSetting(db, accountId, key);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<VersionedAccountSetting<T>>;
+    if (!Number.isInteger(parsed.version) || Number(parsed.version) < 1 || parsed.data === undefined) {
+      return null;
+    }
+    return { version: Number(parsed.version), data: parsed.data };
+  } catch {
+    return null;
+  }
+}
+
 // ── URL settings (link_base_url / tracked_link_base_url) ─────────────────────
 
 const LINK_BASE_URL_KEY = 'link_base_url';

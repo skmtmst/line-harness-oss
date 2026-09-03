@@ -31,7 +31,7 @@ export default function SavedViewDialog({
   onClose,
 }: {
   open: boolean
-  /** 「保存する条件」に並べる中身。設計は 対応マーク・期限 など */
+  /** 「保存する条件」に並べる中身。設計は 対応状況・期限 など */
   conditions: SavedViewCondition[]
   /** 同じ名前があるかを見るための一覧 */
   existingNames: string[]

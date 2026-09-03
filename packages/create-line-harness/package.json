@@ -13,6 +13,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "prepublishOnly": "node ./scripts/guard-source-publish.mjs",
+    "pretest": "pnpm --filter @line-harness/update-engine build",
     "test": "vitest run"
   },
   "keywords": [

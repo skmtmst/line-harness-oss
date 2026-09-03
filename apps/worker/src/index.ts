@@ -68,6 +68,7 @@ import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
 // 旧通知ルールCRUDはインボックスへ置き換え済み。ダッシュボードの通知パネルだけを公開する。
 import { notificationCenter } from './routes/notification-center.js';
+import { notifications } from './routes/notifications.js';
 import { stripe } from './routes/stripe.js';
 import { health } from './routes/health.js';
 import { automations } from './routes/automations.js';
@@ -83,6 +84,7 @@ import { images } from './routes/images.js';
 import { accountSettings } from './routes/account-settings.js';
 import { setup } from './routes/setup.js';
 import { autoReplies } from './routes/auto-replies.js';
+import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
 import booking from './routes/booking.js';
@@ -142,7 +144,8 @@ export type Env = {
   Bindings: {
     DB: D1Database;
     IMAGES: R2Bucket;
-    RAW_MAIL: R2Bucket;
+    /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
+    RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
     EMAIL?: SendEmail;
@@ -322,6 +325,9 @@ app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
 app.route('/', notificationCenter);
+// 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
+// 2026-05 に外したまま mount されていなかった。
+app.route('/', notifications);
 app.route('/', stripe);
 app.route('/', health);
 app.route('/', automations);
@@ -336,6 +342,7 @@ app.route('/', capabilities);
 app.route('/', images);
 app.route('/', setup);
 app.route('/', autoReplies);
+app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
@@ -1294,8 +1301,8 @@ async function scheduled(
   }
 
   // クロス分析は最大50×20・15条件を扱うため、HTTP要求の中では計算しない。
-  // 毎分1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
-  if (event.cron === '* * * * *') {
+  // 5分ごとに1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
+  if (event.cron === '*/5 * * * *') {
     try {
       const {
         processPendingAnalyticsCrossRuns,
@@ -1427,10 +1434,10 @@ async function scheduled(
    * ゴール日から逆算して送る。分けているのは、「3日前に送る」通を届けるには
    * ゴール日がその3日以上前に立っている必要があるため。
    *
-   * 毎分の cron に相乗りしている。専用の Cron Trigger を増やさずに済む
+   * 5分ごとの cron に相乗りしている。専用の Cron Trigger を増やさずに済む
    * （マイルの処理と同じやり方）。
    */
-  if (event.cron === '* * * * *') {
+  if (event.cron === '*/5 * * * *') {
     const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
     if (jstMinutes === 5) {
       jobs.push(
@@ -1446,12 +1453,9 @@ async function scheduled(
   }
 
   // Mileage is an eventually-consistent projection. Reuse the existing
-  // minute cron invocation, but drain only every five minutes and at most 100
+  // five-minute cron invocation and drain at most 100
   // actions per batch so it adds no extra Cron Trigger and keeps D1 load flat.
-  if (
-    event.cron === '* * * * *'
-    && new Date(event.scheduledTime).getUTCMinutes() % 5 === 0
-  ) {
+  if (event.cron === '*/5 * * * *') {
     jobs.push(
       processPendingMileageEvents(env.DB, { limit: 100 }).then((result) => {
         if (result.claimed > 0) {

@@ -224,4 +224,15 @@ describe('印が付く前に当ててしまった作り直し', () => {
   it('一覧に無いファイル名では通さない', () => {
     expect(checkMigration('DROP TABLE friends;', '999_whatever.sql').ok).toBe(false);
   });
+
+  it('grandfathers the four rebuilds that were applied before the marker existed', () => {
+    for (const name of [
+      '189_analytics_cross.sql',
+      '192_inbox_v6_foundation.sql',
+      '202_ec_event_account_and_identity.sql',
+      '265_nen_shared_friend_add_coupon.sql',
+    ]) {
+      expect(checkMigration('DROP TABLE x;', name).ok).toBe(true);
+    }
+  });
 });

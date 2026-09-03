@@ -186,6 +186,7 @@ async function storeRawEmail(
   const pipeAbort = new AbortController();
   const pipePromise = message.raw.pipeTo(fixedLength.writable, { signal: pipeAbort.signal });
   try {
+    if (!env.RAW_MAIL) throw new Error('RAW_MAIL binding is not configured');
     await env.RAW_MAIL.put(objectKey, fixedLength.readable, {
       httpMetadata: { contentType: 'message/rfc822' },
       customMetadata,
@@ -442,6 +443,7 @@ export async function deleteExpiredRestaurantRawEmails(
     checked += results.length;
 
     try {
+      if (!env.RAW_MAIL) throw new Error('RAW_MAIL binding is not configured');
       await env.RAW_MAIL.delete(results.map((row) => row.r2_key));
       for (let offset = 0; offset < results.length; offset += 100) {
         await db.batch(results.slice(offset, offset + 100).map((row) => db.prepare(`UPDATE rt_inbound_emails
