@@ -150,9 +150,13 @@
   color: var(--color-ink);
 }
 
+/*
+ * 確認の実行ボタン。**白文字が乗るので `$accent-deep`。**
+ * `$accent`(#06c755) に白文字は 2.26:1 で、13px のラベルが読めない。
+ */
 .confirm {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 

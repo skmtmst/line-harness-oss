@@ -263,7 +263,7 @@ function StepNav({ current }: { current: 1 | 2 | 3 }) {
             <span
               className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                 active
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : done
                     ? 'bg-success-bg text-success'
                     : 'bg-canvas-sunken text-ink-faint'
@@ -306,7 +306,7 @@ function StepFooter({
       <button
         onClick={next.onClick}
         disabled={saving}
-        className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
       >
         {saving ? '保存中...' : next.label}
       </button>
@@ -464,7 +464,7 @@ function OverviewStep({
         <button
           onClick={onNext}
           disabled={saving}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
         >
           {saving ? '保存中...' : '概要を保存して次へ'}
         </button>
