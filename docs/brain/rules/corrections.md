@@ -22,6 +22,10 @@
 <!-- ここから下に追記。最新を上に。 -->
 
 ## 2026-09-04
+- 指摘: 保護ルールで「ブランチが最新」でないとマージできないため、司令塔が PR ブランチに codex/development を取り込む merge commit を push することがある。push 前に必ず git pull --no-rebase origin <自分のブランチ> を実行して衝突を避ける。rebase や force push はしない
+- 今後: push の直前に `git pull --no-rebase origin <自分のブランチ>` を毎回実行する。`git rebase`、`git push --force`(--force-with-lease を含む)、`commit --amend` 後の push は使わない。直したいときは新しいコミットを積む
+
+## 2026-09-04
 - 指摘: チケットが終わっても止まらない。PR を出したらマージを待たず、gh で自分の lane の blocked → doing → todo の順に次の 1 件を取り、doing にして着手する。取れるものが無いときだけ司令塔に「空きあり」と Issue コメントで知らせる。他の担当の完了を待つチケットは、その 1 件だけ blocked にして依存先を書き、別のチケットに進む
 - 今後: PR を出した直後に `gh issue list --label lane:自分 --label blocked / doing / todo` の順で次を取り、ラベルを doing にしてから着手する。空きが出たときだけ司令塔へ「空きあり」を書く。待ちが要る 1 件は blocked + 依存先を本文に書いて、次へ進む
 
