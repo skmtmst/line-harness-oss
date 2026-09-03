@@ -506,6 +506,29 @@ describe('V6ファネルAPI', () => {
     expect(mocks.getFunnelsWithCurrentVersions).not.toHaveBeenCalled();
   });
 
+  it.each(['0', '1.5', 'invalid'])(
+    '一覧の不正なページ番号 %s は取得前に400で止める',
+    async (page) => {
+      const res = await req(`/api/analytics/funnels?${ACCOUNT}&page=${page}`);
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        success: false,
+        error: 'ページは1以上の整数で指定してください',
+      });
+      expect(mocks.getFunnelsWithCurrentVersions).not.toHaveBeenCalled();
+    },
+  );
+
+  it('一覧の一括取得に失敗したときは空一覧と偽らず500を返す', async () => {
+    mocks.getFunnelsWithCurrentVersions.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+    const res = await req(`/api/analytics/funnels?${ACCOUNT}`);
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+  });
+
   it('作成時に第1版を固定する', async () => {
     const res = await req(`/api/analytics/funnels?${ACCOUNT}`, 'POST', body);
     expect(res.status).toBe(201);
