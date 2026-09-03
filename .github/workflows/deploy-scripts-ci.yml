@@ -1,20 +1,12 @@
 name: Deploy scripts CI
 
-# PR gate for the deploy tooling.
+# Post-merge gate for the deploy tooling.
 #
-# worker-ci.yml only watches apps/worker and packages/*, so changes under
-# scripts/deploy landed with zero status checks. These scripts decide whether a
-# deploy is allowed to proceed, so they need at least as much checking as the
-# code they guard.
+# Pull requests are checked once by required-pr-gate.yml. This workflow keeps
+# the same checks on pushes to the integration and production branches without
+# running them a second time on pull requests.
 
 on:
-  pull_request:
-    paths:
-      - 'scripts/**'
-      - 'package.json'
-      - 'vitest.config.ts'
-      - 'tsconfig.base.json'
-      - '.github/workflows/**'
   push:
     branches: [codex/development, main]
     paths:

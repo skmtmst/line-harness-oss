@@ -1,15 +1,6 @@
 name: Worker CI
 
 on:
-  pull_request:
-    paths:
-      - 'apps/worker/**'
-      - 'packages/db/**'
-      - 'packages/shared/**'
-      - 'packages/line-sdk/**'
-      - 'packages/update-engine/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/worker-ci.yml'
   push:
     branches: [main]
     paths:
