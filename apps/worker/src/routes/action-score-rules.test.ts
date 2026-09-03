@@ -185,4 +185,39 @@ describe('V6 action score rule API', () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ success: false, code: 'bands_invalid', field: 'bands' });
   });
+
+  it.each([
+    'draft_not_found',
+    'published_version_required',
+    'published_version_missing',
+  ])('returns 404 for missing rule state %s', async (code) => {
+    dbMocks.saveActionScoreRuleDraft.mockRejectedValueOnce(
+      new dbMocks.ActionScoreRuleValidationError(code, '対象の版が見つかりません'),
+    );
+
+    const response = await call('/api/action-scores/rules/draft', {
+      method: 'PATCH', body: JSON.stringify({ accountId: 'account-1', configuration }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      success: false,
+      code,
+      error: '対象の版が見つかりません',
+    });
+  });
+
+  it('returns a generic 500 without leaking unexpected storage errors', async () => {
+    dbMocks.getActionScoreRuleConfiguration.mockRejectedValueOnce(
+      new Error('D1 internal details'),
+    );
+
+    const response = await call('/api/action-scores/rules?accountId=account-1');
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'スコアのルールを処理できませんでした',
+    });
+  });
 });
