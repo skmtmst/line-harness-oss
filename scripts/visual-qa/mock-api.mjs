@@ -898,6 +898,42 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
   }
+  if (pathname === '/api/notifications/center') {
+    /*
+      ダッシュボードの通知パネル。**器の形が合わないと画面が落ちる。**
+      `isDashboardNotificationData` が `items` と `counts.{all,error,update,unread}`
+      と `unreadCount` を見ていて、既定の器（空配列）だと通らず
+      「通知を読み込めませんでした」になっていた。
+      中身は設計 `Alekb` の6件をそのまま置く。
+    */
+    const item = (id, category, title, body, isRead, createdAt) => ({
+      id, eventType: `visual_qa.${category}`, category, title, body,
+      metadata: null, isRead, createdAt,
+    })
+    const items = [
+      item('nc-1', 'error', '一斉配信「8月号のご案内」で12件が送信失敗', '配信結果を開く', false, '2026-09-02T01:04:00.000Z'),
+      item('nc-2', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-3', 'error', 'EC連携の取り込みが3件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
+      item('nc-4', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', false, '2026-08-20T00:00:00.000Z'),
+      item('nc-5', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
+      item('nc-6', 'update', 'メンテナンス予定　8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
+    ]
+    const category = query.get('category')
+    const shown = category && category !== 'all' ? items.filter((x) => x.category === category) : items
+    return {
+      success: true,
+      data: {
+        items: shown,
+        counts: {
+          all: items.length,
+          error: items.filter((x) => x.category === 'error').length,
+          update: items.filter((x) => x.category === 'update').length,
+          unread: items.filter((x) => !x.isRead).length,
+        },
+        unreadCount: items.filter((x) => !x.isRead).length,
+      },
+    }
+  }
   if (pathname === '/api/analytics/url-clicks') {
     /*
       分析のURLクリック。**入れ子の器で返す。**

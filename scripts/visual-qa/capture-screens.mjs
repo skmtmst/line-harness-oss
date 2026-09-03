@@ -598,6 +598,18 @@ async function captureDesign(feature, from) {
     const size = sizeFromHtml(src) ?? DESIGN_SIZE[s.node]
     if (!size) { console.log(`${s.node}\t大きさが読めない`); continue }
     const [w, h] = size
+    /*
+      **横に伸びた絵を作らない。**
+      まるごと1枚の書き出しを割ったとき、`left: 2080px` のような
+      置き場所が残っていると、そのぶん左に空白が入った絵になる。
+      機能1で 4000〜10240px の絵ができ、**197枚が同じ形で壊れていた**。
+      `split-design-html.mjs` が置き場所を0に戻すようにしたが、
+      戻し忘れた書き出しを黙って撮らないよう、ここでも見張る。
+    */
+    if (w > 2600) {
+      console.log(`${s.node}\t横に伸びている（${w}px）。割るときに left を0へ戻してください`)
+      continue
+    }
     const out = join(ROOT, 'docs', 'design-reference', s.dir)
     mkdirSync(out, { recursive: true })
     const page = await newPage(browser, w, h)

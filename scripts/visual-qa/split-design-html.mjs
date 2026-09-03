@@ -50,6 +50,18 @@ for (let i = 0; i < marks.length; i += 1) {
   // 印は属性の途中なので、そのタグの頭から次のタグの頭まで。
   const start = body.lastIndexOf('<', marks[i].index)
   const end = i + 1 < marks.length ? body.lastIndexOf('<', marks[i + 1].index) : body.lastIndexOf('</body>')
-  writeFileSync(join(outDir, `${nodes[i]}.html`), `${head}<body>\n${body.slice(start, end)}\n</body></html>\n`)
+  /*
+    **置き場所を0に戻す。**
+    まるごと1枚の書き出しでは、画面が `left: 2080px` のように横へ並べてある。
+    そのまま割ると、1枚目は 1920px でも5枚目は 10240px の絵になる
+    （左に空白がそのぶん入る）。実際に機能1で 4000〜10240px の絵ができた。
+    最上位のタグの `left`/`top` だけ0にする（中の要素の位置は触らない）。
+  */
+  const piece = body.slice(start, end)
+  const openEnd = piece.indexOf('>')
+  const opening = piece.slice(0, openEnd)
+    .replace(/left:\s*-?\d+(\.\d+)?px/, 'left: 0px')
+    .replace(/top:\s*-?\d+(\.\d+)?px/, 'top: 0px')
+  writeFileSync(join(outDir, `${nodes[i]}.html`), `${head}<body>\n${opening}${piece.slice(openEnd)}\n</body></html>\n`)
   console.log(`${nodes[i]}\t${marks[i][1]}`)
 }
