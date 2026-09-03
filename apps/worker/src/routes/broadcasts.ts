@@ -667,12 +667,15 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       title?: string;
       messageType?: BroadcastMessageType;
       messageContent?: string;
+      messageBubbles?: unknown[];
       targetType?: BroadcastTargetType;
       targetTagId?: string | null;
+      segmentConditions?: unknown;
       scheduledAt?: string | null;
       trackLinks?: boolean;
       folderId?: string | null;
       measureOpens?: boolean;
+      stealthSpreadMinutes?: number;
       lineAccountId?: string | null;
       accountIds?: string[];
     }>();
@@ -695,6 +698,54 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       }
     }
 
+    if (body.messageBubbles !== undefined
+        && (!Array.isArray(body.messageBubbles)
+          || body.messageBubbles.length < 1
+          || body.messageBubbles.length > 3)) {
+      return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
+    }
+
+    let segmentConditions: string | null | undefined;
+    if (body.segmentConditions !== undefined && body.segmentConditions !== null) {
+      const raw = body.segmentConditions as { operator?: unknown; rules?: unknown };
+      if ((raw.operator !== 'AND' && raw.operator !== 'OR') || !Array.isArray(raw.rules)) {
+        return c.json(
+          { success: false, error: 'segmentConditions must be { operator: "AND" | "OR", rules: [] }' },
+          400,
+        );
+      }
+      try {
+        const { buildSegmentQuery } = await import('../services/segment-query.js');
+        buildSegmentQuery(raw as SegmentCondition);
+      } catch (segmentError) {
+        return c.json(
+          { success: false, error: segmentError instanceof Error ? segmentError.message : 'invalid segmentConditions' },
+          400,
+        );
+      }
+      segmentConditions = JSON.stringify(raw);
+    } else if (body.segmentConditions === null) {
+      segmentConditions = null;
+    }
+    if (body.targetType === 'segment' && !segmentConditions) {
+      return c.json(
+        { success: false, error: 'segmentConditions is required when targetType is "segment"' },
+        400,
+      );
+    }
+
+    let stealthSpreadMinutes: number | undefined;
+    if (body.stealthSpreadMinutes !== undefined) {
+      const n = Number(body.stealthSpreadMinutes);
+      if (!Number.isInteger(n) || n < 0 || n > 720) {
+        return c.json(
+          { success: false, error: 'stealthSpreadMinutes must be an integer between 0 and 720' },
+          400,
+        );
+      }
+      stealthSpreadMinutes = n;
+    }
+
     // Keep status in sync with scheduledAt changes
     let statusUpdate: 'draft' | 'scheduled' | undefined;
     if (body.scheduledAt !== undefined) {
@@ -705,8 +756,15 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       title: body.title,
       message_type: body.messageType,
       message_content: body.messageContent,
+      ...(body.messageBubbles !== undefined
+        ? { message_bubbles_json: JSON.stringify(body.messageBubbles) }
+        : {}),
       target_type: body.targetType,
       target_tag_id: body.targetTagId,
+      ...(segmentConditions !== undefined ? { segment_conditions: segmentConditions } : {}),
+      ...(stealthSpreadMinutes !== undefined
+        ? { stealth_spread_minutes: stealthSpreadMinutes }
+        : {}),
       scheduled_at: body.scheduledAt,
       ...(body.trackLinks !== undefined ? { track_links: body.trackLinks ? 1 : 0 } : {}),
       ...(body.folderId !== undefined ? { folder_id: body.folderId } : {}),

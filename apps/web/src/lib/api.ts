@@ -2748,10 +2748,16 @@ export const api = {
         title?: string
         messageType?: ApiBroadcast['messageType']
         messageContent?: string
+        messageBubbles?: BroadcastBubble[]
         targetType?: ApiBroadcast['targetType']
         targetTagId?: string | null
+        segmentConditions?: SegmentCondition | null
         scheduledAt?: string | null
         trackLinks?: boolean
+        folderId?: string | null
+        measureOpens?: boolean
+        stealthSpreadMinutes?: number
+        lineAccountId?: string | null
       }
     ) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`, {

@@ -41,6 +41,10 @@ export interface Broadcast {
   dedup_progress: string | null;
   batch_lock_at: string | null;
   track_links: number;
+  /** 何分かけて配るか。0なら一気に送る。 */
+  stealth_spread_minutes?: number;
+  /** SegmentConditionのJSON。segment配信だけが持つ。 */
+  segment_conditions?: string | null;
   folder_id?: string | null;
   /** 開封数を取るか。1 = 取る（既定）。 */
   measure_opens?: number;
@@ -182,8 +186,11 @@ export type UpdateBroadcastInput = Partial<
     | 'title'
     | 'message_type'
     | 'message_content'
+    | 'message_bubbles_json'
     | 'target_type'
     | 'target_tag_id'
+    | 'segment_conditions'
+    | 'stealth_spread_minutes'
     | 'folder_id'
     | 'measure_opens'
     | 'status'
@@ -212,6 +219,10 @@ export async function updateBroadcast(
     fields.push('message_content = ?');
     values.push(updates.message_content);
   }
+  if (updates.message_bubbles_json !== undefined) {
+    fields.push('message_bubbles_json = ?');
+    values.push(updates.message_bubbles_json);
+  }
   if (updates.target_type !== undefined) {
     fields.push('target_type = ?');
     values.push(updates.target_type);
@@ -219,6 +230,14 @@ export async function updateBroadcast(
   if (updates.target_tag_id !== undefined) {
     fields.push('target_tag_id = ?');
     values.push(updates.target_tag_id);
+  }
+  if (updates.segment_conditions !== undefined) {
+    fields.push('segment_conditions = ?');
+    values.push(updates.segment_conditions);
+  }
+  if (updates.stealth_spread_minutes !== undefined) {
+    fields.push('stealth_spread_minutes = ?');
+    values.push(updates.stealth_spread_minutes);
   }
   if (updates.folder_id !== undefined) {
     fields.push('folder_id = ?');

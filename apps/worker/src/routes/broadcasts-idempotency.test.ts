@@ -59,7 +59,13 @@ const row = {
 function setupApp() {
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   app.use('*', async (c, next) => {
-    c.env = { DB: {} as D1Database };
+    c.env = {
+      DB: {
+        prepare: vi.fn(() => ({
+          bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })) })),
+        })),
+      } as unknown as D1Database,
+    };
     // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
     // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
     (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', { id: 'owner-1', name: 'Owner', role: 'owner' as const, readOnly: false });
@@ -173,5 +179,56 @@ describe('POST /api/broadcasts idempotency', () => {
     expect(response.status).toBe(400);
     expect(dbMocks.getBroadcastById).not.toHaveBeenCalled();
     expect(dbMocks.createBroadcast).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /api/broadcasts/:id', () => {
+  test('updates the same draft with bubbles, segment conditions, and send pacing', async () => {
+    const draft = { ...row, status: 'draft', scheduled_at: null };
+    dbMocks.getBroadcastById.mockResolvedValueOnce(draft);
+    dbMocks.updateBroadcast.mockResolvedValueOnce({
+      ...draft,
+      message_bubbles_json: '[{"type":"text"}]',
+      segment_conditions: '{"operator":"AND","rules":[]}',
+      stealth_spread_minutes: 45,
+    });
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messageBubbles: [{ id: 'b-1', type: 'text', content: { text: '更新後' } }],
+        targetType: 'segment',
+        segmentConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+        stealthSpreadMinutes: 45,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(dbMocks.updateBroadcast).toHaveBeenCalledWith(
+      expect.anything(),
+      KEY,
+      expect.objectContaining({
+        message_bubbles_json: expect.stringContaining('更新後'),
+        target_type: 'segment',
+        segment_conditions: expect.stringContaining('tag_exists'),
+        stealth_spread_minutes: 45,
+      }),
+    );
+  });
+
+  test('does not update a segment draft when its conditions cannot be evaluated', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+    const response = await setupApp().request(`/api/broadcasts/${KEY}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetType: 'segment',
+        segmentConditions: { operator: 'AND', rules: [{ type: 'unknown_rule', value: true }] },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(dbMocks.updateBroadcast).not.toHaveBeenCalled();
   });
 });
