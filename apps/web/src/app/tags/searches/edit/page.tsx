@@ -461,7 +461,7 @@ function SavedSearchEditInner() {
       </div>
 
       <StickyBar
-        status={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-v6-control bg-v6-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
+        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-v6-control bg-v6-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
