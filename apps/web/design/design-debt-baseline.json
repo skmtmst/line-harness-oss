@@ -186,6 +186,9 @@
     "direct-primary-button": 3,
     "direct-secondary-button": 3
   },
+  "app/getting-started/page.tsx": {
+    "unresolved-classname": 20
+  },
   "app/health/page.tsx": {
     "unresolved-classname": 5,
     "direct-th": 11,

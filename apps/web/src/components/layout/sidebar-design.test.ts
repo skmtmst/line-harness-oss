@@ -57,7 +57,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // LINE通知はV4作成前から運用中の承認済み追加機能なので、専用機能の末尾に残す。
   { section: '専用機能', items: ['NEN配信', '写真審査', 'EC連携', 'LINE通知'] },
   // D-3: 店舗の追加・設定・一覧は統括へ集約し、店舗側の重複導線を戻さない。
-  { section: '設定', items: ['ログインユーザー', '機能設定', '運用状態'] },
+  { section: '設定', items: ['はじめの設定', 'ログインユーザー', '機能設定', '運用状態'] },
   {
     section: '飲食店向け（テスト）',
     items: [
@@ -122,6 +122,7 @@ const ROUTES: Record<string, string> = {
   写真審査: '/nen-members',
   EC連携: '/ec-commerce',
   LINE通知: '/line-notifications',
+  はじめの設定: '/getting-started',
   ログインユーザー: '/staff',
   機能設定: '/settings',
   運用状態: '/emergency',
@@ -150,11 +151,13 @@ describe('サイドバーが V5正式共通メニューの契約と一致する'
     },
   );
 
-  it('項目の総数が設計どおり（41）', () => {
+  it('項目の総数が設計どおり（42）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 統括一覧を独立した /hq へ移し、店舗側は飲食店向け9項目を維持する。
+    // 2026-09-04: 「設定」区分の先頭に「はじめの設定」を足して 42（要件
+    // v6-34 §5-2「呼び出し元: ダッシュボードの進捗帯、サイドメニュー『設定』区分」）。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(41);
+    expect(total).toBe(42);
   });
 
   it('項目の行き先が仕様どおり', () => {
