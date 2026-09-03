@@ -26,6 +26,8 @@ export interface ReminderRow {
   folder_id: string | null;
   /** 161: 並び順。同じ値のときは created_at の新しい順。 */
   display_order: number;
+  /** 268: 削除後も送信履歴を残す。値がある行は通常画面・実行対象から外す。 */
+  deleted_at: string | null;
 }
 
 export interface ReminderStepRow {
@@ -59,7 +61,7 @@ export async function getReminders(db: D1Database): Promise<ReminderRow[]> {
   // 161: 並べ替えたものが先。まだ並べ替えていないものは全部 0 なので、
   // created_at の新しい順で割る（これまでの並びが変わらない）。
   const result = await db
-    .prepare(`SELECT * FROM reminders ORDER BY display_order ASC, created_at DESC`)
+    .prepare(`SELECT * FROM reminders WHERE deleted_at IS NULL ORDER BY display_order ASC, created_at DESC`)
     .all<ReminderRow>();
   return result.results;
 }
@@ -74,13 +76,13 @@ export async function reorderReminders(db: D1Database, ids: string[]): Promise<v
   if (ids.length === 0) return;
   await db.batch(
     ids.map((id, i) =>
-      db.prepare(`UPDATE reminders SET display_order = ? WHERE id = ?`).bind(i, id),
+      db.prepare(`UPDATE reminders SET display_order = ? WHERE id = ? AND deleted_at IS NULL`).bind(i, id),
     ),
   );
 }
 
 export async function getReminderById(db: D1Database, id: string): Promise<ReminderRow | null> {
-  return db.prepare(`SELECT * FROM reminders WHERE id = ?`).bind(id).first<ReminderRow>();
+  return db.prepare(`SELECT * FROM reminders WHERE id = ? AND deleted_at IS NULL`).bind(id).first<ReminderRow>();
 }
 
 export interface ReminderTriggerInput {
@@ -155,11 +157,25 @@ export async function updateReminder(
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
-  await db.prepare(`UPDATE reminders SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
+  await db.prepare(`UPDATE reminders SET ${sets.join(', ')} WHERE id = ? AND deleted_at IS NULL`).bind(...values).run();
 }
 
 export async function deleteReminder(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM reminders WHERE id = ?`).bind(id).run();
+  const now = jstNow();
+  // D1 の batch は一括で成功・失敗する。定義だけ隠れて登録が動き続ける、または
+  // 登録だけ止まって定義が残る、という半端な削除状態を作らない。
+  await db.batch([
+    db.prepare(
+      `UPDATE reminders
+          SET is_active = 0, deleted_at = ?, updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL`,
+    ).bind(now, now, id),
+    db.prepare(
+      `UPDATE friend_reminders
+          SET status = 'cancelled', updated_at = ?
+        WHERE reminder_id = ? AND status = 'active'`,
+    ).bind(now, id),
+  ]);
 }
 
 // --- リマインダステップ ---
@@ -257,7 +273,7 @@ export async function getPendingReminderDeliveries(
     .prepare(`SELECT fr.*, r.delivery_mode AS delivery_mode
                 FROM friend_reminders fr
                 INNER JOIN reminders r ON r.id = fr.reminder_id
-               WHERE fr.status = 'active' AND r.is_active = 1`)
+               WHERE fr.status = 'active' AND r.is_active = 1 AND r.deleted_at IS NULL`)
     .all<FriendReminderRow & { delivery_mode: string }>();
 
   const results: Array<
@@ -322,6 +338,7 @@ export async function getFriendFieldReminders(
       `SELECT id, name, trigger_field_id, repeat_yearly, line_account_id
          FROM reminders
         WHERE is_active = 1
+          AND deleted_at IS NULL
           AND trigger_type = 'friend_field'
           AND trigger_field_id IS NOT NULL`,
     )
