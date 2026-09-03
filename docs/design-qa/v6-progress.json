@@ -8,8 +8,8 @@
   "missing": 4,
   "match": 0,
   "structureMatchDataPending": 0,
-  "needsFix": 1,
-  "unjudged": 231,
+  "needsFix": 2,
+  "unjudged": 230,
   "remaining": 258,
   "features": [
     {
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
-      "unjudged": 16,
+      "needsFix": 2,
+      "unjudged": 15,
       "remaining": 17,
       "capturedAt": [
         {

@@ -175,7 +175,7 @@ export function matchesMessageKind(
  * auto_reply 行の content/type を resolve する。template_id が set なら templates
  * から取得、参照切れや NULL のときは inline response_content/response_type を使う。
  */
-async function resolveAutoReplyContent(
+export async function resolveAutoReplyContent(
   db: D1Database,
   rule: Pick<AutoReply, 'template_id' | 'response_type' | 'response_content'>,
 ): Promise<{ messageType: string; content: string }> {
@@ -186,6 +186,28 @@ async function resolveAutoReplyContent(
     }
   }
   return { messageType: rule.response_type, content: rule.response_content };
+}
+
+/** 送信せず、本番と同じ差し込み解決まで行った返信内容を返す。 */
+export async function previewAutoReplyContent(
+  db: D1Database,
+  friend: Friend,
+  rule: AutoReply,
+  workerUrl?: string,
+): Promise<{ messageType: string; content: string }> {
+  const resolvedMeta = await resolveMetadata(db, friend);
+  const resolved = await resolveAutoReplyContent(db, rule);
+  const extra = await resolveInterpolationExtra(db, friend.id, resolved.content);
+  return {
+    messageType: resolved.messageType,
+    content: expandVariables(
+      resolved.content,
+      { ...friend, metadata: resolvedMeta },
+      workerUrl,
+      resolved.messageType,
+      extra,
+    ),
+  };
 }
 
 /**
@@ -265,7 +287,7 @@ function maskedInputPreview(text: string): string {
   return [...masked].slice(0, 80).join('');
 }
 
-function matchedKeywordLabel(rule: AutoReply, text: string): string {
+export function matchedKeywordLabel(rule: AutoReply, text: string): string {
   if (rule.respond_to_all === 1) return 'すべてのメッセージ';
   return resolveKeywordRules(rule)
     .filter((keyword) => keywordRuleMatches(keyword, text))
@@ -312,6 +334,81 @@ function actionCounts(result: RunActionsResult): Record<string, number> {
 function safeErrorCode(error: unknown): string {
   if (error instanceof Error && error.name) return error.name.slice(0, 80);
   return 'unknown_error';
+}
+
+export type AutoReplyCandidateReasonCode =
+  | 'message_kind_not_matched'
+  | 'keyword_not_matched'
+  | 'outside_active_window'
+  | 'weekday_not_allowed'
+  | 'operator_handling'
+  | 'already_replied_once'
+  | 'cooldown_active'
+  | 'friend_conditions_not_met';
+
+export interface AutoReplyCandidateEvaluation {
+  rule: AutoReply;
+  order: number;
+  result: 'not_matched' | 'skipped' | 'won';
+  reasonCodes: AutoReplyCandidateReasonCode[];
+}
+
+/** DBのORDER BYと同じ。下書きを混ぜる試験でも本番順を変えない。 */
+export function compareAutoReplyCandidates(a: AutoReply, b: AutoReply): number {
+  return Number(a.line_account_id === null) - Number(b.line_account_id === null)
+    || a.priority - b.priority
+    || a.respond_to_all - b.respond_to_all
+    || a.created_at.localeCompare(b.created_at);
+}
+
+/**
+ * 本番返信と試験画面が共有する評価器。送信・記録・状態更新は一切しない。
+ * 先に通った1件で止める順番も本番と同じにする。
+ */
+export async function evaluateAutoReplyCandidates(
+  db: D1Database,
+  candidates: AutoReply[],
+  input: {
+    friendId: string;
+    incomingText: string;
+    messageKind?: string;
+    now: Date;
+  },
+): Promise<AutoReplyCandidateEvaluation[]> {
+  const evaluations: AutoReplyCandidateEvaluation[] = [];
+  for (const [index, candidate] of candidates.entries()) {
+    if (!matchesMessageKind(candidate, input.messageKind)) {
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'not_matched',
+        reasonCodes: ['message_kind_not_matched'],
+      });
+      continue;
+    }
+    if (!keywordMatches(candidate, input.incomingText)) {
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'not_matched',
+        reasonCodes: ['keyword_not_matched'],
+      });
+      continue;
+    }
+    const condition = await evaluateAutoReplyConditions(db, candidate, input.friendId, input.now);
+    if (!condition.matches) {
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'skipped',
+        reasonCodes: condition.reasonCodes,
+      });
+      continue;
+    }
+    evaluations.push({ rule: candidate, order: index + 1, result: 'won', reasonCodes: [] });
+    break;
+  }
+  return evaluations;
 }
 
 /**
@@ -406,57 +503,28 @@ export async function matchAndReply(
   // 合ったものを1件だけ見るのではなく、条件まで通る最初の1件を探す。
   // 「営業時間内はAで返し、時間外はBで返す」を2行で書けるようにするため。
   const now = new Date(occurredAt);
+  const candidateEvaluations = await evaluateAutoReplyCandidates(db, autoReplies.results, {
+    friendId: friend.id,
+    incomingText,
+    messageKind: opts.messageKind,
+    now,
+  });
   let rule: AutoReply | undefined;
   let ruleVersionId = '';
-  let evaluationOrder = 0;
-  for (const candidate of autoReplies.results) {
-    evaluationOrder += 1;
-    const version = await ensureAutoReplyPublishedVersion(db, candidate);
-    if (!matchesMessageKind(candidate, opts.messageKind)) {
-      await recordAutoReplyEvaluationDetail(db, {
-        evaluationId,
-        autoReplyId: candidate.id,
-        ruleVersionId: version.id,
-        order: evaluationOrder,
-        result: 'not_matched',
-        reasonCodes: ['message_kind_not_matched'],
-      });
-      continue;
-    }
-    if (!keywordMatches(candidate, incomingText)) {
-      await recordAutoReplyEvaluationDetail(db, {
-        evaluationId,
-        autoReplyId: candidate.id,
-        ruleVersionId: version.id,
-        order: evaluationOrder,
-        result: 'not_matched',
-        reasonCodes: ['keyword_not_matched'],
-      });
-      continue;
-    }
-    const condition = await evaluateAutoReplyConditions(db, candidate, friend.id, now);
-    if (!condition.matches) {
-      await recordAutoReplyEvaluationDetail(db, {
-        evaluationId,
-        autoReplyId: candidate.id,
-        ruleVersionId: version.id,
-        order: evaluationOrder,
-        result: 'skipped',
-        reasonCodes: condition.reasonCodes,
-      });
-      continue;
-    }
+  for (const evaluation of candidateEvaluations) {
+    const version = await ensureAutoReplyPublishedVersion(db, evaluation.rule);
     await recordAutoReplyEvaluationDetail(db, {
       evaluationId,
-      autoReplyId: candidate.id,
+      autoReplyId: evaluation.rule.id,
       ruleVersionId: version.id,
-      order: evaluationOrder,
-      result: 'won',
-      reasonCodes: [],
+      order: evaluation.order,
+      result: evaluation.result,
+      reasonCodes: evaluation.reasonCodes,
     });
-    rule = candidate;
-    ruleVersionId = version.id;
-    break;
+    if (evaluation.result === 'won') {
+      rule = evaluation.rule;
+      ruleVersionId = version.id;
+    }
   }
   if (!rule) {
     await markAutoReplyEvaluationSkipped(db, evaluationId, 'no_matching_rule');
@@ -537,17 +605,8 @@ export async function matchAndReply(
   let messageLogId: string | null = null;
   let replyError: unknown = null;
   try {
-    const resolvedMeta = await resolveMetadata(db, friend);
-    const resolved = await resolveAutoReplyContent(db, rule);
-    const extra = await resolveInterpolationExtra(db, friend.id, resolved.content);
-    const expandedContent = expandVariables(
-      resolved.content,
-      { ...friend, metadata: resolvedMeta },
-      workerUrl,
-      resolved.messageType,
-      extra,
-    );
-    const replyMsg = buildMessage(resolved.messageType, expandedContent);
+    const resolved = await previewAutoReplyContent(db, friend, rule, workerUrl);
+    const replyMsg = buildMessage(resolved.messageType, resolved.content);
     const response = await lineClient.replyMessageWithRequestId(replyToken, [replyMsg]);
     replyTokenConsumed = true;
     lineRequestId = response.requestId;
