@@ -857,6 +857,15 @@ export const INBOX_STATS = {
   mine: 0,
   todayInbound: 0,
   todayByChannel: { line: 0, email: 0 },
+  /*
+    担当者ごとの未読数（設計 `YZaDK`）。**0件の担当者はここに載らない**
+    契約なので、`Masato` はわざと入れない——画面が実値0として描くところを
+    確かめるため。担当がまだ決まっていない会話は `operatorId` が `null`。
+  */
+  assigneeUnread: [
+    { operatorId: null, operatorName: null, unread: 2 },
+    { operatorId: 'operator-kenta', operatorName: 'Kenta', unread: 3 },
+  ],
 }
 
 /**
