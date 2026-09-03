@@ -1274,12 +1274,13 @@ async function scheduled(
   }
 
   // 誕生日月・最終購入日・次回発送日など、時間経過だけで条件が変わるタグを6時間ごとに再判定する。
-  // 登録・購入・健康記録・写真審査時は各APIが即時同期するため、ここでは日付条件の補正を担う。
+  // 永続カーソルで20人ずつ進める。登録・購入・健康記録・写真審査時は各APIが即時同期するため、
+  // ここでは日付条件の補正を担う。
   if (event.cron === '0 */6 * * *') {
     try {
       const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
       const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
-      if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
+      if (result.friends > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
     } catch (e) {
       console.error('nen-tag refresh error:', e);
     }
