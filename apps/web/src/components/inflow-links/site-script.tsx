@@ -207,7 +207,7 @@ export default function SiteScript() {
 
       <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
         <div className="border-hairline border-b px-4 py-3">
-          <p className="text-ink text-sm font-semibold">よく見られているページ（直近30日）</p>
+          <p className="text-ink text-sm font-semibold">よく見られているページ（この30日）</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
