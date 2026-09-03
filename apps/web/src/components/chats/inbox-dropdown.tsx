@@ -70,12 +70,21 @@ const rowClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-xs'
 
 export type OperatorOption = { id: string; name: string }
 
+export function buildOperatorRows(operators: OperatorOption[], allowAll: boolean): OperatorOption[] {
+  return [
+    ...(allowAll ? [{ id: 'all', name: 'すべて' }] : []),
+    { id: 'unassigned', name: '未割り当て' },
+    ...operators,
+  ]
+}
+
 export function OperatorDropdown({
   value,
   operators,
   onChange,
   label = '担当者',
   ariaLabel = '担当者を選ぶ',
+  allowAll = true,
 }: {
   /** `all` すべて / `unassigned` 未割り当て / それ以外は担当者ID */
   value: string
@@ -83,16 +92,14 @@ export function OperatorDropdown({
   onChange: (next: string) => void
   label?: string
   ariaLabel?: string
+  /** 一覧の絞り込みでは true。担当者を変更するときは「すべて」を選べないので false。 */
+  allowAll?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const ref = useCloseOnOutside(open, () => setOpen(false))
 
-  const rows = [
-    { id: 'all', name: 'すべて' },
-    { id: 'unassigned', name: '未割り当て' },
-    ...operators,
-  ]
+  const rows = buildOperatorRows(operators, allowAll)
   // 名前で絞る。**大文字小文字を区別しない。** 「Kenta」と打っても出る。
   const shown = query.trim()
     ? rows.filter((row) => row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
@@ -109,7 +116,7 @@ export function OperatorDropdown({
         className={`border-hairline rounded-control bg-canvas text-ink flex w-full items-center gap-1.5 border px-2.5 py-1.5 text-xs ${open ? 'border-accent' : ''}`}
       >
         <span className="text-ink-faint">{label}：</span>
-        <span className="truncate font-medium">{current?.name ?? 'すべて'}</span>
+        <span className="truncate font-medium">{current?.name ?? (allowAll ? 'すべて' : '未割り当て')}</span>
         <span className="text-ink-faint ml-auto"><Chevron open={open} /></span>
       </button>
       {open ? (
