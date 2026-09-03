@@ -1221,10 +1221,6 @@ export const SCREENS = [
     */
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
     route: '/webinars/published?id=webinar-1', mode: 'page',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/webinars/published` が development に無い。判定は未マージ枝 `61eeb3c7` で書かれたもの',
-    why: '`/webinars/published` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged',
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **2026-09-03 に確かめ直した：まだ本流に無い。** `/webinars/published?id=webinar-1` は HTTP 404 で、`apps/web/src/app/webinars/published/page.tsx` も無い。以前ここには「#507 → #508 で公開完了が入った」と書いていたが、**それは未マージのPRの枝で見たもの**だった。以下の観察も同じ枝のもの。 「公開しました」＋公開状態・公開URL・動画の長さ43分・配信枠2件。**出せないものを出さない**のが良い：「所属するLINE公式アカウントのLIFF IDを確認できないため、公開ページのボタンは出していません。」と理由を添えて隠す。「公開後の申込数や視聴結果は、編集画面の「概要・分析」で確認できます。」も書いてある。完了画面へ渡すIDは公開の口が実際に返したものだけ（契約試験が `?status=success` を禁じている）。P2 設計との細かな差は未確認（設計 TimXl の面と1枚ずつ並べるのは次の回） **ルート**：`/webinars/published?id=webinar-1`。**取得元**：`webinars-v6/design-qa.md` ＋ #508 の契約試験。**推奨修正**：LIFF IDが無いときにボタンを隠して理由を書く形は、ほかの公開完了画面にも写せる。**残作業**：設計 `TimXl` の面と1枚ずつ並べる。',
     verdictSource: '/webinars/published?id=webinar-1 が HTTP 404（2026-09-03 確認）＋ apps/web/src/app/webinars/published/page.tsx が無い',
