@@ -168,7 +168,7 @@ export default function SavedViewDialog({
 
         <footer className="border-hairline flex items-center justify-end gap-3 border-t px-6 py-4">
           {done ? (
-            <button type="button" onClick={onClose} className="rounded-control bg-accent text-on-accent px-5 py-2 text-sm font-bold">
+            <button type="button" onClick={onClose} className="rounded-control bg-accent-deep text-on-accent px-5 py-2 text-sm font-bold">
               閉じる
             </button>
           ) : (
@@ -181,7 +181,8 @@ export default function SavedViewDialog({
                 onClick={() => void submit()}
                 disabled={saving || nameMissing}
                 title={nameMissing ? '検索名を入力してください' : undefined}
-                className="rounded-control bg-accent text-on-accent px-5 py-2 text-sm font-bold disabled:opacity-40"
+                /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
+                className="rounded-control bg-accent-deep text-on-accent px-5 py-2 text-sm font-bold disabled:opacity-40"
               >
                 {saving ? '保存中' : 'この条件を保存'}
               </button>
