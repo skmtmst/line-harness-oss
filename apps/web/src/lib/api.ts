@@ -1286,6 +1286,12 @@ export type InboxStats = {
   mine: number
   todayInbound: number
   todayByChannel: { line: number; email: number }
+  /** 担当未設定は operatorId/operatorName が null。0件の担当者は配列に含まれない。 */
+  assigneeUnread: Array<{
+    operatorId: string | null
+    operatorName: string | null
+    unread: number
+  }>
 }
 
 /** ダッシュボードが1回で読む数（設計 `V2 1-1 ダッシュボード`）。 */
