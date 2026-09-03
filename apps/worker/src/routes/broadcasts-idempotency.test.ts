@@ -9,8 +9,8 @@ const dbMocks = {
   deleteBroadcast: vi.fn(),
   getLineAccountById: vi.fn(),
 };
-vi.mock('@line-crm/db', () => dbMocks);
-vi.mock('../services/account-access.js', () => ({
+const d1Prepare = vi.fn();
+const accountAccess = {
   canAccessAllLineAccounts: vi.fn(async () => true),
   getVisibleLineAccountScope: vi.fn(async () => ({
     accounts: [],
@@ -18,7 +18,9 @@ vi.mock('../services/account-access.js', () => ({
     allowedAccountIds: ['account-1'],
     canSeeUnassigned: true,
   })),
-}));
+};
+vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('../services/account-access.js', () => accountAccess);
 
 const { broadcasts } = await import('./broadcasts.js');
 
@@ -56,19 +58,28 @@ const row = {
   alt_text: null,
 };
 
-function setupApp() {
+function setupApp({
+  changes = 1,
+  role = 'owner',
+}: { changes?: number; role?: 'owner' | 'admin' | 'staff' } = {}) {
+  d1Prepare.mockImplementation(() => ({
+    bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
+  }));
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   app.use('*', async (c, next) => {
     c.env = {
       DB: {
-        prepare: vi.fn(() => ({
-          bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })) })),
-        })),
+        prepare: d1Prepare,
       } as unknown as D1Database,
     };
     // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
     // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
-    (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', { id: 'owner-1', name: 'Owner', role: 'owner' as const, readOnly: false });
+    (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', {
+      id: `${role}-1`,
+      name: role,
+      role,
+      readOnly: false,
+    });
     await next();
   });
   app.route('/', broadcasts);
@@ -77,6 +88,9 @@ function setupApp() {
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  d1Prepare.mockReset();
+  accountAccess.canAccessAllLineAccounts.mockReset();
+  accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
 });
 describe('POST /api/broadcasts idempotency', () => {
   test('accepts five validated message bubbles and rejects six before writing', async () => {
@@ -230,5 +244,138 @@ describe('PUT /api/broadcasts/:id', () => {
 
     expect(response.status).toBe(400);
     expect(dbMocks.updateBroadcast).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/broadcasts/:id/cancel', () => {
+  test('予約中の配信だけを削除せず原子的に下書きへ戻す', async () => {
+    dbMocks.getBroadcastById
+      .mockResolvedValueOnce(row)
+      .mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(200);
+    expect(accountAccess.canAccessAllLineAccounts).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ role: 'owner' }),
+      ['account-1'],
+    );
+    expect(d1Prepare).toHaveBeenCalledWith(expect.stringContaining(
+      "WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL",
+    ));
+    expect(dbMocks.deleteBroadcast).not.toHaveBeenCalled();
+    expect((await response.json() as { data: { status: string; scheduledAt: string | null } }).data)
+      .toMatchObject({ status: 'draft', scheduledAt: null });
+  });
+
+  test('閲覧できないアカウントの予約には存在も更新も見せない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+    accountAccess.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(404);
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+
+  test('存在しない配信は404で返し、権限確認や更新へ進まない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(null);
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ success: false, error: 'Broadcast not found' });
+    expect(accountAccess.canAccessAllLineAccounts).not.toHaveBeenCalled();
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+
+  test('スタッフ権限では取消処理へ進まない', async () => {
+    const response = await setupApp({ role: 'staff' }).request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(403);
+    expect(dbMocks.getBroadcastById).not.toHaveBeenCalled();
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+
+  test('同じ取消要求を再実行しても更新は1回だけにする', async () => {
+    dbMocks.getBroadcastById
+      .mockResolvedValueOnce(row)
+      .mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null })
+      .mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+    const app = setupApp();
+
+    const first = await app.request(`/api/broadcasts/${KEY}/cancel`, { method: 'POST' });
+    const replay = await app.request(`/api/broadcasts/${KEY}/cancel`, { method: 'POST' });
+
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(409);
+    expect(d1Prepare).toHaveBeenCalledTimes(1);
+  });
+
+  test('読み取り後に送信開始された配信を下書きへ戻さない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+
+    const response = await setupApp({ changes: 0 }).request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(409);
+    expect(dbMocks.getBroadcastById).toHaveBeenCalledTimes(1);
+    expect(dbMocks.deleteBroadcast).not.toHaveBeenCalled();
+  });
+
+  test('取消UPDATEのD1障害を成功として返さない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+    const app = setupApp();
+    d1Prepare.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        run: vi.fn(async () => { throw new Error('db unavailable'); }),
+      })),
+    }));
+
+    const response = await app.request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ success: false });
+    expect(dbMocks.getBroadcastById).toHaveBeenCalledTimes(1);
+  });
+
+  test('取消後の再読込に失敗したときは成功として返さない', async () => {
+    dbMocks.getBroadcastById
+      .mockResolvedValueOnce(row)
+      .mockResolvedValueOnce(null);
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Broadcast not found after cancellation',
+    });
+    expect(d1Prepare).toHaveBeenCalledTimes(1);
+  });
+
+  test('予約中ではない配信は更新しない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(409);
+    expect(d1Prepare).not.toHaveBeenCalled();
   });
 });
