@@ -35,10 +35,27 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
 
   it('待ち時間は読める単位で言う', () => {
     expect(CODE, '分のまま出している').not.toContain("`${oldestWaitMinutes.toLocaleString('ja-JP')}分前`")
-    expect(CODE).toContain('humanWait(oldestWaitMinutes)')
-    expect(CODE).toContain('if (minutes < 60) return `${minutes}分前`')
-    expect(CODE).toContain('if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}時間前`')
-    expect(CODE).toContain('return `${Math.floor(minutes / (60 * 24))}日前`')
+    expect(CODE).toContain('formatWaitRough(oldestWaitMinutes)')
+  })
+
+  /**
+   * **同じ画面で同じ値を2通りに書かない。**
+   * 一度は運用アラートだけ「6日前」に直し、すぐ上の「対応が必要な受信」は
+   * 「6日7時間50分」のままにしていた。1枚の中で食い違っていた。
+   */
+  it('待ち時間の言い方は、画面の中で1つにそろえる', () => {
+    expect(CODE, 'ダッシュボードの中で細かいほうを混ぜている').not.toContain('formatDurationMinutes(inboxSummary')
+    const rough = [...CODE.matchAll(/formatWaitRough\(/g)].length
+    expect(rough, '待ち時間を出す場所が2つとも粗いほうを使う').toBe(2)
+  })
+
+  it('待ち時間の整形は共通の場所に置く（画面ごとに書かない）', () => {
+    const shared = code(fs.readFileSync(path.join(__dirname, '..', 'lib', 'format-duration.ts'), 'utf8'))
+    expect(shared).toContain('export function formatWaitRough(minutes: number): string')
+    expect(shared).toContain('if (total < 60) return `${total}分前`')
+    expect(shared).toContain('if (total < 60 * 24) return `${Math.floor(total / 60)}時間前`')
+    expect(shared).toContain('return `${Math.floor(total / (60 * 24))}日前`')
+    expect(CODE, 'ダッシュボードの中に自前の整形を書かない').not.toContain('function humanWait')
   })
 
   it('並び順ラベルは他画面と同じ言い方にする', () => {

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
@@ -293,18 +293,6 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
   </Card>
 }
 
-/**
- * 待ち時間を、読める単位で言う。
- *
- * 「9,110分前」は正確だが、運用者が何日前か暗算することになる。
- * 設計 `vUXKb` は「6日前」と書く。
- */
-function humanWait(minutes: number): string {
-  if (minutes < 60) return `${minutes}分前`
-  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}時間前`
-  return `${Math.floor(minutes / (60 * 24))}日前`
-}
-
 function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
@@ -325,7 +313,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
         **分のままにしない。** 9,110分前と書かれても、何日前か読み解けない。
         1時間未満は分、1日未満は時間、それ以上は日で言う。
       */}
-      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : humanWait(oldestWaitMinutes)}</p>
+      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}</p>
       <p>・二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
@@ -643,7 +631,7 @@ export default function DashboardPage() {
   }
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatDurationMinutes(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
+    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatWaitRough(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
     if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
     if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
     if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />

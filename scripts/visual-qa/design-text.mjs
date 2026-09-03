@@ -51,7 +51,14 @@ if (!htmlPath || !dir || nodes.length === 0) {
 
 const html = readFileSync(htmlPath, 'utf8')
 const body = html.slice(html.indexOf('<body>'))
-const marks = [...body.matchAll(/data-pencil-name="(★[^"]*)"/g)]
+/*
+  画面の最上位ノードだけを拾う。
+
+  **`★` だけでは足りない。** 中の部品にも `★項目 会員ランク` `★タグ` のような
+  名前が付いていて、機能3で4つ渡したのに9つ見つかった。
+  画面は必ず `★ V6 <番号>` で始まるので、そこまで見る。
+*/
+const marks = [...body.matchAll(/data-pencil-name="(★ V6 [^"]*)"/g)]
 
 if (marks.length !== nodes.length) {
   console.error(`画面の数が合わない: HTML に ${marks.length}、--nodes に ${nodes.length}`)

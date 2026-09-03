@@ -238,8 +238,16 @@ async function captureImpl(feature) {
           幅で中身は変わらないので、広いほうだけ残す。
         */
         if (width === WIDTHS[WIDTHS.length - 1]) {
+          /*
+            **`body` を使い回さない。** あれは `runSteps` の前に読んだもので、
+            プルダウンやダイアログを開く前の姿しか写っていない。
+            最初にこれで書いてしまい、`JN6mQ` 友だち追加QR の文字が
+            「QRを表示」ボタンまでで、中身がまるごと落ちていた。
+            撮る絵と同じ状態を、ここで読み直す。
+          */
+          const shown = await page.locator('body').innerText()
           // 行末の空白を落とす。表の空欄がタブのまま残ると `git diff --check` が怒る。
-          const trimmed = body.split('\n').map((line) => line.replace(/\s+$/, '')).join('\n')
+          const trimmed = shown.split('\n').map((line) => line.replace(/\s+$/, '')).join('\n')
           writeFileSync(join(out, `${s.node}.txt`), `# ${s.name}\n# ${s.route}\n\n${trimmed}\n`)
         }
         console.log(`${s.node}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
