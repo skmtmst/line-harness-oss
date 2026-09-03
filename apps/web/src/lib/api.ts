@@ -251,6 +251,20 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
 }
 
+/** 支払台帳を作る前に安全に表示できる、承認済み報酬の読み取り専用集計。 */
+export type AffiliatePaymentSummary = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  holdDays: number | null
+  payoutCycle: string | null
+  approvedConversions: number
+  approvedReward: number
+  heldConversions: number
+  heldReward: number
+  holdStatusUnknown: number
+}
+
 /** Broadcast type from API (now camelCase after worker serialization) */
 export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   targetType: BroadcastTargetType;
@@ -3259,6 +3273,17 @@ export const api = {
         linkCount: number;
         friendAdds: number;
       }>>>('/api/affiliates-report?' + new URLSearchParams(params as Record<string, string>)),
+    paymentSummaries: (lineAccountId: string) =>
+      fetchApi<{
+        success: boolean
+        data: AffiliatePaymentSummary[]
+        limitations: {
+          payoutHistory: false
+          bankDestination: false
+          settlementSchedule: false
+        }
+        error?: string
+      }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
