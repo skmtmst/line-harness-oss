@@ -22,6 +22,16 @@
 <!-- ここから下に追記。最新を上に。 -->
 
 ## 2026-09-03
+- やらかし: NodeTerm を司令塔(Claude Code)のシェルから `open -a` で再起動したため、Claude Code の環境変数(CLAUDECODE、ANTHROPIC_BASE_URL、CLAUDE_CODE_CHILD_SESSION など)が NodeTerm と全ノードに引き継がれ、Claude のノードが子セッション扱い・API 課金表示・未ログインになった
+- 原因: `open` は呼び出し元の環境を起動するアプリに渡す。エージェントのシェルは Claude Code の環境を持っている
+- 再発防止: GUI アプリをエージェントから起動するときは `env -i HOME=… USER=… PATH=… open -a <app>` で素の環境にする。起動後に `ps eww` で CLAUDE / ANTHROPIC 変数が 0 件であることを確認する
+
+## 2026-09-03
+- やらかし: NodeTerm の project.json を手で書いたとき、エージェントノードに `cwd` を入れず、全ノードがホームフォルダで起動した。Kanban の GitHub 同期は完了列にもラベル対応が要ることを見落とし、承認が「設定が無効」で失敗した
+- 原因: 仕様(`cwd` はノードごとに持つ、`completionColumnId` は `columnMappings` に含まれる列でなければならない)を読み切らずに書いた
+- 再発防止: 設定ファイルを手で書いたら、アプリで開いて実際に立ち上がる場所(`tmux display -p '#{pane_current_path}'`)と承認の成否を確認してから完了と言う
+
+## 2026-09-03
 - やらかし: 反映履歴 10 本に PR 番号 693〜701 を先取りで書き、別の PR(Codex の #696〜#699)の番号と衝突した(#692)
 - 原因: PR を作る前に番号を推測して書いた
 - 再発防止: 反映履歴の番号は `gh pr create` の結果を見てから書く。1 ブランチに複数話題を積まない

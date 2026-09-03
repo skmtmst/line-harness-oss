@@ -175,7 +175,8 @@
       ],
       "collapsed": false,
       "parentId": "grp-hq",
-      "agentId": "claude"
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-hq"
     },
     {
       "id": "note-hq",
@@ -216,7 +217,8 @@
       ],
       "collapsed": false,
       "parentId": "grp-s0",
-      "agentId": "claude"
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s0"
     },
     {
       "id": "note-s0",
@@ -257,7 +259,8 @@
       ],
       "collapsed": false,
       "parentId": "grp-s1",
-      "agentId": "claude"
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s1"
     },
     {
       "id": "note-s1",
@@ -298,7 +301,8 @@
       ],
       "collapsed": false,
       "parentId": "grp-s2",
-      "agentId": "claude"
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s2"
     },
     {
       "id": "note-s2",
@@ -339,7 +343,8 @@
       ],
       "collapsed": false,
       "parentId": "grp-s3",
-      "agentId": "claude"
+      "agentId": "claude",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-s3"
     },
     {
       "id": "note-s3",
@@ -380,7 +385,8 @@
       ],
       "collapsed": false,
       "parentId": "grp-codex",
-      "agentId": "codex"
+      "agentId": "codex",
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-codex"
     },
     {
       "id": "note-codex",
@@ -624,7 +630,8 @@
       "agentId": "claude",
       "tags": [
         "lane:pen"
-      ]
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-pen"
     },
     {
       "id": "note-pen",
@@ -684,7 +691,8 @@
       "agentId": "codex",
       "tags": [
         "lane:fix"
-      ]
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-fix"
     },
     {
       "id": "note-fix",
@@ -745,7 +753,8 @@
       "tags": [
         "lane:qa",
         "qa:error"
-      ]
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
     },
     {
       "id": "note-qa-error",
@@ -808,7 +817,8 @@
       "tags": [
         "lane:qa",
         "qa:code"
-      ]
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
     },
     {
       "id": "note-qa-code",
@@ -871,7 +881,8 @@
       "tags": [
         "lane:qa",
         "qa:perf"
-      ]
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
     },
     {
       "id": "note-qa-perf",
@@ -934,7 +945,8 @@
       "tags": [
         "lane:qa",
         "qa:sec"
-      ]
+      ],
+      "cwd": "/Volumes/My Passport/Github/lh-work/lh-qa"
     },
     {
       "id": "note-qa-sec",
@@ -1191,6 +1203,10 @@
         {
           "columnId": "blocked",
           "label": "blocked"
+        },
+        {
+          "columnId": "done",
+          "label": "done"
         }
       ],
       "completionColumnId": "done"
