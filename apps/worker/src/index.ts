@@ -29,7 +29,10 @@ import { processDueMeetConsultationReminders } from './services/meet-consultatio
 import { processDueAutomationRuns } from './services/automation-engine.js';
 import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
-import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
+import {
+  processOverdueSupportMarkTriggers,
+  processScheduledAutomationTriggers,
+} from './services/automation-triggers.js';
 import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
@@ -1143,7 +1146,10 @@ async function scheduled(
     const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
       now, executors, limit: 100,
     });
-    for (const result of scheduledResult.results) {
+    const overdueResults = await processOverdueSupportMarkTriggers(env.DB, {
+      now, executors, limit: 100,
+    });
+    for (const result of [...scheduledResult.results, ...overdueResults]) {
       if (result.kind === 'configuration_error') {
         console.error(JSON.stringify({
           event: 'automation_v6_scheduled_trigger_failed',
@@ -1155,10 +1161,11 @@ async function scheduled(
     const dueResult = await processDueAutomationRuns(env.DB, {
       now, executors, limit: 100,
     });
-    if (scheduledResult.results.length + dueResult.processed > 0) {
+    if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
       console.log(JSON.stringify({
         event: 'automation_v6_cron',
         scheduled: scheduledResult.results.length,
+        support_mark_overdue: overdueResults.length,
         resumed: dueResult.processed,
       }));
     }
@@ -1265,6 +1272,25 @@ async function scheduled(
     }
   } catch (e) {
     console.error('webinar-reminders error:', e);
+  }
+
+  // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
+  // 同じ申込へ二重送信しない。
+  try {
+    const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
+    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+    const result = await processWebinarNotificationJobs(env.DB, {
+      proxyBaseUrl:
+        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      defaultLiffId: liffMatch?.[1] ?? null,
+      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+    if (result.sent + result.failed + result.skipped > 0) {
+      console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
+    }
+  } catch (e) {
+    console.error('webinar-notifications error:', e);
   }
 
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
