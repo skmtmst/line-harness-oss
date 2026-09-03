@@ -13,8 +13,65 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  AutomationDraftError,
+  createAutomationDraftFromTemplate,
+  getAutomationDraft,
+  listAutomationDraftResources,
+  listAutomationTemplates,
+  updateAutomationDraft,
+} from '../services/automation-drafts.js';
+import { listLimit } from './list-pagination.js';
 
 const automations = new Hono<Env>();
+
+async function requireAutomationPermission(c: Context<Env>, next: () => Promise<void>) {
+  const staff = c.get('staff');
+  if (!staff || (staff.role === 'staff' && !staff.permissionKeys?.includes('/automations'))) {
+    return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+  }
+  await next();
+}
+
+async function requireDraftAccount(c: Context<Env>): Promise<string | Response> {
+  const id = c.req.query('account_id')?.trim();
+  if (!id) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.allowedAccountIds.includes(id)) {
+    return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
+  }
+  return id;
+}
+
+function draftErrorResponse(c: Context<Env>, error: AutomationDraftError): Response {
+  const status = error.code === 'version_conflict' ? 409
+    : new Set(['not_found', 'template_not_found']).has(error.code) ? 404
+      : 422;
+  return c.json({
+    success: false,
+    error: error.message,
+    code: error.code,
+    ...(error.field ? { field: error.field } : {}),
+  }, status);
+}
+
+async function draftEndpoint<T>(
+  c: Context<Env>,
+  run: () => Promise<T> | T,
+  successStatus = 200,
+): Promise<Response> {
+  try {
+    return c.json({ success: true, data: await run() }, successStatus as 200);
+  } catch (error) {
+    if (error instanceof AutomationDraftError) return draftErrorResponse(c, error);
+    console.error(JSON.stringify({
+      event: 'automation_draft_api_failed',
+      path: c.req.path,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
+    return c.json({ success: false, error: 'オートメーションの下書きを処理できませんでした' }, 500);
+  }
+}
 
 type ExecutionRunStatus =
   | 'queued'
@@ -153,6 +210,88 @@ async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<voi
 }
 
 // ========== 自動化ルールCRUD ==========
+
+/** 実行まで接続済みの処理だけを含む、サーバー管理の見本。 */
+automations.get(
+  '/api/automation-templates',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    return draftEndpoint(c, () => listAutomationTemplates());
+  },
+);
+
+automations.get(
+  '/api/automation-draft-resources',
+  requireAutomationPermission,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    return draftEndpoint(c, () => listAutomationDraftResources(c.env.DB, accountId));
+  },
+);
+
+automations.post(
+  '/api/automation-templates/:key/drafts',
+  requireAutomationPermission,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    return draftEndpoint(c, () => createAutomationDraftFromTemplate(c.env.DB, {
+      templateKey: c.req.param('key'),
+      lineAccountId: accountId,
+      createdBy: c.get('staff')?.id,
+    }), 201);
+  },
+);
+
+automations.get(
+  '/api/automation-drafts/:id',
+  requireAutomationPermission,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    return draftEndpoint(c, () => getAutomationDraft(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+    }));
+  },
+);
+
+automations.put(
+  '/api/automation-drafts/:id',
+  requireAutomationPermission,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    type DraftBody = {
+      expectedDraftVersionId?: unknown;
+      name?: unknown;
+      eventType?: unknown;
+      triggerConfig?: unknown;
+      actions?: unknown;
+    };
+    const body = await c.req.json<DraftBody>().catch((): DraftBody => ({}));
+    return draftEndpoint(c, async () => {
+      await updateAutomationDraft(c.env.DB, {
+        id: c.req.param('id'),
+        lineAccountId: accountId,
+        expectedDraftVersionId: body.expectedDraftVersionId,
+        name: body.name,
+        eventType: body.eventType,
+        triggerConfig: body.triggerConfig,
+        actions: body.actions,
+      });
+      return { updated: true };
+    });
+  },
+);
 
 automations.get('/api/automations', async (c) => {
   try {
@@ -424,7 +563,7 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
 automations.get('/api/automations/:id/logs', async (c) => {
   try {
     const automationId = c.req.param('id');
-    const limit = Number(c.req.query('limit') ?? '100');
+    const limit = listLimit(c.req.query('limit'), 100);
     const logs = await getAutomationLogs(c.env.DB, automationId, limit);
     return c.json({
       success: true,
