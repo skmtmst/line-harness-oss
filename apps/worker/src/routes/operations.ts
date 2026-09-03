@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, Next } from 'hono';
 import {
   OPERATION_CAPABILITIES,
   getOperationControlSet,
   getOperationIncident,
   listOperationIncidents,
+  recordOperation,
   restoreOperationIncident,
   stopOperationCapabilities,
   type OperationCapability,
@@ -13,8 +14,28 @@ import {
 import type { Env } from '../index.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { getOperationImpactPreview } from '../services/operation-impact-preview.js';
 
 export const operations = new Hono<Env>();
+
+export const EMERGENCY_CONTROL_PERMISSION = 'operations.control.execute';
+
+function canControlEmergency(c: Context<Env>): boolean {
+  const staff = c.get('staff');
+  if (staff?.role === 'owner') return true;
+  return staff?.role === 'admin'
+    && staff.permissionKeys?.includes(EMERGENCY_CONTROL_PERMISSION) === true;
+}
+
+async function requireEmergencyControlPermission(c: Context<Env>, next: Next) {
+  if (!canControlEmergency(c)) {
+    return c.json({
+      success: false,
+      error: '緊急停止・復旧の専用権限がありません。オーナーに権限付与を依頼してください',
+    }, 403);
+  }
+  await next();
+}
 
 function requestedAccountId(value: string | null | undefined): string | null {
   return !value || value === 'all' ? null : value.trim();
@@ -56,6 +77,54 @@ operations.get('/api/operations/control', requireRole('owner', 'admin'), async (
   }
 });
 
+operations.get('/api/operations/control/preview', requireRole('owner', 'admin'), async (c) => {
+  const accountId = requestedAccountId(c.req.query('account_id'));
+  if (accountId === null && c.get('staff')?.role !== 'owner') {
+    return c.json({ success: false, error: '全アカウントの影響人数を表示する権限がありません' }, 403);
+  }
+  if (accountId !== null && !await canReadScope(c, accountId)) {
+    return c.json({ success: false, error: 'このアカウントの影響人数を表示する権限がありません' }, 403);
+  }
+  try {
+    const [control, impact] = await Promise.all([
+      getOperationControlSet(c.env.DB, accountId),
+      getOperationImpactPreview(c.env.DB, accountId),
+    ]);
+    const counts = {
+      broadcast_dispatch: impact.broadcast_dispatch.itemCount,
+      scenario_dispatch: impact.scenario_dispatch.itemCount,
+      reminder_dispatch: impact.reminder_dispatch.itemCount,
+      automation_actions: impact.automation_actions.itemCount,
+      auto_reply_dispatch: impact.auto_reply_dispatch.itemCount,
+    };
+    const calculatedAt = new Date().toISOString();
+    await recordOperation(c.env.DB, {
+      targetKind: 'emergency_control',
+      targetId: accountId ?? '*',
+      action: 'previewed',
+      actorId: c.get('staff')!.id,
+      detail: {
+        counts,
+        hasUnknownAudience: Object.values(impact).some((metric) => metric.friendCount === null),
+        calculatedAt,
+      },
+    });
+    return c.json({
+      success: true,
+      data: {
+        control,
+        counts,
+        impact,
+        permissions: { canControl: canControlEmergency(c) },
+        calculatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/operations/control/preview error:', error);
+    return c.json({ success: false, error: '緊急停止の影響人数を取得できませんでした' }, 500);
+  }
+});
+
 operations.get('/api/operations/history', requireRole('owner', 'admin'), async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -88,6 +157,7 @@ operations.get('/api/operations/incidents/:id', requireRole('owner', 'admin'), a
 operations.post(
   '/api/operations/incidents',
   requireRole('owner', 'admin'),
+  requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-stop'),
   async (c) => {
     let body: Record<string, unknown>;
@@ -150,6 +220,7 @@ operations.post(
 operations.post(
   '/api/operations/incidents/:id/restore',
   requireRole('owner', 'admin'),
+  requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-restore'),
   async (c) => {
     let body: Record<string, unknown>;
