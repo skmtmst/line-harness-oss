@@ -64,7 +64,8 @@
   },
   "required": {
     "$説明": "この数を下回るとCIを落とす。B3では入力・検索・選択まで契約へ追加した。減らす方向の変更は承認が要る。",
-    "tokens": 24,
+    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は docs/v6-directives.md §4「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。",
+    "tokens": 21,
     "parts": 20,
     "componentInventory": 85,
     "v6RepresentativeNodes": 10,
@@ -169,14 +170,6 @@
       "note": "追加。表の見出し行の地",
       "lastCheckedAt": "2026-08-24"
     },
-    "--radius-tile": {
-      "pencil": "$radius-md",
-      "source": "10px",
-      "resolved": "10px",
-      "status": "active",
-      "note": "追加。--radius-md にするとTailwind標準の rounded-md(6px) を83か所で上書きするため別名",
-      "lastCheckedAt": "2026-08-24"
-    },
     "--text-caption": {
       "pencil": "$size-caption",
       "source": "12px",
@@ -247,22 +240,6 @@
       "resolved": "#e9f1ff",
       "status": "active",
       "note": "状態バッジの情報背景",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--color-status-warning": {
-      "pencil": "$status-warn-deep",
-      "source": "#a15c00",
-      "resolved": "#a15c00",
-      "status": "active",
-      "note": "状態バッジの注意色",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--color-status-warning-soft": {
-      "pencil": "$status-warn-soft",
-      "source": "#fff7e6",
-      "resolved": "#fff7e6",
-      "status": "active",
-      "note": "状態バッジの注意背景",
       "lastCheckedAt": "2026-08-24"
     },
     "--color-status-danger": {
@@ -398,7 +375,7 @@
           "pencil": "XywGr cornerRadius: $radius-md",
           "class": "card",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -482,7 +459,7 @@
           "pencil": "バッジ cornerRadius: $radius-md",
           "class": "badge",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -682,7 +659,7 @@
           "class": "button",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "nBRKk/uzNEC fontSize: $size-label",
@@ -699,18 +676,18 @@
           "resolved": "600"
         },
         {
-          "pencil": "nBRKk fill: $accent",
+          "pencil": "nBRKk fill: $accent-deep（2026-09-03 決定。Pencil 修正 40 番は未反映）",
           "class": "primary",
           "prop": "background",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
-          "pencil": "nBRKk stroke: $accent",
+          "pencil": "nBRKk stroke: $accent-deep（2026-09-03 決定。Pencil 修正 40 番は未反映）",
           "class": "primary",
           "prop": "border-color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "nBRKk ラベル fill: $on-accent",
@@ -834,7 +811,7 @@
           "class": "item",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "Blot6 item fill: $canvas",
@@ -1048,7 +1025,7 @@
         { "pencil": "J33xq menu item height: 40", "class": "item", "prop": "height", "source": "40px", "resolved": "40px" },
         { "pencil": "J33xq menu item gap: 11", "class": "item", "prop": "gap", "source": "11px", "resolved": "11px" },
         { "pencil": "J33xq menu item padding: [0,12]", "class": "item", "prop": "padding", "source": "0 12px", "resolved": "0 12px" },
-        { "pencil": "J33xq menu item cornerRadius: $radius-md", "class": "item", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
+        { "pencil": "J33xq menu item cornerRadius: $radius-md", "class": "item", "prop": "border-radius", "source": "var(--radius-card)", "resolved": "10px" },
         { "pencil": "J33xq menu label fontSize: $size-body", "class": "item", "prop": "font-size", "source": "14px", "resolved": "14px" },
         { "pencil": "J33xq menu label fontWeight: 600", "class": "item", "prop": "font-weight", "source": "600", "resolved": "600" },
         { "pencil": "J33xq selected fill: $accent-soft", "class": "active", "prop": "background", "source": "var(--color-accent-soft)", "resolved": "#e8f8ee" },
@@ -1174,9 +1151,9 @@
         { "pencil": "z9TQJ gap: 5", "class": "segmented", "prop": "gap", "source": "5px", "resolved": "5px" },
         { "pencil": "z9TQJ padding: 4", "class": "segmented", "prop": "padding", "source": "4px", "resolved": "4px" },
         { "pencil": "z9TQJ fill: $canvas-parchment", "class": "segmented", "prop": "background", "source": "var(--color-shell)", "resolved": "#f5f5f7" },
-        { "pencil": "z9TQJ cornerRadius: $radius-md", "class": "segmented", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
+        { "pencil": "z9TQJ cornerRadius: $radius-md", "class": "segmented", "prop": "border-radius", "source": "var(--radius-card)", "resolved": "10px" },
         { "pencil": "z9TQJ item height: 42", "class": "segmentedTab", "prop": "height", "source": "42px", "resolved": "42px" },
-        { "pencil": "z9TQJ item cornerRadius: $radius-sm", "class": "segmentedTab", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" }
+        { "pencil": "z9TQJ item cornerRadius: $radius-sm", "class": "segmentedTab", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" }
       ]
     },
     "card": {
@@ -1196,7 +1173,7 @@
       "visualVerification": { "status": "unverified", "requiredViewports": [1440, 1920], "reason": "B2の同一状態画像を比較する。" },
       "declarations": [
         { "pencil": "X34VF stroke: $hairline / 1", "class": "card", "prop": "border", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
-        { "pencil": "X34VF cornerRadius: $radius-md", "class": "card", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
+        { "pencil": "X34VF cornerRadius: $radius-md", "class": "card", "prop": "border-radius", "source": "var(--radius-card)", "resolved": "10px" },
         { "pencil": "X34VF fill: $canvas", "class": "card", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
         { "pencil": "X34VF effect: #1920261A 1,1,2", "class": "card", "prop": "box-shadow", "source": "var(--shadow-card)", "resolved": "1px 1px 2px #1920261a" },
         { "pencil": "dashboard card layout: vertical", "class": "vertical", "prop": "display", "source": "flex", "resolved": "flex" },
@@ -1268,8 +1245,8 @@
         { "pencil": "neutral label: $ink-secondary", "class": "neutral", "prop": "color", "source": "var(--color-ink-secondary)", "resolved": "#4a5565" },
         { "pencil": "info fill: $status-info-soft", "class": "info", "prop": "background", "source": "var(--color-status-info-soft)", "resolved": "#e9f1ff" },
         { "pencil": "info label: $status-info", "class": "info", "prop": "color", "source": "var(--color-status-info)", "resolved": "#175cd3" },
-        { "pencil": "warning fill: $status-warn-soft", "class": "warning", "prop": "background", "source": "var(--color-status-warning-soft)", "resolved": "#fff7e6" },
-        { "pencil": "warning label: $status-warn-deep", "class": "warning", "prop": "color", "source": "var(--color-status-warning)", "resolved": "#a15c00" },
+        { "pencil": "warning fill: $status-warn-soft", "class": "warning", "prop": "background", "source": "var(--color-status-warn-soft)", "resolved": "#fff7e6" },
+        { "pencil": "warning label: $status-warn-deep", "class": "warning", "prop": "color", "source": "var(--color-status-warn-deep)", "resolved": "#a15c00" },
         { "pencil": "success fill: $accent-soft", "class": "success", "prop": "background", "source": "var(--color-accent-soft)", "resolved": "#e8f8ee" },
         { "pencil": "success label: $accent", "class": "success", "prop": "color", "source": "var(--color-accent)", "resolved": "#06c755" },
         { "pencil": "danger fill: $status-danger-soft", "class": "danger", "prop": "background", "source": "var(--color-status-danger-soft)", "resolved": "#fef0f0" },
@@ -1294,7 +1271,7 @@
       "declarations": [
         { "pencil": "ytG7l/keKe3 width: fill", "class": "control", "prop": "width", "source": "100%", "resolved": "100%" },
         { "pencil": "ytG7l/keKe3 stroke: $hairline / 1", "class": "control", "prop": "border", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
-        { "pencil": "ytG7l/keKe3 cornerRadius: $radius-sm", "class": "control", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" },
+        { "pencil": "ytG7l/keKe3 cornerRadius: $radius-sm", "class": "control", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" },
         { "pencil": "ytG7l/keKe3 fill: $canvas", "class": "control", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
         { "pencil": "ytG7l/keKe3 text fill: $ink", "class": "control", "prop": "color", "source": "var(--color-ink)", "resolved": "#1d1d1f" },
         { "pencil": "ytG7l/keKe3 fontSize: $size-label", "class": "control", "prop": "font-size", "source": "var(--text-label)", "resolved": "13px" },
@@ -1328,7 +1305,7 @@
         { "pencil": "phlR1 gap: 10", "class": "search", "prop": "gap", "source": "10px", "resolved": "10px" },
         { "pencil": "phlR1 padding: [0,14]", "class": "search", "prop": "padding", "source": "0 14px", "resolved": "0 14px" },
         { "pencil": "phlR1 stroke: $hairline / 1", "class": "search", "prop": "border", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
-        { "pencil": "phlR1 cornerRadius: $radius-sm", "class": "search", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" },
+        { "pencil": "phlR1 cornerRadius: $radius-sm", "class": "search", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" },
         { "pencil": "phlR1 fill: $canvas", "class": "search", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
         { "pencil": "phlR1 icon width: 17", "class": "searchIcon", "prop": "width", "source": "17px", "resolved": "17px" },
         { "pencil": "phlR1 icon height: 17", "class": "searchIcon", "prop": "height", "source": "17px", "resolved": "17px" },
@@ -1358,7 +1335,7 @@
         { "pencil": "rpot9 height: 42", "class": "trigger", "prop": "height", "source": "42px", "resolved": "42px" },
         { "pencil": "rpot9 padding: [0,13]", "class": "trigger", "prop": "padding", "source": "0 13px", "resolved": "0 13px" },
         { "pencil": "rpot9 stroke: $hairline / 1", "class": "trigger", "prop": "border", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
-        { "pencil": "rpot9 cornerRadius: $radius-sm", "class": "closedTrigger", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" },
+        { "pencil": "rpot9 cornerRadius: $radius-sm", "class": "closedTrigger", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" },
         { "pencil": "rpot9 fill: $canvas", "class": "trigger", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
         { "pencil": "rpot9 fontSize: $size-label", "class": "trigger", "prop": "font-size", "source": "var(--text-label)", "resolved": "13px" },
         { "pencil": "rpot9 fontWeight: 600", "class": "trigger", "prop": "font-weight", "source": "600", "resolved": "600" },
@@ -1445,7 +1422,7 @@
         { "pencil": "J6x4Q actions gap: 10", "class": "actions", "prop": "gap", "source": "10px", "resolved": "10px" },
         { "pencil": "J6x4Q button width: 112", "class": "designButton", "prop": "width", "source": "112px", "resolved": "112px" },
         { "pencil": "J6x4Q button height: 38", "class": "button", "prop": "min-height", "source": "38px", "resolved": "38px" },
-        { "pencil": "J6x4Q button cornerRadius: $radius-sm", "class": "button", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" },
+        { "pencil": "J6x4Q button cornerRadius: $radius-sm", "class": "button", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" },
         { "pencil": "J6x4Q button fontSize: $size-caption", "class": "button", "prop": "font-size", "source": "var(--text-caption)", "resolved": "12px" },
         { "pencil": "H2S1T4 fill: $status-danger-soft", "class": "callout", "prop": "background", "source": "var(--color-status-danger-soft)", "resolved": "#fef0f0" },
         { "pencil": "H2S1T4 padding: 16", "class": "callout", "prop": "padding", "source": "16px", "resolved": "16px" },
@@ -1502,11 +1479,11 @@
         { "pencil": "notice height: 48", "class": "notice", "prop": "min-height", "source": "48px", "resolved": "48px" },
         { "pencil": "notice gap: 10", "class": "notice", "prop": "gap", "source": "10px", "resolved": "10px" },
         { "pencil": "notice padding left: 14", "class": "notice", "prop": "padding", "source": "0 44px 0 14px", "resolved": "0 44px 0 14px" },
-        { "pencil": "notice cornerRadius: $radius-sm", "class": "notice", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" },
+        { "pencil": "notice cornerRadius: $radius-sm", "class": "notice", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" },
         { "pencil": "notice fontSize: $size-label", "class": "notice", "prop": "font-size", "source": "var(--text-label)", "resolved": "13px" },
         { "pencil": "notice fontWeight: 700", "class": "notice", "prop": "font-weight", "source": "700", "resolved": "700" },
         { "pencil": "ApbSZ fill: $accent-soft", "class": "success", "prop": "background", "source": "var(--color-accent-soft)", "resolved": "#e8f8ee" },
-        { "pencil": "zPRvi fill: $status-warn-soft", "class": "validation", "prop": "background", "source": "var(--color-status-warning-soft)", "resolved": "#fff7e6" },
+        { "pencil": "zPRvi fill: $status-warn-soft", "class": "validation", "prop": "background", "source": "var(--color-status-warn-soft)", "resolved": "#fff7e6" },
         { "pencil": "I5rKbM fill: $status-danger-soft", "class": "error", "prop": "background", "source": "var(--color-status-danger-soft)", "resolved": "#fef0f0" },
         { "pencil": "notice close icon target", "class": "close", "prop": "width", "source": "32px", "resolved": "32px" }
       ]
@@ -1529,7 +1506,7 @@
       "declarations": [
         { "pencil": "hGpFq width: 200", "class": "menu", "prop": "width", "source": "200px", "resolved": "200px" },
         { "pencil": "hGpFq stroke: $hairline / 1", "class": "menu", "prop": "border", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
-        { "pencil": "hGpFq cornerRadius: $radius-sm", "class": "menu", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" },
+        { "pencil": "hGpFq cornerRadius: $radius-sm", "class": "menu", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "8px" },
         { "pencil": "hGpFq fill: $canvas", "class": "menu", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
         { "pencil": "hGpFq effect: float", "class": "menu", "prop": "box-shadow", "source": "var(--shadow-float)", "resolved": "0 6px 18px #19202626" },
         { "pencil": "hGpFq gap: 2", "class": "menu", "prop": "gap", "source": "2px", "resolved": "2px" },
