@@ -188,6 +188,19 @@ describe('定期走査', () => {
     expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
   });
 
+  it('使用先の一括記録に失敗したときはカーソルを進めない', async () => {
+    const { db } = makeDb(
+      [{ id: 'md-1', r2_key: 'media/a.png' }],
+      { templates: [{ ref_id: 'tpl-1', message_content: 'media/a.png' }] },
+    );
+    dbMocks.recordMediaUsages.mockRejectedValueOnce(new Error('batch write failed'));
+
+    await expect(scanMediaUsage(db, '2026-08-16T06:00:00.000'))
+      .rejects.toThrow('batch write failed');
+    expect(dbMocks.saveMediaUsageScanState).not.toHaveBeenCalled();
+    expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
+  });
+
   it('メディアが1件も無ければDB走査を始めない', async () => {
     const { db, queries } = makeDb([]);
     const result = await scanMediaUsage(db, '2026-08-16T06:00:00.000');
