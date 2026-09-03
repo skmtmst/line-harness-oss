@@ -28,11 +28,20 @@ const dbMocks = {
   getMileageHistoryForFriend: vi.fn(),
   getMileageSelfInsights: vi.fn(),
   getMileageEarningOpportunitiesForFriend: vi.fn(),
+  listMileageRewards: vi.fn(),
+  getMileageRewardRedemptionCounts: vi.fn(),
+  reserveMileageRewardRedemption: vi.fn(),
+  MileageRewardError: class MileageRewardError extends Error {
+    constructor(public code: string, message: string, public status = 400) { super(message); }
+  },
   generateRefSlug: vi.fn(() => 'slug00'),
   // account-settings helpers (used by resolveLinkBaseUrl via @line-crm/db)
   getLinkBaseUrl: vi.fn().mockResolvedValue(null),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+
+const deliveryMocks = { deliverMileageReward: vi.fn() };
+vi.mock('../services/mileage-reward-delivery.js', () => deliveryMocks);
 
 // Import after the mock so index.ts binds the mocked helpers.
 const worker = (await import('../index.js')).default;
@@ -109,9 +118,9 @@ let linksByAffiliate: Map<string, LinkRow[]>;
 let statsByAffiliate: Map<string, Map<string, { friendAdds: number; conversions: number; conversionsPending: number; conversionsApproved: number }>>;
 let slugCounter: number;
 
-const FRIENDS: Record<string, { id: string; display_name: string; user_id: string }> = {
-  'U-alice': { id: 'friend-alice', display_name: 'Alice', user_id: 'user-alice' },
-  'U-bob': { id: 'friend-bob', display_name: 'Bob', user_id: 'user-bob' },
+const FRIENDS: Record<string, { id: string; display_name: string; user_id: string; line_account_id: string }> = {
+  'U-alice': { id: 'friend-alice', display_name: 'Alice', user_id: 'user-alice', line_account_id: 'account-main' },
+  'U-bob': { id: 'friend-bob', display_name: 'Bob', user_id: 'user-bob', line_account_id: 'account-main' },
 };
 
 function installStore() {
@@ -219,6 +228,20 @@ beforeEach(() => {
       url: 'https://liff.line.me/123/?page=webinar&slug=ai',
     },
   ]);
+  dbMocks.listMileageRewards.mockResolvedValue([]);
+  dbMocks.getMileageRewardRedemptionCounts.mockResolvedValue({
+    beneficiaryKey: 'user:user-alice',
+    byRewardId: new Map(),
+    byVersionId: new Map(),
+  });
+  dbMocks.reserveMileageRewardRedemption.mockResolvedValue({
+    kind: 'created',
+    redemption: { id: 'redemption-1' },
+  });
+  deliveryMocks.deliverMileageReward.mockResolvedValue({
+    status: 'succeeded',
+    message: '交換しました',
+  });
   installLineFetchMock();
   installStore();
 });
@@ -311,6 +334,66 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
     const body = (await res.json()) as { opportunities: Array<{ url: string }> };
     const missionUrl = new URL(body.opportunities[0].url);
     expect(missionUrl.searchParams.get('crossAccountToken')).toMatch(/^v1\./u);
+  });
+});
+
+describe('LIFF mileage rewards — verified account and real limits', () => {
+  it('rejects a legacy fallback friend from a different LINE account', async () => {
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValueOnce({
+      ...FRIENDS['U-alice'],
+      line_account_id: 'account-other',
+    });
+
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+
+    expect(response.status).toBe(404);
+    expect(dbMocks.listMileageRewards).not.toHaveBeenCalled();
+  });
+
+  it('does not say redeemable after the per-person limit is reached', async () => {
+    dbMocks.listMileageRewards.mockResolvedValueOnce([{
+      id: 'reward-1',
+      rewardKind: 'coupon',
+      availableCodeCount: 2,
+      currentVersion: {
+        id: 'reward-version-1', requiredMiles: 300, perFriendLimit: 1, stockLimit: 10,
+      },
+    }]);
+    dbMocks.getMileageRewardRedemptionCounts.mockResolvedValueOnce({
+      beneficiaryKey: 'user:user-alice',
+      byRewardId: new Map([['reward-1', 1]]),
+      byVersionId: new Map([['reward-version-1', 1]]),
+    });
+
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { rewards: Array<{ canRedeem: boolean; unavailableReason: string }> };
+    expect(body.rewards[0]).toMatchObject({
+      canRedeem: false,
+      unavailableReason: 'この使い道の交換上限に達しています',
+    });
+  });
+
+  it('requires idempotency and reserves only for the friend resolved from LINE', async () => {
+    const missing = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(missing.status).toBe(400);
+
+    const response = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.reserveMileageRewardRedemption).toHaveBeenCalledWith(DB, expect.objectContaining({
+      lineAccountId: 'account-main',
+      friendId: 'friend-alice',
+      rewardId: 'reward-1',
+      idempotencyKey: '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93',
+    }));
   });
 });
 
@@ -470,7 +553,7 @@ describe('LINE token verification', () => {
     // does. Mirrors liff.ts allowing multi-account login channels.
     installLineFetchMock('3000000000');
     dbMocks.getLineAccounts.mockResolvedValue([
-      { login_channel_id: '3000000000' } as unknown as never,
+      { id: 'account-main', login_channel_id: '3000000000' } as unknown as never,
     ]);
 
     const reg = await call('/api/liff/affiliate/register', {

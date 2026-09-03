@@ -189,7 +189,7 @@ function EditTagInner() {
             <button
               onClick={requestSave}
               disabled={saving || loading}
-              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
+              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
             >
               {saving ? '保存中...' : '保存する'}
             </button>
