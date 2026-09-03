@@ -48,7 +48,7 @@ function StepGroup({ item, n, withLine }: { item: StepTrailItem; n: number; with
         <span
           className={`rounded-pill flex h-6 w-6 items-center justify-center text-xs font-bold ${
             item.state === 'done'
-              ? 'bg-accent text-on-accent'
+              ? 'bg-accent-deep text-on-accent'
               : item.state === 'current'
                 ? 'border-accent text-accent border-2'
                 : 'border-hairline text-ink-faint border'
