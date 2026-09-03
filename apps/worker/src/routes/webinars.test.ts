@@ -50,6 +50,16 @@ vi.mock('../services/friend-tag-attach.js', () => tagMock);
 const localProxyMock = { dispatchLineProxyLocally: vi.fn() };
 vi.mock('../services/local-line-proxy.js', () => localProxyMock);
 
+const webinarNotificationMocks = {
+  enqueueWebinarCompletedNotification: vi.fn(),
+  getWebinarNotificationOverview: vi.fn(),
+  getWebinarNotificationSettings: vi.fn(),
+  registerWebinarSession: vi.fn(),
+  saveWebinarNotificationSettings: vi.fn(),
+  sendWebinarNotificationTest: vi.fn(),
+};
+vi.mock('../services/webinar-notifications.js', () => webinarNotificationMocks);
+
 const accountAccessMock = {
   canAccessAllLineAccounts: vi.fn(async (
     _db: D1Database, _staff: unknown, _ids: Array<string | null>,
@@ -131,6 +141,30 @@ beforeEach(() => {
   });
   localProxyMock.dispatchLineProxyLocally.mockResolvedValue(new Response(null, { status: 200 }));
   dbMocks.recordWebinarPickerOpen.mockResolvedValue(undefined);
+  webinarNotificationMocks.getWebinarNotificationSettings.mockResolvedValue(null);
+  webinarNotificationMocks.getWebinarNotificationOverview.mockResolvedValue({
+    total: 0, pending: 0, sent: 0, failed: 0, skipped: 0, cancelled: 0,
+  });
+  webinarNotificationMocks.registerWebinarSession.mockResolvedValue({
+    registration: {
+      id: 'reg-current', webinar_id: 'w1', friend_id: 'friend-1',
+      session_start_at: SESSION_START, notified_at: null, status: 'active',
+      cancelled_at: null, created_at: 'x',
+    },
+    created: true,
+    rescheduled: false,
+  });
+  webinarNotificationMocks.saveWebinarNotificationSettings.mockResolvedValue({
+    settings: {
+      webinarId: 'w1', version: 1, registrationEnabled: true,
+      dayBeforeEnabled: true, dayBeforeTime: '20:00', hourBeforeEnabled: true,
+      hourBeforeMinutes: 60, startEnabled: true, missedEnabled: true,
+      missedTime: '10:00', completedEnabled: true, updatedAt: 'x',
+    },
+    queued: 4,
+    cancelled: 0,
+  });
+  webinarNotificationMocks.sendWebinarNotificationTest.mockResolvedValue({ sent: 1, failed: 0 });
   dbMocks.applyMileageRulesForEvent.mockResolvedValue({
     event: { id: 'mileage-event-1' }, granted: [],
   });
@@ -187,6 +221,9 @@ describe('admin webinar tenant scope', () => {
     ['PUT', '/api/webinars/w-other/ctas'],
     ['GET', '/api/webinars/w-other/analytics'],
     ['GET', '/api/webinars/w-other/user-comments'],
+    ['GET', '/api/webinars/w-other/notifications'],
+    ['PUT', '/api/webinars/w-other/notifications'],
+    ['POST', '/api/webinars/w-other/notifications/test'],
   ])('%s %s は別統括のウェビナーを404にする', async (method, path) => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ id: 'w-other', account_id: 'account-b' }));
     accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
@@ -610,6 +647,17 @@ describe('POST /api/liff/webinars/:slug/heartbeat', () => {
     );
   });
 
+  test('90%視聴で完了通知を一度だけ作る処理へ渡す', async () => {
+    const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
+      sessionStartAt: SESSION_START,
+      positionSeconds: 6480,
+    });
+    expect(res.status).toBe(200);
+    expect(webinarNotificationMocks.enqueueWebinarCompletedNotification).toHaveBeenCalledWith(
+      expect.anything(), 'w1', 'friend-1', SESSION_START,
+    );
+  });
+
   test('動画長+60秒を超える位置は 422', async () => {
     const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
       sessionStartAt: SESSION_START,
@@ -764,7 +812,7 @@ describe('POST /api/liff/webinars/:slug/register', () => {
       sessionStartAt: SESSION_START,
     });
     expect(res.status).toBe(200);
-    expect(dbMocks.upsertWebinarRegistration).toHaveBeenCalledWith(
+    expect(webinarNotificationMocks.registerWebinarSession).toHaveBeenCalledWith(
       expect.anything(), 'w1', 'friend-1', SESSION_START,
     );
     expect(execCtx.waitUntil).toHaveBeenCalled();
@@ -776,7 +824,7 @@ describe('POST /api/liff/webinars/:slug/register', () => {
       sessionStartAt: SESSION_START + 123,
     });
     expect(res.status).toBe(400);
-    expect(dbMocks.upsertWebinarRegistration).not.toHaveBeenCalled();
+    expect(webinarNotificationMocks.registerWebinarSession).not.toHaveBeenCalled();
   });
 
   test('開始5分ちょうどまでは現在セッションを予約できる', async () => {
@@ -793,6 +841,161 @@ describe('POST /api/liff/webinars/:slug/register', () => {
       sessionStartAt: SESSION_START,
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('webinar notification settings', () => {
+  test('staff は通知設定を変更できない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    const staffApp = new Hono<Env>();
+    staffApp.use('*', async (c, next) => {
+      c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false });
+      return next();
+    });
+    staffApp.route('/', webinarRoutes);
+
+    const res = await staffApp.request('/api/webinars/w1/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }, env, execCtx);
+
+    expect(res.status).toBe(403);
+    expect(webinarNotificationMocks.saveWebinarNotificationSettings).not.toHaveBeenCalled();
+  });
+
+  test('GET は設定と実行状況を同じ応答で返す', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarNotificationMocks.getWebinarNotificationSettings.mockResolvedValue({
+      webinarId: 'w1', version: 2, registrationEnabled: true,
+      dayBeforeEnabled: true, dayBeforeTime: '20:00', hourBeforeEnabled: true,
+      hourBeforeMinutes: 60, startEnabled: true, missedEnabled: true,
+      missedTime: '10:00', completedEnabled: true, updatedAt: 'x',
+    });
+    webinarNotificationMocks.getWebinarNotificationOverview.mockResolvedValue({
+      total: 8, pending: 4, sent: 2, failed: 1, skipped: 1, cancelled: 0,
+    });
+
+    const res = await adminReq('/api/webinars/w1/notifications');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(expect.objectContaining({
+      success: true,
+      data: expect.objectContaining({
+        settings: expect.objectContaining({ version: 2 }),
+        overview: expect.objectContaining({ total: 8, failed: 1 }),
+      }),
+    }));
+  });
+
+  test('PUT は全項目が揃った設定だけを保存する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    const input = {
+      registrationEnabled: true,
+      dayBeforeEnabled: true,
+      dayBeforeTime: '20:00',
+      hourBeforeEnabled: true,
+      hourBeforeMinutes: 60,
+      startEnabled: true,
+      missedEnabled: true,
+      missedTime: '10:00',
+      completedEnabled: true,
+    };
+
+    const res = await adminReq('/api/webinars/w1/notifications', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+
+    expect(res.status).toBe(200);
+    expect(webinarNotificationMocks.saveWebinarNotificationSettings).toHaveBeenCalledWith(
+      expect.anything(), 'w1', input,
+    );
+    const invalid = await adminReq('/api/webinars/w1/notifications', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  test.each(['invalid_time', 'invalid_hour_before'])(
+    'PUT は設定値エラー %s を 400 で返す',
+    async (message) => {
+      dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+      webinarNotificationMocks.saveWebinarNotificationSettings.mockRejectedValueOnce(
+        new Error(message),
+      );
+      const input = {
+        registrationEnabled: true,
+        dayBeforeEnabled: true,
+        dayBeforeTime: '20:00',
+        hourBeforeEnabled: true,
+        hourBeforeMinutes: 60,
+        startEnabled: true,
+        missedEnabled: true,
+        missedTime: '10:00',
+        completedEnabled: true,
+      };
+
+      const res = await adminReq('/api/webinars/w1/notifications', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ success: false, error: message });
+    },
+  );
+
+  test('テスト送信は次の実在セッションと所属アカウントを使う', async () => {
+    vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+
+    const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(200);
+    expect(webinarNotificationMocks.sendWebinarNotificationTest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 'w1', accountId: 'account-a' }),
+      SESSION_START,
+      expect.objectContaining({ defaultLiffId: '999-test' }),
+    );
+  });
+
+  test('存在しないウェビナーへのテスト送信は 404', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(null);
+
+    const res = await adminReq('/api/webinars/missing/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'Not found' });
+    expect(webinarNotificationMocks.sendWebinarNotificationTest).not.toHaveBeenCalled();
+  });
+
+  test('次回開催がないウェビナーへのテスト送信は 400', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({
+      account_id: 'account-a',
+      schedule_json: '[]',
+    }));
+
+    const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error: 'no_upcoming_session' });
+    expect(webinarNotificationMocks.sendWebinarNotificationTest).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['no_test_recipients', 400],
+    ['db unavailable', 500],
+  ])('テスト送信失敗 %s をHTTP %iで返す', async (message, expectedStatus) => {
+    vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarNotificationMocks.sendWebinarNotificationTest.mockRejectedValueOnce(
+      new Error(message),
+    );
+
+    const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(expectedStatus);
+    expect(await res.json()).toMatchObject({ success: false });
   });
 });
 
