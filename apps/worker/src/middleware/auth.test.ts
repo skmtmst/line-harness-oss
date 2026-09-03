@@ -14,6 +14,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'chats-key') return { id: 'chats-1', name: 'Chats Staff', role: 'staff', permission_keys: '["/chats"]' };
     if (token === 'tags-key') return { id: 'tags-1', name: 'Tags Staff', role: 'staff', permission_keys: '["/tags"]' };
     if (token === 'mileage-key') return { id: 'mileage-1', name: 'Mileage Staff', role: 'staff', permission_keys: '["/mileage"]' };
+    if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return {
@@ -84,6 +85,7 @@ function app() {
   a.route('/', adminAuth);
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
+  a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/forms/:id', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
   a.put('/api/forms/:id', (c) => c.json({ success: true }));
   a.delete('/api/forms/:id', (c) => c.json({ success: true }));
@@ -372,6 +374,11 @@ describe('staff feature permissions', () => {
   test('mileage permission protects mileage APIs', async () => {
     expect((await app().request('/api/mileage/history', bearer('mileage-key'), crossSiteEnv())).status).toBe(200);
     expect((await app().request('/api/mileage/history', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test('auto-reply permission protects execution results', async () => {
+    expect((await app().request('/api/auto-reply-runs', bearer('auto-replies-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/auto-reply-runs', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
   });
 
   test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(

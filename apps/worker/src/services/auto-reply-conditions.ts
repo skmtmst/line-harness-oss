@@ -220,13 +220,44 @@ export async function shouldReply(
   friendId: string,
   now: Date,
 ): Promise<boolean> {
-  if (!isWithinActiveWindow(rule, jstHhmm(now))) return false;
-  if (!isOnRespondingDay(rule, now)) return false;
-  if (rule.skip_when_operator_active === 1 && (await isOperatorHandling(db, friendId))) {
-    return false;
+  return (await evaluateAutoReplyConditions(db, rule, friendId, now)).matches;
+}
+
+export type AutoReplyConditionReasonCode =
+  | 'outside_active_window'
+  | 'weekday_not_allowed'
+  | 'operator_handling'
+  | 'already_replied_once'
+  | 'cooldown_active'
+  | 'friend_conditions_not_met';
+
+/**
+ * shouldReply と同じ判定を、履歴・テスト画面で説明できる形にする。
+ * 安い条件から順に見て、最初に止めた理由だけを返すため本番の評価順も変わらない。
+ */
+export async function evaluateAutoReplyConditions(
+  db: D1Database,
+  rule: AutoReplyConditionRow,
+  friendId: string,
+  now: Date,
+): Promise<{ matches: boolean; reasonCodes: AutoReplyConditionReasonCode[] }> {
+  if (!isWithinActiveWindow(rule, jstHhmm(now))) {
+    return { matches: false, reasonCodes: ['outside_active_window'] };
   }
-  if (await hasAlreadyRepliedOnce(db, rule, friendId)) return false;
-  if (await isCoolingDown(db, friendId, rule.cooldown_minutes, now)) return false;
-  if (!(await matchesFriendConditions(db, rule, friendId))) return false;
-  return true;
+  if (!isOnRespondingDay(rule, now)) {
+    return { matches: false, reasonCodes: ['weekday_not_allowed'] };
+  }
+  if (rule.skip_when_operator_active === 1 && (await isOperatorHandling(db, friendId))) {
+    return { matches: false, reasonCodes: ['operator_handling'] };
+  }
+  if (await hasAlreadyRepliedOnce(db, rule, friendId)) {
+    return { matches: false, reasonCodes: ['already_replied_once'] };
+  }
+  if (await isCoolingDown(db, friendId, rule.cooldown_minutes, now)) {
+    return { matches: false, reasonCodes: ['cooldown_active'] };
+  }
+  if (!(await matchesFriendConditions(db, rule, friendId))) {
+    return { matches: false, reasonCodes: ['friend_conditions_not_met'] };
+  }
+  return { matches: true, reasonCodes: [] };
 }
