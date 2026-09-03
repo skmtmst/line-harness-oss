@@ -2,20 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { api, type BroadcastStats } from '@/lib/api'
+import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'
 
-/**
- * 帯の副題に出す数。
- *
- * **口が想定の形を返さなくても `undefined` を画面に出さない。**
- * `予約中 undefined` が実際に出ていた（撮影用のモックが
- * `/api/broadcasts/stats` を持たず、別の形が返っていた）。
- * 数が無いなら `—` にして、単位も付けない。
- */
-export function countText(value: unknown, unit: string): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}${unit}`
-    : '—'
-}
+/** 帯の副題に出す数。中身は `broadcast-kpi-values.ts`。 */
+export { countText }
 
 /**
  * 一斉配信の一覧に出す数（設計 `q76C35` ★V6 6-1 一斉配信の帯）。
@@ -52,40 +42,7 @@ export default function BroadcastKpis() {
     }
   }, [])
 
-  const cards = [
-    {
-      title: '予約中',
-      value: stats?.scheduled ?? null,
-      unit: '件',
-      /* 「今日 1件」は口が返さない。数えずに未取得と言う。 */
-      detail: '今日 —（未取得）',
-    },
-    {
-      title: '下書き',
-      value: null,
-      unit: '件',
-      /* 同上。**0件と書くと「下書きは無い」という別の意味になる。** */
-      detail: '編集途中 ・ 未取得',
-    },
-    {
-      title: '今月の配信',
-      value: stats?.thisMonth ?? null,
-      unit: '件',
-      detail: `${countText(stats?.delivered, '人')}へ到達`,
-    },
-    {
-      title: '平均開封率',
-      value: stats?.openRate ?? null,
-      unit: '%',
-      /*
-        設計 `q76C35` の副題は「過去28日」だけ。**言葉を足さない。**
-        LINEは20人未満の配信だと開封数を返さないので、その配信は平均から
-        外している（0として混ぜると平均が不当に下がる）。この但し書きを
-        画面に出すかは Pencil を先に直す話なので、ここには書かない。
-      */
-      detail: '過去28日',
-    },
-  ]
+  const cards = buildBroadcastKpiCards(stats)
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">

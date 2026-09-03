@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+/** 帯の中身（4枚の組み立て）。数の扱いは `broadcast-kpi-values.test.ts` が直に試す。 */
 const KPIS = readFileSync(
+  join(HERE, '..', '..', 'components', 'broadcasts', 'broadcast-kpi-values.ts'),
+  'utf8',
+)
+/** 帯の描き方（単位を出すかどうか）。 */
+const KPI_VIEW = readFileSync(
   join(HERE, '..', '..', 'components', 'broadcasts', 'broadcast-kpis.tsx'),
   'utf8',
 )
@@ -87,6 +93,15 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
 
   it('数が無いときは単位も出さない', () => {
     /* `—件` は数に見える。 */
-    expect(KPIS).toContain("typeof card.value === 'number' && Number.isFinite(card.value) && (")
+    expect(KPI_VIEW).toContain("typeof card.value === 'number' && Number.isFinite(card.value) && (")
+  })
+
+  it('帯の組み立ては、画面から切り離して試せる形にする', () => {
+    /*
+      部品の中で組み立てていたころは、**文字列の一致を見る契約テストでしか
+      確かめられず、`0` と `—` の取り違えが試験をすり抜けた。**
+    */
+    expect(KPI_VIEW).toContain("import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'")
+    expect(KPI_VIEW).toContain('const cards = buildBroadcastKpiCards(stats)')
   })
 })
