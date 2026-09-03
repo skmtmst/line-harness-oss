@@ -32,7 +32,7 @@ vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(), recordLinkClick: vi.fn(),
   enrollFriendInScenario: vi.fn(), getUrlReachConversionPoints: vi.fn(), trackConversion: mocks.trackConversion,
   createConversionPoint: mocks.createPoint,
-  deleteConversionPoint: mocks.deletePoint,
+  stopConversionPoint: mocks.deletePoint,
   getConversionPointById: mocks.getPoint,
   getConversionPoints: mocks.getPoints,
   updateConversionPoint: mocks.updatePoint,

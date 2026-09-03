@@ -7,7 +7,7 @@ const mocks = {
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),
   updateConversionPoint: vi.fn(),
-  deleteConversionPoint: vi.fn(),
+  stopConversionPoint: vi.fn(),
   trackConversion: vi.fn(),
   getConversionEvents: vi.fn(),
   getConversionReport: vi.fn(),
@@ -63,6 +63,9 @@ const POINT = {
   count_repeat: 1,
   attribution_days: null,
   line_account_id: null,
+  status: 'active' as const,
+  stopped_at: null,
+  updated_at: '2026-08-15',
   created_at: '2026-08-15',
 };
 
@@ -213,5 +216,14 @@ describe('一覧', () => {
       targetUrl: 'https://example.com/a',
       countRepeat: false,
     });
+  });
+});
+
+describe('成果地点の停止', () => {
+  it('削除操作は履歴を消さず停止処理を呼ぶ', async () => {
+    mocks.getConversionPointById.mockResolvedValue(POINT);
+    const res = await req('/api/conversions/points/cp-1', 'DELETE');
+    expect(res.status).toBe(200);
+    expect(mocks.stopConversionPoint).toHaveBeenCalledWith(env.DB, 'cp-1');
   });
 });
