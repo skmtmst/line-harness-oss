@@ -283,6 +283,19 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     expect(d1Prepare).not.toHaveBeenCalled();
   });
 
+  test('存在しない配信は404で返し、権限確認や更新へ進まない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(null);
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ success: false, error: 'Broadcast not found' });
+    expect(accountAccess.canAccessAllLineAccounts).not.toHaveBeenCalled();
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+
   test('スタッフ権限では取消処理へ進まない', async () => {
     const response = await setupApp({ role: 'staff' }).request(`/api/broadcasts/${KEY}/cancel`, {
       method: 'POST',
@@ -336,6 +349,23 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({ success: false });
     expect(dbMocks.getBroadcastById).toHaveBeenCalledTimes(1);
+  });
+
+  test('取消後の再読込に失敗したときは成功として返さない', async () => {
+    dbMocks.getBroadcastById
+      .mockResolvedValueOnce(row)
+      .mockResolvedValueOnce(null);
+
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Broadcast not found after cancellation',
+    });
+    expect(d1Prepare).toHaveBeenCalledTimes(1);
   });
 
   test('予約中ではない配信は更新しない', async () => {
