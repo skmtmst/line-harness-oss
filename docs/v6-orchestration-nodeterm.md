@@ -8,7 +8,7 @@
 |---|---|
 | グループ(git worktree に紐づくフレーム) | **1 役 = 1 グループ = 1 worktree = 1 ブランチ**。フレームの中で開いたノードは全部その worktree で動くので、`cd` 間違いと同じ木の取り合いが起きない |
 | エージェントノード | 各グループに 1 つ。司令塔は Claude Code(Fable 5.1)、S0〜S3 は Claude Code(Opus 5)、実装は Codex |
-| 付箋(sticky)→ エージェントへのリンク | 各グループの指示書(所有パス、今週の順番、守ること)を付箋にして、そのグループのエージェントにリンクする。指示は付箋から 1 回だけ流し込まれる |
+| 付箋(sticky)→ エージェントへのリンク | 各グループに「まず docs/brain/Home.md を読む。あなたは <担当名>」の 1 行だけの付箋を置き、エージェントにリンクする。指示の正本はリポジトリ側(§8) |
 | コンテキストリンク(ノード間のエッジ) | 司令塔 ↔ 各担当 を双方向で結ぶ。司令塔は必要時だけ相手の記録(トランスクリプト・要約・直近出力)を読む。担当同士は結ばない(重なりの元) |
 | Kanban + GitHub Issues 同期 | **台帳そのもの**。列 = GitHub のラベル。Issue を動かすとラベルが変わり、完了列に置くと Issue が閉じる。GitHub が正本なので、NodeTerm を使わない人(Slack から見る人)も同じものを見る |
 | NEEDS YOU(承認待ち)の通知 | 担当エージェントの承認待ちは司令塔ではなく人が答える(承認は人の権限)。司令塔は「止まっている担当」を一覧で見るだけ |
@@ -32,7 +32,7 @@
 トリガー: 09:00 「朝の割り当て」→ 司令塔 / 18:00 「夕方のまとめ」→ 司令塔
 ```
 
-- 付箋の中身は `docs/v6-parallel-plan.md` §4 と `docs/v6-directives.md` §3 からコピーする(正本はリポジトリ側。付箋は写し)。
+- 付箋には指示をコピーしない。「まず docs/brain/Home.md を読む。あなたは S1(機能 1〜5)」のように 1 行だけ書く。指示の正本は `docs/v6-parallel-plan.md` §4 で、エージェントが起動時に読む(§8)。
 - 担当同士のコンテキストリンクは引かない。S1 が S0 の部品の状況を知りたいときは、司令塔に聞くか、GitHub の PR を見る。
 - グループの worktree は NodeTerm の「New worktree…」で作る(ブランチ名は `codex/kenta-r2-<担当>-<機能>`。base は codex/development)。既存の worktree を採用してもよい。
 
@@ -107,7 +107,7 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 1. NodeTerm でこのリポジトリをプロジェクトとして開き、Kanban を作る。
 2. Settings → GitHub Issues: リポジトリ `skmtmst/line-harness-oss`、認証は `gh auth login` 済みの GitHub CLI、列とラベルを §2 の表のとおり対応、完了列 = 完了。
 3. GitHub にラベルを作る: `todo` `doing` `review` `blocked` `lane:hq` `lane:s0` `lane:s1` `lane:s2` `lane:s3` `lane:codex`(NodeTerm の「Create missing labels」でもよい)。
-4. グループを 6 つ作り、それぞれ worktree を紐づける(§1)。各グループに付箋を置き、指示をコピーしてエージェントにリンクする。
+4. グループを 6 つ作り、それぞれ worktree を紐づける(§1)。各グループに 1 行の付箋(担当名と「まず docs/brain/Home.md を読む」)を置き、エージェントにリンクする。
 5. 司令塔ノードと各担当ノードをコンテキストリンクで結ぶ(5 本)。
 6. トリガーを 2 つ作り、arm する(§4)。
 7. 承認待ち(NEEDS YOU)の通知を自分の端末に出す。承認は人が答える。
@@ -118,9 +118,26 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 - できない: Pencil の操作(Pencil の AI に人が貼る)、ステージング配備(Codex)、Cloudflare の確認、承認待ちへの回答(人)。
 - 注意: この設計はまだ NodeTerm 上で動かしていない。§6 を終えたら、最初の 1 日は司令塔の朝夕の文面を人が手で流し、動きを見てからトリガーに任せる。
 
-## 8. 関連文書
+## 8. 記憶の置き場(AI Second Brain Kit の考え方を取り込む)
+
+3 役が「前回の前提を忘れる」「一度言われた修正を繰り返す」のを防ぐため、AI Second Brain Kit(fuuuuuuma/ai-second-brain-kit)の中核 4 枚だけを **このリポジトリの `docs/brain/` に置く**。別の Obsidian Vault は作らない(正本が割れる)。raw / wiki / reports は、このリポジトリでは docs と GitHub Issues が既にその役目。
+
+| ファイル | 役目 | 誰が書くか |
+|---|---|---|
+| `docs/brain/Memory.md` | この仕事の事実・体制・進行中・判断基準(引き継ぎ書) | 司令塔。夕方のまとめで「進行中」を更新 |
+| `docs/brain/Home.md` | 玄関(目次)。必読順と正本へのリンク | 司令塔 |
+| `docs/brain/rules/corrections.md` | オーナーから受けた修正指示(恒久ルール) | 訂正を受けたセッションがその場で追記。司令塔が月 1 で整理 |
+| `docs/brain/rules/mistakes.md` | 起きた失敗と再発防止 | 同上 |
+| `docs/brain/rules/lint.md` | 週次の点検観点 | 司令塔が毎週金曜に実行 |
+
+- **起動時の必読順**(AGENTS.md に追記済み): `AGENTS.md` → `docs/brain/Memory.md` → `docs/brain/rules/corrections.md` → `docs/brain/rules/mistakes.md` → 担当の指示書。
+- NodeTerm の各グループの付箋には、指示書のコピーではなく **「まず docs/brain/Home.md を読む」の 1 行と、そのグループの担当名**だけを書く。指示の正本はリポジトリ側に置き、付箋を更新し忘れて古い指示で動くことを防ぐ。
+- Obsidian で開きたい場合は `docs/brain/` を Vault として開けば、`[[wikilink]]` と frontmatter はそのまま使える。キットの `second-brain` スキルを各エージェントに入れると、訂正時の追記が自動になる(任意)。
+
+## 9. 関連文書
 
 - 担当分けと各セッションの指示: `docs/v6-parallel-plan.md`
 - Pencil の修正指示: `docs/v6-pencil-fix-prompt.md`
 - 役割と今週の順番: `docs/v6-directives.md`
+- 記憶の置き場: `docs/brain/Home.md`
 - Slack との役割分担: `AGENTS.md`「Slack と Codex の共同開発運用」、`docs/codex-slack-sync.md`
