@@ -50,6 +50,16 @@ function sizeFromHtml(src) {
   return w && h ? [Number(w[1]), Number(h[1])] : null
 }
 
+/**
+ * 絵の高さの上限。
+ *
+ * `operations-v6/UhC2O`（更新履歴）が 19,629px・9.3MB になっていた。
+ * 版に置くにも人が見るにも扱えないので、ここで切る。
+ * 8000px は、いちばん縦に長い設計（`ZN0ov` ダッシュボード編集）が
+ * 収まる高さ。設計と並べるぶんには足りる。
+ */
+const MAX_SHOT_HEIGHT = 8_000
+
 /** 画面が落ちたときに出る文言。出ていたら撮らない。 */
 const FAILURE_TEXTS = [
   '画面を表示できませんでした',
@@ -300,7 +310,13 @@ async function applyState(page, screen, kind) {
         else if (data && typeof data === 'object') {
           shape = {}
           for (const [key, value] of Object.entries(data)) {
-            shape[key] = Array.isArray(value) ? [] : typeof value === 'number' ? 0 : value
+            /*
+              **1ページの件数や現在ページを0にしない。**
+              `limit` を0にすると呼ぶ側が `total / limit` で 0 割りをして、
+              ページ送りに `NaN` が並ぶ。空なのは中身であって、器ではない。
+            */
+            const keepsShape = key === 'limit' || key === 'page' || key === 'pageSize' || key === 'perPage'
+            shape[key] = Array.isArray(value) ? [] : (typeof value === 'number' && !keepsShape) ? 0 : value
           }
         }
       } catch { /* 返事が JSON でないときは既定の器 */ }
@@ -392,13 +408,33 @@ async function captureImpl(feature) {
     */
     const shots = [{ label: '', steps: s.steps, kind: null }]
     for (const kind of s.states?.kinds ?? []) {
-      // 'normal' は素の1枚と同じ絵なので、別名で二重に持たない。
-      if (kind === 'normal') continue
-      shots.push({ label: `-${kind}`, steps: s.steps, kind })
+      /*
+        **`normal` も別名で出す。**
+        素の1枚と同じ絵なので飛ばしていたが、`ledger.mjs:83` は
+        `states.kinds` を持つ画面について `<node>-<kind>` だけを数え、
+        素の `<node>` は見ない。飛ばすと `KNG00-normal-1920.png` のような
+        **名指しされている絵が永久に作られない**。
+        差し替えをしない `normal` は、素と同じ撮り方でよい。
+      */
+      shots.push({ label: `-${kind}`, steps: s.steps, kind: kind === 'normal' ? null : kind })
     }
     for (const variant of s.variants ?? []) {
       const suffix = variant.suffix.startsWith('-') ? variant.suffix : `-${variant.suffix}`
-      shots.push({ label: suffix, steps: [...(s.steps ?? []), ...(variant.steps ?? [])], kind: null })
+      /*
+        **素の手順を、二重に走らせない。**
+        台帳の変種は2通りの書き方が混ざっている。
+          26件 … 素のあとに続ける手順だけを書く
+           7件 … 素の手順を丸ごと含めて、頭から書く
+        いつも足していたので、後者で同じ操作を2回することになり、
+        `sqFXf-save` が「詳細条件…（見つかった数 1）」で押せずに止まっていた
+        （1回目で選んだあと、開いた面には同じラジオが無い）。
+        頭が一致していれば、変種の手順をそのまま使う。
+      */
+      const own = variant.steps ?? []
+      const base = s.steps ?? []
+      const includesBase = base.length > 0
+        && JSON.stringify(own.slice(0, base.length)) === JSON.stringify(base)
+      shots.push({ label: suffix, steps: includesBase ? own : [...base, ...own], kind: null })
     }
 
     for (const shotSpec of shots) {
@@ -475,10 +511,26 @@ async function captureImpl(feature) {
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         )
+        /*
+          **高さに上限を置く。**
+          `operations-v6/UhC2O`（更新履歴）が 19,629px・9.3MB になっていた。
+          1枚で1機能ぶんの絵より重く、版に置くにも人が見るにも扱えない。
+          設計と並べて見るのは上のほうなので、そこまでを撮る。
+          切ったときは、どこで切ったかを必ず言う（黙って切ると
+          「下に何も無い」と読み違える）。
+        */
+        const fullHeight = s.mode === 'page'
+          ? await page.evaluate(() => document.documentElement.scrollHeight)
+          : null
+        const capped = fullHeight !== null && fullHeight > MAX_SHOT_HEIGHT
         await page.screenshot({
           path: join(out, `${s.node}${shotSpec.label}-${width}.png`),
-          fullPage: s.mode === 'page',
+          fullPage: s.mode === 'page' && !capped,
+          ...(capped ? { clip: { x: 0, y: 0, width, height: MAX_SHOT_HEIGHT } } : {}),
         })
+        if (capped) {
+          console.log(`  ✂ ${s.node}${shotSpec.label} ${width}px は ${fullHeight}px あるので ${MAX_SHOT_HEIGHT}px で切った`)
+        }
         /*
           **絵と一緒に、見えている文字も残す。**
           絵だけだと、設計との突き合わせを人が1枚ずつ見るしかない。
@@ -494,8 +546,19 @@ async function captureImpl(feature) {
             撮る絵と同じ状態を、ここで読み直す。
           */
           const shown = await page.locator('body').innerText()
+          /*
+            **入力欄の案内文（placeholder）も残す。**
+            `innerText` には出ないが、画面には見えている。
+            設計 `bzDn6` の「名前・LINE名・タグ・メモで検索」が
+            **実装にも同じ文字で在るのに「実装に無い」と出ていた。**
+          */
+          const placeholders = await page.evaluate(() => Array.from(
+            document.querySelectorAll('input[placeholder], textarea[placeholder]'),
+          ).map((el) => el.getAttribute('placeholder')).filter(Boolean))
           // 行末の空白を落とす。表の空欄がタブのまま残ると `git diff --check` が怒る。
-          const trimmed = shown.split('\n').map((line) => line.replace(/\s+$/, '')).join('\n')
+          const trimmed = [...shown.split('\n'), ...placeholders]
+            .map((line) => line.replace(/\s+$/, ''))
+            .join('\n')
           writeFileSync(join(out, `${s.node}${shotSpec.label}.txt`), `# ${s.name}${shotSpec.label}\n# ${s.route}\n\n${trimmed}\n`)
         }
         console.log(`${s.node}${shotSpec.label}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
@@ -535,6 +598,18 @@ async function captureDesign(feature, from) {
     const size = sizeFromHtml(src) ?? DESIGN_SIZE[s.node]
     if (!size) { console.log(`${s.node}\t大きさが読めない`); continue }
     const [w, h] = size
+    /*
+      **横に伸びた絵を作らない。**
+      まるごと1枚の書き出しを割ったとき、`left: 2080px` のような
+      置き場所が残っていると、そのぶん左に空白が入った絵になる。
+      機能1で 4000〜10240px の絵ができ、**197枚が同じ形で壊れていた**。
+      `split-design-html.mjs` が置き場所を0に戻すようにしたが、
+      戻し忘れた書き出しを黙って撮らないよう、ここでも見張る。
+    */
+    if (w > 2600) {
+      console.log(`${s.node}\t横に伸びている（${w}px）。割るときに left を0へ戻してください`)
+      continue
+    }
     const out = join(ROOT, 'docs', 'design-reference', s.dir)
     mkdirSync(out, { recursive: true })
     const page = await newPage(browser, w, h)
