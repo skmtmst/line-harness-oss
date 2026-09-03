@@ -51,7 +51,7 @@ type ResolvedFriend = {
   id: string;
   display_name: string;
   user_id: string | null;
-  line_account_id: string;
+  line_account_id: string | null;
 };
 
 /**
@@ -69,7 +69,7 @@ async function resolveFriendFromLineToken(
 ): Promise<
   | { status: 'invalid_token' }
   | { status: 'no_friend' }
-  | { status: 'ok'; friend: ResolvedFriend }
+  | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null }
 > {
   const db = env.DB;
   const v = await fetch(
@@ -110,13 +110,8 @@ async function resolveFriendFromLineToken(
     (account) => account.login_channel_id === tokenClientId,
   )?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-  // アカウントを特定できないトークンや、legacy fallback が別アカウントの
-  // friend を返した場合は使わない。交換では残高と在庫を動かすため、
-  // LINE user ID が同じというだけで別アカウントへ入れてはいけない。
-  if (!lineAccountId || !friend || friend.line_account_id !== lineAccountId) {
-    return { status: 'no_friend' };
-  }
-  return { status: 'ok', friend: friend as unknown as ResolvedFriend };
+  if (!friend) return { status: 'no_friend' };
+  return { status: 'ok', friend: friend as unknown as ResolvedFriend, lineAccountId };
 }
 
 /** Map a non-ok resolution to its JSON error response. */
@@ -232,14 +227,19 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    // 紹介機能のlegacy fallbackは維持するが、残高を動かすマイル交換では
+    // トークンのLINE Loginチャネルと友だちの所属が一致しない限り閉じる。
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
     const [rewards, mileage, redemptionCounts] = await Promise.all([
       listMileageRewards(c.env.DB, {
-        lineAccountId: resolved.friend.line_account_id,
+        lineAccountId: resolved.lineAccountId,
         customerVisible: true,
       }),
       getMileageSummaryForFriend(c.env.DB, resolved.friend.id),
       getMileageRewardRedemptionCounts(c.env.DB, {
-        lineAccountId: resolved.friend.line_account_id,
+        lineAccountId: resolved.lineAccountId,
         friendId: resolved.friend.id,
       }),
     ]);
@@ -294,12 +294,15 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', async (c) => {
     }
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
     const rewardId = c.req.param('id');
     const requestFingerprint = await sha256Hex(
-      `${resolved.friend.line_account_id}\n${resolved.friend.id}\n${rewardId}`,
+      `${resolved.lineAccountId}\n${resolved.friend.id}\n${rewardId}`,
     );
     const reserved = await reserveMileageRewardRedemption(c.env.DB, {
-      lineAccountId: resolved.friend.line_account_id,
+      lineAccountId: resolved.lineAccountId,
       friendId: resolved.friend.id,
       rewardId,
       idempotencyKey,

@@ -338,6 +338,18 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
 });
 
 describe('LIFF mileage rewards — verified account and real limits', () => {
+  it('rejects a legacy fallback friend from a different LINE account', async () => {
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValueOnce({
+      ...FRIENDS['U-alice'],
+      line_account_id: 'account-other',
+    });
+
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+
+    expect(response.status).toBe(404);
+    expect(dbMocks.listMileageRewards).not.toHaveBeenCalled();
+  });
+
   it('does not say redeemable after the per-person limit is reached', async () => {
     dbMocks.listMileageRewards.mockResolvedValueOnce([{
       id: 'reward-1',
