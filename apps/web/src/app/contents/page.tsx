@@ -79,7 +79,9 @@ const LIMITS: Array<{ label: string; note: string }> = [
   { label: '画像', note: '10MBまで、jpg・png・gif・webp画像のみ可' },
   { label: '音声', note: '30MBまで、mp3・m4a音声のみ可' },
   { label: '動画', note: '90MBまで、mp4動画のみ可' },
-  { label: 'PDF', note: '20MBまで' },
+  // 設計 `eXAJP` は PDF に「LINEでは直接送れないので、リンクとして使います」と
+  // 添えている。これが無いと、PDFを入れたのに配信で選べない理由が分からない。
+  { label: 'PDF', note: '20MBまで。LINEでは直接送れないので、リンクとして使います' },
 ]
 
 function formatSize(bytes: number): string {
@@ -523,6 +525,14 @@ export default function MediaLibraryPage() {
           </p>
         </div>
 
+        {/*
+          **上限には見出しを付ける。**
+          設計 `eXAJP` は「LINEで送れる大きさ（超えると入れられません）」と書く。
+          数字だけ並んでいると、目安なのか超えたら弾かれるのかが読めない。
+          ただし言い方は設計そのままにしない。ここの数字は LINE の上限ではなく
+          **この仕組みの上限**なので（上の注釈のとおり）、「LINEで送れる」は嘘になる。
+        */}
+        <h4 className="text-ink mt-4 mb-1 text-xs font-bold">入れられる大きさ（超えると入れられません）</h4>
         <dl className="text-xs">
           {LIMITS.map((limit) => (
             <div key={limit.label} className="flex gap-4 py-1">

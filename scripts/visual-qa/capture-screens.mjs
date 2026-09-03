@@ -20,7 +20,7 @@ import { chromium } from '@playwright/test'
 import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -231,6 +231,17 @@ async function captureImpl(feature) {
           path: join(out, `${s.node}-${width}.png`),
           fullPage: s.mode === 'page',
         })
+        /*
+          **絵と一緒に、見えている文字も残す。**
+          絵だけだと、設計との突き合わせを人が1枚ずつ見るしかない。
+          文字があれば `compare-text.mjs` が語の食い違いを機械で出せる。
+          幅で中身は変わらないので、広いほうだけ残す。
+        */
+        if (width === WIDTHS[WIDTHS.length - 1]) {
+          // 行末の空白を落とす。表の空欄がタブのまま残ると `git diff --check` が怒る。
+          const trimmed = body.split('\n').map((line) => line.replace(/\s+$/, '')).join('\n')
+          writeFileSync(join(out, `${s.node}.txt`), `# ${s.name}\n# ${s.route}\n\n${trimmed}\n`)
+        }
         console.log(`${s.node}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
         if (overflow >= 2) console.log(`  ⚠ ${s.node} ${width}px に横スクロールが出ている`)
         shot += 1
