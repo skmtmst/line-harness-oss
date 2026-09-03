@@ -67,7 +67,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleLogin}
             disabled={loading}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-control bg-accent px-4 text-base font-bold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-control bg-accent-deep px-4 text-base font-bold text-on-accent transition-colors hover:brightness-92 disabled:opacity-50"
           >
             {/* 白い四角の中に緑のアイコンを入れていたが、設計は白の線画そのまま。 */}
             <svg
