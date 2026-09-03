@@ -441,7 +441,7 @@ function FormEditInner() {
               <button
                 onClick={save}
                 disabled={saving}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
               >
                 {saving ? '保存中...' : 'フォームを保存'}
               </button>
@@ -665,7 +665,7 @@ function FormEditInner() {
                   <div className="relative">
                     <button
                       onClick={() => setShowAddMenu((v) => !v)}
-                      className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium"
+                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
                     >
                       ＋ ブロックを追加
                     </button>

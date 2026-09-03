@@ -313,7 +313,7 @@ function FriendsPageInner({
               ]}
             />
           </div>
-          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-v6-control bg-v6-accent text-label font-bold text-on-accent hover:bg-v6-accent-hover">検索</button>
+          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-v6-control bg-accent-deep text-label font-bold text-on-accent hover:brightness-92">検索</button>
         </form>
 
         {advanced?.summary.length ? (
@@ -490,7 +490,7 @@ function NoticeDialog({ notice, onClose }: { notice: Exclude<Notice, null>; onCl
         <h2 id="friends-notice-title" className="text-lg font-bold text-v6-ink">{notice.title}</h2>
         <p className="mt-2 text-sm leading-6 text-v6-ink-secondary">{notice.message}</p>
         <div className="mt-5 flex justify-end">
-          <button type="button" onClick={onClose} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">確認</button>
+          <button type="button" onClick={onClose} className="rounded-v6-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">確認</button>
         </div>
       </section>
     </div>
@@ -568,7 +568,7 @@ function SavedSearchDialog({
         <div className="mt-5 flex items-center justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-v6-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-v6-ink-secondary hover:bg-v6-surface-strong">閉じる</button>
           {saved.length === 0 ? (
-            <button type="button" onClick={onOpenAdvanced} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">詳細条件を設定</button>
+            <button type="button" onClick={onOpenAdvanced} className="rounded-v6-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">詳細条件を設定</button>
           ) : null}
         </div>
       </section>

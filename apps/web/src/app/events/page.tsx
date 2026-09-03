@@ -124,7 +124,7 @@ export default function EventsListPage() {
           </button>
           <Link
             href="/events/new"
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
           >
             イベントを作成
           </Link>
@@ -205,7 +205,7 @@ export default function EventsListPage() {
             onClick={() => setFilter(filter === key ? 'all' : key)}
             className={`rounded-pill px-3 py-1 text-xs font-medium ${
               filter === key
-                ? 'bg-accent text-on-accent'
+                ? 'bg-accent-deep text-on-accent'
                 : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
           >
@@ -230,7 +230,7 @@ export default function EventsListPage() {
           </p>
           <Link
             href="/events/new"
-            className="bg-accent text-on-accent rounded-control inline-block px-4 py-2 text-sm font-medium"
+            className="bg-accent-deep text-on-accent rounded-control inline-block px-4 py-2 text-sm font-medium"
           >
             最初のイベントを作成
           </Link>
