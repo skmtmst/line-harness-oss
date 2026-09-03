@@ -24,6 +24,7 @@ import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
+import { listLimit, listPage } from './list-pagination.js';
 import type {
   Form as DbForm,
   FormSubmission as DbFormSubmission,
@@ -633,8 +634,8 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
       const submissions = await getFormSubmissions(c.env.DB, id);
       return c.json({ success: true, data: submissions.map(serializeSubmission) });
     }
-    const page = Number(c.req.query('page') ?? '1');
-    const limit = Number(c.req.query('limit') ?? '20');
+    const page = listPage(c.req.query('page'));
+    const limit = listLimit(c.req.query('limit'), 20);
     const submissions = await getFormSubmissionsPage(c.env.DB, id, { page, limit });
     return c.json({
       success: true,
