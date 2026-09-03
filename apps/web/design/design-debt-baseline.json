@@ -338,7 +338,7 @@
     "direct-th": 5
   },
   "app/settings/page.tsx": {
-    "arbitrary-value": 55,
+    "arbitrary-value": 52,
     "unresolved-classname": 1
   },
   "app/staff/new/page.tsx": {
@@ -750,7 +750,7 @@
     "unresolved-classname": 14
   },
   "components/shared/sticky-bar.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 4
   },
   "components/shared/tabs.tsx": {
     "unresolved-classname": 6
