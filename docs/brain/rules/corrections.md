@@ -22,12 +22,12 @@
 <!-- ここから下に追記。最新を上に。 -->
 
 ## 2026-09-04
-- 指摘: 司令塔が保護ルール対応で PR ブランチへ `codex/development` の merge commit を push することがある
-- 今後: push 直前に必ず `git pull --no-rebase origin <自分のブランチ>` を実行して衝突を避け、rebase と force push は使わない
+- 指摘: 保護ルール対応で司令塔が PR ブランチへ `codex/development` を取り込むことがある
+- 今後: push 直前に必ず `git pull --no-rebase origin <自分のブランチ>` を実行し、rebase と force push は使わない
 
 ## 2026-09-04
-- 指摘: チケット完了後や PR 作成後に止まらず、自分の lane から `blocked` → `doing` → `todo` の順で次の 1 件へ進む
-- 今後: PR 作成直後から次のチケットを `doing` にして着手し、依存待ちはそのチケットだけ `blocked` にして別件へ進み、空き時だけ司令塔 Issue へ「空きあり」とコメントする
+- 指摘: チケットが終わっても止まらず、PR 後はマージを待たず次のチケットへ進む
+- 今後: 自分の lane を blocked → doing → todo の順に `gh` で確認し、1 件を doing にして着手する。依存待ちは対象だけ blocked にして依存先を書き、空き時のみ司令塔に Issue コメントする
 
 ## 2026-09-03
 - 指摘: lane の作業順は「停止中 → 作業中 → 未着手」とし、品質チェック・エラー修正ノードへ依頼を出さない
