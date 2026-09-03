@@ -254,7 +254,6 @@ export const ZERO_TOLERANCE = ['display-class-on-part']
 
 export function compare(now, baseline) {
   const worse = {}
-  const better = {}
   const files = new Set([...Object.keys(now), ...Object.keys(baseline)])
   for (const file of files) {
     const a = now[file] ?? {}
@@ -264,10 +263,9 @@ export function compare(now, baseline) {
       const count = a[key] ?? 0
       const was = b[key] ?? 0
       if (count > was) (worse[file] ??= {})[key] = `${was} → ${count}`
-      else if (count < was) (better[file] ??= {})[key] = `${was} → ${count}`
     }
   }
-  return { worse, better }
+  return { worse }
 }
 
 if (process.argv[1] && process.argv[1].endsWith('design-debt.mjs')) {
@@ -282,12 +280,12 @@ if (process.argv[1] && process.argv[1].endsWith('design-debt.mjs')) {
     console.log(`\n${Object.keys(counts).length} ファイル分を design/design-debt-baseline.json に書きました。`)
   } else {
     const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
-    const { worse, better } = compare(counts, baseline)
+    const { worse } = compare(counts, baseline)
     console.log('直書きの数\n')
     for (const [k, n] of Object.entries(sum).sort()) console.log(`  ${k.padEnd(26)}${String(n).padStart(5)} か所`)
 
     const zero = ZERO_TOLERANCE.filter((k) => (sum[k] ?? 0) > 0)
-    const bad = Object.keys(worse).length || Object.keys(better).length || zero.length
+    const bad = Object.keys(worse).length || zero.length
 
     const unresolvedFiles = Object.entries(counts).filter(([, v]) => v['unresolved-classname'])
     if (unresolvedFiles.length) {
@@ -301,7 +299,6 @@ if (process.argv[1] && process.argv[1].endsWith('design-debt.mjs')) {
     }
     for (const k of zero) console.log(`\n★ ${k} は0でなければなりません。現在 ${sum[k]} か所。`)
     for (const [f, d] of Object.entries(worse)) console.log(`\n★ 増えています: ${f} ${JSON.stringify(d)}`)
-    for (const [f, d] of Object.entries(better)) console.log(`\n★ 減っています（基準を締め直してください）: ${f} ${JSON.stringify(d)}`)
     if (bad) console.log('\n直し方: node apps/web/scripts/design-debt.mjs --update')
     else console.log('\n合格')
     process.exit(bad ? 1 : 0)

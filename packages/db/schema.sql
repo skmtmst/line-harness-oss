@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS friend_scenarios (
 );
 
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_next_delivery_at ON friend_scenarios (next_delivery_at);
+CREATE INDEX IF NOT EXISTS idx_friend_scenarios_due_delivery ON friend_scenarios (next_delivery_at, id) WHERE status = 'active' AND next_delivery_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_status ON friend_scenarios (status);
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_friend_id ON friend_scenarios (friend_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_friend_scenarios_unique ON friend_scenarios (friend_id, scenario_id) WHERE status != 'completed';

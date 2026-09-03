@@ -35,6 +35,11 @@ apps/worker/dist/
 # 置いておく必要が無い。
 apps/web/src/generated/release-log.json
 
+# DBの完成形。schema.sqlとmigrationsからビルド・テスト前に毎回生成する。
+# PRには正本のschema/migrationだけを載せ、巨大な生成差分を載せない。
+packages/db/bootstrap.sql
+packages/db/bootstrap-meta.json
+
 # 画像比較の差分と結果。基準画像だけを版に残す。
 test-results/
 playwright-report/
