@@ -155,6 +155,31 @@ describe('processFriendFieldReminders', () => {
 });
 
 describe('分割と再開', () => {
+  it('4,000人の走査枠を複数リマインダへ均等に割り当てる', async () => {
+    getFriendFieldReminders.mockResolvedValue([
+      reminder({ id: 'rem-a', trigger_field_id: 'field-a' }),
+      reminder({ id: 'rem-b', trigger_field_id: 'field-b' }),
+    ]);
+    getFriendsWithFieldValuePage.mockImplementation(
+      async (_db: D1Database, fieldId: string, _after: string | null, limit: number) => (
+        Array.from({ length: limit }, (_, index) => ({
+          friend_id: `${fieldId}-friend-${index + 1}`,
+          value: '1990-05-03',
+        }))
+      ),
+    );
+
+    const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
+
+    expect(result).toEqual({ enrolled: 4_000, skipped: 0, scanned: 4_000, hasMore: true });
+    expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
+      1, db, 'field-a', null, 2_000,
+    );
+    expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
+      2, db, 'field-b', null, 2_000,
+    );
+  });
+
   it('5,001人を4,000人と1,001人の2回に分け、保存カーソルから再開する', async () => {
     const friends = Array.from({ length: 5_001 }, (_, i) => ({
       friend_id: `f-${String(i + 1).padStart(5, '0')}`,
