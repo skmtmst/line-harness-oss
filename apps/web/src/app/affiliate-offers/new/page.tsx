@@ -101,7 +101,7 @@ export default function NewAffiliateOfferPage() {
                   </span>
                 )}
               </p>
-              <p className="bg-accent text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
+              <p className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
                 この案件を紹介する
               </p>
             </div>

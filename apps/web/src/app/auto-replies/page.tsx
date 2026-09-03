@@ -478,7 +478,7 @@ export default function AutoRepliesPage() {
               lineAccountId: selectedAccountId,
               isActive: true,
             })}
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+            className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
           >
             自動応答を作成
           </button>
