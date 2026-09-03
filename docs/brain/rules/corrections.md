@@ -22,12 +22,12 @@
 <!-- ここから下に追記。最新を上に。 -->
 
 ## 2026-09-04
-- 指摘: 保護ルールで「ブランチが最新」でないとマージできないため、司令塔が PR ブランチに codex/development を取り込む merge commit を push することがある。push 前に必ず git pull --no-rebase origin <自分のブランチ> を実行して衝突を避ける。rebase や force push はしない
-- 今後: push の直前に `git pull --no-rebase origin <自分のブランチ>` を毎回実行する。`git rebase`、`git push --force`(--force-with-lease を含む)、`commit --amend` 後の push は使わない。直したいときは新しいコミットを積む
+- 指摘: 保護ルール対応で司令塔が PR ブランチへ `codex/development` を取り込むことがある
+- 今後: push 直前に必ず `git pull --no-rebase origin <自分のブランチ>` を実行し、rebase と force push は使わない
 
 ## 2026-09-04
-- 指摘: チケットが終わっても止まらない。PR を出したらマージを待たず、gh で自分の lane の blocked → doing → todo の順に次の 1 件を取り、doing にして着手する。取れるものが無いときだけ司令塔に「空きあり」と Issue コメントで知らせる。他の担当の完了を待つチケットは、その 1 件だけ blocked にして依存先を書き、別のチケットに進む
-- 今後: PR を出した直後に `gh issue list --label lane:自分 --label blocked / doing / todo` の順で次を取り、ラベルを doing にしてから着手する。空きが出たときだけ司令塔へ「空きあり」を書く。待ちが要る 1 件は blocked + 依存先を本文に書いて、次へ進む
+- 指摘: チケットが終わっても止まらず、PR 後はマージを待たず次のチケットへ進む
+- 今後: 自分の lane を blocked → doing → todo の順に `gh` で確認し、1 件を doing にして着手する。依存待ちは対象だけ blocked にして依存先を書き、空き時のみ司令塔に Issue コメントする
 
 ## 2026-09-03
 - 指摘: lane の作業順は「停止中 → 作業中 → 未着手」とし、品質チェック・エラー修正ノードへ依頼を出さない
