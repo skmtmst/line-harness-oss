@@ -8,8 +8,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordAnalyticsEvent } from '../src/analytics-events.js';
 import {
   rebuildAnalyticsDailyMetrics,
+  rebuildAnalyticsDailyMetricsChunk,
+  getAnalyticsProjectionSchedulerCursor,
   purgeExpiredAnalyticsReadData,
   recentAnalyticsProjectionRange,
+  saveAnalyticsProjectionSchedulerCursor,
 } from '../src/analytics-projection.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -173,12 +176,79 @@ describe('V6分析イベントと日別投影', () => {
       .toEqual({ count: 1 });
   });
 
+  it('1万件超を8千件ずつ再開し、一括再構築と同じ日別値で確定する', async () => {
+    const insert = sqlite.prepare(`
+      INSERT INTO analytics_events (
+        id, line_account_id, friend_id, event_type, source_kind, source_id,
+        occurred_at, idempotency_key
+      ) VALUES (?, 'account-a', 'friend-a', 'message_received', 'test', ?,
+                '2026-08-26T00:00:00.000Z', ?)
+    `);
+    sqlite.transaction(() => {
+      for (let index = 0; index < 10_501; index += 1) {
+        const id = `event-${String(index).padStart(5, '0')}`;
+        insert.run(id, id, id);
+      }
+    })();
+    const input = {
+      accountId: 'account-a',
+      timeZone: 'Asia/Tokyo',
+      range: { fromDate: '2026-08-26', toDate: '2026-08-26' },
+      dataCutoffAt: '2026-08-26T01:00:00.000Z',
+    };
+
+    const first = await rebuildAnalyticsDailyMetricsChunk(db, input);
+    const second = await rebuildAnalyticsDailyMetricsChunk(db, input);
+
+    expect(first).toMatchObject({ completed: false, readRows: 8_000, sourceEventCount: 8_000 });
+    expect(second).toMatchObject({
+      completed: true,
+      readRows: 2_501,
+      sourceEventCount: 10_501,
+      projectedCount: 10_501,
+      mismatchCount: 0,
+      status: 'matched',
+    });
+    const chunkedMetrics = sqlite.prepare(`
+      SELECT metric_key, dimension_value, numerator
+        FROM analytics_daily_metrics WHERE line_account_id = 'account-a'
+        ORDER BY metric_key
+    `).all();
+
+    await rebuildAnalyticsDailyMetrics(db, input);
+    expect(sqlite.prepare(`
+      SELECT metric_key, dimension_value, numerator
+        FROM analytics_daily_metrics WHERE line_account_id = 'account-a'
+        ORDER BY metric_key
+    `).all()).toEqual(chunkedMetrics);
+    expect(chunkedMetrics).toEqual([
+      { metric_key: 'event_total', dimension_value: 'message_received', numerator: 10_501 },
+      { metric_key: 'unique_friends', dimension_value: 'message_received', numerator: 1 },
+    ]);
+  });
+
   it('直近7日をアカウントの暦日で作る', () => {
     expect(recentAnalyticsProjectionRange(
       new Date('2026-08-26T01:00:00.000Z'),
       'America/Los_Angeles',
       7,
     )).toEqual({ fromDate: '2026-08-19', toDate: '2026-08-25' });
+  });
+
+  it('アカウント巡回位置を次のcronへ保存する', async () => {
+    await expect(getAnalyticsProjectionSchedulerCursor(
+      db,
+      '2026-08-26T00:00:00.000Z',
+    )).resolves.toBe('');
+    await saveAnalyticsProjectionSchedulerCursor(
+      db,
+      'account-a',
+      '2026-08-26T00:05:00.000Z',
+    );
+    await expect(getAnalyticsProjectionSchedulerCursor(
+      db,
+      '2026-08-26T00:10:00.000Z',
+    )).resolves.toBe('account-a');
   });
 
   it('分析イベントは13か月、日別集計は25か月を過ぎた分だけ削除する', async () => {
