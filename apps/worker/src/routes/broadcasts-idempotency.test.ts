@@ -79,6 +79,50 @@ beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
 });
 describe('POST /api/broadcasts idempotency', () => {
+  test('accepts five validated message bubbles and rejects six before writing', async () => {
+    const five = Array.from({ length: 5 }, (_, index) => ({
+      id: `bubble-${index + 1}`,
+      type: 'text',
+      content: { text: `本文${index + 1}` },
+    }));
+    dbMocks.createBroadcast.mockResolvedValueOnce({
+      ...row,
+      message_bubbles_json: JSON.stringify(five),
+    });
+    const accepted = await setupApp().request('/api/broadcasts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, messageBubbles: five }),
+    });
+    expect(accepted.status).toBe(201);
+    expect(dbMocks.createBroadcast).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      messageBubblesJson: JSON.stringify(five),
+    }));
+
+    dbMocks.createBroadcast.mockClear();
+    const rejected = await setupApp().request('/api/broadcasts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, messageBubbles: [...five, five[0]] }),
+    });
+    expect(rejected.status).toBe(400);
+    expect(dbMocks.createBroadcast).not.toHaveBeenCalled();
+  });
+
+  test('rejects an unsupported bubble instead of storing content that cannot be sent', async () => {
+    const response = await setupApp().request('/api/broadcasts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...requestBody,
+        messageBubbles: [{ id: 'coupon-1', type: 'coupon', content: { assetId: 'coupon-1' } }],
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ success: false, error: expect.stringContaining('Unsupported') });
+    expect(dbMocks.createBroadcast).not.toHaveBeenCalled();
+  });
+
   test('creates with the idempotency key as the stable broadcast id', async () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce(null);
     dbMocks.createBroadcast.mockResolvedValueOnce(row);

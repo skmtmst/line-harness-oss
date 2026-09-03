@@ -60,9 +60,14 @@ export class LineClient {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(
+      const error = new Error(
         `LINE API error: ${res.status} ${res.statusText} — ${text}`,
       );
+      Object.assign(error, {
+        status: res.status,
+        retryAfter: res.headers.get('retry-after'),
+      });
+      throw error;
     }
 
     // Some endpoints (e.g. push, reply) return an empty body with 200.
@@ -105,6 +110,32 @@ export class LineClient {
     return data;
   }
 
+  /**
+   * pushMessage と同じ送信を行い、監査画面に残せる LINE の要求IDも返す。
+   *
+   * 既存の pushMessage は戻り値をそのまま使う呼び出しがあるため変更しない。
+   * 要求IDが応答に無い場合は null のまま返し、代わりの値を作らない。
+   */
+  async pushMessageWithRequestId(
+    to: string,
+    messages: Message[],
+    retryKey?: string,
+    customAggregationUnits?: string[],
+  ): Promise<{ data: unknown; requestId: string | null }> {
+    const body: PushMessageRequest = { to, messages, customAggregationUnits };
+    const { data, headers } = await this.request(
+      'POST',
+      '/v2/bot/message/push',
+      body,
+      retryKey ? { 'X-Line-Retry-Key': retryKey } : {},
+    );
+    return {
+      data,
+      // Retry-Keyの409は、最初に受理した要求IDを別ヘッダーで返す。
+      requestId: headers.get('x-line-request-id') ?? headers.get('x-line-accepted-request-id'),
+    };
+  }
+
   async multicast(
     to: string[],
     messages: Message[],
@@ -142,9 +173,17 @@ export class LineClient {
     replyToken: string,
     messages: Message[],
   ): Promise<unknown> {
+    return (await this.replyMessageWithRequestId(replyToken, messages)).data;
+  }
+
+  /** 返信がLINEに受理された証拠として、応答ヘッダーの要求IDも返す。 */
+  async replyMessageWithRequestId(
+    replyToken: string,
+    messages: Message[],
+  ): Promise<{ data: unknown; requestId: string | null }> {
     const body: ReplyMessageRequest = { replyToken, messages };
-    const { data } = await this.request('POST', '/v2/bot/message/reply', body);
-    return data;
+    const { data, headers } = await this.request('POST', '/v2/bot/message/reply', body);
+    return { data, requestId: headers.get('x-line-request-id') };
   }
 
   // ─── Rich Menu ────────────────────────────────────────────────────────────

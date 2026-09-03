@@ -14,9 +14,11 @@ export interface TopBarAccount {
 export interface TopBarProps {
   title: string
   /**
-   * マニュアルの行き先。**空文字と null のときは押せなくする。**
+   * マニュアルの行き先。**空文字と null のときは、そもそも描かない。**
    * URLは Masato 確定待ちで、いまは `manual-links.ts` が全部空。
    * 空のまま Link にすると `/` へ飛んでしまい、開いた人が画面を見失う。
+   * 押せない札を「準備中」の吹き出し付きで置くのもやめた。出す＝使える
+   * （`docs/v6-common-rules.md` §5-5、§7-10）。
    */
   manualHref?: string | null
   accounts: TopBarAccount[]
@@ -57,15 +59,14 @@ export default function TopBar({
     onAccountChange(event.target.value)
   }
   const current = accounts.find((account) => account.id === selectedAccountId)
-  const manualLabel = <><BookIcon /><span>マニュアル</span></>
 
   return (
     <header className={classes} data-design-node="cBSCb">
       <div className={styles.titleGroup}>
         <h1 className={styles.title} title={title}>{title}</h1>
         {manualHref
-          ? <Link href={manualHref} className={styles.manual}>{manualLabel}</Link>
-          : <span className={styles.manualDisabled} aria-disabled="true" title="マニュアルは準備中です">{manualLabel}</span>}
+          ? <Link href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
+          : null}
       </div>
 
       <div className={styles.actions}>

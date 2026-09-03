@@ -1,0 +1,119 @@
+/*
+ * 顧客へのお知らせ（Pencil ★V6 `festr` / `Q55bb`）の、この画面だけの寸法。
+ *
+ * 種類の絞り込みは、行そのものが押し口になっている縦の帯。設計は
+ * 高さ40・角丸8・13px・700。共通の `shared/button.tsx` は ★V5 `nBRKk`
+ * （高さ36 / 600）が正本なので、そこへ寄せるとこの帯だけ形が変わる。
+ * **共通ボタンは触らない。**
+ */
+
+.category {
+  display: flex;
+  width: 100%;
+  height: 40px; /* 設計 h40 */
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-control); /* 設計 r8 */
+  padding: 0 12px;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label); /* 設計 13 */
+  font-weight: 700; /* 設計 700 */
+  text-align: left;
+  cursor: pointer;
+}
+
+.category:hover:not(.categoryCurrent) {
+  background: var(--color-canvas-sunken);
+}
+
+.category:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.categoryCurrent {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.categoryCount {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.categoryCurrent .categoryCount {
+  color: var(--color-accent);
+}
+
+/* --- 保存・テスト送信 --------------------------------------------------- */
+
+/* 主要ボタン。設計 高さ40 / 角丸8 / 余白[0,14] / 13px / 700。 */
+.action {
+  display: inline-flex;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 0 14px;
+  font-size: var(--text-label);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.actionPrimary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.actionPrimary:hover:not(:disabled) {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover);
+}
+
+.actionSecondary {
+  border-color: var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.actionSecondary:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+/* 行の中の小さな操作。設計 h32 r6。 */
+.rowAction {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  padding: 0 10px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rowAction:hover {
+  background: var(--color-canvas-sunken);
+}

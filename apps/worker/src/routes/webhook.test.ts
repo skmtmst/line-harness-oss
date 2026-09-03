@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
   replyMessage: vi.fn(),
+  replyMessageWithRequestId: vi.fn(),
   pushMessage: vi.fn(),
 }));
 
@@ -36,6 +37,22 @@ vi.mock('@line-crm/db', () => ({
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
+  reserveAutoReplyEvaluation: vi.fn().mockImplementation(async (_db, input) => ({
+    created: true,
+    row: {
+      id: `evaluation-${input.incomingEventId}`,
+      incoming_event_id: input.incomingEventId,
+      status: 'received',
+      reply_status: 'not_attempted',
+    },
+  })),
+  ensureAutoReplyPublishedVersion: vi.fn().mockResolvedValue({ id: 'version-1' }),
+  recordAutoReplyEvaluationDetail: vi.fn().mockResolvedValue(undefined),
+  markAutoReplyEvaluationMatched: vi.fn().mockResolvedValue(undefined),
+  markAutoReplyEvaluationSkipped: vi.fn().mockResolvedValue(undefined),
+  markAutoReplyEvaluationFinished: vi.fn().mockResolvedValue(undefined),
+  reserveAutoReplyActionRun: vi.fn().mockResolvedValue({ id: 'action-run-1', acquired: true }),
+  finishAutoReplyActionRun: vi.fn().mockResolvedValue(undefined),
   toJstString: vi.fn().mockReturnValue('2026-08-24T12:00:00.000+09:00'),
 }));
 

@@ -64,12 +64,13 @@ export interface DeliveryResult {
 export async function deliverWebhook(
   webhook: WebhookRow,
   body: string,
-  opts: { sleep?: (ms: number) => Promise<void> } = {},
+  opts: { sleep?: (ms: number) => Promise<void>; idempotencyKey?: string } = {},
 ): Promise<DeliveryResult> {
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const maxRetries = Math.max(0, Math.min(5, webhook.max_retries ?? 0));
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (opts.idempotencyKey) headers['X-Webhook-Delivery-Id'] = opts.idempotencyKey;
   if (webhook.secret) {
     headers['X-Webhook-Signature'] = await sign(webhook.secret, body);
   }

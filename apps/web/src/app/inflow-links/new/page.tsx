@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import type { Scenario, Tag, TrafficPool, Template } from '@line-crm/shared'
+import { useEffect, useMemo, useState } from 'react'
+import type { Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
+import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
 import CreatePage, {
   AsideCard,
@@ -46,6 +47,14 @@ export default function NewInflowLinkPage() {
   const [redirectUrl, setRedirectUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
+  /*
+    タグのフォルダ。**タグを平らに並べると選べない**——実データでは
+    「VIPタグ 1〜13」「ペットタグ 1〜12」のように似た名前が続く。
+    フォルダで束ねると、どの群から選ぶのかが先に決まる。
+  */
+  const [tagGroups, setTagGroups] = useState<TagGroup[]>([])
+  /* フォルダで束ねた選択肢。フォルダが取れないときは束ねずにそのまま出す。 */
+  const tagOptionGroups = useMemo(() => groupTagsByFolder(tags, tagGroups), [tags, tagGroups])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
@@ -57,9 +66,15 @@ export default function NewInflowLinkPage() {
       api.scenarios.list(),
       api.pools.list(),
       api.templates.list(),
-    ]).then(([t, s, p, tp]) => {
+      api.tagGroups.list(),
+    ]).then(([t, s, p, tp, tg]) => {
       if (cancelled) return
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
+      /*
+        **フォルダが取れなくてもタグは選べるままにする。**
+        束ねられないだけで、選択そのものを止める理由はない。
+      */
+      if (tg.status === 'fulfilled' && tg.value.success) setTagGroups(tg.value.data)
       if (s.status === 'fulfilled' && s.value.success) setScenarios(s.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
       if (tp.status === 'fulfilled' && tp.value.success) {
@@ -183,11 +198,23 @@ export default function NewInflowLinkPage() {
             className={inputClass}
           >
             <option value="">（なし）</option>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
+            {tagOptionGroups.map((group) =>
+              group.label ? (
+                <optgroup key={group.id ?? 'unfiled'} label={group.label}>
+                  {group.tags.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : (
+                group.tags.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))
+              ),
+            )}
           </select>
         </Field>
 

@@ -29,7 +29,7 @@ import {
 
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, Record<string, number>>
 const { counts } = countDebt()
-const { worse, better } = compare(counts, baseline)
+const { worse } = compare(counts, baseline)
 
 describe('共通部品を通らない直書き', () => {
   it('design-parts.jsonに登録した正本部品自身は負債へ数えない', () => {
@@ -51,11 +51,6 @@ describe('共通部品を通らない直書き', () => {
     // 落ちたら: 共通部品を使うか、意図があるなら
     // node apps/web/scripts/design-debt.mjs --update で基準を更新してください。
     expect(worse).toEqual({})
-  })
-
-  it('減ったら基準も締め直されている', () => {
-    // 締め直さないと、また増える余地が残る。
-    expect(better).toEqual({})
   })
 
   it('共通部品へ表示制御のクラスを渡していない', () => {

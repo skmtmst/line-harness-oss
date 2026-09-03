@@ -9,7 +9,7 @@
  *
  * 守っていること
  * - ローカル専用。`NODE_ENV=production` では起動しない。127.0.0.1 にだけ開く
- * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない
+ * - **更新は原則失敗させる。** 画面確認専用の固定結果だけは返すが、保存も配信も起きない
  * - 実データ・秘密値を持たない。名前も固定の作り物
  * - 毎回まったく同じものを返す。乱数も時刻も使わない（画像が毎回同じになる）
  *
@@ -17,9 +17,37 @@
  *   node scripts/visual-qa/mock-api.mjs            # 既定 8788番
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { fileURLToPath } from 'node:url'
+
+/** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
+const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import {
+  FORM_DELETE_IMPACT_FIXTURES,
+  COMMON_VARS,
+  COMMON_VAR_DELETE_IMPACT,
+  COMMON_VAR_DELETE_IMPACT_EMPTY,
+  MEDIA_DELETE_IMPACT,
+  MEDIA_DELETE_IMPACT_EMPTY,
+  MEDIA_ITEMS,
+  FRIEND_ADD_LIFECYCLE_DRAFT,
+  FRIEND_ADD_LIFECYCLE_PUBLISHED,
+  FRIEND_ADD_LIFECYCLE_TEST_RESULT,
+  FRIEND_ADD_LIFECYCLE_VALIDATION,
+  AUTO_REPLIES, AUTO_REPLY_FOLDERS,
+  BROADCASTS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  TEMPLATES, TEMPLATE_FOLDERS,
+  DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
+  IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
+  IDENTITY_CANDIDATE_LISTS,
+  MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
+  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
+  RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
+  TAGS, TAG_GROUPS,
+} from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -190,15 +218,29 @@ const SUPPORT_EMAIL_ITEMS = [
   {
     id: 'email:mail-1',
     threadId: 'mail-1',
-    customerName: 'テスト 太郎',
-    customerIdentifier: 'taro@example.com',
-    subject: 'ご注文について',
-    preview: 'テスト太郎 様 この度…',
+    customerName: '坂本 真人',
+    customerIdentifier: 'sakamoto@example.com',
+    subject: '発送について',
+    preview: 'ご注文ありがとうございます。発送状況をご案内します。',
     status: 'unread',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
-    lastIncomingAt: '2026-08-15T12:00:00.000Z',
+    lastIncomingAt: '2026-08-16T02:10:00.000Z',
+    isUnread: true,
+  },
+  {
+    id: 'email:mail-2',
+    threadId: 'mail-2',
+    customerName: 'テスト 太郎',
+    customerIdentifier: 'taro@example.com',
+    subject: 'ご注文について',
+    preview: 'ご注文ありがとうございます。内容を確認して対応します。',
+    status: 'unread',
+    revision: 1,
+    assignedStaffId: null,
+    assignedStaffName: null,
+    lastIncomingAt: '2026-08-16T01:30:00.000Z',
     isUnread: true,
   },
 ]
@@ -252,8 +294,234 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
  * 画面が増えて足りなくなったら、ここに1行足す。**推測で埋めない。**
  * 実際に落ちた画面のコンソールを見て、必要な形だけを足す。
  */
+/** 分析の指標1つ。`state` と `reason` を持つのが契約。 */
+const METRIC = (value, state = 'available', reason = null) => ({ value, state, reason })
+
 const SHAPES = {
   '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
+  /*
+    マイルの履歴。**既定の器（`{items,total,page,limit}`）では形が違う。**
+
+    契約は `MileageAdminHistory = { items, pagination: { total, limit, offset } }`。
+    口が無いと既定の器が返り、`pagination` が無いので
+    `mileage-history-tab.tsx` の `result?.pagination.total` が投げ、
+    **機能17の4枚が「画面を表示できませんでした」で1枚も撮れない。**
+    （`?.` が `result` にしか掛かっていないのは実装側の弱さでもある。台帳に別途書いた）
+  */
+  /*
+    行動スコア。契約は `ActionScoreOverview = { summary, items, pagination }`。
+    口が無いと既定の器が返り、`action-score-tab.tsx:124` の
+    `overview?.pagination.total` が投げて `z3PB2` が撮れない。
+  */
+  /*
+    成果承認。**契約は配列**（`ConversionApprovalItem[]`）。
+    `api.ts` 側のURLがテンプレート文字列（`?${qs}` を後ろに足す形）なので
+    `readArrayGetPaths()` が拾えず、既定の器 `{items,total,page,limit}` が返っていた。
+    そのため `tabs.tsx` の `items.map` が投げ、**`n5VVTb` が撮れなかった。**
+    行が無いと「表に無い種別が内部の記号のまま出ていないか」も見られないので、
+    承認待ち・承認済み・重複ありの3行を置く。
+  */
+  '/api/conversions/approvals': [
+    {
+      eventId: 'cv-1', createdAt: '2026-08-24T20:53:00+09:00',
+      friendId: 'friend-1', friendName: 'さかもとまさと',
+      affiliateId: 'af-1', affiliateName: 'Masato.S',
+      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
+      conversionPointName: '購入完了', value: 12000,
+      approvalStatus: 'pending', duplicateFlag: false,
+    },
+    {
+      eventId: 'cv-2', createdAt: '2026-08-19T09:12:00+09:00',
+      friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
+      affiliateId: 'af-1', affiliateName: 'Masato.S',
+      offerId: null, offerName: null, offerRewardMiles: null,
+      conversionPointName: '資料請求', value: null,
+      approvalStatus: 'approved', duplicateFlag: false,
+    },
+    {
+      eventId: 'cv-3', createdAt: '2026-08-13T20:52:00+09:00',
+      friendId: 'friend-3', friendName: null,
+      affiliateId: 'af-2', affiliateName: null,
+      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
+      conversionPointName: '購入完了', value: 8000,
+      approvalStatus: 'pending', duplicateFlag: true,
+    },
+  ],
+  '/api/action-scores/friends': {
+    summary: {
+      scoredFriends: 5, high: 1, normal: 3, low: 1, decreased30d: 0,
+      highMin: 70, normalMin: 40,
+    },
+    items: [
+      { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
+      { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', score: 55, band: 'normal', change30d: 0, lastActionAt: '2026-08-19T09:12:00+09:00' },
+      { friendId: 'friend-3', displayName: '菅野 亮', score: 31, band: 'low', change30d: -6, lastActionAt: '2026-08-13T20:52:00+09:00' },
+    ],
+    pagination: { total: 3, limit: 20, offset: 0 },
+  },
+  /*
+    分析・友だちの増減。**既定の器では `data.data` が無く、画面ごと落ちる**
+    （`overview.metrics` で Cannot read properties of undefined）。
+    そのため機能20の9枚が1枚も撮れなかった。
+
+    契約は `AnalyticsEnvelope<{ state, stateReason, metrics, days, campaigns, … }>` で、
+    各指標が自分の `state` と `reason` を持つ。ここでは**実測できた状態**（`available`）を返す。
+    集計待ち（`pending` で `value` に 0 が入る）ときに `—` へ落ちることは
+    `analytics-pending-value-contract.test.ts` が見張っている。
+  */
+  '/api/analytics/friends': {
+    lineAccountId: 'visual-qa-account',
+    timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' },
+    dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      state: 'available',
+      stateReason: null,
+      metrics: {
+        added: METRIC(58), removed: METRIC(11), net: METRIC(47),
+        currentFriends: METRIC(1842), firstTime: METRIC(52), returning: METRIC(6),
+      },
+      days: [
+      { date: '2026-08-04', added: 3, removed: 0, net: 3 },
+      { date: '2026-08-05', added: 1, removed: 1, net: 0 },
+      { date: '2026-08-06', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-07', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-08', added: 5, removed: 1, net: 4 },
+      { date: '2026-08-09', added: 4, removed: 0, net: 4 },
+      { date: '2026-08-10', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-11', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-12', added: 2, removed: 1, net: 1 },
+      { date: '2026-08-13', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-14', added: 6, removed: 2, net: 4 },
+      { date: '2026-08-15', added: 3, removed: 0, net: 3 },
+      { date: '2026-08-16', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-17', added: 0, removed: 1, net: -1 },
+      { date: '2026-08-18', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-19', added: 4, removed: 1, net: 3 },
+      { date: '2026-08-20', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-21', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-22', added: 3, removed: 1, net: 2 },
+      { date: '2026-08-23', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-24', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-25', added: 5, removed: 1, net: 4 },
+      { date: '2026-08-26', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-27', added: 0, removed: 0, net: 0 },
+      { date: '2026-08-28', added: 2, removed: 0, net: 2 },
+      { date: '2026-08-29', added: 3, removed: 1, net: 2 },
+      { date: '2026-08-30', added: 1, removed: 0, net: 1 },
+      { date: '2026-08-31', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-01', added: 4, removed: 1, net: 3 },
+      { date: '2026-09-02', added: 2, removed: 0, net: 2 },
+      ],
+      campaigns: [
+        { id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', occurredAt: '2026-08-24T10:00:00+09:00', date: '2026-08-24' },
+        { id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', occurredAt: '2026-08-18T18:30:00+09:00', date: '2026-08-18' },
+      ],
+      historyAvailableFrom: '2026-08-04',
+    },
+  },
+  /* 分析・配信の反応。`AnalyticsReactionsOverview`。 */
+  '/api/analytics/reactions': {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      metrics: {
+        sent: METRIC(1842), delivered: METRIC(1836), opened: METRIC(1274),
+        lineClicked: METRIC(318), trackedClicks: METRIC(204),
+        unavailableCampaigns: METRIC(1, 'partial', '20人未満の配信は開封を取得できません'),
+      },
+      campaigns: [
+        {
+          id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', sentAt: '2026-08-24T10:00:00+09:00',
+          targetPeople: METRIC(624), delivered: METRIC(624), opened: METRIC(438),
+          lineClicked: METRIC(112), outcomes: METRIC(9), fetchedAt: '2026-08-25T03:00:00+09:00',
+        },
+        {
+          id: 'bc-2', name: '予約空き枠のご案内', kind: 'broadcast', sentAt: '2026-08-18T18:30:00+09:00',
+          targetPeople: METRIC(203), delivered: METRIC(203), opened: METRIC(141),
+          lineClicked: METRIC(37), outcomes: METRIC(2), fetchedAt: '2026-08-19T03:00:00+09:00',
+        },
+        {
+          id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', sentAt: '2026-08-18T09:00:00+09:00',
+          targetPeople: METRIC(18), delivered: METRIC(18),
+          opened: METRIC(null, 'insufficient', '20人未満のため取得できません'),
+          lineClicked: METRIC(3), outcomes: METRIC(0), fetchedAt: null,
+        },
+      ],
+      trackedClickHours: [
+        { hour: 9, clicks: 22 }, { hour: 10, clicks: 48 }, { hour: 12, clicks: 31 },
+        { hour: 18, clicks: 57 }, { hour: 20, clicks: 46 },
+      ],
+      clickDefinition: 'クリック率は「そのURLを含む配信が届いた人数」に対する割合です。同じ人が複数回押しても、実人数は1として数えます。',
+    },
+  },
+  /* 分析・経路と成果。`AnalyticsRoutesOverview`。 */
+  '/api/analytics/routes': {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      attributionModel: 'first_touch',
+      attributionLabel: '最初に触れた経路',
+      routes: [
+        {
+          id: 'rt-1', refCode: 'sns-aug', name: 'SNSの8月投稿',
+          clicks: METRIC(412), friendAdds: METRIC(38), currentFriends: METRIC(35), reactionPeople: METRIC(21),
+          conversions: { approved: METRIC(4), pending: METRIC(1), rejected: METRIC(0), revenue: METRIC(48000) },
+          adCost: METRIC(12000), costPerFriend: METRIC(315), costPerConversion: METRIC(3000), profitAfterAdCost: METRIC(36000),
+        },
+        {
+          id: 'rt-2', refCode: null, name: '代理店A',
+          clicks: METRIC(97), friendAdds: METRIC(6), currentFriends: METRIC(6), reactionPeople: METRIC(2),
+          conversions: { approved: METRIC(0), pending: METRIC(0), rejected: METRIC(0), revenue: METRIC(0) },
+          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
+          costPerFriend: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+          costPerConversion: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+          profitAfterAdCost: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+        },
+      ],
+      searchConsoleHref: 'https://search.google.com/search-console',
+    },
+  },
+  /* 分析・使われ方。`AnalyticsUsageOverview`。 */
+  '/api/analytics/usage': {
+    lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
+    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    data: {
+      state: 'available', stateReason: null,
+      checkedAt: '2026-09-02T00:00:00+09:00', automaticDeletion: false,
+      summary: {
+        unusedItems: METRIC(79), automaticRuns: METRIC(214), manualSends: METRIC(12), estimatedHoursSaved: METRIC(1),
+      },
+      categories: [
+        { key: 'tags', label: 'タグ', href: '/tags', created: METRIC(101), inUse: METRIC(22), unused: METRIC(79), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-24') },
+        { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
+        { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
+      ],
+    },
+  },
+  '/api/mileage/history': {
+    items: [
+      {
+        id: 'ml-1', friendId: 'friend-1', friendName: 'さかもとまさと',
+        entryType: 'earn', status: 'confirmed', mode: 'automatic',
+        amount: 5, balanceAfter: 5, reason: '写真の投稿が通りました',
+        occurredAt: '2026-08-24T20:53:00+09:00', createdAt: '2026-08-24T20:53:00+09:00',
+      },
+      {
+        id: 'ml-2', friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
+        entryType: 'earn', status: 'confirmed', mode: 'automatic',
+        amount: 3, balanceAfter: 3, reason: '友だち追加',
+        occurredAt: '2026-08-19T09:12:00+09:00', createdAt: '2026-08-19T09:12:00+09:00',
+      },
+      {
+        id: 'ml-3', friendId: 'friend-3', friendName: '菅野 亮',
+        entryType: 'spend', status: 'confirmed', mode: 'manual',
+        amount: -2, balanceAfter: 1, reason: '手で減らしました',
+        occurredAt: '2026-08-13T20:52:00+09:00', createdAt: '2026-08-13T20:52:00+09:00',
+      },
+    ],
+    pagination: { total: 3, limit: 20, offset: 0 },
+  },
   '/api/settings/features': {
     features: FEATURES,
     sidebarOrder: null,
@@ -264,10 +532,26 @@ const SHAPES = {
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 1, members: 0, consultations: 0 },
+  /*
+   * 一斉配信の帯（設計 `q76C35`）。**型どおりに返す。**
+   * ここが無かったせいで、一覧の帯が「予約中 undefined」「失敗 undefined」
+   * のまま撮れていた。返事が無いと別の形（items/total）へ落ちて、
+   * 画面はそれを数として読もうとする。`BroadcastStats` と同じ形にする。
+   */
+  '/api/broadcasts/stats': {
+    thisMonth: 12,
+    scheduled: 4,
+    delivered: 1842,
+    failed: 0,
+    openRate: 69.4,
+  },
   '/api/friends/stats': FRIEND_STATS,
   '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
+  '/api/users-grouped': USERS_GROUPED,
+  '/api/duplicates/stats': DUPLICATE_STATS,
   '/api/operators': OPERATORS,
   '/api/scenarios': FRIEND_SCENARIOS,
+  '/api/media': MEDIA_ITEMS,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },
@@ -296,6 +580,27 @@ const SHAPES = {
   '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
   '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
 
+  /* 友だち追加時配信の公開前確認（PR #597）。契約と同じ形を返す。 */
+  '/api/friend-add-routing/draft': FRIEND_ADD_LIFECYCLE_DRAFT,
+  '/api/friend-add-routing/conflicts': { conflicts: [] },
+
+}
+
+/**
+ * 画面確認だけで完結する、保存を伴わない固定の返事。
+ * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
+ */
+function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
+    return FRIEND_ADD_LIFECYCLE_VALIDATION
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-routing/draft/test') {
+    return FRIEND_ADD_LIFECYCLE_TEST_RESULT
+  }
+  if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
+    return FRIEND_ADD_LIFECYCLE_PUBLISHED
+  }
+  return null
 }
 
 /** `success` の器に入れず、そのまま返すもの。 */
@@ -339,6 +644,25 @@ function tagDeleteImpact(tag) {
   }
 }
 
+/**
+ * リマインダの通知ステップ。**一覧の既定の形（`{items,…}`）では返さない。**
+ * 編集画面は `steps` を配列として回すので、通で返さないとそこで落ちる。
+ */
+function reminderStepsOf(reminder) {
+  const count = Number(reminder.stepCount ?? 0)
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${reminder.id}-step-${i + 1}`,
+    reminderId: reminder.id,
+    offsetMinutes: Number(reminder.triggerOffsetMinutes ?? 0) + i * 60,
+    offsetDays: null,
+    sendAtTime: reminder.sendAtTime,
+    templateId: null,
+    messageType: 'text',
+    messageContent: i === 0 ? 'ご予約日時が近づいています。' : 'あわせてご確認ください。',
+    createdAt: '2026-06-02T00:00:00.000Z',
+  }))
+}
+
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
@@ -349,6 +673,38 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+  }
+  if (pathname === '/api/identity-candidates/detect') {
+    return {
+      success: true,
+      data: query.get('visualState') === 'empty'
+        ? IDENTITY_CANDIDATE_DETECTION.empty
+        : IDENTITY_CANDIDATE_DETECTION.normal,
+    }
+  }
+  if (pathname === '/api/identity-candidates') {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: IDENTITY_CANDIDATE_LISTS.empty }
+    }
+    const kind = query.get('kind') === 'ec_member' ? 'ec_member' : 'friend_duplicate'
+    return { success: true, data: IDENTITY_CANDIDATE_LISTS[kind] }
+  }
+  const identityCandidate = /^\/api\/identity-candidates\/([^/]+)$/.exec(pathname)
+  if (identityCandidate) {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    const candidate = identityCandidate[1] === IDENTITY_CANDIDATE_EC.id
+      ? IDENTITY_CANDIDATE_EC
+      : IDENTITY_CANDIDATE_FRIEND
+    return { success: true, data: candidate }
+  }
+  const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
+  if (mergedPerson) {
+    if (query.get('visualState') === 'error') return MERGED_PERSON_ERROR
+    if (query.get('visualState') === 'empty') {
+      return { success: true, data: MERGED_PERSON_EMPTY }
+    }
+    return { success: true, data: MERGED_PERSON_DETAIL }
   }
   if (pathname === '/api/dashboard/preferences') {
     /*
@@ -361,6 +717,84 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
+  // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
+  const chat = pathname.match(/^\/api\/chats\/([^/]+)$/)
+  if (chat) {
+    // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
+    // `undefined` になり `friendName.charAt(0)` で落ちる。
+    const row = CHATS.find((c) => c.id === chat[1])
+    if (row) {
+      const friend = FRIEND_DETAILS[row.friendId]
+      return {
+        success: true,
+        data: {
+          ...row,
+          friendRealName: friend?.realName ?? null,
+          isAttention: friend?.metadata?.__attention === '1',
+          messages: FRIEND_MESSAGES[row.friendId] ?? [],
+        },
+      }
+    }
+  }
+  const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
+  if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
+  if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
+  if (messages) {
+    // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
+    return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
+  }
+  // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
+  if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  if (pathname === '/api/folders' && query.get('kind') === 'template') {
+    return { success: true, data: TEMPLATE_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
+    return { success: true, data: REMINDER_FOLDERS }
+  }
+  if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
+    return { success: true, data: AUTO_REPLY_FOLDERS }
+  }
+  if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
+  if (autoReplyOne) {
+    const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
+  if (reminderOne) {
+    const found = REMINDERS.find((item) => item.id === reminderOne[1])
+    /*
+      **`steps` を通で足す。** 編集画面は `api.reminders.get()` の返事を
+      `Reminder & { steps: ReminderStep[] }` として読み、`steps.length` を
+      すぐ見る。付けずに返すと画面ごと落ちる。
+    */
+    return found
+      ? { success: true, data: { ...found, steps: reminderStepsOf(found) } }
+      : { success: false, error: 'Not found' }
+  }
+  /*
+    ステップは**通で返す**。一覧の既定（`{items,total,page,limit}`）を返すと
+    編集画面が `steps` を回そうとして落ちる。機能5で2度やった。
+  */
+  const reminderSteps = /^\/api\/reminders\/([^/]+)\/steps$/.exec(pathname)
+  if (reminderSteps) {
+    const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
+    return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
+  }
+  if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
+  const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
+  if (scenario) {
+    // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
+    const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
+    return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
+  }
+  if (pathname === '/api/broadcasts') return { success: true, data: BROADCASTS }
+  if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
+  if (pathname === '/api/chats') return { success: true, data: CHATS }
+  if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**
@@ -389,6 +823,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (formDeleteImpact) {
+    const data = formDeleteImpact[1] === 'form-empty'
+      ? FORM_DELETE_IMPACT_FIXTURES.delete
+      : FORM_DELETE_IMPACT_FIXTURES.archive
+    return { success: true, data }
+  }
+  if (pathname === '/api/friends/bulk-runs/friend-bulk-run-1') {
+    return { success: true, data: FRIEND_BULK_RUN.detail }
+  }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という
@@ -399,6 +843,28 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const tag = TAGS.find((item) => item.id === deleteImpact[1])
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
+  }
+  if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
+  const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (commonVarDeleteImpact) {
+    const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
+      ? COMMON_VAR_DELETE_IMPACT_EMPTY
+      : COMMON_VAR_DELETE_IMPACT
+    return { success: true, data: impact }
+  }
+  const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (mediaDeleteImpact) {
+    const impact = mediaDeleteImpact[1] === MEDIA_DELETE_IMPACT_EMPTY.media.id
+      ? MEDIA_DELETE_IMPACT_EMPTY
+      : MEDIA_DELETE_IMPACT
+    return { success: true, data: impact }
+  }
+  const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (richMenuDeleteImpact) {
+    const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT_EMPTY.group.id
+      ? RICH_MENU_DELETE_IMPACT_EMPTY
+      : RICH_MENU_DELETE_IMPACT
+    return { success: true, data: impact }
   }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
@@ -412,6 +878,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       並べたときに**実装の差に見えてしまう**（実際はこちらの返事が違うだけ）。
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
+  }
+  if (pathname === '/api/friend-fields-stats') {
+    /*
+      友だち情報欄の帯。**口が無いと既定の器（`{items,total,page,limit}`）が返り、
+      `summary.inUse` が `undefined` になって画面に「使用中 undefined件」と出ていた。**
+      設計 `HBTk0` と文字を並べて初めて分かった。
+      画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
+    */
+    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 1_284, formLinks: 3, updatedThisMonth: 4 } }
   }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
@@ -432,17 +907,38 @@ const server = createServer((req, res) => {
 
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible',
+  )
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
     return
   }
 
+  /*
+    **いま動いているモックが、いまのファイルかを言う。**
+
+    直したはずの返事が反映されず、しかもどこにも出ない、というのを
+    何度かやった。直近では `/api/friend-fields-stats` を足したのに
+    古いモックが動いたままで、画面に `undefined` が出続けた。
+    さらに前には、口が足りない古いモックのせいで7画面が
+    「画面を表示できませんでした」で落ち、実装の不具合に見えていた。
+
+    ここが自分の中身の指紋を返し、`capture-screens.mjs` が
+    ディスク上のファイルと突き合わせて、違えば撮影に入る前に止まる。
+  */
+  if (url.pathname === '/__mock-fingerprint') {
+    res.writeHead(200).end(JSON.stringify({ fingerprint: FINGERPRINT }))
+    return
+  }
+
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-  // 更新は通さない。ここで通すと「保存できたつもり」の画像が撮れてしまい、
+  // 更新は原則通さない。固定結果を返す3口も保存・配信は一切行わない。
+  // それ以外を通すと「保存できたつもり」の画像が撮れてしまい、
   // 動いていない画面を動いていると読み違える。
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
@@ -450,6 +946,23 @@ const server = createServer((req, res) => {
   if (method !== 'GET') {
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
+      return
+    }
+    // `ymXJK` の下書き保存だけは、契約どおりの固定201を返す。
+    // DB更新はせず、ほかのPOSTは従来どおり405にする。
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
+      res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
+      return
+    }
+    const fixedResult = visualQaWriteBody(method, url.pathname)
+    if (fixedResult) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: fixedResult }))
+      return
+    }
+    // 対象確認は書き込みを起こさない。IAf7j の確認窓を通常データで撮るため、
+    // この1本だけ本物と同じPOSTの器で返す。実行・再試行・取り消しは405のまま。
+    if (method === 'POST' && url.pathname === '/api/friends/bulk-runs/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: FRIEND_BULK_RUN.preview }))
       return
     }
     res.writeHead(405).end(
@@ -493,5 +1006,5 @@ process.on('uncaughtException', (error) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（GETのみ・更新は405）`)
+  console.log(`[visual-qa] mock API on http://${HOST}:${PORT}（固定の画面確認結果以外の更新は405）`)
 })

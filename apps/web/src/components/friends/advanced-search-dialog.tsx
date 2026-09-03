@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
+import { friendParamsToSavedConditions } from './saved-search-utils'
+import { TextInput } from '@/components/shared/form-controls'
+import Button from '@/components/shared/button'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -30,7 +33,7 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   field: '友だち情報',
   status_message: 'ステータスメッセージ',
   created_at: '友だち登録日',
-  chat_status: '対応マーク',
+  chat_status: '対応状況',
 }
 
 /**
@@ -39,6 +42,9 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
  */
 const NOT_YET: Array<{ label: string; why: string }> = [
   { label: '個別メモ', why: 'メモを検索する口がありません' },
+  // 下のOR節は `'対応状況'` を並べる側に書いているのに、この一覧に項目が無かった。
+  // そのため **設計にあるORの軸が1つ、黙って描かれないまま**だった。
+  { label: '対応状況', why: '対応状況で絞る口がありません' },
   { label: 'シナリオ', why: '購読中のシナリオで絞る口がありません' },
   { label: 'イベント予約', why: '予約から友だちを引く口がありません' },
   { label: 'カレンダー予約', why: '同上' },
@@ -63,6 +69,7 @@ export interface AdvancedSearchResult {
     | 'visibility'
     | 'sort'
     | 'limit'
+    | 'savedSearchId'
   >
   /** 画面に「絞り込み中」を出すための、人が読める形 */
   summary: string[]
@@ -70,12 +77,14 @@ export interface AdvancedSearchResult {
 
 export default function AdvancedSearchDialog({
   open,
+  accountId,
   tags,
   fieldNames,
   onClose,
   onApply,
 }: {
   open: boolean
+  accountId: string | null
   tags: Tag[]
   /** 友だち情報の項目名。取れないときは空でよい（自由入力にする）。 */
   fieldNames: string[]
@@ -91,6 +100,11 @@ export default function AdvancedSearchDialog({
   const [sort, setSort] = useState<'recent' | 'oldest'>('recent')
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [savedNotice, setSavedNotice] = useState('')
 
   const params = useMemo<AdvancedSearchResult['params']>(() => {
     const p: AdvancedSearchResult['params'] = { sort }
@@ -134,7 +148,7 @@ export default function AdvancedSearchDialog({
     }
     if (params.chatStatus) {
       out.push(
-        `対応マーク ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済' }[params.chatStatus]}`,
+        `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[params.chatStatus]}`,
       )
     }
     if (params.visibility === 'blocked') out.push('ブロックした人')
@@ -145,10 +159,10 @@ export default function AdvancedSearchDialog({
   const recount = useCallback(async () => {
     setCounting(true)
     // 件数だけ欲しいので1件だけ取る。total は絞り込み後の総数が返る。
-    const res = await api.friends.list({ ...params, limit: 1, includeTags: false })
+    const res = await api.friends.list({ ...params, accountId: accountId ?? undefined, limit: 1, includeTags: false })
     setCounting(false)
     setCount(res.success ? res.data.total : null)
-  }, [params])
+  }, [accountId, params])
 
   useEffect(() => {
     if (!open) return
@@ -176,6 +190,38 @@ export default function AdvancedSearchDialog({
                 ? { kind: 'created_at', from: '', to: '' }
                 : { kind: 'chat_status', value: 'unread' },
     ])
+
+  const save = async () => {
+    if (!accountId) {
+      setSaveError('LINE公式アカウントを選んでください')
+      return
+    }
+    if (!saveName.trim()) {
+      setSaveError('条件名を入力してください')
+      return
+    }
+    setSaving(true)
+    setSaveError('')
+    try {
+      const res = await api.savedSearches.create({
+        name: saveName.trim(),
+        accountId,
+        conditions: friendParamsToSavedConditions(params),
+        isShared: false,
+      })
+      if (!res.success) {
+        setSaveError(res.error)
+        return
+      }
+      setSaveName('')
+      setSaveOpen(false)
+      setSavedNotice('条件を保存しました')
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '条件を保存できませんでした')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div
@@ -331,7 +377,7 @@ export default function AdvancedSearchDialog({
                 >
                   <option value="unread">未対応</option>
                   <option value="in_progress">対応中</option>
-                  <option value="resolved">対応済</option>
+                  <option value="resolved">対応済み</option>
                 </select>
               )}
             </section>
@@ -356,11 +402,23 @@ export default function AdvancedSearchDialog({
               <span className="rounded-full bg-[#0067D9] px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
               <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {NOT_YET.filter((item) => ['対応マーク', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
-                <button key={item.label} type="button" disabled title={item.why} className="rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
-                  ＋ {item.label === 'イベント予約' ? '予約' : item.label}
-                </button>
+            {/*
+              **押せない理由を `title` に隠さない。**
+
+              以前は `title={item.why}` だけで、マウスを乗せた人にしか読めなかった。
+              押せない札が理由なしに5つ並ぶと、壊れているのか、まだ無いのか分からない。
+              `NOT_YET` は理由の文をもう持っているので、札の下に出す。
+            */}
+            <div className="mt-3 flex flex-wrap gap-3">
+              {NOT_YET.filter((item) => ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
+                <div key={item.label} className="flex max-w-xs flex-col gap-1">
+                  <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
+                    ＋ {item.label === 'イベント予約' ? '予約' : item.label}
+                  </button>
+                  {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-v6-ink-faint`
+                      （#8b938d）が同じ値を既に持っている。design-debt を増やさずに済む。 */}
+                  <span className="text-v6-ink-faint text-nano leading-tight">{item.why}</span>
+                </div>
               ))}
             </div>
           </section>
@@ -412,7 +470,8 @@ export default function AdvancedSearchDialog({
           >
             キャンセル
           </button>
-          <button type="button" onClick={() => { try { localStorage.setItem('friends.savedSearch', JSON.stringify({ params, summary })) } catch { /* 保存できない環境では今回の絞り込みだけ使う */ } }} className="rounded-[9px] border border-[#DADDE2] bg-canvas px-4 py-2 text-sm font-semibold text-[#0067D9] hover:bg-[#F3F8FF]">条件を保存</button>
+          {savedNotice ? <span className="text-xs font-semibold text-v6-accent">{savedNotice}</span> : null}
+          <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
           <button
             type="button"
             onClick={() => onApply({ params, summary })}
@@ -422,6 +481,23 @@ export default function AdvancedSearchDialog({
           </button>
         </div>
       </div>
+      {saveOpen ? (
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-[#101828]/45 p-4" onClick={() => setSaveOpen(false)}>
+          <section className="w-full max-w-md rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card" onClick={(event) => event.stopPropagation()}>
+            <h3 className="text-lg font-bold text-v6-ink">この条件を保存</h3>
+            <p className="mt-1 text-xs leading-5 text-v6-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
+            <label className="mt-4 block text-sm font-semibold text-v6-ink-secondary">
+              条件名
+              <TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" />
+            </label>
+            {saveError ? <p className="mt-3 text-sm text-v6-danger">{saveError}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" onClick={() => setSaveOpen(false)}>キャンセル</Button>
+              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

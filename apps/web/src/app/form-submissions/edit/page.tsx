@@ -32,7 +32,9 @@ import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import OptionsDialog from '@/components/forms/options-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
@@ -71,10 +73,29 @@ function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
   }
 }
 
+/**
+ * そのページへ飛ばしている選択肢の数。
+ *
+ * ページを消すと、この分岐は行き先を失って「次へ進む」に戻る。消す前に
+ * 何本つなぎ直すのかを言うために数える。**数え漏らしを作らないよう、
+ * 全ページの入力ブロックを見る**（自分自身のページも数える。消えるまでは
+ * 分岐として生きているため）。
+ */
+function jumpsInto(layout: FormLayout, sectionId: string): number {
+  let count = 0
+  for (const section of layout.sections) {
+    for (const block of section.blocks) {
+      if (block.kind !== 'input' || !block.choices) continue
+      count += block.choices.filter((c) => c.jumpToSectionId === sectionId).length
+    }
+  }
+  return count
+}
+
 function FormEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const { selectedAccount } = useAccount()
+  const { selectedAccount, selectedAccountId } = useAccount()
 
   /**
    * 友だちに配るURL。
@@ -138,7 +159,7 @@ function FormEditInner() {
       try {
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
           api.tags.list(),
-          api.friendFields.list(),
+          selectedAccountId ? api.friendFields.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
           api.scenarios.list(),
           api.reminders.list(),
           api.templates.list(),
@@ -159,8 +180,8 @@ function FormEditInner() {
             : [],
         })
 
-        if (!id) return
-        const res = await api.forms.get(id)
+        if (!id || !selectedAccountId) return
+        const res = await api.forms.get(id, selectedAccountId)
         if (res.success) {
           setName(res.data.name)
           setDescription(res.data.description ?? '')
@@ -176,7 +197,7 @@ function FormEditInner() {
         setLoading(false)
       }
     })()
-  }, [id])
+  }, [id, selectedAccountId])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -278,12 +299,23 @@ function FormEditInner() {
     setTab(index + 1)
   }
 
+  /*
+   * ページの削除。**ブラウザの `confirm()` は使わない。**
+   * 何個のブロックが消えるのか、どの分岐がつなぎ直されるのかを本文で読ませる。
+   *
+   * **`destructive` は付けない。** ここで消えるのは画面上の下書きだけで、
+   * 「元に戻す」で戻せるし、保存するまで保存済みのフォームは変わらない。
+   * 戻せる操作に赤い窓を出すと、本当に戻せない操作と見分けがつかなくなる。
+   */
+  const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
+  const removeSectionTarget =
+    removeSectionIndex === null ? null : (layout.sections[removeSectionIndex] ?? null)
+
   const removeSection = (index: number) => {
     if (layout.sections.length <= 1) return
     const target = layout.sections[index]
-    if (target.blocks.length > 0 && !window.confirm(`「${target.name}」を中身ごと削除します。`)) {
-      return
-    }
+    if (!target) return
+    setRemoveSectionIndex(null)
     setLayout((prev) => ({
       ...prev,
       // 消えるページへ飛ばしていた選択肢は、行き先を外して「次へ進む」に戻す
@@ -306,7 +338,21 @@ function FormEditInner() {
     setTab(Math.max(0, index - 1))
   }
 
+  const askRemoveSection = (index: number) => {
+    if (layout.sections.length <= 1) return
+    // 中身が無いページは、消えるものが無いので確認しない。
+    if ((layout.sections[index]?.blocks.length ?? 0) === 0) {
+      removeSection(index)
+      return
+    }
+    setRemoveSectionIndex(index)
+  }
+
   const save = async () => {
+    if (!selectedAccountId) {
+      setError('LINE公式アカウントを選んでください')
+      return
+    }
     if (!name.trim()) {
       setError('フォーム名を入力してください')
       return
@@ -323,7 +369,7 @@ function FormEditInner() {
     setError('')
     setNotice('')
     try {
-      const res = await api.forms.update(id, {
+      const res = await api.forms.update(id, selectedAccountId, {
         name: name.trim(),
         description: description.trim() || null,
         layout,
@@ -345,7 +391,7 @@ function FormEditInner() {
   if (!id) {
     return (
       <div>
-        <Header title="回答フォーム編集" />
+
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           フォームが指定されていません。
           <Link href="/form-submissions" className="text-accent ml-1 hover:underline">
@@ -547,7 +593,7 @@ function FormEditInner() {
                         </button>
                         {layout.sections.length > 1 && (
                           <button
-                            onClick={() => removeSection(i)}
+                            onClick={() => askRemoveSection(i)}
                             className="text-danger px-1 text-xs"
                             title="このページを削除"
                           >
@@ -701,6 +747,41 @@ function FormEditInner() {
         </>
       )}
 
+      {/*
+        ページを消す前の確認。**「元に戻す」で戻せるので `destructive` は付けない。**
+        保存するまで、保存済みのフォームと集まった回答は変わらない。
+      */}
+      <ConfirmDialog
+        open={removeSectionTarget !== null}
+        title={removeSectionTarget ? `ページ「${removeSectionTarget.name}」を削除しますか？` : ''}
+        description="このページと、中に置いたブロックを画面から外します。保存するまで、保存済みのフォームは変わりません。"
+        confirmLabel="削除する"
+        onConfirm={() => {
+          if (removeSectionIndex !== null) removeSection(removeSectionIndex)
+        }}
+        onCancel={() => setRemoveSectionIndex(null)}
+      >
+        {removeSectionTarget && (
+          <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+            <li>
+              ・消えること: このページのブロック
+              <span className="tabular-nums">{removeSectionTarget.blocks.length}</span>
+              個が一緒に外れます。
+            </li>
+            {/* 行き先を失った分岐は「次へ進む」に戻る。何本つなぎ直すのかを先に言う。 */}
+            {jumpsInto(layout, removeSectionTarget.id) > 0 && (
+              <li>
+                ・つなぎ直すこと: このページへ飛ばしていた選択肢
+                <span className="tabular-nums">{jumpsInto(layout, removeSectionTarget.id)}</span>
+                件は、行き先が外れて「次へ進む」に戻ります。
+              </li>
+            )}
+            <li>・残ること: すでに集まった回答は消えません。</li>
+            <li>・戻せます: 上の「元に戻す」で戻せます。保存するまで保存済みのフォームは変わりません。</li>
+          </ul>
+        )}
+      </ConfirmDialog>
+
       {showOptions && (
         <OptionsDialog
           value={layout.options}
@@ -714,6 +795,7 @@ function FormEditInner() {
 }
 
 export default function FormEditPage() {
+  usePageTitle('回答フォーム編集')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

@@ -16,6 +16,7 @@ import {
   createVersionedFunnel,
   createFunnelVersion,
   runChronologicalFunnel,
+  getLatestFunnelRun,
   createFunnelResultAudience,
   createAnalyticsCrossRun,
   getAnalyticsCrossRun,
@@ -26,6 +27,9 @@ import {
   getAnalyticsRoutesOverview,
   getAnalyticsUrlClicksOverview,
   getAnalyticsUsageOverview,
+  createSavedAnalyticsFromResult,
+  getSavedAnalytics,
+  getSavedAnalyticsSnapshots,
   getLineAccountById,
   FUNNEL_STEP_KINDS,
   type Funnel,
@@ -218,7 +222,9 @@ function explicitTimestamp(value: unknown, code: string): string {
 function funnelErrorStatus(error: unknown): 404 | 422 | 500 {
   const message = error instanceof Error ? error.message : '';
   if (message.endsWith('_not_found')) return 404;
-  if (message.startsWith('analytics_funnel_') || message.startsWith('analytics_cross_')) return 422;
+  if (message.startsWith('analytics_funnel_')
+      || message.startsWith('analytics_cross_')
+      || message.startsWith('analytics_saved_')) return 422;
   return 500;
 }
 
@@ -410,6 +416,68 @@ analytics.get('/api/analytics/cross/results/:id', async (c) => {
   }
 });
 
+// ── 保存した分析 ─────────────────────────────────────────────
+
+analytics.get('/api/analytics/saved', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    return c.json({ success: true, data: await getSavedAnalytics(c.env.DB, account.accountId) });
+  } catch (error) {
+    console.error('GET /api/analytics/saved error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const body = await c.req.json<{
+      name?: unknown;
+      sourceKind?: unknown;
+      sourceResultId?: unknown;
+    }>();
+    if (body.sourceKind !== 'cross' && body.sourceKind !== 'funnel') {
+      return c.json({ success: false, error: '分析の種類が不正です' }, 422);
+    }
+    if (typeof body.sourceResultId !== 'string' || !body.sourceResultId.trim()) {
+      return c.json({ success: false, error: '保存する分析結果が必要です' }, 422);
+    }
+    const staff = c.get('staff');
+    const result = await createSavedAnalyticsFromResult(c.env.DB, {
+      lineAccountId: account.accountId,
+      name: typeof body.name === 'string' ? body.name : '',
+      sourceKind: body.sourceKind,
+      sourceResultId: body.sourceResultId.trim(),
+      createdBy: staff.id,
+      createdByName: staff.name,
+      createdAt: new Date().toISOString(),
+    });
+    return c.json({ success: true, data: result }, 201);
+  } catch (error) {
+    const status = funnelErrorStatus(error);
+    if (status === 500) console.error('POST /api/analytics/saved error:', error);
+    return c.json({
+      success: false,
+      error: status === 500 ? 'Internal server error' : (error as Error).message,
+    }, status);
+  }
+});
+
+analytics.get('/api/analytics/saved/:id/snapshots', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const items = await getSavedAnalyticsSnapshots(c.env.DB, account.accountId, c.req.param('id'));
+    if (!items) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: items });
+  } catch (error) {
+    console.error('GET /api/analytics/saved/:id/snapshots error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // ── ファネル ────────────────────────────────────────────────
 
 analytics.get('/api/funnels', async (c) => {
@@ -520,6 +588,24 @@ analytics.post('/api/analytics/funnels/:id/run', async (c) => {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels/:id/run error:', error);
     return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+  }
+});
+
+// 画面を開くだけでは再計算せず、最後に固定した結果を返す。
+analytics.get('/api/analytics/funnels/:id/runs/latest', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const result = await getLatestFunnelRun(c.env.DB, account.accountId, c.req.param('id'));
+    if (!result) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    const status = funnelErrorStatus(error);
+    if (status === 500) console.error('GET /api/analytics/funnels/:id/runs/latest error:', error);
+    return c.json({
+      success: false,
+      error: status === 500 ? 'Internal server error' : (error as Error).message,
+    }, status);
   }
 });
 

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
 import SidebarIdentity from './sidebar-identity'
 import {
@@ -145,6 +146,7 @@ export default function Sidebar({
   const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections
 
   const visibleSections = sections
+    .filter((section) => section.id !== 'restaurant-test' || restaurantTestUiEnabled())
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
@@ -404,7 +406,7 @@ export default function Sidebar({
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
-        ここに残すと二重に出る（`docs/v6-shell-contract.md` §8）。
+        ここに残すと二重に出る（`docs/v6-common-rules.md` §1）。
         枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
       */}
       <div className={styles.footer} />

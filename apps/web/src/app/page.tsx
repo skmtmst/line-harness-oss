@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import type { EntryRoute } from '@line-crm/shared'
+import { useRouter } from 'next/navigation'
+import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
@@ -33,8 +34,16 @@ import {
   summarizeTwoFactor,
   type TwoFactorSummary,
 } from '@/components/dashboard/live-summary'
+import {
+  dashboardNotificationDestination,
+  dashboardNotificationFilters,
+  dashboardNotificationItems,
+  isDashboardNotificationData,
+  markDashboardNotificationRead,
+  type DashboardNotificationFilter,
+} from '@/components/dashboard/notification-summary'
 
-/** 通知パネルの絞り込み。中身の口ができるまで数は0のまま。 */
+/** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -43,12 +52,6 @@ function BellIcon() {
     </svg>
   )
 }
-
-const NOTIFICATION_FILTERS = [
-  { id: 'all', label: 'すべて', count: 0 },
-  { id: 'error', label: 'エラー', count: 0 },
-  { id: 'update', label: 'アップデート', count: 0 },
-]
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -274,7 +277,12 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
     <p className="text-ink mt-3 flex items-baseline gap-2">
       <span className="text-ink-secondary text-xs font-medium">LINE公式</span>
       <span className="text-2xl font-bold tabular-nums">
-        {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+        {/*
+          **使用数か残りか読めない形にしない。**
+          「197 / 200通」だけだと、197 が使ったぶんにも残りにも読める。
+          この値は `limit - used` なので残り。言葉を付けて向きを固定する。
+        */}
+        {remaining === null || limit === null ? '—' : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
       </span>
     </p>
     <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
@@ -301,7 +309,11 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
       一覧を取得できなかったときだけ `—` にする。
     */}
     <div className="text-ink-secondary mt-3 space-y-2 text-xs">
-      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分前`}</p>
+      {/*
+        **分のままにしない。** 9,110分前と書かれても、何日前か読み解けない。
+        1時間未満は分、1日未満は時間、それ以上は日で言う。
+      */}
+      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}</p>
       <p>・二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
@@ -322,6 +334,7 @@ function ConnectionStatusCard({ account, risk, activeFriends }: { account: Retur
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const [period, setPeriod] = useState<PeriodKey>('today')
   const [data, setData] = useState<DashboardOverview | null>(null)
@@ -339,7 +352,18 @@ export default function DashboardPage() {
   const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
   const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
   const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notificationFilter, setNotificationFilter] = useState<DashboardNotificationFilter>('all')
+  const [notificationData, setNotificationData] = useState<NotificationCenterData | null>(null)
+  const [notificationAccountId, setNotificationAccountId] = useState<string | null>(null)
+  const [notificationLoading, setNotificationLoading] = useState(false)
+  const [notificationError, setNotificationError] = useState('')
   const loadRequestId = useRef(0)
+  const notificationRequestId = useRef(0)
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  const notificationFilterRef = useRef(notificationFilter)
+  selectedAccountIdRef.current = selectedAccountId
+  notificationFilterRef.current = notificationFilter
   const visibleMain = preferences.main.filter((item) => item.visible)
   const visibleRight = preferences.right.filter((item) => item.visible)
   const visibleToday = preferences.today.filter((item) => item.visible)
@@ -447,6 +471,86 @@ export default function DashboardPage() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
+    notificationRequestId.current += 1
+    setNotificationsOpen(false)
+    setNotificationData(null)
+    setNotificationAccountId(null)
+    setNotificationError('')
+  }, [selectedAccountId])
+
+  const loadNotificationCenter = useCallback(async (limit = 20) => {
+    const requestId = ++notificationRequestId.current
+    if (!selectedAccountId) {
+      setNotificationData(null)
+      setNotificationAccountId(null)
+      setNotificationError('')
+      setNotificationLoading(false)
+      return
+    }
+    setNotificationAccountId(selectedAccountId)
+    setNotificationLoading(true)
+    setNotificationError('')
+    try {
+      const response = await api.notifications.center.list(selectedAccountId, {
+        category: notificationFilter,
+        limit,
+      })
+      if (requestId !== notificationRequestId.current) return
+      if (!response.success) throw new Error(response.error)
+      if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
+      setNotificationData(response.data)
+    } catch {
+      if (requestId !== notificationRequestId.current) return
+      setNotificationData(null)
+      setNotificationError('通知を読み込めませんでした。もう一度お試しください。')
+    } finally {
+      if (requestId === notificationRequestId.current) setNotificationLoading(false)
+    }
+  }, [notificationFilter, selectedAccountId])
+
+  useEffect(() => { void loadNotificationCenter() }, [loadNotificationCenter])
+
+  const openNotification = async (item: NotificationCenterItem) => {
+    if (!selectedAccountId) return
+    const accountId = selectedAccountId
+    if (!item.isRead) {
+      try {
+        const response = await api.notifications.center.markRead(item.id, accountId)
+        if (selectedAccountIdRef.current !== accountId) return
+        if (!response.success) throw new Error(response.error)
+        setNotificationData((current) => current ? markDashboardNotificationRead(current, item.id) : current)
+      } catch {
+        if (selectedAccountIdRef.current !== accountId) return
+        setNotificationError('通知を既読にできませんでした。')
+        return
+      }
+    }
+    const destination = dashboardNotificationDestination(item)
+    if (destination) {
+      setNotificationsOpen(false)
+      router.push(destination)
+    }
+  }
+
+  const markAllNotificationsRead = async () => {
+    const currentNotificationData = notificationAccountId === selectedAccountId ? notificationData : null
+    if (!selectedAccountId || !currentNotificationData || currentNotificationData.unreadCount === 0) return
+    const accountId = selectedAccountId
+    const filter = notificationFilter
+    try {
+      const response = await api.notifications.center.markAllRead(accountId, filter)
+      if (selectedAccountIdRef.current !== accountId || notificationFilterRef.current !== filter) return
+      if (!response.success) throw new Error(response.error)
+      // updated は新規既読数ではなく対象総数。既読済みを
+      // 重ねて引かないよう、未読数はサーバーから取り直す。
+      await loadNotificationCenter()
+    } catch {
+      if (selectedAccountIdRef.current !== accountId || notificationFilterRef.current !== filter) return
+      setNotificationError('通知をまとめて既読にできませんでした。')
+    }
+  }
+
+  useEffect(() => {
     if (!selectedAccountId) {
       setBookings(null)
       setPendingPhotos(null)
@@ -527,7 +631,7 @@ export default function DashboardPage() {
   }
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatDurationMinutes(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
+    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatWaitRough(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
     if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
     if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
     if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
@@ -562,9 +666,13 @@ export default function DashboardPage() {
     return null
   }
 
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [notificationFilter, setNotificationFilter] = useState('all')
-
+  const currentNotificationData = notificationAccountId === selectedAccountId ? notificationData : null
+  const notificationItems = dashboardNotificationItems(
+    currentNotificationData?.items ?? [],
+    (item) => { void openNotification(item) },
+  )
+  const notificationFilters = dashboardNotificationFilters(currentNotificationData)
+  const unreadNotificationCount = currentNotificationData?.unreadCount ?? 0
   const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
   const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
@@ -588,32 +696,44 @@ export default function DashboardPage() {
               >{item.label}</button>
             ))}
           </div>
-          {/*
-            設計（`vUXKb` / `Alekb`）は期間の右にベルを置き、押すと通知パネルが
-            開く。部品（`components/shared/notification-panel.tsx`）は前からある
-            のに、ダッシュボードから呼ばれていなかった。
-
-            **中身を出す口はまだ無い。** バッジに数を作って出すと、本物らしく
-            見えるぶん無いより悪いので、件数は出さずパネルも「まだありません」
-            のままにする。口ができたらここへ繋ぐ。
-          */}
+          {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
           <div className="relative">
             <IconButton
-              aria-label="通知"
+              aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
               aria-expanded={notificationsOpen}
-              onClick={() => setNotificationsOpen((current) => !current)}
+              onClick={() => {
+                if (!notificationsOpen) void loadNotificationCenter()
+                setNotificationsOpen((current) => !current)
+              }}
             >
               <BellIcon />
             </IconButton>
+            {unreadNotificationCount > 0 ? (
+              <span
+                aria-hidden="true"
+                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-bold tabular-nums"
+              >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
+            ) : null}
             <NotificationPanel
               open={notificationsOpen}
-              items={[]}
-              filters={NOTIFICATION_FILTERS}
+              items={notificationItems}
+              filters={notificationFilters}
               activeFilter={notificationFilter}
-              unreadCount={0}
-              onFilterChange={setNotificationFilter}
-              onMarkAllRead={() => {}}
+              unreadCount={unreadNotificationCount}
+              loading={notificationAccountId === selectedAccountId && notificationLoading}
+              error={notificationAccountId === selectedAccountId && notificationError ? notificationError : undefined}
+              onFilterChange={(id) => {
+                if (id === 'all' || id === 'error' || id === 'update') setNotificationFilter(id)
+              }}
+              onMarkAllRead={() => { void markAllNotificationsRead() }}
               onClose={() => setNotificationsOpen(false)}
+              onViewAll={() => {
+                void loadNotificationCenter(100)
+              }}
+              onOpenSettings={() => {
+                setNotificationsOpen(false)
+                router.push('/line-notifications')
+              }}
             />
           </div>
         </div>
@@ -629,7 +749,7 @@ export default function DashboardPage() {
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
-          <span className="text-ink-faint text-xs">優先度順</span>
+          <span className="text-ink-faint text-xs">優先度が高い順</span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}

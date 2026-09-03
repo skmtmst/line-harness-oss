@@ -755,9 +755,15 @@ function validateWebinarBody(
 webinarRoutes.get('/api/webinars', async (c) => {
   try {
     const { scope, where } = await adminAccountScope(c);
+    const requestedAccountId = c.req.query('account_id');
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const listWhere = requestedAccountId ? 'account_id = ?' : where;
+    const bindings = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
     const items = await c.env.DB.prepare(
-      `SELECT * FROM webinars WHERE ${where} ORDER BY created_at DESC`,
-    ).bind(...scope.allowedAccountIds).all<Webinar>();
+      `SELECT * FROM webinars WHERE ${listWhere} ORDER BY created_at DESC`,
+    ).bind(...bindings).all<Webinar>();
     return c.json({ success: true, data: items.results.map(serializeWebinar) });
   } catch (err) {
     console.error('GET /api/webinars error:', err);
@@ -768,7 +774,10 @@ webinarRoutes.get('/api/webinars', async (c) => {
 webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<WebinarBody>();
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const input = validateWebinarBody(body, { requireCore: true });

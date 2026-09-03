@@ -81,6 +81,10 @@ describe('リマインダ一覧の並び', () => {
       'アカウントを選ぶと display_order を見ない並びになっています。' +
         '画面から並べ替えても効きません（161）。',
     ).toContain('display_order');
+    expect(
+      listSql,
+      '削除済みのリマインダが一覧へ戻っています。送信履歴を残すため物理削除しないので、一覧側で必ず隠します（268）。',
+    ).toContain('deleted_at IS NULL');
   });
 
   it('アカウントを選んでいないときは getReminders() に任せる', async () => {

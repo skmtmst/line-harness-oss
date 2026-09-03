@@ -1,6 +1,6 @@
 # V6 22 写真審査 要件定義（実装照合版・下書き）
 
-更新日: 2026-08-26
+更新日: 2026-08-28
 対象: V6 22-x、現行写真投稿・審査・ポイント・公開ギャラリー
 
 ## 0. 結論と採点
@@ -131,6 +131,8 @@ AI補助で許可するもの:
 
 ## 8. ポイント付与
 
+ここでのポイントは外部EC（23）のポイントであり、17マイレージのマイルとは別である（17 §13参照）。マイル台帳へ合算せず、用語も「ポイント」と「マイル」を分ける。
+
 V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再計算しない。
 
 - `photo_reward_policy`をversion化し、適用開始日時とpoint数を持つ
@@ -156,10 +158,11 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 
 権限:
 
-- photo.view、photo.review、photo.bulk_review
-- photo.download_original（再認証・監査）
-- photo.publish、photo.withdraw
-- photo.reward、photo.export
+- `photo.submission.view`、`photo.submission.review`、`photo.submission.bulk_review`
+- `photo.original.download`（再認証・監査）
+- `photo.publication.publish`、`photo.publication.withdraw`
+- `photo.reward.grant`、`photo.submission.export`
+- 命名は共通基盤（`v6-shared-platform-requirements.md` §3）の`domain.resource.action`に従う。
 - PII/同意は項目マスク。公開・一括・original downloadは監査必須
 
 ## 10. API
@@ -188,7 +191,7 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 - bulk一部対象外
 - public asset cache invalidation中/完了/失敗
 
-V6の「出しているもの」の表示回数は、placementごとの実測eventまたは配信logから算出する。取得できない利用先は`未取得`とし、0にしない。
+V6の「出しているもの」の表示回数は、placementごとの実測eventまたは配信logから算出する。取得できない利用先は値を`—`、ラベルを「未取得」とし（共通基盤 §9）、0にしない。
 
 ## 12. 既存移行
 
@@ -216,7 +219,9 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 
 ## 14. 完了条件
 
-- V6 4画面の主操作・状態・遷移が動く
+- V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 管理・LIFF・公開APIのaccount/friend境界testが通る
 - original非公開、EXIF除去、形式・寸法・decode検査が通る
 - AIだけで採否・公開されない
@@ -226,7 +231,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 - legacy 5ptと新版policyが再現可能
 - crop/rotateでoriginalが変わらない
 - 1440/1920で横スクロールなし
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 15. 実装順
 
@@ -237,3 +242,24 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 5. reward policy、outbox、reconciliation
 6. AI補助と人のreview UI
 7. 既存移行、E2E、security、画像比較
+
+## 16. 実装照合の進捗（2026-08-28）
+
+今回、既存の写真投稿・審査APIを作り直さず、最優先の公開範囲を先に修正した。
+
+- LIFF会員画面の採用写真を、ログイン中のfriendだけに限定する
+- 投稿へLINEアカウントを固定し、既存投稿もfriendのaccountから補完する
+- 公開写真APIはLINEアカウント指定を必須にし、別accountの写真を混ぜない
+- 採用と公開同意を分離し、明示同意がない既存採用写真は公開しない
+- ペット名の公開は写真公開とは別の選択にし、既定は非表示にする
+- 本人が公開同意を撤回した時点で、公開APIの対象から外す
+- 管理一覧と審査操作を選択中のLINEアカウントへ限定し、切替前の一覧で新しいアカウントを上書きしない
+- 見送りは定型理由を必須にし、「そのほか」は補足も必須にする。確認画面と投稿者へのLINE文面は同じ内容を使う
+- 審査判断は担当者・理由・付与ポイント・投稿者通知結果を追記履歴へ残す。同じ未審査状態への二重判断は409にする
+- 担当者IDと表示名を判断時点で保存し、スタッフ表に行を持たない環境所有者の操作も記録できるようにする
+- 投稿者通知に失敗しても審査判断を巻き戻さず、失敗として一覧と履歴に残す
+- 通知失敗は同じ審査IDを使って一覧から再送し、試行回数・最初の失敗日時・送信完了日時を残す。LINE側で成功済みだった場合も二重送信を防ぐ
+- 採用済みでも公開同意が無ければ、管理画面に「公開は未同意」と表示し、公開済みと誤認させない
+- 本文の画面名・説明・準備中ボタンを外し、画面名は共通トップバーだけに置く
+
+まだ完了ではない。private originalと派生画像、画像実体検査、ポイントoutbox/reconciliation、写真を1枚ずつ見る画面、公開先管理画面、V6 4画面の最新画像比較は後続実装とする。本変更では本番DB更新・配備を行わない。

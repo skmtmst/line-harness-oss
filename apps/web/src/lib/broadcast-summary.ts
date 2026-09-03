@@ -16,7 +16,7 @@ import type { SegmentCondition } from './segment-condition'
 const TYPE_LABELS: Record<string, string> = {
   text: 'テキスト',
   image: '写真',
-  flex: 'Flex',
+  flex: 'カード型',
   location: '位置情報',
   video: '動画',
   audio: '音声',
@@ -142,4 +142,19 @@ export function audienceSummary(
 
   const count = rules.length + groups.reduce((n, g) => n + (g.rules?.length ?? 0), 0)
   return `詳細条件 ${count} 件`
+}
+
+/**
+ * 一覧の1行目に出す「内容／種別」。
+ *
+ * `contentExcerpt` は読めない中身のとき**種別の名前をそのまま返す**ので、
+ * 素直につなぐと「写真／写真」「カルーセル／カルーセル」になる。
+ * 同じ語を2度出しても何も分からないので、その場合は種別だけにする。
+ */
+export function rowExcerpt(messageType: string, messageContent: string): string {
+  const label = messageTypeLabel(messageType)
+  const excerpt = contentExcerpt(messageType, messageContent)
+  if (!excerpt) return label
+  if (excerpt === label) return label
+  return `${excerpt}／${label}`
 }

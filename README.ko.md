@@ -1,3 +1,5 @@
+> **v0.13.2 시점에서 동결(2026-09-03).** 일본어 `README.md`가 정본이며, 최신 상태로 유지되는 유일한 버전입니다.
+
 🌐 [日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | **한국어** | [Español](README.es.md)
 
 # LINE Harness

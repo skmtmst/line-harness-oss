@@ -71,7 +71,10 @@ describe('V5 B3 入力・検索・選択部品', () => {
     expect(readSource('app/staff/new/page.tsx')).toMatch(/TextInput/)
     expect(readSource('app/reminders/new/page.tsx')).toMatch(/TextArea/)
     expect(readSource('components/shared/list-toolbar.tsx')).toMatch(/SearchField/)
-    expect(readSource('components/shared/list-toolbar.tsx')).toMatch(/Select/)
+    // 一覧の帯から Select は外した。並び順・表示件数は仕組みができるまで描かない
+    // （§2-2「使えないプルダウンを完成画面に置かない」）。共通 Select を使っている
+    // 証拠は上の `app/staff/new/page.tsx` が持つ。
+    expect(readSource('components/shared/list-toolbar.tsx')).not.toMatch(/<Select/)
   })
 
   it('CSSモジュールは生の色とローカル変数を持たず、フォーカス輪郭を消さない', () => {

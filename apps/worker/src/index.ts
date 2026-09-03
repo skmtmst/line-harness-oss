@@ -27,6 +27,7 @@ import { runExpirer } from './services/booking-expirer.js';
 import { processDueEventReminders } from './services/event-booking-reminders.js';
 import { processDueMeetConsultationReminders } from './services/meet-consultation-reminders.js';
 import { processDueAutomationRuns } from './services/automation-engine.js';
+import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
 import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
@@ -39,6 +40,7 @@ import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
+import { friendBulkRuns } from './routes/friend-bulk-runs.js';
 import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
@@ -66,6 +68,7 @@ import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
 // 旧通知ルールCRUDはインボックスへ置き換え済み。ダッシュボードの通知パネルだけを公開する。
 import { notificationCenter } from './routes/notification-center.js';
+import { notifications } from './routes/notifications.js';
 import { stripe } from './routes/stripe.js';
 import { health } from './routes/health.js';
 import { automations } from './routes/automations.js';
@@ -81,6 +84,7 @@ import { images } from './routes/images.js';
 import { accountSettings } from './routes/account-settings.js';
 import { setup } from './routes/setup.js';
 import { autoReplies } from './routes/auto-replies.js';
+import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
 import booking from './routes/booking.js';
@@ -129,6 +133,7 @@ import {
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
+import { restaurantTestEnabled } from './lib/environment-features.js';
 import {
   resolveOgForEvent,
   resolveOgForForm,
@@ -139,13 +144,15 @@ export type Env = {
   Bindings: {
     DB: D1Database;
     IMAGES: R2Bucket;
-    RAW_MAIL: R2Bucket;
+    /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
+    RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
     EMAIL?: SendEmail;
     CONTACT_EMAIL?: string;
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
+    RESTAURANT_TEST_ENABLED?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
@@ -289,6 +296,7 @@ app.use('*', tenantScopeMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', friendBulkRuns);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
@@ -317,6 +325,9 @@ app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
 app.route('/', notificationCenter);
+// 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
+// 2026-05 に外したまま mount されていなかった。
+app.route('/', notifications);
 app.route('/', stripe);
 app.route('/', health);
 app.route('/', automations);
@@ -331,6 +342,7 @@ app.route('/', capabilities);
 app.route('/', images);
 app.route('/', setup);
 app.route('/', autoReplies);
+app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
@@ -443,15 +455,22 @@ app.get('/r/:ref', async (c) => {
   // entry_route: entry_routes owns the ref namespace, so an existing route
   // (even one whose pool is paused) keeps its behavior unchanged. An affiliate
   // ref resolves its LINE account directly (no pool) and lands on that
-  // account's LIFF. is_active=0 links still redirect (spec §8) — pausing an
-  // affiliate link only stops NEW attribution, never breaks existing links.
+  // account's LIFF. Stopped links do not redirect or count a new click.
   // The click is counted here (the landing page hit), and `ref` still rides
   // through to LIFF state below so the existing ref_tracking flow attributes
   // the eventual friend-add via /auth/callback + /api/liff/link.
   let affiliateResolved = false;
   if (!route) {
     const affiliateLink = await getAffiliateLinkByRefCode(c.env.DB, ref);
-    if (affiliateLink) {
+    if (affiliateLink && (
+      affiliateLink.is_active !== 1 || affiliateLink.affiliate_is_active === 0
+    )) {
+      return c.html(
+        '<!doctype html><html lang="ja"><meta charset="utf-8"><title>この紹介リンクは停止しています</title><body><main><h1>この紹介リンクは停止しています</h1><p>紹介元の運用者へ、新しいリンクをご確認ください。</p></main></body></html>',
+        410,
+      );
+    }
+    if (affiliateLink?.is_active === 1) {
       await incrementAffiliateLinkClick(c.env.DB, ref);
       affiliateResolved = true;
       if (affiliateLink.line_account_id) {
@@ -1144,6 +1163,18 @@ async function scheduled(
     console.error('automation-v6 cron error:', e);
   }
 
+  // 友だち一括操作は対象IDを固定したサーバ側ジョブ。待機中の共通アクションと、
+  // Worker終了でleaseが切れた対象だけを再開する。失敗分は利用者が再試行するまで触らない。
+  try {
+    const result = await processDueFriendBulkRuns(env.DB, {
+      now: new Date(event.scheduledTime).toISOString(),
+      executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+    });
+    if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
+  } catch (e) {
+    console.error('friend bulk runs cron error:', e);
+  }
+
   // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
   if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
     try {
@@ -1260,7 +1291,7 @@ async function scheduled(
       const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
       if (
         purged.events + purged.dailyMetrics + purged.reconciliationRuns
-        + purged.funnelRuns + purged.crossRuns + purged.audiences > 0
+        + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
       ) {
         console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
       }
@@ -1270,8 +1301,8 @@ async function scheduled(
   }
 
   // クロス分析は最大50×20・15条件を扱うため、HTTP要求の中では計算しない。
-  // 毎分1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
-  if (event.cron === '* * * * *') {
+  // 5分ごとに1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
+  if (event.cron === '*/5 * * * *') {
     try {
       const {
         processPendingAnalyticsCrossRuns,
@@ -1292,7 +1323,7 @@ async function scheduled(
 
   // 飲食店向け予約メールの原文は、既定90日で非公開R2から破棄する。
   // D1の台帳行は残し、r2_keyとstatusで破棄済みを追跡する。
-  if (event.cron === '0 */6 * * *') {
+  if (event.cron === '0 */6 * * *' && restaurantTestEnabled(env)) {
     try {
       const result = await deleteExpiredRestaurantRawEmails(env);
       if (result.deleted + result.failed > 0) {
@@ -1403,10 +1434,10 @@ async function scheduled(
    * ゴール日から逆算して送る。分けているのは、「3日前に送る」通を届けるには
    * ゴール日がその3日以上前に立っている必要があるため。
    *
-   * 毎分の cron に相乗りしている。専用の Cron Trigger を増やさずに済む
+   * 5分ごとの cron に相乗りしている。専用の Cron Trigger を増やさずに済む
    * （マイルの処理と同じやり方）。
    */
-  if (event.cron === '* * * * *') {
+  if (event.cron === '*/5 * * * *') {
     const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
     if (jstMinutes === 5) {
       jobs.push(
@@ -1422,12 +1453,9 @@ async function scheduled(
   }
 
   // Mileage is an eventually-consistent projection. Reuse the existing
-  // minute cron invocation, but drain only every five minutes and at most 100
+  // five-minute cron invocation and drain at most 100
   // actions per batch so it adds no extra Cron Trigger and keeps D1 load flat.
-  if (
-    event.cron === '* * * * *'
-    && new Date(event.scheduledTime).getUTCMinutes() % 5 === 0
-  ) {
+  if (event.cron === '*/5 * * * *') {
     jobs.push(
       processPendingMileageEvents(env.DB, { limit: 100 }).then((result) => {
         if (result.claimed > 0) {

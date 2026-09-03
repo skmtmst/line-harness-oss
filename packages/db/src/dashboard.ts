@@ -1,4 +1,3 @@
-import { countOperations } from './operation-audit.js';
 /**
  * ダッシュボードが1回で読む数。
  *
@@ -912,6 +911,14 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
   const messageScope = accountScopeSql(scope, 'line_account_id');
   const scenarioScope = accountScopeSql(scope, 'line_account_id');
   const reminderScope = accountScopeSql(scope, 'line_account_id');
+  const markScope = 'allTenants' in scope
+    ? { sql: '1 = 1', binds: [] as string[] }
+    : scope.allowedAccountIds.length > 0
+      ? {
+          sql: `(sms.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')}) OR sms.line_account_id IS NULL)`,
+          binds: [...scope.allowedAccountIds],
+        }
+      : { sql: 'sms.line_account_id IS NULL', binds: [] as string[] };
 
   const safe = async <T>(run: () => Promise<T>, fallback: T): Promise<T> => {
     try {
@@ -946,14 +953,29 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
       const row = await db
         .prepare(
           `SELECT
-             (SELECT COUNT(*) FROM support_marks) AS total,
+             (SELECT COUNT(DISTINCT sm.id)
+                FROM support_marks sm
+                LEFT JOIN support_mark_scopes sms ON sms.mark_id = sm.id
+               WHERE sm.archived_at IS NULL AND ${markScope.sql}) AS total,
              (SELECT COUNT(DISTINCT f.support_mark_id) FROM friends f WHERE f.support_mark_id IS NOT NULL AND ${friendScope.sql}) AS in_use`,
         )
-        .bind(...friendScope.binds)
+        .bind(...markScope.binds, ...friendScope.binds)
         .first<{ total: number; in_use: number }>();
       const inbox = await inboxState(db, scope);
-      // 設計の「対応済 26人・過去7日」。110 の操作記録から出す。
-      const changedLast7 = await countOperations(db, 'support_mark', 'changed', jstDate(-6));
+      // 変更履歴も、対象の友だちが属するアカウントで絞る。
+      const changed = await db
+        .prepare(
+          `SELECT COUNT(*) AS n
+             FROM operation_audit oa
+             JOIN friends f ON f.id = oa.friend_id
+            WHERE oa.target_kind = 'support_mark'
+              AND oa.action = 'changed'
+              AND substr(oa.created_at, 1, 10) >= ?
+              AND ${friendScope.sql}`,
+        )
+        .bind(jstDate(-6), ...friendScope.binds)
+        .first<{ n: number }>();
+      const changedLast7 = changed?.n ?? 0;
       return {
         total: row?.total ?? 0,
         inUse: row?.in_use ?? 0,
@@ -1052,8 +1074,8 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
       const row = await db
         .prepare(
           `SELECT
-             (SELECT COUNT(*) FROM reminders WHERE ${reminderScope.sql}) AS total,
-             (SELECT COUNT(*) FROM reminders WHERE is_active = 1 AND ${reminderScope.sql}) AS active,
+             (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND ${reminderScope.sql}) AS total,
+             (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND is_active = 1 AND ${reminderScope.sql}) AS active,
              (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting`,
         )
         .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds)

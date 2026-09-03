@@ -6,8 +6,11 @@ import { countDebt, totals } from '../../../scripts/design-debt.mjs'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const WEB = join(SRC, '..')
+// 2026-09-02: /tags を外した。`app/tags/page.tsx` に残っていた旧V5の枝は
+// 描かれない死んだコードで、そこにあった共通Th 8セルも画面には出ていない。
+// 正本の `components/friend-fields/tags-page-v4.tsx` はまだ直書きの `<th>` で、
+// 共通Thへは寄せていないため、ここでは見張れない。
 const targets = [
-  'app/tags/page.tsx',
   'app/reminders/page.tsx',
   'app/templates/page.tsx',
   'app/conversions/page.tsx',
@@ -19,12 +22,14 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し74セルを共通Thで維持する', () => {
+  it('5ルートのV6標準見出し65セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(74)
+    // 2026-09-02: 描かれない /tags のV5枝を消し、8セル減って65。
+    // **減ったので締め直す。**
+    expect(migrated).toBe(65)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
@@ -52,9 +57,20 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 4-1 の表に「表示」列（★）を足したぶん1つ増えた。
-    // 共通の `Th` へ寄せるのは、横展開のときにまとめて行う。
-    expect(debt['direct-th']).toBe(297)
+    // 2026-08-29: 統合ユーザー一覧の見出し6つを共通 `Th` へ寄せ、
+    // V6の7列へ増やしても直書きを残さなかった。
+    // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
+    // 共通の `Th` を通すため、この数へは戻さない。
+    // シナリオ一覧と友だち情報欄に加え、対応マークの見出しも共通 `Th` へ寄せた。
+    // 2026-09-02: #475 がログインユーザーと入った記録の19見出しを共通Thへ移した。
+    // 最新 development との統合後の木を再計測し、237へ締め直す。
+    // 2026-09-02: 機能5（シナリオ編集）のコンテンツ表の見出し7個を共通Thへ
+    // 寄せ、設計（bV5Vs）の「配信対象」の桁を足しても直書きを増やさなかった。
+    // 2026-09-02: 一斉配信の一覧を設計 `q76C35` の6列へ組み直し、見出し8つ
+    // （中身は7つで1列ずれていた）を6つにした。直書きの見出しが2つ減るので
+    // 両方を統合した木を公式スクリプトで数え直し、228へ締め直す。
+    // 2026-09-03: 未使用部品 friend-table・step-editor を消して223。
+    expect(debt['direct-th']).toBe(223)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

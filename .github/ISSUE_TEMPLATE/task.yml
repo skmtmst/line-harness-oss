@@ -1,0 +1,62 @@
+name: 作業チケット(V6 台帳)
+description: 司令塔が作る作業単位。NodeTerm の Kanban と GitHub Issues の同期で使う。
+title: "[lane] 対象: 何をするか"
+labels: ["todo"]
+body:
+  - type: dropdown
+    id: lane
+    attributes:
+      label: 担当
+      description: lane ラベルと同じにする
+      options:
+        - hq(司令塔)
+        - s0(共通部品)
+        - s1(機能 1〜5)
+        - s2(機能 6〜13)
+        - s3(機能 14〜32)
+        - pen(Pencil デザイン修正)
+        - codex(API・性能・段取り)
+        - fix(エラー修正)
+        - qa(品質チェック: エラー・コード・速度・セキュリティ)
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: 対象
+      description: 機能番号と画面 Node ID、または API 名
+    validations:
+      required: true
+  - type: textarea
+    id: paths
+    attributes:
+      label: 所有パス
+      description: 触るパス。docs/v6-parallel-plan.md §2 の表の範囲外なら理由を書き、司令塔の承認を待つ
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了条件(担当が更新。終えたら `- [x] ~~文~~` にする)
+      description: 要件書の完了条件から写す。1 行 1 チェックボックス。検証できる文だけ
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: human
+    attributes:
+      label: 人の確認(人がチェックしたら司令塔が閉じる)
+      description: 完了条件と同じ行数。担当は触らない
+      value: |
+        - [ ] 確認:
+  - type: input
+    id: deps
+    attributes:
+      label: 依存
+      description: 先に終わっていないといけない Issue 番号
+  - type: input
+    id: pr
+    attributes:
+      label: PR
+      description: 採番後に skmtmst/line-harness-oss#番号 を書く(先取りしない)

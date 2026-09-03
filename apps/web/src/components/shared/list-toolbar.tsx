@@ -1,95 +1,52 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import SearchField from './search-field'
-import Select from './select'
 
 /**
- * 一覧の上に置く、フォルダ・検索・並び順の帯。
+ * 一覧の上に置く、検索の帯。
  *
  * 一斉配信・テンプレート・シナリオ・リマインダは、設計上どれも
- * 「フォルダの行 ＋ 検索と並び順の行」という同じ形をしている。
+ * 「一覧の上に検索の行がある」という同じ形をしている。
  * 画面ごとに書くと、間隔や並びがそのつどずれる。
  *
- * フォルダと並び順は、仕組みがまだ無いので押せない状態で出す。
- * 何も出さないより「ここに何が来るか」が見えている方がよい。
+ * **押せない飾りは置かない。** 以前ここには、フォルダの札・並び順・
+ * 表示件数・「保存した条件」が、どれも押せない形で並んでいた。
+ * 押せるように見えて何も起きない操作は、運用者に「やった」と
+ * 誤解させる（`docs/v6-common-rules.md` §2-2「使えないプルダウンを
+ * 完成画面に置かない」、§5-5「隠すのではなく描かない」、
+ * §7-10「`準備中` のボタンが1つも無い（出す＝使える）」）。
+ *
+ * 仕組みができた操作は `children` に渡す。帯の形は部品が持ち、
+ * 中身は画面が持つ。フォルダ分けは `folder-panel.tsx` が本物なので、
+ * ここに空の札を二重に並べない。
  */
 export default function ListToolbar({
-  folders,
   searchPlaceholder,
   searchValue,
   onSearchChange,
-  sortLabel,
+  children,
 }: {
-  /**
-   * フォルダの名前。先頭は「すべて」を想定し、それだけ押せる。
-   *
-   * 省略すると帯そのものを出さない。設計でフォルダを横の帯ではなく
-   * 左の縦パネルに置いている画面（友だち属性のタグ）は、そちらが
-   * 本物のフォルダなので、ここに空の帯が二重に並ばないようにする。
-   */
-  folders?: string[]
   searchPlaceholder: string
   searchValue: string
   onSearchChange: (value: string) => void
-  /** 並び順の既定の表示。設計にある文言をそのまま出す。 */
-  sortLabel: string
+  /**
+   * 検索の右に並べる操作。**動くものだけを渡す。**
+   * 並び順・表示件数を出したい画面は、実際にその順で並べてから渡す。
+   */
+  children?: ReactNode
 }) {
   return (
-    <>
-      {folders && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-ink-faint text-xs">フォルダ</span>
-          {folders.map((label, i) => (
-            <button
-              key={label}
-              disabled={i > 0}
-              title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
-              className={`rounded-pill px-3 py-1 text-xs ${
-                i === 0
-                  ? 'bg-accent text-on-accent'
-                  : 'border-hairline text-ink-faint border opacity-50'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <SearchField
-          placeholder={searchPlaceholder}
-          aria-label={searchPlaceholder}
-          value={searchValue}
-          onChange={onSearchChange}
-          onClear={() => onSearchChange('')}
-          className="min-w-0 flex-1"
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <Select
-          aria-label="並び順"
-          value="default"
-          options={[{ value: 'default', label: sortLabel }]}
-          onChange={() => {}}
-          disabled
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <Select
-          aria-label="表示件数"
-          value="20"
-          options={[{ value: '20', label: '20件表示' }]}
-          onChange={() => {}}
-          size="page-size"
-          disabled
-        />
-        <button
-          disabled
-          title="保存した条件は準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-        >
-          保存した条件
-        </button>
-      </div>
-    </>
+    <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+      <SearchField
+        placeholder={searchPlaceholder}
+        aria-label={searchPlaceholder}
+        value={searchValue}
+        onChange={onSearchChange}
+        onClear={() => onSearchChange('')}
+        className="min-w-0 flex-1"
+      />
+      {children}
+    </div>
   )
 }

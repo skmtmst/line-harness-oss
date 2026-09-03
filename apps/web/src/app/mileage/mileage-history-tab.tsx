@@ -12,8 +12,10 @@ import {
   formatMileageDate,
   mileageEntryTypeLabel,
   mileageSourceLabel,
+  mileageSourceNoteText,
   mileageStatusLabel,
 } from './mileage-display'
+import { mileagePaginationTotal } from './mileage-response-state'
 
 const PAGE_SIZE = 50
 
@@ -80,7 +82,8 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
     change()
   }
   const items = result?.items ?? []
-  const pageCount = Math.max(1, Math.ceil((result?.pagination.total ?? 0) / PAGE_SIZE))
+  const total = mileagePaginationTotal(result)
+  const pageCount = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE))
 
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
@@ -137,7 +140,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
       <div className="overflow-hidden rounded-v6-card border border-hairline bg-canvas">
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
           <h2 className="text-base font-bold text-v6-ink">マイルの履歴</h2>
-          <span className="text-xs text-v6-ink-faint">{loading || error ? '—' : `${(result?.pagination.total ?? 0).toLocaleString('ja-JP')}件`}</span>
+          <span className="text-xs text-v6-ink-faint">{loading || error || total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
         </div>
 
         {loading ? (
@@ -172,8 +175,8 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
                   <Td><p className="max-w-52 truncate font-medium text-v6-ink" title={item.reason}>{item.reason}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : item.ruleName ?? 'ルール情報なし'}</p></Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
-                    <p className="mt-1 max-w-44 truncate text-xs text-v6-ink-faint" title={item.sourceReferenceId ?? undefined}>
-                      {item.sourceReferenceId ? `調整元ID: ${item.sourceReferenceId}` : item.hasSourceEvent ? '元の記録あり' : '元の記録なし'}
+                    <p className="mt-1 text-xs text-v6-ink-faint">
+                      {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.hasSourceEvent })}
                     </p>
                   </Td>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
@@ -183,9 +186,9 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
           </DataTable>
         )}
 
-        {!loading && !error && (result?.pagination.total ?? 0) > PAGE_SIZE ? (
+        {!loading && !error && total !== null && total > PAGE_SIZE ? (
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <span className="text-xs text-v6-ink-faint">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, result?.pagination.total ?? 0)} / {(result?.pagination.total ?? 0).toLocaleString('ja-JP')}件</span>
+            <span className="text-xs text-v6-ink-faint">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString('ja-JP')}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} />
           </div>
         ) : null}

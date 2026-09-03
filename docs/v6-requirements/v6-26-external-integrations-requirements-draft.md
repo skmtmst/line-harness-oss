@@ -165,7 +165,7 @@ event typeを自由入力させない。内部event registryのIDとschemaを選
 - 4xxは原則恒久失敗
 - `Retry-After`を尊重
 - exponential backoff＋jitter
-- 既定最大8回・24時間、接続ごと上限
+- 既定最大8回・24時間。共通基盤（`v6-shared-platform-requirements.md`）§6-2の例外で、送信Webhookだけに適用する。接続ごと上限
 - retryはWorker内sleepで待たない
 - 連続失敗でcircuit open、運用者通知
 
@@ -427,7 +427,9 @@ secretとtokenはstep-up MFA必須。作成、公開、停止、rotate、retry�
 
 ## 19. 完了条件
 
-- V6 4画面の主操作が実URLへ遷移する
+- V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 接続・配送がorganization/LINE accountを越境しない
 - 送受信のHMAC、timestamp、event ID、replay拒否が通る
 - secretが暗号化され、list/detail/logへ出ない
@@ -441,7 +443,7 @@ secretとtokenはstep-up MFA必須。作成、公開、停止、rotate、retry�
 - automation/form等の直接fetchが残らない
 - `準備中`のボタンがない
 - 1440px・1920pxで横スクロールがない
-- V6実Node、設計画像、同幅実装画像を横並び確認する
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 20. 実装順
 
@@ -459,3 +461,25 @@ secretとtokenはstep-up MFA必須。作成、公開、停止、rotate、retry�
 ## 21. 最終判断
 
 V6 26は要件定義へ進める。Lステップ越えの設計だが、現行の全体共通Webhook、平文secret、配送台帳なし、オートメーション直fetchはそのまま使えない。接続を組織別にし、外部通信をQueue・署名・台帳へ一本化すれば、V6の成功率、失敗原因、再試行、双方向mappingを安全に実現できる。
+
+## 22. 実装照合の進捗（2026-08-28）
+
+今回、既存のWebhook機能を作り直さず、最優先のアカウント境界を通した。
+
+- 管理APIは対象LINEアカウントを必須にし、サーバー側で閲覧・変更権限を確認する
+- 一覧・作成・編集・削除を、選択したLINEアカウントのデータだけに限定する
+- 管理画面は共通のアカウント選択を使い、選択前は取得・保存しない
+- 運用状態の全体集計は、閲覧できるLINEアカウントごとに取得してから束ねる
+- 所属先が未設定の旧Webhookを、イベント発生時に自動送信しない
+- 受信Webhookの公開URLは、署名検証前に保存済みの所属先を特定する必要があるため、ID検索だけは公開受信処理に限定して残す
+
+まだ完了ではない。次の実装が必要である。
+
+- secretの暗号化保存とrotate
+- timestamp・event ID・replay拒否を含む署名契約
+- DNS解決後とredirect後を含むSSRF防止
+- outbox・Queue・delivery/attempt台帳と再試行
+- inbound schema・mapping・部分失敗からの再開
+- V6 4画面の実装および1440px・1920px画像比較
+
+したがって現時点の判定は「一部実装」であり、「全機能完了」には数えない。

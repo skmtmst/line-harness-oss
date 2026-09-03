@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -44,6 +45,16 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { Th } from '@/components/shared/table'
+import {
+  scenarioReachBarWidth,
+  scenarioReachCountLabel,
+  scenarioReachPercent,
+  scenarioReachPercentLabel,
+} from './scenario-reach-display'
+import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -150,6 +161,7 @@ interface TemplateOpt {
   category: string
   messageType: string
   messageContent: string
+  question: ScenarioQuestion | null
 }
 
 interface TagOpt {
@@ -162,7 +174,11 @@ interface ScenarioStats {
   activeNow: number
   completed: number
   paused: number
-  steps: Array<{ stepOrder: number; reachedCount: number; reachRate: number }>
+  steps: Array<{
+    stepOrder: number
+    reachedCount: number
+    reachRate?: number | null
+  }>
 }
 
 function FlexPreview({ content }: { content: string }) {
@@ -224,7 +240,57 @@ function SettingCard({
   )
 }
 
-export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
+/**
+ * 通の編集の1段。
+ *
+ * 設計では「配信タイミング」「メッセージ」「この通の配信対象」「送信後の
+ * アクション」がそれぞれ別の面になっている。実装は1枚に全部入っていて、
+ * 到達タグ・配信後・絞り込み・下書きが「到達時のアクション」という1つの
+ * 見出しの下にまとめて並んでいた。**どれがどの面の話なのかが読めない。**
+ *
+ * 段に分けて、段ごとに設計のNodeを持たせる。1枚ずつ直すと同じ画面を
+ * 4回触ることになるので、区切りは一度に入れる。
+ */
+function FormSection({
+  node,
+  title,
+  description,
+  action,
+  children,
+}: {
+  node?: string
+  title: string
+  description?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      data-design-node={node}
+      className="bg-canvas border-hairline rounded-card border p-4"
+    >
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div className="min-w-0">
+          <h4 className="text-ink text-sm font-bold">{title}</h4>
+          {description && (
+            <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">{description}</p>
+          )}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+export default function ScenarioDetailClient({
+  scenarioId,
+  showStarted = false,
+}: {
+  scenarioId: string
+  showStarted?: boolean
+}) {
+  usePageTitle('シナリオ詳細')
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -251,6 +317,12 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
   const [previewStepId, setPreviewStepId] = useState<string | null>(null)
   const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
+  const [deleteStepTarget, setDeleteStepTarget] = useState<ScenarioStep | null>(null)
+  const [deletingStepId, setDeletingStepId] = useState<string | null>(null)
+  const [deleteStepError, setDeleteStepError] = useState('')
+  const [deleteScenarioOpen, setDeleteScenarioOpen] = useState(false)
+  const [deletingScenario, setDeletingScenario] = useState(false)
+  const [deleteScenarioError, setDeleteScenarioError] = useState('')
   const [showStepForm, setShowStepForm] = useState(false)
   /** 何通目のあとに差し込むか。末尾に足すときは null。 */
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
@@ -334,12 +406,15 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       if (cancelled) return
       if (statsRes && statsRes.success) setStats(statsRes.data)
       if (tplRes && tplRes.success) {
-        setTemplates(tplRes.data.map((t) => ({
+        setTemplates(tplRes.data
+          .filter((t) => !t.question || t.questionStatus === 'published')
+          .map((t) => ({
           id: t.id,
           name: t.name,
           category: t.category,
           messageType: t.messageType,
           messageContent: t.messageContent,
+          question: (t.question as ScenarioQuestion | null) ?? null,
         })))
       }
       if (tagRes && tagRes.success) {
@@ -450,20 +525,18 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   }
 
   const handleDeleteScenario = async () => {
-    if (!scenario) return
-    const count = stats?.activeNow ?? 0
-    const message =
-      count > 0
-        ? `「${scenario.name}」はいま ${count} 人が購読中です。\n削除すると配信が止まり、途中の人は続きを受け取れません。よろしいですか？`
-        : `「${scenario.name}」を削除しますか？`
-    if (!confirm(message)) return
-    setError('')
+    if (!scenario || deletingScenario) return
+    setDeletingScenario(true)
+    setDeleteScenarioError('')
     try {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
+      setDeleteScenarioOpen(false)
       router.push('/scenarios')
     } catch {
-      setError('削除に失敗しました')
+      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingScenario(false)
     }
   }
 
@@ -596,8 +669,18 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   }
 
   const handleSaveStep = async () => {
+    if (stepForm.question) {
+      if (!stepForm.question.text.trim()) {
+        setStepError('質問文を入力してください')
+        return
+      }
+      if (stepForm.question.choices.length === 0 || stepForm.question.choices.some((choice) => !choice.label.trim())) {
+        setStepError('すべての選択肢に文字を入力してください')
+        return
+      }
+    }
     // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
-    if (stepForm.inputMode === 'direct') {
+    if (!stepForm.question && stepForm.inputMode === 'direct') {
       if (!stepForm.messageContent.trim()) {
         setStepError('メッセージ内容を入力してください')
         return
@@ -727,14 +810,22 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     }
   }
 
-  const handleDeleteStep = async (stepId: string) => {
-    if (!confirm('このステップを削除してもよいですか？')) return
+  const handleDeleteStep = async () => {
+    if (!deleteStepTarget || deletingStepId) return
+    const stepId = deleteStepTarget.id
+    setDeletingStepId(stepId)
+    setDeleteStepError('')
     try {
-      await api.scenarios.deleteStep(id, stepId)
+      const result = await api.scenarios.deleteStep(id, stepId)
+      if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()
-      loadScenario()
+      setDeleteStepTarget(null)
+      void loadScenario()
+      void reloadStats()
     } catch {
-      setError('ステップの削除に失敗しました')
+      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingStepId(null)
     }
   }
 
@@ -766,7 +857,16 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       <h4 className="text-sm font-medium text-ink-secondary mb-3">
         {editingStepId ? 'ステップを編集' : '新しいステップを追加'}
       </h4>
-      <div className="space-y-3 max-w-lg">
+      {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
+          3列の標準段で組む（2:1）。直書きの数を増やさない。 */}
+      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="min-w-0 space-y-4 lg:col-span-2">
+        <FormSection
+          node="xfYLn"
+          title="配信タイミング"
+          description="いつ送るか。送ったあと次の通へ進むかどうかも、設計どおりここでそろえて決めます。"
+        >
+          <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-ink-secondary mb-1">ステップ順序</label>
           <input
@@ -782,7 +882,35 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           value={stepForm.schedule}
           onChange={(schedule) => setStepForm({ ...stepForm, schedule })}
         />
+        {/*
+          送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
+          いった流れで要る。止めておけば、返事が来てから人が再開できる。
 
+          設計（xfYLn）はこれを配信タイミングの4つ目の口として並べる。
+          以前は画面のいちばん下、到達タグと同じ束に置いていたので、
+          「いつ送るか」を決めているときに目に入らなかった。
+        */}
+        <div>
+          <label className="block text-xs font-medium text-ink-secondary mb-1">送信後</label>
+          <select
+            className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            value={stepForm.afterSend}
+            onChange={(e) =>
+              setStepForm({ ...stepForm, afterSend: e.target.value as 'continue' | 'pause' })
+            }
+          >
+            <option value="continue">送信後：次のステップへ進む</option>
+            <option value="pause">送信後：ここで一時停止する</option>
+          </select>
+          <p className="text-xs text-ink-faint mt-0.5">
+            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
+          </p>
+        </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="メッセージ" description="LINEへ届く中身です。">
+          <div className="space-y-3">
         {/* 入力モード切替: 直接入力 / テンプレート参照 */}
         <div className="space-y-2">
           <label className="block text-xs font-medium text-ink-secondary">メッセージの指定方法</label>
@@ -859,7 +987,17 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             <select
               className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               value={stepForm.templateId ?? ''}
-              onChange={(e) => setStepForm({ ...stepForm, templateId: e.target.value || null })}
+              onChange={(e) => {
+                const templateId = e.target.value || null
+                const template = templates.find((item) => item.id === templateId)
+                setStepForm({
+                  ...stepForm,
+                  templateId,
+                  question: template?.question ? structuredClone(template.question) : null,
+                  messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
+                  messageContent: template?.messageContent ?? stepForm.messageContent,
+                })
+              }}
             >
               <option value="">-- 選択してください --</option>
               {templates.map((t) => (
@@ -941,78 +1079,97 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </>
         )}
 
-        {/* 到達時のアクション */}
-        <div className="pt-3 border-t border-hairline space-y-2">
-          <h4 className="text-xs font-semibold text-ink-secondary">到達時のアクション</h4>
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-            <select
-              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              value={stepForm.onReachTagId ?? ''}
-              onChange={(e) => setStepForm({ ...stepForm, onReachTagId: e.target.value || null })}
-            >
-              <option value="">-- なし --</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <p className="text-xs text-ink-faint mt-0.5">
-              このステップが配信完了したら、選んだタグを友だちに付与します
-            </p>
           </div>
+        </FormSection>
 
-          {/*
-            送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
-            いった流れで要る。止めておけば、返事が来てから人が再開できる。
-            以前は送ったら必ず次へ進み、返事を待つあいだにも次の通が届いていた。
-          */}
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">配信後</label>
-            <select
-              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              value={stepForm.afterSend}
-              onChange={(e) =>
-                setStepForm({ ...stepForm, afterSend: e.target.value as 'continue' | 'pause' })
-              }
-            >
-              <option value="continue">次の通へ進む</option>
-              <option value="pause">送信後 一時停止する</option>
-            </select>
-            <p className="text-xs text-ink-faint mt-0.5">
-              一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-            </p>
-          </div>
+        {/*
+          1通ごとの配信対象。シナリオ全体の絞り込みとは別。対象から外れた人は
+          この通だけ飛ばして次へ進む（止めない）。
 
-          {/*
-            1通ごとの配信対象。シナリオ全体の絞り込みとは別。対象から外れた人は
-            この通だけ飛ばして次へ進む（止めない）。
-          */}
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">配信対象の絞り込み</label>
+          設計（r6Gzsu）では独立した面。以前は到達タグ・配信後・下書きと
+          同じ束に埋まっていて、「この通だけ誰に送るか」を決める場所だと
+          読み取れなかった。
+        */}
+        <FormSection
+          node="r6Gzsu"
+          title="この通の配信対象"
+          description="条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。"
+          action={
             <button
               type="button"
               onClick={() => setStepTargetOpen(true)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 w-full border px-3 text-left text-sm"
+              className="text-accent shrink-0 text-xs hover:underline"
             >
-              {stepForm.targetCondition
-                ? describeCondition(stepForm.targetCondition)
-                : 'シナリオ購読中の全員に配信する'}
+              条件を編集
             </button>
-            <p className="text-xs text-ink-faint mt-0.5">
-              条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。
-            </p>
-          </div>
+          }
+        >
+          <p className="text-ink text-sm font-bold">
+            {describeStepAudience(stepForm.targetCondition, tags)}
+          </p>
+        </FormSection>
 
-          {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
-          <label className="text-ink-secondary flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={stepForm.isDraft}
-              onChange={(e) => setStepForm({ ...stepForm, isDraft: e.target.checked })}
-            />
-            下書きにする（配信されません。テスト送信では送れます）
-          </label>
-        </div>
+        {/*
+          送信後のアクション。設計（hz9ti）では独立した面。ここでは段の枠だけ
+          作り、中の並びは触っていない（別担当の受け持ち）。
+        */}
+        <FormSection
+          node="hz9ti"
+          title="送信後のアクション"
+          description="この通が届いたあとに動かすものです。"
+          action={
+            editingStepId ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setActionTarget({
+                    hook: 'step_sent',
+                    stepId: editingStepId,
+                    choiceIndex: null,
+                    title: `${stepForm.stepOrder}通目を送ったあと`,
+                  })
+                }
+                className="text-accent shrink-0 text-xs hover:underline"
+              >
+                ＋ アクションを追加
+              </button>
+            ) : undefined
+          }
+        >
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
+              <select
+                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                value={stepForm.onReachTagId ?? ''}
+                onChange={(e) => setStepForm({ ...stepForm, onReachTagId: e.target.value || null })}
+              >
+                <option value="">-- なし --</option>
+                {tags.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <p className="text-xs text-ink-faint mt-0.5">
+                このステップが配信完了したら、選んだタグを友だちに付与します
+              </p>
+            </div>
+            {!editingStepId && (
+              <p className="text-ink-faint text-xs">
+                そのほかのアクションは、この通を保存してから設定できます。
+              </p>
+            )}
+          </div>
+        </FormSection>
+
+        {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
+        <label className="text-ink-secondary flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={stepForm.isDraft}
+            onChange={(e) => setStepForm({ ...stepForm, isDraft: e.target.checked })}
+          />
+          下書きにする（配信されません。テスト送信では送れます）
+        </label>
 
         {stepError && <p className="text-xs text-red-600">{stepError}</p>}
 
@@ -1032,13 +1189,87 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </button>
         </div>
       </div>
+
+      {/*
+        設計（xfYLn）の右の柱。いま何通目を触っているのか、その通が誰に
+        どう届くのかを、編集の手を止めずに読めるようにする。
+        以前は編集を閉じて表へ戻らないと、前後の通が見えなかった。
+      */}
+      <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
+        <div className="bg-canvas border-hairline rounded-card border p-4">
+          <h4 className="text-ink text-sm font-bold">配信の流れ</h4>
+          <p className="text-ink-faint mt-0.5 text-xs">いま編集しているのは緑の行です。</p>
+          {sortedSteps.length === 0 ? (
+            <p className="text-ink-faint mt-3 text-xs">保存すると、ここに並びます。</p>
+          ) : (
+            <ol className="mt-3 space-y-1.5">
+              {sortedSteps.map((row) => {
+                const current = editingStepId === row.id
+                const rowTitle =
+                  (row.templateId ? templates.find((t) => t.id === row.templateId)?.name : null) ??
+                  (row.messageContent || '').split('\n')[0].slice(0, 24)
+                return (
+                  <li
+                    key={row.id}
+                    className={`rounded-control flex items-center gap-2 px-2 py-1.5 text-xs ${
+                      current ? 'bg-accent-soft text-accent font-semibold' : 'bg-canvas-sunken text-ink-secondary'
+                    }`}
+                  >
+                    <span className="shrink-0 tabular-nums">{row.stepOrder}通目</span>
+                    <span className="shrink-0">{formatScheduleLabel(deliveryMode, row)}</span>
+                    <span className="min-w-0 flex-1 truncate">{rowTitle}</span>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </div>
+
+        <div className="bg-canvas border-hairline rounded-card border p-4">
+          <h4 className="text-ink text-sm font-bold">設定内容</h4>
+          <dl className="mt-3 space-y-2 text-xs">
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">配信対象</dt>
+              <dd className="text-ink min-w-0 text-right font-semibold">
+                {describeStepAudience(stepForm.targetCondition, tags)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">配信日時</dt>
+              <dd className="text-ink min-w-0 text-right font-semibold">
+                {formatScheduleLabel(deliveryMode, {
+                  delayMinutes: stepForm.schedule.delayMinutes,
+                  ...buildSchedulePayload(deliveryMode, stepForm.schedule),
+                } as unknown as ScenarioStep)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">送信後</dt>
+              <dd className="text-ink min-w-0 text-right font-semibold">
+                {describeAfterSend(stepForm.afterSend).label}
+              </dd>
+            </div>
+            {/* 「送信枠を超えていません」「テスト送信が未完了です」は設計にあるが、
+                残りの送信枠もテスト送信の済み／未済も**数える口が無い**。
+                数を作らずに、繋がっていないことをそのまま書く。 */}
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-faint shrink-0">配信前チェック</dt>
+              <dd className="text-ink-faint min-w-0 text-right">—</dd>
+            </div>
+          </dl>
+          <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+            配信前チェックはまだ繋がっていません。残りの送信枠とテスト送信の記録を返す取得口が接続されると表示されます。
+          </p>
+        </div>
+      </aside>
+      </div>
     </div>
   )
 
   if (loading) {
     return (
       <div>
-        <Header title="シナリオ詳細" />
+
         <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
           <div className="bg-canvas-sunken h-6 w-1/3 rounded" />
           <div className="h-4 bg-canvas-sunken rounded w-2/3" />
@@ -1051,7 +1282,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   if (!scenario) {
     return (
       <div>
-        <Header title="シナリオ詳細" />
+
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
           <Link href="/scenarios" className="text-accent hover:text-accent-hover mt-4 inline-block text-sm">
@@ -1105,12 +1336,13 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       <div data-design="Head">
         <Header
           title="シナリオ編集"
-          description="配信のタイミングと内容を並べます。作成しただけでは配信されません。開始するには友だち追加時の配信やアクションから呼び出します。"
+          description="配信のタイミングと内容を並べます。開始するには友だち追加時の配信やアクションから呼び出します。"
           action={
             /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
                一覧へ戻る導線は設計では最下部にあり、ここには置かない
                （下の「シナリオ一覧に戻る」がそれ）。 */
             <div className="flex flex-wrap items-center gap-2">
+              <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
               <button
                 disabled
                 title="マニュアルは準備中です"
@@ -1127,9 +1359,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 一括プレビュー
               </button>
               <button
-                disabled
-                title="一括テスト送信は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
+                disabled={sortedSteps.length === 0}
+                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
                 一括テスト送信
               </button>
@@ -1147,6 +1380,42 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           }
         />
       </div>
+
+      {showStarted ? (
+        <div
+          data-design-node="NrBkW"
+          className="border-success bg-success-bg text-success mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
+          role="status"
+        >
+          <p className="font-semibold">
+            配信を開始しました。条件を満たした友だちから順に配信します。
+          </p>
+          <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
+            開始後の結果を見る
+          </Link>
+        </div>
+      ) : null}
+
+      {/*
+        設計（bV5Vs）はこれを帯で置く。以前は見出し下の説明文へ混ぜていて、
+        ほかの説明と同じ重さで流れ、**作っただけで配信されると思われていた**。
+        始め方の入口も同じ帯に置く。読んだ直後に次の一手へ進める。
+      */}
+      <section
+        data-design-node="bV5Vs"
+        className="border-warning bg-warning-bg rounded-card mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border px-4 py-3"
+        role="note"
+      >
+        <p className="text-warning text-sm font-semibold">
+          作成しただけでは配信されません。開始条件を設定し、テスト送信後に配信を開始してください。
+        </p>
+        {/* 設計はここに「配信を始める方法」の入口を描くが、案内の行き先が
+            まだ無い（上の「マニュアル」も準備中のまま）。行き先の無い青字を
+            置くと押されて何も起きないので、次の一手を言葉で書く。 */}
+        <span className="text-ink-secondary text-xs">
+          このすぐ下の「開始のきっかけ」から設定できます。
+        </span>
+      </section>
 
       {/*
         同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
@@ -1332,7 +1601,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 開始のきっかけ。1本に複数持てる（128）。0本は「止まっている」
                 ではなく「外から呼ばれたときだけ流れる」なので、そう書く。
               */}
-              <SettingCard label="開始のきっかけ">
+              {/* 設計（bV5Vs）はこの札に「設定」の入口を出し、押すと開始条件の
+                  面（EvVO5）が開く。値そのものを押す形だけだと、読むだけの札と
+                  見分けが付かない。 */}
+              <SettingCard label="開始のきっかけ" action="設定" onAction={() => setTriggerOpen(true)}>
                 <button type="button" onClick={() => setTriggerOpen(true)} className="text-left">
                   <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
                     {triggerCount === null
@@ -1457,13 +1729,6 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             >
               分岐を追加
             </button>
-            <button
-              onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
-              disabled={sortedSteps.length === 0}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-            >
-              一括テスト送信
-            </button>
           </div>
         </div>
 
@@ -1482,32 +1747,28 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
           */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
+            <table className="w-full min-w-[1040px]">
               <thead>
+                {/* 見出しは共通の Th（Pencil `tPTMp`）。直書きの見出しを7個
+                    置いていたので、表の桁の高さ・色・太さがこの画面だけ他と
+                    ずれていた。 */}
                 <tr className="border-hairline border-b">
-                  <th className="w-16 px-2 py-2" aria-label="並び" />
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    タイミング
-                  </th>
-                  <th className="text-ink-faint w-full max-w-0 px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    内容
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    種別
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    到達人数
-                  </th>
-                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
-                    配信後
-                  </th>
-                  <th className="px-3 py-2" aria-label="操作" />
+                  <Th className="w-16" aria-label="並び" />
+                  <Th>タイミング</Th>
+                  <Th className="w-full max-w-0">内容</Th>
+                  <Th>種別</Th>
+                  {/* 設計（bV5Vs）の桁。誰に送る通なのかが、開かなくても読める。 */}
+                  <Th>配信対象</Th>
+                  <Th>到達人数</Th>
+                  <Th>配信後</Th>
+                  <Th aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
                 {sortedSteps.map((step, idx) => {
                   const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
-                  const pct = stat ? Math.round(stat.reachRate * 100) : null
+                  const pct = scenarioReachPercent(stat?.reachRate)
+                  const reachBarWidth = scenarioReachBarWidth(pct)
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
@@ -1526,7 +1787,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                     <Fragment key={step.id}>
                       {idx > 0 && (
                         <tr className="group">
-                          <td colSpan={7} className="px-0 py-0">
+                          <td colSpan={8} className="px-0 py-0">
                             {/*
                               通と通のあいだに差し込む入口。末尾にしか足せないと、
                               3通目と4通目のあいだに1通入れたいときに後ろを
@@ -1597,32 +1858,45 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                             {kindLabel}
                           </span>
                         </td>
+                        {/* 誰に送る通か。絞り込みが無い通は `—` ではなく
+                            「購読中の全員」。決まっている値なので、取れて
+                            いない印と混ぜない。 */}
+                        <td className="text-ink-secondary px-3 py-3 align-top text-sm whitespace-nowrap">
+                          {describeStepAudience(step.targetCondition, tags)}
+                        </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
-                              <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
-                                <span
-                                  className="bg-accent block h-full rounded-full"
-                                  style={{ width: `${Math.min(100, pct ?? 0)}%` }}
-                                />
-                              </span>
+                              {reachBarWidth === null ? null : (
+                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                  <span
+                                    className="bg-accent block h-full rounded-full"
+                                    style={{ width: reachBarWidth }}
+                                  />
+                                </span>
+                              )}
                               <span className="text-ink text-sm tabular-nums">
-                                {stat.reachedCount}人
+                                {scenarioReachCountLabel(stat.reachedCount)}
                               </span>
-                              <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
+                              <span className="text-ink-faint text-xs tabular-nums">
+                                {scenarioReachPercentLabel(pct)}
+                              </span>
                             </span>
                           ) : (
                             <span className="text-ink-faint text-sm">—</span>
                           )}
                         </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
-                          {step.afterSend === 'pause' ? (
-                            <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
-                              送信後 一時停止
-                            </span>
-                          ) : (
-                            <span className="text-ink-faint text-sm">—</span>
-                          )}
+                          {(() => {
+                            const after = describeAfterSend(step.afterSend)
+                            return after.paused ? (
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
+                                {after.label}
+                              </span>
+                            ) : (
+                              <span className="text-ink-secondary text-sm">{after.label}</span>
+                            )
+                          })()}
                         </td>
                         <td className="px-3 py-3 text-right align-top whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2 text-xs">
@@ -1680,7 +1954,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                             </button>
                             <button
                               type="button"
-                              onClick={() => void handleDeleteStep(step.id)}
+                              onClick={() => {
+                                setDeleteStepError('')
+                                setDeleteStepTarget(step)
+                              }}
                               title="この通を削除する"
                               aria-label="この通を削除する"
                               className="text-ink-faint hover:text-danger"
@@ -1692,7 +1969,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                       </tr>
                       {previewStepId === step.id && (
                         <tr className="border-hairline border-b">
-                          <td colSpan={7} className="px-3 pb-3">
+                          <td colSpan={8} className="px-3 pb-3">
                             <div className="text-ink-secondary bg-canvas-sunken rounded-card px-3 py-2 text-sm">
                               {(() => {
                                 // テンプレ参照時は「いまのテンプレの中身」を見せる。
@@ -1708,7 +1985,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                       )}
                       {editingStepId === step.id && (
                         <tr>
-                          <td colSpan={7} className="px-3 pb-3">
+                          <td colSpan={8} className="px-3 pb-3">
                             {renderStepForm()}
                           </td>
                         </tr>
@@ -1742,7 +2019,11 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         </Link>
         <button
           type="button"
-          onClick={() => void handleDeleteScenario()}
+          data-qa-open="dqFft-scenario"
+          onClick={() => {
+            setDeleteScenarioError('')
+            setDeleteScenarioOpen(true)
+          }}
           className="text-danger hover:underline text-sm font-medium"
         >
           このシナリオを削除
@@ -1753,6 +2034,49 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         open={previewOpen}
         scenarioId={id}
         onClose={() => setPreviewOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteStepTarget !== null}
+        title={deleteStepTarget ? `${deleteStepTarget.stepOrder}通目を削除しますか？` : 'この通を削除しますか？'}
+        description={deleteStepTarget
+          ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          : ''}
+        confirmLabel="この通を削除"
+        destructive
+        busy={deletingStepId !== null}
+        error={deleteStepError}
+        onConfirm={() => void handleDeleteStep()}
+        onCancel={() => {
+          if (deletingStepId) return
+          setDeleteStepTarget(null)
+          setDeleteStepError('')
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteScenarioOpen && scenario !== null}
+        title={scenario ? `「${scenario.name}」を削除しますか？` : 'このシナリオを削除しますか？'}
+        description={[
+          stats?.activeNow === undefined
+            ? '購読中の人数は確認できません。'
+            : stats.activeNow === 0
+              ? '現在購読中の友だちは0人です。'
+              : `現在${stats.activeNow.toLocaleString('ja-JP')}人が購読中です。途中の人は続きを受け取れません。`,
+          'シナリオの設定と今後の配信が削除されます。',
+          'これまでの配信履歴は監査記録として残ります。',
+          'この操作は取り消せません。',
+        ].join(' ')}
+        confirmLabel="このシナリオを削除"
+        destructive
+        busy={deletingScenario}
+        error={deleteScenarioError}
+        onConfirm={() => void handleDeleteScenario()}
+        onCancel={() => {
+          if (deletingScenario) return
+          setDeleteScenarioOpen(false)
+          setDeleteScenarioError('')
+        }}
       />
 
       {/* シナリオ全体の配信対象 */}
@@ -1815,8 +2139,21 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       {testSend && (
         <TestSendDialog
           scenarioId={id}
+          lineAccountId={scenario?.lineAccountId ?? null}
           stepId={testSend.stepId}
           stepLabel={testSend.label}
+          steps={(testSend.stepId
+            ? sortedSteps.filter((row) => row.id === testSend.stepId)
+            : sortedSteps
+          ).map((row) => ({
+            id: row.id,
+            stepOrder: row.stepOrder,
+            timing: formatScheduleLabel(deliveryMode, row),
+            kind:
+              (row.templateId ? templates.find((t) => t.id === row.templateId)?.name : null) ??
+              (messageTypeOptions.find((o) => o.value === row.messageType)?.label ??
+                row.messageType),
+          }))}
           onClose={() => setTestSend(null)}
         />
       )}
@@ -1827,6 +2164,9 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           scenarioId={id}
           onClose={() => setTriggerOpen(false)}
           onChanged={setTriggerCount}
+          audienceCondition={scenario.audienceCondition}
+          activeNow={stats?.activeNow ?? null}
+          lineAccountId={scenario.lineAccountId}
         />
       )}
 

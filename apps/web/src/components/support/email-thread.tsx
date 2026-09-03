@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -47,13 +47,39 @@ function dateTime(iso: string): string {
   })
 }
 
+export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className="text-ink-faint hover:text-ink-secondary -ml-1 flex-shrink-0 p-1 lg:hidden"
+      aria-label="戻る"
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+      </svg>
+    </button>
+  )
+}
+
+function EmailThreadHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
+      {children}
+    </div>
+  )
+}
+
 export default function EmailThread({
   threadId,
+  onBack,
   onChanged,
   customerInfoOpen = false,
   onOpenCustomerInfo,
 }: {
   threadId: string
+  /** スマホでメール一覧へ戻る。LINEのトークと同じ位置に出す。 */
+  onBack: () => void
   /** 状態や返信で一覧の中身が変わったときに知らせる。 */
   onChanged?: () => void
   customerInfoOpen?: boolean
@@ -241,20 +267,31 @@ export default function EmailThread({
 
   if (!detail) {
     return (
-      <div className="text-ink-faint flex flex-1 items-center justify-center text-sm">
-        {error || '会話を読み込み中...'}
+      <div className="flex h-full flex-col">
+        <EmailThreadHeader>
+          <div className="flex min-w-0 items-center gap-2">
+            <EmailThreadBackButton onBack={onBack} />
+            <p className="text-ink truncate text-sm font-medium">お問い合わせ（メール）</p>
+          </div>
+        </EmailThreadHeader>
+        <div className="text-ink-faint flex flex-1 items-center justify-center text-sm">
+          {error || '会話を読み込み中...'}
+        </div>
       </div>
     )
   }
 
   return (
     <>
-      <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
-          <p className="text-ink-faint mt-0.5 truncate text-xs">
-            {detail.thread.customer_name || detail.thread.customer_email} ・ メール
-          </p>
+      <EmailThreadHeader>
+        <div className="flex min-w-0 items-center gap-2">
+          <EmailThreadBackButton onBack={onBack} />
+          <div className="min-w-0">
+            <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
+            <p className="text-ink-faint mt-0.5 truncate text-xs">
+              {detail.thread.customer_name || detail.thread.customer_email} ・ メール
+            </p>
+          </div>
         </div>
         {/* LINE のトークと同じ並び：対応 ・ 担当 ・ 顧客情報。 */}
         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -268,7 +305,7 @@ export default function EmailThread({
               <option value="unread">未対応</option>
               <option value="in_progress">対応中</option>
               <option value="on_hold">保留</option>
-              <option value="resolved">対応済</option>
+              <option value="resolved">対応済み</option>
             </select>
           </label>
           <label className="flex items-center gap-1.5 text-xs">
@@ -296,7 +333,7 @@ export default function EmailThread({
             </button>
           )}
         </div>
-      </div>
+      </EmailThreadHeader>
 
       <div className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
         {detail.messages.map((message) => (

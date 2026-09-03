@@ -104,6 +104,8 @@ V6が上回る条件:
 
 報酬額はconversion時または承認時の案件versionと売上snapshotから計算し、`reward_calculation`へ式・入力・丸め・currencyを保存する。案件の金額変更で過去分を変えない。
 
+この機能の利用先（link、成果、報酬entry）は**スナップショット型**である（`v6-32-feature-cross-review.md` §2）。理由: 報酬は発生時の案件versionと売上snapshotから再現できなければならず、参照型にすると新版公開で過去金額が変わるため。新版への切替はlinkごとに件数と差分を確認してmigration eventを記録する。
+
 ## 7. 成果承認
 
 状態:
@@ -138,7 +140,28 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 
 「この人だけ確定」と全体締めを混同しない。個別確定は同じ締め期間のpartial settlementとして監査するか、原則全体締め後の支払batch選択にする。推奨は後者。
 
-## 9. 銀行口座・明細・CSV
+## 9. データ
+
+§8の7テーブルの主要カラムを定義する。既存の`affiliates`（`id`、`code`、`friend_id`、`commission_rate`、`hold_days`、`payout_cycle`）、`affiliate_links`（`ref_code`、`line_account_id`、`offer_id`）、`affiliate_offers`（`reward_amount` 円整数、`reward_miles`、`line_account_id`）、`conversion_events`（`affiliate_id`、`attributed_ref_code`、`approval_status`、`approved_at`）は移行元として維持し、新表はそれらのIDを外部キーで参照する。金額は`affiliate_offers.reward_amount`と同じ円単位の整数（`amount_minor`、`currency='JPY'`）で持ち、小数・浮動小数を使わない。
+
+| テーブル | id | 所属 | 金額 | 状態 | 作成・確定日時 | 追記元 |
+|---|---|---|---|---|---|---|
+| `affiliate_reward_entries` | `id` | `organization_id`、`line_account_id`、`affiliate_id` | `entry_type`（credit / debit）、`amount_minor`、`currency` | `status`（pending / approved / held / payable / settled / paid / reversed） | `created_at`、`approved_at`、`payable_at` | `conversion_event_id`、`offer_id`、`offer_version_id`、`reward_calculation_id`、`idempotency_key` |
+| `affiliate_adjustments` | `id` | `organization_id`、`line_account_id`、`affiliate_id` | `amount_minor`（負数可）、`currency` | `reason_type`（refund / cancel / manual）、`status`（open / applied） | `created_at`、`applied_at` | `source_entry_id`、`applied_settlement_id`、`reason`、`actor_id`、`idempotency_key` |
+| `affiliate_settlements` | `id` | `organization_id`、`line_account_id` | `total_amount_minor`、`currency` | `state`（preview / closed / exported / paid / partial / failed） | `period_from`、`period_to`、`timezone`、`created_at`、`closed_at` | `closed_by`、`version`、`idempotency_key` |
+| `affiliate_settlement_lines` | `id` | `settlement_id`、`affiliate_id` | `amount_minor`（締め時点のsnapshot） | `status`（included / withheld） | `created_at` | `entry_id` または `adjustment_id`（どちらか1つ。同じentryを2つのsettlementへ入れない一意制約） |
+| `affiliate_payout_batches` | `id` | `organization_id`、`line_account_id` | `total_amount_minor`、`currency`、`line_count` | `state`（created / approved / exported / imported） | `created_at`、`approved_at`、`exported_at` | `settlement_id`、`bank_format`、`file_checksum`、`created_by`、`approved_by` |
+| `affiliate_payout_results` | `id` | `batch_id`、`affiliate_id` | `paid_amount_minor` | `result`（paid / failed / returned） | `paid_at`、`imported_at` | `settlement_line_id`、`external_reference`、`imported_by` |
+| `affiliate_statements` | `id` | `organization_id`、`affiliate_id` | `total_amount_minor` | `status`（generated / expired / revoked） | `created_at`、`expires_at` | `settlement_id`、`version`、`pdf_object_key`、`generated_by` |
+
+共通規則:
+
+- 全表に`organization_id`と`line_account_id`（§4）。`affiliate_settlement_lines`と`affiliate_payout_results`は親表から所属を引く
+- 追記型。`status`/`state`の変更は行の上書きではなく、decision eventまたはadjustmentを追加する
+- `affiliate_reward_entries`は`(conversion_event_id, offer_version_id, entry_type)`、`affiliate_settlement_lines`は`entry_id`と`adjustment_id`それぞれに一意制約
+- 既存`affiliates.commission_rate`（率）と`affiliate_offers.reward_amount`（固定額）は案件versionのsnapshotへ写し、新表から現在値を参照して再計算しない
+
+## 10. 銀行口座・明細・CSV
 
 - 口座は紹介者本人の認証済み画面で入力
 - 暗号化保存、管理画面は銀行名・支店・種別・末尾4桁・名義だけ
@@ -152,7 +175,7 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 
 税・源泉徴収・インボイスの計算は、対象事業者・契約・法域の確認後に別要件化する。初期版は税額入力/調整項目と明細表示だけにし、法的判定を自動化しない。
 
-## 10. 紹介者の停止・archive
+## 11. 紹介者の停止・archive
 
 - `active → paused → archived`
 - pauseで新規link accessと新規attributionを停止
@@ -162,7 +185,7 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 - GDPR/個人情報削除等は識別情報を匿名化し、金額・監査の法定保持を別管理
 - 物理削除は一般UIから不可
 
-## 11. API
+## 12. API
 
 - affiliates list/detail/create/update/pause/archive
 - offers definitions/versions/publish/pause
@@ -176,19 +199,21 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 
 すべてaccount scope、permission、expected version、idempotency keyを持つ。金額確定、CSV、口座変更、承認、却下、調整は監査必須。
 
-## 12. 権限
+## 13. 権限
 
-- 閲覧: affiliate.view。ただし報酬・口座は項目マスク
-- 紹介者/案件編集: affiliate.manage
-- 成果承認: affiliate.approve
-- 締め・調整: affiliate.settle
-- bank export/支払結果: affiliate.payout＋MFA
-- CSV: affiliate.export
+- 閲覧: `affiliate.report.view`。ただし報酬・口座は項目マスク
+- 紹介者/案件編集: `affiliate.affiliate.manage`、`affiliate.offer.manage`
+- 成果承認: `affiliate.conversion.approve`
+- 締め・調整: `affiliate.settlement.close`、`affiliate.adjustment.create`
+- bank export/支払結果: `affiliate.payout.export`、`affiliate.payout.import`＋MFA
+- CSV: `affiliate.report.export`
 - 紹介者本人: 自分のaccount/affiliateだけ
+
+命名は共通基盤（`v6-shared-platform-requirements.md` §3）の`domain.resource.action`に従う。
 
 同じ人が成果を作り、承認し、支払確定する場合は警告。高額batchは二者承認を設定可能にする。
 
-## 13. 状態
+## 14. 状態
 
 - 空、読込、error、権限不足
 - 紹介者active/paused/archived、友だち未連携
@@ -200,7 +225,7 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 - CSV生成中/失敗/期限切れ
 - 競合409、一括操作の一部対象外
 
-## 14. 既存移行
+## 15. 既存移行
 
 1. affiliates、links、offers、conversion attributionをaccount別に棚卸し
 2. accountを一意に決められない紹介者は隔離し、自動割当しない
@@ -211,7 +236,7 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 7. 運用者が開始残高・既払額を証憑付きでimport
 8. dual-read比較後に新ledgerを正本化
 
-## 15. 除外
+## 16. 除外
 
 - この画面から銀行振込実行
 - 完全なfraud自動判定
@@ -223,9 +248,11 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 - 法務確認なしの税・源泉自動判定
 - 口座番号の通常再表示
 
-## 16. 完了条件
+## 17. 完了条件
 
-- V6 9画面の主操作・状態・遷移が動く
+- V6 9画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - account境界を全API/DB queryで保証
 - クリック→追加→成果→承認→保留→締め→支払を一意に追える
 - 金額・案件・attributionがversion snapshotされる
@@ -235,9 +262,9 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 - 紹介者停止後も履歴・明細を再現
 - 銀行CSVを検証し、実振込はしないと明示
 - 1440/1920で横スクロールなし
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
-## 17. 実装順
+## 18. 実装順
 
 1. tenant境界と物理削除停止
 2. offer/reward snapshotとappend-only ledger
@@ -247,3 +274,15 @@ approved/settled後の取消 → adjustment（次回相殺または追加支払�
 6. CSV/PDFと支払結果
 7. V6各画面、権限、二者承認
 8. legacy金額照合、E2E、security、画像比較
+
+## 19. 実装進捗（2026-08-28）
+
+状態: **一部実装**。9画面すべての完了ではない。
+
+- 完了: 紹介者・紹介リンクを停止すると、停止後のリンク表示・クリック・新規成果帰属を止める
+- 完了: 一般APIからの紹介者物理削除を405で停止し、過去の成果・支払い記録を保持
+- 完了: 紹介者一覧をV6実Node `PouPn`へ接続し、空・読込・失敗を共通状態部品へ接続
+- 完了: 本文の重複タイトル・説明・準備中マニュアルを削除
+- 未完了: 紹介者のアカウント境界、案件版、報酬台帳、締め、支払、口座、CSV/PDF、二者承認
+- 未完了: 支払い `njLGA`、登録 `xqT1Z`、成果内訳 `jwrbf`、案件作成 `GPWzq`、停止確認 `QX70l`、支払確定 `GqFTV` のV6接続
+- 画像確認: Claude側Visual QAへ引き渡し、1440px・1920pxの設計比較は未確認

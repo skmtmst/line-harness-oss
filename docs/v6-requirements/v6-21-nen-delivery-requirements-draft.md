@@ -38,6 +38,8 @@ V6の「開封」は原則「記事を開いた」「linkを押した」「回�
 
 ## 2. Lステップとの差
 
+この機能が実行するアクション(タグ、友だち情報、シナリオ、LINE送信、通知、外部Webhook、リッチメニュー、マイル、コンバージョン、予約操作)は、[25 接続契約](./v6-25-automation-action-contract.md)のカタログ名・入力・安全条件と、共通基盤 §6-2 の再試行既定に従う。25 の実行エンジンを経由しない直接実行でも、同じ冪等キーと実行台帳の状態名を使う。
+
 Lステップは[リマインダ配信](https://linestep.jp/lp/01/features24.html)、[コンバージョン管理](https://linestep.jp/lp/01/features39.html)、回答フォーム、scenario、tagを組み合わせれば近い運用ができる。V6はそれらを「注文・発送・到着・pet誕生日」というNENの言葉へ変換して一画面で提供する。
 
 上回る条件:
@@ -72,6 +74,8 @@ Lステップは[リマインダ配信](https://linestep.jp/lp/01/features24.htm
 - 管理者が既存pendingを新版へ移す場合は対象件数、差分、送信時刻を確認し、migration eventを記録
 - stopは新規job作成を止めるだけかpendingもcancelするかを選ぶ。既定は新規停止＋pending確認
 - 31機能設定オフ、32緊急停止は別判定
+
+この機能の利用先（送信job、column配信、誕生日job）は**スナップショット型**である（`v6-32-feature-cross-review.md` §2）。理由: 公開中の文面編集が既に待っているjobへ黙って効かないよう、jobは予約時の版とrender snapshotで完走させる必要があるため。
 
 現行のjob payloadにはEC eventだけで本文がなく、送信時に最新設定を読む。これをversion IDとrender snapshotへ移行する。
 
@@ -120,7 +124,7 @@ pet profile:
 - 毎日、対象timezoneの将来N日を作る
 - V6既定は誕生日3日前10:00
 - 同一pet×birthday year×flow versionで一回
-- leap day policyを設定
+- 2月29日の扱いは07リマインダの正本に従う（設定者が2/28・3/1・その年は送らないを選ぶ。既定2/28）
 - pet情報修正時は旧jobをcancelし新版を作る
 
 coupon:
@@ -144,7 +148,7 @@ planned → queued → claimed → sent
 ```
 
 - `attempts`に加え`next_retry_at`、error code、provider request ID
-- retryはexponential backoff＋jitter、最大回数は画面と一致。要件は3回を既定、設定可能
+- retryの回数・間隔は共通基盤（`v6-shared-platform-requirements.md`）§6-2の既定に従い、画面に出す最大回数と一致させる
 - 5分cron×30件という固定容量をSLOにしない。Queue consumerとaccount別rate limitへ
 - claim leaseとtimeout recovery
 - 送信直前にversion snapshot、friend、停止、quotaを検査
@@ -227,7 +231,9 @@ test送信は同じaccountの検証済みtest recipientだけ。実注文番号�
 
 ## 15. 完了条件
 
-- V6 7画面の全主操作・状態・遷移が動く
+- V6 7画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 全API・集計がaccount scoped
 - 実測/予定のtriggerが画面で区別される
 - 公開版・job snapshotにより編集で待機中本文が変わらない
@@ -237,7 +243,7 @@ test送信は同じaccountの検証済みtest recipientだけ。実注文番号�
 - open/click/answer/conversionを取得可能性どおり表示
 - permanent failureを要対応から再試行可能
 - 1440/1920で横スクロールなし
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
 ## 16. 実装順
 
@@ -249,3 +255,22 @@ test送信は同じaccountの検証済みtest recipientだけ。実注文番号�
 6. column audience batchとmetrics
 7. pet consent/archiveとcontent review
 8. V6画面、migration、E2E、画像比較
+
+## 17. 実装照合の進捗（2026-08-28）
+
+今回、既存の配信job・キャンペーン設定・LINEアカウントを作り直さず、次のP0安全要件を先に接続した。
+
+- 新しく予約するjobは、その時点の配信見出し・本文・ボタン・画像をsnapshotとして保持する
+- 既存の未送信jobは、移行時点の設定を初回snapshotとして固定する
+- 送信時は現在の設定本文を使わず、予約時snapshotを使う
+- job・友だち・LINEアカウントが同じaccountであることを再確認する
+- 対象accountの送信tokenが無い場合は、既定tokenへ逃がさず送信を止める
+- snapshotが欠ける・壊れる・別campaignのものである場合は送信を止め、理由を履歴へ残す
+- 既存の`account_settings`を再利用し、配信文・配信ON/OFF・誕生日coupon設定をLINEアカウント別に保存する
+- 概要、設定、配信履歴、column、pet、couponの管理APIは選択中LINEアカウントを必須にし、別アカウントを混ぜない
+- account未確定のcolumnは一覧と配信対象へ出さず、EC同期時にaccountが指定されたものだけを扱う
+- アカウント切替中に前の読み込み結果が戻っても、新しい画面へ上書きしない
+- 配信履歴の`sent`、`pending`、`failed`等は運用者向けの日本語で表示する
+- 誕生日couponは誕生日の3日前10:00 JSTに予約し、年またぎを試験した。2月29日は07の方針（既定2/28、設定者が選択）に従い、非うるう年に推測で送らない
+
+まだ完了ではない。公開版、到着予測、2月29日の選択可能な方針、coupon照合、column本文作成、比較指標、恒久失敗の再試行、V6 7画面、最新headの画像比較は後続実装とする。本変更では本番DB更新・配備を行わない。

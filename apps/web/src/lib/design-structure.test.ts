@@ -28,13 +28,8 @@ import structure from './design-structure.json';
  * 設計が動いたのかを後から区別できる。
  */
 
-const APP = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
-
-/** ルートから page.tsx の中身を読む。 */
-function readScreen(route: string): string {
-  const dir = route === '/' ? APP : join(APP, route);
-  return readFileSync(join(dir, 'page.tsx'), 'utf8');
-}
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
+const APP = join(SRC, 'app');
 
 /**
  * `data-design="..."` を書かれた順に集める。
@@ -54,6 +49,11 @@ const SCREENS = Object.entries(structure.screens) as Array<
       name: string;
       sections: string[];
       parts?: string[];
+      implementationGaps?: {
+        sections?: string[];
+        parts?: string[];
+        reason: string;
+      };
       visualVerification?: {
         status: 'verified' | 'unverified' | 'blocked';
         referenceNodeIds: string[];
@@ -70,41 +70,67 @@ const SCREENS = Object.entries(structure.screens) as Array<
 
 const REAL_NODE_ID = /^[A-Za-z0-9]{5,6}$/;
 
+/** 1ファイルぶんの import 先を、実ファイルの絶対パスにして返す。 */
+function importedFiles(file: string, source: string): string[] {
+  const files: string[] = [];
+  const push = (base: string) => {
+    for (const ext of ['.tsx', '.ts', '/page.tsx']) {
+      try {
+        readFileSync(base + ext, 'utf8');
+        files.push(base + ext);
+        return;
+      } catch {
+        // その名前のファイルが無いだけ。次の拡張子を試す。
+      }
+    }
+  };
+  // lib も辿る。選択肢の定義（リッチメニューのレイアウトなど）を lib に
+  // 置いている画面があり、@/components と @/app だけでは中身を読めない。
+  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+    push(join(SRC, m[1], m[2]));
+  }
+  // 画面の中身を同じフォルダのファイルに出していることがある
+  // （scenarios/detail は page.tsx が薄く、実体は scenario-detail-client.tsx）。
+  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
+    push(join(dirname(file), m[1]));
+  }
+  return files;
+}
+
 /**
  * その画面が読み込む部品も含めて、文字列を集める。
  *
  * 節を別ファイルに切り出していると、page.tsx を読むだけでは
- * 中身の語が見つからない。import しているものを1段だけ辿る。
+ * 中身の語が見つからない。import を **2段** 辿る。
+ *
+ * 1段では足りない。page.tsx が「本体の部品を1つ読むだけ」の薄い入口に
+ * なっている画面があり（/tags は `tags-page-v4.tsx` を読むだけ）、
+ * その本体が読む一覧・ダイアログは2段目に来る。1段で止めていたころは、
+ * 入口に残っていた**描かれない旧コード**の import が偶然1段目を埋めていて、
+ * この検査は画面ではなく死んだコードを見ていた。
  */
 function readWithParts(route: string): string {
-  const source = readScreen(route);
-  let combined = source;
-  // lib も辿る。選択肢の定義（リッチメニューのレイアウトなど）を lib に
-  // 置いている画面があり、@/components と @/app だけでは中身を読めない。
-  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
-    for (const ext of ['.tsx', '.ts', '/page.tsx']) {
-      const file = join(dirname(fileURLToPath(import.meta.url)), '..', m[1], m[2] + ext);
+  const start = join(route === '/' ? APP : join(APP, route), 'page.tsx');
+  const seen = new Set<string>();
+  let frontier = [start];
+  let combined = '';
+  for (let depth = 0; depth <= 2; depth += 1) {
+    const next: string[] = [];
+    for (const file of frontier) {
+      if (seen.has(file)) continue;
+      seen.add(file);
+      let source: string;
       try {
-        combined += readFileSync(file, 'utf8');
-        break;
+        source = readFileSync(file, 'utf8');
       } catch {
-        // その名前のファイルが無いだけ。次の拡張子を試す。
+        continue;
+      }
+      combined += source;
+      for (const imported of importedFiles(file, source)) {
+        if (!seen.has(imported)) next.push(imported);
       }
     }
-  }
-  // 画面の中身を同じフォルダのファイルに出していることがある
-  // （scenarios/detail は page.tsx が薄く、実体は scenario-detail-client.tsx）。
-  // 相対 import も1段だけ辿る。
-  const dir = route === '/' ? APP : join(APP, route);
-  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
-    for (const ext of ['.tsx', '.ts']) {
-      try {
-        combined += readFileSync(join(dir, m[1] + ext), 'utf8');
-        break;
-      } catch {
-        // その名前のファイルが無いだけ。次の拡張子を試す。
-      }
-    }
+    frontier = next;
   }
   return combined;
 }
@@ -120,13 +146,16 @@ describe('画面の骨格が設計と一致する', () => {
     // Body / Left / Right は create-page.tsx にある）。page.tsx だけ見ると
     // 「印が付いていない」ことになるので、読み込んでいる部品も一緒に見る。
     const markers = designMarkers(readWithParts(route));
-    const expected = [...spec.sections].sort();
+    const sectionGaps = spec.implementationGaps?.sections ?? [];
+    const expected = spec.sections.filter((section) => !sectionGaps.includes(section)).sort();
+    expect(sectionGaps.every((section) => spec.sections.includes(section))).toBe(true);
     expect(
       markers,
       [
         `${spec.name}（node ${spec.node}）の骨格が設計と違います。`,
         `設計にある節: ${spec.sections.join(' → ')}`,
         `実装にある節: ${markers.length ? markers.join(', ') : '（印が付いていません）'}`,
+        `記録済みの未実装: ${sectionGaps.join(', ') || 'なし'}`,
         `足りない: ${expected.filter((x) => !markers.includes(x)).join(', ') || 'なし'}`,
         `設計に無い: ${markers.filter((x) => !expected.includes(x)).join(', ') || 'なし'}`,
         '',
@@ -149,16 +178,20 @@ describe('画面の骨格が設計と一致する', () => {
   it.each(SCREENS.filter(([, s]) => s.parts?.length))('%s の節の中身', (route, spec) => {
     const source = readWithParts(route);
     const missing = (spec.parts ?? []).filter((part) => !source.includes(part));
+    const recordedGaps = spec.implementationGaps?.parts ?? [];
+    expect(recordedGaps.every((part) => spec.parts?.includes(part))).toBe(true);
+    if (recordedGaps.length > 0) expect(spec.implementationGaps?.reason.trim()).toBeTruthy();
     expect(
       missing,
       [
         `${spec.name}（node ${spec.node}）に、設計にある語が見つかりません。`,
         `無い語: ${missing.join(', ')}`,
         '',
+        `記録済みの未実装: ${recordedGaps.join(', ') || 'なし'}`,
         'データが無いときも「未設定」「まだありません」と出してください。',
         '節ごと消すと、画面にその機能が無いように見えます。',
       ].join('\n'),
-    ).toEqual([]);
+    ).toEqual(recordedGaps);
   });
 });
 

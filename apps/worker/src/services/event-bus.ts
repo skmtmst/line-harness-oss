@@ -20,6 +20,9 @@ import {
   jstNow,
   getFriendScore,
   recordAnalyticsEvent,
+  createWebhookInteraction,
+  finishWebhookInteraction,
+  type WebhookInteractionFailureReason,
 } from '@line-crm/db';
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -187,29 +190,92 @@ async function fireOutgoingWebhooks(
     }
     const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
+      let interactionId: string | null = null;
+      const started = Date.now();
       try {
         const body = JSON.stringify({
           event: eventType,
           timestamp: jstNow(),
           data: payload,
         });
+        const idempotencyKey = payload.sourceEventId
+          ? `outgoing_webhook:${wh.id}:${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
+          : crypto.randomUUID();
+        if (lineAccountId) {
+          try {
+            const interaction = await createWebhookInteraction(db, {
+              lineAccountId,
+              direction: 'outgoing',
+              webhookId: wh.id,
+              webhookName: wh.name,
+              eventType,
+              triggerSummary: eventType,
+              requestBodyJson: body,
+              idempotencyKey,
+            });
+            interactionId = interaction.id;
+          } catch (logError) {
+            // 記録の一時障害で、本体の外部通知まで止めない。
+            console.error(`送信Webhook ${wh.id} の記録開始に失敗:`, logError);
+          }
+        }
         // 以前は fetch を投げっぱなしにしていて、相手が 500 を返しても
         // 成功として扱っていた（例外にならないため）。deliverWebhook は
         // 応答の状態まで見て、必要なら送り直す。
-        const result = await deliverWebhook(wh, body);
+        const result = await deliverWebhook(wh, body, { idempotencyKey });
         if (!result.ok) {
           console.error(
             `送信Webhook ${wh.id} 失敗 (${result.attempts}回試行, 最後の応答=${result.lastStatus ?? '接続不可'})`,
           );
         }
-        await recordDeliveryOutcome(db, wh.id, result.ok);
+        if (interactionId && lineAccountId) {
+          try {
+            await finishWebhookInteraction(db, interactionId, lineAccountId, {
+              status: result.ok ? 'succeeded' : 'failed',
+              responseStatus: result.lastStatus,
+              attemptCount: result.attempts,
+              durationMs: Date.now() - started,
+              failureReason: result.ok ? null : outgoingFailureReason(result.lastStatus),
+            });
+          } catch (logError) {
+            // 届いた通知を、台帳更新の失敗だけで「送信失敗」とは扱わない。
+            console.error(`送信Webhook ${wh.id} の結果記録に失敗:`, logError);
+          }
+        }
+        try {
+          await recordDeliveryOutcome(db, wh.id, result.ok);
+        } catch (outcomeError) {
+          // 連続失敗数の更新は補助情報。配送結果そのものを巻き戻さない。
+          console.error(`送信Webhook ${wh.id} の連続失敗数を更新できませんでした:`, outcomeError);
+        }
       } catch (err) {
+        if (interactionId && lineAccountId) {
+          try {
+            await finishWebhookInteraction(db, interactionId, lineAccountId, {
+              status: 'failed',
+              responseStatus: null,
+              attemptCount: 1,
+              durationMs: Date.now() - started,
+              failureReason: 'unknown',
+            });
+          } catch (logError) {
+            console.error(`送信Webhook ${wh.id} の失敗記録に失敗:`, logError);
+          }
+        }
         console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
       }
     }
   } catch (err) {
     console.error('fireOutgoingWebhooks error:', err);
   }
+}
+
+function outgoingFailureReason(status: number | null): WebhookInteractionFailureReason {
+  if (status === null) return 'connection_failed';
+  if (status === 429) return 'response_429';
+  if (status >= 500) return 'response_5xx';
+  if (status >= 400) return 'response_4xx';
+  return 'unknown';
 }
 
 /** スコアリングルール適用 */
@@ -504,7 +570,8 @@ export async function logOutgoingMessage(
     source: string;
     lineAccountId?: string | null;
   },
-): Promise<void> {
+): Promise<string | null> {
+  const id = crypto.randomUUID();
   try {
     await db
       .prepare(
@@ -512,7 +579,7 @@ export async function logOutgoingMessage(
          VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, ?, ?, ?, ?)`,
       )
       .bind(
-        crypto.randomUUID(),
+        id,
         params.friendId,
         params.messageType,
         params.content,
@@ -522,7 +589,9 @@ export async function logOutgoingMessage(
         jstNow(),
       )
       .run();
+    return id;
   } catch (err) {
     console.error('logOutgoingMessage failed:', err);
+    return null;
   }
 }

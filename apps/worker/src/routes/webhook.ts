@@ -35,6 +35,8 @@ import { parseQuestionPostback } from '../services/scenario-question.js';
 import { handleQuestionAnswer } from '../services/scenario-question-answer.js';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { createEccubeCoupon } from '../services/eccube-coupon.js';
+import { issueFriendAddCoupon } from '../services/friend-add-coupon.js';
 import {
   classifyLineWebhookError,
   processLineWebhookEvents,
@@ -234,6 +236,9 @@ webhook.post('/webhook', async (c) => {
       c.env.WORKER_URL || new URL(c.req.url).origin,
       c.env.LIFF_URL,
       c.env.IMAGES,
+      c.env.NEN_EC_BASE_URL && c.env.ECCUBE_WEBHOOK_SECRET
+        ? { baseUrl: c.env.NEN_EC_BASE_URL, secret: c.env.ECCUBE_WEBHOOK_SECRET }
+        : undefined,
     ),
   });
 
@@ -251,6 +256,7 @@ async function handleEvent(
   workerUrl?: string,
   liffUrl?: string,
   r2?: R2Bucket,
+  ecommerce?: { baseUrl: string; secret: string },
 ): Promise<void> {
   if (event.type === 'follow') {
     const userId =
@@ -279,6 +285,7 @@ async function handleEvent(
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
     });
+    const friendKind = (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time';
 
     // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
     // 再追加でも「今回開いたリンク」が取れた場合だけ候補を結び付ける。
@@ -289,7 +296,7 @@ async function handleEvent(
           lineAccountId,
           friendId: friend.id,
           webhookEventId: event.webhookEventId,
-          friendKind: (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time',
+          friendKind,
           isUnblockedHint:
             typeof (event as unknown as { follow?: { isUnblocked?: unknown } }).follow?.isUnblocked === 'boolean'
               ? Boolean((event as unknown as { follow: { isUnblocked: boolean } }).follow.isUnblocked)
@@ -529,6 +536,23 @@ async function handleEvent(
       }
     }
 
+    // NENの友だち追加クーポンは、アカウント別設定が有効な場合だけ初回追加時に発行する。
+    // 再フォローとWebhook再送は発行台帳の一意制約でも二重発行を防ぐ。
+    if ('first_time' === friendKind && lineAccountId && ecommerce) {
+      try {
+        await issueFriendAddCoupon(db, {
+          lineAccountId,
+          friendId: friend.id,
+          now: new Date(event.timestamp),
+        }, {
+          createCoupon: (coupon) => createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, coupon),
+          sendText: (text) => lineClient.pushMessage(userId, [{ type: 'text', text }]).then(() => undefined),
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_coupon', err, lineAccountId, event);
+      }
+    }
+
     // イベントバス発火: friend_add（replyToken は Step 0 で使用済みの可能性あり）
     await fireEvent(db, 'friend_add', {
       sourceEventId: event.webhookEventId,
@@ -537,7 +561,7 @@ async function handleEvent(
       friendId: friend.id,
       eventData: {
         displayName: friend.display_name,
-        friendKind: (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time',
+        friendKind,
         attributionStatus: currentAttribution ? 'captured' : 'unavailable',
       },
     }, lineAccessToken, lineAccountId);
@@ -669,15 +693,17 @@ async function handleEvent(
     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
     // delivery_type='push' は厳密には push ではないが、incoming/non-test として
     // 既存 chat list / 詳細 SQL のフィルタを通すための妥当な値 (auto_reply text 同様)。
+    let postbackIncomingLogId: string | null = crypto.randomUUID();
     try {
       await db
         .prepare(
           `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
            VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
         )
-        .bind(crypto.randomUUID(), friend.id, postbackLogText, lineAccountId ?? null, jstNow())
+        .bind(postbackIncomingLogId, friend.id, postbackLogText, lineAccountId ?? null, jstNow())
         .run();
     } catch (err) {
+      postbackIncomingLogId = null;
       logWebhookStepFailure('incoming_postback_log', err, lineAccountId, event);
     }
 
@@ -694,6 +720,9 @@ async function handleEvent(
             workerUrl,
             logContext: 'postback',
             messageKind: 'postback',
+            incomingEventId: event.webhookEventId,
+            incomingMessageLogId: postbackIncomingLogId,
+            occurredAt: new Date(event.timestamp).toISOString(),
           })
         : { matched: false, replyTokenConsumed: false };
 
@@ -898,7 +927,14 @@ async function handleEvent(
       event.replyToken,
       // 種別は LINE から届いたものをそのまま渡す。ルール側で
       // 「画像には返さない」といった絞り込みができる。
-      { lineAccountId, workerUrl, messageKind: event.message?.type ?? 'text' },
+      {
+        lineAccountId,
+        workerUrl,
+        messageKind: event.message?.type ?? 'text',
+        incomingEventId: event.webhookEventId,
+        incomingMessageLogId: logId,
+        occurredAt: new Date(event.timestamp).toISOString(),
+      },
     );
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする

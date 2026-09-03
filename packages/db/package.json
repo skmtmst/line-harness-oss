@@ -13,10 +13,12 @@
     "bootstrap.sql"
   ],
   "scripts": {
-    "pretest": "pnpm --filter @line-crm/shared build",
+    "build": "pnpm run generate:bootstrap",
+    "pretest": "pnpm --filter @line-crm/shared build && pnpm run generate:bootstrap",
     "test": "vitest run",
-    "pretypecheck": "pnpm --filter @line-crm/shared build",
+    "pretypecheck": "pnpm --filter @line-crm/shared build && pnpm run generate:bootstrap",
     "typecheck": "tsc --noEmit",
+    "prepack": "pnpm run generate:bootstrap",
     "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs",
     "check:bootstrap": "node ./scripts/generate-bootstrap.mjs --check"
   },

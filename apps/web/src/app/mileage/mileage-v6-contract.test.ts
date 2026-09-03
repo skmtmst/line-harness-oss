@@ -44,6 +44,17 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).not.toContain('準備中')
   })
 
+  it('APIの入れ子が欠けても画面を落とさず、0件とも書かない', () => {
+    expect(HISTORY).toContain('mileagePaginationTotal(result)')
+    expect(HISTORY).not.toContain('result?.pagination.total')
+    expect(PAGE).toContain('mileagePaginationTotal(overview)')
+    expect(PAGE).not.toContain('overview?.pagination.total')
+    expect(FRIEND_DETAIL).toContain('mileageRewardedActions(mileage.insights)')
+    expect(FRIEND_DETAIL).toContain('mileageConnectedAccounts(mileage.connections)')
+    expect(FRIEND_DETAIL).toContain('付与記録の回数は未取得')
+    expect(FRIEND_DETAIL).toContain('接続先はありません')
+  })
+
   it('残高は共通トップバーで選んだLINEアカウントだけを取得する', () => {
     expect(PAGE).toContain('selectedAccountId')
     expect(PAGE).toContain('accountId: accountAtRequest')
@@ -64,7 +75,9 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('既存の更新APIから決めごとの停止と再開を操作できる', () => {
     expect(PAGE).toContain("updateRule(rule, { isActive: !rule.isActive })")
     expect(PAGE).toContain("rule.isActive ? '決めごとを停止' : '決めごとを再開'")
-    expect(PAGE).toContain("rule.isActive ? '動いています' : '止めています'")
+    // 2026-09-02: 一覧をカード格子から設計の表へ移し、状態を共通Chipで出す。
+    // 言い方は変えていない。
+    expect(PAGE).toContain('<Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>')
   })
 
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
@@ -112,5 +125,15 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(SEGMENT).toContain("case 'score_range'")
     expect(BROADCAST_NEW).toContain("type: 'score_range'")
     expect(BROADCAST_NEW).toContain('initialCondition={initialCondition}')
+  })
+
+  it('手動増減の失敗でAPI番号や内部文をそのまま出さない', () => {
+    expect(ADJUSTMENT).toContain('mileageAdjustmentErrorMessage')
+    expect(ADJUSTMENT).toContain("error.status === 405")
+    expect(ADJUSTMENT).toContain('この環境ではマイル変更を実行できません。')
+    expect(ADJUSTMENT).toContain('画面を読み直してからやり直してください。')
+    expect(ADJUSTMENT).toContain("error.status === 428")
+    expect(ADJUSTMENT).toContain('確認手順が完了していません。')
+    expect(ADJUSTMENT).not.toContain("error instanceof ApiError || error instanceof Error ? error.message")
   })
 })

@@ -3,7 +3,13 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { DeliveryMode, Scenario, Tag, Template } from '@line-crm/shared'
+import {
+  countTemplateTextCharacters,
+  type DeliveryMode,
+  type Scenario,
+  type Tag,
+  type Template,
+} from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -22,6 +28,8 @@ import { ConditionDialog, describeCondition } from '@/components/scenarios/scena
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import StepPreview from '@/components/scenarios/step-preview'
+import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
+import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 
 /**
@@ -133,8 +141,20 @@ function FirstStepContent() {
 
   const goDetail = () => router.push(`/scenarios/detail?id=${encodeURIComponent(id)}`)
 
+  /*
+   * 本文が上限を超えているか。
+   *
+   * 超えたまま保存を押せると、LINEに渡してから弾かれる。押せない形にして、
+   * 理由を操作のそばに出す（`docs/v6-common-rules.md` §1 の言葉の決まり）。
+   */
+  const bodyLength = countTemplateTextCharacters(body)
+  const bodyOverLimit =
+    contentMode === 'compose' && kind === 'text' && isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)
+
   const submit = async () => {
-    if (saving) return
+    // ボタンの disabled だけに頼らない。別の呼び出し経路が増えても、
+    // 上限を超えた本文を保存処理へ渡さない。
+    if (saving || bodyOverLimit) return
     setSaving(true)
     setError('')
     if (targetMode === 'tag' && !targetTagId) {
@@ -232,7 +252,7 @@ function FirstStepContent() {
   }
 
   return (
-    <div>
+    <div data-design-node="kk8dz">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/scenarios" className="hover:underline">
           シナリオ配信
@@ -278,7 +298,7 @@ function FirstStepContent() {
         下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
         狭い画面では縦に積む。
       */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_500px] xl:items-start">
       <div data-design="Form" className="space-y-4">
         {/*
           配信対象の絞り込み。Lステップの「配信対象の絞り込み」と同じ3つ。
@@ -289,7 +309,7 @@ function FirstStepContent() {
           2か所で同じことを聞くと、どちらが効くのか分からなくなる。
         */}
         <section className="bg-canvas rounded-card border-hairline border p-5">
-          <h2 className="text-ink text-base font-bold">配信対象の絞り込み</h2>
+          <h2 className="text-ink text-base font-bold">この1通目を誰に送るか</h2>
           <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">
             この1通目を誰に送るかを決めます。開始のきっかけは、このあとの編集画面で決められます。
           </p>
@@ -349,7 +369,7 @@ function FirstStepContent() {
         </section>
 
         <section className="bg-canvas rounded-card border-hairline border p-5">
-          <h2 className="text-ink text-base font-bold">1通目</h2>
+          <h2 className="text-ink text-base font-bold">1通目の内容</h2>
           <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">
             空のままでも進めます。テンプレートや画像は、このあとの編集画面で選べます。
           </p>
@@ -365,7 +385,7 @@ function FirstStepContent() {
                   min={0}
                   value={offsetDays}
                   onChange={e => setOffsetDays(Math.max(0, Number(e.target.value)))}
-                  className="border-hairline rounded-control bg-canvas text-ink w-20 border px-3 py-2 text-sm"
+                  className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
                 />
                 <span className="text-ink-secondary text-sm">日後</span>
               </div>
@@ -377,7 +397,7 @@ function FirstStepContent() {
                   type="time"
                   value={deliveryTime}
                   onChange={e => setDeliveryTime(e.target.value)}
-                  className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
+                  className={`${styles.timeField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
                 />
               </label>
             ) : (
@@ -392,7 +412,7 @@ function FirstStepContent() {
                     onChange={e =>
                       setOffsetHours(Math.min(23, Math.max(0, Number(e.target.value))))
                     }
-                    className="border-hairline rounded-control bg-canvas text-ink w-20 border px-3 py-2 text-sm"
+                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
                   />
                   <span className="text-ink-secondary text-sm">時間後</span>
                 </div>
@@ -437,10 +457,10 @@ function FirstStepContent() {
                       ref={bodyRef}
                       value={body}
                       onChange={e => setBody(e.target.value)}
-                      rows={4}
                       placeholder="はじめまして。友だち追加ありがとうございます。"
-                      className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                      className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
                     />
+                    <CharCounter length={bodyLength} />
                   </div>
                 )}
 
@@ -535,11 +555,22 @@ function FirstStepContent() {
         </div>
       </div>
 
+      {/*
+        上限を超えたまま押せると、LINEに渡してから弾かれる。押せない形にして、
+        理由を操作のそばに置く。「押したのに何も起きない」を作らない。
+      */}
+      {bodyOverLimit && (
+        <p className="bg-danger-bg text-danger rounded-card mt-4 px-4 py-3 text-sm">
+          本文が {LINE_TEXT_LIMIT.toLocaleString('en-US')} 字を超えています。
+          LINEが受け付けないため、この状態では保存できません。
+        </p>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={saving}
+          disabled={saving || bodyOverLimit}
           className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
         >
           {saving ? '保存中…' : '作成して編集へ →'}

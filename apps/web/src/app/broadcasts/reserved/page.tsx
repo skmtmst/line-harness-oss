@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -55,9 +55,15 @@ function ReservedBroadcastContent() {
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const requestGeneration = useRef(0)
 
   const load = useCallback(async () => {
+    const generation = requestGeneration.current + 1
+    requestGeneration.current = generation
+    const isCurrent = () => requestGeneration.current === generation
+
     if (!id) {
+      if (!isCurrent()) return
       setBroadcast(null)
       setError('予約した配信を特定できませんでした。')
       setLoading(false)
@@ -69,6 +75,7 @@ function ReservedBroadcastContent() {
     setEstimate(null)
     try {
       const result = await api.broadcasts.get(id)
+      if (!isCurrent()) return
       if (!result.success) {
         setBroadcast(null)
         setError('予約した配信を表示できませんでした。')
@@ -87,20 +94,25 @@ function ReservedBroadcastContent() {
           accountIds: result.data.accountIds ?? undefined,
           messageContent: result.data.messageContent,
         })
+        if (!isCurrent()) return
         if (preflight.success) setEstimate(preflight.data)
       } catch {
-        setEstimate(null)
+        if (isCurrent()) setEstimate(null)
       }
     } catch {
+      if (!isCurrent()) return
       setBroadcast(null)
       setError('予約した配信を表示できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }, [id])
 
   useEffect(() => {
     void load()
+    return () => {
+      requestGeneration.current += 1
+    }
   }, [load])
 
   if (accountLoading || loading) {

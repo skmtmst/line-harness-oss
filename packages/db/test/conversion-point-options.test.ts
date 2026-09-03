@@ -148,6 +148,29 @@ describe('同じ人を何度数えるか', () => {
       .get(point.id) as { c: number };
     expect(c).toBe(2);
   });
+
+  test('同じ成果地点と冪等キーは再送しても1件だけ記録する', async () => {
+    insertFriend(sqlite, 'f-1');
+    const point = await createConversionPoint(db, { name: '購入', eventType: 'purchase' });
+    const first = await trackConversion(db, {
+      conversionPointId: point.id,
+      friendId: 'f-1',
+      idempotencyKey: 'order-1:version-1',
+    });
+    const second = await trackConversion(db, {
+      conversionPointId: point.id,
+      friendId: 'f-1',
+      idempotencyKey: 'order-1:version-1',
+    });
+
+    expect(second.id).toBe(first.id);
+    expect(sqlite.prepare(
+      'SELECT point_name_snapshot, event_type_snapshot FROM conversion_events WHERE id = ?',
+    ).get(first.id)).toEqual({
+      point_name_snapshot: '購入',
+      event_type_snapshot: 'purchase',
+    });
+  });
 });
 
 describe('URL到達で数える地点の検索', () => {

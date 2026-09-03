@@ -1,33 +1,48 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+
+function scenarioCompletionDetail(active: number, completed: number): string {
+  const enrolled = active + completed
+  if (enrolled === 0) return '—'
+  const rate = Math.round((completed / enrolled) * 100)
+  return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
+}
 import type { Folder } from '@line-crm/shared'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
+import { shouldShowStartChecklist, startChecklist } from './start-checklist'
 
-type ScenarioWithCount = Scenario & { stepCount?: number }
+type ScenarioWithCount = Scenario & {
+  stepCount?: number
+  subscriberCount?: number
+  completedCount?: number
+}
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
-/** フォルダの色。タグ側と同じ8色にそろえる。 */
-const FOLDER_COLORS = [
-  '#3B82F6',
-  '#10B981',
-  '#F59E0B',
-  '#EF4444',
-  '#8B5CF6',
-  '#EC4899',
-  '#06B6D4',
-  '#6B7280',
-]
+/** 作成日時が、運用画面の基準である日本時間の今月か。 */
+function isCreatedThisMonth(createdAt: string, now = new Date()): boolean {
+  const month = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+  })
+  return month.format(new Date(createdAt)) === month.format(now)
+}
 
 export default function ScenariosPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -37,15 +52,17 @@ export default function ScenariosPage() {
   const [nameQuery, setNameQuery] = useState('')
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」だけ。 */
   const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [actionError, setActionError] = useState('')
   const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [folderName, setFolderName] = useState('')
-  const [folderColor, setFolderColor] = useState(FOLDER_COLORS[0])
-  const [addingFolder, setAddingFolder] = useState(false)
+  const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
+  const [toggleBusy, setToggleBusy] = useState(false)
+  const [toggleError, setToggleError] = useState('')
+  const loadRequestRef = useRef(0)
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('scenario')
@@ -56,66 +73,35 @@ export default function ScenariosPage() {
     void loadFolders()
   }, [loadFolders])
 
-  const handleAddFolder = async () => {
-    const name = folderName.trim()
-    if (!name || addingFolder) return
-    setAddingFolder(true)
-    setError('')
-    const res = await api.folders.create({ kind: 'scenario', name, color: folderColor })
-    setAddingFolder(false)
-    if (!res.success) {
-      setError(res.error)
-      return
-    }
-    setFolderName('')
-    setFolderColor(FOLDER_COLORS[0])
-    setFolderDialogOpen(false)
-    void loadFolders()
-  }
-
   const loadScenarios = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    const requestId = ++loadRequestRef.current
+    setLoadStatus('loading')
+    setActionError('')
+    setScenarios([])
     try {
       const res = await api.scenarios.list({ accountId: selectedAccountId || undefined })
+      if (requestId !== loadRequestRef.current) return
       if (res.success) {
         setScenarios(res.data)
+        setLoadStatus('ready')
       } else {
-        setError(res.error)
+        setScenarios([])
+        setLoadStatus('error')
       }
     } catch {
-      setError('シナリオの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      setLoading(false)
+      if (requestId !== loadRequestRef.current) return
+      setScenarios([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     if (accountLoading) return
-    let cancelled = false
-    const fetchData = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const res = await api.scenarios.list({ accountId: selectedAccountId || undefined })
-        if (cancelled) return
-        if (res.success) {
-          setScenarios(res.data)
-        } else {
-          setError(res.error)
-        }
-      } catch {
-        if (cancelled) return
-        setError('シナリオの読み込みに失敗しました。もう一度お試しください。')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    fetchData()
+    void loadScenarios()
     return () => {
-      cancelled = true
+      loadRequestRef.current += 1
     }
-  }, [selectedAccountId, accountLoading])
+  }, [accountLoading, loadScenarios])
 
   /**
    * シナリオを作って、配信方式の選択へ送る。
@@ -131,7 +117,7 @@ export default function ScenariosPage() {
   const handleCreate = async () => {
     if (creating) return
     setCreating(true)
-    setError('')
+    setActionError('')
     const res = await api.scenarios.create({
       // 仮の名前。3段目で必ず聞くが、そこを飛ばした人のぶんが一覧で
       // 区別できるように日付を足す。
@@ -146,7 +132,7 @@ export default function ScenariosPage() {
     if (res.success) {
       router.push(`/scenarios/mode?id=${res.data.id}`)
     } else {
-      setError(res.error)
+      setActionError('シナリオを作成できませんでした。状態を読み直してから、もう一度お試しください。')
       setCreating(false)
     }
   }
@@ -158,7 +144,7 @@ export default function ScenariosPage() {
    * 失敗したときだけ読み直して、元の並びに戻す。
    */
   const handleReorder = async (ids: string[]) => {
-    setError('')
+    setActionError('')
     const rank = new Map(ids.map((id, i) => [id, i]))
     setScenarios((prev) =>
       [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
@@ -167,26 +153,64 @@ export default function ScenariosPage() {
       const res = await api.scenarios.reorder(ids)
       if (!res.success) throw new Error(res.error)
     } catch {
-      setError('並び順を保存できませんでした')
-      loadScenarios()
+      setActionError('並び順を保存できませんでした。最新の並び順を読み直しました。')
+      void loadScenarios()
     }
   }
 
-  const handleToggleActive = async (id: string, current: boolean) => {
+  const requestToggleActive = (id: string) => {
+    const target = scenarios.find((scenario) => scenario.id === id)
+    if (!target) {
+      setActionError('対象のシナリオを確認できませんでした。一覧を読み直してください。')
+      return
+    }
+    setToggleError('')
+    setToggleTarget(target)
+  }
+
+  const confirmToggleActive = async () => {
+    if (!toggleTarget || toggleBusy) return
+    const target = toggleTarget
+    setToggleBusy(true)
+    setToggleError('')
     try {
-      await api.scenarios.update(id, { isActive: !current })
-      loadScenarios()
+      const response = await api.scenarios.update(target.id, { isActive: !target.isActive })
+      if (!response.success) throw new Error(response.error)
+      setToggleTarget(null)
+      if (target.isActive) {
+        void loadScenarios()
+      } else {
+        router.push(`/scenarios/detail?id=${encodeURIComponent(target.id)}&started=1`)
+      }
     } catch {
-      setError('ステータスの変更に失敗しました')
+      setToggleError(
+        target.isActive
+          ? 'シナリオを停止できませんでした。状態を読み直してから、もう一度お試しください。'
+          : 'シナリオを開始できませんでした。状態を読み直してから、もう一度お試しください。',
+      )
+    } finally {
+      setToggleBusy(false)
+    }
+  }
+
+  /** 一覧からフォルダを付け替える。作ったフォルダへ中身を入れる操作。 */
+  const handleMoveFolder = async (id: string, folderId: string) => {
+    setActionError('')
+    try {
+      const res = await api.scenarios.update(id, { folderId: folderId || null })
+      if (!res.success) throw new Error(res.error)
+      void loadScenarios()
+    } catch {
+      setActionError('フォルダを変更できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
       await api.scenarios.delete(id)
-      loadScenarios()
+      void loadScenarios()
     } catch {
-      setError('削除に失敗しました')
+      setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 
@@ -198,19 +222,18 @@ export default function ScenariosPage() {
         description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
+              title="表の左端の ⠿ を掴むと並べ替えられます"
+            >
+              ⇅ 並び替えは ⠿ を掴む
+            </span>
             <button
               disabled
-              title="準備中です"
+              title="マニュアルは準備中です"
               className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
             >
               マニュアル
-            </button>
-            <button
-              disabled
-              title="準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              並び替え
             </button>
           </div>
         }
@@ -224,15 +247,15 @@ export default function ScenariosPage() {
         titles={['シナリオ', '購読中', '読了済', '今週の配信']}
         build={(s) => [
             { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
-            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '重複を含む' },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
             {
               title: '読了済',
               value: s.scenarios.completed,
               unit: '人',
-              detail:
-                s.scenarios.subscribers + s.scenarios.completed > 0
-                  ? `完了率 ${Math.round((s.scenarios.completed / (s.scenarios.subscribers + s.scenarios.completed)) * 100)}%`
-                  : '—',
+              detail: scenarioCompletionDetail(
+                s.scenarios.subscribers,
+                s.scenarios.completed,
+              ),
             },
             // 設計の4枚目。source='scenario'（028）で数えられる。
             { title: '今週の配信', value: s.scenarios.sentThisWeek, unit: '通', detail: '過去7日' },
@@ -243,72 +266,74 @@ export default function ScenariosPage() {
       </div>
 
       {folderDialogOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setFolderDialogOpen(false)}
-        >
-          <div
-            className="bg-canvas rounded-card w-full max-w-sm p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
-            <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-              ここで決めた色が、このフォルダに入れたシナリオの印に出ます。
-            </p>
-            <label className="mt-4 block">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                フォルダ名 <span className="text-danger">*</span>
-              </span>
-              <input
-                type="text"
-                autoFocus
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && folderName.trim()) void handleAddFolder()
-                }}
-                placeholder="例: 01_新規フォロー"
-                className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              />
-            </label>
-            <div className="mt-3">
-              <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
-              <div className="flex flex-wrap gap-2">
-                {FOLDER_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setFolderColor(c)}
-                    aria-label={`色 ${c}`}
-                    aria-pressed={folderColor === c}
-                    style={{ backgroundColor: c }}
-                    className={`rounded-pill h-7 w-7 ${
-                      folderColor === c ? 'ring-accent ring-2 ring-offset-2' : ''
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setFolderDialogOpen(false)}
-                className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
-              >
-                やめる
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleAddFolder()}
-                disabled={addingFolder || !folderName.trim()}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
-              >
-                {addingFolder ? '追加中…' : '追加する'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <FolderAddDialog
+          kind="scenario"
+          note="シナリオを分けてしまう箱です。消しても、入っていたシナリオは未分類として残ります。"
+          placeholder="例: 01_新規フォロー"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
       )}
+
+      {toggleTarget ? (
+        <div data-design-node="RUxNf">
+          <ConfirmDialog
+            open
+            title={`「${toggleTarget.name}」を${toggleTarget.isActive ? '停止' : '開始'}しますか？`}
+            description={[
+              toggleTarget.lineAccountId === null ? '全LINEアカウントに適用されるシナリオです。' : '',
+              `現在の購読中は${toggleTarget.subscriberCount === undefined ? '—人（人数を確認できませんでした）' : `${toggleTarget.subscriberCount}人`}です。`,
+              `配信内容は${toggleTarget.stepCount === undefined ? '—通（通数を確認できませんでした）' : `${toggleTarget.stepCount}通`}です。`,
+              toggleTarget.isActive
+                ? '停止すると新しい配信を止めます。これまでの配信履歴は残ります。'
+                : toggleTarget.subscriberCount === 0
+                  ? '現在届く人はいません。開始後に登録された友だちから配信対象になります。'
+                  : '開始すると、登録条件に合う友だちへの配信が動き始めます。',
+            ].filter(Boolean).join(' ')}
+            confirmLabel={toggleTarget.isActive ? 'シナリオを停止' : 'シナリオを開始'}
+            destructive={toggleTarget.isActive}
+            busy={toggleBusy}
+            error={toggleError || undefined}
+            onConfirm={() => void confirmToggleActive()}
+            onCancel={() => {
+              if (toggleBusy) return
+              setToggleTarget(null)
+              setToggleError('')
+            }}
+          >
+            {shouldShowStartChecklist(toggleTarget.isActive) ? (
+              <div className="space-y-2">
+                <p className="text-ink-secondary text-xs font-medium">配信前チェック</p>
+                <ul className="space-y-1.5 text-sm">
+                  {startChecklist(toggleTarget).map((item) => (
+                    <li key={item.label} className="flex items-start gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={
+                          item.state === 'ok'
+                            ? 'text-success'
+                            : item.state === 'warn'
+                              ? 'text-warning'
+                              : 'text-ink-faint'
+                        }
+                      >
+                        {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                      </span>
+                      <span>
+                        <span className="text-ink block">{item.label}</span>
+                        <span className="text-ink-faint block text-xs">{item.detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-ink-faint text-xs">
+                  「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。
+                </p>
+              </div>
+            ) : null}
+          </ConfirmDialog>
+        </div>
+      ) : null}
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
@@ -318,13 +343,9 @@ export default function ScenariosPage() {
         絵と位置が違っていた。
       */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          disabled
-          title="準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-        >
+        <Button onClick={() => setFolderDialogOpen(true)}>
           フォルダを追加
-        </button>
+        </Button>
         <button
           onClick={() => void handleCreate()}
           disabled={creating}
@@ -368,7 +389,6 @@ export default function ScenariosPage() {
         searchPlaceholder="シナリオ名で検索"
         searchValue={nameQuery}
         onSearchChange={setNameQuery}
-        sortLabel="購読中が多い順"
       />
 
       {/*
@@ -388,38 +408,57 @@ export default function ScenariosPage() {
         >
           停止中のみ
         </button>
-        {['離脱が大きい', '今月作成'].map((label) => (
+        {[
+          {
+            label: '離脱が大きい',
+            disabled: true,
+            active: false,
+            title: '離脱率の比較基準が決まっていないため、まだ数えられません',
+            onClick: undefined,
+          },
+          {
+            label: '今月作成',
+            disabled: false,
+            active: createdThisMonthOnly,
+            title: undefined,
+            onClick: () => setCreatedThisMonthOnly((current) => !current),
+          },
+        ].map((filter) => (
           <button
-            key={label}
-            disabled
-            title="この絞り込みはまだ数えられません"
-            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+            key={filter.label}
+            disabled={filter.disabled}
+            title={filter.title}
+            onClick={filter.onClick}
+            aria-pressed={filter.disabled ? undefined : filter.active}
+            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+              filter.disabled
+                ? 'border-hairline text-ink-faint opacity-50'
+                : filter.active
+                  ? 'border-accent-soft bg-accent-soft text-accent'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+            }`}
           >
-            {label}
+            {filter.label}
           </button>
         ))}
       </div>
 
 
-      {error && (
+      {actionError && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
+          {actionError}
         </div>
       )}
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-canvas rounded-card border border-hairline p-5 animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-canvas-sunken rounded w-full" />
-              <div className="flex gap-4">
-                <div className="h-3 bg-canvas-sunken rounded w-24" />
-                <div className="h-3 bg-canvas-sunken rounded w-16" />
-              </div>
-            </div>
-          ))}
-        </div>
+      {loadStatus === 'loading' ? (
+        <ListState kind="loading" title="シナリオを読み込んでいます" />
+      ) : loadStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title="シナリオを表示できませんでした"
+          description="登録したシナリオは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button variant="secondary" onClick={() => void loadScenarios()}>シナリオを再読み込み</Button>}
+        />
       ) : (
         <ScenarioList
           scenarios={scenarios
@@ -429,6 +468,7 @@ export default function ScenariosPage() {
                 : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
             )
             .filter((sc) => (stoppedOnly ? !sc.isActive : true))
+            .filter((sc) => (createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true))
             .filter((sc) =>
               folderFilter === ''
                 ? true
@@ -437,9 +477,10 @@ export default function ScenariosPage() {
                   : sc.folderId === folderFilter,
             )}
           onReorder={handleReorder}
-          onToggleActive={handleToggleActive}
+          folders={folders}
+          onMoveFolder={handleMoveFolder}
+          onToggleActive={(id) => requestToggleActive(id)}
           onDelete={handleDelete}
-          loading={loading}
         />
       )}
         </div>
