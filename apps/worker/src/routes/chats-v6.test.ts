@@ -118,6 +118,32 @@ describe('V6受信箱のアカウント境界', () => {
       expect.objectContaining({ page: 1, pageSize: 200 }),
     );
   });
+
+  test.each([
+    ['/api/chats?limit=999999', 200],
+    ['/api/chats?limit=-1', 200],
+    ['/api/chats?limit=NaN', 200],
+    ['/api/chats?unansweredOnly=false', 200],
+  ])('%s は無制限取得せず最大200件に止める', async (path, expected) => {
+    const calls: Array<{ sql: string; binds: unknown[] }> = [];
+    const db = {
+      prepare(sql: string) {
+        const call = { sql, binds: [] as unknown[] };
+        calls.push(call);
+        const statement = {
+          bind(...binds: unknown[]) { call.binds = binds; return statement; },
+          all: vi.fn(async () => ({ results: [] })),
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+
+    const response = await app().request(path, {}, { DB: db } as Env['Bindings']);
+    expect(response.status).toBe(200);
+    const list = calls.find(({ sql }) => sql.includes('WITH last_any AS MATERIALIZED'));
+    expect(list?.binds.at(-2)).toBe(expected);
+    expect(list?.binds).not.toContain(-1);
+  });
 });
 
 describe('V6受信箱の保存検索', () => {

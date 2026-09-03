@@ -26,6 +26,7 @@ import {
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { listLimit } from './list-pagination.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -379,8 +380,8 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
     //   単一 MAX() は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
     //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
-    //   preview を計算、(d) デフォルト LIMIT 300 (最終行は last_message_at DESC)。
-    //   同条件の本番実測: 459ms / 165k rows_read (LIMIT 300 時)。
+    //   preview を計算、(d) デフォルト LIMIT 200 (最終行は last_message_at DESC)。
+    //   同条件の本番実測: 459ms / 165k rows_read (旧 LIMIT 300 時)。
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
     //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
@@ -403,10 +404,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         : '0=1';
     }
 
-    const limitParam = Number.parseInt(c.req.query('limit') ?? '', 10);
-    const limit = Number.isFinite(limitParam)
-      ? Math.min(1000, Math.max(1, limitParam))
-      : 300;
+    // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
+    // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
+    const limit = listLimit(c.req.query('limit'), 200);
     // カーソルページング: (last_message_at, friend_id) の複合カーソルより古い行を返す。
     // offset 方式は「取得の合間に新着で行が押し下げられた分が欠落する」構造問題が
     // あるため採用しない。friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
