@@ -68,6 +68,26 @@ describe('一斉配信一覧の削除確認', () => {
     expect(jsx).toContain('この操作は取り消せません。')
   })
 
+  it('題は設計どおり、配信名だけを出す', () => {
+    /*
+     * 設計 `EGMb1` は「「8月キャンペーンのお知らせ」を削除しますか？」。
+     * 「配信「…」」と種類を足すと、**何を消すのかは名前で分かるのに
+     * 読む語だけが増える。**
+     */
+    const jsx = dialog(PAGE)
+    expect(jsx).toContain("title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}")
+    expect(jsx, '設計に無い接頭辞が付いている').not.toContain('title={`配信「')
+  })
+
+  it('送信済みの配信に、下書きの言い方を出さない', () => {
+    /*
+     * 窓の本文は「予約済みかどうか」で分岐する。**送信済みにも削除を出すと、
+     * else の枝が「まだ送っていないので、友だちには何も届きません。」という
+     * 嘘の文を出す。** 削除の口は下書きと予約済みだけに置く。
+     */
+    expect(PAGE).toContain("{(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (")
+  })
+
   it('何を消すのかを、日時と送り先まで読み合わせる', () => {
     const jsx = dialog(PAGE)
     expect(jsx, '配信名を読ませていない').toContain('deleteTarget?.title')
