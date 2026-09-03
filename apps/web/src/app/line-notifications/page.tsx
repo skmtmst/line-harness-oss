@@ -186,7 +186,7 @@ export default function LineNotificationsPage() {
               <label className="block text-sm font-semibold text-ink-secondary">カード画像URL<input value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(e) => update(setting.eventType, { imageUrl: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal" /></label>
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => void testSend(setting)} disabled={busy === setting.eventType} className={`${styles.action} ${styles.actionSecondary}`}>テスト送信</button><button type="button" onClick={() => void save(setting)} disabled={busy === setting.eventType} className={`${styles.action} ${styles.actionPrimary}`}>設定を保存</button></div>
             </div>
-            <div className="min-w-0"><p className="mb-2 text-xs font-semibold text-ink-faint">LINEカードプレビュー</p><CardPreview setting={setting} /></div>
+            <div className="min-w-0"><p className="mb-2 text-xs font-semibold text-ink-faint">LINEプレビュー</p><CardPreview setting={setting} /></div>
           </div>}
         </article>)}
       </section>

@@ -712,9 +712,17 @@ export default function BroadcastForm({
                 }`}
               >
                 <span className="flex items-start gap-2">
+                  {/*
+                    **読み上げ名を付ける。**
+                    `<label>` が丸ごと囲っているので目では押せるが、
+                    丸自体には名前が無く、読み上げでは「ラジオボタン」としか
+                    言われない。撮影ハーネスもこれを名前で探せず、
+                    設計 `cPk8A`（対象条件）が撮れていなかった。
+                  */}
                   <input
                     type="radio"
                     name="broadcast-target-mode"
+                    aria-label={mode.label}
                     checked={targetMode === mode.value}
                     onChange={() => setTargetMode(mode.value)}
                     className="mt-0.5"

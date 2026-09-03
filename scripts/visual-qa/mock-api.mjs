@@ -982,6 +982,66 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     // `versions` `bindings` が入っていないと `.find` で落ちる。
     return { success: true, data: { id: pathname.split('/').pop(), name: '来店後のご案内', versions: [], bindings: [], currentPublishedVersionId: null, currentDraftVersionId: null } }
   }
+  if (pathname === '/api/saved-searches' && query.get('format') === 'segment_v1') {
+    /*
+      配信の「保存した条件から選ぶ」。
+      空だと「この条件を使う」の行が描かれず、設計 `sqFXf`（対象条件を編集）が
+      撮れなかった。設計と同じ2件を返す。
+    */
+    const rule = (field, op, value) => ({ field, operator: op, value })
+    return {
+      success: true,
+      data: [
+        {
+          id: 'sp-1', name: 'VIPかつ未契約', scope: 'friends', conditionFormat: 'segment_v1',
+          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('tag', 'includes', 'VIP'), rule('tag', 'excludes', '契約中')] } },
+          createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: true,
+          displayOrder: 1, createdAt: '2026-08-10T00:00:00.000Z',
+          usedIn: [{ kind: 'broadcast', count: 2 }, { kind: 'automation', count: 1 }],
+        },
+        {
+          id: 'sp-2', name: '誕生日30日前', scope: 'friends', conditionFormat: 'segment_v1',
+          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('field', 'within_days', 30)] } },
+          createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: false,
+          displayOrder: 2, createdAt: '2026-08-18T00:00:00.000Z',
+          usedIn: [{ kind: 'other', count: 1 }],
+        },
+      ],
+    }
+  }
+  if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
+    /*
+      ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
+      既定の器だと `analytics.participants.length` の手前で落ちて、
+      `/webinars/edit` が丸ごと「画面を表示できませんでした」になっていた。
+    */
+    return {
+      data: {
+        id: pathname.split('/').pop(), accountId: 'visual-qa-account',
+        title: '定期便のはじめ方', slug: 'subscription-start', status: 'active',
+        videoPrefix: 'nen/subscription-start', durationSeconds: 2_580,
+        schedule: [], cta: { label: '詳しく見る', url: 'https://example.com/subscription', showAtSeconds: 900 },
+        tagOnAttend: null, tagOnCtaClick: null,
+        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+      },
+    }
+  }
+  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) {
+    // 一覧の器だと `participants` `daily` `formFunnel` が無く、画面が落ちる。
+    return {
+      data: {
+        summary: {
+          reservations: 128, viewers: 96, registeredAndJoined: 74, watched5m: 88,
+          watched15m: 61, completed: 34, avgWatchedSeconds: 1_140, ctaClicks: 41, formSubmissions: 18,
+        },
+        daily: [], participants: [], sessions: [], dropoff: [],
+        formFunnel: {
+          ctaImpressions: 96, ctaClicks: 41, formOpens: 33, formStarts: 27,
+          submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
+        },
+      },
+    }
+  }
   if (pathname === '/api/friend-fields-stats') {
     /*
       友だち情報欄の帯。**口が無いと既定の器（`{items,total,page,limit}`）が返り、
