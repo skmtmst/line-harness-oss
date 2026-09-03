@@ -10,7 +10,7 @@
 | エージェントノード | 各グループに 1 つ。司令塔は Claude Code(Fable 5.1)、S0〜S3 は Claude Code(Opus 5)、実装は Codex |
 | 付箋(sticky)→ エージェントへのリンク | 各グループに「まず docs/brain/Home.md を読む。あなたは <担当名>」の 1 行だけの付箋を置き、エージェントにリンクする。指示の正本はリポジトリ側(§8) |
 | コンテキストリンク(ノード間のエッジ) | 司令塔 ↔ 各担当 を双方向で結ぶ。司令塔は必要時だけ相手の記録(トランスクリプト・要約・直近出力)を読む。担当同士は結ばない(重なりの元) |
-| Kanban + GitHub Issues 同期 | **台帳そのもの**。列 = GitHub のラベル。Issue を動かすとラベルが変わり、完了列に置くと Issue が閉じる。GitHub が正本なので、NodeTerm を使わない人(Slack から見る人)も同じものを見る |
+| Kanban + GitHub Issues 同期 | **台帳そのもの**。列 = GitHub のラベル。Issue を動かすとラベルが変わり、完了列に置くと Issue が閉じる。台帳のリポジトリは `kentavndng/line-harness-board`(非公開。fork 側は Issues が無効で、この口座に有効化権限が無いため)。コードと PR は `skmtmst/line-harness-oss` のまま。Masato は協力者として招待済み |
 | NEEDS YOU(承認待ち)の通知 | 担当エージェントの承認待ちは司令塔ではなく人が答える(承認は人の権限)。司令塔は「止まっている担当」を一覧で見るだけ |
 | トリガーノード | 朝の割り当てと夕方のまとめを司令塔に定時で流す(cron)。定義は `.nodeterm/project.json` で共有され、発火の同意は各マシンで人が arm する |
 | キャンバス制御スキル(`manage-nodeterm-canvas`) | 司令塔がキャンバスを操作する: 担当ノードを開く、worktree を開く、ボードを読む。`spawn-team` は使わない(担当は固定 5 本) |
@@ -64,7 +64,7 @@
 ### 動かし方
 
 - **司令塔だけが Issue を作る**(担当が必要になったものは「依頼」として司令塔に Slack で投げ、司令塔が Issue にする)。
-- 担当は着手時にカードを「作業中」へ、PR が CLEAN になったら「マージ待ち」へ動かす。ブランチ名と PR 題名に Issue 番号を入れる(`#T` ではなく GitHub の `#123`)。
+- 担当は着手時にカードを「作業中」へ、PR が CLEAN になったら「マージ待ち」へ動かす。PR は本体リポジトリに出し、PR 本文に台帳の番号を `kentavndng/line-harness-board#123` の形で書く。ブランチ名には `b123` のように番号を入れる。
 - 司令塔はマージ後にカードを完了列へ(= Issue が閉じる)。
 - 「停止」に置くときは本文に理由と、誰の判断が要るかを書く。人は「停止」列だけ見ればよい。
 
@@ -107,7 +107,7 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 `.nodeterm/project.json` と `.nodeterm/settings.json` はこのリポジトリに **生成済み**(2026-09-03)。グループ 6 つ(worktree は `/Volumes/My Passport/Github/lh-work/lh-<担当>` に作成済み)、エージェントノード 6 つ、付箋 6 枚、コンテキストリンク 11 本、トリガー 7 つ(朝・夕・各担当の 30 分ごとの取得)、Kanban の 5 列と GitHub ラベル対応が入っている。GitHub のラベル 10 個も作成済み。残りは NodeTerm の画面でしかできない 4 手順。
 
 1. NodeTerm(v0.3.4、macOS arm64 の dmg)を入れて起動し、「Open folder…」でこのリポジトリのフォルダを開く。`.nodeterm/project.json` が読み込まれ、キャンバスと Kanban が出る。
-2. Settings → GitHub Issues: 「Include GitHub issues」を on、リポジトリは `skmtmst/line-harness-oss`、認証は GitHub CLI(`gh auth login` 済み)、このプロジェクトのアクセスを承認する。列とラベルの対応は project.json に入っているので確認だけ。
+2. Settings → GitHub Issues: 「Include GitHub issues」を on、リポジトリの上書きが `kentavndng/line-harness-board` になっていることを確認(project.json に入っている)、認証は GitHub CLI(`gh auth login` 済み)、このプロジェクトのアクセスを承認する。列とラベルの対応も入っているので確認だけ。
 3. トリガー 7 つを arm する(カードの ARMED を押す)。定義は共有されるが、発火の同意はこのマシンで人が行う。最初の 1〜2 日は arm せず、朝夕の文面を司令塔に手で貼って動きを見るのがよい。
 4. 各グループのエージェントノードを起動する(Claude Code は `claude`、Codex は `codex`)。Opus 5 のモデル指定はノードのモデル選択で行う。承認待ち(NEEDS YOU)の通知を自分の端末に出す。
 

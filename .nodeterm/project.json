@@ -627,7 +627,7 @@
     ],
     "assignments": [],
     "github": {
-      "repository": "skmtmst/line-harness-oss",
+      "repository": "kentavndng/line-harness-board",
       "columnMappings": [
         {
           "columnId": "todo",
