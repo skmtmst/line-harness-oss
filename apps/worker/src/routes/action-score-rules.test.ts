@@ -82,6 +82,17 @@ describe('V6 action score rule API', () => {
     expect(dbMocks.getActionScoreRuleConfiguration).toHaveBeenCalledWith(env.DB, 'account-1');
   });
 
+  it('returns score bands only for the selected authorized account', async () => {
+    const hidden = await call('/api/action-scores/bands?accountId=hidden');
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.getActionScoreBands).not.toHaveBeenCalled();
+
+    const response = await call('/api/action-scores/bands?accountId=account-1');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: configuration.bands });
+    expect(dbMocks.getActionScoreBands).toHaveBeenCalledWith(env.DB, 'account-1');
+  });
+
   it('lets mileage staff view rules but not change them', async () => {
     dbMocks.getStaffByApiKey.mockResolvedValue({
       id: 'staff-1', name: '担当者', role: 'staff', access_level: 'full', permission_keys: '["/mileage"]',
@@ -132,6 +143,35 @@ describe('V6 action score rule API', () => {
     expect(accepted.status).toBe(200);
     expect(dbMocks.publishActionScoreRuleDraft).toHaveBeenCalledWith(env.DB, {
       lineAccountId: 'account-1', draftVersionId: 'draft-1', publishedBy: 'env-owner',
+    });
+  });
+
+  it('stops only the selected authorized account', async () => {
+    const hidden = await call('/api/action-scores/rules/stop', {
+      method: 'POST', body: JSON.stringify({ accountId: 'hidden' }),
+    });
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.stopActionScoreRules).not.toHaveBeenCalled();
+
+    const response = await call('/api/action-scores/rules/stop', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.stopActionScoreRules).toHaveBeenCalledWith(env.DB, 'account-1');
+  });
+
+  it('returns a conflict when another operator has replaced the draft', async () => {
+    dbMocks.saveActionScoreRuleDraft.mockRejectedValueOnce(
+      new dbMocks.ActionScoreRuleValidationError('version_conflict', '下書きを読み直してください'),
+    );
+    const response = await call('/api/action-scores/rules/draft', {
+      method: 'PATCH', body: JSON.stringify({ accountId: 'account-1', configuration }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: 'version_conflict',
+      error: '下書きを読み直してください',
     });
   });
 
