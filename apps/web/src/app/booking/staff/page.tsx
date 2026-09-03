@@ -6,6 +6,7 @@ import Header from '@/components/layout/header'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
@@ -27,6 +28,8 @@ export default function BookingStaffPage() {
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -69,11 +72,21 @@ export default function BookingStaffPage() {
     await load()
   }
 
+  /**
+   * 消す前に、**何が消えて何が残るかを本文で読ませる。**
+   * ブラウザの `confirm()` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
+   * 画像比較にも写らない（確認の絵をそもそも撮れない）。
+   */
   async function remove(id: string) {
     if (!selectedAccountId) return
-    if (!confirm('このスタッフを削除しますか？（既存予約は維持されます）')) return
-    await bookingApi.deleteStaff(selectedAccountId, id)
-    await load()
+    setDeleting(true)
+    try {
+      await bookingApi.deleteStaff(selectedAccountId, id)
+      setRemoveTarget(null)
+      await load()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -165,7 +178,7 @@ export default function BookingStaffPage() {
                         <Link href={`/booking/staff/shifts?staff_id=${s.id}`} className="text-blue-600 hover:underline">
                           シフト
                         </Link>
-                        <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">削除</button>
+                        <button onClick={() => setRemoveTarget(s)} className="text-red-600 hover:underline">削除</button>
                       </div>
                     </td>
                   </tr>
@@ -177,6 +190,17 @@ export default function BookingStaffPage() {
       )}
 
       {editing && <Modal staff={editing} onSave={save} onClose={() => setEditing(null)} />}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget?.name ?? ''}」を削除しますか？`}
+        description="このスタッフを一覧から削除します。すでに入っている予約はそのまま残ります。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        onCancel={() => setRemoveTarget(null)}
+        onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
+      />
     </div>
   )
 }

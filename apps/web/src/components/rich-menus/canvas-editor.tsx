@@ -100,6 +100,8 @@ export function CanvasEditor({
   const dims = SIZE_DIMS[size]
   const [scale, setScale] = useState(0.3)
   const [drag, setDrag] = useState<DragState>(null)
+  /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */
+  const [limitNotice, setLimitNotice] = useState('')
 
   function toImageCoord(clientX: number, clientY: number) {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -208,11 +210,15 @@ export function CanvasEditor({
         const w = Math.abs(x - drag.startX)
         const h = Math.abs(y - drag.startY)
         if (w >= MIN_AREA && h >= MIN_AREA) {
-          // LINE の上限 (1 page あたり area 20 個) を事前にブロック。
-          // 上限を超えて追加させると Save Draft / Publish が 400 になる。
+          /*
+            LINEの上限（1ページに20個）を先に止める。超えて足すと、保存や
+            登録のときに断られる。**`alert()` では出さない**——見た目が
+            ブラウザ任せで、画像比較にも写らない。画面に文で残す。
+          */
           if (areas.length >= 20) {
-            alert('1 ページあたり areas は最大 20 個までです (LINE 仕様)。')
+            setLimitNotice('1つのページに置けるボタンは20個までです（LINEの決まり）。')
           } else {
+            setLimitNotice('')
             onAddArea({
               id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
                 ? crypto.randomUUID()
@@ -298,6 +304,11 @@ export function CanvasEditor({
 
   return (
     <div className="space-y-2 select-none">
+      {limitNotice && (
+        <p role="status" className="bg-status-warn-soft text-status-warn-deep rounded-control px-3 py-2 text-xs">
+          {limitNotice}
+        </p>
+      )}
       <div className="flex items-center gap-2 text-sm">
         <span className="text-gray-500 text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (

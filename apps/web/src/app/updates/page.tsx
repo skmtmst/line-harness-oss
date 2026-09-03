@@ -121,14 +121,15 @@ export default function UpdatesPage() {
                     {r.status === 'success' &&
                     r.rollback_expires_at &&
                     Date.now() < r.rollback_expires_at ? (
-                      <button
-                        onClick={() =>
-                          alert('rollback not implemented in MVP — use CLI')
-                        }
-                        className="underline text-blue-600 text-xs"
-                      >
-                        Rollback
-                      </button>
+                      /*
+                        **押しても何も起きない口を置かない**（`docs/v6-common-rules.md`
+                        §7-10「出す＝使える」）。戻す仕組みは画面から使えないので、
+                        押し口ではなく文で理由を出す。以前はブラウザの `alert()` で
+                        「rollback not implemented in MVP — use CLI」と内部語を出していた。
+                      */
+                      <span className="text-ink-faint text-xs">
+                        戻せる期間内ですが、この画面からは戻せません
+                      </span>
                     ) : (
                       <span className="text-gray-400 text-xs">—</span>
                     )}
