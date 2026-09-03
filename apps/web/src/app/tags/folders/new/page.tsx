@@ -229,7 +229,7 @@ function FolderEditor() {
 
             <div className="mt-7 flex justify-end gap-2">
               <button type="button" onClick={() => router.back()} className="rounded-control border-hairline text-ink-secondary border px-5 py-2.5 text-sm font-medium">キャンセル</button>
-              <button type="button" disabled={saving || blockedReason !== null} onClick={() => void save()} className="rounded-control bg-accent text-on-accent px-5 py-2.5 text-sm font-bold disabled:opacity-40">{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</button>
+              <button type="button" disabled={saving || blockedReason !== null} onClick={() => void save()} className="rounded-control bg-accent-deep text-on-accent px-5 py-2.5 text-sm font-bold disabled:opacity-40">{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</button>
             </div>
           </>
         )}
