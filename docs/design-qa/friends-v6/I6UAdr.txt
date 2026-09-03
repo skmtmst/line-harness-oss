@@ -138,3 +138,4 @@ LINEアカウント
 Shift + Enter で改行
 画像は JPEG / PNG、1枚 10MB まで
 送信
+メッセージを入力
