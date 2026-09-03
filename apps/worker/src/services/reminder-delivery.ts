@@ -9,25 +9,118 @@
  */
 
 import {
+  claimReminderDeliveryRun,
+  completeReminderDeliveryRunStatement,
   getPendingReminderDeliveries,
   completeReminderIfDone,
+  failReminderDeliveryRun,
   getFriendById,
+  getLineAccountById,
   getTemplateById,
-  jstNow,
+  skipReminderDeliveryRun,
 } from '@line-crm/db';
-import type { LineClient } from '@line-crm/line-sdk';
+import { LineClient } from '@line-crm/line-sdk';
 import { addJitter, sleep } from './stealth.js';
 import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
 
+const LEASE_MINUTES = 5;
+// 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
+const MAX_RETRY_CYCLE_ATTEMPTS = 4;
+const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
+
+type PushClient = Pick<LineClient, 'pushMessageWithRequestId'>;
+
+export interface ReminderDeliveryOptions {
+  now?: Date;
+  pause?: (milliseconds: number) => Promise<void>;
+  resolveClient?: (accountId: string | null, fallback: PushClient) => Promise<PushClient>;
+}
+
+export interface ReminderDeliveryResult {
+  succeeded: number;
+  skipped: number;
+  retrying: number;
+  failed: number;
+}
+
+type SafeDeliveryError = { code: string; message: string; retryable: boolean };
+
+/** Provider本文や秘密値を管理画面へ出さず、運用者が次の行動を選べる言葉へ直す。 */
+export function classifyReminderDeliveryError(error: unknown): SafeDeliveryError {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (raw === 'REMINDER_LINE_ACCOUNT_NOT_FOUND') {
+    return { code: 'line_account_not_found', message: '送信に使うLINEアカウント設定を確認してください。', retryable: false };
+  }
+  const status = Number(/LINE API error:\s*(\d{3})/.exec(raw)?.[1] ?? 0);
+  if (status === 429) {
+    return { code: 'line_rate_limited', message: 'LINE側の送信上限に達しました。時間を置いて再試行します。', retryable: true };
+  }
+  if ([401, 403].includes(status)) {
+    return { code: 'line_authentication_failed', message: 'LINE連携の認証を確認してください。', retryable: false };
+  }
+  if ([400, 404, 422].includes(status)) {
+    return { code: 'line_rejected', message: '送信内容または宛先を確認してください。', retryable: false };
+  }
+  if (status >= 500 || /fetch|network|timeout|socket/i.test(raw)) {
+    return { code: 'line_temporary_failure', message: 'LINEへの送信に一時的に失敗しました。自動で再試行します。', retryable: true };
+  }
+  return { code: 'delivery_failed', message: '送信に失敗しました。設定とLINE連携を確認してください。', retryable: true };
+}
+
+async function defaultResolveClient(
+  db: D1Database,
+  accountId: string | null,
+  _fallback: PushClient,
+): Promise<PushClient> {
+  // 所属不明の友だちを「既定アカウント」で送ると、別店舗名義の誤送信になる。
+  // 古いデータは履歴へ残すが、送信元アカウントを推測しない。
+  if (!accountId) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
+  const account = await getLineAccountById(db, accountId);
+  if (!account) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
+  return new LineClient(account.channel_access_token);
+}
+
+function retryAtFor(runAttempt: number, now: Date, retryable: boolean): string | null {
+  if (!retryable || runAttempt >= MAX_RETRY_CYCLE_ATTEMPTS) return null;
+  const delay = RETRY_DELAYS_MINUTES[Math.max(0, runAttempt - 1)] ?? RETRY_DELAYS_MINUTES.at(-1)!;
+  return new Date(now.getTime() + delay * 60_000).toISOString();
+}
+
+function retryAtForError(
+  error: unknown,
+  runAttempt: number,
+  now: Date,
+  retryable: boolean,
+): string | null {
+  if (!retryable || runAttempt >= MAX_RETRY_CYCLE_ATTEMPTS) return null;
+  const status = Number((error as { status?: unknown } | null)?.status ?? 0);
+  const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter;
+  if (status === 429 && typeof retryAfter === 'string' && retryAfter.trim()) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return new Date(now.getTime() + seconds * 1_000).toISOString();
+    }
+    const retryDate = Date.parse(retryAfter);
+    if (Number.isFinite(retryDate) && retryDate >= now.getTime()) {
+      return new Date(retryDate).toISOString();
+    }
+  }
+  return retryAtFor(runAttempt, now, retryable);
+}
+
 export async function processReminderDeliveries(
   db: D1Database,
   lineClient: LineClient,
-): Promise<void> {
-  const now = new Date();
+  options: ReminderDeliveryOptions = {},
+): Promise<ReminderDeliveryResult> {
+  const now = options.now ?? new Date();
+  const nowIso = now.toISOString();
+  const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
   const pending = await getPendingReminderDeliveries(db);
+  const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0 };
 
   /*
    * 配信時刻が来た通だけに絞る。
@@ -38,82 +131,76 @@ export async function processReminderDeliveries(
    * 判定に使う「いま」と、本文の {{date}} に使う「届く日時」を分けているのは、
    * cron が遅れて動いても本文の日付がずれないようにするため。
    */
-  const dueReminders = pending
-    .map((fr) => ({
-      ...fr,
-      steps: fr.steps.filter(
-        (step) =>
-          resolveReminderSendAt(
-            new Date(fr.target_date),
-            {
-              offsetDays: step.offset_days,
-              sendAtTime: step.send_at_time,
-              offsetMinutes: step.offset_minutes,
-            },
-            fr.delivery_mode === 'time' ? 'time' : 'countdown',
-          ).getTime() <= now.getTime(),
-      ),
-    }))
-    .filter((fr) => fr.steps.length > 0);
+  // 未来の通もqueuedとして先に台帳へ置く。実行結果画面の「配信予定」と
+  // 「次の配信」を、送信時刻になる前から実値で確認できるようにする。
+  // claim側の scheduled_at <= now 条件が、時刻前の外部送信を止める。
+  for (let i = 0; i < pending.length; i++) {
+    const enrollment = pending[i];
+    if (i > 0) {
+      await (options.pause ?? sleep)(addJitter(50, 200));
+    }
 
-  for (let i = 0; i < dueReminders.length; i++) {
-    const fr = dueReminders[i];
-    try {
-      // ステルス: バースト回避のためランダム遅延
-      if (i > 0) {
-        await sleep(addJitter(50, 200));
+    const friend = await getFriendById(db, enrollment.friend_id);
+    const friendAccountId = friend
+      ? (friend as unknown as Record<string, string | null>).line_account_id ?? null
+      : null;
+    const accountId = enrollment.line_account_id ?? friendAccountId;
+
+    for (const step of enrollment.steps) {
+      const sendAt = resolveReminderSendAt(
+        new Date(enrollment.target_date),
+        {
+          offsetDays: step.offset_days,
+          sendAtTime: step.send_at_time,
+          offsetMinutes: step.offset_minutes,
+        },
+        enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+      );
+      const run = await claimReminderDeliveryRun(db, {
+        lineAccountId: accountId,
+        reminderId: enrollment.reminder_id,
+        friendReminderId: enrollment.id,
+        friendId: enrollment.friend_id,
+        reminderStepId: step.id,
+        scheduledAt: sendAt.toISOString(),
+        now: nowIso,
+        leaseExpiresAt,
+      });
+      // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
+      if (!run) continue;
+
+      if (!friend) {
+        await skipReminderDeliveryRun(db, {
+          id: run.id,
+          code: 'friend_not_found',
+          message: '友だち情報が見つからないため送信しませんでした。',
+          now: nowIso,
+        });
+        result.skipped++;
+        continue;
       }
-
-      const friend = await getFriendById(db, fr.friend_id);
-      if (!friend || !friend.is_following) {
+      if (!friend.is_following) {
+        await skipReminderDeliveryRun(db, {
+          id: run.id,
+          code: 'friend_not_following',
+          message: 'ブロックまたは友だち解除のため送信しませんでした。',
+          now: nowIso,
+        });
+        result.skipped++;
         continue;
       }
 
-      // Resolve correct lineClient for this friend's account
-      let deliveryClient = lineClient;
-      const friendAccountId = (friend as unknown as Record<string, string | null>).line_account_id;
-      if (friendAccountId) {
-        const { getLineAccountById } = await import('@line-crm/db');
-        const account = await getLineAccountById(db, friendAccountId);
-        if (account) {
-          const { LineClient: LC } = await import('@line-crm/line-sdk');
-          deliveryClient = new LC(account.channel_access_token);
-        }
-      }
-
-      for (const step of fr.steps) {
-        /*
-         * 差し込みを通す。
-         *
-         * 作成画面は「{{name}} や {{予約日時}} は一人ひとりの内容へ置き換わります」と
-         * 書いているのに、通していなかった。{{name}} が文字のまま相手に届いていた。
-         *
-         * {{date}} の起点は「この通が届く日時」。いまの時刻ではなく、ゴール日時から
-         * 決まる配信時刻を渡す。cron が遅れて動いても、本文の日付がずれない。
-         */
-        const sendAt = resolveReminderSendAt(
-          new Date(fr.target_date),
-          {
-            offsetDays: step.offset_days,
-            sendAtTime: step.send_at_time,
-            offsetMinutes: step.offset_minutes,
-          },
-          fr.delivery_mode === 'time' ? 'time' : 'countdown',
-        );
-        /*
-         * テンプレートを選んでいれば、その中身を送る。
-         *
-         * 参照が切れていたら（テンプレートを消した等）、通に書いてある本文を
-         * そのまま送る。自動応答と同じ考え方。テンプレートが消えたせいで
-         * 何も届かなくなるより、書いてあるものが届くほうがよい。
-         */
+      try {
+        const deliveryClient = await (options.resolveClient
+          ? options.resolveClient(accountId, lineClient)
+          : defaultResolveClient(db, accountId, lineClient));
         let messageType = step.message_type;
         let messageContent = step.message_content;
         if (step.template_id) {
-          const tpl = await getTemplateById(db, step.template_id);
-          if (tpl) {
-            messageType = tpl.message_type;
-            messageContent = tpl.message_content;
+          const template = await getTemplateById(db, step.template_id);
+          if (template) {
+            messageType = template.message_type;
+            messageContent = template.message_content;
           }
         }
 
@@ -127,32 +214,75 @@ export async function processReminderDeliveries(
           { ...extra, deliveredAt: sendAt },
         );
         const message = buildMessage(messageType, expanded);
-        await deliveryClient.pushMessage(friend.line_user_id, [message]);
+        const response = await deliveryClient.pushMessageWithRequestId(
+          friend.line_user_id,
+          [message],
+          run.line_retry_key,
+        );
 
-        // Mark as delivered AFTER successful send.
-        // INSERT OR IGNORE prevents duplicate records if parallel workers both sent.
-        // Prefer possible duplicate send over silent message loss on crash.
-        const lockId = crypto.randomUUID();
-        await db
-          .prepare(`INSERT OR IGNORE INTO friend_reminder_deliveries (id, friend_reminder_id, reminder_step_id) VALUES (?, ?, ?)`)
-          .bind(lockId, fr.id, step.id)
-          .run();
-
-        // メッセージログに記録
+        const deliveredId = crypto.randomUUID();
         const logId = crypto.randomUUID();
-        await db
-          .prepare(
-            `INSERT INTO messages_log (id, friend_id, direction, message_type, content, source, created_at)
-             VALUES (?, ?, 'outgoing', ?, ?, 'reminder', ?)`,
-          )
-          .bind(logId, friend.id, messageType, messageContent, jstNow())
-          .run();
+        await db.batch([
+          db.prepare(
+            `INSERT OR IGNORE INTO friend_reminder_deliveries
+               (id, friend_reminder_id, reminder_step_id, delivered_at)
+             VALUES (?, ?, ?, ?)`,
+          ).bind(deliveredId, enrollment.id, step.id, nowIso),
+          db.prepare(
+            `INSERT INTO messages_log
+               (id, friend_id, direction, message_type, content,
+                template_id_at_send, delivery_type, source, line_account_id, created_at)
+             VALUES (?, ?, 'outgoing', ?, ?, ?, 'push', 'reminder', ?, ?)`,
+          ).bind(
+            logId,
+            friend.id,
+            messageType,
+            expanded,
+            step.template_id,
+            accountId,
+            nowIso,
+          ),
+          completeReminderDeliveryRunStatement(db, {
+            id: run.id,
+            lineRequestId: response.requestId,
+            messageLogId: logId,
+            now: nowIso,
+          }),
+        ]);
+        result.succeeded++;
+      } catch (error) {
+        const safe = classifyReminderDeliveryError(error);
+        const retryAt = retryAtForError(
+          error,
+          run.retry_cycle_attempt_count,
+          now,
+          safe.retryable,
+        );
+        const exhausted = safe.retryable && !retryAt;
+        await failReminderDeliveryRun(db, {
+          id: run.id,
+          code: exhausted ? 'retry_exhausted' : safe.code,
+          message: exhausted
+            ? '自動再試行の上限に達しました。LINE連携を確認し、必要なら手動で再試行してください。'
+            : safe.message,
+          retryAt,
+          now: nowIso,
+        });
+        if (retryAt) result.retrying++;
+        else result.failed++;
+        console.error(JSON.stringify({
+          event: 'reminder_delivery_failed',
+          reminderId: enrollment.reminder_id,
+          friendReminderId: enrollment.id,
+          runId: run.id,
+          code: exhausted ? 'retry_exhausted' : safe.code,
+          retryAt,
+        }));
       }
-
-      // 全ステップ配信済みかチェック
-      await completeReminderIfDone(db, fr.id, fr.reminder_id);
-    } catch (err) {
-      console.error(`リマインダ配信エラー (friend_reminder ${fr.id}):`, err);
     }
+
+    await completeReminderIfDone(db, enrollment.id, enrollment.reminder_id);
   }
+
+  return result;
 }
