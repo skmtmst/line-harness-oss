@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
@@ -98,18 +98,8 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'resolved', label: '対応済み' },
 ]
 
-type InboxSavedViewConditions = {
-  version: 1
-  query: string
-  channels: Array<'line' | 'email'>
-  statuses: Array<'unread' | 'in_progress' | 'on_hold' | 'resolved'>
-  assignees: string[]
-  unread: 'all' | 'mine'
-  messageTypes: string[]
-  receivedFrom: string | null
-  receivedTo: string | null
-  sort: 'newest' | 'waiting_desc'
-}
+import type { InboxSavedViewConditions } from './saved-view-types'
+import { savedViewSummary } from './saved-view-summary'
 
 type InboxSavedView = {
   id: string
@@ -435,6 +425,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [savingView, setSavingView] = useState(false)
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  /*
+    保存した検索の要約で、担当者IDを名前にするための対応表。
+    **引けないときは名前を作らない**——`savedViewSummary` が人数で言う。
+  */
+  const operatorNames = useMemo(
+    () => new Map(operators.map((operator) => [operator.id, operator.name])),
+    [operators],
+  )
+
   /*
     担当者ごとの未読数（設計 `YZaDK`）。**画面に見えている行から数えない**——
     一覧はページ送りされるので、2ページ目の未読が落ちる。
@@ -1267,6 +1266,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       title={view.name}
                     >
                       {view.name}{view.isShared ? '（共有）' : ''}
+                      {/*
+                        **名前の下に、何で絞ったかを出す。**
+                        設計 `ASsb3` は「対応マーク：未対応／期限：超過」のように書く。
+                        名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
+                        どちらを押せばいいのかが、名前の付け方頼みになる。
+                      */}
+                      <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal">
+                        {savedViewSummary(view.conditions, operatorNames)}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -2197,7 +2205,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <button
                     onClick={handleSendMessage}
                     disabled={sending || (!messageContent.trim() && !pendingImage)}
-                    className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {sending ? '送信中...' : '送信'}
                   </button>

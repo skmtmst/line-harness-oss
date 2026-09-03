@@ -25,6 +25,17 @@ describe('画面確認モックの口の形', () => {
     }
   });
 
+  it('`ApiResponse` を通さず `{ data: X[] }` と書いた口も拾う', () => {
+    /*
+      ウェビナーの4つの口は `fetchApi<{ data: Webinar[] }>` と書いてある。
+      中身は `ApiResponse<Webinar[]>` と同じなのに、読み取りが名前しか
+      見ていなかったので拾えず、既定の器 `{items:[],total:0}` が返っていた。
+      `/webinars` は `[...narrowed]` で `narrowed is not iterable` を投げ、
+      **画面が丸ごと「画面を表示できませんでした」になっていた。**
+    */
+    expect(paths.has('/api/webinars'), '/api/webinars を配列の口として拾えていない').toBe(true);
+  });
+
   it('交差型で書かれた一覧の口も拾う', () => {
     /*
       `fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: … }>` は
