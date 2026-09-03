@@ -33,6 +33,7 @@ import {
   processOverdueSupportMarkTriggers,
   processScheduledAutomationTriggers,
 } from './services/automation-triggers.js';
+import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -1182,6 +1183,21 @@ async function scheduled(
     if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
   } catch (e) {
     console.error('friend bulk runs cron error:', e);
+  }
+
+  // 交換後の特典配布に一時失敗したものだけを再試行する。交換予約と配布は
+  // 冪等キー・claimで守られているため、Cronが重なっても二重に渡さない。
+  try {
+    const result = await processDueMileageRewardDeliveries(env.DB, {
+      now: new Date(event.scheduledTime).toISOString(),
+      credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      limit: 50,
+    });
+    if (result.processed > 0) {
+      console.log(JSON.stringify({ event: 'mileage_reward_delivery_retry', ...result }));
+    }
+  } catch (e) {
+    console.error('mileage reward delivery retry error:', e);
   }
 
   // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
