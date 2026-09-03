@@ -2,6 +2,22 @@ import { toJstString } from './utils.js';
 
 export const SCENARIO_DELIVERY_BATCH_LIMIT = 40;
 
+/**
+ * Runtime and the staging-only operational check intentionally share this SQL.
+ * The optional scenario predicate isolates synthetic verification rows without
+ * changing the unscoped cron query used in normal delivery.
+ */
+export function buildFriendScenariosDueForDeliveryQuery(scopeToScenario: boolean): string {
+  const scenarioPredicate = scopeToScenario ? '\n         AND fs.scenario_id = ?' : '';
+  return `SELECT fs.* FROM friend_scenarios fs
+       INNER JOIN scenarios s ON fs.scenario_id = s.id
+       WHERE fs.status = 'active'
+         AND s.is_active = 1
+         AND fs.next_delivery_at <= ?${scenarioPredicate}
+       ORDER BY fs.next_delivery_at ASC, fs.id ASC
+       LIMIT ?`;
+}
+
 export interface ScenarioDeliveryTimestampRow {
   id: string;
   next_delivery_at: string;
