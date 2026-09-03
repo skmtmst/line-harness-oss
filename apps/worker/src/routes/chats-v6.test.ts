@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createSavedSearch: vi.fn(),
   updateSavedSearch: vi.fn(),
   deleteSavedSearch: vi.fn(),
+  getUnansweredRowsMap: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => ({
@@ -27,6 +28,10 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     deleteSavedSearch: mocks.deleteSavedSearch,
   };
 });
+
+vi.mock('../services/unanswered-inbox.js', () => ({
+  getUnansweredRowsMap: mocks.getUnansweredRowsMap,
+}));
 
 import { chats } from './chats.js';
 
@@ -84,6 +89,7 @@ beforeEach(() => {
   mocks.getSavedSearchById.mockResolvedValue(null);
   mocks.updateSavedSearch.mockResolvedValue(null);
   mocks.deleteSavedSearch.mockResolvedValue(false);
+  mocks.getUnansweredRowsMap.mockResolvedValue(new Map());
 });
 
 describe('V6受信箱のアカウント境界', () => {
@@ -93,6 +99,65 @@ describe('V6受信箱のアカウント境界', () => {
     } as Env['Bindings']);
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ success: false });
+  });
+
+  test.each([
+    ['/api/chats?limit=999999', 200],
+    ['/api/chats?limit=-1', 200],
+    ['/api/chats?limit=NaN', 200],
+    ['/api/chats?unansweredOnly=false', 200],
+  ])('%s は無制限取得せず最大200件に止める', async (path, expected) => {
+    const calls: Array<{ sql: string; binds: unknown[] }> = [];
+    const db = {
+      prepare(sql: string) {
+        const call = { sql, binds: [] as unknown[] };
+        calls.push(call);
+        const statement = {
+          bind(...binds: unknown[]) { call.binds = binds; return statement; },
+          all: vi.fn(async () => ({ results: [] })),
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+
+    const response = await app().request(path, {}, { DB: db } as Env['Bindings']);
+    expect(response.status).toBe(200);
+    const list = calls.find(({ sql }) => sql.includes('WITH last_any AS MATERIALIZED'));
+    expect(list?.binds.at(-2)).toBe(expected);
+    expect(list?.binds).not.toContain(-1);
+  });
+
+  test('未対応絞り込みはIDをSQLへ渡してから200件上限を適用する', async () => {
+    mocks.getUnansweredRowsMap.mockResolvedValue(new Map([
+      ['friend-1', {
+        lastIncomingAt: '2026-09-01T00:00:00Z',
+        lastIncomingContent: '要返信',
+        lastIncomingType: 'text',
+      }],
+    ]));
+    const calls: Array<{ sql: string; binds: unknown[] }> = [];
+    const db = {
+      prepare(sql: string) {
+        const call = { sql, binds: [] as unknown[] };
+        calls.push(call);
+        const statement = {
+          bind(...binds: unknown[]) { call.binds = binds; return statement; },
+          all: vi.fn(async () => ({ results: [] })),
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+
+    const response = await app().request(
+      '/api/chats?unansweredOnly=true&limit=9999',
+      {},
+      { DB: db } as Env['Bindings'],
+    );
+    expect(response.status).toBe(200);
+    const list = calls.find(({ sql }) => sql.includes('WITH last_any AS MATERIALIZED'))!;
+    expect(list.sql).toContain('f.id IN (SELECT value FROM json_each(?))');
+    expect(list.binds).toContain('["friend-1"]');
+    expect(list.binds.at(-2)).toBe(200);
   });
 });
 
