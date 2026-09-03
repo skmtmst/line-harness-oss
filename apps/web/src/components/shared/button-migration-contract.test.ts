@@ -265,7 +265,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 両方を統合した木を再計測し、片側の古い値へ戻さない。
     // 2026-09-03: どこからも使われていない部品9本(prompt-modal、multi-account-dedup-section、
     // friend-table、step-editor、support-alert-panel、accounts の4本)を消して1192。
-    expect(debt['arbitrary-value']).toBe(1192)
+    // 2026-09-04: /settings の見出しを共通 PageHeader へ寄せたので、
+    // text-[30px] / text-[#202020] / text-[#777] の3つが減って 1189。
+    expect(debt['arbitrary-value']).toBe(1189)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
