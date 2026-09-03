@@ -87,7 +87,7 @@
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 103,
+    "arbitrary-value": 102,
     "direct-primary-button": 1,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -340,7 +340,7 @@
     "direct-th": 5
   },
   "app/settings/page.tsx": {
-    "arbitrary-value": 57,
+    "arbitrary-value": 52,
     "unresolved-classname": 1
   },
   "app/staff/new/page.tsx": {
@@ -506,7 +506,7 @@
     "direct-secondary-button": 1
   },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 61
+    "arbitrary-value": 59
   },
   "components/dashboard/dashboard-editor.tsx": {
     "arbitrary-value": 17,
@@ -752,7 +752,7 @@
     "unresolved-classname": 14
   },
   "components/shared/sticky-bar.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 4
   },
   "components/shared/tabs.tsx": {
     "unresolved-classname": 6
@@ -767,7 +767,7 @@
     "unresolved-classname": 20
   },
   "components/support/email-thread.tsx": {
-    "arbitrary-value": 43
+    "arbitrary-value": 39
   },
   "components/support/pending-inbox-card.tsx": {
     "arbitrary-value": 8,

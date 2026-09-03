@@ -26,7 +26,9 @@ const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: code(fs.re
 const CSS = fs.readFileSync(path.join(SRC, 'app', 'globals.css'), 'utf8')
 
 /**
- * 白文字を載せる緑は `--color-accent-deep`（#068a3c・4.46:1）。
+ * 白文字を載せる緑は `--color-accent-deep`（**#087a3e・5.44:1**）。
+ *
+ * #068a3c は **4.46:1 で AA の 4.5:1 に届かない**。2026-09-04 に戻した。
  *
  * LINE の緑 #06c755 は白文字で **2.26:1** しかなく、14px 太字に必要な
  * 4.5:1 にまったく届かない。2026-09-03 の決定で、主ボタンは濃いほうへ、
@@ -37,7 +39,7 @@ const CSS = fs.readFileSync(path.join(SRC, 'app', 'globals.css'), 'utf8')
  */
 describe('白文字を載せる緑', () => {
   it('トークンが決定の色になっている', () => {
-    expect(CSS).toContain('--color-accent-deep: #068a3c;')
+    expect(CSS).toContain('--color-accent-deep: #087a3e;')
     expect(CSS, 'LINEの緑は残す').toContain('--color-accent: #06c755;')
   })
 

@@ -375,7 +375,7 @@ function SavedSearchEditInner() {
 
   if (loading) return <p className="text-sm text-ink-faint">読み込んでいます</p>
   if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
-  if (!original) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-danger">{error || '保存した検索が見つかりません'}</p>
+  if (!original) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-status-danger">{error || '保存した検索が見つかりません'}</p>
 
   return (
     <div data-design-node="XBkiQ" className="pb-24">
@@ -384,7 +384,7 @@ function SavedSearchEditInner() {
         <Button href="/tags?tab=searches">保存した検索へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-status-danger-border bg-status-danger-soft p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-4 rounded-control border border-status-danger-border bg-status-danger-soft p-3 text-sm text-status-danger">{error}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
@@ -461,7 +461,7 @@ function SavedSearchEditInner() {
       </div>
 
       <StickyBar
-        status={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-status-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
+        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-status-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
