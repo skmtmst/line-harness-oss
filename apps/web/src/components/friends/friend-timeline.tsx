@@ -261,7 +261,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
             type="button"
             onClick={() => void send()}
             disabled={sending || !text.trim()}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium disabled:opacity-40"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium disabled:opacity-40"
           >
             {sending ? '送信中...' : '送信'}
           </button>
