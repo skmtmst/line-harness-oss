@@ -54,8 +54,8 @@ jobs:
       # 反映履歴は「あとでまとめて書く」と必ず薄くなる。変更した本人が
       # 変更した直後に書くのが一番正確なので、PRの時点で見る。
       #
-      # 落とすが、逃げ道は残す。急ぎの修正が出せなくなるほうが困るので、
-      # PRのタイトルか本文に [skip release-log] があれば通す。
+      # 履歴が無い場合は落とすが、急ぎの修正用に [skip release-log] を残す。
+      # ただし、旧ファイルへの追記と不正な見出しはskipでも通さない。
       # 文書だけ・ワークフローだけの変更も対象外にする。
       - name: Require a release-log entry
         env:
@@ -70,18 +70,65 @@ jobs:
             exit 0
           fi
 
-          case "$PR_TITLE$PR_BODY" in
-            *"[skip release-log]"*)
-              echo "::notice::[skip release-log] があるため、反映履歴の確認を飛ばしました。"
-              exit 0
-              ;;
-          esac
-
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
           if [ -z "$changed" ]; then
             echo "変更がありません。"
             exit 0
           fi
+
+          # 旧1ファイル方式は全員のPRが同じ行で衝突するため凍結する。
+          # 削除は整理として許可するが、置換を含む追加行は許可しない。
+          legacy_added=$(git diff --unified=0 "$BASE_SHA...$HEAD_SHA" \
+            -- docs/release-log/unreleased.md \
+            | grep '^+' | grep -v '^+++' || true)
+          if [ -n "$legacy_added" ]; then
+            echo "::error::docs/release-log/unreleased.md は旧方式のため追記できません。"
+            echo "  docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md を作ってください。"
+            exit 1
+          fi
+
+          # 変更したPR別ファイルは、全文を読んで見出しと項目の置き場を確認する。
+          # 差分の追加行だけを見ると、見出し無しの新規ファイルを見落とす。
+          invalid_release_log=0
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            [ "$path" = "docs/release-log/unreleased/README.md" ] && continue
+            [ -f "$path" ] || continue
+            if ! awk '
+              /^#{1,6}[[:space:]]+/ {
+                if ($0 !~ /^## (追加|変更|修正)[[:space:]]*$/) {
+                  printf "::error file=%s,line=%d::見出しは 追加 / 変更 / 修正 のいずれかにしてください: %s\\n", FILENAME, NR, $0
+                  invalid = 1
+                  section = ""
+                } else {
+                  section = $0
+                }
+                next
+              }
+              /^[-*][[:space:]]/ && section == "" {
+                printf "::error file=%s,line=%d::項目を 追加 / 変更 / 修正 の見出しの下へ置いてください。\\n", FILENAME, NR
+                invalid = 1
+              }
+              END { exit invalid ? 1 : 0 }
+            ' "$path"; then
+              invalid_release_log=1
+            fi
+          done <<EOF
+          $(git diff --name-only --diff-filter=ACMR "$BASE_SHA...$HEAD_SHA" \
+            -- 'docs/release-log/unreleased/*.md')
+          EOF
+          if [ "$invalid_release_log" -ne 0 ]; then
+            exit 1
+          fi
+
+          # 緊急時のskipは「履歴を新しく書かない」ことだけを許す。
+          # 旧ファイルへの追記や、書いた履歴の不正な見出しはskipでも通さない。
+          case "$PR_TITLE$PR_BODY" in
+            *"[skip release-log]"*)
+              echo "::notice::[skip release-log] があるため、反映履歴の必須確認を飛ばしました。"
+              exit 0
+              ;;
+          esac
 
           # 文書とワークフローだけの変更は対象外。
           if ! printf '%s\n' "$changed" | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
@@ -89,16 +136,10 @@ jobs:
             exit 0
           fi
 
-          # 反映履歴は2か所から拾う。
-          #
-          #   docs/release-log/unreleased/<番号>-<担当>-<何の話か>.md  ← これから
-          #   docs/release-log/unreleased.md                          ← これまで
-          #
-          # 1ファイルに全員が書き足す形だと、**全員が同じ場所（`## 追加` の
-          # 直後）に行を差し込むので、PRのたびに必ずぶつかる。** 一晩で9本の
-          # PRが全部ここで止まった。1本ずつ別のファイルにすれば起きない。
+          # 反映履歴はPRごとのファイルから拾う。1ファイルに全員が書き足す形だと、
+          # 同じ場所へ行を差し込んで衝突するため、旧 unreleased.md は上で凍結する。
           added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" \
-            -- docs/release-log/unreleased.md 'docs/release-log/unreleased/*.md' \
+            -- 'docs/release-log/unreleased/*.md' \
             | grep '^+[-*] ' || true)
           added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
           if [ "$added" -gt 0 ]; then
