@@ -195,7 +195,7 @@ function BookingDetailInner() {
           <button
             disabled
             title="この画面から予約の中身を書き換える仕組みは準備中です"
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
           >
             変更を保存
           </button>
@@ -304,7 +304,7 @@ function BookingDetailInner() {
                     <button
                       onClick={() => decide('approve')}
                       disabled={acting}
-                      className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
+                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       承認する
                     </button>
@@ -329,7 +329,7 @@ function BookingDetailInner() {
                     <button
                       onClick={() => decide('complete')}
                       disabled={acting}
-                      className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
+                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       完了にする
                     </button>

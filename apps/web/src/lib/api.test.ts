@@ -6,6 +6,7 @@ let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
+let webinarApi: typeof import('./api').webinarApi
 let api: typeof import('./api').api
 
 beforeAll(async () => {
@@ -17,6 +18,7 @@ beforeAll(async () => {
     extractApiErrorCode,
     extractApiErrorData,
     eventsApi,
+    webinarApi,
     api,
   } = await import('./api'))
 })
@@ -52,6 +54,58 @@ describe('api.nenCampaigns.createColumn', () => {
       imageUrl: null,
       publishedAt: null,
     })
+  })
+})
+
+describe('webinarApi notifications', () => {
+  it('設定保存とテスト送信を専用APIへ渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const input = {
+      registrationEnabled: true,
+      dayBeforeEnabled: true,
+      dayBeforeTime: '20:00',
+      hourBeforeEnabled: true,
+      hourBeforeMinutes: 60,
+      startEnabled: true,
+      missedEnabled: true,
+      missedTime: '10:00',
+      completedEnabled: true,
+    }
+
+    await webinarApi.saveNotifications('webinar/1', input)
+    await webinarApi.testNotifications('webinar/1')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/webinars/webinar/1/notifications',
+    )
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify(input),
+    })
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe(
+      'https://worker.example.com/api/webinars/webinar/1/notifications/test',
+    )
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({ method: 'POST' })
+  })
+})
+
+describe('api.affiliates.paymentSummaries', () => {
+  it('選択中のLINE公式アカウントを必ずクエリへ含める', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: [] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.affiliates.paymentSummaries('account/1')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/affiliate-payments?lineAccountId=account%2F1',
+    )
   })
 })
 
