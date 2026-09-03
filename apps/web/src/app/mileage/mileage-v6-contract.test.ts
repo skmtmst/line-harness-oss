@@ -112,14 +112,14 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
     expect(ACTION_SCORE).toContain('data-design-node="z3PB2"')
     expect(ACTION_SCORE).toContain('api.actionScores.friends')
-    expect(ACTION_SCORE).toContain('顧客の価値を表すものではありません')
+    /* 断り文は下の「3つの言い方で断る」で見る。ここは口と印だけ。 */
     expect(ACTION_SCORE).toContain('kind="loading"')
     expect(ACTION_SCORE).toContain('kind="empty"')
     expect(ACTION_SCORE).toContain('kind="error"')
     expect(API).toContain('/api/action-scores/friends')
   })
 
-  it('スコア層を友だち検索と配信の同じ共通条件へ渡す', () => {
+  it('スコアの帯を友だち検索と配信の同じ共通条件へ渡す', () => {
     expect(ACTION_SCORE).toContain('/friends?')
     expect(ACTION_SCORE).toContain('/broadcasts/new?')
     expect(SEGMENT).toContain("case 'score_range'")
@@ -135,5 +135,28 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(ADJUSTMENT).toContain("error.status === 428")
     expect(ADJUSTMENT).toContain('確認手順が完了していません。')
     expect(ADJUSTMENT).not.toContain("error instanceof ApiError || error instanceof Error ? error.message")
+  })
+
+  it('スコアはマイルではないと3つの言い方で断る', () => {
+    /*
+      設計 `z3PB2` の断り文そのまま。**「顧客には表示されず」だけでは足りない。**
+      「マイルが減るのでは」と聞かれたときに答えられるよう、
+      **交換できないこと・残高が動かないこと**を先に言う。
+      1文ではなく3つとも見る。言い換えると1つ落ちても気づけない。
+    */
+    expect(ACTION_SCORE).toContain('スコアはマイルではありません')
+    expect(ACTION_SCORE).toContain('お客様には見せず、交換もできません')
+    expect(ACTION_SCORE).toContain('マイル残高はスコアで増えも減りもしません')
+  })
+
+  it('点数の集まりを「帯」と呼ぶ', () => {
+    /*
+      設計 `z3PB2` は「帯」。「層」は人を分ける言い方に聞こえるので使わない
+      （§7 #48 の表記ゆれ）。CSVの見出しと表の見出しも同じ言葉にする。
+    */
+    expect(ACTION_SCORE).not.toContain('層')
+    for (const word of ['この帯の人を見る', 'この帯に配信する', '帯または検索条件']) {
+      expect(ACTION_SCORE).toContain(word)
+    }
   })
 })
