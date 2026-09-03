@@ -68,6 +68,7 @@ import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
 // 旧通知ルールCRUDはインボックスへ置き換え済み。ダッシュボードの通知パネルだけを公開する。
 import { notificationCenter } from './routes/notification-center.js';
+import { notifications } from './routes/notifications.js';
 import { stripe } from './routes/stripe.js';
 import { health } from './routes/health.js';
 import { automations } from './routes/automations.js';
@@ -142,7 +143,8 @@ export type Env = {
   Bindings: {
     DB: D1Database;
     IMAGES: R2Bucket;
-    RAW_MAIL: R2Bucket;
+    /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
+    RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
     EMAIL?: SendEmail;
@@ -322,6 +324,9 @@ app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
 app.route('/', notificationCenter);
+// 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
+// 2026-05 に外したまま mount されていなかった。
+app.route('/', notifications);
 app.route('/', stripe);
 app.route('/', health);
 app.route('/', automations);

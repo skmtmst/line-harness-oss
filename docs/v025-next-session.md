@@ -189,7 +189,7 @@ MV2 / TV2 の行を見る。
 | `docs/design-node-ids.md` | 117画面のIDとルート |
 | `docs/v025-screen-audit.md` | 画面ごとの突き合わせ状況 |
 | `docs/v025-open-questions.md` | 判断待ち |
-| `docs/sidebar-v2-spec.md` | サイドバーの仕様 |
+| `docs/archive/sidebar-v2-spec.md` | サイドバーの仕様 |
 | `docs/migration-runbook.md` | マイグレーションの手順 |
 | `docs/DEPLOY-GATE.md` | 誰が何をしてよいか（検証はkenta、本番はmasato） |
 | `apps/web/src/lib/design-structure.json` | 画面の骨格と必ず出す語 |

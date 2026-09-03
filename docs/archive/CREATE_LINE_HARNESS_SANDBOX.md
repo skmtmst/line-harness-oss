@@ -1,3 +1,5 @@
+> **完了済みの引き継ぎ・経緯メモ(2026-09-03 に archive へ移動)。判断に使わない。** 現在の正本は `docs/v6-requirements/v6-requirements-master-index.md` と `docs/v6-common-rules.md`。
+
 # create-line-harness Sandbox Runner
 
 `create-line-harness` writes state into `~/.line-harness`, reads wrangler auth from your home/XDG config, and clones the OSS repo into a canonical location. When you want to reproduce installer bugs on the same MacBook without contaminating your normal setup, run the CLI inside a relocated `HOME`.

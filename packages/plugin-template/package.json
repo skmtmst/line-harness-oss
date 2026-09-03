@@ -11,6 +11,7 @@
     "build:mcp": "tsup mcp-server/index.ts --format esm --out-dir dist-mcp",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "pretypecheck": "pnpm --filter @line-harness/sdk build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -1,3 +1,5 @@
+> **完了済みの引き継ぎ・経緯メモ(2026-09-03 に archive へ移動)。判断に使わない。** 現在の正本は `docs/v6-requirements/v6-requirements-master-index.md` と `docs/v6-common-rules.md`。
+
 # v0.24.0 の進み具合（2026-08-16 更新）
 
 夜のあいだに進めたぶんのまとめ。**どこまで動いて、何が残っているか**を

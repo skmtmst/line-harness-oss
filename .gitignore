@@ -43,3 +43,7 @@ packages/db/bootstrap-meta.json
 # 画像比較の差分と結果。基準画像だけを版に残す。
 test-results/
 playwright-report/
+
+# data/ の SQL は同名の .json から scripts/build-*-knowledge-sql.mjs で生成する。
+# CI・配備では使わず、手動投入用の出力なので版に載せない。
+data/nen-knowledge-*.sql

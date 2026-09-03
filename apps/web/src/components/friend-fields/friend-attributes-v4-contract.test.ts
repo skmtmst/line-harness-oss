@@ -65,7 +65,7 @@ describe('友だち属性 V4 contract', () => {
     expect(source).not.toContain("'前へ'")
     expect(source).toContain('CSVで一括登録')
     // 2026-08-26: 「並び替え」ボタンは設計に無い。つまみを常に出して、
-    // いつでも並び替えられるようにした（docs/v6-shell-contract.md の 4-1 基準）。
+    // いつでも並び替えられるようにした（docs/v6-common-rules.md §1 の 4-1 基準）。
     expect(source).not.toContain('並び替えを終了')
     expect(source).toContain('ドラッグして並び替え')
     expect(source).not.toContain('min-w-[1180px]')
