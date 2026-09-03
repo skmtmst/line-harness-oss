@@ -75,7 +75,7 @@ function PreviewBlock({ block }: { block: FormBlock }) {
         className={`rounded-control py-2 text-center text-sm font-medium ${
           block.style === 'outline'
             ? 'border-accent text-accent border'
-            : 'bg-accent text-on-accent'
+            : 'bg-accent-deep text-on-accent'
         }`}
       >
         {block.label || '（ボタン）'}
@@ -183,7 +183,7 @@ export default function FormPreview({
               {options.prevLabel || '前へ'}
             </div>
           )}
-          <div className="bg-accent text-on-accent rounded-control flex-1 py-2 text-center text-sm font-medium">
+          <div className="bg-accent-deep text-on-accent rounded-control flex-1 py-2 text-center text-sm font-medium">
             {isLast ? options.submitLabel || '送信' : options.nextLabel || '次へ'}
           </div>
         </div>

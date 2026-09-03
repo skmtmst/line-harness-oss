@@ -30,6 +30,7 @@ import { processDueAutomationRuns } from './services/automation-engine.js';
 import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
 import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
+import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -1177,6 +1178,21 @@ async function scheduled(
     console.error('friend bulk runs cron error:', e);
   }
 
+  // 交換後の特典配布に一時失敗したものだけを再試行する。交換予約と配布は
+  // 冪等キー・claimで守られているため、Cronが重なっても二重に渡さない。
+  try {
+    const result = await processDueMileageRewardDeliveries(env.DB, {
+      now: new Date(event.scheduledTime).toISOString(),
+      credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      limit: 50,
+    });
+    if (result.processed > 0) {
+      console.log(JSON.stringify({ event: 'mileage_reward_delivery_retry', ...result }));
+    }
+  } catch (e) {
+    console.error('mileage reward delivery retry error:', e);
+  }
+
   // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
   if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
     try {
@@ -1249,6 +1265,25 @@ async function scheduled(
     }
   } catch (e) {
     console.error('webinar-reminders error:', e);
+  }
+
+  // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
+  // 同じ申込へ二重送信しない。
+  try {
+    const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
+    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+    const result = await processWebinarNotificationJobs(env.DB, {
+      proxyBaseUrl:
+        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      defaultLiffId: liffMatch?.[1] ?? null,
+      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+    if (result.sent + result.failed + result.skipped > 0) {
+      console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
+    }
+  } catch (e) {
+    console.error('webinar-notifications error:', e);
   }
 
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
