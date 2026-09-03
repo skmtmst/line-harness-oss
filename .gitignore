@@ -47,3 +47,24 @@ playwright-report/
 # data/ の SQL は同名の .json から scripts/build-*-knowledge-sql.mjs で生成する。
 # CI・配備では使わず、手動投入用の出力なので版に載せない。
 data/nen-knowledge-*.sql
+
+# 画面確認の絵。
+#
+# **作り直せるものを版に置かない。** `.git` 654MB のうち PNG が 528MB（8割）で、
+# 全機能を1回撮り直すたびに約180MB積まれていた（同じ名前で上書きしても
+# 履歴には新しい塊が残る）。
+#
+# 残すのは**判定の出典として名指しされている絵だけ**。名簿はここに書かず、
+# `scripts/visual-qa/cited-shots.mjs` が台帳と引き継ぎ書から集める。
+# 名指ししたものは `git add -f` で入れ、入れ忘れは
+# `cited-shots.test.ts` が落とす（ここに例外を書き並べると、
+# 新しい判定を書くたびに足し忘れて静かに漏れる）。
+#
+# **文字（`.txt`）は残す。** 判定の出典が237か所で指していて、
+# `compare-text.mjs` の入力でもある。919個で2.0MBしかない。
+docs/design-qa/**/*.png
+docs/design-reference/**/*.png
+
+# 画像比較の基準画像。**CIで使っていないので版から外す**（決定済み・2026-09-03）。
+# 手元で `capture.spec.mjs` を回すときは、その場で作り直す。
+scripts/visual-qa/capture.spec.mjs-snapshots/
