@@ -1,3 +1,5 @@
+> **Frozen at v0.13.2 (2026-09-03).** The Japanese `README.md` is the source of truth and the only version kept up to date.
+
 🌐 [日本語](README.md) | **English** | [简体中文](README.zh-CN.md) | [한국어](README.ko.md) | [Español](README.es.md)
 
 # LINE Harness
