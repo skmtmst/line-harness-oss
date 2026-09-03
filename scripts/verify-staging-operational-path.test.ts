@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
   createD1Query,
+  insertSyntheticDeliveryRows,
   readVerificationTarget,
 } from './verify-staging-operational-path.js';
 
@@ -57,6 +58,34 @@ describe('staging operational verification safety', () => {
     await expect(createD1Query(target, 'masked-token')<{ count: number }>('SELECT 1'))
       .resolves.toEqual([{ count: 1 }]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  test('inserts 41 delivery rows in bounded batches instead of one request per row', async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {
+      calls.push({ sql, params });
+      return [];
+    };
+
+    await insertSyntheticDeliveryRows(
+      query,
+      'run-1',
+      'account-1',
+      '2026-09-04T01:00:00.000+09:00',
+      '2026-09-04T00:59:00.000+09:00',
+    );
+
+    const friendInserts = calls.filter((call) => call.sql.includes('INSERT OR IGNORE INTO friends'));
+    const enrollmentInserts = calls.filter((call) => call.sql.includes('INSERT OR IGNORE INTO friend_scenarios'));
+    expect(calls).toHaveLength(11);
+    expect(friendInserts).toHaveLength(5);
+    expect(enrollmentInserts).toHaveLength(5);
+    expect(friendInserts.flatMap((call) => call.params).filter(
+      (value) => typeof value === 'string' && value.startsWith('verify-b88-friend-'),
+    )).toHaveLength(41);
+    expect(enrollmentInserts.flatMap((call) => call.params).filter(
+      (value) => typeof value === 'string' && value.startsWith('verify-b88-enrollment-'),
+    )).toHaveLength(41);
   });
 
   test('uses expiring session auth, aggregate output, and explicit cleanup', () => {
