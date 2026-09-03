@@ -873,6 +873,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
   }
+  if (pathname === '/api/friend-fields-stats') {
+    /*
+      友だち情報欄の帯。**口が無いと既定の器（`{items,total,page,limit}`）が返り、
+      `summary.inUse` が `undefined` になって画面に「使用中 undefined件」と出ていた。**
+      設計 `HBTk0` と文字を並べて初めて分かった。
+      画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
+    */
+    return { success: true, data: { total: 12, inUse: 9, registeredFriends: 1_284, formLinks: 3, updatedThisMonth: 4 } }
+  }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
   }
