@@ -30,6 +30,8 @@ import {
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
+import type { ReminderStepRow } from '@line-crm/db';
+import type { Message } from '@line-crm/line-sdk';
 
 const LEASE_MINUTES = 5;
 
@@ -46,6 +48,44 @@ export interface ReminderDeliveryResult {
   skipped: number;
   retrying: number;
   failed: number;
+}
+
+/** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
+export async function buildReminderStepMessage(
+  db: D1Database,
+  step: ReminderStepRow,
+  friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>,
+  deliveredAt: Date,
+): Promise<{
+  message: Message;
+  messageType: string;
+  messageContent: string;
+  templateId: string | null;
+}> {
+  let messageType = step.message_type;
+  let messageContent = step.message_content;
+  if (step.template_id) {
+    const template = await getTemplateById(db, step.template_id);
+    if (template) {
+      messageType = template.message_type;
+      messageContent = template.message_content;
+    }
+  }
+  const resolvedMeta = await resolveMetadata(db, friend);
+  const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
+  const expanded = expandVariables(
+    messageContent,
+    { ...friend, metadata: resolvedMeta },
+    undefined,
+    messageType,
+    { ...extra, deliveredAt },
+  );
+  return {
+    message: buildMessage(messageType, expanded),
+    messageType,
+    messageContent: expanded,
+    templateId: step.template_id,
+  };
 }
 
 /** Provider本文や秘密値を管理画面へ出さず、運用者が次の行動を選べる言葉へ直す。 */
@@ -149,29 +189,10 @@ export async function processReminderDeliveries(
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
-        let messageType = step.message_type;
-        let messageContent = step.message_content;
-        if (step.template_id) {
-          const template = await getTemplateById(db, step.template_id);
-          if (template) {
-            messageType = template.message_type;
-            messageContent = template.message_content;
-          }
-        }
-
-        const resolvedMeta = await resolveMetadata(db, friend);
-        const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
-        const expanded = expandVariables(
-          messageContent,
-          { ...friend, metadata: resolvedMeta },
-          undefined,
-          messageType,
-          { ...extra, deliveredAt: sendAt },
-        );
-        const message = buildMessage(messageType, expanded);
+        const built = await buildReminderStepMessage(db, step, friend, sendAt);
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
-          [message],
+          [built.message],
           run.line_retry_key,
         );
 
@@ -191,9 +212,9 @@ export async function processReminderDeliveries(
           ).bind(
             logId,
             friend.id,
-            messageType,
-            expanded,
-            step.template_id,
+            built.messageType,
+            built.messageContent,
+            built.templateId,
             accountId,
             nowIso,
           ),
