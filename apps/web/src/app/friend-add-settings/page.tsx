@@ -234,7 +234,7 @@ export default function FriendAddSettingsPage() {
           onClick={save}
           disabled={saving}
           title={routingError() || undefined}
-          className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+          className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
         >
           {saving ? '保存中…' : '保存'}
         </button>
@@ -890,7 +890,7 @@ function ActionEditor({
         type="button"
         disabled={!canAdd}
         onClick={() => onAdd(build())}
-        className="bg-accent text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
+        className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
       >
         入れる
       </button>
@@ -1038,7 +1038,7 @@ function TestRunButton({
               type="button"
               onClick={run}
               disabled={running || !friendId.trim()}
-              className="bg-accent text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
+              className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
             >
               {label}
             </button>
