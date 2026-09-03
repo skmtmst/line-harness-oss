@@ -259,7 +259,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 両方を統合した木を再計測し、片側の古い値へ戻さない。
     // 2026-09-03: どこからも使われていない部品9本(prompt-modal、multi-account-dedup-section、
     // friend-table、step-editor、support-alert-panel、accounts の4本)を消して1192。
-    expect(debt['arbitrary-value']).toBe(1192)
+    // 2026-09-03: 主ボタンの直書き緑5か所を `bg-accent-deep` に寄せ、
+    // それぞれが持っていた `bg-[#06C755]` と `hover:bg-[#05B94F]` が消えて1182。
+    // **減ったので締め直す。**
+    expect(debt['arbitrary-value']).toBe(1182)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
