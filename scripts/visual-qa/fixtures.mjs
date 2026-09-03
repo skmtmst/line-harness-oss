@@ -1525,3 +1525,156 @@ export const AUTO_REPLIES = [
     actions: [], hits: { period: 0, total: 411 }, createdAt: '2026-01-20T00:00:00.000Z',
   },
 ]
+
+/*
+  紹介者。設計 `PouPn` の「アフィリエイター 12」のうち、札の内訳が撮れる6人。
+
+  **状態を混ぜる。** 全員を有効にすると、設計の札（すべて12／有効10／停止中2／
+  未払いあり4／重複の疑い1）が撮れない。停止中を1人、率0%（定額の人）を1人入れる。
+  `code` は運用者が決めてURLに出す符号なので、設計と同じ値を使う。
+*/
+export const AFFILIATES = [
+  { id: 'af-1', name: '田中 明', code: 'tanaka01', commissionRate: 10, isActive: true, email: 'tanaka@example.com', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'af-2', name: '合同会社ノース', code: 'north', commissionRate: 0, isActive: true, email: 'north@example.com', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: false, createdAt: '2026-03-12T00:00:00.000Z' },
+  { id: 'af-3', name: '木村 亮', code: 'miyuki', commissionRate: 15, isActive: true, email: 'miyuki.s@example.jp', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-04-02T00:00:00.000Z' },
+  { id: 'af-4', name: '中村 彩', code: 'aya-n', commissionRate: 10, isActive: true, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false, createdAt: '2026-05-20T00:00:00.000Z' },
+  { id: 'af-5', name: '山口 商店', code: 'yamaguchi', commissionRate: 5, isActive: true, email: 'yamaguchi@example.com', holdDays: 60, payoutCycle: '四半期', notifyOnConversion: false, createdAt: '2026-01-15T00:00:00.000Z' },
+  { /* 設計の「停止中 2」のうち1人。 */ id: 'af-6', name: '旧パートナーA', code: 'old-a', commissionRate: 10, isActive: false, email: null, holdDays: 30, payoutCycle: null, notifyOnConversion: false, createdAt: '2025-11-01T00:00:00.000Z' },
+]
+
+/** 案件。設計 `GH8VL` の「案件 5」。金額は設計の ¥3,000／¥5,000／¥100／¥1,500／¥8,000。 */
+export const AFFILIATE_OFFERS = [
+  { id: 'ao-1', name: '体験の申し込み', description: 'はじめての方の体験予約', rewardAmount: 3000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-trial', scenarioId: 'scenario-0', isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'ao-2', name: '定期便のお申し込み', description: '定期便の初回', rewardAmount: 5000, rewardMiles: 500, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-02-10T00:00:00.000Z' },
+  { id: 'ao-3', name: '友だち追加', description: null, rewardAmount: 100, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-03-01T00:00:00.000Z' },
+  { id: 'ao-4', name: '資料請求', description: null, rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-03-15T00:00:00.000Z' },
+  { /* 設計の「停止・終了 1」。 */ id: 'ao-5', name: '春の紹介キャンペーン', description: '2026春で終了', rewardAmount: 8000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-01-05T00:00:00.000Z' },
+]
+
+/*
+  マイルの残高。設計 `s98Vfw` の並びそのまま。
+
+  **`/api/mileage/overview` は器の形が要る。** 画面の `isMileageAdminOverview` は
+  `summary` の5つの数と `pagination` を見て、1つでも欠けると
+  「友だちのマイルを表示できませんでした」に落ちる。既定の器が返っていたので、
+  固定データ以前に**この画面は一度も中身が撮れていなかった。**
+*/
+const mileageMember = (id, name, available, pending, lifetime, actions, days) => ({
+  identityKey: `ik-${id}`, primaryFriendId: id, displayName: name, pictureUrl: null,
+  accountCount: 1, accountNames: ['LINE 本店'],
+  available, pending, lifetimeEarned: lifetime,
+  actionCount: actions, messageCount: 0, linkClickCount: 0, formCount: 0,
+  bookingCount: 0, webinarCount: 0, instagramCount: 0,
+  followingDays: days, unfollowCount: 0, referralMiles: 0, qualityReferralCount: 0,
+  lastActivityAt: '2026-08-25T00:00:00.000Z',
+})
+
+export const MILEAGE_OVERVIEW = {
+  summary: {
+    totalMembers: 1284,
+    totalAvailable: 486200,
+    activeMembers30d: 642,
+    totalActions: 4180,
+    queuedEvents: 12,
+  },
+  members: [
+    mileageMember('friend-1', '高橋 直人', 8420, 0, 12400, 42, 296),
+    mileageMember('friend-2', '前田 さくら', 6150, 300, 9800, 31, 216),
+    mileageMember('friend-3', '木村 亮', 4980, 0, 7200, 24, 377),
+    mileageMember('friend-4', '中村 彩', 2310, 0, 3100, 12, 120),
+    mileageMember('friend-5', '石田 未来', 860, 0, 1200, 6, 64),
+    mileageMember('friend-6', '松本 圭', 120, 0, 200, 2, 21),
+  ],
+  pagination: { total: 1284, limit: 20, offset: 0 },
+}
+
+/*
+  たまる決めごと。設計 `N46cQ` の「すべて 9／動いている 7／止めている 2」。
+  **止めているものを2本入れる。** 全部動いていると、その札が撮れない。
+*/
+/**
+ * たまる決めごと1本。**`conditions` を空にしない。**
+ * 画面（`earning-rule-view.ts`）は `rule.conditions.uniquePerReferredFriendPerSubject` を
+ * 直に読むので、`conditions` ごと無いと `Cannot read properties of undefined` で
+ * 一覧が丸ごと落ちる。
+ */
+const mileageRule = (id, name, eventType, amount, conditions, isActive = true) => ({
+  id, name, eventType, source: null, amount,
+  initialStatus: 'available', conditions, isActive,
+  validFrom: null, validUntil: null,
+  createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
+})
+
+export const MILEAGE_RULES = [
+  mileageRule('mr-1', 'LINEでメッセージを送ってくれた', 'message_received', 50, { dailyCapActions: 1 }),
+  mileageRule('mr-2', 'Instagramから戻ってきた', 'inflow_return', 100, { uniquePerSubjectPerDay: true }),
+  mileageRule('mr-3', 'ストーリーズのリンクからLINEに来た人', 'inflow_story', 120, { uniquePerSubject: true }),
+  mileageRule('mr-4', '予約してくれた', 'booking_created', 300, {}),
+  mileageRule('mr-5', '回答フォームに答えてくれた', 'form_submitted', 80, { uniquePerSubject: true }),
+  mileageRule('mr-6', 'ウェビナーを見てくれた', 'webinar_watched', 200, {}),
+  mileageRule('mr-7', '口コミを書いてくれた', 'review_posted', 200, { uniquePerSubject: true }),
+  /* 設計の「止めている 2」。全部動いていると、その札が撮れない。 */
+  mileageRule('mr-8', '誕生日クーポンを受け取った', 'birthday', 500, {}, false),
+  mileageRule('mr-9', '旧キャンペーン（終了）', 'campaign_2025', 1000, {}, false),
+]
+
+/*
+  成果地点。設計 `ZrpKn` の「すべて 12／動いている 10／止めている 2／
+  どこからも使われていない 2」の内訳が撮れる6件。
+*/
+export const CONVERSION_POINTS = [
+  { id: 'cp-1', name: 'ECの注文が確定したとき', eventType: 'ec_order_confirmed', value: 12800, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-2', name: 'ECの定期が確定したとき', eventType: 'ec_subscription_confirmed', value: 24000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-3', name: 'サイトの /download を見たとき', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'cp-4', name: '体験の申し込み', eventType: 'form_submitted', value: 3000, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
+  { /* どこからも使われていない1件。 */ id: 'cp-5', name: '資料請求', eventType: 'form_submitted', value: 1500, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
+  { /* 止めている1件。 */ id: 'cp-6', name: '春の来店（終了）', eventType: 'manual', value: 800, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: null, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+]
+
+/*
+  紹介者ごとの集計。設計 `jwrbf`（成果内訳）が読む。
+
+  **紹介者の一覧に居る人は、ここにも全員入れる。** 片方に居て片方に居ないと、
+  内訳の面が `Cannot read properties of undefined (reading 'toLocaleString')` で
+  落ちる（実装が行の有無を確かめずに数を整形しているため。別途 Issue に出した）。
+*/
+export const AFFILIATE_REPORT = [
+  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 24, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
+  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 16, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
+  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 9, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
+  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 5, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
+  { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', commissionRate: 5, totalClicks: 90, totalConversions: 1, totalRevenue: 60000, confirmedReward: 3000, linkCount: 1, friendAdds: 4 },
+  { /* 成果0の人。0と未取得を混ぜないため、0はきちんと0で返す。 */ affiliateId: 'af-6', affiliateName: '旧パートナーA', code: 'old-a', commissionRate: 10, totalClicks: 0, totalConversions: 0, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 0 },
+]
+
+/*
+  紹介者ひとりぶんの内訳。設計 `jwrbf` が読む（`/api/affiliates/:id/report`）。
+
+  **器そのものが要る。** 既定の配列が返っていたので、内訳の面は
+  `report.clicks.toLocaleString()` で落ちていた。
+  `duplicateFlags` に1件入れてあるのは、設計の「重複の疑い 1」を撮るため。
+*/
+export const AFFILIATE_REPORT_DETAIL = {
+  affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10,
+  clicks: 820, linkClicks: 760, friendAdds: 58,
+  conversions: 24, conversionsApproved: 18, conversionsPending: 4, conversionsRejected: 2,
+  conversionsByPoint: [
+    { conversionPointId: 'cp-1', name: 'ECの注文が確定したとき', count: 14, value: 512000 },
+    { conversionPointId: 'cp-4', name: '体験の申し込み', count: 8, value: 24000 },
+    { conversionPointId: 'cp-5', name: '資料請求', count: 2, value: 3000 },
+  ],
+  byOffer: [
+    { offerId: 'ao-1', offerName: '体験の申し込み', rewardAmount: 3000, conversionsApproved: 12, conversionsPending: 2, confirmedReward: 36000 },
+    { offerId: 'ao-2', offerName: '定期便のお申し込み', rewardAmount: 5000, conversionsApproved: 5, conversionsPending: 1, confirmedReward: 25000 },
+    { offerId: 'ao-4', offerName: '資料請求', rewardAmount: 1500, conversionsApproved: 1, conversionsPending: 1, confirmedReward: 1500 },
+  ],
+  revenue: 860000, estimatedCommission: 86000, confirmedReward: 86000,
+  duplicateFlags: [{ friendId: 'friend-4', identityKey: 'ik-friend-4' }],
+}
+
+/** 紹介者が配っているリンク。設計 `jwrbf` の下半分。 */
+export const AFFILIATE_LINKS = [
+  { id: 'al-1', ref_code: 'tanaka01', label: '体験の申し込み用', click_count: 620, friend_adds: 42, conversions: 18, is_active: true, offer_id: 'ao-1', offer_name: '体験の申し込み' },
+  { id: 'al-2', ref_code: 'tanaka01-ig', label: 'Instagram用', click_count: 160, friend_adds: 12, conversions: 5, is_active: true, offer_id: 'ao-2', offer_name: '定期便のお申し込み' },
+  { /* 止めているリンク。全部有効だと、止めた行の見え方が撮れない。 */ id: 'al-3', ref_code: 'tanaka01-mail', label: 'メール署名用', click_count: 40, friend_adds: 4, conversions: 1, is_active: false, offer_id: null, offer_name: null },
+]

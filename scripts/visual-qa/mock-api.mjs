@@ -50,6 +50,7 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -879,6 +880,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
   }
+  /*
+    紹介者・案件・マイル・成果地点。**空だと一覧の中身を設計と比べられない。**
+
+    `/api/mileage/overview` は器の形まで要る。画面の `isMileageAdminOverview` は
+    `summary` の5つの数と `pagination` を見ていて、1つでも欠けると
+    「友だちのマイルを表示できませんでした」に落ちる。
+  */
+  if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
+  if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
+  /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
+  if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
+  if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
+  if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
