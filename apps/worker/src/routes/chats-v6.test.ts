@@ -119,6 +119,26 @@ describe('V6受信箱のアカウント境界', () => {
     );
   });
 
+  test('未対応一覧の検索・アカウント・状態・担当者をDBページングへ渡す', async () => {
+    const response = await app().request(
+      '/api/chats?unansweredOnly=true&q=%E8%A6%81%E7%A2%BA%E8%AA%8D&lineAccountId=account-1&status=unread&operatorId=operator-1&limit=25',
+      {},
+      { DB: {} as D1Database } as Env['Bindings'],
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.computeUnansweredInbox).toHaveBeenCalledWith(expect.anything(), {
+      q: '要確認',
+      account: 'account-1',
+      status: 'unread',
+      operatorId: 'operator-1',
+      page: 1,
+      pageSize: 25,
+      allowedAccountIds: ['account-1'],
+      canSeeUnassigned: false,
+    });
+  });
+
   test.each([
     ['/api/chats?limit=999999', 200],
     ['/api/chats?limit=-1', 200],
