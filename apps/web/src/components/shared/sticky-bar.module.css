@@ -5,19 +5,29 @@
  * **作成・編集画面の保存はここにしか置かない。** ヘッダーにも置くと、
  * どちらを押せばよいか分からなくなる。
  *
- * 左に状態（「下書き・最終保存 10:24」など）、右にボタン。
- * ボタンの並びは「やめる → 下書き → 実行」で、実行がいちばん右。
+ * **並びは 削除（左端）／ 操作（中央）／ 空き（右端）。**
+ * 3列にして真ん中を `auto` にすると、左の削除の有無で中央がずれない。
+ * `space-between` だと、削除が無い画面で操作が左へ寄ってしまう。
  */
 
 .bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center; /* alignItems: center */
-  justify-content: space-between; /* justifyContent: space_between */
-  height: 72px; /* height: 72 */
-  padding: 0 20px; /* padding: [0, 20] */
+  gap: 16px;
+  min-height: 72px; /* height: 72 */
+  padding: 12px 20px; /* padding: [0, 20]。折り返したときのために上下を持つ */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
   border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
   background: var(--color-canvas); /* fill: $canvas */
+}
+
+/* 左端。削除と、あれば状態の文字。 */
+.lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .status {
@@ -29,5 +39,22 @@
 .actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px; /* gap: 8 */
+  flex-wrap: wrap;
+}
+
+/*
+ * 1440 では、左の削除と中央の操作がぶつかることがある。
+ * **横スクロールさせずに2段へ折る。**
+ */
+@media (max-width: 1100px) {
+  .bar {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .actions {
+    justify-content: flex-end;
+  }
 }
