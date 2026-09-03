@@ -82,7 +82,7 @@ export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = [
   { id: 'monthly-delivery', label: '今月の配信', description: 'プッシュ・リプライ・残枠', group: 'right', defaultVisible: true },
   { id: 'recent-results', label: '最近の成果', description: 'コンバージョン', group: 'right', defaultVisible: true },
   { id: 'booking-status', label: '予約状況', description: '右サイド｜予約の内訳', group: 'right', defaultVisible: false },
-  { id: 'inflow-top', label: '流入経路TOP3', description: '右サイド｜友だち追加経路', group: 'right', defaultVisible: false },
+  { id: 'inflow-top', label: '流入経路TOP3', description: '右サイド｜直近7日の上位経路', group: 'right', defaultVisible: false },
   { id: 'funnel-alert', label: 'ファネル要注意', description: '右サイド｜離脱の検知', group: 'right', defaultVisible: false },
   { id: 'automation-failures', label: 'オートメーション失敗', description: '右サイド｜失敗した処理', group: 'right', defaultVisible: false },
 ]
@@ -285,7 +285,14 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
                 <section key={group}>
                   <div className="mb-2 flex items-baseline justify-between gap-3">
                     <h3 className="text-ink text-sm font-bold">{groupLabel(group)}</h3>
-                    <span className="text-ink-faint text-[11px]">{group === 'today' ? '最大4枚まで・ドラッグで順番変更' : 'ドラッグで順番変更'}</span>
+                    {/*
+                      **上限と操作は別の話なので、1行にまとめない。**
+                      設計 `ZN0ov` は「「今日やること」は4枠までです」を独立した1行で出す。
+                      繋げると、上限の文と操作の案内が1つの札に見える。
+                    */}
+                    <span className="text-ink-faint text-[11px]">
+                      {group === 'today' ? '「今日やること」は4枠までです' : 'ドラッグで順番変更'}
+                    </span>
                   </div>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => handleDragEnd(group, event)}>
                     <SortableContext items={draft[group].map((item) => item.id)} strategy={verticalListSortingStrategy}>
