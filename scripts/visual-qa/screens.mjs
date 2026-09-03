@@ -289,7 +289,7 @@ export const SCREENS = [
     verdictSource: 'inbox-v6/design-qa.md', verdictHead: '7b509106',
   },
   {
-    ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
+    ...INBOX, node: 'IYjvu', name: '2-10 対応状況変更を開く',
     steps: [...OPEN_CHAT, { click: '対応状況を変える' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** 一致。未対応・対応中・保留・対応済の並び、色の丸、色付きの札、選択中の✓まで設計どおり',
     verdictSource: 'inbox-v6/IYjvu-1920.png', verdictHead: '7b509106',
@@ -1078,27 +1078,6 @@ export const SCREENS = [
     流入リンクで出し分ける仕組みがそもそも無い。
   */
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信', verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済みほかの表記統一。設計画像は `docs/design-reference/friend-add-v6/` を撮り直した。**実装との突き合わせはこれから。** **`7b509106` の1440・1920を設計と見比べて、書き直した。判定は据え置き。** 実装は**アカウントに1枚**の設定ページで、① はじめて友だち追加した人 ② 以前からの友だち・ブロックを解除した人 ③ 判定の基準 の3節と、右に「どう振り分けられるか」の流れ図・この1か月の実績（はじめて74人・以前から9人。うち3人はブロック解除でした）。**未接続を隠していない**のは良い——「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません。担当者への通知は受け口がまだありません。」。②で「配信しない／別のシナリオを配信する／はじめての人と同じものを配信する」を言い分け、それぞれの副作用まで書いているのも良い。**残る差**：設計は**流入リンクごとに初回案内を並べる一覧**で、帯（初回案内4件／直近7日の友だち追加86人／送信成功84通／経路が分からなかった人12人）、流入の束（店頭・広告・紹介）のフォルダ、「はじめて友だち追加した人」「以前からの友だち・ブロック解除した人」の2タブ、表（設定名／状態／対象の流入リンク／最初に送るもの／直近7日／操作）、頁送り、「初回案内を作成」。**実装にはこの一覧そのものが無い。** 冒頭の言い分け「経路を確定できるのは『流入と計測』で発行したリンクから来た人だけです。」も出ていない。**壊れ値・内部IDは0件。** **推奨修正**：どちらの形で行くかは**設計との決着が先**。1枚設定のままにするなら設計側を直す。', verdictSource: 'friend-add-v6/uLQQc.txt' , verdictHead: '7b509106' },
-  {
-    ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
-    gap: 'drop',
-    gapNote: '設定はアカウントに1枚。名前もフォルダも優先順位も要らない',
-    status: 'unimplemented',
-    why: '設定名・フォルダ・優先順位が無い。**設定はアカウントに1枚**なので、名前も順番も要らない作りになっている',
-  },
-  {
-    ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件',
-    gap: 'drop',
-    gapNote: '実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記',
-    status: 'unimplemented',
-    why: '流入リンクを選ぶ仕組みが無い。画面にも「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と書いてある（`page.tsx:712`）',
-  },
-  {
-    ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内',
-    gap: 'drop',
-    gapNote: '最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**',
-    status: 'unimplemented',
-    why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
-  },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済みほかの表記統一。設計画像は `docs/design-reference/friend-add-v6/` を撮り直した。**実装との突き合わせはこれから。** 【撮影が成立していない】**この絵は `uLQQc` と同一。** どちらも `/friend-add-settings` を手順なしで撮っている。実装に `data-design-node` が1つも無く（数えて0件）、設計が分けている面を撮り分けられない。**まず実装へ目印が要る。** ／ **P2 友だち追加時の配信。作りは設計に近い。** ルート `/friend-add`。段は 1 はじめて友だち追加した人／2 以前からの友だち・ブロックを解除した人 に分かれ、それぞれ 配信するシナリオ・開始のタイミング（すぐに配信／シナリオの設定どおり）・あわせて実行すること を持つ。**良い点**：「決めていない（有効なシナリオを全部流す）」という**既定の挙動を選択肢の文言に書いている**。「流入元の記録は友だち追加のたびに必ず走るので、ここで指定する必要はありません」と、**やらなくていいことまで書いている**。**P2 残る差**：`uLQQc` と同じで、配信内容の下見（実際に届く文面）と、1・2の条件が重なったときどちらが効くかが出ない。取得元：`friend-add-v6/txMO9.txt`（#431 `2ab18c88` で撮った本文）。1440・1920とも横スクロール0 **推奨修正**：`uLQQc` と同じ。下見と重なりの説明を足す。**「流入元の記録は友だち追加のたびに必ず走るので、ここで指定する必要はありません」のような、やらなくていいことを書く形はそのまま残す。**', verdictSource: 'friend-add-v6/txMO9.txt' , verdictHead: '7b509106' },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
@@ -1140,12 +1119,6 @@ export const SCREENS = [
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **2026-09-03 に確かめ直した：まだ本流に無い。** `/friend-add-settings/runs` は HTTP 404 で、`apps/web/src/app/friend-add-settings/runs/page.tsx` も無い。以前ここには「#506 で実行結果の画面が入った」と書いていたが、**それは未マージのPRの枝で見たもの**だった。以下の観察も同じ枝のもの。 未取得の扱いが設計より丁寧で、上の案内に「LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。**取得できない記録は0件にせず「経路は取得できません」と表示します。**」と書き、実際に行でもそう出る。処理できなかった行の処理日時は「—」。P1 設計の右側3枚（稼働状況＝状態・二重送信防止・最終配信・平均送信0.8秒／要テスト＝未送信3件とテストの導線／担当者シナリオ開始＝テスト待ち8・対応中21・完了7）が無い。「流入経路別の内訳」（予約128回59.8%／Webサイト54回25.2%／紹介キャンペーン32回15.0%）も無い。実行結果をCSVで書き出す、配信を一時停止 の導線も無い。P2 帯4つの中身が設計と違う（設計は 直近28日の追加214人／累計配信1,842通／シナリオ開始198件／エラー3件） **ルート**：`/friend-add-settings/runs`。**取得元**：`friend-add-v6/P2J0Te.txt`。**推奨修正**：**「取得できない記録は0件にせず『経路は取得できません』と表示します」の断りはそのまま残す**（束4の手本）。右側3枚と流入経路別の内訳は、`Q4bkTg`（流入と計測）の「経路が分かる何人か」と同じ口が要るので、そちらと同時に。',
     verdictSource: '/friend-add-settings/runs が HTTP 404（2026-09-03 確認）＋ apps/web/src/app/friend-add-settings/runs/page.tsx が無い',
     verdictHead: '5dc99107',
-  },
-  {
-    ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
-    gap: 'drop',
-    gapNote: '設定は1枚で消せない。削除という考えがそもそも無い',
-    status: 'unimplemented', why: '設定はアカウントに1枚で消せない。削除という考えがそもそも無い',
   },
 
   // ── 機能10 ウェビナー ───────────────────────────────────
@@ -1470,13 +1443,6 @@ export const SCREENS = [
     },
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#586 `7428a314` で、前に挙げたP1（一覧に「回答の保存先」が無い）が解消した。4状態を撮って確かめた。** ルート `/form-submissions`。通常・読込・空・失敗を1440・1920で撮った（計8枚、**すべて横スクロール0**）。 **判定を `structure_match_data_pending` にした理由**：**設計の作りはそろい、残るのは実データの接続だけ**。「今月の回答」と「回答率」は取得元が無く `—` のままで、これは**正しい断り**（`—`＋「月ごとの集計は未対応」「配った人数を持っていません」）。**要修正にすべき差は残っていない**が、**数が2つ未接続なので `match` にはしない。** **① 保存先がフォーム定義の実値から出る。** `summarizeFormDestinations(form.layout, form.onSubmitTagId)`（`page.tsx:429`）が `FormLayout` を歩いて数える。数える先は4通り——入力欄の `destinations.friendFieldIds`／`realName`・`displayName`・`note`／選択肢（`choiceMode` が `tag`・`friendField`・`action`）／`options.afterActions` と `onSubmitTagId`。**固定値ではなく、その定義から出している。** **② 重複を数えない。** 撮影用の固定データに**わざと重複を入れた**——「来店アンケート」は `field-birthday` を2か所（`ご満足度` の `choiceFriendFieldId` と `次回のご来店予定` の `friendFieldIds`）、`tag-0` を2つの選択肢で使う。**重複を数えれば 友だち情報欄5・タグ4、除けば 3・2。画面は「友だち情報欄 3・タグ 2」と出た。** `Set` が効いている。 **③ 実値0は `0`、未取得は `—`。** 保存先の無いフォーム（「休止の理由」）は **「友だち情報欄 0・タグ 0」** と出て `—` にならない。帯は 空のとき フォーム **0件**／公開中 **0件**、失敗のとき フォーム **`—`**／公開中 **`—`**。**数えて0と、読めなかったが別。** **④ 既存の状態表示・帯・横スクロールに後退なし。** 読込＝「回答フォームを読み込んでいます／このまま少しお待ちください。」、失敗＝「**回答フォームを読み込めませんでした**／通信状態を確認して、もう一度読み込んでください。」、空＝「まだ回答フォームがありません／最初のフォームを下書きで作り…」。**失敗のときに作成の誘いを出さない**（束1）。8枚とも横スクロール0。 **⑤ 内部ID・`undefined`・`NaN`・`Invalid Date`・`API error`・`Failed to fetch` は4状態とも0件**（`form-1` `field-birthday` `tag-0` はどれも画面に出ない）。 **P2 残る差（判定は変えない）**：設計は保存先を「友だち情報欄3・タグ2」ではなく**名前で**出す（「愛犬のお名前・誕生日…」）。数だけでも「答えると何が書き換わるか」は分かるので、**消す前・変える前の判断には足りる**。 **撮影用の固定データを直した（実装は変えていない）**：フォームに `layout` を入れていなかった。Worker の `parseLayout()` は `null` を返さず、定義が無ければ `fields` から作り、それも無ければ空の定義を返す（`packages/shared/src/form-layout.ts:447`）ので、**定義の無いフォームは口から返ってこない**。省くと実際には起きない形になるため、4件すべてに入れた。 取得元：`forms-v6/EMBIK-normal.txt` ＋ `-loading` `-empty` `-error` ＋ `form-destination-summary.ts`', verdictSource: 'forms-v6/EMBIK-normal.txt + form-destination-summary.ts' , verdictHead: '7b509106' },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT, verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P1 タグの選び口が、フォルダ分けのない1本の長い並び。** ルート `/forms/edit?id=form-1`。撮った本文で「EC顧客連携済み…VIPタグ1〜13／ペットタグ1〜12／会員タグ1〜9…」が**平らに全部**出る。友だち一覧のタグはフォルダで束ねているのに、ここだけ束ねない。**P1 ブロックの種類が設計より少ない**——実装は テキスト／ラジオボタン／チェックボックス／プルダウン／ファイル／日付／都道府県。設計の 数値・メール・電話・画像・住所自動入力 が無い。**良い点**：日付ブロックが「回答の登録先」で友だち情報欄を選べ、さらに「この日付からリマインダを起動する」でリマインダをつなげられる（設計どおり）。「回答データの見出し：next_visit」も出る。取得元：`forms-v6/vCqUj.txt`。1440・1920とも横スクロール0 **推奨修正**：**タグの選び口をフォルダで束ねる**のが先（VIPタグ1〜13・ペットタグ1〜12…が平らに出ると選べない）。友だち一覧のフォルダの縦帯を持ってくれば足りる。ブロックの種類（数値・メール・電話・画像・住所自動入力）はそのあと。', verdictSource: 'forms-v6/vCqUj.txt' , verdictHead: '6a3eb22b' },
-  {
-    ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
-    gap: 'drop',
-    gapNote: '**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」',
-    status: 'unimplemented',
-    why: '**確かめました（2026-08-28）。作らない決めです。** 「デザイン設定」は `disabled` を直接書いてあり（`form-submissions/edit/page.tsx:379-388`）、覚え書きに「フォームの見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」とあります。**V6から外す候補**',
-  },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: FORM_EDIT,
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 オプション設定の面が設計とそろわない **ルート**：`/form-submissions/edit?id=form-1`（オプション設定）。**取得元**：`forms-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**残作業**：この画面の本文を撮って、設計との差を数え直す。いまの判定は「そろわない」としか書けておらず、具体的な差を出せていない。', verdictSource: 'forms-v6/design-qa.md',
@@ -2602,6 +2568,106 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
     verdictHead: '7b509106',
   },
+
+  // ── pen から届いた新画面（台帳 kentavndng/line-harness-board#18） ──────────
+
+  {
+    /*
+      §7 #6「CSV操作の専用画面」。3-4 UID移行（`vtBCu`）と同じ束で、
+      移行そのものの口がまだ無い。
+    */
+    node: 'ux7of', feature: 3, name: '3-4-A UID・顧客データ移行／CSV',
+    dir: 'friends-v6', route: '/friends/migrations', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: '取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束',
+    why: '`/friends/migrations` が実装に無い。3-4 UID移行そのものが `gap: api` のまま',
+  },
+  {
+    /*
+      §7 #108 で描いた「担当者の未読が数えられないとき」。
+      **実装はもう在る**——skmtmst/line-harness-oss#741 で、集計が読めないときは
+      数だけ `—` にして担当者一覧そのものは残す形にした。
+      `YZaDK` の `-error` と同じ面だが、設計が別ノードを持つので別行で撮る。
+    */
+    ...INBOX, node: 'ohj8J', name: '2-8-A 担当者の未読が数えられないとき',
+    steps: [{ click: '担当者で絞り込む' }],
+    states: { apis: ['**/api/chats/stats**'], kinds: ['error'] },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-04 台帳へ登録して初めて撮った（board#18 の pen からの申し送り）。** ルート `/chats`（「担当者で絞り込む」を開いた形）。通常と集計失敗の2状態を1440・1920で撮った（4枚、はみ出し0）。 **実装はもう在った**——skmtmst/line-harness-oss#741 で、集計が読めないときは**数だけ `—` にして担当者一覧そのものは残す**形にしてある。担当者は `/api/operators` の別の口なので、集計が落ちても消さない。 **実値0と未取得を別の文字にしている**（0件なら「Kenta 0」、読めないなら「Kenta —」）。 P2 設計 `ohj8J` の文字がまだ書き出されていないので、文言の突き合わせは書き出し後。',
+    verdictSource: 'inbox-v6/ohj8J-error.txt', verdictHead: 'f3946713',
+  },
+
+  // ── 機能33 LINEアカウント設定（§7 #28） ──────────────────────────────
+
+  /*
+    **`/accounts` と `/accounts/new` は、いま別の画面への転送になっている。**
+
+      /accounts      → /hq（統括コンソール）
+      /accounts/new  → /restaurant-test/stores/new（飲食店向けのテスト機能）
+
+    そのまま撮ると**別の画面を 33-1・33-2 として台帳に入れる**ので、
+    実装が無いものとして扱う。撮影ハーネスの「飛ばされた」検査が拾った。
+    どちらのルートを 33 に使うかは決めごとが要る（board#18 へ返した）。
+  */
+  {
+    node: 'QT91v', feature: 33, name: '33-1 LINEアカウント一覧',
+    dir: 'accounts-v6', route: '/accounts', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: 'LINEアカウントを読む口はもう在る（`/api/line-accounts`）。一覧の画面を作るだけ',
+    why: '`/accounts` は `/hq`（統括コンソール）への転送で、33-1 の画面は無い',
+  },
+  {
+    node: 'b2NGxk', feature: 33, name: '33-2 LINEアカウントを登録する',
+    dir: 'accounts-v6', route: '/accounts/new', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '登録の口は在る。**飲食店向けの店舗登録とは別の画面**として作る',
+    why: '`/accounts/new` は `/restaurant-test/stores/new`（飲食店向けのテスト機能）への転送で、33-2 の画面は無い',
+  },
+  {
+    node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
+    dir: 'accounts-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '一覧と登録は在るので、読む口はそろっている。詳細・編集の画面を作るだけ',
+    why: '`/accounts` の詳細・編集にあたるルートが実装に無い（一覧と `/accounts/new` だけ）',
+  },
+  {
+    node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
+    dir: 'accounts-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: '別のチャネルへ友だち・配信・履歴を引き継ぐ口が要る。既存の口では足りない',
+    why: '`/accounts/handover` が実装に無く、引き継ぎの口も無い',
+  },
+
+  // ── 機能34 はじめの設定と案内（§7 #29） ──────────────────────────────
+
+  {
+    node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
+    dir: 'getting-started-v6', route: '/getting-started', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '進み具合はいまある口（接続状態・友だち数・配信）から組み立てられる。画面を作るだけ',
+    why: '`/getting-started` が実装に無い',
+  },
+  {
+    node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
+    dir: 'getting-started-v6', route: '/recipes', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: 'レシピ（ひな形の組み合わせ）を持つ口がまだ無い',
+    why: '`/recipes` が実装に無く、レシピを読む口も無い',
+  },
+  {
+    node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
+    dir: 'getting-started-v6', route: '/recipes/clone?id=recipe-1', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: 'レシピを複製して各機能へ展開する口が要る。`y0P0Qx` と同じ束',
+    why: '`/recipes` の複製にあたるルートが実装に無い',
+  },
+  {
+    node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
+    dir: 'getting-started-v6', route: '/settings/manual-links', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '正本の場所を持つだけの表。新しい口は要らない',
+    why: '`/settings/manual-links` が実装に無い',
+  },
 ]
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
@@ -2619,9 +2685,13 @@ export const DESIGN_SIZE = {
   xfYLn: [1920, 1080], r6Gzsu: [1920, 1080], hz9ti: [1920, 1080], dqFft: [1920, 1080],
   EvVO5: [1920, 1080], RUxNf: [1920, 1080], NrBkW: [1920, 1080], g2UNV: [1920, 1080],
   M2b2B: [1920, 1080], q5G45: [1920, 1080],
-  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1107],
-  I6UAdr: [1920, 1384], bzDn6: [1920, 1080], YzxU1: [1920, 1431], InCDe: [1920, 1080],
-  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1080],
+  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1251],
+  I6UAdr: [1920, 1384], bzDn6: [1920, 1220], YzxU1: [1920, 1431], InCDe: [1920, 1220],
+  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1064],
+  /* pen から届いた新画面（台帳 kentavndng/line-harness-board#18 の実測）。 */
+  ux7of: [1920, 1080], ohj8J: [1920, 1840],
+  QT91v: [1920, 1080], b2NGxk: [1920, 1940], T9rA9: [1920, 1120], nx3XW: [1920, 1100],
+  RAW35: [1920, 1010], y0P0Qx: [1920, 720], D5UaX: [1920, 856], f9oUm: [1920, 700],
   vUXKb: [1920, 1668], ZN0ov: [1920, 1754], JN6mQ: [1920, 1668],
   NjK9q: [1920, 1668], Alekb: [1920, 1668],
   l25rlp: [1920, 1080], tP0RW: [1920, 1320], LfrQs: [1920, 1320],

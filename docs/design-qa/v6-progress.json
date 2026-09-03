@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "total": 262,
-  "compared": 232,
-  "unimplemented": 26,
+  "total": 267,
+  "compared": 233,
+  "unimplemented": 30,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 4,
   "match": 0,
-  "structureMatchDataPending": 0,
-  "needsFix": 1,
-  "unjudged": 231,
-  "remaining": 258,
+  "structureMatchDataPending": 1,
+  "needsFix": 2,
+  "unjudged": 230,
+  "remaining": 263,
   "features": [
     {
       "feature": 1,
@@ -45,17 +45,17 @@
     {
       "feature": 2,
       "name": "受信箱",
-      "total": 17,
-      "compared": 17,
+      "total": 18,
+      "compared": 18,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 1,
-      "unjudged": 16,
-      "remaining": 17,
+      "structureMatchDataPending": 1,
+      "needsFix": 2,
+      "unjudged": 15,
+      "remaining": 18,
       "capturedAt": [
         {
           "pr": 513,
@@ -151,9 +151,9 @@
     {
       "feature": 3,
       "name": "友だち",
-      "total": 11,
+      "total": 12,
       "compared": 10,
-      "unimplemented": 1,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -161,7 +161,7 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 10,
-      "remaining": 11,
+      "remaining": 12,
       "capturedAt": [
         {
           "pr": 520,
@@ -940,9 +940,9 @@
     {
       "feature": 9,
       "name": "友だち追加時の配信",
-      "total": 10,
+      "total": 6,
       "compared": 5,
-      "unimplemented": 5,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -950,7 +950,7 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 5,
-      "remaining": 10,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 431,
@@ -1290,9 +1290,9 @@
     {
       "feature": 13,
       "name": "回答フォーム",
-      "total": 7,
+      "total": 6,
       "compared": 5,
-      "unimplemented": 2,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -1300,7 +1300,7 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 5,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 436,
@@ -2455,6 +2455,38 @@
           "note": "development そのもので撮った"
         }
       ]
+    },
+    {
+      "feature": 33,
+      "name": "LINEアカウント設定",
+      "total": 4,
+      "compared": 0,
+      "unimplemented": 4,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 4,
+      "capturedAt": null
+    },
+    {
+      "feature": 34,
+      "name": "はじめの設定と案内",
+      "total": 4,
+      "compared": 0,
+      "unimplemented": 4,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 4,
+      "capturedAt": null
     }
   ],
   "gaps": [
@@ -2509,38 +2541,10 @@
     },
     {
       "feature": 9,
-      "node": "s9gAx",
-      "name": "9-1-A 基本設定",
-      "gap": "drop",
-      "gapNote": "設定はアカウントに1枚。名前もフォルダも優先順位も要らない"
-    },
-    {
-      "feature": 9,
-      "node": "W1wzCa",
-      "name": "9-1-B 流入条件",
-      "gap": "drop",
-      "gapNote": "実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記"
-    },
-    {
-      "feature": 9,
-      "node": "K0Dbr2",
-      "name": "9-1-C 初回案内",
-      "gap": "drop",
-      "gapNote": "最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**"
-    },
-    {
-      "feature": 9,
       "node": "P2J0Te",
       "name": "9-1-H 実行結果",
       "gap": "pending",
       "gapNote": "画面 `/friend-add-settings/runs` が development に無い。判定は未マージ枝 `5dc99107` で書かれたもの"
-    },
-    {
-      "feature": 9,
-      "node": "Q3qP1r",
-      "name": "9-1-I 削除確認",
-      "gap": "drop",
-      "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
     },
     {
       "feature": 10,
@@ -2555,13 +2559,6 @@
       "name": "10-1-K 削除確認",
       "gap": "drop",
       "gapNote": "物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない"
-    },
-    {
-      "feature": 13,
-      "node": "ava2n",
-      "name": "13-1-B フォームのデザイン設定",
-      "gap": "drop",
-      "gapNote": "**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」"
     },
     {
       "feature": 13,
@@ -2639,6 +2636,69 @@
       "name": "25-1-B オートメーションが動いた記録",
       "gap": "pending",
       "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
+    },
+    {
+      "feature": 3,
+      "node": "ux7of",
+      "name": "3-4-A UID・顧客データ移行／CSV",
+      "gap": "api",
+      "gapNote": "取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束"
+    },
+    {
+      "feature": 33,
+      "node": "QT91v",
+      "name": "33-1 LINEアカウント一覧",
+      "gap": "build",
+      "gapNote": "LINEアカウントを読む口はもう在る（`/api/line-accounts`）。一覧の画面を作るだけ"
+    },
+    {
+      "feature": 33,
+      "node": "b2NGxk",
+      "name": "33-2 LINEアカウントを登録する",
+      "gap": "build",
+      "gapNote": "登録の口は在る。**飲食店向けの店舗登録とは別の画面**として作る"
+    },
+    {
+      "feature": 33,
+      "node": "T9rA9",
+      "name": "33-3 LINEアカウントの詳細・編集",
+      "gap": "build",
+      "gapNote": "一覧と登録は在るので、読む口はそろっている。詳細・編集の画面を作るだけ"
+    },
+    {
+      "feature": 33,
+      "node": "nx3XW",
+      "name": "33-4 乗り換え・引き継ぎ",
+      "gap": "api",
+      "gapNote": "別のチャネルへ友だち・配信・履歴を引き継ぐ口が要る。既存の口では足りない"
+    },
+    {
+      "feature": 34,
+      "node": "RAW35",
+      "name": "34-1 はじめの設定",
+      "gap": "build",
+      "gapNote": "進み具合はいまある口（接続状態・友だち数・配信）から組み立てられる。画面を作るだけ"
+    },
+    {
+      "feature": 34,
+      "node": "y0P0Qx",
+      "name": "34-2 レシピ一覧",
+      "gap": "api",
+      "gapNote": "レシピ（ひな形の組み合わせ）を持つ口がまだ無い"
+    },
+    {
+      "feature": 34,
+      "node": "D5UaX",
+      "name": "34-3 レシピを複製する",
+      "gap": "api",
+      "gapNote": "レシピを複製して各機能へ展開する口が要る。`y0P0Qx` と同じ束"
+    },
+    {
+      "feature": 34,
+      "node": "f9oUm",
+      "name": "34-4 マニュアルの正本表",
+      "gap": "build",
+      "gapNote": "正本の場所を持つだけの表。新しい口は要らない"
     }
   ]
 }
