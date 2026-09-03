@@ -81,6 +81,13 @@ const ACCOUNT = {
   id: 'visual-qa-account',
   channelId: '0000000000',
   name: '画面確認アカウント',
+  /*
+    **権限を持たせる。** 無いと `canRunBulk(role)` が false になり、
+    友だち一覧の「操作を選ぶ」が描かれない。押しどころが無いので、
+    その先の一括操作 5 状態（`IAf7j`）が1枚も撮れなかった。
+    撮影用の器なので、いちばん広い `owner` を置く。
+  */
+  role: 'owner',
   channelAccessTokenConfigured: true,
   channelSecretConfigured: true,
   loginChannelId: null,
@@ -945,6 +952,37 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       並べたときに**実装の差に見えてしまう**（実際はこちらの返事が違うだけ）。
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
+  }
+  if (pathname === '/api/support-marks') {
+    /*
+      対応マーク。**「保留」と「対応中」が要る。**
+      設計 `GMvBd`（追加・編集）と `zGZMA`（削除の確認）は、この2つの行を
+      押してから開く。行が無いと押しどころが無く、6+1 状態が撮れなかった。
+
+      `usedIn` も持たせる。**参照数が無いと「削除できるか確認できません」**
+      になり、削除の確認窓（`zGZMA`）まで進めない。「対応中」は使用先を
+      持たせて**消せない側**、「保留」は 0 で**消せる側**にして、
+      両方の見た目を撮れるようにする。
+    */
+    const mark = (id, name, color, order, extra = {}) => ({
+      id, name, color, isDefault: order === 0, autoOnInbound: order === 0,
+      displayOrder: order, createdAt: `${FIXED_TO}T00:00:00.000Z`,
+      friendCount: 0,
+      usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
+      ...extra,
+    })
+    return {
+      success: true,
+      data: [
+        mark('sm-1', '未対応', '#e5484d', 0, { friendCount: 23 }),
+        mark('sm-2', '対応中', '#f5c56b', 1, {
+          friendCount: 8,
+          usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 2, savedSearches: 0, automations: 0 },
+        }),
+        mark('sm-3', '保留', '#8b8f94', 2, { friendCount: 4 }),
+        mark('sm-4', '対応済み', '#05913e', 3, { friendCount: 186 }),
+      ],
+    }
   }
   if (pathname === '/api/notifications/center') {
     /*
