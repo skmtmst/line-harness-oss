@@ -246,7 +246,7 @@ export default function SegmentPresetControls({
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={80}
-              placeholder="例：直近30日で反応した友だち"
+              placeholder="例：この30日で反応した友だち"
               className="border-hairline rounded-control mt-2 w-full border bg-canvas px-3 py-2 text-sm text-ink"
               autoFocus
             />
