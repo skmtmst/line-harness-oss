@@ -48,7 +48,7 @@
 
 順番(1 部品 1 PR、当日マージ):
 1. list-toolbar.tsx の「準備中」を全廃。フォルダ・並び順・表示件数・保存した条件は、動くまで描かない(v6-common-rules §5-5)。どうしても位置を見せる場合は BlockedAction(not-connected.tsx)で理由を本文の文字で出す。契約テストで「page.tsx が『準備中』を含まない」を全 130 ページに適用する(既存の個別テストを一般化)。
-2. 色トークンを 1 系統に。--color-v6-accent 系を --color-accent 系へ寄せ、主ボタン用に --color-action-primary: #068a3c(白文字)を新設。--color-v6-ink-faint(#8b938d)は捨てて #6e7781 へ。角丸の同値別名(10px×3、8px×3、3px×2)を削る。globals.css に同値トークンが 2 つ以上無いことを契約テストで固定。
+2. 色トークンを 1 系統に。--color-v6-accent 系を --color-accent 系へ寄せ、主ボタンは既存の --color-accent-deep(#087a3e)+ 白文字にし、同値の別名トークンは新設しない(索引 §5-2)。--color-v6-ink-faint(#8b938d)は捨てて #6e7781 へ。角丸の同値別名(10px×3、8px×3、3px×2)を削る。globals.css に同値トークンが 2 つ以上無いことを契約テストで固定。
 3. PageHeader を 130 ページへ。本文の H1 とトップバーの画面名の二重表示を無くす。契約テストで「page.tsx が h1 を直接持たない」を禁止。
 4. StickyBar を全「作成・編集」画面へ。下部追従バーの並び(削除左・他は中央)を部品で固定。
 5. 素の select 222 行を shared/select へ。契約テストで「page.tsx が <select を直接持たない」を禁止。
@@ -85,7 +85,7 @@
 
 ## 5. Pencil の修正(人が Pencil の AI に貼る)
 
-`docs/v6-pencil-fix-prompt.md` に 50 件を 1 件ずつ貼れる形で置いた。優先度順(1〜29 要件由来、30〜50 設計画像由来)。主ボタン色の変更(#068a3c + 白文字)は 40 番。反映したら `docs/v6-requirements/v6-32-feature-cross-review.md` §7 の該当行に日付を書き、S1〜S3 に Slack で知らせる。
+`docs/v6-pencil-fix-prompt.md` に 50 件を 1 件ずつ貼れる形で置いた。優先度順(1〜29 要件由来、30〜50 設計画像由来)。主ボタン色の変更($accent-deep #087A3E + 白文字)は 40 番。反映したら `docs/v6-requirements/v6-32-feature-cross-review.md` §7 の該当行に日付を書き、S1〜S3 に Slack で知らせる。
 
 ## 6. 週次の見込み
 
