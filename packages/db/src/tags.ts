@@ -1162,16 +1162,19 @@ import type { Friend } from './friends';
 export async function getFriendsByTag(
   db: D1Database,
   tagId: string,
+  lineAccountId?: string | null,
 ): Promise<Friend[]> {
+  const accountClause = lineAccountId ? ' AND f.line_account_id = ?' : '';
+  const bindings = lineAccountId ? [tagId, lineAccountId] : [tagId];
   const result = await db
     .prepare(
       `SELECT f.*
        FROM friends f
        INNER JOIN friend_tags ft ON ft.friend_id = f.id
-       WHERE ft.tag_id = ?
+       WHERE ft.tag_id = ?${accountClause}
        ORDER BY f.created_at DESC`,
     )
-    .bind(tagId)
+    .bind(...bindings)
     .all<Friend>();
   return result.results;
 }
