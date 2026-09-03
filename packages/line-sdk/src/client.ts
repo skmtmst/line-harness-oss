@@ -173,9 +173,17 @@ export class LineClient {
     replyToken: string,
     messages: Message[],
   ): Promise<unknown> {
+    return (await this.replyMessageWithRequestId(replyToken, messages)).data;
+  }
+
+  /** 返信がLINEに受理された証拠として、応答ヘッダーの要求IDも返す。 */
+  async replyMessageWithRequestId(
+    replyToken: string,
+    messages: Message[],
+  ): Promise<{ data: unknown; requestId: string | null }> {
     const body: ReplyMessageRequest = { replyToken, messages };
-    const { data } = await this.request('POST', '/v2/bot/message/reply', body);
-    return data;
+    const { data, headers } = await this.request('POST', '/v2/bot/message/reply', body);
+    return { data, requestId: headers.get('x-line-request-id') };
   }
 
   // ─── Rich Menu ────────────────────────────────────────────────────────────
