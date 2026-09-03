@@ -93,20 +93,20 @@ export default function FriendListTable({
   const rangeEnd = Math.min(page * pageSize, total)
 
   return (
-    <section className="flex min-h-155 flex-col overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
+    <section className="flex min-h-155 flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-hairline px-4">
-        <h2 className="whitespace-nowrap text-sm font-bold text-v6-ink">
-          友だち一覧 <span className="ml-1 text-xs font-bold text-v6-accent">{total.toLocaleString('ja-JP')}件</span>
+        <h2 className="whitespace-nowrap text-sm font-bold text-ink">
+          友だち一覧 <span className="ml-1 text-xs font-bold text-accent">{total.toLocaleString('ja-JP')}件</span>
         </h2>
         <div className="flex items-center gap-4 text-xs">
-          <span className="whitespace-nowrap text-v6-ink-faint">{selectedCount}件選択中</span>
+          <span className="whitespace-nowrap text-ink-faint">{selectedCount}件選択中</span>
           <details className="relative">
-            <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-v6-action">
+            <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-action">
               表示項目を編集
             </summary>
-            <div className="absolute right-0 z-20 mt-1 w-52 rounded-tile border border-hairline bg-canvas p-2 shadow-lg">
+            <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-lg">
               {COLUMN_LABELS.map((column) => (
-                <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-v6-option px-2 py-2 text-xs text-v6-ink-secondary hover:bg-v6-surface-strong">
+                <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-2 text-xs text-ink-secondary hover:bg-canvas-sunken">
                   <input
                     type="checkbox"
                     checked={visible.has(column.key)}
@@ -116,20 +116,20 @@ export default function FriendListTable({
                       else next.delete(column.key)
                       return next
                     })}
-                    className="h-4 w-4 accent-v6-accent"
+                    className="h-4 w-4 accent-accent"
                   />
                   {column.label}
                 </label>
               ))}
             </div>
           </details>
-          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} className="v6-select h-10 min-w-34.5 rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
+          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} className="v6-select h-10 min-w-34.5 rounded-control border border-hairline bg-canvas text-sm font-semibold text-ink">
             {pageSizeOptions.map((size) => <option key={size} value={size}>{size}件表示</option>)}
           </select>
         </div>
       </div>
 
-      <div className="grid h-11 shrink-0 items-center gap-2 border-b border-hairline bg-v6-surface-strong px-3 text-micro font-semibold text-v6-ink-secondary" style={{ gridTemplateColumns }}>
+      <div className="grid h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary" style={{ gridTemplateColumns }}>
         <div>
           <input
             ref={checkboxRef}
@@ -137,10 +137,10 @@ export default function FriendListTable({
             checked={allSelected}
             onChange={(event) => onToggleAll?.(event.target.checked)}
             aria-label="表示中の友だちをすべて選ぶ"
-            className="h-4 w-4 cursor-pointer accent-v6-accent"
+            className="h-4 w-4 cursor-pointer accent-accent"
           />
         </div>
-        <Star aria-label="注目" className="h-4 w-4 text-v6-ink-faint" />
+        <Star aria-label="注目" className="h-4 w-4 text-ink-faint" />
         <div className="truncate">友だち</div>
         {visible.has('support') ? <div className="truncate">対応・担当</div> : null}
         {visible.has('scenario') ? <div className="truncate" data-column="scenario">シナリオ</div> : null}
@@ -152,8 +152,8 @@ export default function FriendListTable({
       <div className="min-h-0 flex-1">
         {friends.length === 0 ? (
           <div className="flex h-full min-h-77.5 flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm font-semibold text-v6-ink-secondary">条件に合う友だちが見つかりません</p>
-            <p className="mt-1 text-xs text-v6-ink-faint">検索条件を外すか、別のキーワードでお試しください。</p>
+            <p className="text-sm font-semibold text-ink-secondary">条件に合う友だちが見つかりません</p>
+            <p className="mt-1 text-xs text-ink-faint">検索条件を外すか、別のキーワードでお試しください。</p>
           </div>
         ) : friends.map((friend) => (
           <FriendListRow
@@ -169,7 +169,7 @@ export default function FriendListTable({
       </div>
 
       <div className="flex h-12 shrink-0 items-center justify-between border-t border-hairline px-4">
-        <span className="text-xs text-v6-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
+        <span className="text-xs text-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} ariaLabel="友だち一覧のページ" />
       </div>
     </section>

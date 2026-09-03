@@ -415,9 +415,9 @@ export default function AdvancedSearchDialog({
                   <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
                     ＋ {item.label === 'イベント予約' ? '予約' : item.label}
                   </button>
-                  {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-v6-ink-faint`
+                  {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-ink-faint`
                       （#8b938d）が同じ値を既に持っている。design-debt を増やさずに済む。 */}
-                  <span className="text-v6-ink-faint text-nano leading-tight">{item.why}</span>
+                  <span className="text-ink-faint text-nano leading-tight">{item.why}</span>
                 </div>
               ))}
             </div>
@@ -470,7 +470,7 @@ export default function AdvancedSearchDialog({
           >
             キャンセル
           </button>
-          {savedNotice ? <span className="text-xs font-semibold text-v6-accent">{savedNotice}</span> : null}
+          {savedNotice ? <span className="text-xs font-semibold text-accent">{savedNotice}</span> : null}
           <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
           <button
             type="button"
@@ -483,14 +483,14 @@ export default function AdvancedSearchDialog({
       </div>
       {saveOpen ? (
         <div className="fixed inset-0 z-110 flex items-center justify-center bg-[#101828]/45 p-4" onClick={() => setSaveOpen(false)}>
-          <section className="w-full max-w-md rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card" onClick={(event) => event.stopPropagation()}>
-            <h3 className="text-lg font-bold text-v6-ink">この条件を保存</h3>
-            <p className="mt-1 text-xs leading-5 text-v6-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
-            <label className="mt-4 block text-sm font-semibold text-v6-ink-secondary">
+          <section className="w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card" onClick={(event) => event.stopPropagation()}>
+            <h3 className="text-lg font-bold text-ink">この条件を保存</h3>
+            <p className="mt-1 text-xs leading-5 text-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
+            <label className="mt-4 block text-sm font-semibold text-ink-secondary">
               条件名
               <TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" />
             </label>
-            {saveError ? <p className="mt-3 text-sm text-v6-danger">{saveError}</p> : null}
+            {saveError ? <p className="mt-3 text-sm text-danger">{saveError}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" onClick={() => setSaveOpen(false)}>キャンセル</Button>
               <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>

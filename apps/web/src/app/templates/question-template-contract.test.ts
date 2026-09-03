@@ -38,10 +38,12 @@ describe('V6 質問テンプレート', () => {
 
 describe('V6 質問テンプレートの寸法', () => {
   it('パネルの角丸と影をV6の値にそろえる', () => {
-    expect(page).not.toContain('rounded-card')
-    const panels = page.match(/rounded-v6-card/g) ?? []
+    // 角丸と影は1系統になった。card=10px、影は `--shadow-card` だけ。
+    const panels = page.match(/rounded-card/g) ?? []
     expect(panels.length).toBeGreaterThanOrEqual(5)
-    expect(page).toContain('shadow-v6-card')
+    expect(page).toContain('shadow-card')
+    expect(page).not.toContain('rounded-lg')
+    expect(page).not.toContain('rounded-xl')
   })
 
   it('入力欄は共通部品（高さ40px・文字13px）を使う', () => {

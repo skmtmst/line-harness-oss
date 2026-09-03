@@ -107,8 +107,8 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(CSS).toMatch(/\.select\s*\{[^}]*border-radius: var\(--radius-control\);/)
     expect(CSS).toMatch(/\.select\s*\{[^}]*font-size: var\(--text-label\);/)
 
-    // カード r10（$radius-md = --radius-tile）／カード内のまとまり r8
-    expect(CSS).toMatch(/\.card\s*\{[^}]*border-radius: var\(--radius-tile\);/)
+    // カード r10（$radius-md = --radius-card）／カード内のまとまり r8
+    expect(CSS).toMatch(/\.card\s*\{[^}]*border-radius: var\(--radius-card\);/)
     expect(CSS).toMatch(/\.group\s*\{[^}]*border-radius: var\(--radius-control\);/)
 
     // 右カラム 390px、本文入力 120px

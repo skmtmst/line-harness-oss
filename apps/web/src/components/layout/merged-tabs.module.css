@@ -44,7 +44,7 @@
   height: 50px;
   gap: 5px;
   margin-bottom: 20px;
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-card);
   background: var(--color-shell);
   padding: 4px;
 }

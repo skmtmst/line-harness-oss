@@ -15,7 +15,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-card);
   background: var(--color-surface-pearl);
   padding: 24px;
   text-align: center;

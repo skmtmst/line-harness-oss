@@ -48,9 +48,9 @@ describe('V6 顧客へのお知らせの寸法', () => {
   })
 
   it('カードは r10', () => {
-    expect(PAGE).toContain('rounded-tile')
-    // 12px（--radius-card）へ戻さない。
-    expect(PAGE).not.toContain('rounded-card')
+    // `--radius-card` は 10px 1本になった（以前は tile 10 と card 12 の2つ）。
+    // 値そのものは design-token-contract.test.ts が固定している。
+    expect(PAGE).toContain('rounded-card')
   })
 
   it('タブ帯は共通部品（高さ44）を使う', () => {

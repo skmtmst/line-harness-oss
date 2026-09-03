@@ -183,6 +183,7 @@
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 2,
+    "direct-primary-button": 3,
     "direct-secondary-button": 3
   },
   "app/health/page.tsx": {
@@ -214,6 +215,7 @@
   "app/inflow-links/page.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 19,
+    "direct-primary-button": 2,
     "direct-secondary-button": 3
   },
   "app/line-notifications/page.tsx": {
@@ -438,12 +440,6 @@
     "direct-secondary-button": 2,
     "direct-primary-button": 1
   },
-  "components/accounts/follower-import-button.tsx": {
-    "arbitrary-value": 4
-  },
-  "components/accounts/reorder-mode.tsx": {
-    "arbitrary-value": 1
-  },
   "components/accounts/test-recipients-setting.tsx": {
     "arbitrary-value": 2
   },
@@ -473,9 +469,6 @@
     "unresolved-classname": 3
   },
   "components/broadcasts/broadcast-kpis.tsx": {
-    "arbitrary-value": 1
-  },
-  "components/broadcasts/multi-account-dedup-section.tsx": {
     "arbitrary-value": 1
   },
   "components/broadcasts/segment-builder.tsx": {
@@ -621,10 +614,6 @@
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
   },
-  "components/friends/friend-table.tsx": {
-    "arbitrary-value": 2,
-    "direct-th": 5
-  },
   "components/friends/friend-timeline.tsx": {
     "arbitrary-value": 3,
     "direct-primary-button": 1
@@ -666,9 +655,6 @@
   },
   "components/merged-person/merged-person-sections.tsx": {
     "unresolved-classname": 46
-  },
-  "components/prompt-modal.tsx": {
-    "arbitrary-value": 6
   },
   "components/rich-menus/area-properties.tsx": {
     "arbitrary-value": 12,
@@ -713,9 +699,6 @@
   "components/scenarios/schedule-input.tsx": {
     "unresolved-classname": 5
   },
-  "components/scenarios/step-editor.tsx": {
-    "arbitrary-value": 3
-  },
   "components/scenarios/step-preview.tsx": {
     "unresolved-classname": 3
   },
@@ -750,10 +733,6 @@
   "components/shared/list-state.tsx": {
     "unresolved-classname": 5
   },
-  "components/shared/list-toolbar.tsx": {
-    "direct-primary-button": 1,
-    "direct-secondary-button": 2
-  },
   "components/shared/not-connected.tsx": {
     "unresolved-classname": 3
   },
@@ -785,7 +764,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 21
+    "unresolved-classname": 20
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 43
@@ -793,9 +772,6 @@
   "components/support/pending-inbox-card.tsx": {
     "arbitrary-value": 8,
     "direct-th": 4
-  },
-  "components/support/support-alert-panel.tsx": {
-    "arbitrary-value": 3
   },
   "components/support/support-inbox.tsx": {
     "arbitrary-value": 15,

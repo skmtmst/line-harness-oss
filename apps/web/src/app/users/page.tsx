@@ -136,11 +136,11 @@ export default function UsersPage() {
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
       {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
 
-      <section className="rounded-v6-card border border-hairline bg-canvas px-4 py-3 shadow-v6-card">
-        <p className="text-sm font-bold text-v6-ink">
+      <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
+        <p className="text-sm font-bold text-ink">
           複数の友だちを、1人の顧客として横断管理します。
         </p>
-        <p className="mt-1 text-xs leading-5 text-v6-ink-secondary">
+        <p className="mt-1 text-xs leading-5 text-ink-secondary">
           元の友だちは残したまま、登録アカウント・最終接触・重複配信の確認ができます。同じ人か確認が必要なものは「要確認」と表示します。
         </p>
       </section>

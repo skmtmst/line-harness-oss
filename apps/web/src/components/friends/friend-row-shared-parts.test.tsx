@@ -58,10 +58,10 @@ describe('友だち行の担当者とアバター（描画）', () => {
 
   it('アバターは真円ではなく設計のr=18で描く', () => {
     const withPicture = render({ ...BASE, pictureUrl: 'https://example.test/a.png' })
-    expect(withPicture).toContain('rounded-v6-large')
-    expect(withPicture).not.toContain('rounded-full bg-v6-avatar-bg')
+    expect(withPicture).toContain('rounded-large')
+    expect(withPicture).not.toContain('rounded-full bg-avatar-bg')
 
     const withoutPicture = render(BASE)
-    expect(withoutPicture).toContain('rounded-v6-large')
+    expect(withoutPicture).toContain('rounded-large')
   })
 })

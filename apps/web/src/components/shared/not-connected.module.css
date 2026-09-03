@@ -1,5 +1,5 @@
 .note {
-  color: var(--v6-ink-faint, #6b7280);
+  color: var(--color-ink-faint);
   font-size: 0.75rem;
   line-height: 1.6;
 }
@@ -12,7 +12,7 @@
 }
 
 .reason {
-  color: var(--v6-ink-secondary, #4b5563);
+  color: var(--color-ink-secondary);
   font-size: 0.75rem;
   line-height: 1.6;
   max-width: 32rem;

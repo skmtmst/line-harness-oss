@@ -20,7 +20,7 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
     expect(PAGE).toContain("import { Tabs } from '@/components/shared/tabs'")
     expect(PAGE).toContain('<Tabs')
     // ボタン列で代用しない。押しボタンの帯は高さ40で、タブ帯の44にならない。
-    expect(PAGE).not.toContain('rounded-v6-control px-4 py-2.5')
+    expect(PAGE).not.toContain('rounded-control px-4 py-2.5')
     expect(readFileSync(join(SHARED, 'tabs.module.css'), 'utf8')).toContain('height: 44px;')
   })
 
@@ -30,18 +30,16 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
   })
 
   it('カードは r10、カードの中のまとまりは r8', () => {
-    // 14px（--radius-v6-card）と 12px（--radius-card）へ戻さない。
-    expect(PAGE).not.toContain('rounded-v6-card')
-    expect(PAGE).not.toContain('rounded-card')
-    expect(PAGE).not.toContain('rounded-v6-control')
-    expect(PAGE).toContain('rounded-tile')
+    // 角丸は1系統になった。card=10px、control=8px。
+    // 値そのものは design-token-contract.test.ts が固定している。
+    expect(PAGE).toContain('rounded-card')
     expect(PAGE).toContain('rounded-control')
   })
 
   it('右カラムは390px', () => {
     expect(PAGE).toContain('data-design="Right"')
     expect(CSS).toContain('grid-template-columns: minmax(0, 1fr) 390px;')
-    expect(CSS).toMatch(/\.sideCard\s*\{[^}]*border-radius: var\(--radius-tile\);/)
+    expect(CSS).toMatch(/\.sideCard\s*\{[^}]*border-radius: var\(--radius-card\);/)
   })
 
   it('自動で戻す条件は未接続として出し、数を作らない', () => {

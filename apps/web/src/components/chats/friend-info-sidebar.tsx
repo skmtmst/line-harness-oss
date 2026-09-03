@@ -232,7 +232,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           */
           <div
             data-inbox-v6="detail-sections-panel"
-            className="bg-canvas border-hairline rounded-v6-dialog shadow-float absolute top-[calc(100%+6px)] right-2 z-30 w-[320px] border p-3"
+            className="bg-canvas border-hairline rounded-panel shadow-float absolute top-[calc(100%+6px)] right-2 z-30 w-[320px] border p-3"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -243,7 +243,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 type="button"
                 onClick={() => setShowSettings(false)}
                 aria-label="表示項目を閉じる"
-                className="text-ink-faint hover:bg-canvas-sunken rounded-v6-control -mt-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
+                className="text-ink-faint hover:bg-canvas-sunken rounded-control -mt-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
@@ -253,7 +253,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 const label = DETAIL_SECTIONS.find((item) => item.key === key)?.label ?? key
                 const visible = !hiddenSections.includes(key)
                 return (
-                  <div key={key} className="border-hairline rounded-v6-control flex items-center gap-2 border px-2 py-1.5">
+                  <div key={key} className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5">
                     <span className="flex shrink-0 flex-col">
                       <button
                         type="button"

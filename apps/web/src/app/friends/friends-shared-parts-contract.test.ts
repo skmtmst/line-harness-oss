@@ -55,12 +55,12 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY, '詳細条件が110pxでない').toContain('w-27.5')
     expect(FRIENDS_BODY, '保存した検索が130pxでない').toContain('w-32.5')
     expect(FRIENDS_BODY, '検索実行が70pxでない').toContain('w-17.5')
-    expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-v6-control')
+    expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-control')
   })
 
   it('行のアバターは真円ではなく設計の40x40 r=18', () => {
-    expect(TOKENS).toContain('--radius-v6-large: 18px;')
-    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-v6-large bg-v6-avatar-bg object-cover')
+    expect(TOKENS).toContain('--radius-large: 18px;')
+    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover')
     expect(ROW_BODY, 'アバターが真円のまま').not.toContain('h-10 w-10 shrink-0 rounded-full')
   })
 
