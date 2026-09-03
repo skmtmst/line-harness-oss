@@ -133,6 +133,13 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 
 worktree のパスは絶対パスで project.json に入っているので、別のマシンで開く場合はグループの worktree を「Unbind」してから自分のパスで作り直す。
 
+### 追記(2026-09-03): 起動前の 2 つの確認
+
+- 各 worktree で `pnpm install --frozen-lockfile` を済ませておく。無いと Slack フック・テスト・型検査が全部落ちる。
+- Codex は自動承認で動かす。`~/.codex/config.toml` に `approval_policy = "never"`、`sandbox_mode = "workspace-write"`、`[sandbox_workspace_write] network_access = true` と `writable_roots = ["<本体の .git>", "<lh-work>"]`。本番 DB の更新と本番(main)への配備の禁止は AGENTS.md の指示で守る(砂場ではなく約束で止める)。
+- Codex ノードを再起動するときは `codex resume <セッション id>` で会話を引き継ぐ。同じ作業ツリーを共有する qa 4 本は `--last` が別ノードのセッションを拾って失敗するので、id を指定するか新規に起動する。
+
+
 ## 7. 司令塔(Fable 5.1)がこの設計で実際にできること・できないこと
 
 - できる: `gh` で Issue と PR を読み書き、ラベルで台帳を動かす、ゲート確認とマージ、docs/v6-*.md の更新、担当の記録をコンテキストリンク経由で読む、キャンバス制御スキルで担当ノードの状態を読む。
