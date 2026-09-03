@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 export interface Friend {
   id: string;
   line_user_id: string;
@@ -29,7 +29,9 @@ export async function getFriends(
   db: D1Database,
   opts: GetFriendsOptions = {},
 ): Promise<Friend[]> {
-  const { limit = 50, offset = 0, tagId } = opts;
+  const { tagId } = opts;
+  const limit = boundedListLimit(opts.limit, 50);
+  const offset = nonNegativeListOffset(opts.offset);
 
   if (tagId) {
     const result = await db
