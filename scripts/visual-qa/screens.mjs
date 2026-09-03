@@ -282,7 +282,7 @@ export const SCREENS = [
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
-    steps: [...OPEN_CHAT, { click: '対応マークを変える' }],
+    steps: [...OPEN_CHAT, { click: '対応状況を変える' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** 一致。未対応・対応中・保留・対応済の並び、色の丸、色付きの札、選択中の✓まで設計どおり',
     verdictSource: 'inbox-v6/IYjvu-1920.png', verdictHead: '7b509106',
   },

@@ -154,6 +154,48 @@ async function runSteps(page, steps = [], node = '') {
       continue
     }
     const root = step.scope === 'main' ? page.locator('main') : page
+
+    if (step.select !== undefined) {
+      /*
+        選ぶ操作。**素の `<select>` と、自前のプルダウンの両方がある。**
+
+        ここが実装されていなかった。`select` の手順は下の `click` へ落ちて
+        `getByRole('button', { name: undefined })` になり、
+        **画面の先頭のボタンを押していた。**
+        `YZaDK` 2-8 担当者プルダウンは、それで統括コンソールへ飛んだ状態を
+        撮って「撮影OK」と言っていた。台帳の17か所が同じ穴を踏んでいた。
+      */
+      const native = root.locator(`select[aria-label="${step.select}"]`)
+      if (await native.count() > 0) {
+        await native.first().selectOption({ label: step.label }, { timeout: 15_000 })
+      } else {
+        const opener = root.getByRole('button', { name: step.select })
+        if (await opener.count() === 0) {
+          throw new Error(`${node}: 選ぶ口「${step.select}」が見つかりません（素の select も自前のプルダウンも0件）`)
+        }
+        await opener.first().click({ timeout: 15_000 })
+        await page.waitForTimeout(300)
+        const option = page.getByRole('option', { name: step.label })
+          .or(page.getByRole('menuitem', { name: step.label }))
+          .or(page.getByRole('button', { name: step.label }))
+        if (await option.count() === 0) {
+          throw new Error(`${node}: 「${step.select}」を開いたが「${step.label}」がありません`)
+        }
+        await option.first().click({ timeout: 15_000 })
+      }
+      await page.waitForTimeout(step.after ?? 800)
+      continue
+    }
+
+    /*
+      **知らない手順で黙って進まない。**
+      `click` が無いまま下へ来ると `name: undefined` で全部のボタンに当たり、
+      先頭を押してしまう。台帳に新しい種類を足したとき、
+      静かに間違った絵が増えるより、ここで止まったほうがいい。
+    */
+    if (step.click === undefined) {
+      throw new Error(`${node}: 知らない手順です ${JSON.stringify(step)}`)
+    }
     const target = root.getByRole(step.role ?? 'button', { name: step.click })
     const one = step.nth === undefined ? target.first() : target.nth(step.nth)
     if (step.onlyIfOff && (await one.getAttribute('aria-checked')) === 'true') continue
@@ -222,6 +264,26 @@ async function captureImpl(feature) {
         }
 
         await runSteps(page, s.steps, s.node)
+
+        /*
+          **操作のあとも行き先を見る。**
+          `YZaDK` 2-8 担当者プルダウンは `/chats` に入るところまでは正しく、
+          そのあとの選択で統括コンソール（店舗一覧）へ飛んでいた。
+          行き先を入る前しか見ていなかったので、**別の画面を撮って
+          「撮影OK」と言っていた**。設計と並べる文字を出すまで気づけなかった。
+          押す先の名前が他の操作にも当たっていたのが元だが、
+          当たったこと自体をここで捕まえる。
+        */
+        const afterUrl = new URL(page.url())
+        const afterLanded = afterUrl.pathname + afterUrl.search
+        if (afterLanded !== s.route) {
+          throw new Error(`操作のあと ${s.route} から ${afterLanded} へ飛んだ`)
+        }
+        const afterBody = await page.locator('body').innerText()
+        for (const bad of FAILURE_TEXTS) {
+          if (afterBody.includes(bad)) throw new Error(`操作のあと「${bad}」で止まっている`)
+        }
+
         await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
 
         const overflow = await page.evaluate(
