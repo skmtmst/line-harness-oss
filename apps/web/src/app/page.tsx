@@ -182,7 +182,7 @@ function FriendAddLinkCard() {
           aria-label="友だち追加リンク"
           className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
-        <button type="button" onClick={onCopy} className="bg-accent text-on-accent hover:bg-accent-hover rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
+        <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
           {copied ? 'コピーしました ✓' : 'コピー'}
         </button>
         <button type="button" onClick={() => setShowQr(true)} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
