@@ -33,6 +33,8 @@ type ApiEnvelope<T> = { success: boolean; data: T };
 
 type DueEnrollment = { id: string };
 
+const INSERT_BATCH_SIZE = 10;
+
 function required(name: string, value: string | undefined): string {
   if (!value?.trim()) throw new Error(`${name} is required`);
   return value.trim();
@@ -129,7 +131,15 @@ async function notificationRequest<T>(
   return body.data;
 }
 
-async function insertSyntheticDeliveryRows(
+function batches<T>(items: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
+export async function insertSyntheticDeliveryRows(
   query: QueryD1,
   runId: string,
   lineAccountId: string,
@@ -142,26 +152,34 @@ async function insertSyntheticDeliveryRows(
      VALUES (?, ?, ?, 'manual', 1, 'relative', ?, ?, ?)`,
     [`verify-b88-scenario-${runId}`, 'staging verification', 'synthetic; no message steps', lineAccountId, now, now],
   );
-  for (let index = 0; index < 41; index++) {
-    const suffix = String(index).padStart(2, '0');
+  const suffixes = Array.from({ length: 41 }, (_, index) => String(index).padStart(2, '0'));
+  for (const batch of batches(suffixes, INSERT_BATCH_SIZE)) {
     await query(
       `INSERT OR IGNORE INTO friends
          (id, line_user_id, display_name, is_following, line_account_id, created_at, updated_at)
-       VALUES (?, ?, 'staging verification', 1, ?, ?, ?)`,
-      [`verify-b88-friend-${runId}-${suffix}`, `verify-b88-line-${runId}-${suffix}`, lineAccountId, now, now],
+       VALUES ${batch.map(() => "(?, ?, 'staging verification', 1, ?, ?, ?)").join(', ')}`,
+      batch.flatMap((suffix) => [
+        `verify-b88-friend-${runId}-${suffix}`,
+        `verify-b88-line-${runId}-${suffix}`,
+        lineAccountId,
+        now,
+        now,
+      ]),
     );
+  }
+  for (const batch of batches(suffixes, INSERT_BATCH_SIZE)) {
     await query(
       `INSERT OR IGNORE INTO friend_scenarios
          (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, updated_at)
-       VALUES (?, ?, ?, -1, 'active', ?, ?, ?)`,
-      [
+       VALUES ${batch.map(() => "(?, ?, ?, -1, 'active', ?, ?, ?)").join(', ')}`,
+      batch.flatMap((suffix) => [
         `verify-b88-enrollment-${runId}-${suffix}`,
         `verify-b88-friend-${runId}-${suffix}`,
         `verify-b88-scenario-${runId}`,
         now,
         dueAt,
         now,
-      ],
+      ]),
     );
   }
 }
