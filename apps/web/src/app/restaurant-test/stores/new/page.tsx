@@ -192,7 +192,7 @@ export default function NewRestaurantStorePage() {
             <Field label="店舗の略称" required={false} help="管理画面で店舗を見分ける短い名前です。空欄の場合は店舗名を使います。">
               <input value={alias} onChange={(event) => setAlias(event.target.value)} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
             </Field>
-            <div className="flex justify-end"><button type="button" onClick={nextFromBasics} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></div>
+            <div className="flex justify-end"><button type="button" onClick={nextFromBasics} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></div>
           </div>}
 
           {step === STEP.OFFICIAL_ACCOUNT && <div className="mt-7 space-y-5">
@@ -201,7 +201,7 @@ export default function NewRestaurantStorePage() {
               <p className="mt-2">LINE公式アカウントをお持ちでない方は、LINE for Businessから無料で店舗専用のアカウントを開設してください。作成後、この画面へ戻ってチェックを入れます。</p>
             </div>
             <label className="flex cursor-pointer items-start gap-3 rounded-control border border-hairline px-4 py-3 text-sm font-semibold text-ink"><input type="checkbox" checked={officialAccountReady} onChange={(event) => setOfficialAccountReady(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />LINE公式アカウントを作成済みです</label>
-            <div className="flex justify-between gap-3"><button type="button" onClick={() => setStep(STEP.BASICS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">次へ</button></div>
+            <div className="flex justify-between gap-3"><button type="button" onClick={() => setStep(STEP.BASICS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">次へ</button></div>
           </div>}
 
           {step === STEP.CREDENTIALS && <div className="mt-7 space-y-6">
@@ -212,7 +212,7 @@ export default function NewRestaurantStorePage() {
             <Field label="チャネルシークレット" required help="同じ「チャネル基本設定」のチャネルシークレットをコピーしてください。保存後、この値は画面に表示されません。" error={errors.channelSecret}>
               <input type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="new-password" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
             </Field>
-            <div className="flex justify-between gap-3"><button type="button" onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" onClick={nextFromCredentials} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></div>
+            <div className="flex justify-between gap-3"><button type="button" onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" onClick={nextFromCredentials} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent">次へ</button></div>
           </div>}
 
           {step === STEP.CONNECT && <div className="mt-7">
@@ -220,12 +220,12 @@ export default function NewRestaurantStorePage() {
               <p className="text-lg font-bold text-success">接続できました</p>
               <p className="mt-2 text-sm leading-6 text-ink-secondary">「{created.storeName}」とLINE公式アカウント「{created.lineAccountName}」を登録しました。</p>
               {selectedAccountId
-                ? <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
+                ? <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
                 : <Link href="/hq" className="mt-5 inline-flex text-sm font-semibold text-action">統括の店舗一覧へ</Link>}
             </div> : <>
               <div className="rounded-card bg-canvas-sunken p-5 text-sm leading-6 text-ink-secondary"><p className="font-semibold text-ink">以下のLINE公式アカウントのセットアップを行います。</p><p className="mt-1">トークンとボット表示名を取得できた場合だけ、店舗とLINE公式アカウントをまとめて登録します。</p><dl className="mt-4 grid gap-2"><div><dt className="text-xs text-ink-faint">店舗名</dt><dd className="font-semibold text-ink">{name}</dd></div><div><dt className="text-xs text-ink-faint">店舗の略称</dt><dd className="font-semibold text-ink">{alias || name}</dd></div></dl></div>
               {connectionError && <div role="alert" className="mt-4 rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm leading-6 text-danger">{connectionError}</div>}
-              <div className="mt-5 flex justify-between gap-3"><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></div>
+              <div className="mt-5 flex justify-between gap-3"><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></div>
             </>}
           </div>}
         </main>
