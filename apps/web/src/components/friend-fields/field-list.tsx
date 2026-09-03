@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
+import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 
 export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
@@ -115,6 +116,32 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     catch (reason) { setError(reason instanceof ApiError ? reason.message : '削除できませんでした') }
   }
 
+  /*
+    **数が出せないときは、なぜ出せないのかを添える。**
+
+    以前は `summary` が無いと 1枚目の補足が空文字になり、残る3枚は
+    「1項目以上を登録」「追加・編集」という**数え方の説明のまま**だった。
+    そのため読込中も取得失敗も、画面には `—` と数え方の説明が並ぶだけで、
+    **待てば出るのか、壊れているのか、まだ無いのかが区別できなかった。**
+
+    言葉は共通部品（`components/shared/not-connected.tsx`）に決めてある
+    ものを使う。画面ごとに言い方を作らない。
+  */
+  /*
+    **権限不足は `status` で見る。**
+    もとの直しは `status === 'error'` の中で `error === ''` を権限不足の
+    しるしにしていたが、403 は `setStatus('forbidden')` へ行く（この下の
+    `load`）ので、その枝には**一度も入らなかった**。実際、403 を返して
+    開くと帯は「1項目以上を登録」「追加・編集」という数え方の説明のままで、
+    **見る権限が無いのか、まだ数が来ていないのかが区別できなかった。**
+  */
+  const kpiReason = status === 'loading' ? STATE_TEXT.loading
+    : status === 'forbidden' ? STATE_TEXT.forbiddenView
+      : status === 'error' ? STATE_TEXT.error
+        : null
+  /** 数が出せるときの補足（数え方の説明）と、出せないときの理由を切り替える。 */
+  const detailOf = (whenAvailable: string): string => kpiReason ?? whenAvailable
+
   const cards = [
     /*
       **`undefined` を画面に出さない。**
@@ -122,11 +149,26 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
       入っていないとき「使用中 undefined件」と出ていた。
       型は `inUse: number` だが、返事が形どおりとは限らない。
       値が無いなら数を語らず、取れていないことを言う。
+
+      **読込中・失敗・権限不足のほうが先。** 数え方の説明を出す前に
+      `detailOf` で状態の理由へ差し替える。器が来ているのに `inUse` だけ
+      入っていない場合だけ「使用中の数は取得できません」を出す。
     */
-    { title: '項目数', value: summary?.total ?? null, unit: '件', detail: typeof summary?.inUse === 'number' ? `使用中 ${summary.inUse}件` : '使用中の数は取得できません' },
-    { title: '登録済み友だち', value: summary?.registeredFriends ?? null, unit: '人', detail: '1項目以上を登録' },
-    { title: 'フォーム連携', value: summary?.formLinks ?? null, unit: summary?.formLinks === null ? '' : '件', detail: summary?.formLinks === null ? '未取得' : '回答の登録先' },
-    { title: '今月の更新', value: summary?.updatedThisMonth ?? null, unit: '件', detail: '追加・編集' },
+    {
+      title: '項目数',
+      value: summary?.total ?? null,
+      unit: '件',
+      detail: detailOf(typeof summary?.inUse === 'number' ? `使用中 ${summary.inUse}件` : '使用中の数は取得できません'),
+    },
+    { title: '登録済み友だち', value: summary?.registeredFriends ?? null, unit: '人', detail: detailOf('1項目以上を登録') },
+    {
+      title: 'フォーム連携',
+      value: summary?.formLinks ?? null,
+      unit: summary?.formLinks === null ? '' : '件',
+      // 口そのものが無いときは、読込・失敗とは別の言葉にする。
+      detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答の登録先'),
+    },
+    { title: '今月の更新', value: summary?.updatedThisMonth ?? null, unit: '件', detail: detailOf('追加・編集') },
   ]
 
   return (
