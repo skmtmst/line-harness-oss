@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -29,6 +30,9 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
     message?: string
     mode?: string
   } | null>(null)
+  const [confirmingDefault, setConfirmingDefault] = useState(false)
+  const [defaultBusy, setDefaultBusy] = useState(false)
+  const [defaultError, setDefaultError] = useState('')
 
   useEffect(() => {
     api.tags
@@ -41,19 +45,42 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
       })
   }, [])
 
-  async function apply() {
-    // 「全員のデフォルト」は影響範囲が大きいので強い確認。
+  /*
+    「全員のデフォルト」は影響範囲が大きいので設計の確認窓で聞く。
+    **ブラウザの `confirm()` を使わない。** 何が表示され、どのメニューの
+    設定が外れるかを本文で読ませられず、画像比較にも写らない。
+
+    設定そのものは別のメニューを選び直せば戻せる（データは消えない）ので
+    `destructive` は付けない。ただし**前に既定だったメニューは記録されない**
+    ことを本文に書いて、押す前に控えさせる。
+  */
+  function apply() {
     if (mode.kind === 'set-default') {
-      if (
-        !confirm(
-          'このリッチメニューを「LINE 公式アカウントの全員のデフォルト」に設定します。\n\n' +
-            '・新規友だちも含め、特別な設定をしていない全員に表示されます\n' +
-            '・同アカウント内で他のメニューがデフォルトに設定されていた場合、そちらは解除されます\n\n' +
-            '続行しますか？',
-        )
-      )
-        return
+      setDefaultError('')
+      setConfirmingDefault(true)
+      return
     }
+    void runApply()
+  }
+
+  async function confirmSetDefault() {
+    if (defaultBusy) return
+    setDefaultBusy(true)
+    setDefaultError('')
+    try {
+      const res = await api.richMenuGroups.applyToTag(groupId, { mode: 'set-default' })
+      if (!res.success) throw new Error(res.error ?? '適用失敗')
+      setResult(res.data)
+      setConfirmingDefault(false)
+      setPhase('done')
+    } catch {
+      setDefaultError('全員のデフォルトに設定できませんでした。いまの表示は変わっていません。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDefaultBusy(false)
+    }
+  }
+
+  async function runApply() {
     setPhase('running')
     setError(null)
     try {
@@ -127,7 +154,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                   checked={mode.kind === 'set-default'}
                   onChange={() => setMode({ kind: 'set-default' })}
                   label="全員のデフォルトに設定する"
-                  description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同アカ内の他メニューのデフォルト設定は解除されます。"
+                  description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
                   warn
                 />
               </div>
@@ -204,6 +231,21 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDefault}
+        title={`「${groupName}」を全員のデフォルトにしますか？`}
+        description="特別な設定をしていない友だち全員のトーク画面に、このメニューが出るようになります。これから友だちになる人にも出ます。同じLINE公式アカウントで別のメニューがデフォルトになっていた場合、そちらの設定は外れます。前にどのメニューがデフォルトだったかは記録されないので、戻したいときは自分で選び直すことになります。すでにタグや個別の指定でメニューを割り当てている友だちには、そちらが優先されます。"
+        confirmLabel="全員のデフォルトにする"
+        busy={defaultBusy}
+        error={defaultError}
+        onConfirm={() => void confirmSetDefault()}
+        onCancel={() => {
+          if (defaultBusy) return
+          setDefaultError('')
+          setConfirmingDefault(false)
+        }}
+      />
     </div>
   )
 }

@@ -198,6 +198,21 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
             : risks.some((risk) => risk !== 'normal')
               ? 'unknown'
               : 'normal'
+      /*
+        **バッジと本文で違うことを言わない。**
+
+        `lineSeverity` は、`normal`／`warning`／`danger` のどれでもない危険度が
+        1つでもあると `unknown`（＝未確認）に落ちる。ところが本文は
+        「アカウントが0件かどうか」だけで分けていたので、判定できなかったときにも
+        「確認しました」と書いていた。検証環境で
+        **本文「確認しました（3アカウント）」・バッジ「未確認」**という
+        食い違いが出ている。ほかの2項目（月間配信数・友だち変化）は
+        本文もバッジも「取れなかった」で揃っているので、ここだけずれていた。
+
+        判定できなかった件数を本文に出して、バッジと同じことを言わせる。
+      */
+      const undeterminedCount = risks.filter((risk) =>
+        risk !== 'normal' && risk !== 'warning' && risk !== 'danger').length
       nextChecks.push({
         id: 'line',
         label: 'LINE接続',
@@ -205,7 +220,9 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         severity: lineSeverity,
         detail: activeAccounts.length === 0
           ? '有効なLINEアカウントが登録されていません'
-          : `LINE APIの認証エラーと接続状態を確認しました（${activeAccounts.length}アカウント）`,
+          : undeterminedCount > 0
+            ? `${activeAccounts.length}アカウントのうち${undeterminedCount}件は接続状態を判定できませんでした`
+            : `LINE APIの認証エラーと接続状態を確認しました（${activeAccounts.length}アカウント）`,
       })
     } else {
       nextChecks.push({ id: 'line', label: 'LINE接続', icon: 'L', severity: 'unknown', detail: 'LINE接続状態を取得できませんでした' })

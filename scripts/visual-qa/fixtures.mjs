@@ -155,8 +155,10 @@ export const LIST_STATS = {
   marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },
   searches: { total: 0, limit: 5 },
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
-  scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 },
-  reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0 },
+  // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
+  scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
+  // 設計 `M1EXwB` の帯: リマインダ9件（有効7）/ 送信予定124通 / 今月386通 / 失敗2通
+  reminders: { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 },
 }
 
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
@@ -176,26 +178,41 @@ export const OPERATORS = [
   { id: 'operator-kenta', name: 'Kenta' },
 ]
 
+/**
+ * シナリオ配信の一覧。設計 `★ V6 5-1` `TC1b1` の5行そのまま。
+ *
+ * 1件だけで返していたころは、**配信方式も終了後の動きも1通りしか出ず**、
+ * 設計の5行（時刻／経過時間、一時停止／別シナリオへ／1つ前を再開、
+ * 稼働中／停止中／下書き）をどれも確かめられなかった。
+ */
 export const FRIEND_SCENARIOS = [
-  {
-    id: 'scenario-paused',
-    name: '停止中',
-    description: null,
-    triggerType: 'manual',
-    triggerTagId: null,
-    lineAccountId: 'visual-qa-account',
-    isActive: false,
-    deliveryMode: 'relative',
-    allowConcurrent: true,
-    displayOrder: 0,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    folderId: null,
-    audienceCondition: null,
-    onCompleteMode: 'pause',
-    onCompleteScenarioId: null,
-  },
-]
+  // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
+  ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
+  ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'start_other', true],
+  ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
+  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'restart_prev', false],
+  ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
+].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
+  id: `scenario-${index}`,
+  name: String(name),
+  description: String(description),
+  triggerType: 'manual',
+  triggerTagId: null,
+  lineAccountId: 'visual-qa-account',
+  isActive: Boolean(isActive),
+  deliveryMode: String(deliveryMode),
+  allowConcurrent: true,
+  displayOrder: index,
+  folderId: null,
+  audienceCondition: null,
+  onCompleteMode: String(onCompleteMode),
+  onCompleteScenarioId: null,
+  subscriberCount: Number(subscriberCount),
+  completedCount: Number(completedCount),
+  stepCount: 3,
+  createdAt: `${day}T00:00:00.000Z`,
+  updatedAt: `${day}T00:00:00.000Z`,
+}))
 
 /**
  * 友だち追加時配信を公開する2画面（`ec9vg` / `quhg6`）の固定データ。
@@ -894,6 +911,32 @@ export const FRIEND_MILEAGE = {
     spent: 0,
   },
   history: [],
+  /*
+    **`insights` と `connections` を欠かさない。**
+
+    口の契約は `{ summary, history, insights, connections }` の4つ。
+    `insights` が無いと `mileage/friends/detail/page.tsx` が
+    `insights.rewardedActions` で投げ、**画面ごと「画面を表示できませんでした」
+    になって `HIU5O` と `vz0Ji` が1枚も撮れない。**
+    型に無い名前で書いても握りつぶされるだけなので、`MileageSelfInsights` と
+    `MileageConnectedAccount` の名前をそのまま使う。
+  */
+  insights: {
+    accountCount: 1,
+    rewardedActions: 3,
+    referralMiles: 0,
+    qualityReferralCount: 0,
+    lastEarnedAt: '2026-08-24T20:53:00+09:00',
+  },
+  connections: [
+    {
+      accountId: 'visual-qa-account',
+      accountName: '画面確認アカウント',
+      friendId: 'friend-1',
+      available: 5,
+      lastEarnedAt: '2026-08-24T20:53:00+09:00',
+    },
+  ],
 }
 
 /**
@@ -1208,3 +1251,255 @@ export const IDENTITY_CANDIDATE_DETECTION = {
   normal: { processed: 1, hasMore: false, nextCursor: null },
   empty: { processed: 0, hasMore: false, nextCursor: null },
 }
+
+/**
+ * シナリオの通。設計 `bV5Vs`（5-1-C シナリオ編集）の3通。
+ *
+ * **`steps` を配列で返さないと画面ごと落ちる**（`scenario.steps` を回す）。
+ * 空の一覧の形で返していたあいだ、シナリオを開くたびに「もう一度試す」
+ * だけの画面になっていた。
+ */
+export const SCENARIO_STEPS = [
+  [1, 0, 'ご登録ありがとうございます。まずはこちらをご覧ください。'],
+  [2, 1440, '使い方のご案内です。よくある質問もまとめました。'],
+  [3, 4320, 'ご不明な点はありませんか。お気軽にご返信ください。'],
+].map(([stepOrder, delayMinutes, messageContent], index) => ({
+  id: `step-${index}`,
+  scenarioId: 'scenario-0',
+  stepOrder: Number(stepOrder),
+  delayMinutes: Number(delayMinutes),
+  offsetDays: null,
+  offsetMinutes: null,
+  deliveryTime: null,
+  templateId: null,
+  onReachTagId: null,
+  afterSend: 'continue',
+  messageType: 'text',
+  messageContent: String(messageContent),
+  targetCondition: null,
+  question: null,
+  isDraft: false,
+  createdAt: '2026-08-16T00:00:00.000Z',
+}))
+
+/**
+ * シナリオの到達率。設計 `bV5Vs` の通ごとの数。
+ *
+ * 一覧の形で返していたあいだ、画面は `stats.steps.find(...)` で落ちていた。
+ * **配列には `steps` が無い。**
+ */
+export const SCENARIO_STATS = {
+  enrolledTotal: 428,
+  activeNow: 116,
+  completed: 312,
+  paused: 0,
+  steps: SCENARIO_STEPS.map((step, index) => ({
+    stepOrder: step.stepOrder,
+    reachedCount: [428, 381, 312][index] ?? 0,
+    reachedRate: [1, 0.89, 0.73][index] ?? 0,
+  })),
+}
+
+/**
+ * 一斉配信の一覧。設計 `★ V6 6-1` `q76C35` の5行そのまま。
+ *
+ * **状態を1通りしか入れないと、状態ごとの見え方を確かめられない。**
+ * 設計は 予約済み・下書き（未設定）・送信済み・停止中 の4通りが並ぶが、
+ * **「停止中」は型に無い**（draft / scheduled / sending / sent の4つ）。
+ */
+export const BROADCASTS = [
+  // 題, 種別, 対象, 状態, 予定, 対象数, 成功数
+  ['8月キャンペーンのお知らせ', 'image', 'all', 'scheduled', '2026-08-24T01:00:00.000Z', 0, 0],
+  ['未購入者フォロー', 'text', 'segment', 'draft', null, 18, 0],
+  ['新商品発売のお知らせ', 'carousel', 'tag', 'sent', '2026-08-20T03:00:00.000Z', 624, 624],
+  ['予約空き枠のご案内', 'text', 'tag', 'sent', '2026-08-18T09:30:00.000Z', 203, 203],
+  /*
+    設計の5行目は「停止中／停止済み」だが、**その状態が型に無い**
+    （`BroadcastStatus` は draft / scheduled / sending / sent の4つ）。
+    近いものが無いので下書きで置き、突き合わせ文書に差として書いた。
+  */
+  ['重要なお知らせ', 'text', 'all', 'draft', '2026-08-17T00:00:00.000Z', 0, 0],
+].map(([title, messageType, targetType, status, scheduledAt, totalCount, successCount], index) => ({
+  id: `broadcast-${index}`,
+  title: String(title),
+  messageType: String(messageType),
+  messageContent: `${title}の本文です。`,
+  targetType: String(targetType),
+  targetTagId: targetType === 'tag' ? 'tag-0' : null,
+  status: String(status),
+  scheduledAt,
+  sentAt: status === 'sent' ? scheduledAt : null,
+  totalCount: Number(totalCount),
+  successCount: Number(successCount),
+  folderId: null,
+  createdAt: '2026-08-16T00:00:00.000Z',
+}))
+
+/**
+ * 機能7 リマインダ。設計 `M1EXwB` の5行そのまま。
+ *
+ * **`Reminder` の型に照らして書く。** 設計の言葉（「予約日時の1日前」）は
+ * 見出しであって項目名ではない。`triggerType` は
+ * `'manual' | 'booking' | 'event' | 'friend_field'` の4つしかなく、
+ * ここに設計の日本語をそのまま入れると画面は既定値のまま描かれ、
+ * **5行とも同じきっかけで撮れてしまう**（機能4で一度やった）。
+ */
+export const REMINDER_FOLDERS = [
+  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'rf-contract', kind: 'reminder', name: '契約更新', parentId: null, displayOrder: 2, color: '#d97706' },
+  { id: 'rf-event', kind: 'reminder', name: 'イベント', parentId: null, displayOrder: 3, color: '#7c3aed' },
+  { id: 'rf-follow', kind: 'reminder', name: 'フォロー', parentId: null, displayOrder: 4, color: '#059669' },
+]
+
+export const REMINDERS = [
+  {
+    id: 'reminder-1', name: '予約前日のご案内', description: '予約日時の1日前',
+    isActive: true, triggerType: 'booking', deliveryMode: 'time',
+    triggerOffsetMinutes: -1440, sendAtTime: '18:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-booking', stepCount: 1, displayOrder: 1,
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z',
+  },
+  {
+    id: 'reminder-2', name: '予約1時間前のご案内', description: '予約日時の1時間前',
+    isActive: true, triggerType: 'booking', deliveryMode: 'countdown',
+    triggerOffsetMinutes: -60, sendAtTime: null, targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-booking', stepCount: 1, displayOrder: 2,
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T11:00:00.000Z',
+  },
+  {
+    id: 'reminder-3', name: '契約更新30日前', description: '契約終了の30日前',
+    isActive: true, triggerType: 'friend_field', deliveryMode: 'time',
+    triggerOffsetMinutes: -43200, sendAtTime: '10:00', targetTagId: null,
+    triggerFieldId: 'field-contract-end', repeatYearly: false,
+    folderId: 'rf-contract', stepCount: 2, displayOrder: 3,
+    createdAt: '2026-05-11T00:00:00.000Z', updatedAt: '2026-08-21T01:00:00.000Z',
+  },
+  {
+    /* 下書き。**0通なので「最終送信」は空。** ここを「—」ではなく空で
+       出すか、設計どおり空欄にするかは実装側の決めごと。 */
+    id: 'reminder-4', name: 'イベント当日案内', description: 'イベント当日',
+    isActive: false, triggerType: 'event', deliveryMode: 'time',
+    triggerOffsetMinutes: 0, sendAtTime: '09:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-event', stepCount: 1, displayOrder: 4,
+    createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    /* 停止中。設計は「下書き」と別の札で描いている。実装の `isActive` は
+       真偽値ひとつなので、**下書きと停止中を描き分けられない。** */
+    id: 'reminder-5', name: '未返信3日後フォロー', description: '最終送信の3日後',
+    isActive: false, triggerType: 'manual', deliveryMode: 'time',
+    triggerOffsetMinutes: 4320, sendAtTime: '12:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-follow', stepCount: 1, displayOrder: 5,
+    createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-19T03:00:00.000Z',
+  },
+]
+
+/** 設計 `M1EXwB` の帯。リマインダ9件（有効7）／送信予定124通／今月386通／失敗2通。 */
+export const REMINDER_STATS = { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 }
+
+/**
+ * 友だち情報欄の項目。リマインダの起点（`triggerFieldId`）に日付の欄が要る。
+ *
+ * **`FriendField` の型どおりに書く。** `type` は10種類の決まった言葉で、
+ * ここに設計の日本語を入れると欄は既定の1行入力として描かれ、
+ * 「日付の欄だけ選べる」という決まりを**何も確かめないまま**撮れてしまう。
+ */
+export const FRIEND_FIELDS = [
+  {
+    id: 'field-birthday', folderId: null, name: '誕生日', fieldKey: 'birthday',
+    type: 'date', options: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: true,
+    displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'field-contract-end', folderId: null, name: '契約終了日', fieldKey: 'contract_end',
+    type: 'date', options: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'field-next-delivery', folderId: null, name: '次回お届け日', fieldKey: 'next_delivery',
+    type: 'date', options: null, defaultValue: null, source: 'ec',
+    ecFieldPath: 'subscription.next_ship_at', ecIsMaster: true, isPersonal: false, isStarred: false,
+    displayOrder: 3, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+  {
+    id: 'field-plan', folderId: null, name: 'ご契約プラン', fieldKey: 'plan',
+    type: 'select', options: ['ライト', 'スタンダード', 'プレミアム'], defaultValue: null,
+    source: 'manual', ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+]
+
+/**
+ * 機能8 自動応答。設計 `cmDfJ` の5行。
+ *
+ * **画面が読む形に合わせる。** `packages/shared` の `AutoReply` は
+ * `keyword / matchType / responseType / responseContent / isActive` しか
+ * 持たないが、画面（`auto-replies/page.tsx`）はそれより広い形を読む
+ * （`priority` `folderId` `actions` `responseWeekdays` `hits` など）。
+ * 狭いほうに合わせて書くと、優先順位も曜日も当たり回数も空のまま撮れて、
+ * **設計の一覧と比べるものが何も無くなる。**
+ */
+export const AUTO_REPLY_FOLDERS = [
+  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669' },
+  { id: 'arf-keyword', kind: 'auto_reply', name: 'キーワード', parentId: null, displayOrder: 3, color: '#d97706' },
+  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 4, color: '#7c3aed' },
+]
+
+const AR_BASE = {
+  templateId: null, lineAccountId: null, activeFrom: null, activeUntil: null,
+  cooldownMinutes: null, skipWhenOperatorActive: false, messageKinds: null,
+  responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false,
+  friendConditions: null, respondToAll: false, keywordMatchMode: 'any',
+}
+
+export const AUTO_REPLIES = [
+  {
+    ...AR_BASE, id: 'ar-1', name: '営業時間外の自動返信', keyword: '', matchType: 'contains',
+    responseType: 'text', responseContent: '本日の受付は終了しました。翌営業日にご連絡します。',
+    isActive: true, priority: 1, folderId: 'arf-afterhours',
+    activeFrom: '21:00', activeUntil: '09:00',
+    responseWeekdays: [0, 1, 2, 3, 4, 5, 6], respondToAll: true,
+    actions: [{ actionType: 'support_mark' }],
+    keywords: [], hits: { period: 214, total: 1893 },
+    createdAt: '2026-03-04T00:00:00.000Z',
+  },
+  {
+    ...AR_BASE, id: 'ar-2', name: '予約変更のお問い合わせ', keyword: '予約変更', matchType: 'contains',
+    responseType: 'text', responseContent: '予約変更を承ります。ご希望の日時をこのトークでお知らせください。',
+    isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
+    keywords: [{ word: '予約変更' }, { word: '日程変更' }, { word: 'キャンセル' }],
+    actions: [{ actionType: 'support_mark' }],
+    hits: { period: 186, total: 942 }, createdAt: '2026-04-18T00:00:00.000Z',
+  },
+  {
+    ...AR_BASE, id: 'ar-3', name: '商品についての質問', keyword: '商品', matchType: 'contains',
+    responseType: 'text', responseContent: '商品についてのご質問ありがとうございます。',
+    isActive: true, priority: 3, folderId: 'arf-inquiry',
+    keywords: [{ word: '商品' }, { word: '価格' }, { word: '在庫' }, { word: 'サイズ' }, { word: '送料' }],
+    actions: [{ actionType: 'tag' }],
+    hits: { period: 152, total: 733 }, createdAt: '2026-05-06T00:00:00.000Z',
+  },
+  {
+    /* 下書き。**当たった回数は0。** 「一度も当たっていない」と
+       「まだ動かしていない」は違うので、0で撮れることが要る。 */
+    ...AR_BASE, id: 'ar-4', name: 'キャンセル受付', keyword: 'キャンセル', matchType: 'contains',
+    responseType: 'text', responseContent: 'キャンセルを承りました。',
+    isActive: false, priority: 4, folderId: 'arf-booking',
+    keywords: [{ word: 'キャンセル' }, { word: '取り消し' }],
+    actions: [], hits: { period: 0, total: 0 }, createdAt: '2026-08-12T00:00:00.000Z',
+  },
+  {
+    ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
+    responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
+    isActive: false, priority: 5, folderId: 'arf-keyword',
+    keywords: [{ word: '営業時間' }],
+    actions: [], hits: { period: 0, total: 411 }, createdAt: '2026-01-20T00:00:00.000Z',
+  },
+]

@@ -10,6 +10,7 @@ import NotificationsPage from '@/app/notifications/page'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import WebhookInteractions from './webhook-interactions'
 
 type Tab = 'incoming' | 'outgoing'
@@ -42,6 +43,38 @@ const MERGED_TABS = [
   { key: 'notify', label: '未対応の通知' },
 ]
 
+/*
+  受け取る設定の「どこから来るか」を、**見本から選べるようにする**。
+
+  設計 `M0Gb7` は「予約サービス」「アンケートツール」のような見本を選んで作る道を
+  持っているが、実装は `sourceType` の自由入力だけだった。**何を書けばよいか
+  分からない欄**になっていて、`line` という置き文字だけが手がかりになっていた。
+
+  値（`value`）は今までどおりの文字列なので、口も保存の形も変えない。
+  見本に無いものは「その他」を選べば自由に書ける。
+*/
+const SOURCE_PRESETS = [
+  { value: 'line', label: 'LINE公式アカウント', hint: '友だち追加やメッセージの通知を受け取ります' },
+  { value: 'booking', label: '予約サービス', hint: '予約の確定・変更・取り消しを受け取ります' },
+  { value: 'form', label: 'アンケートツール', hint: '回答が届いたことを受け取ります' },
+  { value: 'ec', label: 'ECサイト', hint: '注文や発送の知らせを受け取ります' },
+  { value: 'payment', label: '決済サービス', hint: '支払いの成否を受け取ります' },
+] as const
+
+/** 見本に無い「その他」を選んだときだけ、自由入力に切り替える印。 */
+const SOURCE_OTHER = '__other__'
+
+/**
+ * 保存してある値を、画面の言葉に戻す。
+ *
+ * 未設定を `-`（半角ハイフン）で書いていた。V6の決めごとは `—`。
+ * 半角は数や記号に見えて、「無い」と読み取れない。
+ */
+function sourceLabel(value: string | null | undefined): string {
+  if (!value) return '—'
+  return SOURCE_PRESETS.find((preset) => preset.value === value)?.label ?? value
+}
+
 function WebhooksPageInner() {
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -57,6 +90,12 @@ function WebhooksPageInner() {
   const [showCreate, setShowCreate] = useState(false)
 
   const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
+  // 見本に無いものを選んだときだけ、自由入力に切り替える。
+  const [sourceIsOther, setSourceIsOther] = useState(false)
+  const selectedPreset = sourceIsOther
+    ? null
+    : SOURCE_PRESETS.find((preset) => preset.value === inForm.sourceType) ?? null
+
   const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
 
   // After a successful create the API returns the secret exactly once.
@@ -71,6 +110,20 @@ function WebhooksPageInner() {
     | null
   >(null)
   const [rotateSecretValue, setRotateSecretValue] = useState('')
+
+  /**
+   * 削除の確認。ブラウザの `confirm()` は「この受信Webhookを削除しますか？」
+   * としか言えず、URLが無効になることも、届いた記録が残ることも読めない。
+   * 画像比較にも写らないので、共通の `ConfirmDialog` へ移した（設計 `H2S1T4`）。
+   *
+   * 押した時点のLINEアカウントを一緒に持つ。窓を開けたまま切り替えられると、
+   * 別アカウントのWebhookを消してしまう。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: 'incoming' | 'outgoing'; id: string; name: string; accountId: string } | null
+  >(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -124,6 +177,7 @@ function WebhooksPageInner() {
     setRotateSecretValue('')
     setShowCreate(false)
     setInForm({ name: '', sourceType: '', secret: '' })
+    setSourceIsOther(false)
     setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
     void load()
   }, [load, selectedAccountId])
@@ -160,37 +214,45 @@ function WebhooksPageInner() {
     }
   }
 
-  const handleDeleteIncoming = async (id: string) => {
+  /** 削除の窓を開ける。押した時点のLINEアカウントをここで固定する。 */
+  const askDelete = (kind: 'incoming' | 'outgoing', id: string, name: string) => {
     const requestAccountId = selectedAccountId
     if (!requestAccountId || loadedAccountId !== requestAccountId) {
       return setError('LINEアカウントの一覧を読み直してください')
     }
-    if (!confirm('この受信Webhookを削除しますか？')) return
-    try {
-      const res = await api.webhooks.incoming.delete(id, requestAccountId)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
-    } catch {
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('削除に失敗しました')
-    }
+    setDeleteError('')
+    setDeleteTarget({ kind, id, name, accountId: requestAccountId })
   }
 
-  const handleDeleteOutgoing = async (id: string) => {
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId || loadedAccountId !== requestAccountId) {
-      return setError('LINEアカウントの一覧を読み直してください')
+  const handleConfirmDelete = async () => {
+    // 押している間は受け付けない。二度押しの2回目は404になり、
+    // 消えているのに「削除できませんでした」と出る。
+    if (!deleteTarget || deleting) return
+    const requestAccountId = deleteTarget.accountId
+    const kind = deleteTarget.kind
+    const label = kind === 'incoming' ? '受信Webhook' : '送信Webhook'
+    // 窓を開けたまま切り替えられていたら、消さずに選び直させる。
+    if (requestAccountId !== selectedAccountId || loadedAccountId !== requestAccountId) {
+      setDeleteError('LINEアカウントが切り替わりました。削除するWebhookを選び直してください。')
+      return
     }
-    if (!confirm('この送信Webhookを削除しますか？')) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      const res = await api.webhooks.outgoing.delete(id, requestAccountId)
+      const res =
+        kind === 'incoming'
+          ? await api.webhooks.incoming.delete(deleteTarget.id, requestAccountId)
+          : await api.webhooks.outgoing.delete(deleteTarget.id, requestAccountId)
+      if (!res.success) throw new Error(res.error)
       if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) return setError(res.error)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
+      setDeleteTarget(null)
+      await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('削除に失敗しました')
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setDeleteError(`この${label}を削除できませんでした。状態を読み直してから、もう一度お試しください。`)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -220,6 +282,7 @@ function WebhooksPageInner() {
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
       setInForm({ name: '', sourceType: '', secret: '' })
+      setSourceIsOther(false)
       setShowCreate(false)
       load()
     } catch {
@@ -469,13 +532,36 @@ function WebhooksPageInner() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ソースタイプ</label>
-              <input
-                value={inForm.sourceType}
-                onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
+              <label className="block text-sm font-medium text-gray-700 mb-1">どこから来るか</label>
+              <select
+                value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
+                onChange={(e) => {
+                  const next = e.target.value
+                  if (next === SOURCE_OTHER) { setSourceIsOther(true); setInForm({ ...inForm, sourceType: '' }); return }
+                  setSourceIsOther(false)
+                  setInForm({ ...inForm, sourceType: next })
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="line"
-              />
+              >
+                <option value="">選んでください</option>
+                {SOURCE_PRESETS.map((preset) => (
+                  <option key={preset.value} value={preset.value}>{preset.label}</option>
+                ))}
+                <option value={SOURCE_OTHER}>その他（自分で書く）</option>
+              </select>
+              {/* 選んだものが何を受け取るのかを、選んだ直後に出す。 */}
+              {selectedPreset ? (
+                <p className="text-ink-faint mt-1 text-xs">{selectedPreset.hint}</p>
+              ) : null}
+              {sourceIsOther ? (
+                <input
+                  value={inForm.sourceType}
+                  onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
+                  className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm"
+                  placeholder="送ってくるサービスの名前"
+                  aria-label="どこから来るか（自分で書く）"
+                />
+              ) : null}
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -628,7 +714,7 @@ function WebhooksPageInner() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ソースタイプ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">どこから来るか</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">エンドポイントURL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">シークレット</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ステータス</th>
@@ -640,7 +726,7 @@ function WebhooksPageInner() {
                 {incoming.map((wh) => (
                   <tr key={wh.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{wh.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{wh.sourceType || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{sourceLabel(wh.sourceType)}</td>
                     <td className="px-4 py-3">
                       <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 break-all">
                         {endpointUrl(wh.id)}
@@ -690,7 +776,7 @@ function WebhooksPageInner() {
                         {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
                       </button>
                       <button
-                        onClick={() => handleDeleteIncoming(wh.id)}
+                        onClick={() => askDelete('incoming', wh.id, wh.name)}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         削除
@@ -826,7 +912,7 @@ function WebhooksPageInner() {
                         {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
                       </button>
                       <button
-                        onClick={() => handleDeleteOutgoing(wh.id)}
+                        onClick={() => askDelete('outgoing', wh.id, wh.name)}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         削除
@@ -841,6 +927,26 @@ function WebhooksPageInner() {
           </div>
         )
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`${deleteTarget?.kind === 'outgoing' ? '送信' : '受信'}Webhook「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description={
+          deleteTarget?.kind === 'outgoing'
+            ? 'この宛先への送信が止まり、これから起きる出来事は通知されなくなります。すでに送った記録は残ります。この操作は取り消せません。'
+            : 'この受け口のURLは使えなくなり、これから届く通知は受け取れなくなります。すでに受け取った記録は残ります。この操作は取り消せません。'
+        }
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteTarget(null)
+          setDeleteError('')
+        }}
+      />
     </div>
   )
 }

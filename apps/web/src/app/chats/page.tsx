@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
+import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
@@ -17,11 +18,10 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
-import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
-import { Link2, Star } from 'lucide-react'
+import { Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star } from 'lucide-react'
 
 interface Chat {
   id: string
@@ -36,7 +36,7 @@ interface Chat {
   lastMessageContent: string | null
   lastMessageDirection: 'incoming' | 'outgoing' | null
   lastMessageType: string | null
-  /** ログイン中の担当者だけの未読。対応状態とは別。 */
+  /** ログイン中の担当者だけの未読。対応状況とは別。 */
   isUnread: boolean
   createdAt: string
   updatedAt: string
@@ -86,15 +86,15 @@ const statusConfig: Record<Chat['status'], { label: string; className: string }>
   unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
   on_hold: { label: '保留', className: 'bg-info-bg text-info' },
-  resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+  resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
 }
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: '全て' },
+  { key: 'all', label: 'すべて' },
   { key: 'unread', label: '未対応' },
   { key: 'in_progress', label: '対応中' },
   { key: 'on_hold', label: '保留' },
-  { key: 'resolved', label: '対応済' },
+  { key: 'resolved', label: '対応済み' },
 ]
 
 type InboxSavedViewConditions = {
@@ -151,17 +151,6 @@ function StickerMessageImage({ content }: { content: string }) {
   )
 }
 
-function formatDatetime(iso: string | null): string {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 function formatInboxDatetime(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('ja-JP', {
@@ -170,6 +159,34 @@ function formatInboxDatetime(iso: string | null): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+/**
+ * 設計 `xGLVe` の一覧は日付だけの `08/18`。年まで出すと桁が伸びて、
+ * 同じ行の右に並ぶ対応状況の札を押し出す。年は見出し側で出す。
+ */
+function formatInboxListDate(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * 設計 `xGLVe` は、返信を待たせている行だけ日付ではなく待ち時間を出す
+ * （`1時間12分`）。上の帯の「最長 ◯◯待ち」と同じ物差し。
+ * **最終受信からの差なので、新しい口は要らない。**
+ */
+function formatWaitingDuration(iso: string | null, nowMs: number): string | null {
+  if (!iso) return null
+  const at = new Date(iso).getTime()
+  if (!Number.isFinite(at)) return null
+  const minutes = Math.floor((nowMs - at) / 60000)
+  if (minutes < 0) return null
+  if (minutes < 1) return '1分未満'
+  if (minutes < 60) return `${minutes}分`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}時間${minutes % 60}分`
 }
 
 function sameYmd(aIso: string, bIso: string): boolean {
@@ -397,6 +414,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  /*
+    設計 `f0zn6` の「自分の未読」。`isUnread` は
+    **ログイン中の担当者だけの未読**で、対応状況とは別の値。
+    札の数は「いま一覧に出ている自分の未読」で、新しい口は要らない。
+  */
+  const [mineUnreadOnly, setMineUnreadOnly] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -527,19 +550,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const loadEmails = useCallback(async () => {
     try {
       const res = await fetchApi<{ success: boolean; data: { items: EmailInboxItem[] } }>(
-        `/api/support/inbox?${new URLSearchParams({
-          channel: 'email',
+        `/api/support/inbox?${buildSupportEmailInboxQuery({
           status: statusFilter,
-          limit: '200',
-          ...(debouncedNameQuery ? { q: debouncedNameQuery } : {}),
-          ...(selectedAccountId ? { lineAccountId: selectedAccountId } : {}),
+          query: debouncedNameQuery,
         })}`,
       )
       if (res.success) setEmailItems(res.data.items)
     } catch {
       // メールが出ないだけ。LINEのトークは使える。
     }
-  }, [statusFilter, debouncedNameQuery, selectedAccountId])
+  }, [statusFilter, debouncedNameQuery])
 
   useEffect(() => {
     void loadEmails()
@@ -862,7 +882,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId)
-    // 既読はログイン中の担当者だけに反映する。対応状態は変えない。
+    // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
     setChats((prev) => prev.map((chat) => (
       chat.id === chatId ? { ...chat, isUnread: false } : chat
     )))
@@ -1050,7 +1070,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       await api.chats.update(selectedChatId, { status: newStatus, revision: chatDetail.revision })
       loadChatDetail(selectedChatId)
       loadChats()
-      // 対応済/未読の切替は未対応バッジに影響するので即時更新させる
+      // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch {
       setError('ステータスの更新に失敗しました。')
@@ -1123,6 +1143,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
       + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
   }
+  /*
+    設計 `f0zn6` の札の数。**いま一覧に持っている行の中の自分の未読**で、
+    総数ではない。全体の数を出す口はまだ無い。
+  */
+  const mineUnreadCount =
+    visibleMailItems.filter((item) => item.isUnread).length
+    + visibleLineItems.filter((chat) => chat.isUnread).length
   const activeFriendId = selectedFriendId
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
@@ -1166,8 +1193,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
 
-          以前は `<details>` の小さな箱（208px）で、中身は対応状態だけだった。
-          設計は 対応マーク・担当者・受信経路・期限・メッセージ種別・未読だけ の
+          以前は `<details>` の小さな箱（208px）で、中身は対応状況だけだった。
+          設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
         <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
@@ -1235,7 +1262,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         <SavedViewDialog
           open={saveDialogOpen}
           conditions={[
-            { label: '対応マーク', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
+            { label: '対応状況', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
             { label: '担当者', value: assigneeFilter === 'all' ? 'すべて' : assigneeFilter === 'unassigned' ? '未割り当て' : (operators.find((o) => o.id === assigneeFilter)?.name ?? 'すべて') },
             { label: '受信経路', value: channel === 'all' ? 'LINE・MAIL' : channel === 'line' ? 'LINE' : 'MAIL' },
           ]}
@@ -1282,7 +1309,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           data-inbox-v4="conversation-list"
           className={`w-full border-[#E5E7EB] bg-canvas lg:w-[330px] 2xl:w-[420px] lg:flex-shrink-0 border-r flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
-          {/* タブ (全て / 未読 / 対応中 / 対応済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
+          {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className="border-[#E5E7EB] border-b p-3">
@@ -1332,6 +1359,25 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               >
                 <option value="newest">新しい順</option>
               </select>
+              {/*
+                設計 `f0zn6` の「自分の未読」。担当ではなく**自分が読んだか**で
+                絞る。対応状況の絞り込み（下の帯）とは別の物差しなので、
+                同じ帯には混ぜない。
+              */}
+              <button
+                type="button"
+                data-inbox-v6="mine-unread-toggle"
+                onClick={() => setMineUnreadOnly((current) => !current)}
+                aria-pressed={mineUnreadOnly}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-1 text-[11px] font-semibold whitespace-nowrap ${
+                  mineUnreadOnly ? 'bg-status-danger-soft text-v6-danger-text' : 'text-ink-secondary hover:bg-canvas-sunken'
+                }`}
+              >
+                <span className="bg-status-danger text-on-accent text-nano inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-bold">
+                  {mineUnreadCount}
+                </span>
+                自分の未読
+              </button>
             </div>
           </div>
 
@@ -1398,6 +1444,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
+                  .filter((item) => (mineUnreadOnly ? item.isUnread : true))
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
                   .filter((item) => assigneeFilter === 'all'
                     || (assigneeFilter === 'unassigned' ? !item.assignedStaffId : item.assignedStaffId === assigneeFilter))
@@ -1441,7 +1488,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-ink truncate text-sm font-medium">{item.customerName}</p>
                             <span className="text-ink-faint shrink-0 text-[10px]">
-                              {formatDatetime(item.lastIncomingAt)}
+                              {formatInboxListDate(item.lastIncomingAt)}
                             </span>
                           </div>
                           <div className="mt-1 flex items-start justify-between gap-2">
@@ -1460,7 +1507,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
                                 {(item.assignedStaffName ?? '未').charAt(0)}
                               </span>
-                              <span className="truncate">{item.assignedStaffName ?? '未割り当て'}</span>
+                              <span className="truncate">担当：{item.assignedStaffName ?? '未割り当て'}</span>
                             </span>
                           </div>
                         </div>
@@ -1476,6 +1523,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
+                  .filter((chat) => (mineUnreadOnly ? chat.isUnread : true))
                   .filter((chat) => {
                     if (assigneeFilter !== 'all') {
                       if (assigneeFilter === 'unassigned' ? Boolean(chat.operatorId) : chat.operatorId !== assigneeFilter) return false
@@ -1493,6 +1541,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   // 太字と印の表示はこの status を使う。direction だけだと button 押下も
                   // 強調してしまって S/N 比が悪化する。
                   const needsAttention = chat.status === 'unread'
+                  /*
+                    設計 `xGLVe` は、今日届いてまだ返していない行だけ待ち時間を
+                    出す。古い行まで「◯◯時間待ち」にすると桁が伸びて読めない。
+                  */
+                  const waitingLabel = needsAttention
+                    && chat.lastMessageAt
+                    && sameYmd(chat.lastMessageAt, new Date().toISOString())
+                    ? formatWaitingDuration(chat.lastMessageAt, Date.now())
+                    : null
                   // 最新メッセージの本文 preview。flex/image は文字列で見せても意味が薄いので type 表記に置換。
                   const previewRaw = chat.lastMessageContent ?? ''
                   const preview = (() => {
@@ -1511,7 +1568,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       key={chat.id}
                       onClick={() => { setSelectedFriendId(null); handleSelectChat(chat.id); }}
                       className={`w-full border-b border-[#E5E7EB] px-3 py-3 text-left transition-colors ${
-                        isSelected && !selectedFriendId ? 'bg-[#EAFBF0]' : 'hover:bg-[#F7F8F6]'
+                        isSelected && !selectedFriendId
+                          ? 'bg-[#EAFBF0]'
+                          : chat.isUnread
+                            /*
+                              設計 `f0zn6` は、自分あての未読だけ行の地を薄い赤に
+                              する。丸い点だけだと、行を目で追うときに見落とす。
+                            */
+                            ? 'bg-status-danger-soft hover:bg-v6-danger-selected'
+                            : 'hover:bg-[#F7F8F6]'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -1532,7 +1597,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <p className="text-sm font-medium text-ink truncate">{chat.friendName}</p>
                             </div>
-                            <span className="text-[10px] text-ink-faint flex-shrink-0">{formatDatetime(chat.lastMessageAt)}</span>
+                            {waitingLabel ? (
+                              <span className="text-status-warn-deep shrink-0 text-nano font-semibold">{waitingLabel}</span>
+                            ) : (
+                              <span className="text-ink-faint shrink-0 text-nano">{formatInboxListDate(chat.lastMessageAt)}</span>
+                            )}
                           </div>
                           {/*
                             設計は行ごとに状態を出す。色だけだと、赤い点が
@@ -1562,7 +1631,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
                                 {(operatorName ?? '未').charAt(0)}
                               </span>
-                              <span className="truncate">{operatorName ?? '未割り当て'}</span>
+                              <span className="truncate">担当：{operatorName ?? '未割り当て'}</span>
                             </span>
                           </div>
                         </div>
@@ -1599,6 +1668,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             /* メールの往復。LINEのトークと同じ場所に出す。 */
             <EmailThread
               threadId={selectedThreadId}
+              onBack={() => setSelectedThreadId(null)}
               customerInfoOpen={showFriendInfo}
               onOpenCustomerInfo={() => setShowFriendInfo(true)}
               onChanged={() => {
@@ -1681,11 +1751,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
                     ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
                   */}
-                  <StatusDropdown
-                    value={chatDetail.status as ChatStatus}
-                    onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
-                    ariaLabel="対応マークを変える"
-                  />
+                  {/*
+                    設計 `xGLVe` / `H3lAOB` の並びは 担当 → 対応状況。
+                    先に「誰が」を決めてから「どうなっている」を動かす順で、
+                    一覧の行の並び（担当の札 → 対応状況の札）とも向きがそろう。
+                  */}
                   <OperatorDropdown
                     value={chatDetail.operatorId ?? 'unassigned'}
                     operators={operators}
@@ -1693,19 +1763,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     label="担当"
                     ariaLabel="担当者を変える"
                   />
-                  {!showFriendInfo && (
-                    <button
-                      type="button"
-                      onClick={() => setShowFriendInfo(true)}
-                      className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
-                    >
-                      顧客情報を開く
-                    </button>
-                  )}
+                  <StatusDropdown
+                    value={chatDetail.status as ChatStatus}
+                    onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
+                    ariaLabel="対応状況を変える"
+                  />
+                  {/*
+                    設計 `H3lAOB` は、閉じているときも開いているときも
+                    **同じ場所に同じ1つのボタン**を置く。閉じる口が右パネルの
+                    中にしか無いと、閉じたあと戻す口を別の場所で探すことになる。
+                  */}
+                  <button
+                    type="button"
+                    data-inbox-v6="customer-info-toggle"
+                    onClick={() => setShowFriendInfo((current) => !current)}
+                    aria-expanded={showFriendInfo}
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-v6-control border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                  >
+                    {showFriendInfo
+                      ? <PanelRightClose aria-hidden="true" size={14} />
+                      : <PanelRightOpen aria-hidden="true" size={14} />}
+                    {showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'}
+                  </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/*
-                    「未読に戻す」「対応中にする」「対応済にする」は
+                    「未読に戻す」「対応中にする」「対応済みにする」は
                     上の「対応 ▾」と同じことをしていたので外した。
                     同じ操作の入口が2つあると、どちらが正なのか分からない。
                   */}
@@ -1862,7 +1945,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
-              <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
+              <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3 relative">
                 {/* 上段 */}
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -1881,12 +1964,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     >
                       ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </button>
+                    {/*
+                      設計 `B7CER8` は、開いている間このボタン自体が
+                      琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
+                      なのかが分かる印が要る。
+                    */}
                     <button
                       type="button"
+                      data-inbox-v6="internal-memo-toggle"
                       onClick={() => setShowMemoEditor((current) => !current)}
                       aria-expanded={showMemoEditor}
-                      className="inline-flex items-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
+                      className={`inline-flex items-center gap-1.5 rounded-v6-control border px-3 py-2 text-xs font-semibold ${
+                        showMemoEditor
+                          ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
+                          : 'border-[#E5E7EB] bg-canvas text-[#344054] hover:bg-[#F7F8F6]'
+                      }`}
                     >
+                      <NotebookPen aria-hidden="true" size={14} />
                       内部メモ
                     </button>
                   </div>
@@ -1921,65 +2015,71 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
-                {showMemoEditor && typeof document !== 'undefined' && createPortal(
+                {/*
+                  設計 `B7CER8` の内部メモは**画面を覆う窓ではなく、
+                  「内部メモ」ボタンの上に出る紙**。トークを隠さずに、
+                  直前のやり取りを見ながら書けるようにするため。
+                */}
+                {showMemoEditor && (
                   <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
                     role="dialog"
-                    aria-modal="true"
                     aria-labelledby="chat-internal-memo-title"
-                    onClick={() => {
+                    data-inbox-v6="internal-memo-popover"
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Escape') return
+                      event.stopPropagation()
                       setMemoDraft(chatDetail?.notes ?? '')
                       setMemoError('')
                       setShowMemoEditor(false)
                     }}
+                    className="border-hairline rounded-v6-dialog shadow-float absolute bottom-full left-4 z-30 mb-2 w-[calc(100%-2rem)] max-w-[760px] border bg-canvas p-5"
                   >
-                    <div
-                      className="border-hairline w-full max-w-lg rounded-[14px] border bg-canvas shadow-2xl"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <div className="border-hairline border-b px-5 py-4">
-                        <div>
-                          <h2 id="chat-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
-                          <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
-                        </div>
-                      </div>
-                      <div className="px-5 py-4">
-                        <label htmlFor="chat-internal-memo" className="text-ink-secondary text-xs font-semibold">メモ内容</label>
-                        <textarea
-                          id="chat-internal-memo"
-                          value={memoDraft}
-                          onChange={(event) => setMemoDraft(event.target.value)}
-                          rows={7}
-                          autoFocus
-                          placeholder="メモを追加"
-                          className="border-hairline focus:border-accent focus:ring-accent/15 mt-2 w-full resize-y rounded-lg border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
-                        />
-                        {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
-                      </div>
-                      <div className="border-hairline flex justify-end gap-2 border-t px-5 py-4">
-                        <button
-                          type="button"
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 id="chat-internal-memo-title" className="text-ink flex items-center gap-2 text-sm font-bold">
+                        <NotebookPen aria-hidden="true" size={16} className="text-status-warn" />
+                        内部メモを追加
+                      </h2>
+                      <span className="rounded-pill bg-status-warn-soft text-status-warn-deep text-micro shrink-0 px-2 py-0.5 font-semibold">
+                        スタッフのみ
+                      </span>
+                    </div>
+                    <p className="text-ink-faint mt-2 text-xs">
+                      対応方針や引き継ぎ内容を入力してください。顧客には表示・送信されません。
+                    </p>
+                    <label htmlFor="chat-internal-memo" className="sr-only">内部メモの本文</label>
+                    <textarea
+                      id="chat-internal-memo"
+                      value={memoDraft}
+                      onChange={(event) => setMemoDraft(event.target.value)}
+                      rows={4}
+                      autoFocus
+                      placeholder="例：次回返信時に配送先住所を確認する"
+                      className="border-hairline focus:border-accent focus:ring-accent/15 rounded-v6-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
+                    />
+                    {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-ink-faint text-xs">この内容は社内メンバーだけが確認できます</p>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {/* 設計 `B7CER8` の2つは h36・角丸8・13px・600。共通ボタンと同値。 */}
+                        <Button
                           onClick={() => {
                             setMemoDraft(chatDetail?.notes ?? '')
                             setMemoError('')
                             setShowMemoEditor(false)
                           }}
-                          className="border-hairline text-ink-secondary rounded-lg border bg-canvas px-4 py-2 text-sm font-semibold hover:bg-[#F7F8F6]"
                         >
                           キャンセル
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button
+                          variant="primary"
                           onClick={() => void handleSaveMemo()}
                           disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
-                          className="bg-accent text-on-accent rounded-lg px-4 py-2 text-sm font-semibold hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {memoSaving ? '保存中...' : '保存'}
-                        </button>
+                          {memoSaving ? '保存中...' : 'メモを保存'}
+                        </Button>
                       </div>
                     </div>
-                  </div>,
-                  document.body,
+                  </div>
                 )}
 
                 <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">

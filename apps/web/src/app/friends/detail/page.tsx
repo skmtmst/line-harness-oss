@@ -149,14 +149,14 @@ function SectionHead({
   )
 }
 
-/** 対応マーク。やり取りがまだ無い友だちは、未対応でも対応済みでもない。 */
+/** 対応状況。やり取りがまだ無い友だちは、未対応でも対応済みでもない。 */
 function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_hold' | 'resolved' }) {
   if (!status) return <span className="text-ink-faint text-xs">やり取りなし</span>
   const map = {
     unread: { label: '未対応', className: 'bg-warning-bg text-warning' },
     in_progress: { label: '対応中', className: 'bg-info-bg text-info' },
     on_hold: { label: '保留', className: 'bg-action-soft text-action' },
-    resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+    resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
   } as const
   const s = map[status]
   return (
@@ -412,7 +412,7 @@ function FriendDetailInner() {
                 />
                 <dl className="space-y-1 text-xs">
                   <div className="flex justify-between gap-2">
-                    <dt className="text-ink-faint">対応マーク</dt>
+                    <dt className="text-ink-faint">対応状況</dt>
                     <dd>
                       <SupportMarkBadge status={friend?.support?.status} />
                     </dd>

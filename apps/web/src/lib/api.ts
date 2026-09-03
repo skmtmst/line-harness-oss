@@ -2763,10 +2763,16 @@ export const api = {
         title?: string
         messageType?: ApiBroadcast['messageType']
         messageContent?: string
+        messageBubbles?: BroadcastBubble[]
         targetType?: ApiBroadcast['targetType']
         targetTagId?: string | null
+        segmentConditions?: SegmentCondition | null
         scheduledAt?: string | null
         trackLinks?: boolean
+        folderId?: string | null
+        measureOpens?: boolean
+        stealthSpreadMinutes?: number
+        lineAccountId?: string | null
       }
     ) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`, {
@@ -3220,9 +3226,14 @@ export const api = {
       }>>>('/api/affiliates-report?' + new URLSearchParams(params as Record<string, string>)),
   },
   templates: {
-    list: (category?: string) =>
-      fetchApi<ApiResponse<Array<{
+    list: (category?: string, accountId?: string) => {
+      const query = new URLSearchParams()
+      if (category) query.set('category', category)
+      if (accountId) query.set('account_id', accountId)
+      const suffix = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<Array<{
         id: string;
+        accountId: string | null;
         name: string;
         category: string;
         messageType: string;
@@ -3236,11 +3247,13 @@ export const api = {
         createdAt: string;
         updatedAt: string;
       }>>>(
-        '/api/templates' + (category ? '?' + new URLSearchParams({ category }) : ''),
-      ),
+        `/api/templates${suffix}`,
+      )
+    },
     get: (id: string) =>
       fetchApi<ApiResponse<{
         id: string;
+        accountId: string | null;
         name: string;
         category: string;
         messageType: string;
@@ -3256,6 +3269,10 @@ export const api = {
         usedBy: {
           autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>;
           automations: Array<{ id: string; name: string; eventType: string }>;
+          scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>;
+          reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
+          richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
+          trackedLinks: Array<{ id: string; name: string }>;
         };
         createdAt: string;
         updatedAt: string;
@@ -3263,6 +3280,7 @@ export const api = {
         `/api/templates/${id}`,
       ),
     create: (data: {
+      accountId: string
       name: string
       category: string
       messageType: string
@@ -3297,7 +3315,11 @@ export const api = {
     usages: (id: string) =>
       fetchApi<ApiResponse<{
         autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null }>;
+        automations: Array<{ id: string; name: string; eventType: string }>;
         scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>;
+        reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
+        richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
+        trackedLinks: Array<{ id: string; name: string }>;
       }>>(`/api/templates/${id}/usages`),
   },
   autoReplies: {
@@ -5461,7 +5483,9 @@ export type WebinarCtaCard = {
 }
 
 export const webinarApi = {
-  list: () => fetchApi<{ data: Webinar[] }>('/api/webinars'),
+  list: (accountId?: string) => fetchApi<{ data: Webinar[] }>(
+    `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+  ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   create: (input: WebinarInput) =>
     fetchApi<{ data: Webinar }>('/api/webinars', { method: 'POST', body: JSON.stringify(input) }),

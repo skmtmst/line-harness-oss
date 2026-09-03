@@ -71,7 +71,7 @@ export default function FolderAddDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-canvas rounded-card w-full max-w-md p-5 shadow-xl">
+      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
         <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
         {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
 

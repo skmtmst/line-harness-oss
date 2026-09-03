@@ -4,7 +4,7 @@
 - 枝: `codex/kenta-v6-visual-qa`
 - 更新: 2026-08-27（整理候補・削除保護・CSV一括登録まで接続）
 - 正本: Pencil `★ V6 4-1 友だち属性・タグ（1920）` `hqrOv`
-- 併読: `docs/v6-shell-contract.md`（枠の決めごと）、`docs/v6-common-rules.md`（設計の決めごと）
+- 併読: `docs/v6-common-rules.md` §1（枠の決めごと）、`docs/v6-common-rules.md`（設計の決めごと）
 
 ## 0. これは何か
 
@@ -104,7 +104,7 @@ Export(["hqrOv"], "html-css", "<出力先>", { includeHtmlScaffold: true })
 
 ## 4. 画面を見る手順
 
-**これが無いと、設計と比べられない。** ローカルで開くのに4つ要る（`v6-shell-contract.md` §10）。
+**これが無いと、設計と比べられない。** ローカルで開くのに4つ要る（`docs/v6-common-rules.md` §10）。
 
 ```bash
 # 1. 共有パッケージを建てる（無いと全ルート500）

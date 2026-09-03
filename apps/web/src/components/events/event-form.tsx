@@ -8,6 +8,7 @@ import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso } from './jst'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -166,7 +167,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         accountIdsArr = [accountId, ...accountIdsArr]
       }
       if (targetType === 'multi-account-dedup' && accountIdsArr.length === 0) {
-        throw new Error('複数アカウント横断の場合は対象アカを 1 件以上選択してください')
+        throw new Error('複数アカウント横断の場合は対象アカウントを 1 件以上選んでください')
       }
       const payload: Partial<EventDetail> = {
         name: draft.name,
@@ -309,14 +310,14 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 </div>
                 <p className="text-xs text-blue-700 mt-2">
                   broadcast 編集で「リンクするイベント」から選ぶと自動挿入。
-                  {'{{liff_id}}'} は配信時に各友だちのアカに対応した値に置換されます。
+                  {'{{liff_id}}'} は配信時に各友だちのアカウントに対応した値に置換されます。
                 </p>
               </div>
               <div>
-                <div className="text-sm font-medium text-blue-900 mb-2">各アカ固定 URL (QR・LP 直貼り用)</div>
+                <div className="text-sm font-medium text-blue-900 mb-2">アカウントごとの固定 URL (QR・LP 直貼り用)</div>
                 <div className="space-y-1.5">
                   {targetAccounts.length === 0 && (
-                    <div className="text-xs text-amber-700">対象アカが選択されていません</div>
+                    <div className="text-xs text-amber-700">対象アカウントが選ばれていません</div>
                   )}
                   {targetAccounts.map((a) => {
                     const acct = a as unknown as { liffId?: string | null; name: string; country: string | null }
@@ -593,7 +594,7 @@ function OverviewTab({
             }`}
           >
             <div className="text-sm font-bold">単一アカウント</div>
-            <div className="text-xs text-gray-600">1 つの LINE アカで運用</div>
+            <div className="text-xs text-gray-600">1 つの LINE アカウントで運用</div>
           </button>
           <button
             type="button"
@@ -621,7 +622,7 @@ function OverviewTab({
 
         {targetType === 'multi-account-dedup' && (
           <div className="space-y-1.5">
-            <div className="text-xs text-gray-600">対象アカ（重複なし配信）</div>
+            <div className="text-xs text-gray-600">対象アカウント（重複なし配信）</div>
             {activeAccounts.length === 0 && (
               <div className="text-sm text-gray-500 italic p-2">アクティブなアカウントがありません</div>
             )}
@@ -652,7 +653,7 @@ function OverviewTab({
                   />
                   <span className="text-sm">
                     {a.country ? a.country + ' ' : ''}{a.name}
-                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">(現アカ・必須)</span>}
+                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">（今のアカウント・必須）</span>}
                   </span>
                 </label>
               )
@@ -684,6 +685,19 @@ function SlotsTab({
   const [err, setErr] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
+  /*
+    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
+    何件できるのか・何が消えるのかを本文で読ませられず、画像比較にも写らない。
+  */
+  const [deleteSlotTarget, setDeleteSlotTarget] = useState<EventSlot | null>(null)
+  const [deletingSlot, setDeletingSlot] = useState(false)
+  const [deleteSlotError, setDeleteSlotError] = useState('')
+  /** まとめて作る枠の下見。作る前に件数と最初・最後を読ませる。 */
+  const [bulkPreview, setBulkPreview] = useState<
+    { slots: Array<{ starts_at: string; ends_at: string; capacity: number | null }> } | null
+  >(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState('')
 
   if (!eventId) {
     return (
@@ -699,18 +713,44 @@ function SlotsTab({
     setSlots(res.items)
   }
 
-  async function deleteSlot(slotId: string) {
-    if (!eventId) return
-    if (!confirm('この枠を削除しますか？（既存予約があると削除できません）')) return
-    setBusy(true)
+  /*
+    予約が入っている枠は、そもそもボタンを押せないようにしてある
+    （`disabled={busy || (s.active_count ?? 0) > 0}`）。ここまで来るのは
+    予約が0件の枠だけ。サーバー側でも同じ判定をしているので、行き違いで
+    断られたときは窓の中に運用者の言葉で出す。
+  */
+  async function deleteSlot() {
+    if (!deleteSlotTarget || !eventId || deletingSlot) return
+    setDeletingSlot(true)
+    setDeleteSlotError('')
     setErr(null)
     try {
-      await eventsApi.deleteSlot(accountId, eventId, slotId)
+      await eventsApi.deleteSlot(accountId, eventId, deleteSlotTarget.id)
+      setDeleteSlotTarget(null)
       await refresh()
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+    } catch {
+      setDeleteSlotError('枠を削除できませんでした。あとから予約が入った可能性があります。読み直してから、もう一度お試しください。')
     } finally {
-      setBusy(false)
+      setDeletingSlot(false)
+    }
+  }
+
+  async function createBulkSlots() {
+    if (!bulkPreview || !eventId || bulkBusy) return
+    setBulkBusy(true)
+    setBulkError('')
+    try {
+      await eventsApi.createSlots(accountId, eventId, bulkPreview.slots)
+      setBulkPreview(null)
+      await refresh()
+      setShowBulk(false)
+    } catch {
+      // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
+      // どこまで作られたかを見せるため、失敗しても一覧を取り直す。
+      setBulkError('枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。')
+      await refresh()
+    } finally {
+      setBulkBusy(false)
     }
   }
 
@@ -782,7 +822,7 @@ function SlotsTab({
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button
-                      onClick={() => deleteSlot(s.id)}
+                      onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
                       disabled={busy || (s.active_count ?? 0) > 0}
                       title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
                       className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
@@ -811,18 +851,51 @@ function SlotsTab({
         <BulkSlotDialog
           onClose={() => setShowBulk(false)}
           onSubmit={async (input) => {
-            const generated = generateBulkSlots(input)
-            if (generated.length === 0) {
-              alert('生成される枠が0件でした。条件を確認してください。')
-              return
-            }
-            if (!confirm(`${generated.length}件の枠を生成します。よろしいですか？`)) return
-            await eventsApi.createSlots(accountId, eventId, generated)
-            await refresh()
-            setShowBulk(false)
+            /*
+              作る前に**下見を出す**。件数が0でも `alert()` は使わず、
+              同じ窓で理由を読ませて、作るボタンを出さない。
+            */
+            setBulkError('')
+            setBulkPreview({ slots: generateBulkSlots(input) })
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteSlotTarget !== null}
+        title="この予約枠を削除しますか？"
+        description={`${deleteSlotTarget ? formatJpDateTime(deleteSlotTarget.starts_at) : ''}の枠を削除します。この枠はもう予約できなくなります。いま予約は入っていません。ほかの枠とイベント本体、これまでの予約の記録は残ります。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={deletingSlot}
+        error={deleteSlotError}
+        onConfirm={() => void deleteSlot()}
+        onCancel={() => {
+          if (deletingSlot) return
+          setDeleteSlotError('')
+          setDeleteSlotTarget(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkPreview !== null}
+        title={bulkPreview && bulkPreview.slots.length === 0
+          ? '作られる枠が0件です'
+          : `${bulkPreview?.slots.length ?? 0}件の予約枠を作りますか？`}
+        description={bulkPreview && bulkPreview.slots.length === 0
+          ? '入れた条件では枠が1つも作られません。期間・曜日・時間帯を見直してから、もう一度お試しください。まだ何も作っていません。'
+          : `${bulkPreview && bulkPreview.slots.length > 0 ? formatJpDateTime(bulkPreview.slots[0].starts_at) : ''}から${bulkPreview && bulkPreview.slots.length > 0 ? formatJpDateTime(bulkPreview.slots[bulkPreview.slots.length - 1].starts_at) : ''}までの枠をまとめて作ります。いまある枠は消えません。作った枠は1件ずつ削除できます（予約が入ったあとは削除できません）。`}
+        confirmLabel="まとめて作る"
+        cancelLabel={bulkPreview && bulkPreview.slots.length === 0 ? '条件を直す' : 'キャンセル'}
+        busy={bulkBusy}
+        error={bulkError}
+        onConfirm={bulkPreview && bulkPreview.slots.length > 0 ? () => void createBulkSlots() : undefined}
+        onCancel={() => {
+          if (bulkBusy) return
+          setBulkError('')
+          setBulkPreview(null)
+        }}
+      />
     </div>
   )
 }

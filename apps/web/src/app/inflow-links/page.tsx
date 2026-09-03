@@ -509,7 +509,22 @@ function InflowLinksPageInner() {
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
   // 「稼働中」は登録済みの行。orphan（外部が発行した未登録 ref）は流入実績が
   // あるだけで、こちらから止める・直すができないので数に入れない。
-  const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length
+  // 帯は画面全体の要約なので、**フォルダの選択や検索文字で数が変わってはいけない。**
+  // ここを `sortedRows`（フォルダ＋検索で絞ったもの）から数えていたため、
+  // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
+  // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
+  // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
+  const accountRouteCount = accountFilteredRows.length
+  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
+  /*
+    **読み込めていないときに0件と書かない。**
+
+    一覧側は読込中・空・取得失敗を3つに言い分けているのに、帯だけが
+    `sortedRows.length` をそのまま出していた。取得に失敗すると配列は空なので、
+    **登録した流入元が1つも無いように読める。** 設計 `BMmxU` の主題は
+    「空・読込・エラーを混ぜない」なので、帯も同じ扱いにする。
+  */
+  const routeCountAvailable = !loading && !loadFailed
   const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
   const addRate = summaryAvailable && totalClicks > 0
@@ -555,9 +570,15 @@ function InflowLinksPageInner() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
-          value={sortedRows.length}
+          value={routeCountAvailable ? accountRouteCount : null}
           unit="件"
-          detail={`稼働中 ${activeRouteCount}`}
+          detail={
+            routeCountAvailable
+              ? `稼働中 ${activeRouteCount}`
+              : loading
+                ? '読み込んでいます'
+                : '読み込めませんでした'
+          }
         />
         {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
         <KpiCard title="今月の追加" value={null} unit="人" detail="前月比は出せません" />

@@ -1,3 +1,5 @@
+> **冻结于 v0.13.2(2026-09-03)。** 日文版 `README.md` 为正本,也是唯一持续更新的版本。
+
 🌐 [日本語](README.md) | [English](README.en.md) | **简体中文** | [한국어](README.ko.md) | [Español](README.es.md)
 
 # LINE Harness

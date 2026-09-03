@@ -30,7 +30,7 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'status_message', label: 'ステータスメッセージ' },
   { value: 'mark', label: '対応マーク' },
   { value: 'scenario', label: 'シナリオ' },
-  { value: 'chat_status', label: '対応状態' },
+  { value: 'chat_status', label: '対応状況' },
   { value: 'following', label: '友だち状態' },
   { value: 'created_at', label: '友だち追加日' },
 ]
@@ -166,7 +166,7 @@ function ConditionEditor({
       ) : condition.kind === 'following' ? (
         <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className="min-w-44 flex-1" />
       ) : condition.kind === 'chat_status' ? (
-        <Select aria-label="対応状態" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状態を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" />
+        <Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" />
       ) : condition.kind === 'created_at' ? (
         <div className="flex min-w-80 flex-1 items-center gap-2">
           <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: event.target.value } })} className="flex-1" />
@@ -241,6 +241,8 @@ function SavedSearchEditInner() {
   const [name, setName] = useState('')
   const [conditions, setConditions] = useState<SavedSearchConditions>({ all: [], any: [] })
   const [isShared, setIsShared] = useState(false)
+  /** 保存済みの総数。上限50件までの残りを共有範囲の下に出すために持つ。 */
+  const [savedCount, setSavedCount] = useState<number | null>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [previewStale, setPreviewStale] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -285,6 +287,7 @@ function SavedSearchEditInner() {
         scenarios: scenarioResult?.success !== true,
         fields: fieldResult?.success !== true,
       })
+      setSavedCount(searches.success ? searches.data.length : null)
       const found = searches.success ? searches.data.find((item) => item.id === id) ?? null : null
       if (!found) {
         setError('保存した検索が見つかりません')
@@ -370,7 +373,7 @@ function SavedSearchEditInner() {
     }
   }
 
-  if (loading) return <p className="text-sm text-v6-ink-faint">読み込み中…</p>
+  if (loading) return <p className="text-sm text-v6-ink-faint">読み込んでいます</p>
   if (!selectedAccountId) return <p className="rounded-v6-card border border-hairline bg-canvas p-5 text-sm text-v6-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
   if (!original) return <p className="rounded-v6-card border border-hairline bg-canvas p-5 text-sm text-v6-danger">{error || '保存した検索が見つかりません'}</p>
 
@@ -397,6 +400,18 @@ function SavedSearchEditInner() {
                 <label className="flex items-center gap-2"><input type="radio" checked={isShared} onChange={() => setIsShared(true)} /> 全員（他の担当者からも使えます）</label>
                 <label className="flex items-center gap-2"><input type="radio" checked={!isShared} onChange={() => setIsShared(false)} /> 自分だけ</label>
               </div>
+              {/*
+                設計 `XBkiQ`：共有範囲を選ぶ場所で、上限と「共有すると何が
+                起きるか」を先に言う。50件に近づいてから初めて知る、という
+                順番にしない。件数は一覧の取得結果そのものなので、読めて
+                いないときは数を出さずに上限だけ書く。
+              */}
+              <p className="mt-2 text-xs leading-5 text-v6-ink-faint">
+                {savedCount === null
+                  ? '保存できるのは50件までです。'
+                  : `保存できるのは50件までです（いま${savedCount}件）。`}
+                共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。
+              </p>
             </fieldset>
           </section>
 
@@ -461,5 +476,5 @@ function SavedSearchEditInner() {
 }
 
 export default function SavedSearchEditPage() {
-  return <Suspense fallback={<p className="text-sm text-v6-ink-faint">読み込み中…</p>}><SavedSearchEditInner /></Suspense>
+  return <Suspense fallback={<p className="text-sm text-v6-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense>
 }

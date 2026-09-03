@@ -17,6 +17,7 @@
     "db:dry-run-v6-automations": "tsx scripts/dry-run-v6-automations.ts",
     "db:dry-run-v6-analytics": "tsx scripts/dry-run-v6-analytics.ts",
     "db:dry-run-v6-funnels": "tsx scripts/dry-run-v6-funnels.ts",
+    "db:dry-run-scenario-delivery-timestamps": "tsx scripts/dry-run-scenario-delivery-timestamps.ts",
     "deploy:setup": "node packages/create-line-harness/dist/index.js",
     "deploy:update": "node packages/create-line-harness/dist/index.js update",
     "sandbox:create-line-harness": "bash scripts/run-create-line-harness-sandbox.sh",
@@ -35,8 +36,11 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "15.5.14",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.0",

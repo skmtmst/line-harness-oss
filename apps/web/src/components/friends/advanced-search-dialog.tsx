@@ -33,7 +33,7 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   field: '友だち情報',
   status_message: 'ステータスメッセージ',
   created_at: '友だち登録日',
-  chat_status: '対応マーク',
+  chat_status: '対応状況',
 }
 
 /**
@@ -42,6 +42,9 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
  */
 const NOT_YET: Array<{ label: string; why: string }> = [
   { label: '個別メモ', why: 'メモを検索する口がありません' },
+  // 下のOR節は `'対応状況'` を並べる側に書いているのに、この一覧に項目が無かった。
+  // そのため **設計にあるORの軸が1つ、黙って描かれないまま**だった。
+  { label: '対応状況', why: '対応状況で絞る口がありません' },
   { label: 'シナリオ', why: '購読中のシナリオで絞る口がありません' },
   { label: 'イベント予約', why: '予約から友だちを引く口がありません' },
   { label: 'カレンダー予約', why: '同上' },
@@ -145,7 +148,7 @@ export default function AdvancedSearchDialog({
     }
     if (params.chatStatus) {
       out.push(
-        `対応マーク ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済' }[params.chatStatus]}`,
+        `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[params.chatStatus]}`,
       )
     }
     if (params.visibility === 'blocked') out.push('ブロックした人')
@@ -374,7 +377,7 @@ export default function AdvancedSearchDialog({
                 >
                   <option value="unread">未対応</option>
                   <option value="in_progress">対応中</option>
-                  <option value="resolved">対応済</option>
+                  <option value="resolved">対応済み</option>
                 </select>
               )}
             </section>
@@ -399,11 +402,23 @@ export default function AdvancedSearchDialog({
               <span className="rounded-full bg-[#0067D9] px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
               <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {NOT_YET.filter((item) => ['対応マーク', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
-                <button key={item.label} type="button" disabled title={item.why} className="rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
-                  ＋ {item.label === 'イベント予約' ? '予約' : item.label}
-                </button>
+            {/*
+              **押せない理由を `title` に隠さない。**
+
+              以前は `title={item.why}` だけで、マウスを乗せた人にしか読めなかった。
+              押せない札が理由なしに5つ並ぶと、壊れているのか、まだ無いのか分からない。
+              `NOT_YET` は理由の文をもう持っているので、札の下に出す。
+            */}
+            <div className="mt-3 flex flex-wrap gap-3">
+              {NOT_YET.filter((item) => ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
+                <div key={item.label} className="flex max-w-xs flex-col gap-1">
+                  <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
+                    ＋ {item.label === 'イベント予約' ? '予約' : item.label}
+                  </button>
+                  {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-v6-ink-faint`
+                      （#8b938d）が同じ値を既に持っている。design-debt を増やさずに済む。 */}
+                  <span className="text-v6-ink-faint text-nano leading-tight">{item.why}</span>
+                </div>
               ))}
             </div>
           </section>

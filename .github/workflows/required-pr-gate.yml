@@ -248,7 +248,11 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
         run: |
+          pnpm --filter web exec next lint --report-unused-disable-directives-severity error
           pnpm --filter web typecheck
           pnpm --filter web test
           pnpm --filter web build
           pnpm --filter web verify:design
+
+      - name: Typecheck LIFF
+        run: pnpm --filter liff typecheck

@@ -30,7 +30,13 @@ describe('統合ユーザーV6の画面契約', () => {
   it('内部の統合キーを画面へ出さない', () => {
     expect(ROW).not.toContain('{row.identityKey}')
     expect(ROW).not.toContain('{row.identityKeyKind}')
-    expect(ROW).toContain('UID: {shortenUid(a.lineUserId)}')
+    // **この試験は名前と逆のことを見張っていた。**
+    // 「内部の統合キーを画面へ出さない」と言いながら、
+    // `UID: {shortenUid(a.lineUserId)}` が**出ていること**を要求していた。
+    // 生のLINEユーザーIDは、頭10文字でも `title` の中でも、外に出ている。
+    // 設計 `friends-v6/r7eSi.png` はここに状態の言葉だけを置く。
+    expect(ROW).not.toContain('shortenUid')
+    expect(ROW).not.toContain('title={a.lineUserId}')
     expect(ROW).toContain("{expanded ? '閉じる' : '詳細を見る'}")
     expect(PAGE).not.toContain('画像トークン')
     expect(PAGE).not.toContain('worker キャッシュ')

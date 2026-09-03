@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { api, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import Button from '@/components/shared/button'
 
 interface FriendDetail {
   id: string
@@ -62,7 +63,7 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
   unread: { label: '未対応', className: 'bg-red-100 text-red-700' },
   in_progress: { label: '対応中', className: 'bg-yellow-100 text-yellow-700' },
   on_hold: { label: '保留', className: 'bg-action-soft text-action' },
-  resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+  resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
 }
 
 /** Render a metadata value safely as text. Objects/arrays → JSON, primitives → as-is. */
@@ -224,43 +225,99 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           </button>
         </div>
         {showSettings && (
-          <div className="bg-canvas border-hairline absolute top-[calc(100%+6px)] right-2 z-30 w-64 rounded-card border p-3 shadow-xl">
-            <p className="text-ink text-xs font-bold">表示・並び順</p>
-            <div className="mt-2 space-y-1.5">
+          /*
+            設計 `Xi4x9`「右パネルの表示項目」。**掴んで動かす形は入れていない。**
+            掴む操作はキーボードだけでは使えないので、代わりに「上へ／下へ」を
+            置いた。出し入れの中身は設計と同じ。
+          */
+          <div
+            data-inbox-v6="detail-sections-panel"
+            className="bg-canvas border-hairline rounded-v6-dialog shadow-float absolute top-[calc(100%+6px)] right-2 z-30 w-[320px] border p-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-ink text-xs font-bold">右パネルの表示項目</p>
+                <p className="text-ink-faint text-micro mt-0.5">スイッチで表示切替・上へ／下へで順番変更</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                aria-label="表示項目を閉じる"
+                className="text-ink-faint hover:bg-canvas-sunken rounded-v6-control -mt-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </div>
+            <div className="mt-3 space-y-1.5">
               {sectionOrder.map((key, index) => {
                 const label = DETAIL_SECTIONS.find((item) => item.key === key)?.label ?? key
                 const visible = !hiddenSections.includes(key)
                 return (
-                  <div key={key} className="border-hairline flex items-center gap-2 rounded-control border px-2 py-1.5">
-                    <label className="flex min-w-0 flex-1 items-center gap-2 text-xs">
+                  <div key={key} className="border-hairline rounded-v6-control flex items-center gap-2 border px-2 py-1.5">
+                    <span className="flex shrink-0 flex-col">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => moveSection(key, -1)}
+                        aria-label={`${label}を上へ`}
+                        className="text-ink-faint hover:text-ink text-nano leading-3 disabled:opacity-30"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === sectionOrder.length - 1}
+                        onClick={() => moveSection(key, 1)}
+                        aria-label={`${label}を下へ`}
+                        className="text-ink-faint hover:text-ink text-nano leading-3 disabled:opacity-30"
+                      >
+                        ▼
+                      </button>
+                    </span>
+                    <span className="text-ink min-w-0 flex-1 truncate text-xs">{label}</span>
+                    {/*
+                      素の `<input type="checkbox">` を土台にする。見た目だけの
+                      `<button>` にすると、読み上げで「入／切」が伝わらない。
+                    */}
+                    <label className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center">
                       <input
                         type="checkbox"
+                        role="switch"
                         checked={visible}
+                        aria-label={`${label}を表示`}
                         onChange={() => setHiddenSections((current) => (
                           visible ? [...current, key] : current.filter((item) => item !== key)
                         ))}
+                        className="peer sr-only"
                       />
-                      <span className="truncate">{label}</span>
+                      {/*
+                        軌道と丸は**どちらも input の兄弟**にする。入れ子にすると
+                        `peer-checked:` は兄弟にしか効かないので、丸が動かない。
+                      */}
+                      <span className="rounded-pill bg-step-idle peer-checked:bg-accent peer-focus-visible:ring-accent/40 absolute inset-0 transition-colors peer-focus-visible:ring-2" />
+                      <span className="bg-canvas peer-checked:translate-x-4 absolute left-0.5 h-4 w-4 rounded-full transition-transform" />
                     </label>
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      onClick={() => moveSection(key, -1)}
-                      className="text-accent text-[10px] disabled:opacity-30"
-                    >
-                      上へ
-                    </button>
-                    <button
-                      type="button"
-                      disabled={index === sectionOrder.length - 1}
-                      onClick={() => moveSection(key, 1)}
-                      className="text-accent text-[10px] disabled:opacity-30"
-                    >
-                      下へ
-                    </button>
                   </div>
                 )
               })}
+            </div>
+            {/*
+              **全部隠すと右パネルが空になり、何を隠したのかも画面から読めない。**
+              戻す道をここに置く。
+            */}
+            <div className="mt-3 flex items-center justify-between gap-2">
+              {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
+              <Button
+                onClick={() => {
+                  setSectionOrder(DETAIL_SECTIONS.map((item) => item.key))
+                  setHiddenSections([])
+                }}
+              >
+                初期状態に戻す
+              </Button>
+              <Button variant="primary" onClick={() => setShowSettings(false)}>
+                完了
+              </Button>
             </div>
           </div>
         )}
@@ -397,7 +454,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-2 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
               <div className="flex justify-between items-center">
-                <span className="text-[11px] text-gray-500">対応マーク</span>
+                <span className="text-[11px] text-gray-500">対応状況</span>
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
                     {statusLabels[chatStatus.status].label}

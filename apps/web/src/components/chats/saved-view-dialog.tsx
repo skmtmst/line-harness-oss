@@ -31,7 +31,7 @@ export default function SavedViewDialog({
   onClose,
 }: {
   open: boolean
-  /** 「保存する条件」に並べる中身。設計は 対応マーク・期限 など */
+  /** 「保存する条件」に並べる中身。設計は 対応状況・期限 など */
   conditions: SavedViewCondition[]
   /** 同じ名前があるかを見るための一覧 */
   existingNames: string[]
@@ -96,7 +96,7 @@ export default function SavedViewDialog({
         aria-modal="true"
         aria-label="保存した検索を作成"
         data-qa-dialog="saved-view"
-        className="bg-canvas rounded-card flex w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
+        className="bg-canvas rounded-panel flex w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
       >
         <header className="border-hairline flex items-start gap-4 border-b px-6 py-5">
           <div>

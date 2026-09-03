@@ -34,7 +34,7 @@ function app(staff: AuthenticatedStaff = operator) {
 }
 
 function environment(): Env['Bindings'] {
-  return { DB: testDb.db } as Env['Bindings'];
+  return { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
 }
 
 function insertAccount(id: string, tenantId: string): void {
@@ -66,6 +66,30 @@ afterEach(() => {
 });
 
 describe('専用機能目録 API', () => {
+  it('本番相当の無効環境では保存値に関係なく飲食店テストを無効で返す', async () => {
+    const bindings = { ...environment(), RESTAURANT_TEST_ENABLED: 'false' };
+    const response = await app().request(
+      '/api/settings/features?account_id=default-account', {}, bindings,
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { features: Record<string, boolean> } };
+    expect(body.data.features.restaurant_test).toBe(false);
+  });
+
+  it('本番相当の無効環境では飲食店テストの有効化要求を無効で保存する', async () => {
+    const bindings = { ...environment(), RESTAURANT_TEST_ENABLED: 'false' };
+    const response = await app().request('/api/settings/features?account_id=default-account', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: { restaurant_test: true } }),
+    }, bindings);
+
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare(
+      "SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.restaurant_test'",
+    ).get('default-account')).toEqual({ value: '{"enabled":false}' });
+  });
+
   it('運営が保存した目録を既存GETから取得できる', async () => {
     expect((await putCatalog(['nen_campaigns'])).status).toBe(200);
 

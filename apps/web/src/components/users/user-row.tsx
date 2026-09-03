@@ -59,10 +59,6 @@ function formatDateTime(value: string): string {
   return Number.isNaN(date.getTime()) ? '—' : dateTimeFmt.format(date)
 }
 
-function shortenUid(value: string): string {
-  return value.length > 14 ? `${value.slice(0, 10)}…` : value
-}
-
 const UID_STATUS = {
   url_token: {
     label: '要確認',
@@ -87,7 +83,6 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
    */
   const mergedPersonId = mergedPersonIdOf(row)
   const uidStatus = UID_STATUS[row.identityKeyKind]
-  const primaryUid = row.accounts[0]?.lineUserId
   const duplicateCount = row.accounts.length
 
   return (
@@ -133,9 +128,14 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
           >
             {uidStatus.label}
           </span>
-          <span className="mt-1 block truncate font-mono text-nano text-v6-ink-faint" title={primaryUid}>
-            {primaryUid ? shortenUid(primaryUid) : '—'}
-          </span>
+          {/*
+            **LINEユーザーIDを画面に出さない。**
+
+            ここは以前 `U0000000000…` の頭10文字を描き、全文を `title` に入れていた。
+            設計 `friends-v6/r7eSi.png` はこの桁に「連携済み／未連携／要確認」という
+            **状態の言葉だけ**を置く。言葉はすぐ上の `uidStatus.label` で既に出ている。
+            `title` に全文を残すのも同じことなので、まとめて消す。
+          */}
         </td>
         <td className="px-3 py-3 text-xs tabular-nums text-v6-ink-secondary">
           <span className="block truncate" title={formatDateTime(row.lastActivityAt)}>
@@ -189,8 +189,8 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
                         className={`h-2 w-2 rounded-full ${a.isFollowing ? 'bg-v6-accent' : 'bg-v6-ink-disabled'}`}
                       />
                       <span className="font-medium">{a.accountName}</span>
-                      <span className="font-mono text-xs text-v6-ink-faint" title={a.lineUserId}>
-                        UID: {shortenUid(a.lineUserId)}
+                      <span className="text-xs text-v6-ink-faint">
+                        {a.isFollowing ? '友だち' : 'ブロック・削除'}
                       </span>
                       <span className="text-xs text-v6-ink-faint">
                         登録: {fmt.format(new Date(a.joinedAt))}

@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
  * 「タグを作る」「1通目を設定」のようにその画面固有の名前だった。
  * メニュー名で足りるのは約120枚しかない。
  *
- * 詳しくは `docs/v6-shell-contract.md` §3。
+ * 詳しくは `docs/v6-common-rules.md` §1。
  */
 export interface PageChrome {
   /** トップバーに出す画面名。null なら既定（menu.ts のラベル）を出す。 */

@@ -26,6 +26,7 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
@@ -37,6 +38,8 @@ import MessageKindFields, {
 } from '@/components/scenarios/message-kind-fields'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
+import { broadcastSteps } from '@/components/broadcasts/broadcast-steps'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -87,6 +90,14 @@ const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   research: 'リサーチは準備中です',
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
+
+/**
+ * 配信名の上限。設計 `zZ9fA` の「14 / 60文字」。
+ *
+ * 保存の口には上限が無いので、ここで止めなければいくらでも入る。
+ * 一覧（`q76C35`）の1列目に出る名前なので、長いと表がその1件で崩れる。
+ */
+const TITLE_MAX = 60
 
 /** 位置情報・音声・スタンプは、シナリオと同じ入力欄をそのまま使う。 */
 const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
@@ -257,6 +268,38 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
   </section>
 }
 
+/**
+ * 送る内容がそのまま送れる形になっているか。空文字なら問題なし。
+ *
+ * **保存の検査と、上の5段の帯が同じ関数を見る。** 別々に書いていると、
+ * 帯は「メッセージ 済み」なのに保存で断られる、という一番困る形になる。
+ */
+function bubblesError(bubbles: BroadcastBubble[]): string {
+  for (const [index, bubble] of bubbles.entries()) {
+    if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
+    if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
+    /*
+      位置情報・音声・スタンプは、足りない項目があると送る形にできない。
+      空のまま保存すると、本文が空文字の配信になって、相手には**何も
+      書かれていないメッセージ**が届く。
+    */
+    if (KIND_FIELD_TYPES.has(bubble.type)) {
+      const state = bubble.content.state as MessageKindState | undefined
+      if (!state || !serializeMessageKind(bubble.type as MessageKind, state)) {
+        return `吹き出し${index + 1}の${TYPE_LABELS[bubble.type]}を入力してください`
+      }
+    }
+    if (bubble.type === 'carousel' && !String(bubble.content.columnsJson ?? '').trim()) {
+      return `吹き出し${index + 1}のカルーセルを選択してください`
+    }
+    if (bubble.type === 'flex') {
+      try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
+    }
+    if (isContentTemplateType(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}のテンプレートを選択してください`
+  }
+  return ''
+}
+
 export default function BroadcastForm({
   tags,
   onSuccess,
@@ -267,7 +310,12 @@ export default function BroadcastForm({
   initialCondition = null,
 }: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
-  const createIdempotencyKey = useRef(crypto.randomUUID())
+  /*
+   * テスト送信と本番予約で同じ下書きを使う。
+   * 押すたびにPOSTすると、テストした回数だけ一覧へ下書きが増え、最後の予約は
+   * さらに別のレコードになる。アカウントを切り替えた場合だけ新しい下書きへ分ける。
+   */
+  const draftSession = useRef(newBroadcastDraftSession())
   const appliedInitialTemplate = useRef(false)
   const [title, setTitle] = useState('')
   const [bubbles, setBubbles] = useState<BroadcastBubble[]>([emptyBubble()])
@@ -429,31 +477,12 @@ export default function BroadcastForm({
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
   const validate = () => {
     if (!title.trim()) return '管理用タイトルを入力してください'
+    if (title.trim().length > TITLE_MAX) return `配信名は${TITLE_MAX}文字までにしてください`
     // 宛先が空のまま保存すると、絞ったつもりで全員に届く。
     const audienceProblem = audienceError(targetMode, { scenarioId, tagId, condition })
     if (audienceProblem) return audienceProblem
-    for (const [index, bubble] of bubbles.entries()) {
-      if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
-      if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
-      /*
-        位置情報・音声・スタンプは、足りない項目があると送る形にできない。
-        空のまま保存すると、本文が空文字の配信になって、相手には**何も
-        書かれていないメッセージ**が届く。
-      */
-      if (KIND_FIELD_TYPES.has(bubble.type)) {
-        const state = bubble.content.state as MessageKindState | undefined
-        if (!state || !serializeMessageKind(bubble.type as MessageKind, state)) {
-          return `吹き出し${index + 1}の${TYPE_LABELS[bubble.type]}を入力してください`
-        }
-      }
-      if (bubble.type === 'carousel' && !String(bubble.content.columnsJson ?? '').trim()) {
-        return `吹き出し${index + 1}のカルーセルを選択してください`
-      }
-      if (bubble.type === 'flex') {
-        try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
-      }
-      if (isContentTemplateType(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}のテンプレートを選択してください`
-    }
+    const bubbleProblem = bubblesError(bubbles)
+    if (bubbleProblem) return bubbleProblem
     return ''
   }
   /**
@@ -505,11 +534,46 @@ export default function BroadcastForm({
     return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
   }
 
+  const draftPayload = (scheduledAt: string | null) => {
+    const first = bubbles[0]
+    const legacy = bubbleLegacyMessage(first)
+    return {
+      title: title.trim() || '（テスト送信）',
+      messageType: legacy.messageType,
+      messageContent: legacy.messageContent,
+      messageBubbles: bubblesForSave(bubbles),
+      ...targetPayload(),
+      lineAccountId: selectedAccountId || null,
+      scheduledAt,
+      trackLinks,
+      folderId: folderId || null,
+      measureOpens,
+      stealthSpreadMinutes: Number(spreadMinutes) || 0,
+    }
+  }
+
+  /** テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。 */
+  const persistDraft = async (scheduledAt: string | null): Promise<ApiBroadcast> => {
+    const accountId = selectedAccountId || null
+    const payload = draftPayload(scheduledAt)
+    const result = await persistBroadcastDraft(
+      draftSession.current,
+      accountId,
+      payload,
+      {
+        create: api.broadcasts.create,
+        update: api.broadcasts.update,
+      },
+    )
+    draftSession.current = result.session
+    return result.broadcast
+  }
+
   /**
    * テスト送信。下書きを作って、そこから自分宛に送る。
    *
-   * 作った下書きは残る。送って終わりにすると、確かめた内容と本番で送る
-   * 内容が別物になりうる。同じ下書きをそのまま予約に進められるようにする。
+   * 最初だけ下書きを作り、2回目以降と本番予約は同じ行を更新する。
+   * 確かめた内容と本番で送る内容を同じ実体にし、テスト回数ぶん下書きを増やさない。
    */
   const handleTestSend = async () => {
     const validationError = validate()
@@ -521,26 +585,8 @@ export default function BroadcastForm({
     setError('')
     setTestResult('')
     try {
-      const first = bubbles[0]
-      const legacy = bubbleLegacyMessage(first)
-      const created = await api.broadcasts.create(
-        {
-          title: title.trim() || '（テスト送信）',
-          messageType: legacy.messageType,
-          messageContent: legacy.messageContent,
-          messageBubbles: bubblesForSave(bubbles),
-          ...targetPayload(),
-          lineAccountId: selectedAccountId || null,
-          scheduledAt: null,
-          trackLinks,
-          folderId: folderId || null,
-          measureOpens,
-          stealthSpreadMinutes: Number(spreadMinutes) || 0,
-        },
-        { idempotencyKey: crypto.randomUUID() },
-      )
-      if (!created.success) throw new Error(created.error)
-      const res = await api.broadcasts.testSend(created.data.id)
+      const draft = await persistDraft(null)
+      const res = await api.broadcasts.testSend(draft.id)
       if (res.success) {
         setTestResult(`テスト送信しました（${res.sent ?? 0}件）`)
       } else {
@@ -594,16 +640,29 @@ export default function BroadcastForm({
     `ConfirmDialog` は `onConfirm` を渡さないと確認のボタンごと出さないので、
     押せそうに見えるボタンが残らない。
   */
+  /*
+   * 設計 `LMiL2` の5段。判定は保存の検査と同じ関数を通す。
+   *
+   * **人数が0でも「対象者は済み」にする。** 条件としては決まっていて、
+   * 0人であることは配信前チェックと最終確認が別に止める。ここで赤くすると
+   * 数え終わる前は毎回「未入力」に見えて、進み表示として読めなくなる。
+   */
+  const steps = broadcastSteps({
+    basicDone: title.trim().length > 0 && title.trim().length <= TITLE_MAX,
+    audienceDone: !audienceError(targetMode, { scenarioId, tagId, condition }),
+    messageDone: !bubblesError(bubbles),
+    scheduleDone: sendMode === 'now' || (sendMode === 'scheduled' && Boolean(scheduledDate) && Boolean(scheduledTime)),
+  })
+
   const canConfirm = audienceCount !== null && audienceCount > 0
 
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
     setSaving(true); setError('')
-    const first = bubbles[0]
-    const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, folderId: folderId || null, measureOpens, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
-      if (res.success) { setConfirmOpen(false); onSuccess(res.data) } else setError(res.error)
+      const saved = await persistDraft(scheduledAtIso())
+      setConfirmOpen(false)
+      onSuccess(saved)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
 
@@ -619,12 +678,19 @@ export default function BroadcastForm({
         一覧に戻る
       </button>
     </div>
+    <BroadcastStepRail steps={steps} />
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
-        <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+        <section id="broadcast-step-basic" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
             <label className="block">
-              <span className="text-ink block text-sm font-bold">管理用タイトル</span>
+              <span className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-ink text-sm font-bold">管理用タイトル</span>
+                {/* 設計 `zZ9fA` の「14 / 60文字」。上限に当たってから気づくと書き直しになる。 */}
+                <span className={`text-xs tabular-nums ${title.trim().length > TITLE_MAX ? 'text-danger' : 'text-ink-faint'}`}>
+                  {title.trim().length} / {TITLE_MAX}文字
+                </span>
+              </span>
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="border-hairline rounded-card mt-2 w-full border px-4 py-3 text-sm" />
             </label>
             <label className="block">
@@ -640,7 +706,7 @@ export default function BroadcastForm({
             </label>
           </div>
         </section>
-        <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+        <section id="broadcast-step-audience" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-sm font-bold text-ink">1. 送る相手</p>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
@@ -736,7 +802,7 @@ export default function BroadcastForm({
             <ConditionBuilder value={condition} onChange={setCondition} showCount={false} />
           </div>}
         </section>
-        <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
+        <section id="broadcast-step-message" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-ink text-sm font-bold">3. 送る内容</p>
             <button
@@ -850,7 +916,7 @@ export default function BroadcastForm({
           </p>
         )}
         {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-        <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
+        <section id="broadcast-step-schedule" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <p className="text-ink mb-3 text-sm font-bold">2. 送る時間</p>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
@@ -910,6 +976,20 @@ export default function BroadcastForm({
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                 />
               </div>
+              {/*
+                設計 `Bw0zt` の注意書き。予約は条件を保存するだけで、実際の
+                宛先は**予約の時刻に条件をもう一度あてて**決まる
+                （`services/broadcast.ts` の cron が `buildSegmentQuery` を
+                その場で組み直す）。いま出ている人数のまま固定されると
+                思われると、増減したときに「数が合わない」と読まれる。
+
+                **送信枠には触れない。** 残り通数を読む口がこの画面には無く、
+                「送信枠も再確認します」と書くと出せない数を約束することになる。
+              */}
+              <p className="bg-warning-bg text-warning rounded-control sm:col-span-2 p-3 text-xs leading-relaxed">
+                予約した時刻に、そのときの条件でもう一度対象を数え直してから送ります。
+                いま出ている人数から増減することがあります。
+              </p>
             </div>
           )}
 
@@ -939,7 +1019,7 @@ export default function BroadcastForm({
           </div>
         </section>
 
-    <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
+    <section id="broadcast-step-confirm" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink text-sm font-bold">配信前チェック</p>
         {preflight && (

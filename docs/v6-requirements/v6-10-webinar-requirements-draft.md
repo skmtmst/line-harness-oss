@@ -106,7 +106,7 @@ V6が上回る条件:
 - 視聴完了: 動画時間の90%以上を実視聴、または終端到達＋最低実視聴率
 - 離脱: 最終有効segmentの終了区間。通信断は「推定離脱」
 - 最も視聴された区間: distinct viewerのsegment coverage
-- 外部URLは取得可能なprovider eventだけを表示し、「取得不可」を0にしない
+- 外部URLは取得可能なprovider eventだけを表示し、取得できない指標は`—`（未取得）として0にしない
 
 CTA impressionは表示時、clickはserver idempotent event、form submissionは13回答フォームの成功eventを正本とする。
 
@@ -129,18 +129,18 @@ CTA impressionは表示時、clickはserver idempotent event、form submission�
 - 同一friend×webinar version×session×notification typeを一回
 - 再予約・session変更時は旧jobをcancelして新版を作る
 - 配信時点でfollow状態、機能停止、運用kill switch、予約statusを再確認
-- 失敗はretry/backoffし、恒久失敗を要対応へ
+- 一時失敗の再試行は共通基盤 §6-2 の既定に従い、恒久失敗を要対応へ
 - 視聴完了/CTA/未視聴のactionは25共通action versionを参照
 - action executionはidempotentで、失敗しても視聴eventを失わない
 
 Slack通知は必須の本体機能にせず、24運用者通知または26外部連携のchannelとして設定する。
 
-## 9. 管理APIと権限
+## 9. 管理API
 
 現行管理APIは全件list・ID取得・更新・削除でaccount scopeを検査していない。全routeで次を必須にする。
 
 - `account_id`必須、本人のscopeを検証
-- GETは`webinars.view`、編集・公開は別permission
+- GETは機能の`view`以上、編集・公開は`edit`＋§10の重要操作permission
 - 公開、停止、削除、CSV、個人視聴履歴を重要操作として監査
 - URL直打ちでも同じ制約
 - updateは`expected_version`、競合409
@@ -158,7 +158,32 @@ Slack通知は必須の本体機能にせず、24運用者通知または26外�
 - analytics summary/segments/funnel
 - action execution/retry
 
-## 10. 一覧・参加者・分析
+## 10. 権限
+
+この表は役割 bundle の既定値であり、正本は `v6-30-login-users-requirements-draft.md` §7 の三段階(`edit` / `view` / `none`)と重要操作 permission である。表中の「個別権限」「指定者のみ」「二者承認」は、次の permission key を staff へ個別付与することを指す。
+
+| 操作 | owner | admin | staff |
+|---|---:|---:|---:|
+| 一覧・参加者・分析を見る | ○ | ○ | 許可範囲 |
+| 定義・下書き版の編集 | ○ | ○ | 個別権限 |
+| 公開・一時停止・archive | ○ | ○ | × |
+| 参加者の個人視聴履歴 | ○ | ○ | 個別権限 |
+| 参加者CSV | ○ | ○ | 個別権限 |
+| action再実行 | ○ | ○ | 指定者のみ |
+| test identityへの確認送信 | ○ | ○ | 個別権限 |
+
+| permission key | 対象操作 |
+|---|---|
+| `webinar.definition.edit` | 定義・下書き版の編集、動画upload |
+| `webinar.definition.publish` | 公開、一時停止、archive |
+| `webinar.participant.view` | 参加者の個人視聴履歴を見る |
+| `webinar.participant.export` | 参加者CSVの生成 |
+| `webinar.action_run.retry` | action executionの再実行 |
+| `webinar.test.send` | test identityへの確認送信 |
+
+画面で隠すだけでなく、§9のroute metadataで機能・操作・対象scopeを宣言し、APIで拒否する。
+
+## 11. 一覧・参加者・分析
 
 一覧KPIは定義を固定する。
 
@@ -172,7 +197,7 @@ Slack通知は必須の本体機能にせず、24運用者通知または26外�
 
 分析は概要、視聴、離脱、CTA、申込のtab。人数とsession延べ数を混ぜない。平均0.8秒のような異常値には母数・計測欠落警告を出す。
 
-## 11. 削除
+## 12. 削除
 
 V6の「元に戻せません」「履歴が見えなくなる」を物理削除として実装しない。
 
@@ -183,7 +208,7 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 - 個人情報の削除要求は保持policyに沿い匿名化し、集計整合を保つ
 - video binaryはretention後に別jobで削除。参照中versionがあれば拒否
 
-## 12. 状態
+## 13. 状態
 
 - 動画処理中、失敗、ready
 - 下書き、公開予定、公開中、一時停止、終了、archive
@@ -195,7 +220,7 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 - action成功、retry中、恒久失敗
 - 版競合
 
-## 13. 既存移行
+## 14. 既存移行
 
 1. webinarsのaccount null、slug、status、schedule JSON、動画prefixを棚卸し
 2. account未設定を安全に紐付けられない場合は隔離
@@ -206,7 +231,7 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 7. physical delete APIをarchiveへ切替
 8. R2 asset参照数とorphanをdry-run
 
-## 14. 除外
+## 15. 除外
 
 - 外部動画から取得不能な個人視聴区間・完了率
 - LINE個人既読
@@ -218,21 +243,23 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 - last positionだけで正確な離脱を断定
 - 誰か分からないpublic視聴をfriendへ自動名寄せ
 
-## 15. 完了条件
+## 16. 完了条件
 
-- V6 13画面の全主操作・状態・遷移が動く
+- V6 13画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
+- 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
+- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
 - 1440/1920で横スクロールなし
 - 全管理APIでaccount scopeと権限を保証
-- on-demand、疑似ライブ、外部URLの分析可能範囲が分かる
+- on-demand・疑似ライブ・外部 URL の 3 方式それぞれで、取得できる指標と取得できない指標を画面上で `—`(未取得)と区別して表示する
 - 公開version固定、予約者snapshot固定
 - 通知・actionが重複しない
 - segmentに基づく視聴・離脱・CTA funnelを検証
-- 外部videoの未取得を0表示しない
+- 外部videoの未取得を0にせず`—`（未取得）と表示する
 - archiveで履歴を保持
 - test identityで公開前E2Eを実行
-- V6実Nodeと同幅画像比較を添付
+- 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
 
-## 16. 実装順
+## 17. 実装順
 
 1. account境界とarchiveをP0修正
 2. definition/version/publication
