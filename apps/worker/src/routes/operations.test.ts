@@ -3,9 +3,13 @@ import { Hono } from 'hono';
 
 import type { Env } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { operations } from './operations.js';
+import { EMERGENCY_CONTROL_PERMISSION, operations } from './operations.js';
 
-function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
+function app(
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+  emergencyControl = role !== 'staff',
+  tenantId?: string,
+) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', {
@@ -13,7 +17,8 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
       name: role,
       role,
       readOnly: false,
-      permissionKeys: [],
+      permissionKeys: emergencyControl ? [EMERGENCY_CONTROL_PERMISSION] : [],
+      tenantId,
     });
     await next();
   });
@@ -103,6 +108,94 @@ describe('緊急停止の保存API', () => {
     expect((await app('owner').request(
       '/api/operations/incidents', request, bindings(),
     )).status).toBe(400);
+  });
+
+  it('管理者は専用permissionがなければ影響を見られても停止できない', async () => {
+    const preview = await app('admin', false).request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toMatchObject({
+      success: true,
+      data: { permissions: { canControl: false } },
+    });
+    const stopped = await app('admin', false).request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    expect(stopped.status).toBe(403);
+    expect(await stopped.json()).toMatchObject({ error: expect.stringContaining('専用権限') });
+
+    const ownerStopped = await app('owner').request(
+      '/api/operations/incidents', stopRequest('account-1'), bindings(),
+    );
+    const ownerStoppedBody = await ownerStopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    const restored = await app('admin', false).request(
+      `/api/operations/incidents/${ownerStoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-confirm-irreversible': 'operation-restore',
+        },
+        body: JSON.stringify({
+          expectedVersion: ownerStoppedBody.data.control.version,
+          confirmation: '復旧',
+        }),
+      },
+      bindings(),
+    );
+    expect(restored.status).toBe(403);
+  });
+
+  it('全アカウントの影響数はownerだけに返す', async () => {
+    expect((await app('admin').request(
+      '/api/operations/control/preview', {}, bindings(),
+    )).status).toBe(403);
+    expect((await app('owner').request(
+      '/api/operations/control/preview', {}, bindings(),
+    )).status).toBe(200);
+  });
+
+  it('影響人数の再計算を操作者と対象範囲付きで記録する', async () => {
+    const response = await app('owner').request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(response.status).toBe(200);
+
+    const row = testDb.raw.prepare(
+      `SELECT target_kind, target_id, action, actor_id, detail_json
+         FROM operation_audit
+        WHERE target_kind = 'emergency_control'`,
+    ).get() as {
+      target_kind: string;
+      target_id: string;
+      action: string;
+      actor_id: string;
+      detail_json: string;
+    };
+    expect(row).toMatchObject({
+      target_kind: 'emergency_control',
+      target_id: 'account-1',
+      action: 'previewed',
+      actor_id: 'owner-1',
+    });
+    expect(JSON.parse(row.detail_json)).toMatchObject({
+      counts: { broadcast_dispatch: 0 },
+      hasUnknownAudience: true,
+      calculatedAt: expect.any(String),
+    });
+  });
+
+  it('別統括のアカウント影響数を返さない', async () => {
+    testDb.raw.prepare("INSERT INTO tenants (id, name) VALUES ('tenant-2', '統括2')").run();
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-2' WHERE id = 'account-1'").run();
+
+    const response = await app('admin', true, 'tenant-1').request(
+      '/api/operations/control/preview?account_id=account-1', {}, bindings(),
+    );
+    expect(response.status).toBe(403);
   });
 
   it('管理者も全体停止の現在状態を確認できる', async () => {
