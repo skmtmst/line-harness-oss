@@ -90,7 +90,7 @@ Kenta Kawano
 LINE
 MAIL
 新しい順
-対応マーク
+対応状況
 すべて
 未対応
 対応中
