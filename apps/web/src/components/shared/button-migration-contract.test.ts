@@ -265,9 +265,15 @@ describe('標準ボタンの第1段階移行', () => {
     // 両方を統合した木を再計測し、片側の古い値へ戻さない。
     // 2026-09-03: どこからも使われていない部品9本(prompt-modal、multi-account-dedup-section、
     // friend-table、step-editor、support-alert-panel、accounts の4本)を消して1192。
+    // 2026-09-03: 主ボタンの直書き緑5か所を `bg-accent-deep` に寄せ、
+    // それぞれが持っていた `bg-[#06C755]` と `hover:bg-[#05B94F]` が消えて1182。
+    // **減ったので締め直す。**
+    // 2026-09-03: 保存した検索の要約を名前の下に足したぶんで 1183。
+    // 設計 `ASsb3` が「対応マーク：未対応／期限：超過」と出しているので、
+    // 11px の指定が1つ増えた。**増えたぶんの理由が書けるものだけ足す。**
     // 2026-09-04: /settings の見出しを共通 PageHeader へ寄せたので、
-    // text-[30px] / text-[#202020] / text-[#777] の3つが減って 1189。
-    expect(debt['arbitrary-value']).toBe(1189)
+    // text-[30px] / text-[#202020] / text-[#777] の3つが減って 1180。
+    expect(debt['arbitrary-value']).toBe(1180)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
