@@ -708,7 +708,14 @@ export default function BroadcastForm({
         </section>
         <section id="broadcast-step-audience" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="text-sm font-bold text-ink">1. 送る相手</p>
+            {/*
+              番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
+              以前は 1・3・2 と振ってあり、画面には「1. 送る相手 → 3. 送る内容 →
+              2. 送る時間」の順に並んでいた。**番号が飛んで見えるので、
+              間の節を見落としたと読まれる。** 設計 `zZ9fA` の段は
+              基本設定 → 対象者 → メッセージ → 送信設定 → 確認。
+            */}
+            <p className="text-sm font-bold text-ink">2. 送る相手</p>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-bold text-accent">送信対象</p>
               <p className="text-2xl font-black text-accent">
@@ -925,7 +932,7 @@ export default function BroadcastForm({
         )}
         {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         <section id="broadcast-step-schedule" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
-          <p className="text-ink mb-3 text-sm font-bold">2. 送る時間</p>
+          <p className="text-ink mb-3 text-sm font-bold">4. 送る時間</p>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
               type="button"
