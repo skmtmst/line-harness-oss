@@ -245,6 +245,20 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
 }
 
+/** 支払台帳を作る前に安全に表示できる、承認済み報酬の読み取り専用集計。 */
+export type AffiliatePaymentSummary = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  holdDays: number | null
+  payoutCycle: string | null
+  approvedConversions: number
+  approvedReward: number
+  heldConversions: number
+  heldReward: number
+  holdStatusUnknown: number
+}
+
 /** Broadcast type from API (now camelCase after worker serialization) */
 export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   targetType: BroadcastTargetType;
@@ -1007,6 +1021,29 @@ export type MileageAdminHistoryItem = {
 export type MileageAdminHistory = {
   items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
+}
+export type AutomationTemplateSummary = {
+  key: string
+  name: string
+  description: string
+  triggerLabel: string
+  actionLabel: string
+}
+export type AutomationDraftAction = {
+  id: string
+  type: 'add_tag' | 'start_scenario' | 'send_message'
+  params: Record<string, unknown>
+  onFailure: 'stop'
+}
+export type AutomationDraftDetail = {
+  id: string
+  draftVersionId: string
+  name: string
+  description: string | null
+  eventType: 'friend_add' | 'tag_change' | 'message_received'
+  triggerConfig: Record<string, unknown>
+  conditions: Record<string, unknown>
+  actions: AutomationDraftAction[]
 }
 export type ActionScoreBand = 'high' | 'normal' | 'low'
 export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
@@ -3230,6 +3267,17 @@ export const api = {
         linkCount: number;
         friendAdds: number;
       }>>>('/api/affiliates-report?' + new URLSearchParams(params as Record<string, string>)),
+    paymentSummaries: (lineAccountId: string) =>
+      fetchApi<{
+        success: boolean
+        data: AffiliatePaymentSummary[]
+        limitations: {
+          payoutHistory: false
+          bankDestination: false
+          settlementSchedule: false
+        }
+        error?: string
+      }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
@@ -3517,6 +3565,34 @@ export const api = {
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
       ),
+    templates: (accountId: string) =>
+      fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
+        `/api/automation-templates?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    createDraftFromTemplate: (templateKey: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
+        `/api/automation-templates/${encodeURIComponent(templateKey)}/drafts?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    getDraft: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<AutomationDraftDetail>>(
+        `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    draftResources: (accountId: string) =>
+      fetchApi<ApiResponse<{
+        tags: Array<{ id: string; name: string }>
+        scenarios: Array<{ id: string; name: string }>
+      }>>(`/api/automation-draft-resources?account_id=${encodeURIComponent(accountId)}`),
+    updateDraft: (id: string, accountId: string, data: {
+      expectedDraftVersionId: string
+      name: string
+      eventType: AutomationDraftDetail['eventType']
+      triggerConfig: Record<string, unknown>
+      actions: AutomationDraftAction[]
+    }) => fetchApi<ApiResponse<{ updated: true }>>(
+      `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
   },
   commonActions: {
     resources: (accountId: string, excludeId?: string) => {

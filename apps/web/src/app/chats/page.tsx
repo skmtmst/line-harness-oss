@@ -98,7 +98,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'resolved', label: '対応済み' },
 ]
 
-import type { InboxSavedViewConditions } from './saved-view-types'
+import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
 import { savedViewSummary } from './saved-view-summary'
 
 type InboxSavedView = {
@@ -111,7 +111,7 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
       LINE
     </span>
   ) : (
@@ -335,7 +335,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
             <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                 msg.direction === 'outgoing'
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : 'bg-canvas-sunken text-ink'
               }`}>
                 <div className="text-sm whitespace-pre-wrap break-words">{renderContent(msg)}</div>
@@ -369,7 +369,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
           <button
             onClick={handleSend}
             disabled={!message.trim() || sending}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
           >
             {sending ? '...' : '送信'}
           </button>
@@ -718,7 +718,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   const applySavedView = (view: InboxSavedView) => {
-    const conditions = view.conditions
+    /*
+      **形を確かめてから読む。** 受信箱より前に作られた行は
+      `{ all: [], any: [] }` の形で入っていて、`conditions.statuses.length` を
+      そのまま読むと受信箱ごと真っ白になる。
+    */
+    const conditions = normalizeSavedViewConditions(view.conditions)
     setNameQuery(conditions.query ?? '')
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
@@ -1273,7 +1278,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
                       <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal">
-                        {savedViewSummary(view.conditions, operatorNames)}
+                        {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>
                     <button

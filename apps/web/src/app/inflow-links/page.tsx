@@ -600,7 +600,7 @@ function InflowLinksPageInner() {
         <aside>
           <button
             onClick={() => setEditingGenre('new')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-v6-accent px-4 py-3 text-sm font-bold text-on-accent shadow-sm hover:bg-v6-accent-hover"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-deep px-4 py-3 text-sm font-bold text-on-accent shadow-sm hover:brightness-92"
           >
             <span className="text-xl leading-none">＋</span>
             フォルダを追加
@@ -1145,7 +1145,7 @@ function ReferralQrModal({
         <div className="mt-5 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
           <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-canvas p-2" />
-          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-v6-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-v6-accent-hover">
+          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-accent-deep px-4 py-2.5 text-sm font-semibold text-on-accent hover:brightness-92">
             QRコードをダウンロード
           </a>
         </div>
