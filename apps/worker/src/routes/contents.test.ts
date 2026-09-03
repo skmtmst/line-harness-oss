@@ -695,6 +695,29 @@ describe('共通情報', () => {
     });
   });
 
+  it.each([
+    ['accountId不足', { nextValue: '11-20' }, 'accountId is required'],
+    ['nextValue不足', { accountId: 'account-1' }, '変更後の値を入力してください'],
+  ])('%sは400で返し、使用先を走査しない', async (_case, body, error) => {
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', body);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error });
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
+  it('対象の共通情報が存在しないときは404で返し、使用先を走査しない', async () => {
+    mocks.getCommonVarById.mockResolvedValue(null);
+
+    const res = await req('/api/common-vars/missing/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'Not found' });
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
   it('変更後の空値とLINE文字数超過をエラーとして返す', async () => {
     mocks.getCommonVarUsageImpact.mockResolvedValue({
       ...EMPTY_COMMON_VAR_IMPACT,
