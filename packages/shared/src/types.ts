@@ -1333,6 +1333,10 @@ export interface Reminder {
   triggerFieldId?: string | null;
   /** 154: 毎年くり返すか（誕生日なら true）。 */
   repeatYearly?: boolean;
+  /** 下書き・公開・停止のどれか。**公開しているものと編集中のものを分けるため。** */
+  lifecycleStatus?: ReminderLifecycleStatus;
+  currentDraftVersionId?: string | null;
+  currentPublishedVersionId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1849,3 +1853,89 @@ export type FriendAddEventViewState =
   | { status: "empty"; summary: FriendAddEventSummary }
   | { status: "ready"; data: FriendAddEventList }
   | { status: "error"; message: string };
+
+export type ReminderLifecycleStatus = "draft" | "published" | "stopped";
+
+export interface ReminderStopConditions {
+  bookingCancelled: boolean;
+  supportMarkCompleted: boolean;
+  daysAfterTarget: number | null;
+  friendBlocked: boolean;
+}
+
+export interface ReminderDraftStep {
+  stableStepId: string;
+  offsetMinutes: number;
+  messageType: MessageType;
+  messageContent: string;
+  offsetDays?: number | null;
+  sendAtTime?: string | null;
+  templateId?: string | null;
+  targetCondition?: Record<string, unknown>;
+  action?: Record<string, unknown>;
+}
+
+export interface ReminderDraftSettings {
+  name: string;
+  description?: string | null;
+  lineAccountId: string;
+  triggerType: ReminderTriggerType;
+  deliveryMode: "time" | "countdown";
+  triggerFieldId?: string | null;
+  repeatYearly?: boolean;
+  triggerOffsetMinutes?: number | null;
+  sendAtTime?: string | null;
+  targetTagId?: string | null;
+  folderId?: string | null;
+  stopConditions: ReminderStopConditions;
+  steps: ReminderDraftStep[];
+}
+
+export interface ReminderDraftVersion {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "superseded";
+  settings: ReminderDraftSettings;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export interface ReminderValidationResult {
+  valid: boolean;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: "passed" | "failed" | "warning";
+    message: string;
+  }>;
+  audience: { matched: number | null; excluded: number | null };
+}
+
+export interface ReminderPreviewResult {
+  targetDate: string;
+  items: Array<{
+    stableStepId: string;
+    stepNumber: number;
+    scheduledAt: string;
+    label: string;
+    state: "scheduled" | "past" | "duplicate";
+  }>;
+  summary: {
+    audience: number | null;
+    next7Days: number | null;
+    next30Days: number | null;
+    duplicateCount: number;
+  };
+}
+
+export interface ReminderPublishResult {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  audience: number | null;
+  plannedDeliveries: number | null;
+  nextScheduledAt: string | null;
+}
