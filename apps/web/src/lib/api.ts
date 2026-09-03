@@ -245,6 +245,20 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
 }
 
+/** 支払台帳を作る前に安全に表示できる、承認済み報酬の読み取り専用集計。 */
+export type AffiliatePaymentSummary = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  holdDays: number | null
+  payoutCycle: string | null
+  approvedConversions: number
+  approvedReward: number
+  heldConversions: number
+  heldReward: number
+  holdStatusUnknown: number
+}
+
 /** Broadcast type from API (now camelCase after worker serialization) */
 export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   targetType: BroadcastTargetType;
@@ -3253,6 +3267,17 @@ export const api = {
         linkCount: number;
         friendAdds: number;
       }>>>('/api/affiliates-report?' + new URLSearchParams(params as Record<string, string>)),
+    paymentSummaries: (lineAccountId: string) =>
+      fetchApi<{
+        success: boolean
+        data: AffiliatePaymentSummary[]
+        limitations: {
+          payoutHistory: false
+          bankDestination: false
+          settlementSchedule: false
+        }
+        error?: string
+      }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
@@ -5469,6 +5494,35 @@ export type Webinar = {
 
 export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>>
 
+export type WebinarNotificationSettings = {
+  webinarId: string
+  version: number
+  registrationEnabled: boolean
+  dayBeforeEnabled: boolean
+  dayBeforeTime: string
+  hourBeforeEnabled: boolean
+  hourBeforeMinutes: number
+  startEnabled: boolean
+  missedEnabled: boolean
+  missedTime: string
+  completedEnabled: boolean
+  updatedAt: string
+}
+
+export type WebinarNotificationSettingsInput = Omit<
+  WebinarNotificationSettings,
+  'webinarId' | 'version' | 'updatedAt'
+>
+
+export type WebinarNotificationOverview = {
+  total: number
+  pending: number
+  sent: number
+  failed: number
+  skipped: number
+  cancelled: number
+}
+
 export type WebinarSakuraComment = { id?: string; atSeconds: number; authorName: string; body: string }
 
 export type WebinarAnalytics = {
@@ -5549,6 +5603,25 @@ export const webinarApi = {
   update: (id: string, input: WebinarInput) =>
     fetchApi<{ data: Webinar }>(`/api/webinars/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   remove: (id: string) => fetchApi<{ data: null }>(`/api/webinars/${id}`, { method: 'DELETE' }),
+  notifications: (id: string) => fetchApi<{
+    data: {
+      settings: WebinarNotificationSettings | null
+      overview: WebinarNotificationOverview
+    }
+  }>(`/api/webinars/${id}/notifications`),
+  saveNotifications: (id: string, input: WebinarNotificationSettingsInput) => fetchApi<{
+    data: {
+      settings: WebinarNotificationSettings
+      queued: number
+      cancelled: number
+    }
+  }>(`/api/webinars/${id}/notifications`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  }),
+  testNotifications: (id: string) => fetchApi<{
+    data: { sent: number; failed: number }
+  }>(`/api/webinars/${id}/notifications/test`, { method: 'POST' }),
   comments: (id: string) =>
     fetchApi<{ data: WebinarSakuraComment[] }>(`/api/webinars/${id}/comments`),
   saveComments: (id: string, comments: WebinarSakuraComment[]) =>
