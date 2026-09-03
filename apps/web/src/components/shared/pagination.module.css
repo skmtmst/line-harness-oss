@@ -44,9 +44,13 @@ button.item:disabled {
   width: 38px;
 }
 
+/*
+ * いま開いているページ。**白文字が乗るので `$accent-deep`。**
+ * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
+ */
 .current {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
   font-weight: 700;
 }
