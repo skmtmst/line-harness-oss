@@ -609,6 +609,25 @@ const RAW = {
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
   '/admin/version': { version: '0.0.0-dev', worker_hash: '', admin_hash: '', liff_hash: '' },
   '/admin/manifest': { releases: [], versions: [] },
+
+  /*
+    **`{success, data}` で包まない口。**
+
+    `api.ts` には `fetchApi<{ menus: BookingMenu[] }>` のように、
+    器を通さずそのまま返る口がある。包んで返すと画面側は
+    `res.menus` が `undefined` になり、`.filter` で丸ごと落ちる。
+
+      /booking/menus  … Cannot read properties of undefined (reading 'filter')
+      /events         … 同上
+
+    どちらも「画面を表示できませんでした」になっていて、
+    **実装の不具合に見えていた。**
+  */
+  '/api/booking/admin/menus': { menus: [] },
+  '/api/booking/admin/staff': { staff: [] },
+  '/api/events/admin/events': { items: [] },
+  // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
+  '/api/booking/admin/requests': { requests: [] },
 }
 
 /** 参照が1つも無ければ消せる（`packages/db` の `canDelete` と同じ数え方）。 */
@@ -878,6 +897,90 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       並べたときに**実装の差に見えてしまう**（実際はこちらの返事が違うだけ）。
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
+  }
+  if (pathname === '/api/analytics/url-clicks') {
+    /*
+      分析のURLクリック。**入れ子の器で返す。**
+      画面は `state.data.data` と読む（`period` は外側にある）。
+      ほかの分析タブと同じ形。既定の器だと `overview.stateReason` で落ちて、
+      画面が丸ごと「画面を表示できませんでした」になっていた。
+    */
+    return {
+      success: true,
+      data: {
+        lineAccountId: 'visual-qa-account',
+        timeZone: 'Asia/Tokyo',
+        period: { from: '2026-08-05', to: '2026-09-03' },
+        dataCutoffAt: '2026-09-03T00:00:00+09:00',
+        data: {
+          state: 'available',
+          stateReason: null,
+          clickRateDefinition: 'クリック率は「実人数 ÷ 届いた人数」で出しています。',
+          links: [
+            {
+              trackedLinkId: 'tl-1', name: '定期便の案内', originalUrl: 'https://example.com/subscription',
+              isActive: true, clicks: METRIC(482), knownClickPeople: METRIC(311),
+              deliveredPeople: METRIC(1_842), clickRate: METRIC(16.9),
+              usageLocations: ['一斉配信「9月の定期便」', 'リッチメニュー「メインA」'],
+            },
+            {
+              trackedLinkId: 'tl-2', name: '来店クーポン', originalUrl: 'https://example.com/coupon',
+              isActive: false, clicks: METRIC(96), knownClickPeople: METRIC(74),
+              deliveredPeople: METRIC(640), clickRate: METRIC(11.6),
+              usageLocations: [],
+            },
+          ],
+        },
+      },
+    }
+  }
+  if (pathname === '/api/nen-campaigns/overview') {
+    // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
+    return { success: true, data: { activeCampaigns: 2, jobs: { total: 18, pending: 3, sent: 14, failed: 1 }, columns: 6, pets: 4, coupons: 2 } }
+  }
+  if (pathname === '/api/webhooks/interactions') {
+    /*
+      やり取りの記録。**`summary` が丸ごと要る。**
+      既定の器だと `data.summary.total` で落ち、画面が
+      「画面を表示できませんでした」になっていた。
+      数は設計 `KNG00` に合わせる（この30日 1,972回・成功 1,966・失敗 6）。
+    */
+    return {
+      success: true,
+      data: {
+        total: 1_972,
+        page: 1,
+        limit: 20,
+        summary: { total: 1_972, outgoing: 1_486, incoming: 486, succeeded: 1_966, failed: 6, averageDurationMs: 400 },
+        items: [
+          {
+            id: 'wi-1', direction: 'outgoing', webhookName: 'Slack ／ #注文チャンネル',
+            eventType: '注文が確定したとき', triggerSummary: '注文 #12492・¥12,800・石田 未来',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 300, failureReason: null, canRetry: false,
+            startedAt: '2026-08-25T02:42:00.000Z', completedAt: '2026-08-25T02:42:00.300Z', retryOfId: null,
+          },
+          {
+            id: 'wi-2', direction: 'outgoing', webhookName: 'Slack ／ #アラート',
+            eventType: '在庫が少なくなったとき', triggerSummary: '定期便パンフ 残り 3',
+            status: 'failed', responseLabel: '503 Service Unavailable', responseStatus: 503,
+            attemptCount: 3, durationMs: 10_000, failureReason: '相手が応答しませんでした', canRetry: true,
+            startedAt: '2026-08-24T05:10:00.000Z', completedAt: '2026-08-24T05:10:10.000Z', retryOfId: null,
+          },
+          {
+            id: 'wi-3', direction: 'incoming', webhookName: '予約サービス',
+            eventType: '予約が入ったとき', triggerSummary: '8/26 14:00 トリミング（小型犬）',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 180, failureReason: null, canRetry: false,
+            startedAt: '2026-08-24T01:05:00.000Z', completedAt: '2026-08-24T01:05:00.180Z', retryOfId: null,
+          },
+        ],
+      },
+    }
+  }
+  if (pathname.startsWith('/api/common-actions/') && !pathname.includes('/resources')) {
+    // `versions` `bindings` が入っていないと `.find` で落ちる。
+    return { success: true, data: { id: pathname.split('/').pop(), name: '来店後のご案内', versions: [], bindings: [], currentPublishedVersionId: null, currentDraftVersionId: null } }
   }
   if (pathname === '/api/friend-fields-stats') {
     /*
