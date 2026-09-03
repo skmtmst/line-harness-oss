@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { NotConnected } from '@/components/shared/not-connected'
+import WebinarLinePreview from '@/components/webinars/webinar-line-preview'
+import { ctaPreview, notificationPreview, videoPreview } from './preview-body'
 import {
   STEPS,
   nextLabelOf,
@@ -1090,14 +1092,37 @@ function EditWebinarInner() {
               **段を分けるために面を割らない**——割ると、いま在る1枚の
               保存の口が2つに増え、片方だけ保存する事故が起きる。
             */}
-            {(pane === 'basic' || pane === 'video') && <WebinarForm initial={webinar} />}
-            {pane === 'cta' && <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />}
-            {pane === 'notifications' && (
+            {(pane === 'basic' || pane === 'video') && (
               /*
-                **口がまだ無い段**（台帳 Issue #93）。押せる形で置かず、
-                理由を見える文字で出す。
+                設計は段の右にLINEプレビューを置く（`PV1Vh` `d3rFGD` `Ho8z4`）。
+                **中身は各段の入力から組み立てる。新しい口は使わない。**
+                入力がまだ無いときは、それらしい文を作らずに何を入れれば
+                埋まるかを書く——見本の文を置くと、保存すればそれが届くと
+                読めてしまう。
               */
-              <NotConnected source="通知・リマインドの設定" />
+              <div className="flex flex-col gap-6 xl:flex-row">
+                <div className="min-w-0 flex-1"><WebinarForm initial={webinar} /></div>
+                {pane === 'video' && (
+                  <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...videoPreview(webinar)} /></div>
+                )}
+              </div>
+            )}
+            {pane === 'cta' && (
+              <div className="flex flex-col gap-6 xl:flex-row">
+                <div className="min-w-0 flex-1"><CtasTab webinarId={webinar.id} accountId={webinar.accountId} /></div>
+                <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...ctaPreview(webinar)} /></div>
+              </div>
+            )}
+            {pane === 'notifications' && (
+              <div className="flex flex-col gap-6 xl:flex-row">
+                {/*
+                  **口がまだ無い段**（台帳 Issue #93）。押せる形で置かず、
+                  理由を見える文字で出す。
+                */}
+                <div className="min-w-0 flex-1"><NotConnected source="通知・リマインドの設定" /></div>
+                {/* 送る文がまだ無いので、プレビューも「何を入れれば埋まるか」だけ。 */}
+                <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...notificationPreview(null)} /></div>
+              </div>
             )}
             {pane === 'review' && <ReviewStep webinar={webinar} onBack={setPane} />}
             {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
