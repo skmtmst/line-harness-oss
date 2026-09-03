@@ -4,12 +4,12 @@
   "compared": 232,
   "unimplemented": 26,
   "unconfirmed": 0,
-  "elsewhere": 4,
-  "missing": 0,
+  "elsewhere": 0,
+  "missing": 4,
   "match": 0,
   "structureMatchDataPending": 0,
-  "needsFix": 0,
-  "unjudged": 232,
+  "needsFix": 1,
+  "unjudged": 231,
   "remaining": 258,
   "features": [
     {
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 17,
+      "needsFix": 1,
+      "unjudged": 16,
       "remaining": 17,
       "capturedAt": [
         {
@@ -252,8 +252,8 @@
       "compared": 17,
       "unimplemented": 0,
       "unconfirmed": 0,
-      "elsewhere": 4,
-      "missing": 0,
+      "elsewhere": 0,
+      "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
