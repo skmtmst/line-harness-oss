@@ -63,6 +63,29 @@ describe('分析の日別投影更新', () => {
     );
   });
 
+  it('分割処理が未完了なら進行中として返す', async () => {
+    mocks.rebuildAnalyticsDailyMetricsChunk.mockResolvedValueOnce({
+      status: 'matched',
+      completed: false,
+    });
+    const accounts = [
+      { id: 'account-a', is_active: 1, timezone: 'Asia/Tokyo' },
+    ] as never;
+
+    const result = await refreshRecentAnalyticsProjections(
+      {} as D1Database,
+      accounts,
+      new Date('2026-08-26T00:00:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      processed: 1, matched: 0, mismatched: 0, inProgress: 1, failed: 0,
+    });
+    expect(mocks.saveAnalyticsProjectionSchedulerCursor).toHaveBeenCalledWith(
+      {}, 'account-a', '2026-08-26T00:00:00.000Z',
+    );
+  });
+
   it('1アカウントの失敗で残りを止めない', async () => {
     mocks.getAnalyticsProjectionSchedulerCursor
       .mockResolvedValueOnce('')
