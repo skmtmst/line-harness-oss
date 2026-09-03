@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 // args is the meaningful assertion.
 const dbMocks = {
   getLineAccounts: vi.fn(),
+  getLineAccountListStats: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
@@ -95,6 +96,9 @@ beforeEach(() => {
   dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
+  dbMocks.getLineAccountListStats.mockResolvedValue({
+    'acc-1': { friendCount: 12, activeScenarios: 3, messagesThisMonth: 8 },
+  });
   dbMocks.getLineAccountCredentialHealth.mockResolvedValue(null);
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
@@ -389,7 +393,7 @@ describe('GET /api/line-accounts', () => {
     dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
     dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
 
-    const res = await setupApp('staff').request('/api/line-accounts?live=0');
+    const res = await setupApp('staff').request('/api/line-accounts');
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({
@@ -397,10 +401,33 @@ describe('GET /api/line-accounts', () => {
     });
   });
 
-  test('Webhook URLの照合結果を秘密情報なしで返す', async () => {
+  test('通常一覧は集計を一括取得し、LINE APIを待たない', async () => {
+    const accounts = Array.from({ length: 40 }, (_, index) => ({
+      ...fakeAccount,
+      id: `acc-${index + 1}`,
+      channel_id: String(index + 1),
+    }));
+    dbMocks.getLineAccounts.mockResolvedValue(accounts);
+    dbMocks.getLineAccountListStats.mockResolvedValue({
+      'acc-1': { friendCount: 12, activeScenarios: 3, messagesThisMonth: 8 },
+    });
+
+    const res = await setupApp('owner').request('/api/line-accounts');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getLineAccountListStats).toHaveBeenCalledTimes(1);
+    expect(dbMocks.getLineAccountListStats).toHaveBeenCalledWith(expect.anything(), accounts.map((item) => item.id));
+    expect(fetch).not.toHaveBeenCalled();
+    const body = (await res.json()) as { data: Array<{ stats: { friendCount: number } }> };
+    expect(body.data).toHaveLength(40);
+    expect(body.data[0].stats.friendCount).toBe(12);
+    expect(body.data[1].stats.friendCount).toBe(0);
+  });
+
+  test('live=1のときだけWebhook URLとプランを秘密情報なしで返す', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
     const app = setupApp('owner');
-    const res = await app.request('/api/line-accounts');
+    const res = await app.request('/api/line-accounts?live=1');
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
