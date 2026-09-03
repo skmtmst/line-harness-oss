@@ -45,6 +45,7 @@ export * from './affiliate-offers';
 export * from './mileage';
 export * from './affiliate-attribution';
 export * from './affiliate-report';
+export * from './affiliate-payments';
 export * from './account-settings';
 export * from './webinars';
 
