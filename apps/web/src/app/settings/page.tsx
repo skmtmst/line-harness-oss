@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import PageHeader from '@/components/shared/page-header'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import {
@@ -391,14 +392,13 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-[30px] font-bold tracking-tight text-[#202020]">機能設定</h1>
-          <p className="mt-1 text-xs leading-relaxed text-[#777]">
-            使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。並び順は↑↓で、同じ区分の中だけ入れ替えられます。
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <PageHeader
+        className="mb-5"
+        breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
+        title="機能設定"
+        description="使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。並び順は↑↓で、同じ区分の中だけ入れ替えられます。"
+        actions={(
+          <>
           <button
             type="button"
             onClick={() => {
@@ -422,8 +422,9 @@ export default function SettingsPage() {
             </svg>
             {saving ? '保存中…' : '保存'}
           </button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       <div className="mb-5 flex items-start gap-3 rounded-[16px] bg-[#edf8ff] px-5 py-3.5 text-xs leading-relaxed text-[#3f4b53]">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-[#0066d6]">
