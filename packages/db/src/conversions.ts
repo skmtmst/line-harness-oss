@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 import { resolveAffiliateAttribution } from './affiliate-attribution.js';
 // =============================================================================
 // Conversion Points & Events — CV Tracking
@@ -349,8 +349,8 @@ export async function getConversionEvents(
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = opts.limit ?? 100;
-  const offset = opts.offset ?? 0;
+  const limit = boundedListLimit(opts.limit, 100);
+  const offset = nonNegativeListOffset(opts.offset);
 
   values.push(limit, offset);
 
