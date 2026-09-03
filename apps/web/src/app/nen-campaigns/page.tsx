@@ -41,7 +41,7 @@ function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: ()
     <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm sm:col-span-2">
       <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-[#3f3f3f] px-4 py-3 text-white">
         <div>
-          <p className="text-sm font-bold">LINE配信プレビュー</p>
+          <p className="text-sm font-bold">LINEプレビュー</p>
           <p className="mt-0.5 text-xs text-gray-300">実際のトーク画面に近い見え方です</p>
         </div>
         <button type="button" onClick={onClose} className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">
@@ -96,7 +96,7 @@ function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
           <div>
-            <p className="text-sm font-bold">{setting.label}のLINE配信プレビュー</p>
+            <p className="text-sm font-bold">{setting.label}のLINEプレビュー</p>
             <p className="mt-0.5 text-xs text-gray-300">見出し・本文・自動挿入データを含む送信イメージ</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">プレビューを隠す</button>
@@ -412,7 +412,7 @@ export default function NenCampaignsPage() {
                     aria-controls={`campaign-preview-${setting.campaignKey}`}
                     onClick={() => setPreviewCampaignKey(previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}
                     className={`rounded-xl border px-4 py-2 text-sm font-semibold ${previewCampaignKey === setting.campaignKey ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
-                  >{previewCampaignKey === setting.campaignKey ? 'プレビューを隠す' : '配信プレビュー'}</button>
+                  >{previewCampaignKey === setting.campaignKey ? 'プレビューを隠す' : 'LINEプレビュー'}</button>
                   <button onClick={() => setExpanded(expanded === setting.campaignKey ? null : setting.campaignKey)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{expanded === setting.campaignKey ? '編集を閉じる' : '内容を編集'}</button>
                   {/* 設計 9-1-1。送り方まで含めて1画面で直す。 */}
                   <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">送り方も編集</Link>
@@ -458,7 +458,7 @@ export default function NenCampaignsPage() {
                       onClick={() => setPreviewColumnId(isPreviewOpen ? null : column.id)}
                       className={`rounded-xl border px-4 py-2 text-sm font-semibold ${isPreviewOpen ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
                     >
-                      {isPreviewOpen ? 'プレビューを隠す' : '配信プレビュー'}
+                      {isPreviewOpen ? 'プレビューを隠す' : 'LINEプレビュー'}
                     </button>
                     <button type="button" onClick={() => setEditingColumnId(editingColumnId === column.id ? null : column.id)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">
                       {editingColumnId === column.id ? '編集を閉じる' : '配信文を編集'}

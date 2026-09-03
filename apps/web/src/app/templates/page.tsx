@@ -677,7 +677,12 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
-                        {t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
+                        {/*
+                          **取れていないのを「0件」とも「undefined件」とも言わない。**
+                          `usageCount` が入っていないひな形で「undefined件で使用」と
+                          出ていた（一覧の20行すべて）。
+                        */}
+                        {typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">

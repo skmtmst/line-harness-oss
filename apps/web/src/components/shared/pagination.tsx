@@ -13,9 +13,25 @@ export type PaginationProps = {
 }
 
 /** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
+/**
+ * ページ番号として使える数に直す。
+ *
+ * **`NaN` をそのまま並べない。** `Math.max(1, Math.floor(NaN))` は `NaN` なので、
+ * 呼ぶ側が `total / limit` で 0 割りをすると、ページ送りに「… NaN … NaN 次へ」と
+ * 出る。実際に受信箱の「やり取りの記録」が空のときそうなっていた
+ * （`data.total / data.limit` が `0 / 0`）。
+ *
+ * ここで止めるのは、**呼ぶ側が9か所あって、そのすべてを直しても
+ * 次に足す人が同じことをする**ため。
+ */
+function safePage(value: number, fallback: number): number {
+  const floored = Math.floor(value)
+  return Number.isFinite(floored) ? Math.max(1, floored) : fallback
+}
+
 export function paginationItems(page: number, pageCount: number): PaginationItem[] {
-  const total = Math.max(1, Math.floor(pageCount))
-  const current = Math.min(total, Math.max(1, Math.floor(page)))
+  const total = safePage(pageCount, 1)
+  const current = Math.min(total, safePage(page, 1))
 
   if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1)
   if (current <= 3) return [1, 2, 3, 'ellipsis', total]
@@ -52,8 +68,8 @@ export default function Pagination({
   disabled = false,
   className,
 }: PaginationProps) {
-  const total = Math.max(1, Math.floor(pageCount))
-  const current = Math.min(total, Math.max(1, Math.floor(page)))
+  const total = safePage(pageCount, 1)
+  const current = Math.min(total, safePage(page, 1))
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
 
   // 送る先が1ページだけなら、そもそも出さない。
