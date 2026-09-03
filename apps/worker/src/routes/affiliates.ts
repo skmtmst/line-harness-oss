@@ -14,6 +14,7 @@ import {
   getFriendJourney,
   getAffiliateByFriendId,
   getAffiliateJourneys,
+  getAffiliatePaymentSummaries,
   listAffiliateLinks,
   listAffiliateOffers,
 } from '@line-crm/db';
@@ -22,6 +23,7 @@ import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const affiliates = new Hono<Env>();
 
@@ -112,6 +114,33 @@ affiliates.get('/api/affiliates', async (c) => {
   } catch (err) {
     console.error('GET /api/affiliates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// 支払済み台帳はまだ無いため、承認済み報酬と保留期間内の金額だけを返す。
+affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId');
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: '支払い履歴が見つかりません' }, 404);
+    }
+    const items = await getAffiliatePaymentSummaries(c.env.DB, lineAccountId);
+    return c.json({
+      success: true,
+      data: items,
+      limitations: {
+        payoutHistory: false,
+        bankDestination: false,
+        settlementSchedule: false,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/affiliate-payments error:', err);
+    return c.json({ success: false, error: '支払い情報を取得できませんでした' }, 500);
   }
 });
 
