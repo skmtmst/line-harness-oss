@@ -1,6 +1,7 @@
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
 import {
+  buildFriendScenariosDueForDeliveryQuery,
   normalizeScenarioDeliveryTimestamp,
   SCENARIO_DELIVERY_BATCH_LIMIT,
 } from './scenario-delivery-timestamps.js';
@@ -596,21 +597,17 @@ export async function getFriendScenariosDueForDelivery(
   db: D1Database,
   now: string,
   limit = SCENARIO_DELIVERY_BATCH_LIMIT,
+  scenarioId?: string,
 ): Promise<FriendScenario[]> {
   const dueBefore = normalizeScenarioDeliveryTimestamp(now);
   if (dueBefore === null) throw new Error(`Invalid due-delivery timestamp: ${now}`);
   const batchLimit = Math.max(1, Math.floor(limit));
+  const query = buildFriendScenariosDueForDeliveryQuery(scenarioId !== undefined);
   const result = await db
-    .prepare(
-      `SELECT fs.* FROM friend_scenarios fs
-       INNER JOIN scenarios s ON fs.scenario_id = s.id
-       WHERE fs.status = 'active'
-         AND s.is_active = 1
-         AND fs.next_delivery_at <= ?
-       ORDER BY fs.next_delivery_at ASC, fs.id ASC
-       LIMIT ?`,
-    )
-    .bind(dueBefore, batchLimit)
+    .prepare(query)
+    .bind(...(scenarioId === undefined
+      ? [dueBefore, batchLimit]
+      : [dueBefore, scenarioId, batchLimit]))
     .all<FriendScenario>();
   return result.results;
 }
