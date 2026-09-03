@@ -20,6 +20,7 @@ import { chromium } from '@playwright/test'
 import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 
@@ -309,6 +310,46 @@ async function applyState(page, screen, kind) {
   return hits
 }
 
+/**
+ * 動いているモックが、いまの `mock-api.mjs` かを確かめる。
+ *
+ * **古いモックが動いたままだと、直したはずの返事が反映されず、
+ * しかもどこにも出ない。** 直近では `/api/friend-fields-stats` を足したのに
+ * 画面に `undefined` が出続けた。その前は、口が足りない古いモックのせいで
+ * 7画面が「画面を表示できませんでした」で落ち、**実装の不具合に見えていた**。
+ *
+ * モックが自分の指紋を返すので、ディスク上のファイルと突き合わせる。
+ * 違えば、撮る前に止めて「動かし直せ」と言う。
+ */
+async function requireFreshMock() {
+  const file = join(ROOT, 'scripts', 'visual-qa', 'mock-api.mjs')
+  const want = createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 16)
+  const api = process.env.VISUAL_QA_API ?? 'http://127.0.0.1:8788'
+  let got = null
+  try {
+    const response = await fetch(`${api}/__mock-fingerprint`)
+    got = response.ok ? (await response.json()).fingerprint : null
+  } catch {
+    console.error(`モック（${api}）が動いていません。先に \`node scripts/visual-qa/mock-api.mjs\` を起動してください。`)
+    process.exit(1)
+  }
+  if (got === null) {
+    console.error(
+      `モック（${api}）が指紋を返しません。**古いモックが動いたままです。**\n`
+      + '止めて `node scripts/visual-qa/mock-api.mjs` を起動し直してください。',
+    )
+    process.exit(1)
+  }
+  if (got !== want) {
+    console.error(
+      `モックが古いままです（動いている ${got} ／ ファイル ${want}）。\n`
+      + '**このまま撮ると、直した返事が反映されない絵ができます。**\n'
+      + '止めて `node scripts/visual-qa/mock-api.mjs` を起動し直してください。',
+    )
+    process.exit(1)
+  }
+}
+
 async function captureImpl(feature) {
   const list = screensOf(feature)
   if (!list.length) { console.error(`機能${feature} の画面が screens.mjs にありません`); process.exit(1) }
@@ -514,6 +555,7 @@ if (flag('check')) {
 } else if (flag('design')) {
   await captureDesign(value('feature'), value('from'))
 } else if (flag('impl')) {
+  await requireFreshMock()
   await captureImpl(value('feature'))
 } else {
   console.error('--check / --design / --impl のどれかを渡してください')
