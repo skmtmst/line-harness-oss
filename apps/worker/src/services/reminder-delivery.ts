@@ -25,11 +25,9 @@ import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
+import { nextDeliveryRetryAt } from './delivery-retry-policy.js';
 
 const LEASE_MINUTES = 5;
-// 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
-const MAX_RETRY_CYCLE_ATTEMPTS = 4;
-const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
 
 type PushClient = Pick<LineClient, 'pushMessageWithRequestId'>;
 
@@ -54,7 +52,7 @@ export function classifyReminderDeliveryError(error: unknown): SafeDeliveryError
   if (raw === 'REMINDER_LINE_ACCOUNT_NOT_FOUND') {
     return { code: 'line_account_not_found', message: '送信に使うLINEアカウント設定を確認してください。', retryable: false };
   }
-  const status = Number(/LINE API error:\s*(\d{3})/.exec(raw)?.[1] ?? 0);
+  const status = Number(/(?:LINE API error|LINE Harness proxy error):\s*(\d{3})/.exec(raw)?.[1] ?? 0);
   if (status === 429) {
     return { code: 'line_rate_limited', message: 'LINE側の送信上限に達しました。時間を置いて再試行します。', retryable: true };
   }
@@ -84,9 +82,8 @@ async function defaultResolveClient(
 }
 
 function retryAtFor(runAttempt: number, now: Date, retryable: boolean): string | null {
-  if (!retryable || runAttempt >= MAX_RETRY_CYCLE_ATTEMPTS) return null;
-  const delay = RETRY_DELAYS_MINUTES[Math.max(0, runAttempt - 1)] ?? RETRY_DELAYS_MINUTES.at(-1)!;
-  return new Date(now.getTime() + delay * 60_000).toISOString();
+  if (!retryable) return null;
+  return nextDeliveryRetryAt(now, runAttempt)?.toISOString() ?? null;
 }
 
 function retryAtForError(
@@ -95,7 +92,7 @@ function retryAtForError(
   now: Date,
   retryable: boolean,
 ): string | null {
-  if (!retryable || runAttempt >= MAX_RETRY_CYCLE_ATTEMPTS) return null;
+  if (!retryable || nextDeliveryRetryAt(now, runAttempt) === null) return null;
   const status = Number((error as { status?: unknown } | null)?.status ?? 0);
   const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter;
   if (status === 429 && typeof retryAfter === 'string' && retryAfter.trim()) {

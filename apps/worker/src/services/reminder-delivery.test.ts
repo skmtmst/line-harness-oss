@@ -273,6 +273,11 @@ describe('リマインダ配信の実行記録', () => {
       message: 'LINE連携の認証を確認してください。',
       retryable: false,
     })
+    expect(classifyReminderDeliveryError(new Error('LINE Harness proxy error: 500 — token=secret'))).toEqual({
+      code: 'line_temporary_failure',
+      message: 'LINEへの送信に一時的に失敗しました。自動で再試行します。',
+      retryable: true,
+    })
     expect(classifyReminderDeliveryError(new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND'))).toEqual({
       code: 'line_account_not_found',
       message: '送信に使うLINEアカウント設定を確認してください。',

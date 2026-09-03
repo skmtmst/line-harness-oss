@@ -1251,6 +1251,25 @@ async function scheduled(
     console.error('webinar-reminders error:', e);
   }
 
+  // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
+  // 同じ申込へ二重送信しない。
+  try {
+    const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
+    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+    const result = await processWebinarNotificationJobs(env.DB, {
+      proxyBaseUrl:
+        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      defaultLiffId: liffMatch?.[1] ?? null,
+      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+    if (result.sent + result.failed + result.skipped > 0) {
+      console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
+    }
+  } catch (e) {
+    console.error('webinar-notifications error:', e);
+  }
+
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
   try {
     const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
