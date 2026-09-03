@@ -55,6 +55,22 @@ describe('api.nenCampaigns.createColumn', () => {
   })
 })
 
+describe('api.affiliates.paymentSummaries', () => {
+  it('選択中のLINE公式アカウントを必ずクエリへ含める', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: [] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.affiliates.paymentSummaries('account/1')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/affiliate-payments?lineAccountId=account%2F1',
+    )
+  })
+})
+
 describe('eventsApi.createSlots', () => {
   const slots = Array.from({ length: 900 }, (_, index) => ({
     starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
