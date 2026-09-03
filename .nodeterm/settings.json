@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "rev": 1,
+  "savedAt": "2026-09-03T10:06:51.852643Z",
+  "worktree": {
+    "basePath": "/Volumes/My Passport/Github/lh-work",
+    "baseRef": "codex/development"
+  },
+  "agents": {
+    "defaultAgentId": "claude",
+    "env": {
+      "NEXT_PUBLIC_API_URL": "http://127.0.0.1:8788"
+    }
+  }
+}
