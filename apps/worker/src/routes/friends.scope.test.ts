@@ -152,6 +152,7 @@ describe('A-8 friends tenant scope', () => {
     const response = await createApp(prepared, rows).request('/api/friends?includeTags=false&limit=100');
 
     expect(response.status).toBe(200);
+    expect(mocks.getFriendTagsByFriendIds).not.toHaveBeenCalled();
     expect(prepared.filter(({ sql }) => sql.includes('friend_tags'))).toHaveLength(0);
     expect(prepared.length).toBeLessThan(10);
   });
@@ -177,6 +178,17 @@ describe('A-8 friends tenant scope', () => {
     expect(body.data.items[0]).toMatchObject({
       id: 'friend-0', tags: [{ id: 'tag-1', name: '重要' }],
     });
+  });
+
+  test('タグの一括取得に失敗したときはタグ0件と偽らず500を返す', async () => {
+    mocks.getFriendTagsByFriendIds.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const rows = [{ id: 'friend-1', display_name: 'Friend 1', line_user_id: 'U1' }];
+
+    const response = await createApp([], rows).request('/api/friends');
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, error: 'Internal server error' });
+    expect(mocks.getFriendTagsByFriendIds).toHaveBeenCalledTimes(1);
   });
 
   test.each([
