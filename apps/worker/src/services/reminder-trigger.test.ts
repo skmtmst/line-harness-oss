@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ enroll: vi.fn() }));
+vi.mock('@line-crm/db', () => ({ enrollFriendInReminder: mocks.enroll }));
+
 import { resolveAnchor, enrollByTrigger, type ReminderTriggerRow } from './reminder-trigger.js';
 
 const RULE: ReminderTriggerRow = {
@@ -7,7 +11,12 @@ const RULE: ReminderTriggerRow = {
   trigger_offset_minutes: null,
   send_at_time: null,
   target_tag_id: null,
+  current_published_version_id: 'version-1',
 };
+
+beforeEach(() => {
+  mocks.enroll.mockReset().mockResolvedValue({ id: 'enrollment-1' });
+});
 
 describe('起点の時刻', () => {
   it('何も設定しなければ開始時刻そのもの', () => {
@@ -126,7 +135,12 @@ describe('きっかけによる自動登録', () => {
       startsAtIso: '2026-08-20T01:00:00.000Z',
     });
     expect(n).toBe(1);
-    expect(runs).toHaveLength(1);
+    expect(runs).toHaveLength(0);
+    expect(mocks.enroll).toHaveBeenCalledWith(db, expect.objectContaining({
+      reminderId: 'r-1',
+      friendId: 'f-1',
+      sourceKind: 'booking',
+    }));
   });
 
   it('同じ起点で既に登録済みなら増やさない', async () => {
