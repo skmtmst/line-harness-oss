@@ -7,9 +7,9 @@
   "elsewhere": 0,
   "missing": 4,
   "match": 0,
-  "structureMatchDataPending": 30,
-  "needsFix": 30,
-  "unjudged": 172,
+  "structureMatchDataPending": 0,
+  "needsFix": 2,
+  "unjudged": 230,
   "remaining": 258,
   "features": [
     {
@@ -22,24 +22,11 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 3,
-      "needsFix": 2,
-      "unjudged": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 5,
       "remaining": 5,
       "capturedAt": [
-        {
-          "pr": 0,
-          "head": "49e1341c",
-          "on": "2026-09-03",
-          "screens": [
-            "vUXKb",
-            "ZN0ov",
-            "JN6mQ",
-            "NjK9q",
-            "Alekb"
-          ],
-          "note": "第2ラウンド第1段。**S0 の #719（共通部品の「準備中」全廃）を取り込んだあとの codex/development で撮り直した。**5画面10枚、はみ出し0。撮影は内蔵SSDの作業ツリー、モックは 8798 番（8788 番は別セッションが握っていたため）"
-        },
         {
           "pr": 419,
           "head": "c84baa63",
@@ -65,36 +52,11 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 14,
-      "needsFix": 3,
-      "unjudged": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 2,
+      "unjudged": 15,
       "remaining": 17,
       "capturedAt": [
-        {
-          "pr": 0,
-          "head": "49e1341c",
-          "on": "2026-09-03",
-          "screens": [
-            "xGLVe",
-            "NfgOs",
-            "H3lAOB",
-            "Xi4x9",
-            "f0zn6",
-            "NWbuF",
-            "B7CER8",
-            "YZaDK",
-            "L35UOV",
-            "IYjvu",
-            "TUveA",
-            "w72a2",
-            "ASsb3",
-            "ANgda",
-            "tBlkL",
-            "AuSDY",
-            "LHjwD"
-          ],
-          "note": "第2ラウンド第1段。17画面38枚、はみ出し0。**`YZaDK-selected`（担当者ごとの未読）は撮れていない**——`GET /api/chats/stats` に担当者ごとの数が無いため（board#33）。**`ASsb3-menu` も撮れていない**——実装に `data-qa-open` の印が無い。`TUveA` はフォルダの読み上げ名が変わっていて撮れず、この台帳の `steps` を直してから撮った"
-        },
         {
           "pr": 513,
           "head": "60b39036",
@@ -196,28 +158,11 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 3,
-      "needsFix": 6,
-      "unjudged": 1,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 10,
       "remaining": 11,
       "capturedAt": [
-        {
-          "pr": 0,
-          "head": "49e1341c",
-          "on": "2026-09-03",
-          "screens": [
-            "PhxG6",
-            "LT8RS",
-            "Igi72",
-            "I6UAdr",
-            "bzDn6",
-            "YzxU1",
-            "InCDe",
-            "r7eSi",
-            "w8W4Eh"
-          ],
-          "note": "第2ラウンド第1段。9画面48枚（状態ぶんを含む）、はみ出し0。**`IAf7j`（一括操作）の5状態は撮れていない**——モックの `/api/line-accounts` が `role` を返さず、`canRunBulk`（owner か admin）が false になって「操作を選ぶ」が描かれないため。**`w8W4Eh-edit` `w8W4Eh-conflict` も撮れていない**（固定データの行に押しどころが出ない）"
-        },
         {
           "pr": 520,
           "head": "4848a8f3",
@@ -310,38 +255,11 @@
       "elsewhere": 0,
       "missing": 4,
       "match": 0,
-      "structureMatchDataPending": 4,
-      "needsFix": 11,
-      "unjudged": 2,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 17,
       "remaining": 17,
       "capturedAt": [
-        {
-          "pr": 0,
-          "head": "49e1341c",
-          "on": "2026-09-03",
-          "screens": [
-            "hqrOv",
-            "dKlkz",
-            "H374MR",
-            "sfTEW",
-            "op1rh",
-            "QzRsJ",
-            "HBTk0",
-            "yKEdO",
-            "rIhbN",
-            "QKx8Q",
-            "l25rlp",
-            "tP0RW",
-            "LfrQs",
-            "ee0sk",
-            "VjXGX",
-            "byqIW",
-            "A1ZYeP",
-            "KoT6c",
-            "XBkiQ"
-          ],
-          "note": "第2ラウンド第1段。19画面44枚、はみ出し0。**`GMvBd`（対応マークを追加・編集、6状態）と `zGZMA`（削除確認）は撮れていない**——モックが返す対応マークに「保留」「対応中」の行が無く、押しどころが描かれないため"
-        },
         {
           "pr": 420,
           "head": "87c150ad",
@@ -498,33 +416,11 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 6,
-      "needsFix": 8,
-      "unjudged": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 14,
       "remaining": 14,
       "capturedAt": [
-        {
-          "pr": 0,
-          "head": "49e1341c",
-          "on": "2026-09-03",
-          "screens": [
-            "TC1b1",
-            "cCB7r",
-            "kk8dz",
-            "bV5Vs",
-            "xfYLn",
-            "r6Gzsu",
-            "hz9ti",
-            "dqFft",
-            "EvVO5",
-            "RUxNf",
-            "NrBkW",
-            "g2UNV",
-            "M2b2B",
-            "q5G45"
-          ],
-          "note": "第2ラウンド第1段。14画面38枚（状態ぶんを含む）、はみ出し0。撮れなかった画面は無い"
-        },
         {
           "pr": 534,
           "head": "0158ba8e",
