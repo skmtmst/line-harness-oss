@@ -1,4 +1,11 @@
-import { addTagToFriend, getLineAccountById, jstNow, removeTagFromFriend } from '@line-crm/db';
+import {
+  addTagToFriend,
+  getLineAccountById,
+  getSupportMarkById,
+  jstNow,
+  removeTagFromFriend,
+  setFriendSupportMark,
+} from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   AutomationActionError,
@@ -232,6 +239,46 @@ async function metadataExecutor(context: AutomationActionContext): Promise<void>
   if ((result.meta?.changes ?? 0) !== 1) throw invalid('friend_update_failed', '友だち情報を更新できませんでした');
 }
 
+async function supportMarkExecutor(
+  context: AutomationActionContext,
+  dependencies: AutomationActionExecutorDependencies,
+): Promise<void> {
+  const friend = await requireFriend(context);
+  const markId = requiredString(context.action.params.markId, 'support_mark_id_missing', '対応マーク');
+  const account = await context.db.prepare(
+    `SELECT tenant_id FROM line_accounts WHERE id = ?`,
+  ).bind(context.lineAccountId).first<{ tenant_id: string }>();
+  if (!account) throw invalid('line_account_not_found', 'LINE公式アカウントが見つかりません');
+  const scope = { tenantId: account.tenant_id, lineAccountId: context.lineAccountId };
+  const mark = await getSupportMarkById(context.db, markId, scope);
+  if (!mark) {
+    throw invalid('support_mark_not_found', '対応マークが見つからないか、別のLINE公式アカウントにあります');
+  }
+
+  const protectionMinutes = Number(context.action.params.manualProtectionMinutes ?? 0);
+  if (Number.isFinite(protectionMinutes) && protectionMinutes > 0) {
+    const now = dependencies.now?.() ?? new Date().toISOString();
+    const protectedChange = await context.db.prepare(
+      `SELECT 1 AS ok
+         FROM operation_audit
+        WHERE target_kind = 'support_mark' AND action = 'changed'
+          AND friend_id = ? AND actor_id IS NOT NULL
+          AND datetime(created_at) >= datetime(?, ?)
+        LIMIT 1`,
+    ).bind(friend.id, now, `-${Math.floor(protectionMinutes)} minutes`).first<{ ok: number }>();
+    if (protectedChange) return;
+  }
+
+  const updated = await setFriendSupportMark(context.db, friend.id, mark.id, scope, null, {
+    source: 'automation',
+    automationId: context.automationId,
+    automationVersionId: context.automationVersionId,
+    sourceEventId: context.sourceEventId,
+    reason: typeof context.inputEvent.type === 'string' ? context.inputEvent.type : 'condition_matched',
+  });
+  if (!updated) throw invalid('support_mark_update_failed', '対応マークを変更できませんでした');
+}
+
 async function scenarioExecutor(context: AutomationActionContext): Promise<void> {
   const friend = await requireFriend(context);
   const scenarioId = requiredString(context.action.params.scenarioId, 'scenario_id_missing', 'シナリオ');
@@ -453,6 +500,7 @@ export function createAutomationActionExecutors(
     add_tag: (context) => tagExecutor(context, 'add'),
     remove_tag: (context) => tagExecutor(context, 'remove'),
     set_metadata: metadataExecutor,
+    set_support_mark: (context) => supportMarkExecutor(context, dependencies),
     start_scenario: scenarioExecutor,
     stop_scenario: (context) => changeScenarioStatus(context, 'stop'),
     resume_scenario: (context) => changeScenarioStatus(context, 'resume'),
