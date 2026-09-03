@@ -7,6 +7,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { listLimit } from './list-pagination.js';
 
 const stripe = new Hono<Env>();
 
@@ -31,7 +32,7 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
   try {
     const friendId = c.req.query('friendId') ?? undefined;
     const eventType = c.req.query('eventType') ?? undefined;
-    const limit = Number(c.req.query('limit') ?? '100');
+    const limit = listLimit(c.req.query('limit'), 100);
     const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit });
     return c.json({
       success: true,
