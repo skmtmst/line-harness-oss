@@ -26,6 +26,7 @@ import {
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { listLimit } from './list-pagination.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -352,24 +353,24 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         : '0=1';
     }
 
-    // unansweredOnly は取得後に unansweredMap と突合して絞るため全件必要。
-    // SQLite は LIMIT に負値を渡すと「無制限」になる (documented 挙動)。
-    const NO_LIMIT = -1;
-    const limitParam = Number.parseInt(c.req.query('limit') ?? '', 10);
-    const limit = unansweredOnly
-      ? NO_LIMIT
-      : Number.isFinite(limitParam)
-        ? Math.min(1000, Math.max(1, limitParam))
-        : 300;
+    // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
+    // 1回の応答を最大200件に止める。未対応一覧そのもののDBページングは #80 で扱う。
+    const limit = listLimit(c.req.query('limit'), 200);
     // カーソルページング: (last_message_at, friend_id) の複合カーソルより古い行を返す。
     // offset 方式は「取得の合間に新着で行が押し下げられた分が欠落する」構造問題が
     // あるため採用しない。friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
     const beforeAt = c.req.query('beforeAt') || undefined;
     const beforeId = c.req.query('beforeId') || undefined;
-    const useCursor = !unansweredOnly && Boolean(beforeAt && beforeId);
+    const useCursor = Boolean(beforeAt && beforeId);
 
     const conditions: string[] = [];
     const conditionBindings: unknown[] = [];
+    if (unansweredMap) {
+      // 未対応IDをSQL側で先に絞る。JSON配列を1 bindにすることでD1のbind数上限を避け、
+      // LIMIT適用後のJS絞り込みで対象を取りこぼさない。
+      conditions.push('f.id IN (SELECT value FROM json_each(?))');
+      conditionBindings.push(JSON.stringify([...unansweredMap.keys()]));
+    }
     if (status) {
       conditions.push(`COALESCE(c.status, 'resolved') = ?`);
       conditionBindings.push(status);
