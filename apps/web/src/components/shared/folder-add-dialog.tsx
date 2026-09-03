@@ -123,7 +123,7 @@ export default function FolderAddDialog({
             type="button"
             onClick={() => void add()}
             disabled={saving || !name.trim()}
-            className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+            className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
             {saving ? '追加中…' : '追加する'}
           </button>
