@@ -66,8 +66,11 @@ if (marks.length !== nodes.length) {
   process.exit(1)
 }
 
-const out = join(ROOT, 'docs', 'design-reference', dir)
-mkdirSync(out, { recursive: true })
+/*
+  1回の書き出しに、別の機能の画面が混ざることがある（機能22と23など）。
+  そのときは `--nodes` の項目を `写真-v6:Qu6Vk` のように書けば、
+  その画面だけ置き場を変えられる。書かなければ `--dir` を使う。
+*/
 for (let i = 0; i < marks.length; i += 1) {
   // 印は属性の途中なので、そのタグを閉じた次から取る。
   // ここを外すと `data-pencil-name="…"` や `<div` が文字として混ざる。
@@ -76,7 +79,10 @@ for (let i = 0; i < marks.length; i += 1) {
   // 印の位置で切ると、開きかけの `<div` が文字として残る。
   const end = i + 1 < marks.length ? body.lastIndexOf('<', marks[i + 1].index) : body.length
   const text = textOf(body.slice(start, end))
-  const file = join(out, `${nodes[i]}.txt`)
+  const [nodeDir, nodeId] = nodes[i].includes(':') ? nodes[i].split(':') : [dir, nodes[i]]
+  const out = join(ROOT, 'docs', 'design-reference', nodeDir)
+  mkdirSync(out, { recursive: true })
+  const file = join(out, `${nodeId}.txt`)
   writeFileSync(file, `# ${marks[i][1]}\n\n${text}\n`)
-  console.log(`${nodes[i]}\t${marks[i][1]}\t${text.split('\n').length}行`)
+  console.log(`${nodeId}\t${marks[i][1]}\t${text.split('\n').length}行`)
 }
