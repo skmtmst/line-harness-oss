@@ -179,6 +179,20 @@ describe('A-8 friends tenant scope', () => {
     });
   });
 
+  test.each([
+    ['999999', 200],
+    ['-1', 50],
+    ['NaN', 50],
+  ])('/api/friends は limit=%s を安全な件数へ直す', async (raw, expected) => {
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      `/api/friends?includeTags=false&limit=${raw}&offset=-1`,
+    );
+    expect(response.status).toBe(200);
+    const list = prepared.find(({ sql }) => sql.includes('ORDER BY f.created_at') && sql.includes('LIMIT ? OFFSET ?'));
+    expect(list?.binds.slice(-2)).toEqual([expected, 0]);
+  });
+
   test('an explicit hidden LINE account cannot bypass the visible-account scope', async () => {
     const response = await createApp([]).request('/api/friends?lineAccountId=other&includeTags=false');
     expect(response.status).toBe(404);

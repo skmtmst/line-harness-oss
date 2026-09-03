@@ -33,6 +33,7 @@ import {
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
 import { compileSavedSearch } from '../services/saved-search-filter.js';
+import { listLimit, listOffset } from './list-pagination.js';
 
 const friends = new Hono<Env>();
 
@@ -149,8 +150,8 @@ function serializeTag(row: DbTag) {
 // GET /api/friends - list with pagination
 friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = Number(c.req.query('limit') ?? '50');
-    const offset = Number(c.req.query('offset') ?? '0');
+    const limit = listLimit(c.req.query('limit'), 50);
+    const offset = listOffset(c.req.query('offset'));
     const tagId = c.req.query('tagId');
     const lineAccountId = c.req.query('lineAccountId');
     const audienceId = c.req.query('audienceId')?.trim();
