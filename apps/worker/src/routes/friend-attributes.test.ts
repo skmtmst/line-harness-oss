@@ -425,6 +425,26 @@ describe('対応マーク', () => {
     );
   });
 
+  it('自動変更ルールを選択中のマークへ作成する', async () => {
+    const input = {
+      name: '担当者が決まったら対応中へ', event: 'staff_assigned', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true,
+    };
+    const res = await req(
+      '/api/support-marks/m-1/automation-rules?lineAccountId=account-1',
+      'POST',
+      input,
+    );
+    expect(res.status).toBe(201);
+    expect(supportMarkAutomation.createSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'm-1',
+      'u-1',
+      input,
+    );
+  });
+
   it('版競合を成功扱いにせず409で読み直しを促す', async () => {
     supportMarkAutomation.updateSupportMarkAutomationRule.mockResolvedValue('conflict');
     const res = await req('/api/support-mark-rules/rule-1?lineAccountId=account-1', 'PATCH', {
@@ -442,6 +462,30 @@ describe('対応マーク', () => {
     }, 'staff');
     expect(res.status).toBe(403);
     expect(supportMarkAutomation.createSupportMarkAutomationRule).not.toHaveBeenCalled();
+  });
+
+  it('保管は読み込んだ版を必須にし、競合を409で返す', async () => {
+    const missingVersion = await req(
+      '/api/support-mark-rules/rule-1?lineAccountId=account-1',
+      'DELETE',
+    );
+    expect(missingVersion.status).toBe(400);
+    expect(supportMarkAutomation.archiveSupportMarkAutomationRule).not.toHaveBeenCalled();
+
+    supportMarkAutomation.archiveSupportMarkAutomationRule.mockResolvedValueOnce('conflict');
+    const conflict = await req(
+      '/api/support-mark-rules/rule-1?lineAccountId=account-1',
+      'DELETE',
+      { expectedVersion: 2 },
+    );
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT' });
+    expect(supportMarkAutomation.archiveSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'rule-1',
+      2,
+    );
   });
 });
 
