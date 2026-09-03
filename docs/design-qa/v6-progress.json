@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 58,
-  "structureMatchDataPending": 17,
-  "needsFix": 155,
-  "unjudged": 0,
-  "remaining": 200,
+  "match": 0,
+  "structureMatchDataPending": 30,
+  "needsFix": 30,
+  "unjudged": 170,
+  "remaining": 258,
   "features": [
     {
       "feature": 1,
@@ -22,11 +22,24 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 5,
-      "needsFix": 0,
+      "structureMatchDataPending": 3,
+      "needsFix": 2,
       "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "49e1341c",
+          "on": "2026-09-03",
+          "screens": [
+            "vUXKb",
+            "ZN0ov",
+            "JN6mQ",
+            "NjK9q",
+            "Alekb"
+          ],
+          "note": "第2ラウンド第1段。**S0 の #719（共通部品の「準備中」全廃）を取り込んだあとの codex/development で撮り直した。**5画面10枚、はみ出し0。撮影は内蔵SSDの作業ツリー、モックは 8798 番（8788 番は別セッションが握っていたため）"
+        },
         {
           "pr": 419,
           "head": "c84baa63",
@@ -51,12 +64,37 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
-      "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "match": 0,
+      "structureMatchDataPending": 14,
+      "needsFix": 3,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 17,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "49e1341c",
+          "on": "2026-09-03",
+          "screens": [
+            "xGLVe",
+            "NfgOs",
+            "H3lAOB",
+            "Xi4x9",
+            "f0zn6",
+            "NWbuF",
+            "B7CER8",
+            "YZaDK",
+            "L35UOV",
+            "IYjvu",
+            "TUveA",
+            "w72a2",
+            "ASsb3",
+            "ANgda",
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "第2ラウンド第1段。17画面38枚、はみ出し0。**`YZaDK-selected`（担当者ごとの未読）は撮れていない**——`GET /api/chats/stats` に担当者ごとの数が無いため（board#33）。**`ASsb3-menu` も撮れていない**——実装に `data-qa-open` の印が無い。`TUveA` はフォルダの読み上げ名が変わっていて撮れず、この台帳の `steps` を直してから撮った"
+        },
         {
           "pr": 513,
           "head": "60b39036",
@@ -157,12 +195,29 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
-      "structureMatchDataPending": 0,
-      "needsFix": 5,
-      "unjudged": 0,
-      "remaining": 6,
+      "match": 0,
+      "structureMatchDataPending": 3,
+      "needsFix": 6,
+      "unjudged": 1,
+      "remaining": 11,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "49e1341c",
+          "on": "2026-09-03",
+          "screens": [
+            "PhxG6",
+            "LT8RS",
+            "Igi72",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "InCDe",
+            "r7eSi",
+            "w8W4Eh"
+          ],
+          "note": "第2ラウンド第1段。9画面48枚（状態ぶんを含む）、はみ出し0。**`IAf7j`（一括操作）の5状態は撮れていない**——モックの `/api/line-accounts` が `role` を返さず、`canRunBulk`（owner か admin）が false になって「操作を選ぶ」が描かれないため。**`w8W4Eh-edit` `w8W4Eh-conflict` も撮れていない**（固定データの行に押しどころが出ない）"
+        },
         {
           "pr": 520,
           "head": "4848a8f3",
@@ -254,12 +309,39 @@
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 1,
-      "needsFix": 13,
-      "unjudged": 0,
-      "remaining": 14,
+      "match": 0,
+      "structureMatchDataPending": 4,
+      "needsFix": 11,
+      "unjudged": 2,
+      "remaining": 17,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "49e1341c",
+          "on": "2026-09-03",
+          "screens": [
+            "hqrOv",
+            "dKlkz",
+            "H374MR",
+            "sfTEW",
+            "op1rh",
+            "QzRsJ",
+            "HBTk0",
+            "yKEdO",
+            "rIhbN",
+            "QKx8Q",
+            "l25rlp",
+            "tP0RW",
+            "LfrQs",
+            "ee0sk",
+            "VjXGX",
+            "byqIW",
+            "A1ZYeP",
+            "KoT6c",
+            "XBkiQ"
+          ],
+          "note": "第2ラウンド第1段。19画面44枚、はみ出し0。**`GMvBd`（対応マークを追加・編集、6状態）と `zGZMA`（削除確認）は撮れていない**——モックが返す対応マークに「保留」「対応中」の行が無く、押しどころが描かれないため"
+        },
         {
           "pr": 420,
           "head": "87c150ad",
@@ -376,6 +458,33 @@
             "XBkiQ"
           ],
           "note": "第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木で撮った。**撮っただけで、判定は書き換えていない**（絵を1枚ずつ見ていないため）。`VjXGX`（遡及反映の確認ダイアログ）と `zGZMA`（対応マーク削除の確認）は、固定データにボタンが出ず撮れなかった。**#670 の主対象 `rIhbN`・`QKx8Q`・`hqrOv` は撮っていない** — 本流 `codex/development` の台帳は95行しかなく、この3件の行が無いため。撮影は内蔵SSDのクローンで実施（外付けドライブが障害のため）"
+        },
+        {
+          "pr": 670,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "l25rlp",
+            "tP0RW",
+            "LfrQs",
+            "ee0sk",
+            "VjXGX",
+            "byqIW",
+            "A1ZYeP",
+            "KoT6c",
+            "HBTk0",
+            "yKEdO",
+            "dKlkz",
+            "hqrOv",
+            "rIhbN",
+            "QKx8Q",
+            "XBkiQ",
+            "H374MR",
+            "sfTEW",
+            "op1rh",
+            "QzRsJ"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。19 Node が撮れた（前回は本流の台帳が95行で `rIhbN`・`QKx8Q`・`hqrOv` の行が無く撮れなかった）。`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。"
         }
       ]
     },
@@ -388,12 +497,34 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
-      "structureMatchDataPending": 0,
+      "match": 0,
+      "structureMatchDataPending": 6,
       "needsFix": 8,
       "unjudged": 0,
-      "remaining": 8,
+      "remaining": 14,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "49e1341c",
+          "on": "2026-09-03",
+          "screens": [
+            "TC1b1",
+            "cCB7r",
+            "kk8dz",
+            "bV5Vs",
+            "xfYLn",
+            "r6Gzsu",
+            "hz9ti",
+            "dqFft",
+            "EvVO5",
+            "RUxNf",
+            "NrBkW",
+            "g2UNV",
+            "M2b2B",
+            "q5G45"
+          ],
+          "note": "第2ラウンド第1段。14画面38枚（状態ぶんを含む）、はみ出し0。撮れなかった画面は無い"
+        },
         {
           "pr": 534,
           "head": "0158ba8e",
@@ -564,11 +695,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 9,
-      "unjudged": 0,
-      "remaining": 10,
+      "needsFix": 0,
+      "unjudged": 14,
+      "remaining": 15,
       "capturedAt": [
         {
           "pr": 543,
@@ -706,6 +837,27 @@
             "xkRDb"
           ],
           "note": "第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木で撮った。**絵を見て判定し直したのは `q76C35` だけ。** 残りは撮っただけで判定は据え置き。`cPk8A`（保存した条件から選ぶ）と `sqFXf`（この条件を保存）は押せる形になっておらず撮れていない。`TmHjF`（一覧の状態）は口の返事を差し替える手順が仕組みに無く撮れない。撮影は内蔵SSDのクローンで実施（外付けドライブが障害のため）"
+        },
+        {
+          "pr": 674,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "bPF0s",
+            "u6gHt",
+            "EGMb1",
+            "xkRDb",
+            "TmHjF"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`TmHjF`（一覧の状態）が今回は撮れた。**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。"
         }
       ]
     },
@@ -718,11 +870,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
-      "unjudged": 0,
-      "remaining": 6,
+      "needsFix": 0,
+      "unjudged": 10,
+      "remaining": 11,
       "capturedAt": [
         {
           "pr": 429,
@@ -828,11 +980,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
-      "unjudged": 0,
-      "remaining": 10,
+      "needsFix": 0,
+      "unjudged": 6,
+      "remaining": 11,
       "capturedAt": [
         {
           "pr": 544,
@@ -898,11 +1050,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 0,
-      "remaining": 8,
+      "needsFix": 0,
+      "unjudged": 5,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 431,
@@ -947,8 +1099,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 11,
       "remaining": 13,
       "capturedAt": [
         {
@@ -1042,11 +1194,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 8,
-      "unjudged": 0,
-      "remaining": 8,
+      "needsFix": 0,
+      "unjudged": 10,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 433,
@@ -1134,11 +1286,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 7,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 0,
-      "remaining": 2,
+      "needsFix": 0,
+      "unjudged": 9,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 509,
@@ -1249,9 +1401,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 5,
       "remaining": 7,
       "capturedAt": [
         {
@@ -1314,8 +1466,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 4,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1346,6 +1498,17 @@
             "yPkWe"
           ],
           "note": "Claude実装。#611 の delete-impact で、差し込まれている場所と空欄のまま送られることを削除の窓へ出した。差し替えの口は契約待ち"
+        },
+        {
+          "pr": 668,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "gBtaK",
+            "yPkWe",
+            "WuKzU"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`uNBlA`（変える前に影響を見る）は `#cv-value` が見つからず撮れていない。`fill` の選択子を読むように直したあとも残ったので、**その id の欄が画面に無い**（ルートは200を返す）。"
         }
       ]
     },
@@ -1360,8 +1523,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 5,
       "remaining": 5,
       "capturedAt": [
         {
@@ -1399,6 +1562,18 @@
             "YfTfJ"
           ],
           "note": "Claude実装。使われている場所と確認時刻を表示。差し替えAPI待ちに加え、アカウント切替の遅延応答P1を監査で記録"
+        },
+        {
+          "pr": 667,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "g89Tc",
+            "eXAJP",
+            "YfTfJ",
+            "h8pBZr"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`voJtX`（詳細と差し替え）は「夏の定番セット.jpgの使用箇所」が見つからず撮れていない。"
         }
       ]
     },
@@ -1411,11 +1586,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
-      "unjudged": 0,
-      "remaining": 8,
+      "needsFix": 0,
+      "unjudged": 7,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 558,
@@ -1467,6 +1642,20 @@
             "njLGA"
           ],
           "note": "取得失敗のとき帯を — にする直し。0円と見分けがつくようになった"
+        },
+        {
+          "pr": 667,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "n5VVTb",
+            "PouPn",
+            "GH8VL",
+            "njLGA",
+            "GPWzq",
+            "xqT1Z"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。**`n5VVTb`（成果承認）が撮れるようになった。** 撮影の口（`/api/conversions/approvals`）を足したため。`jwrbf`（成果内訳）は「田中 明」が見つからず撮れていない。"
         }
       ]
     },
@@ -1479,11 +1668,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 8,
-      "unjudged": 0,
-      "remaining": 10,
+      "needsFix": 0,
+      "unjudged": 9,
+      "remaining": 11,
       "capturedAt": [
         {
           "pr": 549,
@@ -1587,6 +1776,22 @@
             "qlVLJ"
           ],
           "note": "Claudeが実装して撮った。#549 の上。**`z3PB2` の「層の境目が違う」は誤りで、40は撮影用の固定データの誤り**（`DEFAULT_BANDS` は 30 / 70 で設計と一致）。固定データを直して撮り直した"
+        },
+        {
+          "pr": 667,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "MvZm5",
+            "HIU5O",
+            "z3PB2",
+            "k8VCU",
+            "s98Vfw",
+            "N46cQ",
+            "qlVLJ",
+            "BmoGY"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。**機能17は直前まで4枚とも「画面を表示できませんでした」で1枚も撮れなかった。** 撮影の口と固定データを直して8 Node が撮れた。`vz0Ji` は「マイルを手で増やす・減らす」が見つからず撮れていない。"
         }
       ]
     },
@@ -1599,11 +1804,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 7,
-      "unjudged": 0,
-      "remaining": 7,
+      "needsFix": 0,
+      "unjudged": 9,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 443,
@@ -1660,6 +1865,23 @@
             "UIaM7"
           ],
           "note": "Claudeが実装して撮った。#574 の上（#574 は #443 を含む）"
+        },
+        {
+          "pr": 666,
+          "head": "7d830282",
+          "on": "2026-09-02",
+          "screens": [
+            "Q4bkTg",
+            "BMmxU",
+            "IhSBB",
+            "v0HaI",
+            "BuVDB",
+            "Im2b1",
+            "TEVk8",
+            "JupxW",
+            "UIaM7"
+          ],
+          "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。9 Node すべて撮れた。"
         }
       ]
     },
@@ -1674,8 +1896,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 4,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1705,11 +1927,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 6,
-      "needsFix": 1,
-      "unjudged": 0,
-      "remaining": 8,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 8,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 445,
@@ -1741,6 +1963,21 @@
             "QQ1SR"
           ],
           "note": "使われ方の4つの帯と片づけの導線。通常・読込・空・失敗の4状態"
+        },
+        {
+          "pr": 676,
+          "head": "a0bb3f44",
+          "on": "2026-09-02",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "dfwD4"
+          ],
+          "note": "#676・#677 が入った木で撮り直した。**それまで機能20は9枚とも「画面を表示できませんでした」で1枚も撮れていなかった。**原因は実装ではなく撮影側で、`/api/analytics/friends`・`reactions`・`routes`・`usage` の口がモックに無く、既定の器 `{items,total,page,limit}` が返って `overview.metrics` で投げていた。契約どおりの形を返すようにして7 Node が撮れた。`Fh2Qj`（ファネル）はまだ撮れない。"
         }
       ]
     },
@@ -1753,11 +1990,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 2,
-      "needsFix": 3,
-      "unjudged": 0,
-      "remaining": 6,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 6,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 446,
@@ -1825,9 +2062,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 2,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1856,11 +2093,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
-      "unjudged": 0,
-      "remaining": 3,
+      "needsFix": 0,
+      "unjudged": 2,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 0,
@@ -1892,9 +2129,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 5,
-      "unjudged": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 6,
       "remaining": 6,
       "capturedAt": [
         {
@@ -1948,11 +2185,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
-      "remaining": 5,
+      "needsFix": 0,
+      "unjudged": 7,
+      "remaining": 8,
       "capturedAt": [
         {
           "pr": 502,
@@ -2019,8 +2256,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 4,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2071,11 +2308,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
-      "remaining": 4,
+      "needsFix": 0,
+      "unjudged": 7,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 459,
@@ -2132,8 +2369,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 4,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2184,11 +2421,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
+      "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
-      "unjudged": 0,
-      "remaining": 1,
+      "needsFix": 0,
+      "unjudged": 4,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 533,
@@ -2242,8 +2479,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 4,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2271,8 +2508,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 1,
       "remaining": 1,
       "capturedAt": [
         {
@@ -2297,8 +2534,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 0,
+      "needsFix": 0,
+      "unjudged": 4,
       "remaining": 4,
       "capturedAt": [
         {
