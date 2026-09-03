@@ -5,6 +5,7 @@ export * from './friends';
 export * from './tags';
 export * from './scenarios';
 export * from './scenario-schedule';
+export * from './scenario-delivery-timestamps';
 export * from './scenario-triggers';
 export * from './scenario-resolve';
 export * from './broadcasts';
