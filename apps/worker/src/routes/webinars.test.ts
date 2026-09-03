@@ -930,6 +930,22 @@ describe('webinar notification settings', () => {
       expect.objectContaining({ defaultLiffId: '999-test' }),
     );
   });
+
+  test.each([
+    ['no_test_recipients', 400],
+    ['db unavailable', 500],
+  ])('テスト送信失敗 %s をHTTP %iで返す', async (message, expectedStatus) => {
+    vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarNotificationMocks.sendWebinarNotificationTest.mockRejectedValueOnce(
+      new Error(message),
+    );
+
+    const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
+
+    expect(res.status).toBe(expectedStatus);
+    expect(await res.json()).toMatchObject({ success: false });
+  });
 });
 
 describe('admin CRUD', () => {
