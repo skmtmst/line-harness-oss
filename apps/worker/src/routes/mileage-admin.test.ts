@@ -130,6 +130,51 @@ describe('mileage admin API', () => {
     });
   });
 
+  it('requires explicit confirmation before publishing a reward', async () => {
+    const request = {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    } satisfies RequestInit;
+    expect((await call('/api/mileage/rewards/reward-1/publish', request)).status).toBe(428);
+    expect(dbMocks.publishMileageReward).not.toHaveBeenCalled();
+
+    dbMocks.publishMileageReward.mockResolvedValueOnce({ id: 'reward-1', status: 'published' });
+    const response = await call('/api/mileage/rewards/reward-1/publish', {
+      ...request,
+      headers: { 'X-Confirm-Irreversible': 'mileage-reward-publish' },
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.publishMileageReward).toHaveBeenCalledWith(env.DB, {
+      id: 'reward-1', lineAccountId: 'account-1', publishedBy: 'env-owner',
+    });
+  });
+
+  it('deduplicates and encrypts exchange codes before saving them', async () => {
+    dbMocks.encryptCredential
+      .mockResolvedValueOnce('encrypted-a')
+      .mockResolvedValueOnce('encrypted-b');
+    dbMocks.importMileageRewardCodes.mockResolvedValueOnce({ imported: 2, duplicates: 0 });
+
+    const response = await call('/api/mileage/rewards/reward-1/codes', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1', codes: [' CODE-A ', 'CODE-A', 'CODE-B'] }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(dbMocks.encryptCredential).toHaveBeenCalledTimes(2);
+    expect(dbMocks.encryptCredential).toHaveBeenNthCalledWith(1, 'CODE-A', undefined);
+    expect(dbMocks.encryptCredential).toHaveBeenNthCalledWith(2, 'CODE-B', undefined);
+    expect(dbMocks.importMileageRewardCodes).toHaveBeenCalledWith(env.DB, {
+      rewardId: 'reward-1',
+      lineAccountId: 'account-1',
+      codes: [
+        { ciphertext: 'encrypted-a', fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        { ciphertext: 'encrypted-b', fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/) },
+      ],
+    });
+    expect(await response.text()).not.toContain('CODE-A');
+  });
+
   it('tests a reward without writing mileage or inventory', async () => {
     dbMocks.getMileageReward.mockResolvedValueOnce({
       id: 'reward-1', rewardKind: 'coupon', availableCodeCount: 0,
