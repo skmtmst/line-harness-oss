@@ -114,6 +114,43 @@ describe('getFriendScenariosDueForDelivery', () => {
     expect(rows.at(-1)?.id).toBe('due-39');
   });
 
+  test('isolates a synthetic scenario for the staging batch check', async () => {
+    sqlite.prepare(
+      `INSERT INTO scenarios (id, name, trigger_type, is_active) VALUES (?, ?, 'manual', 1)`,
+    ).run('verification-scenario', 'verification');
+    for (let i = 0; i < 41; i++) {
+      insertEnrollment(
+        `verification-${String(i).padStart(2, '0')}`,
+        'verification-scenario',
+        'active',
+        '2026-09-03T08:00:00.000+09:00',
+      );
+    }
+    insertEnrollment('unrelated', 'active-scenario', 'active', '2026-09-03T08:00:00.000+09:00');
+
+    const first = await getFriendScenariosDueForDelivery(
+      db,
+      '2026-09-03T09:00:00.000+09:00',
+      40,
+      'verification-scenario',
+    );
+    expect(first).toHaveLength(40);
+    expect(first.every((row) => row.scenario_id === 'verification-scenario')).toBe(true);
+
+    const placeholders = first.map(() => '?').join(', ');
+    sqlite.prepare(
+      `UPDATE friend_scenarios SET status = 'completed' WHERE id IN (${placeholders})`,
+    ).run(...first.map((row) => row.id));
+    const second = await getFriendScenariosDueForDelivery(
+      db,
+      '2026-09-03T09:00:00.000+09:00',
+      40,
+      'verification-scenario',
+    );
+    expect(second).toHaveLength(1);
+    expect(second[0].id).toBe('verification-40');
+  });
+
   test('normalizes a next timestamp before saving it', async () => {
     insertEnrollment('advance', 'active-scenario', 'active', '2026-09-03T08:00:00.000+09:00');
 
