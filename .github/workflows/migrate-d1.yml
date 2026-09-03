@@ -16,6 +16,14 @@ name: Migrate D1
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: マイグレーション確認か、ステージング運用経路の確認か
+        type: choice
+        required: true
+        default: migrate
+        options:
+          - migrate
+          - verify-operational-path
       environment:
         description: どのデータベースに当てるか
         type: choice
@@ -38,6 +46,7 @@ permissions:
 
 jobs:
   migrate:
+    if: inputs.operation == 'migrate'
     environment:
       name: ${{ inputs.environment }}
     runs-on: ubuntu-latest
@@ -207,3 +216,45 @@ jobs:
           else
             echo "$COUNT 件を当てました。上のサマリーに復元点が出ています。"
           fi
+
+  verify-operational-path:
+    if: inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development'
+    environment:
+      name: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERIFY_ENVIRONMENT: staging
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify D1, delivery batches, and notification rules
+        run: |
+          set -o pipefail
+          pnpm tsx scripts/verify-staging-operational-path.ts \
+            | tee "$RUNNER_TEMP/staging-verification.json"
+
+      - name: Publish aggregate-only result
+        if: always()
+        run: |
+          {
+            echo '## ステージング運用経路の確認'
+            echo
+            if [ -s "$RUNNER_TEMP/staging-verification.json" ]; then
+              echo '```json'
+              tail -n 1 "$RUNNER_TEMP/staging-verification.json"
+              echo '```'
+            else
+              echo '検証結果を生成できませんでした。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

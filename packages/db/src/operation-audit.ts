@@ -9,10 +9,15 @@
  */
 
 /** 何に対する操作か。 */
-export type AuditTargetKind = 'support_mark' | 'saved_search' | 'tag' | 'friend_field';
+export type AuditTargetKind =
+  | 'support_mark'
+  | 'saved_search'
+  | 'tag'
+  | 'friend_field'
+  | 'emergency_control';
 
 /** 何をしたか。 */
-export type AuditAction = 'changed' | 'used' | 'created' | 'deleted' | 'archived';
+export type AuditAction = 'changed' | 'used' | 'created' | 'deleted' | 'archived' | 'previewed';
 
 export interface RecordOperationInput {
   targetKind: AuditTargetKind;
