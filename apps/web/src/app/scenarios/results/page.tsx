@@ -116,7 +116,13 @@ function ResultsInner() {
         <Link href="/scenarios" className={styles.crumb}>← シナリオ一覧</Link>
         <span className={styles.actionEnd}>
           <Button href={`/scenarios/detail?id=${id}`}>シナリオ編集へ戻る</Button>
-          <Button variant="primary" onClick={exportCsv} disabled={!scenario || !stats}>CSVで書き出す</Button>
+          {/*
+            **書き出しは主要ボタンにしない。**
+            横断レビュー §7 の #44。この画面でいちばんしたいことは結果を見ることで、
+            CSVに落とすことではない。緑にすると、そちらが本筋に見える。
+            ほかの7画面はすべて副次で置いてあり、ここだけ例外だった。
+          */}
+          <Button onClick={exportCsv} disabled={!scenario || !stats}>CSVで書き出す</Button>
         </span>
       </div>
 

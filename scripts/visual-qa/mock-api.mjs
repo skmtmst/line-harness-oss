@@ -613,7 +613,39 @@ const RAW = {
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
   '/admin/version': { version: '0.0.0-dev', worker_hash: '', admin_hash: '', liff_hash: '' },
   '/admin/manifest': { releases: [], versions: [] },
+
+  /*
+    **`{success, data}` で包まない口。**
+
+    `api.ts` には `fetchApi<{ menus: BookingMenu[] }>` のように、
+    器を通さずそのまま返る口がある。包んで返すと画面側は
+    `res.menus` が `undefined` になり、`.filter` で丸ごと落ちる。
+
+      /booking/menus  … Cannot read properties of undefined (reading 'filter')
+      /events         … 同上
+
+    どちらも「画面を表示できませんでした」になっていて、
+    **実装の不具合に見えていた。**
+  */
+  '/api/booking/admin/menus': { menus: [] },
+  '/api/booking/admin/staff': { staff: [] },
+  '/api/events/admin/events': { items: [] },
+  // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
+  '/api/booking/admin/requests': { requests: [] },
 }
+
+/**
+ * 同じく包まない口のうち、**途中にIDが入るもの**。
+ *
+ * `RAW` は道が一致したときしか効かないので、
+ * `/api/events/admin/events/ev-1/bookings` のように id が挟まる口は
+ * 素通りして `{success,data:{items…}}` に包まれていた。
+ * 画面は `listRes.items` を読むので `undefined` になり、
+ * `29-1-B 申込者の一覧` が `.filter` で「画面を表示できませんでした」になっていた。
+ */
+const RAW_PATTERNS = [
+  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: [] }],
+]
 
 /** 参照が1つも無ければ消せる（`packages/db` の `canDelete` と同じ数え方）。 */
 function tagDeleteImpact(tag) {
@@ -912,6 +944,212 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: { riskLevel: 'normal', logs: [] } }
   }
+  if (pathname === '/api/notifications/center') {
+    /*
+      ダッシュボードの通知パネル。**器の形が合わないと画面が落ちる。**
+      `isDashboardNotificationData` が `items` と `counts.{all,error,update,unread}`
+      と `unreadCount` を見ていて、既定の器（空配列）だと通らず
+      「通知を読み込めませんでした」になっていた。
+      中身は設計 `Alekb` の6件をそのまま置く。
+    */
+    const item = (id, category, title, body, isRead, createdAt) => ({
+      id, eventType: `visual_qa.${category}`, category, title, body,
+      metadata: null, isRead, createdAt,
+    })
+    const items = [
+      item('nc-1', 'error', '一斉配信「8月号のご案内」で12件が送信失敗', '配信結果を開く', false, '2026-09-02T01:04:00.000Z'),
+      item('nc-2', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-3', 'error', 'EC連携の取り込みが3件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
+      item('nc-4', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', false, '2026-08-20T00:00:00.000Z'),
+      item('nc-5', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
+      item('nc-6', 'update', 'メンテナンス予定　8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
+    ]
+    const category = query.get('category')
+    const shown = category && category !== 'all' ? items.filter((x) => x.category === category) : items
+    return {
+      success: true,
+      data: {
+        items: shown,
+        counts: {
+          all: items.length,
+          error: items.filter((x) => x.category === 'error').length,
+          update: items.filter((x) => x.category === 'update').length,
+          unread: items.filter((x) => !x.isRead).length,
+        },
+        unreadCount: items.filter((x) => !x.isRead).length,
+      },
+    }
+  }
+  if (pathname === '/api/analytics/url-clicks') {
+    /*
+      分析のURLクリック。**入れ子の器で返す。**
+      画面は `state.data.data` と読む（`period` は外側にある）。
+      ほかの分析タブと同じ形。既定の器だと `overview.stateReason` で落ちて、
+      画面が丸ごと「画面を表示できませんでした」になっていた。
+    */
+    return {
+      success: true,
+      data: {
+        lineAccountId: 'visual-qa-account',
+        timeZone: 'Asia/Tokyo',
+        period: { from: '2026-08-05', to: '2026-09-03' },
+        dataCutoffAt: '2026-09-03T00:00:00+09:00',
+        data: {
+          state: 'available',
+          stateReason: null,
+          clickRateDefinition: 'クリック率は「実人数 ÷ 届いた人数」で出しています。',
+          links: [
+            {
+              trackedLinkId: 'tl-1', name: '定期便の案内', originalUrl: 'https://example.com/subscription',
+              isActive: true, clicks: METRIC(482), knownClickPeople: METRIC(311),
+              deliveredPeople: METRIC(1_842), clickRate: METRIC(16.9),
+              usageLocations: ['一斉配信「9月の定期便」', 'リッチメニュー「メインA」'],
+            },
+            {
+              trackedLinkId: 'tl-2', name: '来店クーポン', originalUrl: 'https://example.com/coupon',
+              isActive: false, clicks: METRIC(96), knownClickPeople: METRIC(74),
+              deliveredPeople: METRIC(640), clickRate: METRIC(11.6),
+              usageLocations: [],
+            },
+          ],
+        },
+      },
+    }
+  }
+  if (pathname === '/api/nen-campaigns/overview') {
+    // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
+    return { success: true, data: { activeCampaigns: 2, jobs: { total: 18, pending: 3, sent: 14, failed: 1 }, columns: 6, pets: 4, coupons: 2 } }
+  }
+  if (pathname === '/api/webhooks/interactions') {
+    /*
+      やり取りの記録。**`summary` が丸ごと要る。**
+      既定の器だと `data.summary.total` で落ち、画面が
+      「画面を表示できませんでした」になっていた。
+      数は設計 `KNG00` に合わせる（この30日 1,972回・成功 1,966・失敗 6）。
+    */
+    return {
+      success: true,
+      data: {
+        total: 1_972,
+        page: 1,
+        limit: 20,
+        summary: { total: 1_972, outgoing: 1_486, incoming: 486, succeeded: 1_966, failed: 6, averageDurationMs: 400 },
+        items: [
+          {
+            id: 'wi-1', direction: 'outgoing', webhookName: 'Slack ／ #注文チャンネル',
+            eventType: '注文が確定したとき', triggerSummary: '注文 #12492・¥12,800・石田 未来',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 300, failureReason: null, canRetry: false,
+            startedAt: '2026-08-25T02:42:00.000Z', completedAt: '2026-08-25T02:42:00.300Z', retryOfId: null,
+          },
+          {
+            id: 'wi-2', direction: 'outgoing', webhookName: 'Slack ／ #アラート',
+            eventType: '在庫が少なくなったとき', triggerSummary: '定期便パンフ 残り 3',
+            status: 'failed', responseLabel: '503 Service Unavailable', responseStatus: 503,
+            attemptCount: 3, durationMs: 10_000, failureReason: '相手が応答しませんでした', canRetry: true,
+            startedAt: '2026-08-24T05:10:00.000Z', completedAt: '2026-08-24T05:10:10.000Z', retryOfId: null,
+          },
+          {
+            id: 'wi-3', direction: 'incoming', webhookName: '予約サービス',
+            eventType: '予約が入ったとき', triggerSummary: '8/26 14:00 トリミング（小型犬）',
+            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
+            attemptCount: 1, durationMs: 180, failureReason: null, canRetry: false,
+            startedAt: '2026-08-24T01:05:00.000Z', completedAt: '2026-08-24T01:05:00.180Z', retryOfId: null,
+          },
+        ],
+      },
+    }
+  }
+  if (pathname === '/api/common-actions/resources') {
+    /*
+      共通アクションを作るときの選択肢。**器が6つとも要る。**
+
+      `api.ts` の `CommonActionResources` は6つの配列を持つが、
+      `readArrayGetPaths()` は「返りが配列そのもの」の口しか拾えないので、
+      ここが既定の `{items,total,page,limit}` に落ちていた。
+      画面は `resources.tags.map(...)` を読むので
+      `Cannot read properties of undefined (reading 'map')` で
+      `/common-actions/new` が「画面を表示できませんでした」になっていた。
+    */
+    return {
+      success: true,
+      data: {
+        tags: [
+          { id: 'tag-vip', name: 'VIP' },
+          { id: 'tag-trial', name: '体験申込' },
+        ],
+        scenarios: [{ id: 'scenario-0', name: '来店後シナリオ' }],
+        templates: [{ id: 'template-usage-1', name: '来店後のご案内' }],
+        webhooks: [{ id: 'wh-1', name: '予約サービスへ知らせる' }],
+        richMenus: [{ id: 'rmg-1', name: '通常メニュー' }],
+        commonActions: [{ id: 'ca-1', name: '来店後のご案内', version: 3 }],
+      },
+    }
+  }
+  if (pathname.startsWith('/api/common-actions/') && !pathname.includes('/resources')) {
+    // `versions` `bindings` が入っていないと `.find` で落ちる。
+    return { success: true, data: { id: pathname.split('/').pop(), name: '来店後のご案内', versions: [], bindings: [], currentPublishedVersionId: null, currentDraftVersionId: null } }
+  }
+  if (pathname === '/api/saved-searches' && query.get('format') === 'segment_v1') {
+    /*
+      配信の「保存した条件から選ぶ」。
+      空だと「この条件を使う」の行が描かれず、設計 `sqFXf`（対象条件を編集）が
+      撮れなかった。設計と同じ2件を返す。
+    */
+    const rule = (field, op, value) => ({ field, operator: op, value })
+    return {
+      success: true,
+      data: [
+        {
+          id: 'sp-1', name: 'VIPかつ未契約', scope: 'friends', conditionFormat: 'segment_v1',
+          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('tag', 'includes', 'VIP'), rule('tag', 'excludes', '契約中')] } },
+          createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: true,
+          displayOrder: 1, createdAt: '2026-08-10T00:00:00.000Z',
+          usedIn: [{ kind: 'broadcast', count: 2 }, { kind: 'automation', count: 1 }],
+        },
+        {
+          id: 'sp-2', name: '誕生日30日前', scope: 'friends', conditionFormat: 'segment_v1',
+          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('field', 'within_days', 30)] } },
+          createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: false,
+          displayOrder: 2, createdAt: '2026-08-18T00:00:00.000Z',
+          usedIn: [{ kind: 'other', count: 1 }],
+        },
+      ],
+    }
+  }
+  if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
+    /*
+      ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
+      既定の器だと `analytics.participants.length` の手前で落ちて、
+      `/webinars/edit` が丸ごと「画面を表示できませんでした」になっていた。
+    */
+    return {
+      data: {
+        id: pathname.split('/').pop(), accountId: 'visual-qa-account',
+        title: '定期便のはじめ方', slug: 'subscription-start', status: 'active',
+        videoPrefix: 'nen/subscription-start', durationSeconds: 2_580,
+        schedule: [], cta: { label: '詳しく見る', url: 'https://example.com/subscription', showAtSeconds: 900 },
+        tagOnAttend: null, tagOnCtaClick: null,
+        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+      },
+    }
+  }
+  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) {
+    // 一覧の器だと `participants` `daily` `formFunnel` が無く、画面が落ちる。
+    return {
+      data: {
+        summary: {
+          reservations: 128, viewers: 96, registeredAndJoined: 74, watched5m: 88,
+          watched15m: 61, completed: 34, avgWatchedSeconds: 1_140, ctaClicks: 41, formSubmissions: 18,
+        },
+        daily: [], participants: [], sessions: [], dropoff: [],
+        formFunnel: {
+          ctaImpressions: 96, ctaClicks: 41, formOpens: 33, formStarts: 27,
+          submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
+        },
+      },
+    }
+  }
   if (pathname === '/api/friend-fields-stats') {
     /*
       友だち情報欄の帯。**口が無いと既定の器（`{items,total,page,limit}`）が返り、
@@ -1006,6 +1244,11 @@ const server = createServer((req, res) => {
 
   if (url.pathname in RAW) {
     res.writeHead(200).end(JSON.stringify(RAW[url.pathname]))
+    return
+  }
+  const rawPattern = RAW_PATTERNS.find(([re]) => re.test(url.pathname))
+  if (rawPattern) {
+    res.writeHead(200).end(JSON.stringify(rawPattern[1]))
     return
   }
   res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname, url.searchParams)))

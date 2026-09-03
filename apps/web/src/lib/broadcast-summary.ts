@@ -24,8 +24,16 @@ const TYPE_LABELS: Record<string, string> = {
   carousel: 'カルーセル',
 }
 
-/** 送るものの種別。知らない種別はそのまま出す（「Flex」と嘘をつかない）。 */
-export function messageTypeLabel(messageType: string): string {
+/**
+ * 送るものの種別。知らない種別はそのまま出す（「Flex」と嘘をつかない）。
+ *
+ * **ただし「無い」をそのまま出さない。** 種別が入っていない配信で
+ * 詳細画面が「1通（undefined）」と出していた。
+ * 知らない種別を出すのは、内部の名前でも運用者の手がかりになるからで、
+ * `undefined` は手がかりにならない。
+ */
+export function messageTypeLabel(messageType: string | null | undefined): string {
+  if (!messageType) return '種別なし'
   return TYPE_LABELS[messageType] ?? messageType
 }
 
