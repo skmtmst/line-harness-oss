@@ -1,3 +1,5 @@
+> **廃止(2026-09-03)。** 利用者向けマニュアルの正本は `apps/docs`(公開サイト)に決めた。ここは placeholder のまま止まっていた下書きで、判断に使わない。
+
 ---
 chapter: 6
 title: MCP × Claude Code で自動化
