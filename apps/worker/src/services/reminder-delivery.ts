@@ -25,13 +25,15 @@ import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
+import {
+  classifyExternalDeliveryError,
+  externalDeliveryRetryAt,
+  type SafeExternalDeliveryError,
+} from './external-delivery-retry.js';
 import type { ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 
 const LEASE_MINUTES = 5;
-// 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
-const MAX_RETRY_CYCLE_ATTEMPTS = 4;
-const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
 
 type PushClient = Pick<LineClient, 'pushMessageWithRequestId'>;
 
@@ -47,8 +49,6 @@ export interface ReminderDeliveryResult {
   retrying: number;
   failed: number;
 }
-
-type SafeDeliveryError = { code: string; message: string; retryable: boolean };
 
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
 export async function buildReminderStepMessage(
@@ -89,25 +89,8 @@ export async function buildReminderStepMessage(
 }
 
 /** Provider本文や秘密値を管理画面へ出さず、運用者が次の行動を選べる言葉へ直す。 */
-export function classifyReminderDeliveryError(error: unknown): SafeDeliveryError {
-  const raw = error instanceof Error ? error.message : String(error);
-  if (raw === 'REMINDER_LINE_ACCOUNT_NOT_FOUND') {
-    return { code: 'line_account_not_found', message: '送信に使うLINEアカウント設定を確認してください。', retryable: false };
-  }
-  const status = Number(/LINE API error:\s*(\d{3})/.exec(raw)?.[1] ?? 0);
-  if (status === 429) {
-    return { code: 'line_rate_limited', message: 'LINE側の送信上限に達しました。時間を置いて再試行します。', retryable: true };
-  }
-  if ([401, 403].includes(status)) {
-    return { code: 'line_authentication_failed', message: 'LINE連携の認証を確認してください。', retryable: false };
-  }
-  if ([400, 404, 422].includes(status)) {
-    return { code: 'line_rejected', message: '送信内容または宛先を確認してください。', retryable: false };
-  }
-  if (status >= 500 || /fetch|network|timeout|socket/i.test(raw)) {
-    return { code: 'line_temporary_failure', message: 'LINEへの送信に一時的に失敗しました。自動で再試行します。', retryable: true };
-  }
-  return { code: 'delivery_failed', message: '送信に失敗しました。設定とLINE連携を確認してください。', retryable: true };
+export function classifyReminderDeliveryError(error: unknown): SafeExternalDeliveryError {
+  return classifyExternalDeliveryError(error);
 }
 
 async function defaultResolveClient(
@@ -121,34 +104,6 @@ async function defaultResolveClient(
   const account = await getLineAccountById(db, accountId);
   if (!account) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
   return new LineClient(account.channel_access_token);
-}
-
-function retryAtFor(runAttempt: number, now: Date, retryable: boolean): string | null {
-  if (!retryable || runAttempt >= MAX_RETRY_CYCLE_ATTEMPTS) return null;
-  const delay = RETRY_DELAYS_MINUTES[Math.max(0, runAttempt - 1)] ?? RETRY_DELAYS_MINUTES.at(-1)!;
-  return new Date(now.getTime() + delay * 60_000).toISOString();
-}
-
-function retryAtForError(
-  error: unknown,
-  runAttempt: number,
-  now: Date,
-  retryable: boolean,
-): string | null {
-  if (!retryable || runAttempt >= MAX_RETRY_CYCLE_ATTEMPTS) return null;
-  const status = Number((error as { status?: unknown } | null)?.status ?? 0);
-  const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter;
-  if (status === 429 && typeof retryAfter === 'string' && retryAfter.trim()) {
-    const seconds = Number(retryAfter);
-    if (Number.isFinite(seconds) && seconds >= 0) {
-      return new Date(now.getTime() + seconds * 1_000).toISOString();
-    }
-    const retryDate = Date.parse(retryAfter);
-    if (Number.isFinite(retryDate) && retryDate >= now.getTime()) {
-      return new Date(retryDate).toISOString();
-    }
-  }
-  return retryAtFor(runAttempt, now, retryable);
 }
 
 export async function processReminderDeliveries(
@@ -273,12 +228,12 @@ export async function processReminderDeliveries(
         result.succeeded++;
       } catch (error) {
         const safe = classifyReminderDeliveryError(error);
-        const retryAt = retryAtForError(
+        const retryAt = externalDeliveryRetryAt(
           error,
           run.retry_cycle_attempt_count,
           now,
           safe.retryable,
-        );
+        )?.toISOString() ?? null;
         const exhausted = safe.retryable && !retryAt;
         await failReminderDeliveryRun(db, {
           id: run.id,
