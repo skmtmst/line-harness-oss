@@ -14,7 +14,7 @@ export async function pushViaHarnessProxy(
   messages: Message[],
   retryKey?: string,
   dispatch?: HarnessProxyDispatch,
-): Promise<void> {
+): Promise<{ requestId: string | null }> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
@@ -34,10 +34,20 @@ export async function pushViaHarnessProxy(
   // 同じ retry key がすでに LINE に受理済みなら、再送の 409 も成功扱い。
   const alreadyAccepted =
     response.status === 409 && Boolean(response.headers.get('x-line-accepted-request-id'));
-  if (response.ok || alreadyAccepted) return;
+  if (response.ok || alreadyAccepted) {
+    return {
+      requestId: response.headers.get('x-line-request-id')
+        ?? response.headers.get('x-line-accepted-request-id'),
+    };
+  }
 
   const body = await response.text().catch(() => '');
-  throw new Error(
+  const error = new Error(
     `LINE Harness proxy error: ${response.status} ${response.statusText} — ${body.slice(0, 500)}`,
   );
+  Object.assign(error, {
+    status: response.status,
+    retryAfter: response.headers.get('retry-after'),
+  });
+  throw error;
 }
