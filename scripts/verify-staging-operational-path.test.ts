@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { readVerificationTarget } from './verify-staging-operational-path.js';
 
 const workflow = readFileSync(
-  new URL('../.github/workflows/verify-staging-operational-path.yml', import.meta.url),
+  new URL('../.github/workflows/migrate-d1.yml', import.meta.url),
   'utf8',
 );
 const script = readFileSync(
@@ -27,11 +27,12 @@ describe('staging operational verification safety', () => {
       .toThrow('must not have cron triggers');
   });
 
-  test('workflow has no production input and uses only the staging environment', () => {
-    expect(workflow).toContain("if: github.ref == 'refs/heads/codex/development'");
+  test('operational check is limited to staging on codex/development', () => {
+    expect(workflow).toContain("inputs.operation == 'verify-operational-path'");
+    expect(workflow).toContain("inputs.environment == 'staging'");
+    expect(workflow).toContain("github.ref == 'refs/heads/codex/development'");
     expect(workflow).toContain('name: staging');
     expect(workflow).toContain('VERIFY_ENVIRONMENT: staging');
-    expect(workflow).not.toContain('production');
     expect(workflow).not.toMatch(/\bset\s+-x\b/);
   });
 
