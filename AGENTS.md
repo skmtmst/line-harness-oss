@@ -119,3 +119,9 @@
 - `docs/design-reference/` と `docs/design-qa/` の `-v2` `-v3` `-v4` `-v5` が付くフォルダは旧設計の画像です。設計一致の比較には `-v6` だけを使ってください。
 - `docs/pendev-v4-implementation-runbook.md` は V3/V4 の積み残しにだけ使い、新しい画面の根拠にしないでください。
 - `docs/v6-requirements/v6-32-feature-requirements-progress.md` の実装・画像確認の状況は廃止済みです。実装の進捗は `docs/design-qa/v6-progress-ledger.md` を見てください。
+
+## 起動時の必読(全エージェント共通)
+
+- 新しいセッションを始めたら、回答の前にこの順で読んでください: `AGENTS.md` → `docs/brain/Memory.md`(この仕事の事実と判断基準) → `docs/brain/rules/corrections.md`(受けた修正指示。恒久的に守る) → `docs/brain/rules/mistakes.md`(やらかしと再発防止) → 自分の担当の指示書(`docs/v6-directives.md`、`docs/v6-parallel-plan.md`)。
+- 利用者に訂正・要望を言われたら、その場で `docs/brain/rules/corrections.md` に 3 行(日付 / 指摘 / 今後)で追記してください。同じ失敗を 2 回指摘されたら `docs/brain/rules/mistakes.md` に追記してください。
+- `docs/brain/Memory.md` の「進行中」が実態とずれていたら、気づいた人が直してください。

@@ -1,0 +1,53 @@
+name: 作業チケット(V6 台帳)
+description: 司令塔が作る作業単位。NodeTerm の Kanban と GitHub Issues の同期で使う。
+title: "[lane] 対象: 何をするか"
+labels: ["todo"]
+body:
+  - type: dropdown
+    id: lane
+    attributes:
+      label: 担当
+      description: lane ラベルと同じにする
+      options:
+        - hq(司令塔)
+        - s0(共通部品)
+        - s1(機能 1〜5)
+        - s2(機能 6〜13)
+        - s3(機能 14〜32)
+        - codex(API・性能・段取り)
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: 対象
+      description: 機能番号と画面 Node ID、または API 名
+      placeholder: "機能 2 受信箱 xGLVe / GET /api/notifications/rules"
+    validations:
+      required: true
+  - type: textarea
+    id: paths
+    attributes:
+      label: 所有パス
+      description: 触るパス。docs/v6-parallel-plan.md §2 の表の範囲外なら理由を書き、司令塔の承認を待つ
+      placeholder: "apps/web/src/app/chats、apps/web/src/components/chats、docs/design-qa/inbox-v6"
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了条件
+      description: 要件書の完了条件から写す。検証できる文だけ(「動く」「分かる」は不可)
+    validations:
+      required: true
+  - type: input
+    id: deps
+    attributes:
+      label: 依存
+      description: 先に終わっていないといけない Issue 番号
+      placeholder: "#123"
+  - type: input
+    id: pr
+    attributes:
+      label: PR
+      description: 採番後に書く(先取りしない)
