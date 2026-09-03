@@ -13,6 +13,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "pretypecheck": "pnpm --filter @line-harness/sdk build",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
