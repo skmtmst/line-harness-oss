@@ -98,7 +98,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'resolved', label: '対応済み' },
 ]
 
-import type { InboxSavedViewConditions } from './saved-view-types'
+import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
 import { savedViewSummary } from './saved-view-summary'
 
 type InboxSavedView = {
@@ -718,7 +718,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   const applySavedView = (view: InboxSavedView) => {
-    const conditions = view.conditions
+    /*
+      **形を確かめてから読む。** 受信箱より前に作られた行は
+      `{ all: [], any: [] }` の形で入っていて、`conditions.statuses.length` を
+      そのまま読むと受信箱ごと真っ白になる。
+    */
+    const conditions = normalizeSavedViewConditions(view.conditions)
     setNameQuery(conditions.query ?? '')
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
@@ -1273,7 +1278,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
                       <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal">
-                        {savedViewSummary(view.conditions, operatorNames)}
+                        {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>
                     <button
