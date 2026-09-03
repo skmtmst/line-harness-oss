@@ -43,6 +43,15 @@ const accountAccess = {
 const savedSearchInsights = {
   getSavedSearchMatchInsights: vi.fn(),
 };
+const supportMarkAutomation = {
+  SUPPORT_MARK_RULE_EVENTS: [
+    'message_received', 'manual_reply_sent', 'staff_assigned', 'response_overdue', 'condition_matched',
+  ],
+  listSupportMarkAutomationRules: vi.fn(),
+  createSupportMarkAutomationRule: vi.fn(),
+  updateSupportMarkAutomationRule: vi.fn(),
+  archiveSupportMarkAutomationRule: vi.fn(),
+};
 const segmentQuery = {
   buildSegmentWhere: vi.fn(),
 };
@@ -58,6 +67,7 @@ const folders = {
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
 vi.mock('../services/saved-search-insights.js', () => savedSearchInsights);
+vi.mock('../services/support-mark-automation.js', () => supportMarkAutomation);
 vi.mock('../services/segment-query.js', () => segmentQuery);
 
 const { friendAttributes } = await import('./friend-attributes.js');
@@ -138,6 +148,16 @@ beforeEach(() => {
   marks.replaceAndArchiveSupportMark.mockResolvedValue(0);
   marks.setFriendSupportMark.mockResolvedValue(true);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
+  supportMarkAutomation.listSupportMarkAutomationRules.mockResolvedValue([]);
+  supportMarkAutomation.createSupportMarkAutomationRule.mockResolvedValue({
+    id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
+    condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
+    version: 1, updatedAt: '2026-09-04T09:00:00+09:00',
+  });
+  supportMarkAutomation.updateSupportMarkAutomationRule.mockResolvedValue({
+    id: 'rule-1', version: 2,
+  });
+  supportMarkAutomation.archiveSupportMarkAutomationRule.mockResolvedValue('archived');
   searches.getSavedSearches.mockResolvedValue([SEARCH]);
   searches.getSavedSearchById.mockResolvedValue(SEARCH);
   searches.createSavedSearch.mockResolvedValue(SEARCH);
@@ -393,6 +413,119 @@ describe('対応マーク', () => {
       markId: 'm-1',
     });
     expect(res.status).toBe(422);
+  });
+
+  it('自動変更ルールは選択中のアカウントとマークだけを一覧する', async () => {
+    const res = await req('/api/support-marks/m-1/automation-rules?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(supportMarkAutomation.listSupportMarkAutomationRules).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'm-1',
+    );
+  });
+
+  it('自動変更ルールを選択中のマークへ作成する', async () => {
+    const input = {
+      name: '担当者が決まったら対応中へ', event: 'staff_assigned', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true,
+    };
+    const res = await req(
+      '/api/support-marks/m-1/automation-rules?lineAccountId=account-1',
+      'POST',
+      input,
+    );
+    expect(res.status).toBe(201);
+    expect(supportMarkAutomation.createSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'm-1',
+      'u-1',
+      input,
+    );
+  });
+
+  it('版競合を成功扱いにせず409で読み直しを促す', async () => {
+    supportMarkAutomation.updateSupportMarkAutomationRule.mockResolvedValue('conflict');
+    const res = await req('/api/support-mark-rules/rule-1?lineAccountId=account-1', 'PATCH', {
+      name: '担当者が決まったら対応中へ', event: 'staff_assigned', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true, expectedVersion: 1,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT' });
+  });
+
+  it('読み込んだ版を指定して自動変更ルールを更新する', async () => {
+    const input = {
+      name: '担当者が決まったら対応中へ', event: 'staff_assigned', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true,
+    };
+
+    const res = await req('/api/support-mark-rules/rule-1?lineAccountId=account-1', 'PATCH', {
+      ...input,
+      expectedVersion: 1,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { id: 'rule-1', version: 2 } });
+    expect(supportMarkAutomation.updateSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'rule-1',
+      'u-1',
+      1,
+      input,
+    );
+  });
+
+  it('スタッフは自動変更ルールを作れない', async () => {
+    const res = await req('/api/support-marks/m-1/automation-rules?lineAccountId=account-1', 'POST', {
+      name: '受信で未対応へ', event: 'message_received', condition: null,
+      priority: 10, manualProtectionMinutes: 0, isActive: true,
+    }, 'staff');
+    expect(res.status).toBe(403);
+    expect(supportMarkAutomation.createSupportMarkAutomationRule).not.toHaveBeenCalled();
+  });
+
+  it('保管は読み込んだ版を必須にし、競合を409で返す', async () => {
+    const missingVersion = await req(
+      '/api/support-mark-rules/rule-1?lineAccountId=account-1',
+      'DELETE',
+    );
+    expect(missingVersion.status).toBe(400);
+    expect(supportMarkAutomation.archiveSupportMarkAutomationRule).not.toHaveBeenCalled();
+
+    supportMarkAutomation.archiveSupportMarkAutomationRule.mockResolvedValueOnce('conflict');
+    const conflict = await req(
+      '/api/support-mark-rules/rule-1?lineAccountId=account-1',
+      'DELETE',
+      { expectedVersion: 2 },
+    );
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT' });
+    expect(supportMarkAutomation.archiveSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'rule-1',
+      2,
+    );
+  });
+
+  it('読み込んだ版を指定して自動変更ルールを停止する', async () => {
+    const res = await req(
+      '/api/support-mark-rules/rule-1?lineAccountId=account-1',
+      'DELETE',
+      { expectedVersion: 2 },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: null });
+    expect(supportMarkAutomation.archiveSupportMarkAutomationRule).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'rule-1',
+      2,
+    );
   });
 });
 
