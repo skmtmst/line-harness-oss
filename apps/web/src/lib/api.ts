@@ -27,6 +27,8 @@ import type {
   MediaItem,
   MediaUsage,
   MediaDeleteImpact,
+  MediaReplacementImpact,
+  MediaReplacementResult,
   CommonVar,
   CommonVarDeleteImpact,
   CommonVarSchedule,
@@ -2412,6 +2414,19 @@ export const api = {
       fetchApi<ApiResponse<MediaDeleteImpact>>(
         `/api/media/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`,
       ),
+    /** 差し替え前に、共有・参照不明を含む現在の使用先を読み直す。 */
+    replacementImpact: (id: string, replacementId: string, accountId: string) =>
+      fetchApi<ApiResponse<MediaReplacementImpact>>(
+        `/api/media/${id}/replacement-impact?accountId=${encodeURIComponent(accountId)}&replacementId=${encodeURIComponent(replacementId)}`,
+      ),
+    replaceUsages: (
+      id: string,
+      accountId: string,
+      input: { replacementMediaId: string; expectedRevision: string },
+    ) => fetchApi<ApiResponse<MediaReplacementResult>>(
+      `/api/media/${id}/replace-usages?accountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
     /** 使用中は 409 で止まり、使用先から外すまで消せない。 */
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
@@ -2748,10 +2763,16 @@ export const api = {
         title?: string
         messageType?: ApiBroadcast['messageType']
         messageContent?: string
+        messageBubbles?: BroadcastBubble[]
         targetType?: ApiBroadcast['targetType']
         targetTagId?: string | null
+        segmentConditions?: SegmentCondition | null
         scheduledAt?: string | null
         trackLinks?: boolean
+        folderId?: string | null
+        measureOpens?: boolean
+        stealthSpreadMinutes?: number
+        lineAccountId?: string | null
       }
     ) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`, {

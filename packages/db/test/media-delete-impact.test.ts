@@ -3,10 +3,14 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getMediaDeleteImpact } from '../src/media.js';
+import {
+  applyMediaReplacementPlan,
+  getMediaDeleteImpact,
+  getMediaReplacementPlan,
+} from '../src/media.js';
 
 function asD1(sqlite: Database.Database): D1Database {
-  return {
+  const d1 = {
     prepare(query: string) {
       const prepared = () => sqlite.prepare(query);
       return {
@@ -26,7 +30,13 @@ function asD1(sqlite: Database.Database): D1Database {
         },
       };
     },
+    async batch(statements: D1PreparedStatement[]) {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
   } as unknown as D1Database;
+  return d1;
 }
 
 function insertAccount(sqlite: Database.Database, id: string) {
@@ -58,7 +68,11 @@ describe('getMediaDeleteImpact', () => {
       `INSERT INTO media
          (id, line_account_id, kind, filename, mime_type, size_bytes, r2_key, created_at)
        VALUES ('media-1', 'account-1', 'image', '案内.png', 'image/png', 100,
-               'media/guide.png', '2026-08-31T09:00:00.000')`,
+               'media/guide.png', '2026-08-31T09:00:00.000'),
+              ('media-2', 'account-1', 'image', '新案内.png', 'image/png', 100,
+               'media/new-guide.png', '2026-08-31T09:01:00.000'),
+              ('media-video', 'account-1', 'video', '動画.mp4', 'video/mp4', 100,
+               'media/movie.mp4', '2026-08-31T09:02:00.000')`,
     ).run();
     db = asD1(sqlite);
   });
@@ -181,5 +195,62 @@ describe('getMediaDeleteImpact', () => {
     await expect(
       getMediaDeleteImpact(db, 'media-1', 'account-2', '2026-08-31T10:00:00.000'),
     ).resolves.toBeNull();
+  });
+
+  test('同じアカウント・同じ種類の使用先だけを差し替えられる', async () => {
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-1', '案内', 'image', '{"url":"media/guide.png"}', 'account-1')`,
+    ).run();
+    insertUsage(sqlite, 'template', 'template-1');
+    const plan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(plan?.impact).toMatchObject({
+      usageCount: 1,
+      replaceableCount: 1,
+      blockers: [],
+      canReplace: true,
+    });
+    const changes = await applyMediaReplacementPlan(db, plan!, 'account-1');
+    expect(changes).toBe(1);
+    expect(sqlite.prepare(`SELECT message_content FROM templates WHERE id = 'template-1'`).get())
+      .toEqual({ message_content: '{"url":"media/new-guide.png"}' });
+    expect(sqlite.prepare(`SELECT media_id FROM media_usages`).all())
+      .toEqual([{ media_id: 'media-2' }]);
+  });
+
+  test('別種類・複数アカウント共有・ウェビナー動画は一括差し替えを止める', async () => {
+    sqlite.prepare(
+      `INSERT INTO broadcasts
+         (id, title, message_type, message_content, line_account_id, account_ids)
+       VALUES ('broadcast-1', '共有配信', 'image', 'media/guide.png', 'account-1',
+               '["account-1","account-2"]')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO webinars (id, account_id, title, slug, video_prefix, created_at, updated_at)
+       VALUES ('webinar-1', 'account-1', '講座', 'guide', 'media/guide.png',
+               '2026-08-31T09:00:00.000', '2026-08-31T09:00:00.000')`,
+    ).run();
+    insertUsage(sqlite, 'broadcast', 'broadcast-1');
+    insertUsage(sqlite, 'webinar', 'webinar-1');
+
+    const sharedPlan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-2', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(sharedPlan?.impact).toMatchObject({
+      canReplace: false,
+      blockers: expect.arrayContaining(['shared_reference', 'unsupported_reference']),
+    });
+    await expect(applyMediaReplacementPlan(db, sharedPlan!, 'account-1'))
+      .rejects.toThrow('media_replacement_blocked');
+
+    const kindPlan = await getMediaReplacementPlan(db, {
+      sourceId: 'media-1', replacementId: 'media-video', lineAccountId: 'account-1',
+      checkedAt: '2026-08-31T10:00:00.000',
+    });
+    expect(kindPlan?.impact.blockers).toContain('different_kind');
   });
 });

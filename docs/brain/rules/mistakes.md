@@ -27,6 +27,21 @@
 - 再発防止: Pencil で節を組み替えたら **必ず `get_screenshot` で見る**(`bounds` の数字だけで判断しない)。絵に出ていなければ、その親を `Replace(parentId, Get(parentId))` で丸ごと作り直す。これで位置が正しくなる(子の id は振り直される)
 
 ## 2026-09-03
+- やらかし: 「準備中を全廃」の完了条件を字面で受け、`grep 準備中` を 0 件にする契約テストを書きかけた。実際は `準備中` がイベントの「まだ公開していない」状態の呼び名として設計そのものにあり(design-structure.json の /events)、0 件にすると実装が設計から離れるところだった
+- 原因: 禁じたい語の意味(言い訳か、設計の状態名か)を分けずに数えた
+- 再発防止: 語を禁じる契約テストを書く前に、その語が `design-structure.json` と設計画像に出ていないか数える。出ていたら、禁じるのは言い回し(「〜です」「〜）」)にして、設計の語は場所と数を固定して残す
+
+## 2026-09-03
+- やらかし: 担当ごとの worktree(lh-work/lh-*)を作っただけで依存を入れず、Slack フック(pnpm exec tsx)・テスト・型検査が全ノードで落ちていた
+- 原因: worktree は node_modules を共有しない
+- 再発防止: worktree を作ったら必ず `pnpm install --frozen-lockfile` を回してから起動する(docs/v6-orchestration-nodeterm.md §6 に追記)
+
+## 2026-09-03
+- やらかし: Codex を自動承認(workspace-write)にしたら、worktree の git 管理領域(本体の .git/worktrees/ 配下)に書けず fetch/merge が失敗した
+- 原因: 砂場の書き込み範囲が作業ツリーだけで、git の管理領域は本体リポジトリ側にある
+- 再発防止: `~/.codex/config.toml` の `[sandbox_workspace_write] writable_roots` に本体の `.git` と `lh-work` を入れる。設定変更後は Codex を再起動する(起動時にしか読まない)
+
+## 2026-09-03
 - やらかし: NodeTerm を司令塔(Claude Code)のシェルから `open -a` で再起動したため、Claude Code の環境変数(CLAUDECODE、ANTHROPIC_BASE_URL、CLAUDE_CODE_CHILD_SESSION など)が NodeTerm と全ノードに引き継がれ、Claude のノードが子セッション扱い・API 課金表示・未ログインになった
 - 原因: `open` は呼び出し元の環境を起動するアプリに渡す。エージェントのシェルは Claude Code の環境を持っている
 - 再発防止: GUI アプリをエージェントから起動するときは `env -i HOME=… USER=… PATH=… open -a <app>` で素の環境にする。起動後に `ps eww` で CLAUDE / ANTHROPIC 変数が 0 件であることを確認する

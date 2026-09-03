@@ -389,7 +389,6 @@ export default function ScenariosPage() {
         searchPlaceholder="シナリオ名で検索"
         searchValue={nameQuery}
         onSearchChange={setNameQuery}
-        sortLabel="購読中が多い順"
       />
 
       {/*

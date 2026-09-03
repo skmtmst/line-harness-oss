@@ -32,6 +32,9 @@ import {
   COMMON_VAR_DELETE_IMPACT_EMPTY,
   MEDIA_DELETE_IMPACT,
   MEDIA_DELETE_IMPACT_EMPTY,
+  MEDIA_REPLACEMENT_IMPACT,
+  MEDIA_REPLACEMENT_IMPACT_BLOCKED,
+  MEDIA_REPLACEMENT_IMPACT_EMPTY,
   MEDIA_ITEMS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
@@ -857,6 +860,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const impact = mediaDeleteImpact[1] === MEDIA_DELETE_IMPACT_EMPTY.media.id
       ? MEDIA_DELETE_IMPACT_EMPTY
       : MEDIA_DELETE_IMPACT
+    return { success: true, data: impact }
+  }
+  const mediaReplacementImpact = /^\/api\/media\/([^/]+)\/replacement-impact$/.exec(pathname)
+  if (mediaReplacementImpact) {
+    if (query.get('replacementId') === 'media-delete-target') {
+      return { success: true, data: MEDIA_REPLACEMENT_IMPACT_BLOCKED }
+    }
+    const impact = mediaReplacementImpact[1] === MEDIA_REPLACEMENT_IMPACT_EMPTY.source.id
+      ? MEDIA_REPLACEMENT_IMPACT_EMPTY
+      : MEDIA_REPLACEMENT_IMPACT
     return { success: true, data: impact }
   }
   const richMenuDeleteImpact = /^\/api\/rich-menu-groups\/([^/]+)\/delete-impact$/.exec(pathname)

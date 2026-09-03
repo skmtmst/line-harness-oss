@@ -36,8 +36,11 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "15.5.14",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.0",
