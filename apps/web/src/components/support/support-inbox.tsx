@@ -243,11 +243,11 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
             </div>
           ) : selected.channel === 'line' ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent text-2xl font-bold text-white">LINE</div>
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent-deep text-2xl font-bold text-white">LINE</div>
               <h2 className="text-lg font-bold text-gray-900">{selected.customerName}</h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-gray-500">LINEの会話履歴と送信機能は、既存の個別チャット画面でそのまま使えます。</p>
               <p className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">{selected.preview}</p>
-              <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-600">LINEで返信する →</Link>
+              <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-xl bg-accent-deep px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-600">LINEで返信する →</Link>
             </div>
           ) : detail ? (
             <>
@@ -278,7 +278,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" rows={4} className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-emerald-500 focus:bg-white" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] text-gray-400">From: contact-shed@nen-petfood.com</p>
-                  <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
+                  <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent-deep px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
                 </div>
               </div>
             </>

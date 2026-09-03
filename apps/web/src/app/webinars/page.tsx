@@ -130,7 +130,7 @@ export default function WebinarsPage() {
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/webinars/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
               >
                 ウェビナーを作成
               </Link>
