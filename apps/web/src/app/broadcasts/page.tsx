@@ -3,13 +3,14 @@
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
-import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
+import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -66,6 +67,12 @@ function BroadcastList() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+   * **権限不足を「読み込み失敗」に混ぜない。** 直し方がまったく違う——
+   * 失敗は読み直せば直るが、権限不足は誰かに権限を足してもらうしかない。
+   * 同じ枠で「もう一度試す」を出すと、何度押しても直らない道へ誘う。
+   */
+  const [forbidden, setForbidden] = useState(false)
   /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
   const [scheduledOnly, setScheduledOnly] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
@@ -130,6 +137,7 @@ function BroadcastList() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    setForbidden(false)
     try {
       const [broadcastsRes, tagsRes] = await Promise.all([
         api.broadcasts.list({ accountId: selectedAccountId || undefined }),
@@ -138,8 +146,10 @@ function BroadcastList() {
       if (broadcastsRes.success) setBroadcasts(broadcastsRes.data)
       else setError(broadcastsRes.error)
       if (tagsRes.success) setTags(tagsRes.data)
-    } catch {
-      setError('データの読み込みに失敗しました。もう一度お試しください。')
+    } catch (err) {
+      /* 403 は読み直しても直らない。失敗と別の1枚にする。 */
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else setError('データの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       setLoading(false)
     }
@@ -374,8 +384,8 @@ function BroadcastList() {
             ))}
           </div>
 
-      {/* Error */}
-      {error && (
+      {/* 読み込み失敗の帯。**権限不足のときは出さない**（下で別の1枚を出す）。 */}
+      {error && !forbidden && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
@@ -432,21 +442,30 @@ function BroadcastList() {
             </div>
           ))}
         </div>
+      ) : forbidden ? (
+        /*
+          権限不足。**「ありません」とも「失敗しました」とも別の1枚**にする。
+          読み直しても直らないので、誰に頼めばよいかを言う。
+        */
+        <ListState kind="forbidden" title="配信を見る権限がありません" />
       ) : broadcasts.length === 0 && !showCreate ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          {/* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */}
-          <p className="text-ink-faint">
-            {error
-              ? 'いまは読み込めていません。上の案内をご覧ください。'
-              : '配信がありません。「新規配信」から作成してください。'}
-          </p>
-        </div>
+        /* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */
+        error ? (
+          <ListState
+            kind="error"
+            title="表示できませんでした"
+            description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+          />
+        ) : (
+          /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
+          <ListState kind="empty" title="まだ配信がありません" description="最初の1つを作ると、ここに並びます。" />
+        )
       ) : visibleBroadcasts.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">
-            {activeTab === 'dedup' ? '複数アカウントの重複除外配信はまだありません。' : 'このタブに該当する配信はありません。'}
-          </p>
-        </div>
+        <ListState
+          kind="empty"
+          title={activeTab === 'dedup' ? '複数アカウントの重複除外配信はまだありません' : 'このタブに該当する配信はありません'}
+          description="絞り込みを変えるか、新しく作成してください。"
+        />
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
