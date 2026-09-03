@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow } from './utils.js';
 
 export interface AdPlatform {
   id: string;
@@ -169,11 +169,12 @@ export async function getAdConversionLogs(
   platformId: string,
   limit = 50,
 ): Promise<AdConversionLog[]> {
+  const safeLimit = boundedListLimit(limit, 50);
   const result = await db
     .prepare(
       `SELECT * FROM ad_conversion_logs WHERE ad_platform_id = ? ORDER BY created_at DESC LIMIT ?`,
     )
-    .bind(platformId, limit)
+    .bind(platformId, safeLimit)
     .all<AdConversionLog>();
   return result.results;
 }
