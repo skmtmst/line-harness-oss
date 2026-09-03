@@ -975,7 +975,7 @@ export default function MediaLibraryPage() {
               }
               className="accent-green-500"
             />
-            全てのメディアを選択
+            すべてのメディアを選択
           </label>
           <button
             onClick={() => void removeSelected()}

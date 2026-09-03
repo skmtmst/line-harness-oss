@@ -305,7 +305,7 @@ export default function EmailThread({
               <option value="unread">未対応</option>
               <option value="in_progress">対応中</option>
               <option value="on_hold">保留</option>
-              <option value="resolved">対応済</option>
+              <option value="resolved">対応済み</option>
             </select>
           </label>
           <label className="flex items-center gap-1.5 text-xs">

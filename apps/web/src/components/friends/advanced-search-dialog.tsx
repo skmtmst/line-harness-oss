@@ -148,7 +148,7 @@ export default function AdvancedSearchDialog({
     }
     if (params.chatStatus) {
       out.push(
-        `対応マーク ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済' }[params.chatStatus]}`,
+        `対応マーク ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[params.chatStatus]}`,
       )
     }
     if (params.visibility === 'blocked') out.push('ブロックした人')
@@ -377,7 +377,7 @@ export default function AdvancedSearchDialog({
                 >
                   <option value="unread">未対応</option>
                   <option value="in_progress">対応中</option>
-                  <option value="resolved">対応済</option>
+                  <option value="resolved">対応済み</option>
                 </select>
               )}
             </section>

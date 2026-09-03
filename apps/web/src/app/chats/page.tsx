@@ -86,15 +86,15 @@ const statusConfig: Record<Chat['status'], { label: string; className: string }>
   unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
   on_hold: { label: '保留', className: 'bg-info-bg text-info' },
-  resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+  resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
 }
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: '全て' },
+  { key: 'all', label: 'すべて' },
   { key: 'unread', label: '未対応' },
   { key: 'in_progress', label: '対応中' },
   { key: 'on_hold', label: '保留' },
-  { key: 'resolved', label: '対応済' },
+  { key: 'resolved', label: '対応済み' },
 ]
 
 type InboxSavedViewConditions = {
@@ -1070,7 +1070,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       await api.chats.update(selectedChatId, { status: newStatus, revision: chatDetail.revision })
       loadChatDetail(selectedChatId)
       loadChats()
-      // 対応済/未読の切替は未対応バッジに影響するので即時更新させる
+      // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch {
       setError('ステータスの更新に失敗しました。')
@@ -1309,7 +1309,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           data-inbox-v4="conversation-list"
           className={`w-full border-[#E5E7EB] bg-canvas lg:w-[330px] 2xl:w-[420px] lg:flex-shrink-0 border-r flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
-          {/* タブ (全て / 未読 / 対応中 / 対応済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
+          {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className="border-[#E5E7EB] border-b p-3">
@@ -1788,7 +1788,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/*
-                    「未読に戻す」「対応中にする」「対応済にする」は
+                    「未読に戻す」「対応中にする」「対応済みにする」は
                     上の「対応 ▾」と同じことをしていたので外した。
                     同じ操作の入口が2つあると、どちらが正なのか分からない。
                   */}

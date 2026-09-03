@@ -291,7 +291,7 @@ function BookingsInner() {
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
                     <th className="text-left px-4 py-2 font-medium">友だち</th>
-                    <th className="text-left px-4 py-2 font-medium">経由アカ</th>
+                    <th className="text-left px-4 py-2 font-medium">経由アカウント</th>
                     <th className="text-left px-4 py-2 font-medium">予約枠</th>
                     <th className="text-left px-4 py-2 font-medium">状態</th>
                     <th className="text-left px-4 py-2 font-medium">受付日時</th>

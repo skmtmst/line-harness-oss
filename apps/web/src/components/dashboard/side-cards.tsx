@@ -47,15 +47,15 @@ function Figure({ label, value, unit }: { label: string; value: number | null; u
 
 export function InboxStatusCard({ inbox }: { inbox: DashboardOverview['inbox'] }) {
   /*
-    設計は「未対応 / 対応中 / 対応済」の3本。
-    以前は対応中と対応済を足して「対応済」1本にしていたので、
+    設計は「未対応 / 対応中 / 対応済み」の3本。
+    以前は対応中と対応済みを足して「対応済み」1本にしていたので、
     **手をつけたが終わっていないもの（対応中）が画面から消えていた。**
     未対応が減っても、それが片付いたのか手をつけただけなのかが読めない。
   */
   const rows = [
     { label: '未対応', value: inbox.unanswered, bar: 'bg-warning' },
     { label: '対応中', value: inbox.inProgress, bar: 'bg-info' },
-    { label: '対応済', value: inbox.resolved, bar: 'bg-success' },
+    { label: '対応済み', value: inbox.resolved, bar: 'bg-success' },
   ]
   const total = rows.reduce((sum, r) => sum + r.value, 0)
 

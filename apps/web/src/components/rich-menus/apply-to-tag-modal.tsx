@@ -154,7 +154,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                   checked={mode.kind === 'set-default'}
                   onChange={() => setMode({ kind: 'set-default' })}
                   label="全員のデフォルトに設定する"
-                  description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同アカ内の他メニューのデフォルト設定は解除されます。"
+                  description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
                   warn
                 />
               </div>

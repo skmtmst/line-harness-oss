@@ -147,7 +147,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
       <select value={status} onChange={(e) => setStatus(e.target.value as Chat['status'])} className={SELECT}>
         <option value="unread">未対応</option>
         <option value="in_progress">対応中</option>
-        <option value="resolved">対応済</option>
+        <option value="resolved">対応済み</option>
       </select>
       {/* 友だちIDでも引ける（resolveOrCreateChat）。トークが無い人にも当てられる。 */}
       <Go busy={busy} onClick={() => void run(() => api.chats.update(friendId, { status }), '対応マークを変えました')} />

@@ -156,7 +156,7 @@ function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_
     unread: { label: '未対応', className: 'bg-warning-bg text-warning' },
     in_progress: { label: '対応中', className: 'bg-info-bg text-info' },
     on_hold: { label: '保留', className: 'bg-action-soft text-action' },
-    resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+    resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
   } as const
   const s = map[status]
   return (

@@ -28,7 +28,7 @@ const STATUS_OPTIONS: { value: InboxFilterValue['status']; label: string }[] = [
   { value: 'unread', label: '未対応' },
   { value: 'in_progress', label: '対応中' },
   { value: 'on_hold', label: '保留' },
-  { value: 'resolved', label: '対応済' },
+  { value: 'resolved', label: '対応済み' },
 ]
 
 const CHANNEL_OPTIONS: { value: InboxFilterValue['channel']; label: string }[] = [

@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react'
  * - 担当者 … 選択肢の上に**名前で絞る入力欄**がある。担当が増えるほど
  *   縦に伸びるので、探す手段が要る
  * - 対応マーク … 1件ずつに**色の丸と色付きの札**が付く。未対応が赤、
- *   対応中が黄、対応済が緑。文字だけだと、一覧の札と目で結びつかない
+ *   対応中が黄、対応済みが緑。文字だけだと、一覧の札と目で結びつかない
  *
  * 素の `<select>` にしていたころは、開いた中身がブラウザ任せで
  * **画像に写らなかった**。設計の 2-8 / 2-9 / 2-10 は「開いた状態」なので、
@@ -165,7 +165,7 @@ const STATUS_STYLE: Record<ChatStatus, { label: string; dot: string; pill: strin
   unread: { label: '未対応', dot: 'bg-danger', pill: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', dot: 'bg-warning', pill: 'bg-warning-bg text-warning' },
   on_hold: { label: '保留', dot: 'bg-info', pill: 'bg-info-bg text-info' },
-  resolved: { label: '対応済', dot: 'bg-accent', pill: 'bg-accent-soft text-accent' },
+  resolved: { label: '対応済み', dot: 'bg-accent', pill: 'bg-accent-soft text-accent' },
 }
 
 const STATUS_ORDER: ChatStatus[] = ['unread', 'in_progress', 'on_hold', 'resolved']
