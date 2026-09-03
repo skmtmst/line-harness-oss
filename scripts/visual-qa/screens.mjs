@@ -772,17 +772,13 @@ export const SCREENS = [
       固定データの `broadcast-0` が予約済みなので、そこを見る。
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/broadcasts/reserved` の page.tsx が `codex/development` に無い。撮らない・合格にもしない。',
+    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（設計と比べられない）。**`/broadcasts/reserved` は 2026-09-03 夜のマージで入ったので、未実装ではなくなった**（前の注記を取り消す）。撮れたが、出ているのは面ではなく**アカウント違いの止め画面**——「選択中のアカウントの配信ではありません」。モックの `broadcast-0` が `lineAccountId` を持たず、撮影ハーネスが選ぶ `visual-qa-account` と一致しないため（`reserved/page.tsx:47` の `broadcast.lineAccountId === selectedAccountId`）。**撮影ハーネス側の不足。** `-cancel`（予約を取り消す）も同じ理由で押せない。**設計側に `bPF0s.txt` が無く**、文字の突き合わせはそもそもできない（画像のみ）。',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
       suffix: '-cancel', mode: 'viewport',
       steps: [{ click: '予約を取り消す', after: 900 }],
     }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/broadcasts/reserved` が development に無い。判定は未マージ枝 `51827fe1` で書かれたもの',
-    why: '`/broadcasts/reserved` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細',

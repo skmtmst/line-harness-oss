@@ -12,18 +12,18 @@
 | 一致 | 0 |
 | 構造一致・データ未接続 | 3 |
 | 要修正 | 46 |
-| 未実装 | 16 |
-| 未判定（撮れていない） | 21 |
+| 未実装 | 15 |
+| 未判定（撮れていない・比べられない） | 22 |
 | **合計** | **86** |
 
 **「一致」は 0 件。** 一致は文言一致 ＋ 寸法一致 ＋ 全状態撮影済みのときだけ付ける。
 
-## 2. 撮れなかった 21 画面の理由
+## 2. 撮れなかった 22 画面の理由
 
 撮れなかったものは判定を空欄のまま残した。見ていない絵を「合っていた」と数えないため。
-理由は 3 つに分かれ、**そのうち 15 画面は実装ではなく撮影ハーネス側の不足**だった。
+理由は 3 つに分かれ、**そのうち 16 画面は実装ではなく撮影ハーネス側の不足**だった。
 
-### 2-1. 撮影ハーネスの固定データ不足（15 画面）— `scripts/visual-qa/` は S0 の所有
+### 2-1. 撮影ハーネスの固定データ不足（16 画面）— `scripts/visual-qa/` は S0 の所有
 
 モックに口が無く、`EMPTY_PAGE`（`{items:[],total:0,page:1,limit:20}`）へ落ちている。
 **器の形が本番と違う**ので、画面が配列を期待している所で落ちる。
@@ -37,6 +37,12 @@
 | `/api/forms` | 配列 | `[]` | `v9tYhl`（行が無くフォームを開けない） |
 | `/api/folders?type=template` | 配列 | `[]` | `CzndJ` `W7LBc` のフォルダ状態 |
 | `/api/segment-presets` | 配列 | 空の器 | `sqFXf-save`（保存済み条件が無く「この条件を使う」に届かない） |
+| `/api/broadcasts` の行 | `lineAccountId` を持つ | 持たない | `bPF0s`（アカウント違いの止め画面が出る。`reserved/page.tsx:47`） |
+
+**`bPF0s` 6-1-I 一斉配信・予約完了は、2026-09-03 夜のマージで `/broadcasts/reserved` が入り、未実装ではなくなった。**
+撮れるようになったが、出るのは面ではなく「選択中のアカウントの配信ではありません」の止め画面。
+モックの `broadcast-0` に `lineAccountId: 'visual-qa-account'` を持たせれば通る。
+**設計側に `bPF0s.txt` が無い**（`.png` だけ）ので、文字の突き合わせはそのあとでも別途 Pencil からの書き出しが要る。
 
 ### 2-2. 撮影ハーネスが「落ちた画面」を撮って合格にしていた（2 画面）
 
@@ -142,7 +148,9 @@ S2 の 8 機能では 1 件も出ていない。
 
 | 渡す先 | 内容 |
 |---|---|
-| S0（`scripts/visual-qa/`） | モックに `/api/webinars`（配列で返す）・`/api/webinars/:id`・`/api/rich-menu-groups`・`/api/forms`・`/api/folders?type=template`・`/api/segment-presets` の固定データを足す。`/api/friend-add-routing/draft` は `routing` を持つ形にする |
+| S0（`scripts/visual-qa/`） | モックに `/api/webinars`（配列で返す）・`/api/webinars/:id`・`/api/rich-menu-groups`・`/api/forms`・`/api/folders?type=template`・`/api/segment-presets` の固定データを足す。`/api/friend-add-routing/draft` は `routing` を持つ形にし、`/api/broadcasts` の行に `lineAccountId: 'visual-qa-account'` を入れる |
+| S0（`components/shared/folder-panel.tsx`） | フォルダ行の「…」（名前を変える／消す）と `data-qa-open`。設計 `q76C35` は常に見える「…」だが、いまはカーソルを置いたときだけ出る「編集」で、撮った絵に写らない。**7 画面が同じ部品を使う**ので S1〜S3 では触らない（旧 PR #602 に実装あり） |
 | S0（`capture-screens.mjs`） | `FAILURE_TEXTS` に「設定を表示できませんでした」を足す。いま落ちた画面を「撮影OK」と言う |
 | S3（`screens.mjs` の S3 区画） | `role: 'text'` が 4 か所残っている（`:1604` `:2059` `:2211` `:2375`）。ARIA に無い役割なので当たらない |
+| pen（Pencil） | `bPF0s` 6-1-I の設計テキスト（`docs/design-reference/broadcasts-v6/bPF0s.txt`）が無い。`.png` だけでは文字を突き合わせられない |
 | 司令塔 | `Flex` を用語表に載せるか（LINE 側の呼び名で、言い換えると通じない恐れがある） |

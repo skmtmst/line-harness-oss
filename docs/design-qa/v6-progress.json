@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 214,
-  "unimplemented": 28,
+  "compared": 215,
+  "unimplemented": 27,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 16,
   "match": 0,
   "structureMatchDataPending": 3,
   "needsFix": 46,
-  "unjudged": 181,
+  "unjudged": 182,
   "remaining": 258,
   "features": [
     {
@@ -586,15 +586,15 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 14,
-      "unimplemented": 1,
+      "compared": 15,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
       "needsFix": 12,
-      "unjudged": 1,
+      "unjudged": 2,
       "remaining": 15,
       "capturedAt": [
         {
@@ -2464,13 +2464,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 6,
-      "node": "bPF0s",
-      "name": "6-1-I 一斉配信・予約完了",
-      "gap": "pending",
-      "gapNote": "画面 `/broadcasts/reserved` が development に無い。判定は未マージ枝 `51827fe1` で書かれたもの"
     },
     {
       "feature": 7,
