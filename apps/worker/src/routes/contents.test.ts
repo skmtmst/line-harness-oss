@@ -47,18 +47,18 @@ const env = {
   WORKER_URL: 'https://api.example.com',
 };
 
-function makeApp() {
+function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role: 'owner', readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
     return next();
   });
   app.route('/', contents);
   return app;
 }
 
-function req(path: string, method: string, body?: unknown) {
-  return makeApp().fetch(
+function req(path: string, method: string, body?: unknown, role: 'owner' | 'admin' | 'staff' = 'owner') {
+  return makeApp(role).fetch(
     new Request(`https://example.com${path}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -645,6 +645,142 @@ describe('共通情報', () => {
       success: false,
       error: '使用先を確認できないため削除できません',
     });
+  });
+
+  it('変更前後の文と遷移先を、選択中アカウントの使用先だけで返す', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 2,
+      blockingTotal: 1,
+      historicalTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 1, broadcast: 1 },
+      items: [
+        {
+          kind: 'template', source_id: 'template-1', source_parent_id: null,
+          source_name: '予約案内', source_status: 'active',
+          source_content: JSON.stringify({ text: '受付は{{var.shop_hours}}です', secret: '画面へ出さない' }),
+          is_historical: 0,
+        },
+        {
+          kind: 'broadcast', source_id: 'broadcast-1', source_parent_id: null,
+          source_name: '配信済み', source_status: 'sent',
+          source_content: '{{var.shop_hours}}でした', is_historical: 1,
+        },
+      ],
+    });
+
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.getCommonVarUsageImpact).toHaveBeenCalledWith(env.DB, 'shop_hours', 'account-1');
+    const text = await res.text();
+    expect(text).not.toContain('画面へ出さない');
+    expect(JSON.parse(text)).toMatchObject({
+      data: {
+        canSave: true,
+        items: [
+          {
+            name: '予約案内', href: '/templates/edit?id=template-1',
+            status: '使われています', changesOnSave: true,
+            currentPreview: '受付は10-19です', nextPreview: '受付は11-20です',
+          },
+          {
+            name: '配信済み', status: '送信済み・変わりません',
+            changesOnSave: false, currentPreview: '10-19でした', nextPreview: '10-19でした',
+          },
+        ],
+      },
+    });
+  });
+
+  it.each([
+    ['accountId不足', { nextValue: '11-20' }, 'accountId is required'],
+    ['nextValue不足', { accountId: 'account-1' }, '変更後の値を入力してください'],
+  ])('%sは400で返し、使用先を走査しない', async (_case, body, error) => {
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', body);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error });
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
+  it('対象の共通情報が存在しないときは404で返し、使用先を走査しない', async () => {
+    mocks.getCommonVarById.mockResolvedValue(null);
+
+    const res = await req('/api/common-vars/missing/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'Not found' });
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
+  it('変更後の空値とLINE文字数超過をエラーとして返す', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      blockingTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 1 },
+      items: [{
+        kind: 'template', source_id: 'template-1', source_parent_id: null,
+        source_name: '長い案内', source_status: 'active',
+        source_content: '{{var.shop_hours}}', is_historical: 0,
+      }],
+    });
+
+    const tooLong = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: 'あ'.repeat(5_001),
+    });
+    expect(await tooLong.json()).toMatchObject({
+      data: {
+        canSave: false,
+        errorTotal: 1,
+        recommendedAction: 'fix_errors',
+        items: [{
+          nextCharacterCount: 5_001,
+          characterLimit: 5_000,
+          exceedsCharacterLimit: true,
+        }],
+      },
+    });
+
+    const empty = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '',
+    });
+    expect(await empty.json()).toMatchObject({
+      data: { canSave: false, items: [{ errors: ['変更後の値が空になります'] }] },
+    });
+  });
+
+  it('変更影響も権限外アカウントの存在と使用先を返さない', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'other', nextValue: '11-20',
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.getCommonVarById).not.toHaveBeenCalled();
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
+  it('スタッフ権限では変更影響の本文を返さない', async () => {
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    }, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.getCommonVarById).not.toHaveBeenCalled();
+    expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
+  });
+
+  it('変更影響の走査失敗を0件にせず503で返す', async () => {
+    mocks.getCommonVarUsageImpact.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: '影響する場所を確認できませんでした' });
   });
 
   it('使用中の共通情報はAPIを直接呼んでも削除できない', async () => {
