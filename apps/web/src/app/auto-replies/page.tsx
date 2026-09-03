@@ -353,14 +353,34 @@ export default function AutoRepliesPage() {
     }
   }
 
-  // ヒット数の合計（152）。KPI に出す。
-  const monthlyHits = items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
-  const totalHits = items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
+  /*
+    ヒット数の合計（152）。KPI に出す。
+
+    **1つでもヒット数を持たないルールがあると、合計は足りない。**
+    `?? 0` で埋めて足すと、**実測より小さい数を実測として読ませる**ことに
+    なる（「今月のヒット 12回」と出ているのに、本当は数えられていない
+    ルールが混ざっている）。全部そろっているときだけ数を出す。
+  */
+  const hitsAllKnown = items.length > 0 && items.every((r) => r.hits !== undefined)
+  const monthlyHits = hitsAllKnown
+    ? items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
+    : null
+  const totalHits = hitsAllKnown
+    ? items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
+    : null
   // 曜日か時間帯を決めているルール。「営業時間外だけ返す」の類がいくつあるか。
+  // これはルール自身の設定なので、ヒット数が無くても数えられる。
   const timeRestrictedCount = items.filter(
     (r) => r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0,
   ).length
-  const neverHitCount = items.filter((r) => (r.hits?.total ?? 0) === 0).length
+  /*
+    **ヒット数が分からないルールを「一度も当たっていない」と数えない。**
+    `?? 0` だと、数えられていないだけのルールが「未ヒット」に混ざり、
+    消してよいものとして読まれる。
+  */
+  const neverHitCount = hitsAllKnown
+    ? items.filter((r) => r.hits?.total === 0).length
+    : null
   // アカウントが変わってから新しい取得が始まるまでの1描画でも、前の一覧を
   // 見せない。取得側の照合と表示側の照合を両方持つ。
   const visibleLoadState = visibleAutoReplyLoadState(
@@ -396,8 +416,13 @@ export default function AutoRepliesPage() {
 
   const inSaved = inFolder.filter((r) => {
     if (savedFilter === 'inactive') return !r.isActive
+    /*
+      **ヒット数が分からないルールを、どちらの札にも入れない。**
+      `?? 0` だと「未ヒット」に混ざり、当たっているかもしれないルールを
+      消してよいものとして見せてしまう。
+    */
     if (savedFilter === 'used') return (r.hits?.period ?? 0) > 0
-    if (savedFilter === 'never') return (r.hits?.total ?? 0) === 0
+    if (savedFilter === 'never') return r.hits?.total === 0
     if (savedFilter === 'timed') {
       return Boolean(r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0)
     }
@@ -430,20 +455,13 @@ export default function AutoRepliesPage() {
         description="受信したメッセージに自動で返します。キーワード・メッセージ種別・曜日や時間帯・友だち条件で出し分けできます。"
         action={
           <div className="flex flex-wrap gap-2">
-          <button
-            disabled
-            title="マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-          >
-            マニュアル
-          </button>
-          <button
-            disabled
-            title="評価順の数字で並びます"
-            className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-          >
-            並び替え
-          </button>
+          {/*
+            **押しても何も起きない「マニュアル」を出さない**（`v6-common-rules`
+            §5-5「動くまで描かない」／S0 の #719 が一覧の帯で同じことをした）。
+            行き先が決まっていないので、押せない形で位置だけ見せても、
+            いつ使えるようになるのか読む人には分からない。
+            「並び替え」は評価順で自動に決まるため、押す口そのものが要らない。
+          */}
           <button
             onClick={() => setFolderDialogOpen(true)}
             className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
@@ -490,7 +508,7 @@ export default function AutoRepliesPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `累計 ${totalHits}回・ヒット数はルールごとに数えます`
+              ? `累計 ${totalHits ?? '—'}回・ヒット数はルールごとに数えます`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
@@ -512,7 +530,7 @@ export default function AutoRepliesPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? '一度も当たっていないルール（30日以上の絞り込みは準備中）'
+              ? '一度も当たっていないルール'
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
@@ -728,10 +746,11 @@ export default function AutoRepliesPage() {
                     </td>
                     <td className="px-4 py-3">{renderEffectiveCell(r)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? 0}</span>
+                      {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
+                      <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
                       <span className="text-ink-faint ml-1 text-[10px]">
-                        （累計 {r.hits?.total ?? 0}）
+                        （累計 {r.hits?.total ?? '—'}）
                       </span>
                     </td>
                     <td className="px-4 py-3">
