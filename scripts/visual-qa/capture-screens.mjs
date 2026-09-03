@@ -155,6 +155,30 @@ async function runSteps(page, steps = [], node = '') {
     }
     const root = step.scope === 'main' ? page.locator('main') : page
 
+    if (step.qaOpen !== undefined) {
+      /*
+        設計の絵と同じ状態を開く。実装側が `data-qa-open="<node>"` を
+        付けた押しどころを探して押す。
+
+        ここも実装されていなかった。台帳の33か所が下の `click` へ落ちて
+        `getByRole('button', { name: undefined })` になり、
+        **画面の先頭のボタンを押していた。** `quhg6` `xkRDb` が
+        `/hq` へ飛んでいたのはこれ。名前で探すより確実なので、
+        新しい画面はこちらで書く。
+      */
+      const opener = root.locator(`[data-qa-open="${step.qaOpen}"]`)
+      const found = await opener.count()
+      if (found === 0) {
+        throw new Error(
+          `${node}: data-qa-open="${step.qaOpen}" の押しどころがありません。`
+          + '固定データが空でその行が描かれていないか、実装側に属性が付いていません。',
+        )
+      }
+      await opener.first().click({ timeout: 15_000 })
+      await page.waitForTimeout(step.after ?? 800)
+      continue
+    }
+
     if (step.select !== undefined) {
       /*
         選ぶ操作。**素の `<select>` と、自前のプルダウンの両方がある。**
@@ -214,6 +238,77 @@ async function runSteps(page, steps = [], node = '') {
   }
 }
 
+/**
+ * 一覧の状態を作る。`states.apis` の口の返事を差し替える。
+ *
+ * 台帳の頭に書いてある決めごとをそのまま実装した。
+ *
+ *   loading   … 返事を遅らせる。撮るころにはまだ読み込み中
+ *   empty     … 空で返す。**器の形は保つ**（`{items:[],total:0,…}`）
+ *   error     … 500。読めなかったことを画面に言わせる
+ *   forbidden … 403。権限が無いことを言わせる
+ *
+ * **差し替えるのは一覧の口だけにしない。** 台帳の注意書きどおり、
+ * 上の帯だけ前の数が残ると「読めなかったのに件数は出ている」という
+ * 起きない絵になる。`states.apis` に帯の口も並べるのは台帳側の仕事。
+ */
+async function applyState(page, screen, kind) {
+  const patterns = screen.states?.apis ?? []
+  if (patterns.length === 0) {
+    throw new Error(`${screen.node}: states.kinds があるのに states.apis が空です`)
+  }
+  /*
+    **当たったかを数える。**
+    当てはめが実際の口とずれていると、差し替えが一度も起きず、
+    **素の絵と同じものが `-error` という名前で保存される。**
+    最初にそうなった（`b3HfZ-error` が素の絵と1文字も違わなかった）。
+    0回なら、あとで呼び出し側が止める。
+  */
+  const hits = { count: 0 }
+  for (const pattern of patterns) {
+    await page.route(pattern, async (route) => {
+      hits.count += 1
+      if (kind === 'loading') {
+        /*
+          **返さない。中断もしない。**
+          はじめは30秒待って `route.abort()` していたが、
+          中断は画面にとって失敗なので、`-loading` の絵に
+          「友だちを表示できませんでした」が写っていた。
+          読み込み中を撮りたいのに、エラーの絵になっていた。
+          何もせず置いておけば、画面は読み込み中のまま。
+          後片づけは画面を閉じるときに Playwright がやる。
+        */
+        await new Promise(() => {})
+        return
+      }
+      if (kind === 'error') {
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, error: '読み込めませんでした' }) })
+        return
+      }
+      if (kind === 'forbidden') {
+        await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ success: false, error: '権限がありません' }) })
+        return
+      }
+      // empty。**器の形を保つ。** 形が違うと画面が落ち、空ではなく壊れた絵になる。
+      const response = await route.fetch()
+      let shape = { items: [], total: 0, page: 1, limit: 20 }
+      try {
+        const original = await response.json()
+        const data = original?.data
+        if (Array.isArray(data)) shape = []
+        else if (data && typeof data === 'object') {
+          shape = {}
+          for (const [key, value] of Object.entries(data)) {
+            shape[key] = Array.isArray(value) ? [] : typeof value === 'number' ? 0 : value
+          }
+        }
+      } catch { /* 返事が JSON でないときは既定の器 */ }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: shape }) })
+    })
+  }
+  return hits
+}
+
 async function captureImpl(feature) {
   const list = screensOf(feature)
   if (!list.length) { console.error(`機能${feature} の画面が screens.mjs にありません`); process.exit(1) }
@@ -241,10 +336,44 @@ async function captureImpl(feature) {
     }
     const out = join(ROOT, 'docs', 'design-qa', s.dir)
     mkdirSync(out, { recursive: true })
+
+    /*
+      **1画面が1枚とは限らない。**
+
+      台帳は `states`（一覧の状態）と `variants`（開いた形）を持っていて、
+      その説明も冒頭に書いてある。けれど `capture-screens.mjs` は
+      `s.states` も `s.variants` も**一度も読んでいなかった**。
+      51枚が状態別、22枚が変種を宣言しているのに、出ていたのは素の1枚だけ。
+      `ledger.mjs` は `<node>-<状態>` という名前の絵を数えているので、
+      **台帳の集計は、存在しない絵を前提にしていた。**
+
+      ここで撮るぶんを組み立てる。名札が空なら素の1枚。
+    */
+    const shots = [{ label: '', steps: s.steps, kind: null }]
+    for (const kind of s.states?.kinds ?? []) {
+      // 'normal' は素の1枚と同じ絵なので、別名で二重に持たない。
+      if (kind === 'normal') continue
+      shots.push({ label: `-${kind}`, steps: s.steps, kind })
+    }
+    for (const variant of s.variants ?? []) {
+      const suffix = variant.suffix.startsWith('-') ? variant.suffix : `-${variant.suffix}`
+      shots.push({ label: suffix, steps: [...(s.steps ?? []), ...(variant.steps ?? [])], kind: null })
+    }
+
+    for (const shotSpec of shots) {
     for (const width of WIDTHS) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
       try {
-        await page.goto(`${BASE}${s.route}`, { waitUntil: 'networkidle', timeout: 120_000 })
+        const stateHits = shotSpec.kind ? await applyState(page, s, shotSpec.kind) : null
+        /*
+          **読み込み中を撮るときは `networkidle` を待たない。**
+          待つ口をわざと止めているので、いつまでも静かにならない。
+          `domcontentloaded` まで待って、少し置いてから撮る。
+        */
+        await page.goto(`${BASE}${s.route}`, {
+          waitUntil: shotSpec.kind === 'loading' ? 'domcontentloaded' : 'networkidle',
+          timeout: 120_000,
+        })
         await page.waitForTimeout(1200)
 
         // 行き先を必ず見る。**クエリまで見る**（タブは `?tab=` でしか区別できない）。
@@ -259,11 +388,18 @@ async function captureImpl(feature) {
           「もう一度試す」だけになっていた。それでも撮影は成功していて、
           設計と並べる直前まで気づけなかった。
         */
-        for (const bad of FAILURE_TEXTS) {
-          if (body.includes(bad)) throw new Error(`「${bad}」で止まっている`)
+        /*
+          **状態別の絵では、この見張りを外す。**
+          `error` や `forbidden` を撮るときは「読み込めませんでした」が
+          出ているのが正解。ここで止めると、いちばん撮りたい絵が撮れない。
+        */
+        if (!shotSpec.kind) {
+          for (const bad of FAILURE_TEXTS) {
+            if (body.includes(bad)) throw new Error(`「${bad}」で止まっている`)
+          }
         }
 
-        await runSteps(page, s.steps, s.node)
+        await runSteps(page, shotSpec.steps, s.node + shotSpec.label)
 
         /*
           **操作のあとも行き先を見る。**
@@ -280,8 +416,17 @@ async function captureImpl(feature) {
           throw new Error(`操作のあと ${s.route} から ${afterLanded} へ飛んだ`)
         }
         const afterBody = await page.locator('body').innerText()
-        for (const bad of FAILURE_TEXTS) {
-          if (afterBody.includes(bad)) throw new Error(`操作のあと「${bad}」で止まっている`)
+        if (!shotSpec.kind) {
+          for (const bad of FAILURE_TEXTS) {
+            if (afterBody.includes(bad)) throw new Error(`操作のあと「${bad}」で止まっている`)
+          }
+        }
+
+        if (stateHits && stateHits.count === 0) {
+          throw new Error(
+            `${s.node}: states.apis ${JSON.stringify(s.states.apis)} が一度も当たりませんでした。`
+            + '当てはめがずれていると、素の絵が「-' + shotSpec.kind + '」という名前で保存されます。',
+          )
         }
 
         await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
@@ -290,7 +435,7 @@ async function captureImpl(feature) {
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         )
         await page.screenshot({
-          path: join(out, `${s.node}-${width}.png`),
+          path: join(out, `${s.node}${shotSpec.label}-${width}.png`),
           fullPage: s.mode === 'page',
         })
         /*
@@ -310,18 +455,19 @@ async function captureImpl(feature) {
           const shown = await page.locator('body').innerText()
           // 行末の空白を落とす。表の空欄がタブのまま残ると `git diff --check` が怒る。
           const trimmed = shown.split('\n').map((line) => line.replace(/\s+$/, '')).join('\n')
-          writeFileSync(join(out, `${s.node}.txt`), `# ${s.name}\n# ${s.route}\n\n${trimmed}\n`)
+          writeFileSync(join(out, `${s.node}${shotSpec.label}.txt`), `# ${s.name}${shotSpec.label}\n# ${s.route}\n\n${trimmed}\n`)
         }
-        console.log(`${s.node}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
-        if (overflow >= 2) console.log(`  ⚠ ${s.node} ${width}px に横スクロールが出ている`)
+        console.log(`${s.node}${shotSpec.label}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
+        if (overflow >= 2) console.log(`  ⚠ ${s.node}${shotSpec.label} ${width}px に横スクロールが出ている`)
         shot += 1
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error)
-        console.log(`${s.node}\t${width}px\t撮れず\t${reason.split('\n')[0]}`)
-        failures.push(`${s.node} ${width}px: ${reason.split('\n')[0]}`)
+        console.log(`${s.node}${shotSpec.label}\t${width}px\t撮れず\t${reason.split('\n')[0]}`)
+        failures.push(`${s.node}${shotSpec.label} ${width}px: ${reason.split('\n')[0]}`)
       } finally {
         await page.close()
       }
+    }
     }
   }
   await browser.close()
