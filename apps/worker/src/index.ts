@@ -1444,9 +1444,9 @@ async function scheduled(
     if (jstMinutes === 5) {
       jobs.push(
         processFriendFieldReminders(env.DB).then((result) => {
-          if (result.enrolled > 0) {
+          if (result.enrolled > 0 || result.hasMore) {
             console.log(
-              `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
+              `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped} scanned=${result.scanned} has_more=${result.hasMore}`,
             );
           }
         }),
