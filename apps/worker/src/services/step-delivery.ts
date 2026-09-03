@@ -15,7 +15,6 @@ import {
   getFriendById,
   jstNow,
   computeNextDeliveryAt,
-  SCENARIO_DELIVERY_BATCH_LIMIT,
   resolveStepContent,
   addTagToFriend,
   type DeliveryMode,
@@ -164,7 +163,7 @@ export async function resolveMetadata(
 }
 
 const MAX_SENDS_PER_CRON = 40; // CF Free plan: 50 subrequests limit (margin for other jobs)
-const MAX_ATTEMPTS_PER_CRON = SCENARIO_DELIVERY_BATCH_LIMIT; // condition skips/errors also consume CPU and D1 work
+const MAX_ATTEMPTS_PER_CRON = 40; // condition skips/errors also consume CPU and D1 work
 
 export function getLineApiErrorStatus(err: unknown): number | null {
   if (!(err instanceof Error)) return null;
