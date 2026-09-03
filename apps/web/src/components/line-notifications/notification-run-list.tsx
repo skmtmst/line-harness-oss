@@ -122,6 +122,7 @@ export default function NotificationRunList({
       ) : state === 'error' ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title={`${title}を表示できませんでした`}
           description="登録済みの記録は消えていません。時間をおいて読み直してください。"
           action={<Button onClick={() => void load()}>記録を再読み込み</Button>}

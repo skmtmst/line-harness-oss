@@ -100,6 +100,7 @@ function FriendMileageInner() {
       <div data-design-node="HIU5O">
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title="マイル明細を表示できませんでした"
           description="友だちが選択中のLINEアカウントにいるか確認して、再読み込みしてください。"
           action={<Button onClick={() => void load()}>マイル明細を再読み込み</Button>}

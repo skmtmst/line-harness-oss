@@ -697,6 +697,7 @@ function WebhooksPageInner() {
       ) : activeStatus === 'error' ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title={`${activeLabel}を表示できませんでした`}
           description="登録内容は消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void load()}>{activeLabel}を再読み込み</Button>}

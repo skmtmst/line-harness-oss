@@ -621,6 +621,7 @@ export default function TemplatesPage() {
       ) : view === 'error' ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title={failure?.title}
           description={failure?.description}
           action={

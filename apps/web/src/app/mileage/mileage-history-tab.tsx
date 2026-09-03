@@ -148,6 +148,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
         ) : error ? (
           <ListState
             kind="error"
+            onRetry={() => void load()}
             description="マイルの履歴を確認できませんでした。再読み込みしてください。"
             action={<Button onClick={() => void load()}>履歴を再読み込み</Button>}
           />

@@ -123,6 +123,7 @@ function ReservedBroadcastContent() {
     return (
       <ListState
         kind="error"
+        onRetry={() => void load()}
         title="予約結果を表示できませんでした"
         description={error || '予約した配信が見つかりませんでした。'}
         action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
@@ -145,6 +146,7 @@ function ReservedBroadcastContent() {
     return (
       <ListState
         kind="error"
+        onRetry={() => void load()}
         title="予約状態を確認できませんでした"
         description="この配信は予約待ちではありません。配信詳細で現在の状態を確認してください。"
         action={<Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>配信詳細を見る</Button>}

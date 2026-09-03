@@ -1,6 +1,8 @@
 import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock, TriangleAlert } from 'lucide-react'
+import Button from './button'
+import { STATE_TEXT } from './not-connected'
 import styles from './list-state.module.css'
 
 /**
@@ -33,7 +35,7 @@ const ICONS: Record<ListStateKind, typeof Inbox> = {
 const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
   loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
-  error: { title: '表示できませんでした', description: '再読み込みしても直らない場合はエラー報告へ。' },
+  error: { title: '表示できませんでした', description: '通信が途切れたか、応答がありませんでした。もう一度読み込んでも直らないときは、運用状態の画面で様子を見てください。' },
   forbidden: { title: '表示する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' },
 }
 
@@ -42,6 +44,8 @@ export default function ListState({
   title,
   description,
   action,
+  onRetry,
+  retrying = false,
   className,
 }: {
   kind: ListStateKind
@@ -50,6 +54,16 @@ export default function ListState({
   description?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
+  /**
+   * もう一度読み込む。**`kind="error"` のときだけ押し口を出す。**
+   *
+   * 「表示できませんでした」だけ出して、直す手を渡していなかった。
+   * 運用者にできることは**画面を丸ごと読み直すこと**しかなく、それだと
+   * 入力中の絞り込みまで消える。ここから読み直せば、画面はそのまま。
+   */
+  onRetry?: () => void
+  /** 読み直している間。二度押しを止める。 */
+  retrying?: boolean
   className?: string
 }) {
   const preset = PRESETS[kind]
@@ -75,6 +89,13 @@ export default function ListState({
       <Icon aria-hidden="true" size={24} className={iconClass} />
       <p className={titleClass}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
+      {danger && onRetry ? (
+        <div className={styles.action}>
+          <Button type="button" onClick={onRetry} disabled={retrying}>
+            {retrying ? '読み込んでいます' : STATE_TEXT.retry}
+          </Button>
+        </div>
+      ) : null}
       {action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )

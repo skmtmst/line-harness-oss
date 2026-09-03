@@ -661,6 +661,7 @@ export default function MediaLibraryPage() {
       ) : loadFailed ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title="メディアを表示できませんでした"
           description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
           action={<Button variant="secondary" onClick={() => void load()}>登録メディアを再読み込み</Button>}

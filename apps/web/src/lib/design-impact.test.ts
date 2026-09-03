@@ -10,8 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする82ファイルを利用先に数える', () => {
-    expect(directImporters(files, button)).toHaveLength(82)
+  it('共通Buttonを直接importする83ファイルを利用先に数える', () => {
+    // 2026-09-04: 一覧の失敗状態（`shared/list-state.tsx`）に「再読み込み」の
+    // 押し口を足したので 82 → 83。共通 Button を使うので数に入る。
+    expect(directImporters(files, button)).toHaveLength(83)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {

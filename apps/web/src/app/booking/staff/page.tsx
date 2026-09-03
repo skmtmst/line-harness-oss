@@ -99,6 +99,7 @@ export default function BookingStaffPage() {
       ) : loadStatus === 'error' ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title="予約スタッフを表示できませんでした"
           description="登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}

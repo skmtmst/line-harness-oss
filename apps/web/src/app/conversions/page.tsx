@@ -317,6 +317,7 @@ function ConversionsPageInner() {
       ) : loadFailed ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title="成果地点を読み込めませんでした"
           description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
           action={

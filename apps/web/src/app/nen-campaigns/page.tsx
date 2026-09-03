@@ -310,6 +310,7 @@ export default function NenCampaignsPage() {
         <main className="p-6">
           <ListState
             kind="error"
+            onRetry={() => void load()}
             description={loadError}
             action={(
               <Button variant="primary" onClick={() => void load()}>

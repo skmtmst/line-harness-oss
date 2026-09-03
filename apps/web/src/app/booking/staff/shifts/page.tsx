@@ -277,6 +277,7 @@ function StaffShiftsPageContent() {
       ) : loadStatus === 'error' && loadError ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title="受付時間と休業日を表示できませんでした"
           description="保存済みの設定は消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void load()}>受付時間と休業日を再読み込み</Button>}

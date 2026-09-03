@@ -223,6 +223,7 @@ export default function WebhookInteractions() {
       ) : error ? (
         <ListState
           kind="error"
+          onRetry={() => void load()}
           title="やり取りの記録を表示できませんでした"
           description="記録は消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button onClick={() => void load()}>やり取りの記録を再読み込み</Button>}
