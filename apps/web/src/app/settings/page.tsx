@@ -415,7 +415,7 @@ export default function SettingsPage() {
             type="button"
             onClick={() => void save()}
             disabled={loading || saving}
-            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#06c755] px-5 text-sm font-bold text-white hover:bg-[#05b34c] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-accent-deep px-5 text-sm font-bold text-white hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
