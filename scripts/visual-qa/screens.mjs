@@ -658,7 +658,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/new`（STEP 1）。**LINEプレビューの面が無い。** 設計の道案内（「配信日時は STEP 4 で設定します」「メッセージは STEP 3」「テスト送信と表示確認は、STEP 3 でメッセージを作ると使えます。」）も出ていない。取得元 `broadcasts-v6/zZ9fA.txt`',
     verdictHead: '49e1341c', route: NEW_BC,
-    
+
   },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件',
@@ -672,13 +672,13 @@ export const SCREENS = [
       なので、そこまで進めてから撮る。
     */
     steps: [{ click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 }],
-    
+
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集',
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/new`（メッセージ編集）。**ボタンの編集（最大4つ）・URLの扱いの表・LINEプレビューが無い。** 設計の「メッセージの下に並びます。最大4つまで。」「短縮すると、URLごとのクリック数を計測できます。」に当たる面が出ていない。取得元 `broadcasts-v6/XQfMD.txt`',
     verdictHead: '49e1341c', route: NEW_BC,
-    
+
   },
   {
     /*
@@ -691,7 +691,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/new`（テンプレート選択）。**プレビューの但し書き「実際のLINE表示に近い確認用プレビューです。」が無い。** ひな形の名前の違いは見本データの差。取得元 `broadcasts-v6/p97Tf.txt`',
     verdictHead: '49e1341c', route: NEW_BC,
     mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
-    
+
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定',
@@ -699,7 +699,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/new`（送信設定）。**LINEの月間集計上限の但し書き（設計「LINEの月間集計上限を使います（今月 12 / 1,000 種類）」）とLINEプレビューが無い。** 取得元 `broadcasts-v6/Bw0zt.txt`',
     verdictHead: '49e1341c', route: NEW_BC,
     mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
-    
+
   },
   {
     /*
@@ -724,7 +724,7 @@ export const SCREENS = [
       { click: 'テスト送信' },
       { wait: 800 },
     ],
-    
+
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック',
@@ -742,7 +742,7 @@ export const SCREENS = [
     steps: [
       { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
     ],
-    
+
   },
   {
     /*
@@ -779,13 +779,13 @@ export const SCREENS = [
       suffix: '-cancel', mode: 'viewport',
       steps: [{ click: '予約を取り消す', after: 900 }],
     }],
-    
+
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細',
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/detail`。**壊れ値が2つ出ている**——「1通（undefined）」（`u6gHt.txt:111`）と「Invalid Date 作成」（同115）。**未取得を `—` にする規則から外れている。** 設計の「CSVで書き出す」も無い。取得元 `broadcasts-v6/u6gHt.txt`',
     verdictHead: '49e1341c', route: '/broadcasts/detail?id=broadcast-2',
-    
+
   },
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認',
@@ -793,7 +793,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts`（削除確認）。**文言が設計と1語違う**——設計「「8月キャンペーンのお知らせ」を削除しますか？」／実装「配信「8月キャンペーンのお知らせ」を削除しますか？」。取得元 `broadcasts-v6/EGMb1.txt`',
     verdictHead: '49e1341c', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
-    
+
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
@@ -824,14 +824,14 @@ export const SCREENS = [
         { click: 'この条件を保存', after: 900 },
       ],
     }],
-    
+
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/broadcasts`。**実装に `data-qa-open="xkRDb"` の押しどころが無く、フォルダごとの「…」を開けない。** 一覧に出ているのは「フォルダを追加」だけ。台帳の注記は #602 で「…」が入ったとしているが、いまの `codex/development`（`49e1341c`）では見つからない。**古い絵（committed）は残っているが、それをこの head の判定には使わない。**', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
-    
+
   },
   {
     ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）',
@@ -847,7 +847,7 @@ export const SCREENS = [
       apis: ['**/api/broadcasts?**', '**/api/broadcasts', '**/api/broadcasts/stats*', '**/api/list-stats*'],
       kinds: ['loading', 'empty', 'error', 'forbidden'],
     },
-    
+
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
@@ -870,7 +870,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（通知ステップ編集）。**STEP 1〜5とLINEプレビューが無い。** 設計の「URLの扱い」（短縮する／しないの表）も無い。差し込みが `{{name}}` `{{meet_url}}` の生表記のままで、横断レビュー §7 の33番（差し込みチップに統一）が実装側に届いていない。取得元 `reminders-v6/J64xI.txt`',
     verdictHead: '49e1341c',
     route: '/reminders/edit?id=reminder-3',
-    
+
   },
   {
     ...REMINDER, node: 's7T2dz', name: '7-1-C 対象と終了条件',
@@ -878,7 +878,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（対象と終了条件）。**STEP 1〜5が無い。** 設計の終了条件「基準日を過ぎて7日経過」と基準日の選び口「予約日時（Google Meet相談）」が出ていない。取得元 `reminders-v6/s7T2dz.txt`',
     verdictHead: '49e1341c',
     route: '/reminders/edit?id=reminder-3&stage=target', mode: 'page',
-    
+
   },
   {
     ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー',
@@ -886,7 +886,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（配信予定プレビュー）。**STEP 1〜5・LINEプレビューが無く、期間の切り替え（今後7日／今後30日）も無い。** 取得元 `reminders-v6/JCz6J.txt`',
     verdictHead: '49e1341c',
     route: '/reminders/edit?id=reminder-3&stage=preview', mode: 'page',
-    
+
   },
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
@@ -894,7 +894,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（テスト送信確認）。**STEP 1〜5とLINEプレビューが無い。** 設計は差し込みの置き換え表（`{{name}}`→Kenta、`{{meet_url}}`→meet.google.com/test-0000）を出すが、その表が無い。取得元 `reminders-v6/W98zZQ.txt`',
     verdictHead: '49e1341c',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
-    
+
   },
   {
     ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認',
@@ -902,7 +902,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（最終確認）。**STEP 1〜5とLINEプレビューが無い。** 設計の要約（対象・基準日・通知の並び「前日・1時間前・当日」）が出ていない。取得元 `reminders-v6/s6Vvp.txt`',
     verdictHead: '49e1341c',
     route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
-    
+
   },
   {
     ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了',
@@ -912,7 +912,7 @@ export const SCREENS = [
     route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
     /* 公開を押した先。**確認から実際に進める。** */
     steps: [{ click: 'この内容で公開', after: 1500 }],
-    
+
   },
   {
     /*
@@ -948,7 +948,7 @@ export const SCREENS = [
     steps: [{ click: 'このページのリマインダをすべて選ぶ', role: 'checkbox' }, { click: '選択したリマインダを削除' }],
     /* 失敗しても窓が閉じないか、文が画面の言葉かを見る。撮影用の口は405。 */
     variants: [{ suffix: '-fail', steps: [{ click: 'このページのリマインダをすべて選ぶ', role: 'checkbox' }, { click: '選択したリマインダを削除' }, { click: '削除する' }, { wait: 1200 }] }],
-    
+
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）',
@@ -956,7 +956,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**設計の「今後7日」の帯が無い。** 失敗のとき「取得できませんでした」と出る。取得元 `reminders-v6/dC0yg-*.txt`',
     verdictHead: '49e1341c', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
-    
+
   },
 
   // ── 機能8 自動応答 ──────────────────────────────────────
@@ -974,7 +974,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（ルール編集）。**STEP 1〜5とLINEプレビューが無い。** 内部語が2件出ている——「Flex（JSONを直接書く）」「画像（JSONを直接書く）」。取得元 `auto-replies-v6/K7vg2.txt`',
     verdictHead: '49e1341c',
     route: '/auto-replies/edit?id=ar-2',
-    
+
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
@@ -982,7 +982,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（反応条件）。**STEP 1〜5が無い。** 設計の「複数のキーワードは、下の「必須／OR」でつなぎ方を決めます」「過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。」と、軸の区別（標準互換15軸／この画面だけの6軸）が無い。取得元 `auto-replies-v6/nzWIX.txt`',
     verdictHead: '49e1341c',
     route: '/auto-replies/edit?id=ar-2',
-    
+
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
@@ -990,7 +990,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies`（応答とアクション）。**STEP 1〜5とLINEプレビューが無い。** 内部語「Flex（JSONを直接書く）」「画像（JSONを直接書く）」が出ている。取得元 `auto-replies-v6/ivDoe.txt`',
     verdictHead: '49e1341c',
     route: '/auto-replies/edit?id=ar-2',
-    
+
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
@@ -1009,7 +1009,7 @@ export const SCREENS = [
     gap: 'pending',
     gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
     why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    
+
   },
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
@@ -1021,7 +1021,7 @@ export const SCREENS = [
     gap: 'pending',
     gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
     why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    
+
   },
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
@@ -1033,7 +1033,7 @@ export const SCREENS = [
     gap: 'pending',
     gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
     why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    
+
   },
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
@@ -1045,7 +1045,7 @@ export const SCREENS = [
     gap: 'pending',
     gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
     why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    
+
   },
   {
     /*
@@ -1080,7 +1080,7 @@ export const SCREENS = [
     verdictHead: '49e1341c',
     mode: 'viewport', height: 1080,
     steps: [{ click: '削除' }],
-    
+
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
@@ -1089,7 +1089,7 @@ export const SCREENS = [
     verdictHead: '49e1341c',
     /* **通常も撮る。** 内部の言葉は行の上に出るので、行が無い3状態だけでは見えない。 */
     states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    
+
   },
 
   // ── 機能9 友だち追加時の配信 ────────────────────────────
@@ -1132,7 +1132,7 @@ export const SCREENS = [
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/friend-add-settings`（プレビューとテスト）。`uLQQc` と同じ理由で面が出ず、「テスト実行」に届かない。',
     mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
-    
+
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
@@ -1142,7 +1142,7 @@ export const SCREENS = [
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
-    
+
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
@@ -1152,7 +1152,7 @@ export const SCREENS = [
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
     /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
-    
+
   },
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
@@ -1163,7 +1163,7 @@ export const SCREENS = [
     gap: 'pending',
     gapNote: '画面 `/friend-add-settings/runs` が development に無い。判定は未マージ枝 `5dc99107` で書かれたもの',
     why: '`/friend-add-settings/runs` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    
+
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
@@ -1196,36 +1196,36 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`ZC13r` と同じ——モックに `/api/webinars` の固定データが無く、`webinar.schedule` が無いまま `.length` を読んで落ちる（`edit/page.tsx:950`）。**撮影ハーネス側の不足。**', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
-    
+
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
-    
+
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。台帳Issue #93 が同じ話。', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
-    
+
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'Ho8z4' }],
-    
+
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT,
     mode: 'viewport', height: 1080,
-    
+
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。台帳Issue #99 が同じ話。',
     route: '/webinars/edit?id=webinar-1', mode: 'page',
     steps: [{ qaOpen: 'D6yO7e' }],
-    
+
   },
   {
     /*
@@ -1240,17 +1240,17 @@ export const SCREENS = [
     gap: 'pending',
     gapNote: '画面 `/webinars/published` が development に無い。判定は未マージ枝 `61eeb3c7` で書かれたもの',
     why: '`/webinars/published` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    
+
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`（参加者）。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ click: '参加者' }],
-    
+
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`（分析）。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ click: '分析' }],
-    
+
   },
   {
     ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
@@ -1264,7 +1264,7 @@ export const SCREENS = [
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars`。素の1枚が `ZC13r` と同じ理由で落ちる。読込・空・失敗の3状態だけは撮れたが、**素の絵が無いので比べられない。**',
     states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
-    
+
   },
 
   // ── 機能11 テンプレート ─────────────────────────────────
@@ -1295,7 +1295,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`。**LINEプレビューと、本文に入れたURLの扱いの表が無い。** 差し込みの但し書き（設計「は差し込みです。差し込んだ結果が4,500文字を超えると、自動で分けて送ります。」）も無い。内部語「Flex」「内容 / JSON *」が出ている。取得元 `templates-v6/GFlD7.txt`',
     verdictHead: '49e1341c',
     steps: [{ click: 'テンプレートを作る' }],
-    
+
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
@@ -1303,7 +1303,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/carousel`。**言い方が設計と違う**——設計「パネル 1〜5」に対し実装は「カード 1」「＋ カードを追加（1/9）」。設計の推奨寸法（横1024 × 縦678px）、パネルごとの選択肢（最大3つ）、LINEプレビューが無い。取得元 `templates-v6/FRkls.txt`',
     verdictHead: '49e1341c',
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
-    
+
   },
   {
     /*
@@ -1316,7 +1316,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 構造一致・データ未接続。ルート `/templates/questions/new`。1440・1920で撮った（はみ出し0）。**設計の見出し（「質問文（この文のあとにボタンが2つ出ます）」「選択肢 1」「選択肢 2」）と言い方が違うだけで、聞く中身は同じ。** タグの選び口に固定データのタグが並ぶ。取得元 `templates-v6/NNDMR.txt`',
     verdictHead: '49e1341c',
     route: '/templates/questions/new', mode: 'page',
-    
+
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
@@ -1324,7 +1324,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（リッチメッセージ）。**面の分け方（A〜F、上下2面・左右2面・上1・下2）を選ぶ形が無く、LINEプレビューも無い。** 設計の寸法の但し書き（「上下に分けるときは 1040 × 520px も可」）も無い。取得元 `templates-v6/j9ixI.txt`',
     verdictHead: '49e1341c',
     steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
-    
+
   },
   {
     ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
@@ -1332,7 +1332,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（クーポン）。**使われたときのアクション（設計「タグ「夏CP利用」を付ける ／ マイルを 100 付与 ／ 対応マークを「来店あり」に」）とLINEプレビューが無い。** 成果への繋がりの説明も無い。取得元 `templates-v6/hsBtl.txt`',
     verdictHead: '49e1341c',
     steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
-    
+
   },
   {
     ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
@@ -1340,7 +1340,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（リサーチ）。**LINEプレビューと、リサーチと回答フォームの使い分けの説明が無い。** 回答後のアクション（お礼メッセージ／タグ／マイル）も無い。取得元 `templates-v6/J3GxEZ.txt`',
     verdictHead: '49e1341c',
     steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
-    
+
   },
   {
     /*
@@ -1355,7 +1355,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`（削除確認）。**消す前に「どこで使われているか」を出していない**——設計は「このテンプレートは 3か所で使われています」「削除すると、この3か所では文面が空になり、配信が止まります。」を出す。内部値 `text` と「undefined件で使用」も同じ面に出る。取得元 `templates-v6/M9cij.txt`',
     verdictHead: '49e1341c',
     mode: 'viewport', height: 1080,
-    steps: [{ click: '削除', scope: 'main' }], 
+    steps: [{ click: '削除', scope: 'main' }],
   },
   {
     /*
@@ -1387,7 +1387,7 @@ export const SCREENS = [
       名前を持たない分類なので、開く相手がそもそも無い。
       **撮るには実装をフォルダの口へつなぐ必要がある。**
     */
-    steps: [{ click: 'フォルダ「お問い合わせ」を操作' }], 
+    steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
@@ -1395,7 +1395,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**設計の種類別の件数（メッセージ64／カルーセル24／…）が無い。** 内部値 `text` と「undefined件で使用」も出る。取得元 `templates-v6/NKyoA-*.txt`',
     verdictHead: '49e1341c',
     states: { apis: ['**/api/templates*', '**/api/templates/**', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
-    
+
   },
 
   // ── 機能12 リッチメニュー ───────────────────────────────
@@ -1427,7 +1427,7 @@ export const SCREENS = [
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus/connections?id=rmg-1`。`kQ1bs` と同じ理由。',
     route: '/rich-menus/connections?id=rmg-1', mode: 'page',
-    
+
   },
   {
     ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし',
@@ -1438,7 +1438,7 @@ export const SCREENS = [
       （`connections/page.tsx:41`）ひとつだけ。
     */
     states: { apis: ['**/api/rich-menu-groups/*', '**/api/rich-menu-groups/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    
+
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus/edit?id=rmg-1`（公開のしかた）。`kQ1bs` と同じ理由。', route: RM_EDIT, },
@@ -1468,7 +1468,7 @@ export const SCREENS = [
       /* 失敗は**消せる下書き**（`rmg-5`）で撮る。塞がれた行には押し口が出ない。 */
       { suffix: '-managed-fail', steps: [{ click: '削除', nth: 6 }, { click: '削除する' }, { wait: 1200 }] },
     ],
-    
+
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
@@ -1476,7 +1476,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**失敗のとき「公開中 —・一覧を取得できませんでした」と、未取得の `—` と失敗の文が同じ行に並ぶ。** 設計の優先順位の説明も無い。取得元 `rich-menus-v6/RW5Tb-*.txt`',
     verdictHead: '49e1341c',
     states: { apis: ['**/api/rich-menu-groups*', '**/api/rich-menu-groups/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    
+
   },
 
   // ── 機能13 回答フォーム ─────────────────────────────────
@@ -1514,7 +1514,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions/edit`（オプション設定）。**回答後のアクション（設計「タグ「来店アンケート回答済み」を付ける ／ マイルを 50 付与」）と、お礼ページのURLの欄が無い。** 内部語 `LIFF` も出る。取得元 `forms-v6/cSqvP.txt`',
     verdictHead: '49e1341c', route: FORM_EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: 'オプション設定' }],
-    
+
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/form-submissions`（集まった回答）。**モックの `/api/forms` が空で行が1つも無く、フォームを開けない。** 撮影ハーネス側の不足。', steps: [{ click: '来店アンケート' }], },
@@ -1532,7 +1532,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**空のときの誘い文が設計と違う**——設計「フォームがまだ1つも無いときの見え方です。「フォームを作る」から最初の1つを作ると、ここに一覧が並びます。」「最初の1つを作ると、集まった回答もここから見られます。」が出ていない。取得元 `forms-v6/ZOPyc-*.txt`',
     verdictHead: '49e1341c',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
-    
+
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
