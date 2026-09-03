@@ -1697,3 +1697,182 @@ export const AFFILIATE_LINKS = [
   { id: 'al-2', ref_code: 'tanaka01-ig', label: 'Instagram用', click_count: 160, friend_adds: 12, conversions: 5, is_active: true, offer_id: 'ao-2', offer_name: '定期便のお申し込み' },
   { /* 止めているリンク。全部有効だと、止めた行の見え方が撮れない。 */ id: 'al-3', ref_code: 'tanaka01-mail', label: 'メール署名用', click_count: 40, friend_adds: 4, conversions: 1, is_active: false, offer_id: null, offer_name: null },
 ]
+
+/*
+  共通アクション。設計 `xOpDs` の「共通アクション 14」のうち、札の内訳が撮れる5本。
+
+  **版と呼び出し元を混ぜる。** 設計の札は 公開中11／下書き3／**古い版あり2**／
+  **呼ばれていない1**。全部が公開中・呼ばれている状態だと、その4つが撮れない。
+  版が見えないと「直してよいか」が判断できない、というのが設計の言いたいこと。
+*/
+export const COMMON_ACTIONS = [
+  { id: 'ca-1', name: '来店後のご案内', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 3, bindingCount: 5, oldVersionBindingCount: 0, updatedAt: '2026-08-25T01:00:00.000Z' },
+  { id: 'ca-2', name: '定期便のご案内', description: 'メッセージ ほか2つ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
+  { id: 'ca-3', name: '予約のリマインド', description: 'リマインダ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
+  { /* 設計の「呼ばれていない 1」。 */ id: 'ca-4', name: '休業のお知らせ', description: 'メッセージ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T09:00:00.000Z' },
+  { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: '口コミのお願い（下書き）', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
+]
+
+/*
+  予約メニュー。設計 `QSLEH` の「メニュー 8／止めているもの 2つ」。
+  料金は設計の ¥8,400／¥12,600／¥4,200／¥1,200／¥2,800。
+  **`is_active` は 0/1 の数**（この口は DB の行をそのまま返す）。
+*/
+export const BOOKING_MENUS = [
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 90, buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
+  { id: 'bm-2', name: 'トリミング（大型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
+  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 45, buffer_after_minutes: 10, base_price: 4200, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12 },
+  { id: 'bm-4', name: '爪切りだけ', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
+  { id: 'bm-5', name: '歯みがき', category_label: 'お手入れ', description: null, duration_minutes: 30, buffer_after_minutes: 5, base_price: 2800, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6 },
+  { /* 設計の「止めているもの 2つ」。 */ id: 'bm-6', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null },
+]
+
+/** 予約スタッフ。設計 `tksPc` の押し口「佐々木」を含む。 */
+export const BOOKING_STAFF = [
+  { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: '小型犬が得意です。', sort_order: 1, is_designation_optional: 0, is_active: 1 },
+  { id: 'bs-2', name: '中川 由美', display_name: '中川', role: '受付', profile_image_url: null, bio: null, sort_order: 2, is_designation_optional: 1, is_active: 1 },
+  { id: 'bs-3', name: '高田 誠', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 3, is_designation_optional: 0, is_active: 1 },
+]
+
+/*
+  メニューに就ける担当。設計 `GFDqW`（代理予約・内容確認）が読む。
+
+  **`/api/booking/admin/menus/:id/staff` は道の途中にIDが入る。**
+  `RAW` に載せられないので `RAW_PATTERNS` で返す。器は `{staff}` で、
+  包むと `res.staff` が `undefined` になり、選ぶ口が0件のまま撮れない。
+*/
+export const BOOKING_MENU_STAFF = [
+  { id: 'bs-1', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: '小型犬が得意です。', is_designation_optional: 0, price: 8400, duration_minutes: 90 },
+  { id: 'bs-3', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, is_designation_optional: 0, price: 8400, duration_minutes: 90 },
+]
+
+/*
+  空いている時間。設計 `GFDqW`（代理予約・内容確認）が読む。
+
+  **時刻は動かさない。** 撮るたびに枠が変わると画像が毎回違うものになる。
+  `10:00〜11:45` は「トリミング（小型犬）」の90分＋間隔15分ぶん。
+  台帳の手順がこの表記で選ぶので、幅を変えるときは両方を直す。
+*/
+export const BOOKING_AVAILABILITY = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        { date: '2026-09-03', start: '10:00', end: '11:45' },
+        { date: '2026-09-03', start: '13:00', end: '14:45' },
+        /* 台帳の `Lg8ff`（予約枠の重なりと入力エラー）が選ぶ枠。 */
+        { date: '2026-09-03', start: '14:00', end: '15:45' },
+        { date: '2026-09-04', start: '10:00', end: '11:45' },
+      ],
+    },
+    {
+      staff_id: 'bs-3', display_name: '高田',
+      slots: [{ date: '2026-09-03', start: '15:00', end: '16:45' }],
+    },
+  ],
+}
+
+/*
+  予約。設計 `TV2DI`（予約管理）の台帳そのまま。
+
+  **LINEからと電話からを混ぜる。** 設計は「LINEから 9・電話 3」を色で分けて
+  同じところに並べる。片方だけだと、その読み分けが撮れない。
+  **LINEの友だちと結びついていない行**も1つ入れる（設計の
+  「LINEの友だちと結びついていません。当日の連絡ができません」を出すため）。
+*/
+const booking = (id, friendId, name, start, end, menu, staff, price, status = 'confirmed') => ({
+  id, friend_id: friendId, starts_at: start, ends_at: end, status,
+  customer_note: null, internal_note: null, price_at_booking: price,
+  menu_name: menu, staff_name: staff, friend_name: name,
+  requested_at: '2026-09-02T02:00:00.000Z', decided_at: '2026-09-02T02:05:00.000Z',
+  external_event_id: null,
+})
+
+export const BOOKING_REQUESTS = [
+  booking('bk-1', 'friend-1', '高橋 直人', '2026-09-03T00:00:00.000Z', '2026-09-03T01:45:00.000Z', 'トリミング（小型犬）', '佐々木', 8400),
+  booking('bk-2', 'friend-2', '前田 さくら', '2026-09-03T02:00:00.000Z', '2026-09-03T03:45:00.000Z', 'トリミング（大型犬）', '佐々木', 12600),
+  booking('bk-3', 'friend-3', '木村 亮', '2026-09-03T04:00:00.000Z', '2026-09-03T04:45:00.000Z', 'シャンプーのみ', '高田', 4200),
+  booking('bk-4', 'friend-4', '中村 彩', '2026-09-03T05:00:00.000Z', '2026-09-03T05:15:00.000Z', '爪切りだけ', '中川', 1200),
+  /* 電話で受けた予約。**LINEの友だちと結びついていない。** */
+  { ...booking('bk-5', '', null, '2026-09-03T06:00:00.000Z', '2026-09-03T07:45:00.000Z', 'トリミング（小型犬）', '佐々木', 8400), friend_name: null },
+  /* まだ決めていない1件。設計の「承認待ち」。 */
+  booking('bk-6', 'friend-5', '石田 未来', '2026-09-04T01:00:00.000Z', '2026-09-04T02:45:00.000Z', 'トリミング（小型犬）', '高田', 8400, 'requested'),
+]
+
+/*
+  お知らせの種類。設計 `festr`（24-1 LINE通知）の「お知らせの種類 9つ」。
+
+  **止めているものを2つ入れる。** 設計の札は 出している7／止めている2／
+  文面が未設定1。全部が出ている状態だと、その3つが撮れない。
+  台帳の `Q55bb`（お知らせの中身を編集する）は「発送した」を押すので、
+  その名前の行が要る。
+*/
+const ecNotification = (eventType, label, category, order, isEnabled = true, title = null) => ({
+  eventType, label, isEnabled,
+  title: title ?? label,
+  introText: 'いつもご利用ありがとうございます。',
+  outroText: 'ご不明な点はこのままご返信ください。',
+  category, buttonLabel: '注文を見る', buttonUrl: 'https://example.com/orders',
+  imageUrl: '', displayOrder: order,
+  fixedFields: ['注文番号', '金額'],
+  fixedPreview: 'ご注文 NEN-1001 / ¥12,800',
+  updatedAt: '2026-08-25T00:00:00.000Z',
+})
+
+export const EC_NOTIFICATION_SETTINGS = [
+  ecNotification('ec_order.confirmed', '注文が確定した', 'order', 1),
+  ecNotification('ec_payment.received', '入金を確認した', 'payment', 2),
+  ecNotification('ec_shipping.shipped', '発送した', 'shipping', 3),
+  ecNotification('ec_shipping.delivered', 'お届けした', 'shipping', 4),
+  ecNotification('ec_subscription.renewed', '定期便が続いた', 'subscription', 5),
+  ecNotification('ec_subscription.paused', '定期便を止めた', 'subscription', 6),
+  ecNotification('ec_support.cancelled', 'キャンセルした', 'support', 7),
+  /* 設計の「止めている 2」。 */
+  ecNotification('ec_support.refunded', '返金した', 'support', 8, false),
+  /* 設計の「文面が未設定 1」。**空文字は「まだ決めていない」で、0件ではない。** */
+  { ...ecNotification('ec_order.backordered', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
+]
+
+/*
+  イベント。設計 `ugP5y`（29-1 イベント予約）の
+  「これからの回 6／受付前 2／終わった回 24」の内訳が撮れる4件。
+*/
+const adminEvent = (id, name, nextSlot, capacity, active, pending, published = 1) => ({
+  id, name, venue_name: '店内スペース（2階）', venue_url: null, image_url: null,
+  description: 'はじめての方むけに、おうちでできるコツをお伝えします。',
+  description_centered: 0, max_bookings_per_friend: 1, requires_approval: 1,
+  cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: 3,
+  is_published: published, sort_order: 1,
+  created_at: '2026-09-01T01:00:00.000Z', updated_at: '2026-09-02T01:00:00.000Z',
+  next_slot_starts_at: nextSlot,
+  total_capacity: capacity, total_active: active, pending_count: pending,
+  visible_tag_id: null, visible_tag_name: null,
+})
+
+/*
+  イベント。設計 `ugP5y` の「これからの回 6／受付前 2／終わった回 24」の内訳が撮れる4件。
+
+  **`total_active` と `pending_count` は必ず数で入れる。** 画面は
+  `items.reduce((sum, e) => sum + e.total_active, 0)` で足すので、
+  入っていないと帯が `NaN人` `NaN件` になる（一度そうなった）。
+*/
+export const ADMIN_EVENTS = [
+  adminEvent('ev-1', '秋のしつけ教室（第1回）', '2026-09-25T05:00:00.000Z', 12, 9, 2),
+  adminEvent('ev-2', 'ごはん相談会', '2026-09-28T02:00:00.000Z', 8, 8, 1),
+  /* 設計の「申し込みが少ない 1」。 */
+  adminEvent('ev-3', '爪切り体験', '2026-10-02T06:00:00.000Z', 10, 1, 0),
+  /* 設計の「受付前 2」。公開していないので、埋まり具合の分母にも入らない。 */
+  adminEvent('ev-4', '冬のしつけ教室', '2026-12-05T05:00:00.000Z', 12, 0, 0, 0),
+]
+
+/*
+  イベントの申込者。設計 `i5SN2j` の「申し込み12／キャンセル待ち3／取り消した2」。
+  **同伴のペット**も入れる（設計は「ももちゃん（犬・4歳）」のように出す）。
+*/
+export const EVENT_BOOKINGS = [
+  { id: 'eb-1', event_id: 'ev-1', friend_id: 'friend-1', friend_name: '高橋 直人', status: 'confirmed', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, created_at: '2026-09-01T02:00:00.000Z' },
+  { id: 'eb-2', event_id: 'ev-1', friend_id: 'friend-2', friend_name: '前田 さくら', status: 'confirmed', companion_count: 1, companion_note: 'そらくん（猫・2歳）', is_first_time: 0, created_at: '2026-09-01T03:00:00.000Z' },
+  { id: 'eb-3', event_id: 'ev-1', friend_id: 'friend-3', friend_name: '木村 亮', status: 'confirmed', companion_count: 1, companion_note: 'こむぎちゃん（犬・7歳）', is_first_time: 1, created_at: '2026-09-01T04:00:00.000Z' },
+  { /* キャンセル待ち。全部が確定だと、その札が撮れない。 */ id: 'eb-4', event_id: 'ev-1', friend_id: 'friend-4', friend_name: '中村 彩', status: 'waitlist', companion_count: 1, companion_note: 'ぷりんちゃん（うさぎ・3歳）', is_first_time: 1, created_at: '2026-09-02T01:00:00.000Z' },
+  { /* 取り消した1件。 */ id: 'eb-5', event_id: 'ev-1', friend_id: 'friend-5', friend_name: '石田 未来', status: 'cancelled', companion_count: 1, companion_note: 'レオくん（犬・1歳）', is_first_time: 0, created_at: '2026-09-01T05:00:00.000Z' },
+]

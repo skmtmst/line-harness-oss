@@ -1,4 +1,4 @@
-# 29-1-B 申込者の一覧-error
+# 29-1-B 申込者の一覧
 # /events/bookings?id=ev-1
 
 画
@@ -70,9 +70,9 @@ CSVで書き出す
 
 申込
 
-0人
+3人
 
-定員なし
+定員 12 ・ 残り9
 
 承認待ち
 
@@ -88,11 +88,10 @@ CSVで書き出す
 
 キャンセル
 
-0件
+1件
 
 この一覧のうち
 
-API error: 500
 承認待ち
 確定
 拒否
@@ -101,4 +100,21 @@ API error: 500
 参加済
 無断
 全件
-該当する予約はありません
+友だち	経由アカウント	予約枠	状態	受付日時	操作
+friend-1		Invalid Date	確定	Invalid Date
+参加済
+無断
+キャンセル
+
+friend-2		Invalid Date	確定	Invalid Date
+参加済
+無断
+キャンセル
+
+friend-3		Invalid Date	確定	Invalid Date
+参加済
+無断
+キャンセル
+
+friend-4		Invalid Date	waitlist	Invalid Date
+friend-5		Invalid Date	キャンセル	Invalid Date

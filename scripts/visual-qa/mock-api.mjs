@@ -50,7 +50,9 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
-  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
+  COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
+  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, MILEAGE_RULES, CONVERSION_POINTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -627,11 +629,13 @@ const RAW = {
     どちらも「画面を表示できませんでした」になっていて、
     **実装の不具合に見えていた。**
   */
-  '/api/booking/admin/menus': { menus: [] },
-  '/api/booking/admin/staff': { staff: [] },
-  '/api/events/admin/events': { items: [] },
+  /* 空いている時間。包むと `res.by_staff` が undefined になり、選ぶ口が0件になる。 */
+  '/api/booking/admin/availability': BOOKING_AVAILABILITY,
+  '/api/booking/admin/menus': { menus: BOOKING_MENUS },
+  '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
-  '/api/booking/admin/requests': { requests: [] },
+  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS },
 }
 
 /**
@@ -644,7 +648,9 @@ const RAW = {
  * `29-1-B 申込者の一覧` が `.filter` で「画面を表示できませんでした」になっていた。
  */
 const RAW_PATTERNS = [
-  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: [] }],
+  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: EVENT_BOOKINGS }],
+  /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
+  [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
 ]
 
 /** 参照が1つも無ければ消せる（`packages/db` の `canDelete` と同じ数え方）。 */
@@ -889,6 +895,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
+  if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }

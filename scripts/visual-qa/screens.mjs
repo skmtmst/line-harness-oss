@@ -2074,7 +2074,11 @@ export const SCREENS = [
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#504 `806ed169` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の通知テンプレート編集は、差し込みの一覧と送信前の見え方を並べて確かめる。実装との差は送信処理がつながってから見る **ルート**：`/line-notifications`（お知らせの中身を編集）。**取得元**：`line-notify-v6/Q55bb.txt`。**推奨修正**：差し込みの一覧と送信前の見え方を並べる。**`vCqUj`（フォーム）と `NNDMR`（質問）が差し込みの選び口を既に持っている**ので写す。送信処理がつながってから細かな差を見る。', verdictSource: 'line-notify-v6/Q55bb.txt',
-    mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
+    mode: 'viewport', height: 1136, /*
+      **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
+      （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
+    */
+    steps: [{ click: '内容を編集', nth: 2, after: 800 }],
     verdictHead: '7b509106',
   },
   {
@@ -2226,7 +2230,12 @@ export const SCREENS = [
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 予約の詳細の面が設計とそろわない。代理で入れた予約をLINEの予約と同じ扱いにする道（前日・当日のお知らせ、成果地点「予約が入った」を数える）が無い **ルート**：`/booking/bookings`（予約の詳細）。**取得元**：`booking-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**代理で入れた予約をLINEの予約と同じ扱いにするのが先**（前日・当日のお知らせ、成果地点「予約が入った」を数える）。`GfceK`（代理予約の登録完了）でも同じ要点が確かめられていないので、**同じ束で直す**。', verdictSource: 'booking-v6/design-qa.md',
-    mode: 'viewport', height: 1136, steps: [{ click: '高橋 直人', role: 'text' }],
+    mode: 'viewport', height: 1136, /*
+      **`role: 'text'` は当たらない。** ARIA にその役は無く
+      `getByRole('text', …)` は0件になる。表の名前は桁なので `cell` で探す。
+      `jwrbf`（16-1-E）と同じ直し。
+    */
+    steps: [{ click: '高橋 直人', role: 'cell' }],
     verdictHead: '7b509106',
   },
   /*
