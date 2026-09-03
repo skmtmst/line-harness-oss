@@ -411,7 +411,7 @@ export default function AutomationsPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving}
-                className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium disabled:opacity-50"
+                className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 min-h-[44px] text-sm font-medium disabled:opacity-50"
               >
                 {saving ? '作成中...' : '作成'}
               </button>
