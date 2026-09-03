@@ -26,8 +26,17 @@ const BAND_LABELS: Record<ActionScoreBand, string> = {
   low: '低い',
 }
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('ja-JP').format(value)
+/**
+ * 数を出す。**数でないものを `NaN` と書かない。**
+ *
+ * 固定データの点数が入っていないとき、表の「いまの点数」に `NaN` が並んでいた。
+ * `Intl.NumberFormat` は `undefined` を渡すと `NaN` を返す。
+ * 取れていないものは `—` と書き、0 とも言い分ける。
+ */
+function formatNumber(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? new Intl.NumberFormat('ja-JP').format(value)
+    : '—'
 }
 
 function ScoreBand({ band }: { band: ActionScoreBand }) {

@@ -24,7 +24,15 @@
   --color-accent: #06c755;
   --color-accent-hover: #05b34c;
   --color-accent-soft: #e8f8ee;
-  --color-accent-deep: #087a3e;
+  /*
+   * 主ボタンの背景。**白文字が載る前提の緑。**
+   *
+   * LINE の緑 `--color-accent`（#06c755）に白文字だと 2.26:1 しかなく、
+   * 14px 太字に必要な 4.5:1 にまったく届かない。
+   * 2026-09-03 の決定で #068a3c（4.46:1）にした。
+   * LINE の緑は選択状態・チップ・有効表示に残す。
+   */
+  --color-accent-deep: #068a3c;
   --color-on-accent: #ffffff;
 
   /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
