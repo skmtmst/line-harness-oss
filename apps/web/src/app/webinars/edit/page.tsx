@@ -1054,7 +1054,7 @@ function EditWebinarInner() {
                   <span
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                       state === 'done'
-                        ? 'bg-accent text-on-accent'
+                        ? 'bg-accent-deep text-on-accent'
                         : state === 'current'
                           ? 'border-accent text-accent border-2'
                           : 'border-hairline text-ink-faint border'
