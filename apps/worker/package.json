@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build",
+    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db --filter @line-harness/update-engine build",
     "test": "vitest run",
-    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build",
+    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db --filter @line-harness/update-engine build",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && wrangler deploy",
-    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build",
+    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db --filter @line-harness/update-engine build",
     "typecheck": "tsc --noEmit",
     "inject-version": "tsx scripts/inject-version.ts"
   },
