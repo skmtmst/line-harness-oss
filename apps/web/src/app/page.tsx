@@ -277,7 +277,12 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
     <p className="text-ink mt-3 flex items-baseline gap-2">
       <span className="text-ink-secondary text-xs font-medium">LINE公式</span>
       <span className="text-2xl font-bold tabular-nums">
-        {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+        {/*
+          **使用数か残りか読めない形にしない。**
+          「197 / 200通」だけだと、197 が使ったぶんにも残りにも読める。
+          この値は `limit - used` なので残り。言葉を付けて向きを固定する。
+        */}
+        {remaining === null || limit === null ? '—' : `残り ${remaining.toLocaleString('ja-JP')} / 上限 ${limit.toLocaleString('ja-JP')}通`}
       </span>
     </p>
     <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
@@ -286,6 +291,18 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
       <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
     </div>
   </Card>
+}
+
+/**
+ * 待ち時間を、読める単位で言う。
+ *
+ * 「9,110分前」は正確だが、運用者が何日前か暗算することになる。
+ * 設計 `vUXKb` は「6日前」と書く。
+ */
+function humanWait(minutes: number): string {
+  if (minutes < 60) return `${minutes}分前`
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}時間前`
+  return `${Math.floor(minutes / (60 * 24))}日前`
 }
 
 function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null }) {
@@ -304,7 +321,11 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
       一覧を取得できなかったときだけ `—` にする。
     */}
     <div className="text-ink-secondary mt-3 space-y-2 text-xs">
-      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分前`}</p>
+      {/*
+        **分のままにしない。** 9,110分前と書かれても、何日前か読み解けない。
+        1時間未満は分、1日未満は時間、それ以上は日で言う。
+      */}
+      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : humanWait(oldestWaitMinutes)}</p>
       <p>・二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
@@ -740,7 +761,7 @@ export default function DashboardPage() {
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
-          <span className="text-ink-faint text-xs">優先度順</span>
+          <span className="text-ink-faint text-xs">優先度が高い順</span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
