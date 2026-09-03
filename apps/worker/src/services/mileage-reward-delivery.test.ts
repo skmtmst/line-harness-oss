@@ -78,6 +78,26 @@ describe('mileage reward delivery', () => {
     expect(dbMocks.refundMileageRewardRedemption).not.toHaveBeenCalled();
   });
 
+  it('stops automatic retries after the shared three-retry limit', async () => {
+    dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
+      redemption: {
+        ...plan().redemption,
+        status: 'delivery_failed',
+        attemptCount: 3,
+      },
+    }));
+    dbMocks.decryptCredential.mockRejectedValueOnce(new Error('temporary provider failure'));
+
+    const result = await deliverMileageReward(db, 'redemption-1', {
+      now: () => '2026-08-29T00:00:00.000Z',
+    });
+
+    expect(result).toMatchObject({ status: 'delivery_failed', retryAt: null });
+    expect(dbMocks.recordMileageRedemptionAttempt).toHaveBeenCalledWith(db, expect.objectContaining({
+      redemptionId: 'redemption-1', status: 'failed', retryAt: null,
+    }));
+  });
+
   it('restores mileage immediately when the published policy is refund', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({ failurePolicy: 'refund' }));
     dbMocks.decryptCredential.mockRejectedValueOnce(new Error('delivery failed'));

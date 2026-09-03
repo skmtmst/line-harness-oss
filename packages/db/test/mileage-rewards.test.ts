@@ -157,6 +157,64 @@ describe('V6 mileage rewards', () => {
     })).rejects.toMatchObject({ code: 'idempotency_conflict' });
   });
 
+  it('allows only one concurrent exchange to reserve the last coupon code', async () => {
+    sqlite.prepare(`INSERT INTO users (id, display_name) VALUES ('user-2', 'マイル利用者2')`).run();
+    sqlite.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, picture_url, user_id, line_account_id)
+       VALUES ('friend-2', 'U2', '利用者B', NULL, 'user-2', 'account-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO mileage_ledger
+         (id, program_id, beneficiary_user_id, beneficiary_friend_id, entry_type, status,
+          amount, reason, source, source_event_id, idempotency_key, metadata, occurred_at, created_at)
+       VALUES ('grant-2', 'default', 'user-2', 'friend-2', 'grant', 'available',
+               1000, '初期付与', 'test', 'event-2', 'grant-2', '{}',
+               '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')`,
+    ).run();
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '最後の1枚', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id,
+      lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'last-code', fingerprint: 'last-code' }],
+    });
+    await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+
+    let arrivals = 0;
+    let release!: () => void;
+    const bothReady = new Promise<void>((resolve) => { release = resolve; });
+    const racingDb = {
+      prepare: db.prepare.bind(db),
+      async batch(statements: D1PreparedStatement[]) {
+        arrivals += 1;
+        if (arrivals === 2) release();
+        await bothReady;
+        return db.batch(statements);
+      },
+    } as unknown as D1Database;
+    const results = await Promise.allSettled([
+      reserveMileageRewardRedemption(racingDb, {
+        lineAccountId: 'account-1', friendId: 'friend-1', rewardId: draft.id,
+        idempotencyKey: 'race-1', requestFingerprint: 'race-fp-1',
+      }),
+      reserveMileageRewardRedemption(racingDb, {
+        lineAccountId: 'account-1', friendId: 'friend-2', rewardId: draft.id,
+        idempotencyKey: 'race-2', requestFingerprint: 'race-fp-2',
+      }),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')[0]).toMatchObject({
+      reason: { code: 'out_of_stock' },
+    });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_redemptions`).get()).toEqual({ count: 1 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM mileage_ledger WHERE entry_type = 'spend'`).get())
+      .toEqual({ count: 1 });
+  });
+
   it('records delivery failure and restores mileage through an append-only refund', async () => {
     const draft = await createMileageRewardDraft(db, {
       lineAccountId: 'account-1',

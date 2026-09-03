@@ -801,12 +801,33 @@ export async function reserveMileageRewardRedemption(
        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?
          FROM mileage_wallets w
         WHERE w.program_id = ? AND w.beneficiary_key = ?
-          AND w.version = ? AND w.available >= ?`,
+          AND w.version = ? AND w.available >= ?
+          AND NOT EXISTS (
+            SELECT 1 FROM mileage_redemptions existing
+             WHERE existing.program_id = ? AND existing.idempotency_key = ?
+          )
+          AND (? IS NULL OR EXISTS (
+            SELECT 1 FROM mileage_reward_codes inventory
+             WHERE inventory.id = ? AND inventory.status = 'available'
+          ))
+          AND (? IS NULL OR (
+            SELECT COUNT(*) FROM mileage_redemptions stock
+             WHERE stock.reward_version_id = ? AND stock.status != 'refunded'
+          ) < ?)
+          AND (? IS NULL OR (
+            SELECT COUNT(*) FROM mileage_redemptions person_limit
+             WHERE person_limit.reward_id = ? AND person_limit.beneficiary_key = ?
+               AND person_limit.status != 'refunded'
+          ) < ?)`,
     ).bind(
       redemptionId, reward.lineAccountId, reward.programId, beneficiaryKey,
       friend.user_id, friend.id, reward.id, version.id,
       null, code?.id ?? null, input.idempotencyKey, input.requestFingerprint,
       now, now, reward.programId, beneficiaryKey, wallet.version, version.requiredMiles,
+      reward.programId, input.idempotencyKey,
+      code?.id ?? null, code?.id ?? null,
+      version.stockLimit, version.id, version.stockLimit,
+      version.perFriendLimit, reward.id, beneficiaryKey, version.perFriendLimit,
     ),
     db.prepare(
       `INSERT INTO mileage_ledger
@@ -858,6 +879,47 @@ export async function reserveMileageRewardRedemption(
   await db.batch(statements);
   const created = await getMileageRedemption(db, redemptionId);
   if (!created) {
+    const racedExisting = await db.prepare(
+      `SELECT * FROM mileage_redemptions WHERE program_id = ? AND idempotency_key = ?`,
+    ).bind(reward.programId, input.idempotencyKey).first<RedemptionRow>();
+    if (racedExisting) {
+      if (racedExisting.request_fingerprint !== input.requestFingerprint) {
+        throw new MileageRewardError('idempotency_conflict', '同じ処理IDに別の交換内容が指定されました', 409);
+      }
+      return { kind: 'existing', redemption: mapRedemption(racedExisting) };
+    }
+    if (code) {
+      const inventory = await db.prepare(
+        `SELECT status FROM mileage_reward_codes WHERE id = ?`,
+      ).bind(code.id).first<{ status: string }>();
+      if (inventory?.status !== 'available') {
+        throw new MileageRewardError('out_of_stock', '交換コードの在庫がありません', 409);
+      }
+    }
+    if (version.stockLimit != null) {
+      const currentStock = await db.prepare(
+        `SELECT COUNT(*) AS count FROM mileage_redemptions
+          WHERE reward_version_id = ? AND status != 'refunded'`,
+      ).bind(version.id).first<{ count: number }>();
+      if ((currentStock?.count ?? 0) >= version.stockLimit) {
+        throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
+      }
+    }
+    if (version.perFriendLimit != null) {
+      const currentCount = await db.prepare(
+        `SELECT COUNT(*) AS count FROM mileage_redemptions
+          WHERE reward_id = ? AND beneficiary_key = ? AND status != 'refunded'`,
+      ).bind(reward.id, beneficiaryKey).first<{ count: number }>();
+      if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
+        throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
+      }
+    }
+    const currentWallet = await db.prepare(
+      `SELECT available FROM mileage_wallets WHERE program_id = ? AND beneficiary_key = ?`,
+    ).bind(reward.programId, beneficiaryKey).first<{ available: number }>();
+    if (!currentWallet || currentWallet.available < version.requiredMiles) {
+      throw new MileageRewardError('insufficient_miles', '交換に必要なマイルが足りません', 409);
+    }
     throw new MileageRewardError('wallet_changed', 'マイル残高が変わりました。読み直してください', 409);
   }
   return { kind: 'created', redemption: created };
