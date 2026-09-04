@@ -16,13 +16,14 @@ tags: [memory, core]
 - 最初の顧客は 然-NEN(ペットフード EC)。飲食店向けは本番では無効のテスト機能。
 - ゴール: Pencil(Pen.dev)の ★V6 260 画面と要件書どおりに仕上げ、機能・安全性・使い勝手で Lステップを超える。
 
-## 体制・役割
+## 体制・役割(2026-09-04 14:30 オーナー決定で改訂)
 
 - オーナー: Kenta(kengdom53、GitHub は kentavndng 名義のセッションが多い)。共同開発者 Masato(skmtmst)。
-- 司令塔: Claude Fable 5.1。台帳、優先順位、割り当て、ゲート確認とマージ、衝突の裁定。コードは緊急修正の独立 PR だけ。
-- デザイン: Claude Opus 5 を 4 セッション(S0 共通部品、S1 機能 1〜5、S2 機能 6〜13、S3 機能 14〜32)。Pencil の修正は人が Pencil の AI に貼る。
-- 実装: Codex。API、DB、性能、CI、ステージング配備。
+- **作業はすべて Codex が行う。Claude は司令塔(hq)のみ。** 司令塔の役目: 割り当て、判断を Issue に残す、統合 PR 後の台帳更新、台帳の整合(担当・対象・所有パス・完了条件・依存がそろっているか)、共通部品変更中の印の管理。他ノードの端末には書かない(指示は Issue コメントで渡す)。
+- 運用規則の正本: 台帳 README(kentavndng/line-harness-board)と台帳 #143。要点: 各レーンの作業中は 1 件まで、全体のマージ待ちは 5 件まで、1 PR = 利用者向けの目的 1 つ、ブランチは毎回最新の codex/development から、共通部品変更中は依存する画面作業を止める、判断と完了条件は Issue に残す(Claude が停止中でも Codex が Issue だけで進める)。
+- 統合: 合格済み PR は司令塔(人)が 3〜5 本ずつ統合 PR にまとめて通す。lane は自分の PR に update-branch もマージもしない。
 - 正本: GitHub の Issue と PR。NodeTerm は動かす場所。Slack は見える化。
+- (改訂前の体制: デザインは Claude Opus 5 の 4 セッション S0〜S3、Pencil の修正は人が Pencil の AI に貼る。lane ラベル s0〜s3・pen は台帳に残っているが、作業者は Codex。)
 
 ## いま進行中のこと(2026-09-03 夜時点)
 

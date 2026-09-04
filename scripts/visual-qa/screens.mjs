@@ -291,7 +291,7 @@ export const SCREENS = [
     verdictHead: 'b8359655',
   },
   {
-    ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
+    ...INBOX, node: 'IYjvu', name: '2-10 対応状況変更を開く',
     steps: [...OPEN_CHAT, { click: '対応状況を変える' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** 一致。未対応・対応中・保留・対応済の並び、色の丸、色付きの札、選択中の✓まで設計どおり',
     verdictSource: 'inbox-v6/IYjvu-1920.png', verdictHead: '7b509106',
@@ -2717,6 +2717,106 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
     verdictHead: '7b509106',
   },
+
+  // ── pen から届いた新画面（台帳 kentavndng/line-harness-board#18） ──────────
+
+  {
+    /*
+      §7 #6「CSV操作の専用画面」。3-4 UID移行（`vtBCu`）と同じ束で、
+      移行そのものの口がまだ無い。
+    */
+    node: 'ux7of', feature: 3, name: '3-4-A UID・顧客データ移行／CSV',
+    dir: 'friends-v6', route: '/friends/migrations', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: '取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束',
+    why: '`/friends/migrations` が実装に無い。3-4 UID移行そのものが `gap: api` のまま',
+  },
+  {
+    /*
+      §7 #108 で描いた「担当者の未読が数えられないとき」。
+      **実装はもう在る**——skmtmst/line-harness-oss#741 で、集計が読めないときは
+      数だけ `—` にして担当者一覧そのものは残す形にした。
+      `YZaDK` の `-error` と同じ面だが、設計が別ノードを持つので別行で撮る。
+    */
+    ...INBOX, node: 'ohj8J', name: '2-8-A 担当者の未読が数えられないとき',
+    steps: [{ click: '担当者で絞り込む' }],
+    states: { apis: ['**/api/chats/stats**'], kinds: ['error'] },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-04 台帳へ登録して初めて撮った（board#18 の pen からの申し送り）。** ルート `/chats`（「担当者で絞り込む」を開いた形）。通常と集計失敗の2状態を1440・1920で撮った（4枚、はみ出し0）。 **実装はもう在った**——skmtmst/line-harness-oss#741 で、集計が読めないときは**数だけ `—` にして担当者一覧そのものは残す**形にしてある。担当者は `/api/operators` の別の口なので、集計が落ちても消さない。 **実値0と未取得を別の文字にしている**（0件なら「Kenta 0」、読めないなら「Kenta —」）。 P2 設計 `ohj8J` の文字がまだ書き出されていないので、文言の突き合わせは書き出し後。',
+    verdictSource: 'inbox-v6/ohj8J-error.txt', verdictHead: 'f3946713',
+  },
+
+  // ── 機能33 LINEアカウント設定（§7 #28） ──────────────────────────────
+
+  /*
+    **`/accounts` と `/accounts/new` は、いま別の画面への転送になっている。**
+
+      /accounts      → /hq（統括コンソール）
+      /accounts/new  → /restaurant-test/stores/new（飲食店向けのテスト機能）
+
+    そのまま撮ると**別の画面を 33-1・33-2 として台帳に入れる**ので、
+    実装が無いものとして扱う。撮影ハーネスの「飛ばされた」検査が拾った。
+    どちらのルートを 33 に使うかは決めごとが要る（board#18 へ返した）。
+  */
+  {
+    node: 'QT91v', feature: 33, name: '33-1 LINEアカウント一覧',
+    dir: 'accounts-v6', route: '/accounts', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: 'LINEアカウントを読む口はもう在る（`/api/line-accounts`）。一覧の画面を作るだけ',
+    why: '`/accounts` は `/hq`（統括コンソール）への転送で、33-1 の画面は無い',
+  },
+  {
+    node: 'b2NGxk', feature: 33, name: '33-2 LINEアカウントを登録する',
+    dir: 'accounts-v6', route: '/accounts/new', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '登録の口は在る。**飲食店向けの店舗登録とは別の画面**として作る',
+    why: '`/accounts/new` は `/restaurant-test/stores/new`（飲食店向けのテスト機能）への転送で、33-2 の画面は無い',
+  },
+  {
+    node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
+    dir: 'accounts-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '一覧と登録は在るので、読む口はそろっている。詳細・編集の画面を作るだけ',
+    why: '`/accounts` の詳細・編集にあたるルートが実装に無い（一覧と `/accounts/new` だけ）',
+  },
+  {
+    node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
+    dir: 'accounts-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: '別のチャネルへ友だち・配信・履歴を引き継ぐ口が要る。既存の口では足りない',
+    why: '`/accounts/handover` が実装に無く、引き継ぎの口も無い',
+  },
+
+  // ── 機能34 はじめの設定と案内（§7 #29） ──────────────────────────────
+
+  {
+    node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
+    dir: 'getting-started-v6', route: '/getting-started', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '進み具合はいまある口（接続状態・友だち数・配信）から組み立てられる。画面を作るだけ',
+    why: '`/getting-started` が実装に無い',
+  },
+  {
+    node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
+    dir: 'getting-started-v6', route: '/recipes', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: 'レシピ（ひな形の組み合わせ）を持つ口がまだ無い',
+    why: '`/recipes` が実装に無く、レシピを読む口も無い',
+  },
+  {
+    node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
+    dir: 'getting-started-v6', route: '/recipes/clone?id=recipe-1', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: 'レシピを複製して各機能へ展開する口が要る。`y0P0Qx` と同じ束',
+    why: '`/recipes` の複製にあたるルートが実装に無い',
+  },
+  {
+    node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
+    dir: 'getting-started-v6', route: '/settings/manual-links', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '正本の場所を持つだけの表。新しい口は要らない',
+    why: '`/settings/manual-links` が実装に無い',
+  },
 ]
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
@@ -2734,9 +2834,13 @@ export const DESIGN_SIZE = {
   xfYLn: [1920, 1080], r6Gzsu: [1920, 1080], hz9ti: [1920, 1080], dqFft: [1920, 1080],
   EvVO5: [1920, 1080], RUxNf: [1920, 1080], NrBkW: [1920, 1080], g2UNV: [1920, 1080],
   M2b2B: [1920, 1080], q5G45: [1920, 1080],
-  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1107],
-  I6UAdr: [1920, 1384], bzDn6: [1920, 1080], YzxU1: [1920, 1431], InCDe: [1920, 1080],
-  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1080],
+  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1251],
+  I6UAdr: [1920, 1384], bzDn6: [1920, 1220], YzxU1: [1920, 1431], InCDe: [1920, 1220],
+  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1064],
+  /* pen から届いた新画面（台帳 kentavndng/line-harness-board#18 の実測）。 */
+  ux7of: [1920, 1080], ohj8J: [1920, 1840],
+  QT91v: [1920, 1080], b2NGxk: [1920, 1940], T9rA9: [1920, 1120], nx3XW: [1920, 1100],
+  RAW35: [1920, 1010], y0P0Qx: [1920, 720], D5UaX: [1920, 856], f9oUm: [1920, 700],
   vUXKb: [1920, 1668], ZN0ov: [1920, 1754], JN6mQ: [1920, 1668],
   NjK9q: [1920, 1668], Alekb: [1920, 1668],
   l25rlp: [1920, 1080], tP0RW: [1920, 1320], LfrQs: [1920, 1320],

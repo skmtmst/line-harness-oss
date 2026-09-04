@@ -10,11 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  // development の基準 93 に、この枝が足す削除の確認と書き出しで 1 増える。
-  it('共通Buttonを直接importする94ファイルを利用先に数える', () => {
-    // 2026-09-04: LINEアカウントの一覧・登録・詳細・乗り換え（★V6 33-1〜33-4）の
-    // 4画面が共通 Button を使う。統合 PR #834 #845 のぶんと合わせて実測し直す。
-    expect(directImporters(files, button)).toHaveLength(94)
+  it('共通Buttonを直接importする96ファイルを利用先に数える', () => {
+    // 2026-09-04: 最新 development の95ファイルに、この枝の削除確認が使う
+    // 詳細画面の1ファイルを加えた実測値。書き出しは既存の一覧画面内で行う。
+    expect(directImporters(files, button)).toHaveLength(96)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {

@@ -1,11 +1,14 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 
 /**
  * 共通情報の登録。
@@ -181,19 +184,12 @@ export default function NewCommonVarPage() {
             <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">
               フォルダ
             </label>
-            <select
+            <SelectField
               id="cv-folder"
               value={folderId}
               onChange={(e) => setFolderId(e.target.value)}
-              className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-            >
-              <option value="">未分類</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+            />
           </div>
         </div>
 
@@ -295,18 +291,16 @@ export default function NewCommonVarPage() {
         {error && <p className="text-danger text-sm">{error}</p>}
       </div>
 
-      <div className="border-hairline mt-4 flex max-w-3xl items-center justify-between border-t pt-4">
-        <Link href="/contents/vars" className="text-info text-sm hover:underline">
-          共通情報一覧へ戻る
-        </Link>
-        <button
-          onClick={() => void save()}
-          disabled={saving}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-        >
-          {saving ? '登録中...' : '登録'}
-        </button>
-      </div>
+      <StickyBar
+        actions={(
+          <>
+            <Button href="/contents/vars">共通情報一覧へ戻る</Button>
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
+              {saving ? '登録中…' : '登録'}
+            </Button>
+          </>
+        )}
+      />
     </div>
   )
 }
