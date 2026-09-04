@@ -230,3 +230,21 @@ describe('GET /api/automations?lineAccountId=X', () => {
     expect(body.data).toEqual([]);
   });
 });
+
+describe('GET /api/automations/:id/logs', () => {
+  test.each([
+    ['999999', 200],
+    ['-1', 100],
+    ['NaN', 100],
+  ])('limit=%s を最大200件以内へ直す', async (raw, expected) => {
+    dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: null });
+    dbMocks.getAutomationLogs.mockResolvedValue([]);
+    const res = await setupApp({} as D1Database).request(`/api/automations/automation-1/logs?limit=${raw}`);
+    expect(res.status).toBe(200);
+    expect(dbMocks.getAutomationLogs).toHaveBeenCalledWith(
+      expect.anything(),
+      'automation-1',
+      expected,
+    );
+  });
+});

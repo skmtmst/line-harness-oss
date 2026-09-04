@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow } from './utils.js';
 // アクション自動化 (IF-THEN ルール) クエリヘルパー
 
 export interface AutomationRow {
@@ -216,13 +216,14 @@ export async function deleteAutomation(db: D1Database, id: string): Promise<void
 // --- 自動化ログ ---
 
 export async function getAutomationLogs(db: D1Database, automationId?: string, limit = 100): Promise<AutomationLogRow[]> {
+  const safeLimit = boundedListLimit(limit, 100);
   if (automationId) {
     const result = await db.prepare(`SELECT * FROM automation_logs WHERE automation_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(automationId, limit).all<AutomationLogRow>();
+      .bind(automationId, safeLimit).all<AutomationLogRow>();
     return result.results;
   }
   const result = await db.prepare(`SELECT * FROM automation_logs ORDER BY created_at DESC LIMIT ?`)
-    .bind(limit).all<AutomationLogRow>();
+    .bind(safeLimit).all<AutomationLogRow>();
   return result.results;
 }
 

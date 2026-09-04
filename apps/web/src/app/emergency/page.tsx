@@ -9,6 +9,8 @@ import { api, type DashboardOverview } from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
 import { apiCheckDetail } from './api-check-detail'
+import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
+import type { OperationImpactPreview } from '@/lib/api'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -20,6 +22,20 @@ const SNAPSHOT_KEY = 'nen_emergency_snapshot_v1'
 const OPERATION_HISTORY_KEY = 'nen_operation_history_v1'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
+
+/*
+  画面の並びと、口が返す名前の対応。
+
+  画面は `broadcasts`、口は `broadcast_dispatch` と呼ぶ。**どちらかに寄せない。**
+  画面の名前を口に合わせると運用者向けの文が内部語になり、口を画面に合わせると
+  ほかの口（停止・復旧）とずれる。ここで1か所だけ橋を架ける。
+*/
+const IMPACT_KEY: Record<StopTarget, EmergencyStopTarget> = {
+  broadcasts: 'broadcast_dispatch',
+  scenarios: 'scenario_dispatch',
+  reminders: 'reminder_dispatch',
+  automations: 'automation_actions',
+}
 type ConfirmMode = 'stop' | 'restore' | null
 
 interface EmergencySnapshot {
@@ -374,6 +390,31 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [snapshot, setSnapshot] = useState<EmergencySnapshot | null>(null)
   useEffect(() => setSnapshot(readSnapshot()), [])
 
+  /*
+    **止める前に、何本止まって何人に関わるかを実測で出す。**
+
+    以前はここに数が1つも出ず、取り消せない操作を「予約中の一斉配信」という
+    名前だけで押していた。設計 `b3HfZ` は行ごとに件数と人数を出す。
+
+    数は口（`GET /api/operations/control/preview`）が返した実測だけを使う。
+    **取れないときに0人と書かない**——`operationImpactText` が `—人` を出す。
+  */
+  const [impact, setImpact] = useState<OperationImpactPreview | null>(null)
+  const [impactFailed, setImpactFailed] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setImpact(null); setImpactFailed(false)
+    const accountId = targetAccountId === 'all' ? null : targetAccountId
+    api.operations.preview(accountId)
+      .then((response) => {
+        if (cancelled) return
+        if (response.success) setImpact(response.data.impact)
+        else setImpactFailed(true)
+      })
+      .catch(() => { if (!cancelled) setImpactFailed(true) })
+    return () => { cancelled = true }
+  }, [targetAccountId])
+
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const accountName = targetAccountId === 'all' ? 'すべてのアカウント' : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
   const fullReason = reasonDetail.trim() ? `${reason}: ${reasonDetail.trim()}` : reason
@@ -438,12 +479,12 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       <section className={`border-hairline rounded-card border bg-white p-4 ${snapshot ? 'pointer-events-none opacity-50' : ''}`}>
         <div><h2 className="text-base font-bold text-gray-900">緊急停止</h2><p className="mt-1 text-xs text-gray-500">停止対象を実行直前に取得します。</p></div>
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-gray-700" htmlFor="emergency-account">対象アカウント</label><select id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-white px-3 text-sm"><option value="all">すべてのアカウント</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></div><div><label className="text-xs font-bold text-gray-700" htmlFor="emergency-reason">停止理由</label><select id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-white px-3 text-sm"><option>障害対応</option><option>誤配信の防止</option><option>アカウント異常</option><option>メンテナンス</option><option>その他</option></select></div></div>
-        <div className="border-hairline mt-5 overflow-hidden rounded-control border">{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-0 hover:bg-gray-50"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-red-600" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-gray-900">{targetLabels[key].label}</span><span className="block text-xs text-gray-500">{targetLabels[key].note}</span></span></label>)}</div>
+        <div className="border-hairline mt-5 overflow-hidden rounded-control border">{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-0 hover:bg-gray-50"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-red-600" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-gray-900">{targetLabels[key].label}</span><span className="block text-xs text-gray-500">{targetLabels[key].note}</span></span><span className="max-w-sm shrink-0 text-right text-xs font-bold text-ink-secondary">{impactFailed ? '影響を確認できません' : operationImpactText(IMPACT_KEY[key], impact)}</span></label>)}</div>
         <div className="mt-5"><label className="text-xs font-bold text-gray-700" htmlFor="emergency-detail">補足（任意）</label><textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm" /></div>
         <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || Boolean(snapshot)} className="rounded-control min-h-10 bg-red-600 px-4 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">緊急停止する</button></div>
       </section>
       {snapshot && <section className="rounded-card border border-blue-200 bg-blue-50 p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-blue-900">復旧</h2><p className="mt-1 text-xs text-blue-800">期限を過ぎた予約配信は安全のため再開しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running} className="rounded-control border border-blue-300 bg-white px-4 py-2 text-xs font-bold text-blue-800 hover:bg-blue-100">復旧する</button></div></section>}
-      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-lg bg-white p-6 shadow-2xl"><h2 id="emergency-confirm-title" className="text-lg font-bold text-gray-900">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><div className={`mt-4 rounded-control p-4 text-sm ${confirmMode === 'stop' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><p className="mt-1">{selectedTargets.map((key) => targetLabels[key].label).join('・')}</p><p className="mt-1">理由：{fullReason}</p></> : <><p className="font-bold">{snapshot?.accountName}</p><p className="mt-1">停止前に動いていた配信を再開します。</p></>}</div><label className="mt-4 block text-sm font-bold text-gray-800" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-sm" /><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control border-hairline min-h-11 border px-4 text-sm font-bold text-gray-700">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-white disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-red-600' : 'bg-blue-700'}`}>{running ? '実行中...' : '実行する'}</button></div></div></div>}
+      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-lg bg-white p-6 shadow-2xl"><h2 id="emergency-confirm-title" className="text-lg font-bold text-gray-900">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><div className={`mt-4 rounded-control p-4 text-sm ${confirmMode === 'stop' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactFailed ? '影響を確認できません' : operationImpactText(IMPACT_KEY[key], impact)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{snapshot?.accountName}</p><p className="mt-1">停止前に動いていた配信を再開します。</p></>}</div><label className="mt-4 block text-sm font-bold text-gray-800" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-sm" /><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control border-hairline min-h-11 border px-4 text-sm font-bold text-gray-700">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-white disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-red-600' : 'bg-blue-700'}`}>{running ? '実行中...' : '実行する'}</button></div></div></div>}
     </div>
   )
 }
@@ -474,7 +515,7 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
+    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
   return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }

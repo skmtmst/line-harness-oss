@@ -221,7 +221,7 @@ function BookingsInner() {
           <button
             disabled
             title="予約者だけを宛先にする配信は準備中です"
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
           >
             予約者に一斉送信
           </button>

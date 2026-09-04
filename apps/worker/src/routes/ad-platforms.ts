@@ -11,6 +11,7 @@ import {
 import { sendAdConversions } from '../services/ad-conversion.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { listLimit } from './list-pagination.js';
 
 function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
   const masked: Record<string, unknown> = {};
@@ -174,7 +175,7 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 adPlatforms.get('/api/ad-platforms/:id/logs', async (c) => {
   try {
     const id = c.req.param('id');
-    const limit = Number(c.req.query('limit') ?? '50');
+    const limit = listLimit(c.req.query('limit'), 50);
     const logs = await getAdConversionLogs(c.env.DB, id, limit);
 
     return c.json({

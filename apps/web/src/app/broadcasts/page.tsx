@@ -240,7 +240,7 @@ function BroadcastList() {
             </button>
             <button
               onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
-              className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+              className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
             >
               + 新規配信
             </button>
@@ -616,7 +616,13 @@ function BroadcastList() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={`配信「${deleteTarget?.title ?? ''}」を削除しますか？`}
+        /*
+          **題は設計 `EGMb1` どおり、配信名だけ。**
+          「配信「…」を削除しますか？」と接頭辞を付けていたが、設計は
+          「「8月キャンペーンのお知らせ」を削除しますか？」。何を消すのかは
+          名前で分かるので、種類を足すと読む語が増えるだけになる。
+        */
+        title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
         description={
           deleteTarget?.status === 'scheduled'
             ? '予約が取り消され、この配信は送られなくなります。下書きの中身も一緒に消えます。すでに送った配信の記録は残ります。この操作は取り消せません。'

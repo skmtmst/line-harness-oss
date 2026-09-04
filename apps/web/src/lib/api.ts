@@ -1,6 +1,12 @@
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
+  AutoReplyConflict,
+  AutoReplyDraftInput,
+  AutoReplyDraftVersion,
+  AutoReplyDryRunResult,
+  AutoReplyPublishResult,
+  AutoReplyValidationResult,
   Friend,
   FriendAddRouting,
   FriendAddRoutingDraftTestResult,
@@ -125,6 +131,52 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+/*
+ * 緊急停止の「止める前に何が止まるか」。
+ *
+ * ここに置いてあるのは**影響を見るぶんだけ**。止める・戻す口は
+ * 段階的な本人確認のヘッダを送るが、worker 側の許可一覧にまだ無い
+ * （`apps/worker/src/cors-headers.test.ts` が落ちる）。口が入ってから足す。
+ */
+export type OperationCapability =
+  | 'broadcast_dispatch'
+  | 'scenario_dispatch'
+  | 'reminder_dispatch'
+  | 'automation_actions'
+  | 'auto_reply_dispatch'
+  | 'webhook_outgoing'
+  | 'ad_postback'
+
+export type OperationImpactMetric = {
+  itemCount: number
+  /** 数える経路が無いときは null。**0人と読み替えない。** */
+  friendCount: number | null
+  pendingCount?: number
+  nearestScheduledAt?: string | null
+}
+
+export type OperationImpactPreview = Record<
+  Extract<OperationCapability,
+    | 'broadcast_dispatch'
+    | 'scenario_dispatch'
+    | 'reminder_dispatch'
+    | 'automation_actions'
+    | 'auto_reply_dispatch'>,
+  OperationImpactMetric
+>
+
+export type OperationControl = {
+  scopeKey: string
+  lineAccountId: string | null
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  updatedAt: string | null
+}
+
 export type FormDeleteImpact = {
   form: {
     id: string
@@ -211,6 +263,39 @@ export type RichMenuDeleteImpact = {
   recommendedAction: 'delete' | 'unpublish' | 'review_references'
 }
 
+/**
+ * 対応マークの自動変更ルール（設計 `GMvBd` 4-3-A）。
+ *
+ * きっかけは5つ。**Worker の `SUPPORT_MARK_RULE_EVENTS` と同じ並び**で持つ。
+ * 画面側で足すと、選べるのに保存できない選択肢ができる。
+ */
+export type SupportMarkAutomationEvent =
+  | 'message_received'
+  | 'manual_reply_sent'
+  | 'staff_assigned'
+  | 'response_overdue'
+  | 'condition_matched'
+
+export type SupportMarkAutomationRule = {
+  id: string
+  name: string
+  markId: string
+  event: SupportMarkAutomationEvent
+  condition: SegmentCondition | null
+  priority: number
+  /** 手で変えたマークを守る時間（分）。**0は「保護しない」で、未取得ではない。** */
+  manualProtectionMinutes: number
+  isActive: boolean
+  /** 取り合いを見つけるための版。読んだ版と違えば 409。 */
+  version: number
+  updatedAt: string
+}
+
+export type SaveSupportMarkAutomationRule = Omit<
+  SupportMarkAutomationRule,
+  'id' | 'markId' | 'version' | 'updatedAt'
+>
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -243,6 +328,20 @@ export type ConversionApprovalItem = {
   value: number | null
   approvalStatus: 'pending' | 'approved' | 'rejected'
   duplicateFlag: boolean
+}
+
+/** 支払台帳を作る前に安全に表示できる、承認済み報酬の読み取り専用集計。 */
+export type AffiliatePaymentSummary = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  holdDays: number | null
+  payoutCycle: string | null
+  approvedConversions: number
+  approvedReward: number
+  heldConversions: number
+  heldReward: number
+  holdStatusUnknown: number
 }
 
 /** Broadcast type from API (now camelCase after worker serialization) */
@@ -1055,6 +1154,55 @@ export type ActionScoreOverview = {
     lastChangedAt: string | null
   }>
   pagination: { total: number; limit: number; offset: number }
+}
+export type ActionScoreRuleOperation = 'delta' | 'set'
+export type ActionScoreFrequencyKind =
+  | 'unlimited'
+  | 'per_day'
+  | 'per_subject'
+  | 'per_subject_per_day'
+  | 'once_per_period'
+export type ActionScoreRule = {
+  id: string
+  name: string
+  eventType: string
+  source: string | null
+  operation: ActionScoreRuleOperation
+  value: number
+  frequency: { kind: ActionScoreFrequencyKind; limit: number }
+  sameSourceEventOnce: true
+  validFrom: string | null
+  validUntil: string | null
+  enabled: boolean
+}
+export type ActionScoreBands = {
+  min: number
+  max: number
+  normalMin: number
+  highMin: number
+}
+export type ActionScoreRuleBundle = { rules: ActionScoreRule[]; bands: ActionScoreBands }
+export type ActionScoreRuleVersion = ActionScoreRuleBundle & {
+  id: string | null
+  versionNumber: number
+  status: 'draft' | 'published'
+  createdAt: string | null
+  publishedAt: string | null
+}
+export type ActionScoreRuleConfiguration = {
+  configured: boolean
+  status: 'not_configured' | 'draft' | 'published' | 'stopped'
+  currentDraftVersionId: string | null
+  currentPublishedVersionId: string | null
+  editableVersion: ActionScoreRuleVersion
+  publishedVersion: ActionScoreRuleVersion | null
+}
+export type ActionScoreRuleTestResult = {
+  scoreBefore: number
+  scoreAfter: number
+  bandBefore: ActionScoreBand
+  bandAfter: ActionScoreBand
+  matched: Array<{ ruleId: string; ruleName: string; scoreBefore: number; scoreAfter: number }>
 }
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
@@ -1950,6 +2098,37 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ friendIds, markId }),
         },
+      ),
+    /*
+      自動変更ルール。**まだ Worker に無い口を呼ぶことがある**（API は
+      skmtmst/line-harness-oss#758）。呼び出し側は 404 を「未接続」として
+      扱い、押しても何も起きない操作を並べない。
+    */
+    automationRules: (markId: string, accountId: string) =>
+      fetchApi<ApiResponse<SupportMarkAutomationRule[]>>(
+        `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    createAutomationRule: (
+      markId: string,
+      accountId: string,
+      data: SaveSupportMarkAutomationRule,
+    ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
+      `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    updateAutomationRule: (
+      ruleId: string,
+      accountId: string,
+      expectedVersion: number,
+      data: SaveSupportMarkAutomationRule,
+    ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
+      `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'PATCH', body: JSON.stringify({ ...data, expectedVersion }) },
+    ),
+    archiveAutomationRule: (ruleId: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
       ),
   },
   /** 保存した検索。上限50件。 */
@@ -2987,8 +3166,8 @@ export const api = {
       }),
   },
   lineAccounts: {
-    list: (live = true) =>
-      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '' : '?live=0'}`),
+    list: (live = false) =>
+      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
@@ -3253,6 +3432,17 @@ export const api = {
         linkCount: number;
         friendAdds: number;
       }>>>('/api/affiliates-report?' + new URLSearchParams(params as Record<string, string>)),
+    paymentSummaries: (lineAccountId: string) =>
+      fetchApi<{
+        success: boolean
+        data: AffiliatePaymentSummary[]
+        limitations: {
+          payoutHistory: false
+          bankDestination: false
+          settlementSchedule: false
+        }
+        error?: string
+      }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
@@ -3352,6 +3542,48 @@ export const api = {
       }>>(`/api/templates/${id}/usages`),
   },
   autoReplies: {
+    /*
+      公開までの4段（下書き→検査→競合→試験→公開）。**口はすべて
+      `apps/worker/src/routes/auto-replies.ts` に在るものを読むだけ。**
+      公開は `Idempotency-Key` を付ける——二度押しで2回公開すると、
+      同じ変更が2つの版として台帳に残る。
+    */
+    createDraft: (body: AutoReplyDraftInput) =>
+      fetchApi<ApiResponse<AutoReplyDraftVersion>>('/api/auto-replies/drafts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getDraft: (id: string) =>
+      fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`),
+    saveDraft: (id: string, body: AutoReplyDraftInput) =>
+      fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    validateDraft: (id: string) =>
+      fetchApi<ApiResponse<AutoReplyValidationResult>>(`/api/auto-replies/${id}/validate`, {
+        method: 'POST',
+      }),
+    conflicts: (id: string) =>
+      fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
+    testDraft: (id: string, body: {
+      friendId: string;
+      incomingText: string;
+      messageKind?: string;
+      occurredAt?: string;
+    }) => fetchApi<ApiResponse<AutoReplyDryRunResult>>(`/api/auto-replies/${id}/test`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    publishDraft: (
+      id: string,
+      body: { acknowledgedConflictIds: string[] },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AutoReplyPublishResult>>(`/api/auto-replies/${id}/publish`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(body),
+    }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
@@ -4169,6 +4401,44 @@ export const api = {
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<ActionScoreOverview>>(`/api/action-scores/friends?${query.toString()}`)
     },
+    rules: (accountId: string) =>
+      fetchApi<ApiResponse<ActionScoreRuleConfiguration>>(
+        `/api/action-scores/rules?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    bands: (accountId: string) =>
+      fetchApi<ApiResponse<ActionScoreBands>>(
+        `/api/action-scores/bands?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    saveDraft: (data: {
+      accountId: string
+      expectedDraftVersionId: string | null
+      configuration: ActionScoreRuleBundle
+    }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/draft', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    testRules: (data: {
+      accountId: string
+      configuration: ActionScoreRuleBundle
+      currentScore: number
+      eventType: string
+      source?: string | null
+      occurredAt?: string
+    }) => fetchApi<ApiResponse<ActionScoreRuleTestResult>>('/api/action-scores/rules/test', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    publishRules: (data: { accountId: string; draftVersionId: string }) =>
+      fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/publish', {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'action-score-rules-publish' },
+        body: JSON.stringify(data),
+      }),
+    stopRules: (accountId: string) =>
+      fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/stop', {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
   },
   webhooks: {
     incoming: {
@@ -4905,6 +5175,19 @@ export const api = {
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
+  /** 緊急停止の影響（見るだけ）。止める・戻す口はまだ足していない。 */
+  operations: {
+    preview: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<{
+        control: OperationControl
+        counts: Partial<Record<OperationCapability, number>>
+        impact: OperationImpactPreview
+        permissions: { canControl: boolean }
+        calculatedAt: string
+      }>>(`/api/operations/control/preview${query}`)
+    },
+  },
   adPlatforms: {
     list: () =>
       fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
@@ -5469,6 +5752,35 @@ export type Webinar = {
 
 export type WebinarInput = Partial<Omit<Webinar, 'id' | 'createdAt' | 'updatedAt'>>
 
+export type WebinarNotificationSettings = {
+  webinarId: string
+  version: number
+  registrationEnabled: boolean
+  dayBeforeEnabled: boolean
+  dayBeforeTime: string
+  hourBeforeEnabled: boolean
+  hourBeforeMinutes: number
+  startEnabled: boolean
+  missedEnabled: boolean
+  missedTime: string
+  completedEnabled: boolean
+  updatedAt: string
+}
+
+export type WebinarNotificationSettingsInput = Omit<
+  WebinarNotificationSettings,
+  'webinarId' | 'version' | 'updatedAt'
+>
+
+export type WebinarNotificationOverview = {
+  total: number
+  pending: number
+  sent: number
+  failed: number
+  skipped: number
+  cancelled: number
+}
+
 export type WebinarSakuraComment = { id?: string; atSeconds: number; authorName: string; body: string }
 
 export type WebinarAnalytics = {
@@ -5549,6 +5861,25 @@ export const webinarApi = {
   update: (id: string, input: WebinarInput) =>
     fetchApi<{ data: Webinar }>(`/api/webinars/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   remove: (id: string) => fetchApi<{ data: null }>(`/api/webinars/${id}`, { method: 'DELETE' }),
+  notifications: (id: string) => fetchApi<{
+    data: {
+      settings: WebinarNotificationSettings | null
+      overview: WebinarNotificationOverview
+    }
+  }>(`/api/webinars/${id}/notifications`),
+  saveNotifications: (id: string, input: WebinarNotificationSettingsInput) => fetchApi<{
+    data: {
+      settings: WebinarNotificationSettings
+      queued: number
+      cancelled: number
+    }
+  }>(`/api/webinars/${id}/notifications`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  }),
+  testNotifications: (id: string) => fetchApi<{
+    data: { sent: number; failed: number }
+  }>(`/api/webinars/${id}/notifications/test`, { method: 'POST' }),
   comments: (id: string) =>
     fetchApi<{ data: WebinarSakuraComment[] }>(`/api/webinars/${id}/comments`),
   saveComments: (id: string, comments: WebinarSakuraComment[]) =>

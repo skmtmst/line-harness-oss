@@ -345,12 +345,17 @@ export const SCREENS = [
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
-    steps: [
-      { click: '保存した検索' }, { click: 'この条件を保存' },
-      { click: 'この条件を保存', nth: 1 },
-    ],
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。**  **#555 の新head `9eee9655` でも撮った。変更は重複エラーの文言1行だけで、未入力のときの見え方は変わっていない。** 判定は据え置く（**P2** 残る差は `ANgda` と同じ窓の作り）。',
-    verdictSource: 'inbox-v6/AuSDY-1440.png', verdictHead: '7b509106',
+    /*
+      **もう「押して断られる」形ではない。** 名前が空のあいだは保存ボタンが
+      押せないので、前のように2回押しても何も起きない（押せない口を押して
+      「撮れず」になる）。窓を開いたところまでで撮る。空のときの案内
+      「検索名を入力してください。」は、開いた時点で出ている。
+    */
+    steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 名前が空のあいだは保存できない形にして撮り直した（board#50）。** ルート `/chats`（「保存した検索」→「この条件を保存」）。1440・1920とも横スクロール0。 **設計と合ったところ**：名前が空のとき保存ボタンが**押せない見た目になっている**。設計 `AuSDY` も同じく灰色で押せない形。「0 / 40文字」も一致。**押してから断るのではなく、押せない形にしてから何をすれば進めるかを書く。** 空のときの文言も設計の「検索名を入力してください。」をそのまま使った。 **残る差（P2）**：(1) 設計はその文を**赤い帯（⚠つき）**で出し、入力欄の枠も赤い。実装は灰色の小さな案内 → board#57 で直す。(2) 設計の入力欄の初期表示は「検索名を入力してください」、実装は「例：未対応・期限超過」。(3) 設計の「保存する条件」は**その場で変えられる選び口**（対応マーク・期限・受信経路・担当者）、実装は読むだけ。(4) 設計にある「よく使うに追加」の切り替えが実装に無い。(5) ボタンが設計「検索条件を保存」／実装「この条件を保存」。 **撮り方も直した**——前は「この条件を保存」を2回押して断られる形を撮っていたが、押せなくなったので窓を開いたところまでで撮る。',
+    verdictSource: 'inbox-v6/AuSDY.txt',
+    verdictHead: '15d9cf71',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -961,13 +966,20 @@ export const SCREENS = [
     */
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`（削除確認）。**一覧に「このページのリマインダをすべて選ぶ」が無く、一部失敗（`-fail`）の絵に進めない。** 「選択したリマインダを削除（5）」は出ている。文言も設計と違う——設計「「未返信3日後フォロー」を削除しますか？」。取得元 `reminders-v6/Y0Sn3.txt`',
-    verdictHead: '49e1341c', route: '/reminders',
+    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`（削除確認）。**一部失敗（`-fail`）の絵が初めて撮れた**——変種が基本手順を二重に持っていたのを直した（`capture-screens.mjs` は `[...steps, ...variant.steps]` で繋ぐ）。窓は開いたまま「選択したリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。」が出て、やり直せる。内部の番号も英語も出ない。設計との差は題の文言（設計「「未返信3日後フォロー」を削除しますか？」）。取得元 `reminders-v6/Y0Sn3.txt` ＋ `Y0Sn3-fail.txt`',
+    verdictHead: '2f016fcd',
+    route: '/reminders',
     mode: 'viewport', height: 1080,
     /* 撮れない理由: 一覧の選択チェックに aria-label が無く押せない。撮るには実装側に目印が要る */
     steps: [{ click: 'このページのリマインダをすべて選ぶ', role: 'checkbox' }, { click: '選択したリマインダを削除' }],
     /* 失敗しても窓が閉じないか、文が画面の言葉かを見る。撮影用の口は405。 */
-    variants: [{ suffix: '-fail', steps: [{ click: 'このページのリマインダをすべて選ぶ', role: 'checkbox' }, { click: '選択したリマインダを削除' }, { click: '削除する' }, { wait: 1200 }] }],
+    /*
+      **変種の手順は基本手順の続きとして足される**（`capture-screens.mjs` が
+      `[...s.steps, ...variant.steps]` で繋ぐ）。ここで全選択と削除を
+      もう一度書くと、**開いた確認窓の上から下のチェック欄を押すことになり**
+      「見つかった数 0」で時間切れになる。続きだけを書く。
+    */
+    variants: [{ suffix: '-fail', steps: [{ click: '削除する' }, { wait: 1200 }] }],
 
   },
   {
@@ -1014,7 +1026,9 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/auto-replies/publish` の page.tsx が `codex/development` に無い。台帳Issue #46 が同じ話。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/auto-replies/publish`。**画面が入ったので未実装ではなくなった。** 通常・読込・空・失敗・権限不足の5状態を1440・1920で撮った（はみ出し0、壊れ値0件）。`draft.settings` の形を確かめる前に読んで白い画面になっていたのも直した。設計との突き合わせは、モックに `/api/auto-replies/:id/conflicts` の固定データが入ってから。',
+    verdictHead: '2f016fcd',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 重なりの確認。最初に開く段 */
     /*
@@ -1025,46 +1039,30 @@ export const SCREENS = [
       apis: ['**/api/auto-replies/*/draft*', '**/api/auto-replies/*/conflicts*'],
       kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
     },
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
 
   },
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/auto-replies/publish` の page.tsx が `codex/development` に無い。台帳Issue #46 が同じ話。',
+    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/auto-replies/publish`（試験）。**画面は入った**が、モックに `/api/auto-replies/:id/conflicts` の固定データが無く、重なりの行を押せない。`scripts/visual-qa/` は S0 の所有。',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 「確認したので次へ」で試す段へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
 
   },
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/auto-replies/publish` の page.tsx が `codex/development` に無い。台帳Issue #46 が同じ話。',
+    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/auto-replies/publish`（最終確認）。`g46ja` と同じ理由。',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 試してから最後の確認へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
 
   },
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/auto-replies/publish` の page.tsx が `codex/development` に無い。台帳Issue #46 が同じ話。',
+    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/auto-replies/publish`（有効化完了）。`g46ja` と同じ理由。',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 公開まで押し切る */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }, { click: 'この内容で公開する', after: 1200 }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
 
   },
   {
@@ -1206,7 +1204,13 @@ export const SCREENS = [
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
     */
     states: {
-      apis: ['**/api/webinars/overview**'],
+      /*
+        **口の当てはめは、画面が実際に呼ぶものに合わせる。**
+        `/api/webinars/overview` は誰も呼んでいないので、差し替えが
+        一度も当たらず、素の絵が `-empty` という名前で保存されていた。
+        一覧が読むのは `/api/webinars`（`zCQXe` と同じ）。
+      */
+      apis: ['**/api/webinars*', '**/api/webinars/**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
@@ -1797,11 +1801,11 @@ export const SCREENS = [
     states: {
       apis: ['**/api/action-scores/friends*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
-    }, verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** P1 層の境目が設計と違う（設計 ふつう30〜69点・低い29点以下／実装 ふつう40〜69点・低い39点以下）。同じ点数の人が別の層に入る。P1 「内訳を見る」が無く、なぜその点数かを追えない。帯ごとの「この帯の人を見る」「この帯に配信する」も、文だけでボタンが無い。P2 呼び名が設計の「帯」でなく「層」。注意文から「マイル残高はスコアで増えも減りもしません」が落ちている。「点数が変わった理由は未取得」と正直に出しているのは正しい **ルート**：`/mileage?tab=score`。**取得元**：`mileage-v6/z3PB2.txt`。**推奨修正**：**層の境目を設計へそろえるのが先**（ふつう30〜69点・低い29点以下）。**同じ点数の人が別の層に入る**ので、配信の宛先がずれる。「内訳を見る」と帯ごとのボタンはそのあと。**「点数が変わった理由は未取得」と正直に出しているのは正しいので変えない。**', verdictHead: '6a3eb22b',
-    verdict: 'unjudged',
-    verdictNote: '**前の判定を取り消す。** 「層の境目が設計と違う（実装 ふつう40〜69点）」は誤りだった。境目は口が返す値をそのまま描いており、`packages/db` の `DEFAULT_BANDS` は 30 / 70 で**設計と一致**している。40 は**撮影用の固定データ**（`ACTION_SCORES.summary`）に書いてあった値で、同じファイルの `SCORE_BANDS` は 30。**固定データの中で食い違っていた**。30に直して撮り直すと「高い（70点以上）／ふつう（30〜69点）／低い（29点以下）」と設計どおりに出る。#624で呼び名を「層」→「帯」、断りの文を設計どおりにした（**「マイル残高はスコアで増えも減りもしません」が落ちていた**）。「顧客」→「お客様」。残る差：行ごとの「内訳を見る」（点数の内訳を返す口が無い）、タブの件数表示、「点がついている人」の全体比、帯ごとの押し口は帯を選んだときだけ出る（設計は常に出る）',
-    verdictSource: 'Claude実装',
-    verdictHead: '5e8f32d3',
+    },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 断り文と「帯」の言い方を設計にそろえて撮り直した（board#39）。** ルート `/mileage?tab=score`。通常・読込中・0件・取得失敗の5枚を1440・1920で撮った（10枚、はみ出し0）。 **設計と合わせたところ**：(1) 断り文を設計 `z3PB2` そのままに——「スコアはマイルではありません。**お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。**」。前は「顧客には表示されず…顧客の価値を表すものではありません」で、**「マイルが減るのでは」と聞かれたときに答えられなかった。** (2) 点数の集まりの呼び方を「層」→**「帯」**に統一（CSVの見出し・帯の説明・押し口・表の見出し・0件の断りの6か所）。「層」は人を分ける言い方に聞こえる（§7 #48 の表記ゆれ）。 **P1 設計にある「使い道」タブが実装に無い。** 設計のタブは 友だちの残高／たまる決めごと／**使い道**／履歴／行動スコア の5つだが、実装は4つ。17-1-B `qlVLJ`（マイルの使い道）の画面ごと無い。交換の口は skmtmst/line-harness-oss#772 で本流に入ったので、**画面を作れば繋がる**。 **P2 設計にある「スコアのルールを作る」への入口を置いていない。** 押し先の `/mileage/score-rules`（17-2-A `s6MBc`）がまだ実装に無く、**押しても何も起きない口になる**ため（§5-5）。board#75／skmtmst/line-harness-oss#770 が入ってから足す。 残りの差（帯の境目 40/39 と 30/29、件数、CSVボタンの文言）は撮影用の固定データと文言で、第2段で詰める。',
+    verdictSource: 'mileage-v6/z3PB2.txt',
+    verdictHead: 'd2710ef40',
   },
   {
     /*
@@ -2443,7 +2447,12 @@ export const SCREENS = [
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#475 `15febf7f` で撮った。** 帯は 管理スタッフ 5人（管理者2・その他3）／二要素認証 **2 / 5**（未設定3人）／過去30日のログイン 2回（失敗1）／最終ログイン 09:02 佐々木 亮太。上に **「🔑 二段階認証が未設定のユーザーが 3人 います」** と、**数ではなく次にすることを出す帯**がある。表は ユーザー・役割・担当範囲・LINE連携・二段階認証・利用状態・操作。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧は最後の操作と、権限の変更履歴への導線を持つ **ルート**：`/staff?tab=members`（見せる範囲）。**取得元**：`staff-v6/EOTS4.txt`。**推奨修正**：最後の操作と権限の変更履歴への導線を足す。**どちらも `jwVlo`（入った記録）が記録の一覧になってからでないと飛び先が無い**ので、そちらが先。**「二段階認証が未設定のユーザーが 3人 います」という、数ではなく次にすることを出す帯は維持する。**', verdictSource: 'staff-v6/EOTS4.txt',
-    mode: 'viewport', height: 1080, steps: [{ click: '高田 誠', role: 'text' }],
+    mode: 'viewport', height: 1080, /*
+      **行の押し口は「範囲を編集」。** 人の名前は文字で、押せる役を持っていない。
+      名前で探していたので、固定データを足したあとも0件のままだった
+      （`page.tsx:142` の行末が `範囲を編集`）。
+    */
+    steps: [{ click: '範囲を編集' }],
     verdictHead: '7b509106',
   },
   /*
@@ -2610,12 +2619,14 @@ export const SCREENS = [
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
-    dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
     /*
+      **マークの設定は専用の画面へ移った**（`/tags/marks/edit?id=`）。
+      前は一覧で「保留」を押して撮っていたが、いま一覧の名前は編集画面への
+      入口で、設計 `GMvBd` の印（`data-design-node`）も編集画面が持つ。
+      直接そこを開く。押して辿ると、一覧の固定データ次第で撮れなくなる。
       設計は名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。
-      マークを1つ選ぶとルールが出るので、押してから撮る。
     */
-    steps: [{ click: '保留' }],
+    dir: 'friend-attributes-v6', route: '/tags/marks/edit?id=mark-hold', mode: 'page',
     states: {
       apis: ['**/api/support-marks/*/automation-rules**'],
       kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
@@ -2626,17 +2637,16 @@ export const SCREENS = [
         suffix: 'conflict',
         state: { apis: ['**/api/support-marks/**/automation-rules**', '**/api/support-mark-rules/**'], kind: 'conflict' },
         steps: [
-          { click: '保留' },
           { qaOpen: 'GMvBd' },
           { fill: 'ルールの名前', text: '期限を過ぎたら確認待ちへ' },
           { qaOpen: 'GMvBd-save' },
         ],
       },
     ],
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** 契約枝 `codex/kenta-v6-support-mark-rules-api`（head `e95ac2b5`）の上に画面を実装。**未実装から外した。** 名前・色・並び順・初期値と自動変更ルールを同じ面で扱い、きっかけ5つ・優先順位・手動変更の保護時間を確認して保存できる。**並びは実行順そのもの**（Workerの `ORDER BY priority DESC, created_at ASC` と同じ）で、複数一致したときは上から1本だけ動くことを先に言う。読込中・0件・取得失敗・権限不足・版競合を混ぜず、5状態を撮った。**409では窓を閉じず**、書いた内容を残したまま「最新の内容を読み直す」を出す。停止は履歴を消さないことを確認窓に書く。残る差：設計は追加専用の1枚（パンくず「対応マーク > マークを追加」と下部の「キャンセル／対応マークを追加」）で、実装は一覧と同じ面に置いている。設計のルールは畳んだチップ（「担当者を割り当てたとき」→「このマークに変更」）で、実装は行に開いて出す。**条件（`condition`）の組み立ては未対応**——口は `SegmentCondition` を受けるが、組み立ての部品は `XBkiQ` と共通化してから入れる',
-    verdictSource: 'Claude実装',
-    verdictHead: '7b509106',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 自動変更ルールを同じ面に載せて撮った（board#34）。前は6状態とも撮れていなかった。** ルート `/tags/marks/edit?id=mark-hold`。通常・読込中・0件・取得失敗・権限不足・版競合の**7枚すべて**を1440・1920で撮った（14枚、はみ出し0）。 **設計 `GMvBd` は「基本情報」と同じ面に「自動変更ルール」を置く。** 別画面にすると「このマークがいつ付くのか」を見るのに行き来する。実装もその並びにした。 出ている中身：「受信・返信・担当割当・期限超過などをきっかけに、「保留」へ自動で変えられます。」「同時にいくつも当てはまったときは、上から順に見て最初に合った1本だけが動きます。」＋実行順の番号つきで2本（担当者が決まったとき・優先順位100・手動変更のあと1時間／返信の期限を過ぎたとき・優先順位50・**保護しない**）。**0は「保護しない」と書き、未取得の `—` と別にしている。** **撮れなかった原因はモックの欠けだった**（board#105）。対応マーク3件（「保留」を含む）と自動変更ルール2件を固定データに足して撮れるようにした。**止めているルールを1件混ぜている**——全部動いていると「動いています／止めています」の描き分けを一度も確かめられない。 **P1 API がまだ本流に無い**（skmtmst/line-harness-oss#758）。**404 を「取得失敗」に混ぜず「まだ接続されていません」と本文で断り、追加の口も押せなくした**（§5-5）。#758 が入るまで一致にしない。 **P2 設計との残る差**：設計はルール行に「担当者を割り当てたとき」「このマークに変更」と**変更先のマーク**まで書くが、実装はきっかけと優先順位まで。',
+    verdictSource: 'friend-attributes-v6/GMvBd.txt',
+    verdictHead: '30448b92',
   },
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',

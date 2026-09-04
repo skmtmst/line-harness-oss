@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 219,
-  "unimplemented": 26,
+  "compared": 223,
+  "unimplemented": 22,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 17,
   "match": 0,
   "structureMatchDataPending": 3,
-  "needsFix": 48,
+  "needsFix": 52,
   "unjudged": 181,
   "remaining": 258,
   "features": [
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 15,
+      "needsFix": 3,
+      "unjudged": 14,
       "remaining": 17,
       "capturedAt": [
         {
@@ -256,8 +256,8 @@
       "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 17,
+      "needsFix": 1,
+      "unjudged": 16,
       "remaining": 17,
       "capturedAt": [
         {
@@ -871,15 +871,15 @@
       "feature": 8,
       "name": "自動応答",
       "total": 11,
-      "compared": 6,
-      "unimplemented": 5,
+      "compared": 7,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 3,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
-      "unjudged": 0,
+      "needsFix": 7,
+      "unjudged": 3,
       "remaining": 11,
       "capturedAt": [
         {
@@ -941,11 +941,11 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 10,
-      "compared": 2,
+      "compared": 4,
       "unimplemented": 5,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 3,
+      "missing": 1,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 2,
@@ -1177,11 +1177,11 @@
       "feature": 12,
       "name": "リッチメニュー",
       "total": 9,
-      "compared": 4,
+      "compared": 5,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 5,
+      "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 4,
@@ -1566,8 +1566,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 9,
+      "needsFix": 1,
+      "unjudged": 8,
       "remaining": 11,
       "capturedAt": [
         {
@@ -2471,34 +2471,6 @@
       "name": "7-1-H 実行結果",
       "gap": "pending",
       "gapNote": "画面 `/reminders/detail` が development に無い。判定は未マージ枝 `4bc71249` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "U9hzqH",
-      "name": "8-1-D 競合と優先順位",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "g46ja",
-      "name": "8-1-E 自動応答テスト",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "Yj6CQ",
-      "name": "8-1-F 最終確認",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "e6iJG",
-      "name": "8-1-G 有効化完了",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
     },
     {
       "feature": 8,
