@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel from '@/components/shared/folder-panel'
@@ -576,30 +577,15 @@ export default function AutoRepliesPage() {
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
-          aria-label="並び順"
-          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
-        >
-          <option value="hits">ヒット数が多い順</option>
-          <option value="priority">評価順</option>
-          <option value="name">名前順</option>
-          <option value="created">作った順</option>
-        </select>
+        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "hits", label: "ヒット数が多い順" }, { value: "priority", label: "評価順" }, { value: "name", label: "名前順" }, { value: "created", label: "作った順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <select
+        <SelectField
+          size="compact"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
           aria-label="表示件数"
-          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
-        >
-          {[20, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n}件
-            </option>
-          ))}
-        </select>
+          options={[{ value: '20', label: '20件' }, { value: '50', label: '50件' }, { value: '100', label: '100件' }]}
+        />
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
