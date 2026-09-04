@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WebinarOverview, WebinarOverviewMetric } from '@/lib/api'
-import { NOT_AVAILABLE, audienceText, metricView, overviewCards } from './overview-view'
+import { NOT_AVAILABLE, audienceText, metricView, overviewCards, rateView } from './overview-view'
 
 const available = (value: number): WebinarOverviewMetric => ({
   value,
@@ -51,12 +51,18 @@ describe('ウェビナー一覧の実測値', () => {
     const card = overviewCards(overview()).find(({ key }) => key === 'viewers')
     expect(card?.view.text).toBe(NOT_AVAILABLE)
     expect(card?.view.note).toContain('区間')
+    expect(card?.detail).toContain('視聴率 —')
+  })
+
+  it('視聴率の小数を百分率で表示する', () => {
+    expect(rateView(available(0.729))).toEqual({ text: '72.9%', note: null, available: true })
   })
 
   it('CTAは延べクリック数ではなく押した人数を表示する', () => {
     const card = overviewCards(overview()).find(({ key }) => key === 'cta')
-    expect(card?.title).toBe('CTAを押した人')
+    expect(card?.title).toBe('CTA反応')
     expect(card?.view.text).toBe('86人')
+    expect(card?.detail).toBe('クリックした人')
   })
 })
 

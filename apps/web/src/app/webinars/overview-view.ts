@@ -27,6 +27,22 @@ export function metricView(
   }
 }
 
+export function rateView(metric: WebinarOverviewMetric | undefined): MetricView {
+  if (!metric || metric.state !== 'available' || metric.value === null) {
+    return {
+      text: NOT_AVAILABLE,
+      note: metric?.reason ?? '取得できていません',
+      available: false,
+    }
+  }
+
+  return {
+    text: `${Math.round(metric.value * 1000) / 10}%`,
+    note: null,
+    available: true,
+  }
+}
+
 export type OverviewCard = {
   key: 'webinars' | 'registrations' | 'viewers' | 'cta'
   title: string
@@ -40,6 +56,7 @@ export type OverviewCard = {
 export function overviewCards(overview: WebinarOverview | null): OverviewCard[] {
   const metrics = overview?.metrics
   const bookings = metricView(metrics?.registrationBookings, '件')
+  const viewRate = rateView(metrics?.viewRate)
 
   return [
     {
@@ -61,13 +78,15 @@ export function overviewCards(overview: WebinarOverview | null): OverviewCard[] 
       key: 'viewers',
       title: '視聴',
       view: metricView(metrics?.viewers, '人'),
-      detail: null,
+      detail: viewRate.available
+        ? `視聴率 ${viewRate.text}`
+        : `視聴率 ${NOT_AVAILABLE}（${viewRate.note}）`,
     },
     {
       key: 'cta',
-      title: 'CTAを押した人',
+      title: 'CTA反応',
       view: metricView(metrics?.ctaUniquePeople, '人'),
-      detail: null,
+      detail: 'クリックした人',
     },
   ]
 }

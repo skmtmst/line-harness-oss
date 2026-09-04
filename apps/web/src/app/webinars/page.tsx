@@ -218,9 +218,8 @@ export default function WebinarsPage() {
               >
                 {card.view.text}
               </p>
-              <p className="text-ink-faint mt-0.5 text-xs">
-                {card.view.note ?? card.detail ?? ''}
-              </p>
+              {card.view.note ? <p className="text-ink-faint mt-0.5 text-xs">{card.view.note}</p> : null}
+              {card.detail ? <p className="text-ink-faint mt-0.5 text-xs">{card.detail}</p> : null}
             </div>
           ))}
         </div>
