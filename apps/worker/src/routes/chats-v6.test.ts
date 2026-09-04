@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   createSavedSearch: vi.fn(),
   updateSavedSearch: vi.fn(),
   deleteSavedSearch: vi.fn(),
-  getUnansweredRowsMap: vi.fn(),
+  computeUnansweredInbox: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => ({
@@ -30,7 +30,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
 });
 
 vi.mock('../services/unanswered-inbox.js', () => ({
-  getUnansweredRowsMap: mocks.getUnansweredRowsMap,
+  computeUnansweredInbox: mocks.computeUnansweredInbox,
 }));
 
 import { chats } from './chats.js';
@@ -89,7 +89,12 @@ beforeEach(() => {
   mocks.getSavedSearchById.mockResolvedValue(null);
   mocks.updateSavedSearch.mockResolvedValue(null);
   mocks.deleteSavedSearch.mockResolvedValue(false);
-  mocks.getUnansweredRowsMap.mockResolvedValue(new Map());
+  mocks.computeUnansweredInbox.mockResolvedValue({
+    total: 0,
+    page: 1,
+    pageSize: 200,
+    rows: [],
+  });
 });
 
 describe('V6受信箱のアカウント境界', () => {
@@ -99,6 +104,39 @@ describe('V6受信箱のアカウント境界', () => {
     } as Env['Bindings']);
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ success: false });
+  });
+
+  test('未対応一覧は要求値が大きくてもDBページを200件に制限する', async () => {
+    const response = await app().request('/api/chats?unansweredOnly=true&limit=999', {}, {
+      DB: {} as D1Database,
+    } as Env['Bindings']);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, data: [] });
+    expect(mocks.computeUnansweredInbox).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ page: 1, pageSize: 200 }),
+    );
+  });
+
+  test('未対応一覧の検索・アカウント・状態・担当者をDBページングへ渡す', async () => {
+    const response = await app().request(
+      '/api/chats?unansweredOnly=true&q=%E8%A6%81%E7%A2%BA%E8%AA%8D&lineAccountId=account-1&status=unread&operatorId=operator-1&limit=25',
+      {},
+      { DB: {} as D1Database } as Env['Bindings'],
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.computeUnansweredInbox).toHaveBeenCalledWith(expect.anything(), {
+      q: '要確認',
+      account: 'account-1',
+      status: 'unread',
+      operatorId: 'operator-1',
+      page: 1,
+      pageSize: 25,
+      allowedAccountIds: ['account-1'],
+      canSeeUnassigned: false,
+    });
   });
 
   test.each([
@@ -125,39 +163,6 @@ describe('V6受信箱のアカウント境界', () => {
     const list = calls.find(({ sql }) => sql.includes('WITH last_any AS MATERIALIZED'));
     expect(list?.binds.at(-2)).toBe(expected);
     expect(list?.binds).not.toContain(-1);
-  });
-
-  test('未対応絞り込みはIDをSQLへ渡してから200件上限を適用する', async () => {
-    mocks.getUnansweredRowsMap.mockResolvedValue(new Map([
-      ['friend-1', {
-        lastIncomingAt: '2026-09-01T00:00:00Z',
-        lastIncomingContent: '要返信',
-        lastIncomingType: 'text',
-      }],
-    ]));
-    const calls: Array<{ sql: string; binds: unknown[] }> = [];
-    const db = {
-      prepare(sql: string) {
-        const call = { sql, binds: [] as unknown[] };
-        calls.push(call);
-        const statement = {
-          bind(...binds: unknown[]) { call.binds = binds; return statement; },
-          all: vi.fn(async () => ({ results: [] })),
-        };
-        return statement;
-      },
-    } as unknown as D1Database;
-
-    const response = await app().request(
-      '/api/chats?unansweredOnly=true&limit=9999',
-      {},
-      { DB: db } as Env['Bindings'],
-    );
-    expect(response.status).toBe(200);
-    const list = calls.find(({ sql }) => sql.includes('WITH last_any AS MATERIALIZED'))!;
-    expect(list.sql).toContain('f.id IN (SELECT value FROM json_each(?))');
-    expect(list.binds).toContain('["friend-1"]');
-    expect(list.binds.at(-2)).toBe(200);
   });
 });
 

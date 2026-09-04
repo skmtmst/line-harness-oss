@@ -505,8 +505,15 @@ export async function setFriendSupportMark(
   markId: string | null,
   scope: SupportMarkScope,
   actorId?: string | null,
+  detail?: Record<string, unknown> | null,
 ): Promise<boolean> {
   if (markId && !(await getSupportMarkById(db, markId, scope))) return false;
+  const before = await db
+    .prepare(`SELECT support_mark_id FROM friends WHERE id = ? AND line_account_id = ?`)
+    .bind(friendId, scope.lineAccountId)
+    .first<{ support_mark_id: string | null }>();
+  if (!before) return false;
+  if (before.support_mark_id === markId) return true;
   const result = await db
     .prepare(
       `UPDATE friends SET support_mark_id = ?
@@ -524,6 +531,11 @@ export async function setFriendSupportMark(
     action: 'changed',
     actorId: actorId ?? null,
     friendId,
+    detail: {
+      beforeMarkId: before.support_mark_id,
+      afterMarkId: markId,
+      ...(detail ?? {}),
+    },
   });
   return true;
 }

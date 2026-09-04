@@ -1850,6 +1850,102 @@ export type FriendAddEventViewState =
   | { status: "ready"; data: FriendAddEventList }
   | { status: "error"; message: string };
 
+/** 自動応答の公開前に固定する編集内容。保存しても本番ルールは変わらない。 */
+export interface AutoReplyDraftInput {
+  keyword: string;
+  matchType: "exact" | "contains";
+  responseType: string;
+  responseContent: string;
+  templateId: string | null;
+  lineAccountId: string;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  cooldownMinutes: number | null;
+  skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string[] | null;
+  friendConditions: Record<string, unknown> | null;
+  actions: unknown[] | null;
+  responseWeekdays: number[] | null;
+  responseHolidayRule: "ignore" | "include" | "exclude" | null;
+  oncePerFriend: boolean;
+  keywords: Array<{
+    keyword: string;
+    matchType?: "exact" | "contains";
+    minLength?: number;
+    caseSensitive?: boolean;
+  }> | null;
+  respondToAll: boolean;
+  name: string | null;
+  keywordMatchMode: "any" | "all";
+  folderId: string | null;
+}
+
+export interface AutoReplyDraftVersion {
+  autoReplyId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "retired";
+  settings: AutoReplyDraftInput;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export type AutoReplyTestReasonCode =
+  | "message_kind_not_matched"
+  | "keyword_not_matched"
+  | "outside_active_window"
+  | "weekday_not_allowed"
+  | "operator_handling"
+  | "already_replied_once"
+  | "cooldown_active"
+  | "friend_conditions_not_met";
+
+export interface AutoReplyConflict {
+  autoReplyId: string;
+  name: string;
+  certainty: "certain" | "possible";
+  winnerAutoReplyId: string;
+  reason: string;
+}
+
+export interface AutoReplyValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  conflicts: AutoReplyConflict[];
+  lastTestStatus: "succeeded" | "failed" | null;
+}
+
+export interface AutoReplyDryRunResult {
+  matched: boolean;
+  draftWon: boolean;
+  winner: {
+    autoReplyId: string;
+    name: string;
+    responseType: string;
+    responseContent: string;
+  } | null;
+  candidates: Array<{
+    autoReplyId: string;
+    name: string;
+    priority: number;
+    result: "not_matched" | "skipped" | "won";
+    reasonCodes: AutoReplyTestReasonCode[];
+  }>;
+  actions: Array<{ kind: string }>;
+  stateChanged: false;
+}
+
+export interface AutoReplyPublishResult {
+  autoReplyId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  acknowledgedConflictIds: string[];
+}
+
 /** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */
 export type ExecutionOwnerKind =
   | "broadcast"
@@ -2015,7 +2111,3 @@ export interface AutoReplyRunsResponse {
     offset: number;
   };
 }
-
-// -----------------------------------------------------------------------------
-// スコアリング (Lead Scoring)
-// -----------------------------------------------------------------------------

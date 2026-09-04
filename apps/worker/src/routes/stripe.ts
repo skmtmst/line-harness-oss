@@ -7,6 +7,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { listLimit } from './list-pagination.js';
 
 const stripe = new Hono<Env>();
@@ -128,8 +129,9 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
 
     // 決済成功時の自動処理
     if (body.type === 'payment_intent.succeeded' && friendId) {
-      const { applyScoring } = await import('@line-crm/db');
-      await applyScoring(db, friendId, 'purchase');
+      const friendAccount = await db.prepare(
+        `SELECT line_account_id FROM friends WHERE id = ?`,
+      ).bind(friendId).first<{ line_account_id: string | null }>();
 
       // 自動タグ付け（product_idベース）
       const productId = obj.metadata?.product_id;
@@ -158,10 +160,30 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
         },
         occurredAt: event.processed_at,
       });
+      if (friendAccount?.line_account_id) {
+        await applyActionScoreEvent(db, {
+          lineAccountId: friendAccount.line_account_id,
+          friendId,
+          eventType: 'purchase_completed',
+          source: 'stripe',
+          sourceEventId: body.id,
+          subjectKey: productId || obj.id,
+          occurredAt: event.processed_at,
+        }).catch((error) => {
+          // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
+          console.error('stripe action score failed:', error);
+        });
+      }
 
       // イベントバスに発火（自動化ルール用）
       const { fireEvent } = await import('../services/event-bus.js');
-      await fireEvent(db, 'cv_fire', { friendId, eventData: { type: 'purchase', amount: obj.amount, stripeEventId: body.id } });
+      await fireEvent(db, 'cv_fire', {
+        sourceEventId: body.id,
+        sourceKind: 'stripe',
+        occurredAt: event.processed_at,
+        friendId,
+        eventData: { type: 'purchase', amount: obj.amount, stripeEventId: body.id },
+      }, undefined, friendAccount?.line_account_id);
     }
 
     // サブスクリプションイベント処理

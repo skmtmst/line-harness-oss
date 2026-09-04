@@ -22,6 +22,7 @@ import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { applyActionScoreEvent } from '../services/action-score-events.js';
 
 const trackedLinks = new Hono<Env>();
 
@@ -408,13 +409,27 @@ trackedLinks.get('/t/:linkId', async (c) => {
           });
           const accountId = await resolveLinkAccountId(c.env.DB, link);
           if (accountId) {
-            await dispatchAutomationEventWithLogging(c.env.DB, {
-              lineAccountId: accountId,
-              eventType: 'link_clicked',
-              sourceEventId: click.id,
-              friendId,
-              eventData: { trackedLinkId: link.id, clickId: click.id },
-            });
+            const results = await Promise.allSettled([
+              applyActionScoreEvent(c.env.DB, {
+                lineAccountId: accountId,
+                friendId,
+                eventType: 'link_clicked',
+                source: 'tracked_link',
+                sourceEventId: click.id,
+                subjectKey: link.id,
+                occurredAt: click.clicked_at,
+              }),
+              dispatchAutomationEventWithLogging(c.env.DB, {
+                lineAccountId: accountId,
+                eventType: 'link_clicked',
+                sourceEventId: click.id,
+                friendId,
+                eventData: { trackedLinkId: link.id, clickId: click.id },
+              }),
+            ]);
+            for (const result of results) {
+              if (result.status === 'rejected') console.error('tracked link action event failed:', result.reason);
+            }
           }
         }
 
