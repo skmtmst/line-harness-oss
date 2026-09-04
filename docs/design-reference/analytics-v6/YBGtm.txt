@@ -67,6 +67,7 @@ Kenta Kawano
 ログアウト
 分析
 経路と成果
+Search Consoleを見る
 定期レポートをつくる
 友だちの増減
 配信の反応
