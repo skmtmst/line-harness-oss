@@ -6,6 +6,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { useAccount } from '@/contexts/account-context'
@@ -55,6 +56,15 @@ function ReservedBroadcastContent() {
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+    予約の取消。**送信が始まったあとは戻せない**ので、押す前に何が起きるかを
+    読ませ、押している間は受け付けない。取り消しても中身は消えず、下書きに
+    戻るだけ——作り直しにならないことを先に言う。
+  */
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const [cancelled, setCancelled] = useState(false)
   const requestGeneration = useRef(0)
 
   const load = useCallback(async () => {
@@ -221,10 +231,68 @@ function ReservedBroadcastContent() {
         </section>
       ) : null}
 
+      {cancelled && (
+        <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+          予約を取り消しました。内容は下書きとして残っています。
+        </p>
+      )}
+
       <div className="flex flex-wrap justify-center gap-3">
         <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>予約内容を確認</Button>
         <Button href="/broadcasts">配信予定へ戻る</Button>
+        {/*
+          **取り消せるのは、まだ送り始めていない予約だけ。**
+          送信中・送信済みに出すと、押せるのに409で断られる。
+        */}
+        {broadcast.status === 'scheduled' && !cancelled && (
+          <Button
+            onClick={() => { setCancelError(''); setCancelOpen(true) }}
+          >
+            予約を取り消す
+          </Button>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={cancelOpen}
+        title={`「${broadcast.title}」の予約を取り消しますか？`}
+        description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
+        confirmLabel="予約を取り消す"
+        destructive
+        busy={cancelling}
+        error={cancelError || undefined}
+        onCancel={() => {
+          if (cancelling) return
+          setCancelOpen(false)
+        }}
+        onConfirm={async () => {
+          if (cancelling) return
+          setCancelling(true)
+          setCancelError('')
+          try {
+            const res = await api.broadcasts.cancelReservation(broadcast.id)
+            if (!res.success) throw new Error(res.error)
+            setBroadcast(res.data)
+            setCancelled(true)
+            setCancelOpen(false)
+          } catch {
+            /*
+              **口の返事をそのまま出さない。** 409（もう予約中ではない）も
+              通信の失敗も、運用者にできることは同じ——読み直して確かめる。
+            */
+            setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
+          } finally {
+            setCancelling(false)
+          }
+        }}
+      >
+        <dl className="text-ink-secondary space-y-1 text-xs">
+          <div className="flex gap-2">
+            <dt className="text-ink-faint shrink-0">配信日時</dt>
+            <dd className="min-w-0">{formatJst(broadcast.scheduledAt)}</dd>
+          </div>
+        </dl>
+      </ConfirmDialog>
     </div>
   )
 }
