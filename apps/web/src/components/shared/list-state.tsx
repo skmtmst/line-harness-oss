@@ -30,7 +30,15 @@ const ICONS: Record<ListStateKind, typeof Inbox> = {
   forbidden: Lock,
 }
 
-const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
+/**
+ * 状態ごとの言葉。**画面側からも読めるように出す。**
+ *
+ * 一覧の外（帯や表の中）で同じ事故を伝える画面がある。そこで文言を
+ * 書き直すと、**同じ事故が画面によって違う言葉になる**（リマインダは
+ * 「リマインダの読み込みに失敗しました。もう一度お試しください。」で、
+ * ほかは「表示できませんでした」だった）。ここから引く。
+ */
+export const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
   loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
   error: { title: '表示できませんでした', description: '再読み込みしても直らない場合はエラー報告へ。' },
