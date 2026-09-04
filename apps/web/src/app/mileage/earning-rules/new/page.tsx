@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -290,21 +291,16 @@ export default function NewMileageRulePage() {
         </Field>
 
         <Field label="きっかけ" htmlFor="sc-event" required note={selected.note}>
-          <select
+          <SelectField
             id="sc-event"
             value={eventType}
             onChange={(e) => {
               setEventType(e.target.value)
               setSource('')
             }}
+            options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
             className={inputClass}
-          >
-            {EVENT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
 
         <Field
@@ -397,16 +393,7 @@ export default function NewMileageRulePage() {
         </Field>
 
         <Field label="同じ対象の数えかた" htmlFor="sc-unique">
-          <select
-            id="sc-unique"
-            value={uniqueMode}
-            onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)}
-            className={inputClass}
-          >
-            <option value="">何度でも数える</option>
-            <option value="subject">同じ対象は1回だけ</option>
-            <option value="subjectPerDay">同じ対象は1日1回だけ</option>
-          </select>
+          <SelectField id="sc-unique" value={uniqueMode} onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)} options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} className={inputClass} />
         </Field>
         <p className="text-ink-faint text-xs leading-relaxed">
           同じフォームやウェビナーを、何度でも1回として数えるかどうかです。1日1回にすると、日をまたげばまた対象になります。

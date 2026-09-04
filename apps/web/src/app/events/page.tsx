@@ -176,21 +176,17 @@ export default function EventsListPage() {
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>開催日が近い順</option>
-        </select>
+        {/*
+          **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
+          「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
+          ようになるのか読む人には分からない。
+        */}
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <select
-          disabled
-          title="表示件数の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>20件</option>
-        </select>
+        {/*
+          **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
+          「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
+          ようになるのか読む人には分からない。
+        */}
         <button
           disabled
           title="保存した条件は準備中です"

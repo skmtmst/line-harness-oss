@@ -269,18 +269,13 @@ function EditTagInner() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="倍率" htmlFor="tag-multiplier">
-                  <select
+                  <SelectField
                     id="tag-multiplier"
                     value={multiplier}
                     onChange={(e) => setMultiplier(e.target.value)}
+                    options={MULTIPLIERS.map((m) => ({ value: m.value, label: m.label }))}
                     className={inputClass}
-                  >
-                    {MULTIPLIERS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </Field>
                 <Field
                   label="優先度"
