@@ -6,6 +6,7 @@ import type { FriendAddRouting, FriendAddAction } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import SelectField from '@/components/shared/select-field'
 
 type Option = { id: string; name: string }
 
@@ -301,6 +302,7 @@ export default function FriendAddSettingsPage() {
                   }
                   options={scenarios}
                   placeholder="決めていない（有効なシナリオを全部流す）"
+                  ariaLabel="初回の友だちへ配信するシナリオ"
                 />
               </Field>
               <Field label="開始のタイミング">
@@ -315,6 +317,7 @@ export default function FriendAddSettingsPage() {
                     { id: 'immediate', name: 'すぐに配信' },
                     { id: 'scenario', name: 'シナリオの設定どおり' },
                   ]}
+                  ariaLabel="初回シナリオを開始するタイミング"
                 />
               </Field>
             </div>
@@ -376,6 +379,7 @@ export default function FriendAddSettingsPage() {
                     }
                     options={scenarios}
                     placeholder="選んでください"
+                    ariaLabel="以前からの友だちへ配信するシナリオ"
                   />
                 </Field>
                 )}
@@ -394,6 +398,7 @@ export default function FriendAddSettingsPage() {
                       { id: 'resume', name: '前回読んだところから' },
                       { id: 'beginning', name: '最初から' },
                     ]}
+                    ariaLabel="以前からの友だちへの配信開始位置"
                   />
                 </Field>
               </div>
@@ -447,6 +452,7 @@ export default function FriendAddSettingsPage() {
                     { id: 'unfollow_count_zero', name: 'ブロックされた回数が0回' },
                     { id: 'first_followed_at_missing', name: '初回フォロー日が未記録' },
                   ]}
+                  ariaLabel="初回の友だちを判定する基準"
                 />
               </Field>
               <Field label="ブロック解除の判定">
@@ -602,25 +608,25 @@ function Select({
   onChange,
   options,
   placeholder,
+  ariaLabel,
 }: {
   value: string
   onChange: (value: string) => void
   options: Option[]
   placeholder?: string
+  ariaLabel: string
 }) {
   return (
-    <select
+    <SelectField
       value={value}
       onChange={e => onChange(e.target.value)}
+      aria-label={ariaLabel}
       className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map(o => (
-        <option key={o.id} value={o.id}>
-          {o.name}
-        </option>
-      ))}
-    </select>
+      options={[
+        ...(placeholder ? [{ value: '', label: placeholder }] : []),
+        ...options.map((option) => ({ value: option.id, label: option.name })),
+      ]}
+    />
   )
 }
 
@@ -843,22 +849,23 @@ function ActionEditor({
           value={kind}
           onChange={v => setKind(v as ActionKind)}
           options={ACTION_KINDS as unknown as Option[]}
+          ariaLabel="友だち追加時に行うアクションの種類"
         />
       </Field>
       {(kind === 'tag_add' || kind === 'tag_remove') && (
         <Field label="タグ">
-          <Select value={tagId} onChange={setTagId} options={tags} placeholder="選んでください" />
+          <Select value={tagId} onChange={setTagId} options={tags} placeholder="選んでください" ariaLabel="友だち追加時に操作するタグ" />
         </Field>
       )}
       {kind === 'support_mark_set' && (
         <Field label="対応マーク">
-          <Select value={markId} onChange={setMarkId} options={marks} placeholder="選んでください" />
+          <Select value={markId} onChange={setMarkId} options={marks} placeholder="選んでください" ariaLabel="友だち追加時に付ける対応マーク" />
         </Field>
       )}
       {kind === 'friend_field' && (
         <>
           <Field label="友だち情報欄">
-            <Select value={fieldId} onChange={setFieldId} options={fields} placeholder="選んでください" />
+            <Select value={fieldId} onChange={setFieldId} options={fields} placeholder="選んでください" ariaLabel="友だち追加時に更新する友だち情報欄" />
           </Field>
           <Field label="入れる値">
             <input
@@ -872,7 +879,7 @@ function ActionEditor({
       )}
       {kind === 'scenario_start' && (
         <Field label="シナリオ">
-          <Select value={scenarioId} onChange={setScenarioId} options={scenarios} placeholder="選んでください" />
+          <Select value={scenarioId} onChange={setScenarioId} options={scenarios} placeholder="選んでください" ariaLabel="友だち追加時に開始するシナリオ" />
         </Field>
       )}
       {kind === 'mile' && (

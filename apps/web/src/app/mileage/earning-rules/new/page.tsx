@@ -308,18 +308,14 @@ export default function NewMileageRulePage() {
           htmlFor="sc-source"
           note="同じ行動でも、経由した場所ごとに分けられます。"
         >
-          <select
+          <SelectField
             id="sc-source"
             value={source}
             onChange={(e) => setSource(e.target.value)}
+            aria-label="行動の出どころ"
             className={inputClass}
-          >
-            {selected.sources.map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
+            options={selected.sources.map(([value, label]) => ({ value, label }))}
+          />
         </Field>
       </FormSection>
 
@@ -378,18 +374,14 @@ export default function NewMileageRulePage() {
           htmlFor="sc-cap"
           note="同じ人が1日に何回まで対象になるかです。"
         >
-          <select
+          <SelectField
             id="sc-cap"
             value={dailyCap}
             onChange={(e) => setDailyCap(e.target.value)}
+            aria-label="1日に数える回数"
             className={inputClass}
-          >
-            {DAILY_CAPS.map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
+            options={DAILY_CAPS.map(([value, label]) => ({ value, label }))}
+          />
         </Field>
 
         <Field label="同じ対象の数えかた" htmlFor="sc-unique">

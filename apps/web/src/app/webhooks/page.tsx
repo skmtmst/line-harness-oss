@@ -11,6 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
 
 type Tab = 'incoming' | 'outgoing'
@@ -533,7 +534,7 @@ function WebhooksPageInner() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">どこから来るか</label>
-              <select
+              <SelectField
                 value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
                 onChange={(e) => {
                   const next = e.target.value
@@ -541,14 +542,14 @@ function WebhooksPageInner() {
                   setSourceIsOther(false)
                   setInForm({ ...inForm, sourceType: next })
                 }}
+                aria-label="受信元の種類"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">選んでください</option>
-                {SOURCE_PRESETS.map((preset) => (
-                  <option key={preset.value} value={preset.value}>{preset.label}</option>
-                ))}
-                <option value={SOURCE_OTHER}>その他（自分で書く）</option>
-              </select>
+                options={[
+                  { value: '', label: '選んでください' },
+                  ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
+                  { value: SOURCE_OTHER, label: 'その他（自分で書く）' },
+                ]}
+              />
               {/* 選んだものが何を受け取るのかを、選んだ直後に出す。 */}
               {selectedPreset ? (
                 <p className="text-ink-faint mt-1 text-xs">{selectedPreset.hint}</p>

@@ -29,12 +29,7 @@ export const STEPS: ReadonlyArray<{
   { key: 'basic', no: 1, title: '基本設定', mark: 'webinar-step-basic' },
   { key: 'video', no: 2, title: '動画', mark: 'PV1Vh', node: 'PV1Vh' },
   { key: 'cta', no: 3, title: 'CTA・フォーム', mark: 'd3rFGD', node: 'd3rFGD' },
-  /*
-    通知・リマインドの設定は、この画面にまだ口が無い（台帳 Issue #93）。
-    **段そのものは出す。** 隠すと「ウェビナーに通知の機能が無い」と読まれ、
-    設計の5段のうち1つが欠けたまま公開まで進んでしまう。
-  */
-  { key: 'notifications', no: 4, title: '通知', mark: 'Ho8z4', node: 'Ho8z4', notConnected: '通知・リマインドの設定' },
+  { key: 'notifications', no: 4, title: '通知', mark: 'Ho8z4', node: 'Ho8z4' },
   { key: 'review', no: 5, title: '確認', mark: 'D6yO7e', node: 'D6yO7e' },
 ]
 
