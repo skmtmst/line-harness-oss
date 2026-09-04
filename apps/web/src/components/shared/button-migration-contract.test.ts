@@ -288,7 +288,7 @@ describe('標準ボタンの第1段階移行', () => {
     // LINEアカウント一覧（★V6 33-1）の表の最小幅 `min-w-[56rem]` と
     // 登録（★V6 33-2）の右の欄の幅 `xl:grid-cols-[minmax(0,1fr)_22rem]` で増えた。
     // 合わせて実測し直す。ほかの一覧の表も同じ書き方（`templates` は `min-w-[640px]`）。
-    expect(debt['arbitrary-value']).toBe(1179)
+    expect(debt['arbitrary-value']).toBe(1180)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
