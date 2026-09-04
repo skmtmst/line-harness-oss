@@ -390,11 +390,17 @@ export default function BroadcastForm({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState('')
+  const [previewConfirmed, setPreviewConfirmed] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (openTemplatePickerInitially) setShowTemplatePicker(true)
   }, [openTemplatePickerInitially])
+
+  // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
+  useEffect(() => {
+    setPreviewConfirmed(false)
+  }, [bubbles, scheduledDate, scheduledTime, sendMode])
 
   useEffect(() => {
     api.folders.list('broadcast')
@@ -648,7 +654,9 @@ export default function BroadcastForm({
     ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${Number(spreadMinutes) > 0 ? `（${spreadMinutes}分かけて配信）` : ''}`
     : null
   const unconfirmedCount = preflight
-    ? preflight.warnings.filter((w) => w.level === 'warning').length + (testResult ? 0 : 1)
+    ? preflight.warnings.filter((w) => w.level === 'warning').length
+      + (testResult ? 0 : 1)
+      + (previewConfirmed ? 0 : 1)
     : null
 
   /**
@@ -1143,6 +1151,22 @@ export default function BroadcastForm({
                 {testResult || '本番前に自分宛に1通送って、見え方を確認してください。'}
               </p>
             </li>
+            <li className={`rounded-control border p-2 ${previewConfirmed ? 'border-hairline' : 'border-warning-bg bg-warning-bg'}`}>
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={previewConfirmed}
+                  onChange={(event) => setPreviewConfirmed(event.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className={`block text-xs font-medium ${previewConfirmed ? 'text-ink' : 'text-warning'}`}>
+                    {previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}
+                  </span>
+                  <span className="text-ink-faint block text-xs">右側で文字切れ・画像・ボタンの見え方を確認してください。</span>
+                </span>
+              </label>
+            </li>
             {/* 開封数は配信先が20人以上のときだけ LINE から返る。人数が
                 足りないと空欄になるので、送る前に伝える。 */}
             <li className="border-hairline rounded-control border p-2">
@@ -1212,7 +1236,7 @@ export default function BroadcastForm({
       </>
     )} />
       </div>
-      <aside className="xl:sticky xl:top-6 xl:h-fit"><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
+      <aside className="xl:sticky xl:top-6 xl:h-fit"><h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3><p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
     {sendMode === 'scheduled' && scheduledDate && (
       <p className="text-ink-faint mt-1 text-center text-xs">
         {scheduledDate.replace(/-/g, '/')} {scheduledTime} から{' '}
@@ -1300,6 +1324,7 @@ export default function BroadcastForm({
                 <li key={w.message}>{w.message}</li>
               ))}
               {testResult ? null : <li>テスト送信がまだです</li>}
+              {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
             </ul>
           </div>
         ) : null}
