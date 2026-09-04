@@ -12,6 +12,10 @@ vi.mock('@line-crm/db', () => ({
   getLineAccounts: vi.fn().mockResolvedValue([{ id: 'acc-1', parent_line_account_id: null }]),
   getStaffById: vi.fn().mockResolvedValue({ account_scope: 'all' }),
   getStaffAccountScopeIds: vi.fn().mockResolvedValue([]),
+  getLineAccountArchiveBlockers: vi.fn().mockResolvedValue([]),
+  setDefaultLineAccount: vi.fn(),
+  archiveLineAccount: vi.fn(),
+  restoreLineAccount: vi.fn(),
   jstNow: () => '2026-08-15T00:00:00+09:00',
 }));
 
