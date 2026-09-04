@@ -5,8 +5,10 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
+import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
-import { webinarApi, type Webinar } from '@/lib/api'
+import { ApiError, webinarApi, type Webinar } from '@/lib/api'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -61,7 +63,7 @@ export default function WebinarsPage() {
   const [page, setPage] = useState(1)
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
 
   const visibleItems = loadedAccountId === selectedAccountId ? items : []
 
@@ -70,7 +72,7 @@ export default function WebinarsPage() {
     if (!selectedAccountId) {
       setItems([])
       setLoadedAccountId(null)
-      setError(false)
+      setLoadFailure(null)
       setLoading(false)
       return
     }
@@ -78,14 +80,23 @@ export default function WebinarsPage() {
     setLoading(true)
     setItems([])
     setLoadedAccountId(null)
-    setError(false)
+    setLoadFailure(null)
     try {
       const res = await webinarApi.list(accountId)
       if (requestGeneration.current !== generation) return
+      /*
+        **配列で来なかったら、そこで止める。**
+        口の契約は配列（`apps/worker/src/routes/webinars.ts` は
+        `data: items.results.map(serializeWebinar)` を返す）だが、器だけが
+        違う返事（`{items:[],total:0}` など）が来ると `[...narrowed]` で
+        `narrowed is not iterable` になり、**一覧が白い画面になる**。
+        読めなかったこととして扱えば、理由と読み直しの口が出る。
+      */
+      if (!Array.isArray(res.data)) throw new ApiError(500, 'ウェビナーの一覧が読めない形で返りました')
       setItems(res.data)
       setLoadedAccountId(accountId)
-    } catch {
-      if (requestGeneration.current === generation) setError(true)
+    } catch (err) {
+      if (requestGeneration.current === generation) setLoadFailure(webinarLoadFailure(err))
     } finally {
       if (requestGeneration.current === generation) setLoading(false)
     }
@@ -94,6 +105,9 @@ export default function WebinarsPage() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  /** 数を出してよいのは、読めたときだけ。 */
+  const hasListData = !accountLoading && !loading && loadFailure === null && Boolean(selectedAccountId)
 
   const filtered = useMemo(() => {
     // タイトルと slug の両方を見る。URLで探すこともあるため。
@@ -149,12 +163,17 @@ export default function WebinarsPage() {
       <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ウェビナー</p>
+          {/*
+            **読めていないときに 0 件と書かない。** 「1つも無い」と
+            「読めなかった」は別のことで、0 と出すと消えたように見える。
+            数が無いときは `—`（単位も付けない。`—件` は数に見える）。
+          */}
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {visibleItems.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+            {hasListData ? visibleItems.length : '—'}
+            {hasListData && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {visibleItems.filter((w) => w.status === 'active').length}
+            公開中 {hasListData ? visibleItems.filter((w) => w.status === 'active').length : '—（未取得）'}
           </p>
         </div>
         {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
@@ -234,9 +253,7 @@ export default function WebinarsPage() {
         </div>
 
         {accountLoading || loading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-            読み込み中...
-          </div>
+          <ListState kind="loading" />
         ) : !selectedAccountId ? (
           <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
             <div className="text-ink font-medium">
@@ -245,18 +262,17 @@ export default function WebinarsPage() {
                 : 'LINE公式アカウントが登録されていません'}
             </div>
           </div>
-        ) : error ? (
-          <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
-            <div className="text-danger font-medium">ウェビナーを読み込めませんでした</div>
-            <p className="text-ink-secondary mt-2 text-sm">通信状態を確認して、もう一度読み込んでください。</p>
-            <Button
-              variant="primary"
-              onClick={() => void refresh()}
-              className="mt-4"
-            >
-              もう一度読み込む
-            </Button>
-          </div>
+        ) : loadFailure ? (
+          /*
+            権限不足と読み込み失敗を1枚ずつ言い分ける。**押しても直らない
+            ときは読み直しの口を出さない。**
+          */
+          <ListState
+            kind={loadFailure.kind}
+            title={loadFailure.title}
+            description={loadFailure.description}
+            action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined}
+          />
         ) : visibleItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
@@ -303,7 +319,7 @@ export default function WebinarsPage() {
             ))}
           </div>
         )}
-        {!loading && !error && selectedAccountId && filtered.length > 0 && (
+        {hasListData && filtered.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-ink-faint text-xs tabular-nums">
               {visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件

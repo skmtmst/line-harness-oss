@@ -1149,7 +1149,13 @@ export const SCREENS = [
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
     */
     states: {
-      apis: ['**/api/webinars/overview**'],
+      /*
+        **口の当てはめは、画面が実際に呼ぶものに合わせる。**
+        `/api/webinars/overview` は誰も呼んでいないので、差し替えが
+        一度も当たらず、素の絵が `-empty` という名前で保存されていた。
+        一覧が読むのは `/api/webinars`（`zCQXe` と同じ）。
+      */
+      apis: ['**/api/webinars*', '**/api/webinars/**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しを副次ボタンに統一（`yxyzQ` が緑の主ボタンだった）／#48 表記統一。設計画像は `docs/design-reference/webinars-v6/` を撮り直した。**実装との突き合わせはこれから。** 契約枝 `codex/kenta-v6-webinar-contracts-v2`（head `7b2dc2f9`）の `GET /api/webinars/overview` を読むようにした。**前の判定「一覧では数えられません」は解消。** ウェビナー数6件（公開中3）／申込428人（**延べ予約451件を分けて添える**）／視聴 `—`「実際に見た区間の記録をまだ集計できないため」／CTAを押した人86人。**設計の視聴312人・72.9%は固定値で置かない**——口が unavailable と理由を返すので、そのまま出す。**CTAは押した実人数**で、設計の「CTA反応…件 クリック」という件数の名前は使わない（クリック延べ数は取れない）。通常・0件・取得失敗・権限不足を別に撮った（8枚）。失敗は帯ごと失敗にして「集計を読み直す」を出す。**アカウント切替時は前の集計をその場で捨てる**。残る差：設計は行ごとに申込・視聴を出すが、実装は1本ぶんの数を一覧で持たない。フォルダの縦帯も無い', verdictSource: 'webinars-v6/ZC13r.txt + webinars-v6/design-qa.md' , verdictHead: '7b509106' },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しを副次ボタンに統一（`yxyzQ` が緑の主ボタンだった）／#48 表記統一。設計画像は `docs/design-reference/webinars-v6/` を撮り直した。**実装との突き合わせはこれから。** **P1 作成の段が無い。** ルート `/webinars/new`。撮った本文の見出しは「ウェビナーを作る／録画と配信枠を設定すると、友だちが『◯』…」の1枚で、設計の 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 という段が無い。**段の終わり（公開前確認 `D6yO7e`・公開完了 `TimXl`）が未実装**なので、作り終えたかどうかを画面が言えない。**推奨修正**：#508 が `D6yO7e` を実装済みなので、#507 → #508 の取り込み後に段を通す。取得元：`webinars-v6/lvaY5.txt`。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt' , verdictHead: '7b509106' },
