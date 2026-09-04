@@ -2126,3 +2126,45 @@ export const EC_OVERVIEW = {
     { eventType: 'ec_shipping.shipped', label: '発送', count: 20 },
   ],
 }
+
+/**
+ * `/api/mileage/rewards` — マイルの使い道（`qlVLJ` 17-1-B）。
+ *
+ * 設計の数字をそのまま置いている。**`neverRedeemedFriendCount` は null。**
+ * 本物の口（`packages/db/src/mileage-rewards.ts`）がいま固定で null を返すので、
+ * ここで 786 を入れると、**撮った絵だけが本物より良く見える**。
+ * 設計の 786人 と実装の `—` の差は、絵ではなく台帳の判定で言う。
+ */
+function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
+  return {
+    id: `mrv-${requiredMiles}`, versionNumber: 1, status: 'published',
+    requiredMiles, stockLimit, perFriendLimit: null,
+    startsAt: null, endsAt: null, benefitExpiresDays: 30,
+    commonActionVersionId: null, failurePolicy: 'refund',
+    customerMessage: '交換ありがとうございます。', publishedAt: '2026-08-01T00:00:00.000Z',
+    ...extra,
+  }
+}
+
+export const MILEAGE_REWARDS = {
+  rewards: [
+    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
+    { id: 'mr-2', name: '誕生月クーポン', description: '誕生月に使える 10%オフ', rewardKind: 'coupon', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1200, 200), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', name: '先行案内', description: '新商品を先にお知らせします', rewardKind: 'early_access', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(2000, null), exchangedThisMonth: 6, availableCodeCount: null },
+    { id: 'mr-4', name: 'ゴールドのタグ', description: 'タグ「ゴールド」が付きます', rewardKind: 'tag', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(5000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
+    { id: 'mr-5', name: 'お試しセット', description: null, rewardKind: 'coupon', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(800, 50), exchangedThisMonth: 0, availableCodeCount: null },
+  ].map((reward) => ({
+    lineAccountId: 'acc-1', programId: 'mp-1', imageUrl: null,
+    currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,
+    createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-30T00:00:00.000Z',
+    ...reward,
+  })),
+  summary: {
+    publishedCount: 4,
+    redeemedMilesThisMonth: 18900,
+    neverRedeemedFriendCount: null,
+    mostRedeemedRewardName: '送料無料',
+    mostRedeemedRewardCount: 32,
+  },
+}

@@ -1030,6 +1030,65 @@ export type MileageAdjustmentResult = {
   balanceAfter: number
   replayed: boolean
 }
+/*
+ * マイルの使い道（`/api/mileage/rewards`）。#772 で口が入った。
+ *
+ * **版を分けて持つ。** 公開中の版と直しかけの下書きは別で、
+ * 直しても公開中の交換条件は変わらない。画面でもそこを混ぜない。
+ */
+export type MileageRewardKind = 'coupon' | 'tag' | 'scenario' | 'template' | 'early_access' | 'rank'
+export type MileageRewardStatus = 'draft' | 'published' | 'stopped' | 'archived'
+export type MileageRewardFailurePolicy = 'retry' | 'refund' | 'manual'
+
+export type MileageRewardVersion = {
+  id: string
+  versionNumber: number
+  status: 'draft' | 'published'
+  requiredMiles: number
+  /** 数に限りがあるとき。null なら限りなし。**0 と混ぜない。** */
+  stockLimit: number | null
+  perFriendLimit: number | null
+  startsAt: string | null
+  endsAt: string | null
+  benefitExpiresDays: number | null
+  commonActionVersionId: string | null
+  failurePolicy: MileageRewardFailurePolicy
+  customerMessage: string
+  publishedAt: string | null
+}
+
+export type MileageRewardSummary = {
+  id: string
+  lineAccountId: string
+  programId: string
+  name: string
+  description: string | null
+  imageUrl: string | null
+  rewardKind: MileageRewardKind
+  status: MileageRewardStatus
+  sortOrder: number
+  currentDraftVersionId: string | null
+  currentPublishedVersionId: string | null
+  currentVersion: MileageRewardVersion | null
+  exchangedThisMonth: number
+  /** 引換コードの残り。数える経路が無いときは null。**0 と混ぜない。** */
+  availableCodeCount: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type MileageRewardAdminOverview = {
+  rewards: MileageRewardSummary[]
+  summary: {
+    publishedCount: number
+    redeemedMilesThisMonth: number
+    /** 1回も使っていない人。数える経路が無いときは null。 */
+    neverRedeemedFriendCount: number | null
+    mostRedeemedRewardName: string | null
+    mostRedeemedRewardCount: number | null
+  }
+}
+
 export type MileageRule = {
   id: string
   name: string
@@ -4304,6 +4363,14 @@ export const api = {
       ),
   },
   mileage: {
+    /*
+      使い道の一覧（#772 の口）。**アカウント単位で返る。**
+      渡さないと、ほかの店の使い道まで混ざる。
+    */
+    rewards: (accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardAdminOverview>>(
+        `/api/mileage/rewards?accountId=${encodeURIComponent(accountId)}`,
+      ),
     overview: (params?: { accountId?: string; search?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
       if (params?.accountId) query.set('accountId', params.accountId)

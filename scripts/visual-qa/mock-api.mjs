@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  MILEAGE_REWARDS,
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
   COMMON_VAR_DELETE_IMPACT,
@@ -514,6 +515,7 @@ const SHAPES = {
       ],
     },
   },
+  '/api/mileage/rewards': MILEAGE_REWARDS,
   '/api/mileage/history': {
     items: [
       {
