@@ -1801,6 +1801,13 @@ export const SCREENS = [
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
     verdictHead: '31293424',
+    /* 第1段の記録を残し、現在の判定だけを後勝ちで更新する。 */
+    ...{
+      verdict: 'structure_match_data_pending',
+      verdictNote: '**2026-09-04 S3 第2段で再照合。** 構造一致・データ未接続。設計本文、現在の2段確認ダイアログ、既存の1440/1920確認記録を突き合わせた。だれの残高を動かすか、増減、マイル数、理由区分、詳しい理由、変更前・変更量・変更後、実行者を残す説明がそろい、残高不足・二重反映・高額調整を安全側で止める。設計にあるLINE通知と有効期限は送信・失効台帳が未接続のため、画面も「実行しません」と明示して値を作っていない。正本要件 §4-7 の問い合わせ・注文・調整元IDは実装済み。**接続条件**：送信台帳と失効ロットが入ったら通知・期限を接続し、同じ2幅で撮り直す。',
+      verdictSource: 'mileage-v6/vz0Ji.txt + apps/web/src/app/mileage/friends/detail/mileage-adjustment-dialog.tsx + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
+      verdictHead: 'eb0a4fea8',
+    },
   },
   {
     /*
@@ -1813,6 +1820,13 @@ export const SCREENS = [
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** #624で「渡すもの」を選ぶ欄から**並べたタイル**へ。それぞれ何が起きるかを添えた。選ぶ欄だと開くまで中身が見えない。**設計の「回答フォームへ」「品もの」は入れていない**——`MileageRewardKind` に無く、勝手に足すと選べるように見えて保存できない（契約待ち）。#549で入った安全策3つ（公開版の固定・二重交換の防止・渡せなかったときの決めごと）は設計に無いがそのまま残す。残る差：「だれが交換できますか」の条件、「交換されたときにすること」の後続処理、右の「使い道のつくりかた」「つながる先」',
     verdictSource: 'Claude実装',
     verdictHead: '5e8f32d3',
+    /* #863 合流後の実装を照合した現在の判定。 */
+    ...{
+      verdict: 'needs_fix',
+      verdictNote: '**2026-09-04 S3 第2段で再照合。** 要修正。#863 合流後の実装には、名前・説明・必要マイル、渡す種類、在庫、1人あたり上限、期間、有効日数、公開版を直接変えない下書き、受け渡し失敗時の再試行・返却、顧客への案内、公開前確認がそろう。今回 `eb0a4fea8` で、既存の副作用なしテストAPIを「自分で交換をテスト」へ接続し、残高と在庫を動かさない結果を表示した。残る差は「だれが交換できるか」の条件、運用者が選べる共通アクション、画像・クーポンの選択、右側の作り方とつながる先。回答フォーム・品ものは保存契約に無いため、選べるふりをさせない。新規実装画像は実行環境の Chromium Mach port 拒否で未取得。**推奨修正**：次は共通条件と共通アクションの選択APIを接続し、1440/1920で撮り直す。',
+      verdictSource: 'mileage-v6/p9CcEB.txt + apps/web/src/app/mileage/rewards/edit/page.tsx + apps/web/src/app/mileage/rewards/edit/reward-form.test.ts + docs/v6-requirements/v6-17-mileage-score-requirements-draft.md',
+      verdictHead: 'eb0a4fea8',
+    },
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
