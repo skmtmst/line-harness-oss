@@ -10,6 +10,9 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
+import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import type { Folder } from '@line-crm/shared'
 import {
   createBlockedReason,
   failureOf,
@@ -27,6 +30,8 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  /** 置き場。未分類は null。一覧の口が返している。 */
+  folderId: string | null
   question: TemplateQuestion | null
   questionStatus: 'draft' | 'published'
   usageCount: number
@@ -108,6 +113,18 @@ export default function TemplatesPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+  /*
+    フォルダ。**`category`（テンプレートが持つ文字列）から組み立てるのを
+    やめ、本物のフォルダを読む。** 設計 `CzndJ` は「フォルダはアカウントで
+    1組」で、名前・色・並び順・削除を持つ。文字列から組み立てると、
+    空のフォルダが作れず、名前を直すと中身が散らばる。
+  */
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderError, setFolderError] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   /**
@@ -221,7 +238,12 @@ export default function TemplatesPage() {
     if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
       return false
     }
-    if (selectedCategory !== 'all' && (t.category || '未分類') !== selectedCategory) return false
+    /*
+      フォルダで絞る。**`category` の文字列ではなく `folderId` で見る。**
+      `unfiled` は置き場の無いもの。
+    */
+    if (selectedCategory === 'unfiled' && t.folderId !== null) return false
+    if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return false
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
     if (typeFilter === 'question') return Boolean(t.question)
@@ -229,11 +251,59 @@ export default function TemplatesPage() {
     return t.messageType === typeFilter
   })
 
-  const categoryCounts = templates.reduce<Record<string, number>>((counts, template) => {
-    const category = template.category || '未分類'
-    counts[category] = (counts[category] ?? 0) + 1
-    return counts
-  }, {})
+  /** フォルダを読み直す。並び順は API の `displayOrder` に従う。 */
+  const loadFolders = useCallback(async () => {
+    setFolderError('')
+    try {
+      const res = await api.folders.list('template')
+      if (res.success) setFolders(res.data)
+      else setFolderError('フォルダを読み込めませんでした。')
+    } catch {
+      setFolderError('フォルダを読み込めませんでした。')
+    }
+  }, [])
+
+  useEffect(() => { void loadFolders() }, [loadFolders])
+
+  /**
+   * 並び順を入れ替える。
+   *
+   * **隣と番号を交換する。** 全部に振り直すと、同時に触った人の並びを
+   * 上書きしてしまう。端の行には押し口を出さないので、隣は必ずある。
+   */
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    const target = folders[index]
+    const neighbor = folders[index + direction]
+    if (!target || !neighbor) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      await api.folders.update(target.id, { displayOrder: neighbor.displayOrder })
+      await api.folders.update(neighbor.id, { displayOrder: target.displayOrder })
+      await loadFolders()
+    } catch {
+      setFolderError('並び順を変えられませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!deletingFolder) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(deletingFolder.id)
+      if (!res.success) throw new Error(res.error ?? '削除できませんでした')
+      setDeletingFolder(null)
+      if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
+      await loadFolders()
+    } catch {
+      setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
 
   const handleCreate = async () => {
     if (!selectedAccountId) {
@@ -419,32 +489,53 @@ export default function TemplatesPage() {
       <div className={styles.body} data-design="Body">
       {activeSection === 'message' ? <>
       <div className={styles.contentLayout}>
-      <aside className={`${styles.folderRail} bg-canvas border-hairline shrink-0 rounded-card border p-3`} aria-label="テンプレートのフォルダ">
-        <div className="text-ink-secondary mb-2 flex items-center justify-between text-xs font-bold">
-          <span>フォルダ</span>
-          <span>{Object.keys(categoryCounts).length}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSelectedCategory('all')}
-          className={`flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === 'all' ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+      {/*
+        フォルダの帯。**本物のフォルダを出す。**
+        以前は `category`（テンプレートが持つ文字列）から組み立てていたので、
+        空のフォルダを作れず、名前を直すと中身が散らばった。
+      */}
+      <div className={`${styles.folderRail} shrink-0`}>
+        <FolderPanel
+          total={`${folders.length} 件`}
+          activeId={selectedCategory}
+          onSelect={setSelectedCategory}
+          rows={[
+            { id: 'all', label: 'すべて', count: templates.length },
+            ...folders.map((folder, index) => ({
+              id: folder.id,
+              label: folder.name,
+              count: templates.filter((t) => t.folderId === folder.id).length,
+              color: folder.color,
+              onEdit: () => setEditingFolder(folder),
+              // 端の行には口を出さない。押せない矢印を置かない。
+              onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
+              onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+              onDelete: () => setDeletingFolder(folder),
+              deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
+            })),
+            {
+              id: 'unfiled',
+              label: '未分類',
+              count: templates.filter((t) => t.folderId === null).length,
+            },
+          ]}
         >
-          <span>すべて</span>
-          <span className="text-xs tabular-nums">{templates.length}</span>
-        </button>
-        {Object.entries(categoryCounts).map(([category, count]) => (
-          <button
-            key={category}
-            type="button"
-            onClick={() => setSelectedCategory(category)}
-            className={`mt-1 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === category ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-            title={category}
-          >
-            <span className="min-w-0 truncate">{category}</span>
-            <span className="ml-2 shrink-0 text-xs tabular-nums">{count}</span>
-          </button>
-        ))}
-      </aside>
+          <Button type="button" onClick={() => setFolderDialogOpen(true)} className="w-full">
+            フォルダを追加
+          </Button>
+          {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
+          {/*
+            **移せないことを、その場で断る。** フォルダは作れるが、
+            テンプレートを入れる口がまだ無い（`POST`/`PUT /api/templates` が
+            `folderId` を受けない）。作れるのに移せないと、
+            「入れたのに反映されない」と読まれる。
+          */}
+          <p className="text-ink-faint text-xs leading-relaxed">
+            テンプレートをフォルダへ移す操作は、まだ繋がっていません。
+            置き場を保存する口が接続されると使えます。
+          </p>
+        </FolderPanel>
+      </div>
       <div className="min-w-0 flex-1">
 
       {/*
@@ -939,6 +1030,46 @@ export default function TemplatesPage() {
           }}
         />
       </div>
+
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="template"
+          note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
+          placeholder="例: 01_定期便"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => { setFolderDialogOpen(false); void loadFolders() }}
+        />
+      )}
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="template"
+          folder={editingFolder}
+          note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
+          placeholder="例: 01_定期便"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void loadFolders() }}
+        />
+      )}
+
+      {/*
+        **消す前に、中身がどうなるかを本文で読ませる。**
+        設計 `CzndJ` の「削除しても、中のテンプレートは未分類に残ります。」。
+        吹き出しだけでは読めない。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中のテンプレートは未分類に残ります。いまこのフォルダに入っているのは${
+          deletingFolder ? templates.filter((t) => t.folderId === deletingFolder.id).length : 0
+        }件です。`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
+      />
       </div>
       </div>
       </> : <BroadcastAssetManager kind={activeSection} />}

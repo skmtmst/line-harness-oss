@@ -1211,6 +1211,7 @@ export interface FriendFieldReminderRow {
   trigger_field_id: string | null;
   repeat_yearly: number;
   line_account_id: string | null;
+  scan_cursor: string | null;
 }
 
 /** 友だち情報欄の日付を起点にする、動いているリマインダ。 */
@@ -1219,22 +1220,29 @@ export async function getFriendFieldReminders(
 ): Promise<FriendFieldReminderRow[]> {
   const rows = await db
     .prepare(
-      `SELECT id, name, trigger_field_id, repeat_yearly, line_account_id
-         FROM reminders
-        WHERE is_active = 1
-          AND deleted_at IS NULL
-          AND trigger_type = 'friend_field'
-          AND trigger_field_id IS NOT NULL`,
+      `SELECT r.id, r.name, r.trigger_field_id, r.repeat_yearly, r.line_account_id,
+              s.cursor AS scan_cursor
+         FROM reminders r
+         LEFT JOIN friend_field_reminder_scan_states s ON s.reminder_id = r.id
+        WHERE r.is_active = 1
+          AND r.deleted_at IS NULL
+          AND r.trigger_type = 'friend_field'
+          AND r.trigger_field_id IS NOT NULL
+        ORDER BY r.id ASC`,
     )
     .all<FriendFieldReminderRow>();
   return rows.results ?? [];
 }
 
-/** その欄に値を入れている友だちを、値と一緒に返す。 */
-export async function getFriendsWithFieldValue(
+/** その欄に値を入れている友だちを、保存済みカーソルの続きから返す。 */
+export async function getFriendsWithFieldValuePage(
   db: D1Database,
   fieldId: string,
+  lineAccountId: string | null,
+  afterFriendId: string | null,
+  limit: number,
 ): Promise<Array<{ friend_id: string; value: string }>> {
+  if (!Number.isInteger(limit) || limit < 1) return [];
   const rows = await db
     .prepare(
       `SELECT v.friend_id AS friend_id, v.value AS value
@@ -1242,39 +1250,80 @@ export async function getFriendsWithFieldValue(
          JOIN friends f ON f.id = v.friend_id
         WHERE v.field_id = ?
           AND v.value IS NOT NULL AND v.value != ''
-          AND f.is_following = 1`,
+          AND f.is_following = 1
+          AND (? IS NULL OR f.line_account_id = ?)
+          AND (? IS NULL OR v.friend_id > ?)
+        ORDER BY v.friend_id ASC
+        LIMIT ?`,
     )
-    .bind(fieldId)
+    .bind(fieldId, lineAccountId, lineAccountId, afterFriendId, afterFriendId, limit)
     .all<{ friend_id: string; value: string }>();
   return rows.results ?? [];
 }
 
 /**
- * その人・そのリマインダ・そのゴール日での登録が、もうあるか。
- *
- * 毎年くり返すリマインダは、年ごとに別のゴール日になる。だから
- * 「去年立てたから今年は立てない」にはならない。同じ年に二重に立つのだけを防ぐ。
+ * 次回走査の開始位置を保存する。末尾まで読んだときは null に戻し、次の周期を
+ * 先頭から始める。
  */
-/**
- * このリマインダに、いま入っている「友だち＋ゴール日」の組を全部返す。
- *
- * 毎日の処理で1人ずつ `hasReminderEnrollment` を呼ぶと、**友だちの数だけ
- * 問い合わせが飛ぶ。** 誕生日リマインダは「誕生日が入っている人」を全員
- * 見るので、5,000人いれば毎日5,000回になる。Cloudflare Workers の
- * 1回の実行で出せる問い合わせ数には上限があり、そこに当たると
- * **その日のぶんが途中で止まる**（しかも例外にならず、途中まで動いたように見える）。
- *
- * 1回で引いて、あとは手元で照合する。
- */
-export async function getReminderEnrollmentKeys(
+export async function setFriendFieldReminderScanCursor(
   db: D1Database,
   reminderId: string,
-): Promise<Set<string>> {
-  const rows = await db
-    .prepare(`SELECT friend_id, target_date FROM friend_reminders WHERE reminder_id = ?`)
-    .bind(reminderId)
-    .all<{ friend_id: string; target_date: string }>();
-  return new Set((rows.results ?? []).map((r) => `${r.friend_id}\u0000${r.target_date}`));
+  cursor: string | null,
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO friend_field_reminder_scan_states (reminder_id, cursor, updated_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(reminder_id) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`,
+  ).bind(reminderId, cursor, jstNow()).run();
+}
+
+const FRIEND_REMINDER_INSERT_CHUNK = 30;
+
+/**
+ * 友だち情報欄の走査で見つけた登録候補を、100 bind 未満の塊で登録する。
+ *
+ * NOT EXISTS で過去のランダムIDの登録を除外し、決定的なIDと INSERT OR IGNORE で
+ * 中断後の再実行や同時実行でも二重登録しない。
+ */
+export async function enrollFriendsInReminderOnce(
+  db: D1Database,
+  reminderId: string,
+  candidates: Array<{ friendId: string; targetDate: string }>,
+): Promise<number> {
+  let enrolled = 0;
+  const now = jstNow();
+
+  for (let offset = 0; offset < candidates.length; offset += FRIEND_REMINDER_INSERT_CHUNK) {
+    const chunk = candidates.slice(offset, offset + FRIEND_REMINDER_INSERT_CHUNK);
+    const values = chunk.map(() => '(?, ?, ?)').join(', ');
+    const bindings: unknown[] = [];
+    for (const candidate of chunk) {
+      bindings.push(
+        `ffr:${encodeURIComponent(reminderId)}:${encodeURIComponent(candidate.friendId)}:${encodeURIComponent(candidate.targetDate)}`,
+        candidate.friendId,
+        candidate.targetDate,
+      );
+    }
+    bindings.push(reminderId, now, now);
+
+    const result = await db.prepare(
+      `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
+       INSERT OR IGNORE INTO friend_reminders
+         (id, friend_id, reminder_id, target_date, created_at, updated_at)
+       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?
+         FROM candidates c
+        WHERE NOT EXISTS (
+          SELECT 1
+            FROM friend_reminders existing
+           WHERE existing.friend_id = c.friend_id
+             AND existing.reminder_id = ?
+             AND existing.target_date = c.target_date
+        )`,
+    ).bind(...bindings, reminderId).run();
+    enrolled += Number(result.meta?.changes ?? 0);
+  }
+
+  return enrolled;
 }
 
 export async function hasReminderEnrollment(

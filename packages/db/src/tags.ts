@@ -1157,6 +1157,36 @@ export async function getFriendTags(
   return result.results;
 }
 
+/**
+ * 表示中の友だちのタグを1回で取得する。
+ * ID配列はjson_eachへ1バインドで渡し、D1のバインド数上限にも依存しない。
+ */
+export async function getFriendTagsByFriendIds(
+  db: D1Database,
+  friendIds: string[],
+): Promise<Map<string, Tag[]>> {
+  if (friendIds.length === 0) return new Map();
+  const result = await db
+    .prepare(
+      `SELECT ft.friend_id, t.*, fo.color AS folder_color
+       FROM friend_tags ft
+       INNER JOIN tags t ON t.id = ft.tag_id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
+       WHERE ft.friend_id IN (SELECT CAST(value AS TEXT) FROM json_each(?))
+       ORDER BY ft.friend_id ASC, t.name ASC`,
+    )
+    .bind(JSON.stringify(friendIds))
+    .all<Tag & { friend_id: string }>();
+
+  const byFriendId = new Map<string, Tag[]>();
+  for (const row of result.results) {
+    const tags = byFriendId.get(row.friend_id) ?? [];
+    tags.push(row);
+    byFriendId.set(row.friend_id, tags);
+  }
+  return byFriendId;
+}
+
 import type { Friend } from './friends';
 
 export async function getFriendsByTag(
