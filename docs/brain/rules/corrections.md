@@ -76,3 +76,7 @@
 ## 2026-09-04
 - 指摘: 自分のPRはマージせず、required gateがSUCCESSになったらIssueへ「ゲート合格」とコメントして次の仕事へ進む
 - 今後: マージは司令塔の統合PRに任せ、個別PRのbase更新競争を起こさない。既にマージ済みのPRはそのままとする
+
+## 2026-09-04
+- 指摘: 統合PRで基準点が動いた作業区切りでは最新baseを取り込み、自分のPRがCONFLICTINGなら最優先で直す
+- 今後: 作業区切りに `git fetch origin && git merge origin/codex/development` を実行し、競合解消を新規作業より先に行う
