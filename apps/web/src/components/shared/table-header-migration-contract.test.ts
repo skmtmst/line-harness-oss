@@ -22,14 +22,16 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('5ルートのV6標準見出し65セルを共通Thで維持する', () => {
+  it('5ルートのV6標準見出し66セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
     // 2026-09-02: 描かれない /tags のV5枝を消し、8セル減って65。
     // **減ったので締め直す。**
-    expect(migrated).toBe(65)
+    // 2026-09-04: テンプレートに「置き場」列を足して66（台帳 #124。
+    // フォルダへ入れる口ができたので、行から直接移せるようにした）。
+    expect(migrated).toBe(66)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
