@@ -83,22 +83,53 @@ jobs:
             exit 0
           fi
 
+          # 旧来の共有ファイルへ新しい履歴行を足すと、同時作業のたびに競合する。
+          # ファイル自体は過去分として残すが、新規行はPRごとのファイルだけに書く。
+          legacy_added=$(git diff "$BASE_SHA...$HEAD_SHA" \
+            -- docs/release-log/unreleased.md \
+            | grep '^+[-*] ' || true)
+          if [ -n "$legacy_added" ]; then
+            echo "::error::旧 docs/release-log/unreleased.md へ反映履歴を追加できません。"
+            echo "docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md を作ってください。"
+            printf '%s\n' "$legacy_added" | sed 's/^+/    /'
+            exit 1
+          fi
+
+          # 変更したPR別ファイルは、見出しを「追加・変更・修正」に限定する。
+          release_files=$(git diff --diff-filter=AM --name-only "$BASE_SHA...$HEAD_SHA" \
+            -- 'docs/release-log/unreleased/*.md')
+          while IFS= read -r release_file; do
+            [ -n "$release_file" ] || continue
+            invalid_headings=$(grep -nE '^#{1,6}[[:space:]]' "$release_file" \
+              | grep -vE '^[0-9]+:## (追加|変更|修正)$' || true)
+            if [ -n "$invalid_headings" ]; then
+              echo "::error file=${release_file}::反映履歴の見出しは「追加」「変更」「修正」だけです。"
+              printf '%s\n' "$invalid_headings" | sed 's/^/    /'
+              exit 1
+            fi
+            if ! grep -qE '^## (追加|変更|修正)$' "$release_file"; then
+              echo "::error file=${release_file}::反映履歴に「追加」「変更」「修正」の見出しがありません。"
+              exit 1
+            fi
+          done <<EOF
+          $release_files
+          EOF
+
           # 文書とワークフローだけの変更は対象外。
           if ! printf '%s\n' "$changed" | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
             echo "文書・ワークフローだけの変更のため、反映履歴の確認を飛ばしました。"
             exit 0
           fi
 
-          # 反映履歴は2か所から拾う。
+          # 新しい反映履歴はPRごとのファイルだけから拾う。
           #
-          #   docs/release-log/unreleased/<番号>-<担当>-<何の話か>.md  ← これから
-          #   docs/release-log/unreleased.md                          ← これまで
+          #   docs/release-log/unreleased/<番号>-<担当>-<何の話か>.md
           #
           # 1ファイルに全員が書き足す形だと、**全員が同じ場所（`## 追加` の
           # 直後）に行を差し込むので、PRのたびに必ずぶつかる。** 一晩で9本の
           # PRが全部ここで止まった。1本ずつ別のファイルにすれば起きない。
           added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" \
-            -- docs/release-log/unreleased.md 'docs/release-log/unreleased/*.md' \
+            -- 'docs/release-log/unreleased/*.md' \
             | grep '^+[-*] ' || true)
           added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
           if [ "$added" -gt 0 ]; then
