@@ -961,6 +961,10 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  /** 統括内で最初に選ぶ既定アカウントか。 */
+  isDefault: boolean;
+  /** アーカイブ日時。null なら通常利用中。 */
+  archivedAt: string | null;
   /** 友だち数の上限。null なら上限を管理しない */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null なら警告しない */
