@@ -209,7 +209,7 @@ function FriendAddPublishInner() {
         kind="error"
         title={failure?.title}
         description={failure?.description}
-        action={<Button type="button" onClick={() => setReloadKey((k) => k + 1)}>読み直す</Button>}
+        onRetry={() => setReloadKey((key) => key + 1)}
       />
     )
   }

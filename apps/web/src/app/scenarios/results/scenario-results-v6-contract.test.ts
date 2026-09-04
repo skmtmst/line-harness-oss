@@ -16,7 +16,7 @@ describe('V6 5-1-L シナリオ配信結果', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('kind="empty"')
-    expect(PAGE).toContain('配信結果を再読み込み')
+    expect(PAGE).toContain('onRetry={() => void load()}')
   })
 
   it('取れない開封・クリック・失敗数を0として作らない', () => {
