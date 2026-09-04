@@ -135,7 +135,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       ) : state === 'loading' ? (
         <ListState kind="loading" title="運用者へのお知らせを読み込んでいます" />
       ) : state === 'error' ? (
-        <ListState kind="error" title="運用者へのお知らせを表示できませんでした" action={<Button onClick={() => void load()} variant="secondary">もう一度読み込む</Button>} />
+        <ListState kind="error" title="運用者へのお知らせを表示できませんでした" onRetry={() => void load()} />
       ) : state === 'forbidden' ? (
         <ListState kind="forbidden" />
       ) : rules.length === 0 ? (

@@ -302,7 +302,7 @@ export default function SegmentPresetControls({
               kind="error"
               title="保存した条件を表示できませんでした"
               description="通信状態を確認して、もう一度お試しください。"
-              action={<Button type="button" variant="secondary" onClick={() => void loadPresets()}>再読み込み</Button>}
+              onRetry={() => void loadPresets()}
             />
           ) : null}
           {!loading && !loadError && presets.length === 0 ? (

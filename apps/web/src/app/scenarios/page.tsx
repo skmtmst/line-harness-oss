@@ -457,7 +457,7 @@ export default function ScenariosPage() {
           kind="error"
           title="シナリオを表示できませんでした"
           description="登録したシナリオは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={<Button variant="secondary" onClick={() => void loadScenarios()}>シナリオを再読み込み</Button>}
+          onRetry={() => void loadScenarios()}
         />
       ) : (
         <ScenarioList

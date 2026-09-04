@@ -24,7 +24,7 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('kind="loading"');
     expect(page).toContain('kind="empty"');
     expect(page).toContain('kind="error"');
-    expect(page).toContain('写真を再読み込み');
+    expect(page).toContain('onRetry={() => void load()}');
     expect(page).toContain("countsReady ? counts.pending : '—'");
     expect(page).toContain("countsReady ? counts[value] : '—'");
   });

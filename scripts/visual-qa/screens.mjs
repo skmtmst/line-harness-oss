@@ -1817,10 +1817,6 @@ export const SCREENS = [
     */
     ...MILEAGE, node: 'p9CcEB', name: '17-1-G マイルの使い道をつくる',
     route: '/mileage/rewards/edit?id=mr-1', mode: 'page',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/mileage/rewards/edit` が development に無い。判定は未マージ枝 `5e8f32d3` で書かれたもの',
-    why: '`/mileage/rewards/edit` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged',
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** #624で「渡すもの」を選ぶ欄から**並べたタイル**へ。それぞれ何が起きるかを添えた。選ぶ欄だと開くまで中身が見えない。**設計の「回答フォームへ」「品もの」は入れていない**——`MileageRewardKind` に無く、勝手に足すと選べるように見えて保存できない（契約待ち）。#549で入った安全策3つ（公開版の固定・二重交換の防止・渡せなかったときの決めごと）は設計に無いがそのまま残す。残る差：「だれが交換できますか」の条件、「交換されたときにすること」の後続処理、右の「使い道のつくりかた」「つながる先」',
     verdictSource: 'Claude実装',

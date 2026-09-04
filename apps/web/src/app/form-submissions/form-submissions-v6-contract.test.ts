@@ -20,7 +20,7 @@ describe('V6回答フォーム一覧', () => {
     expect(PAGE).toContain("kind=\"error\"")
     expect(PAGE).toContain('まだ回答フォームがありません')
     expect(PAGE).toContain('条件に合うフォームはありません')
-    expect(PAGE).toContain('回答フォームを再読み込み')
+    expect(PAGE).toContain('onRetry={() => void loadForms()}')
   })
 
   it('フォーム数と公開中は未取得を0件にせずダッシュで表示する', () => {

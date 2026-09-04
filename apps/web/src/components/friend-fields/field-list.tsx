@@ -196,7 +196,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
           <tbody className="divide-y divide-hairline">
             {status === 'loading' ? <tr><td colSpan={7} className="p-0"><ListState kind="loading" /></td></tr>
               : status === 'forbidden' ? <tr><td colSpan={7} className="p-0"><ListState kind="forbidden" description="友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
-              : status === 'error' ? <tr><td colSpan={7} className="p-0"><ListState kind="error" description={error || '友だち情報欄を読み込めませんでした。'} action={<Button variant="secondary" onClick={() => void load()}>友だち情報欄を再読み込み</Button>} /></td></tr>
+              : status === 'error' ? <tr><td colSpan={7} className="p-0"><ListState kind="error" description={error || '友だち情報欄を読み込めませんでした。'} onRetry={() => void load()} /></td></tr>
               : items.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ友だち情報欄がありません" description="「＋ 項目を追加」から最初の項目を作ってください。" /></td></tr>
               : visible.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" /></td></tr>
               : visible.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
