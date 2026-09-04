@@ -80,7 +80,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(137)  // 2026-09-04: 合流ブランチの4画面（自動応答の公開・実行結果、ウェビナーの公開完了、友だち追加時配信の実行結果）と、development 側の LINEアカウントの登録・詳細・乗り換えが**どちらも増えた**ので実測し直す。
+    expect(PAGES.length).toBe(141)  // 2026-09-04: 合流ブランチと development の追加画面を合わせた実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

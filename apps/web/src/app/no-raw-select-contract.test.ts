@@ -93,7 +93,7 @@ const NOT_YET: Record<string, number> = {
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(137)  // 2026-09-04: 合流ブランチの4画面（自動応答の公開・実行結果、ウェビナーの公開完了、友だち追加時配信の実行結果）と、development 側の LINEアカウントの登録・詳細・乗り換えが**どちらも増えた**ので実測し直す。
+    expect(PAGES.length).toBe(141)  // 2026-09-04: 合流ブランチと development の追加画面を合わせた実測値。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {

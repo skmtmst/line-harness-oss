@@ -127,7 +127,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(137)  // 2026-09-04: 合流ブランチの4画面（自動応答の公開・実行結果、ウェビナーの公開完了、友だち追加時配信の実行結果）と、development 側の LINEアカウントの登録・詳細・乗り換えが**どちらも増えた**ので実測し直す。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(141)  // 2026-09-04: 合流ブランチと development の追加画面を合わせた実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

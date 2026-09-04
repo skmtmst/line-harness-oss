@@ -195,6 +195,9 @@
     "direct-primary-button": 3,
     "direct-secondary-button": 3
   },
+  "app/getting-started/page.tsx": {
+    "unresolved-classname": 20
+  },
   "app/health/page.tsx": {
     "unresolved-classname": 5,
     "direct-th": 11,
@@ -277,6 +280,12 @@
   "app/pools/new/page.tsx": {
     "unresolved-classname": 3
   },
+  "app/recipes/clone/page.tsx": {
+    "unresolved-classname": 32
+  },
+  "app/recipes/page.tsx": {
+    "unresolved-classname": 17
+  },
   "app/reminders/edit/page.tsx": {
     "unresolved-classname": 9,
     "arbitrary-value": 7,
@@ -347,6 +356,9 @@
   "app/search-console/page.tsx": {
     "arbitrary-value": 11,
     "direct-th": 5
+  },
+  "app/settings/manual-links/page.tsx": {
+    "unresolved-classname": 5
   },
   "app/settings/page.tsx": {
     "arbitrary-value": 52,
