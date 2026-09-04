@@ -286,8 +286,8 @@ describe('標準ボタンの第1段階移行', () => {
     // タブの `shadow-[0_-1px_0_0_rgba(226,232,240,1)]` が1つ消えて 1179。
     // 同じ日に LINEアカウント一覧（★V6 33-1）の表の最小幅 `min-w-[56rem]` と、
     // 登録（★V6 33-2）の右の欄の幅 `xl:grid-cols-[minmax(0,1fr)_22rem]` が増えた。
-    // ほかの一覧の表も同じ書き方（`templates` は `min-w-[640px]`）。
-    expect(debt['arbitrary-value']).toBe(1180)
+    // 4画面ぶんを合わせて 1181。ほかの一覧の表も同じ書き方（`templates` は `min-w-[640px]`）。
+    expect(debt['arbitrary-value']).toBe(1181)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
