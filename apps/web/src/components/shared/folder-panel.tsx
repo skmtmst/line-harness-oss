@@ -29,6 +29,22 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /**
+   * 並び順を動かす。**端の行には渡さない**（押せない口を置かない）。
+   * 設計 `CzndJ` の「並び順を上へ／下へ」。
+   */
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  /** 消す。設計 `CzndJ` の「フォルダを削除」。 */
+  onDelete?: () => void
+  /**
+   * 消す前に読ませる一言。**中身がどうなるかを、押す前に書く。**
+   *
+   * 設計 `CzndJ` は「削除しても、中のテンプレートは未分類に残ります。」。
+   * **この部品はテンプレートにも属性にも使う**ので、言葉は呼ぶ側が決める。
+   * ここで「テンプレート」と書くと、ほかの画面で嘘になる。
+   */
+  deleteNote?: string
 }
 
 export default function FolderPanel({
@@ -47,7 +63,8 @@ export default function FolderPanel({
   children?: ReactNode
 }) {
   return (
-    <aside className="bg-canvas rounded-card border-hairline h-fit overflow-hidden border">
+    // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
+    <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-hidden border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
         <p className="text-ink text-sm font-semibold">フォルダ</p>
         <span className="text-ink-faint text-xs tabular-nums">{total}</span>
@@ -90,7 +107,7 @@ export default function FolderPanel({
               <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>
             </button>
             {/* 直す入口は行にカーソルを置いたときだけ。常に出していると、
-                選ぶつもりで押し間違える。消すのは編集の中に置く。 */}
+                選ぶつもりで押し間違える。 */}
             {row.onEdit && (
               <button
                 onClick={row.onEdit}
@@ -99,6 +116,46 @@ export default function FolderPanel({
                 className="text-ink-faint hover:text-accent px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
               >
                 編集
+              </button>
+            )}
+            {/*
+              並び順。**端の行には口を出さない。** 押せない矢印を置くと、
+              押せるのか壊れているのか分からない（`onMoveUp` を渡さない側で
+              決める）。
+            */}
+            {row.onMoveUp && (
+              <button
+                onClick={row.onMoveUp}
+                aria-label={`フォルダ「${row.label}」を上へ`}
+                title="並び順を上へ"
+                className="text-ink-faint hover:text-accent px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+              >
+                ↑
+              </button>
+            )}
+            {row.onMoveDown && (
+              <button
+                onClick={row.onMoveDown}
+                aria-label={`フォルダ「${row.label}」を下へ`}
+                title="並び順を下へ"
+                className="text-ink-faint hover:text-accent px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+              >
+                ↓
+              </button>
+            )}
+            {row.onDelete && (
+              <button
+                onClick={row.onDelete}
+                aria-label={`フォルダ「${row.label}」を削除`}
+                /*
+                  **消したあとどうなるかを、押す前に読ませる。**
+                  吹き出しだけでは読み落とすので、呼ぶ側は確認窓にも同じ
+                  言葉を出す（`deleteNote` を渡す）。
+                */
+                title={row.deleteNote ?? 'フォルダを削除'}
+                className="text-ink-faint hover:text-danger px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+              >
+                削除
               </button>
             )}
           </div>
