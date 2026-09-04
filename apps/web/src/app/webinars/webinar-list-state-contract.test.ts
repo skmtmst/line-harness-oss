@@ -9,6 +9,7 @@ import { webinarLoadFailure } from './webinar-load-failure'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const OVERVIEW = readFileSync(join(HERE, 'overview-view.ts'), 'utf8')
 
 /**
  * ウェビナー一覧（設計 `ZC13r` 10-1 ／ `zCQXe` 10-1-L）の、
@@ -54,17 +55,24 @@ describe('読み込めなかった理由の見分け', () => {
 })
 
 describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
-  it('読めていないときに 0 件と書かない', () => {
+  it('集計が読めていないときに 0 件と書かない', () => {
     /*
      * 「1つも無い」と「読めなかった」は別のこと。0 と出すと消えたように見える。
      */
-    expect(PAGE).toContain("{hasListData ? visibleItems.length : '—'}")
-    expect(PAGE).toContain("公開中 {hasListData ? visibleItems.filter((w) => w.status === 'active').length : '—（未取得）'}")
+    expect(PAGE).toContain('overviewCards(visibleOverview)')
+    expect(OVERVIEW).toContain("metric.state !== 'available' || metric.value === null")
+    expect(OVERVIEW).toContain('metric?.reason ??')
   })
 
-  it('数が無いときは単位も出さない', () => {
-    /* `—件` は数に見える。 */
-    expect(PAGE).toContain('{hasListData && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}')
+  it('集計失敗を空表示にせず、その場で再読み込みできる', () => {
+    expect(PAGE).toContain('visibleOverviewFailure ? (')
+    expect(PAGE).toContain('集計を読み直す')
+    expect(PAGE).toContain('visibleOverviewFailure.retryable')
+  })
+
+  it('アカウント切替時に前の集計を表示しない', () => {
+    expect(PAGE).toContain('loadedOverviewAccountId === selectedAccountId ? overview : null')
+    expect(PAGE).toContain('overviewRequestGeneration.current !== generation')
   })
 
   it('読めていないときはページ送りを出さない', () => {
