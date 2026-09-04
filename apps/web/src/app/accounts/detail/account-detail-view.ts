@@ -92,9 +92,7 @@ export function accountActions(account: LineAccount): AccountAction[] {
       title: '乗り換えを始める',
       description: '別のLINEアカウントへ、友だちと設定を引き継ぎます。事前確認をしてから本実行します。',
       actionLabel: '乗り換えを始める',
-      // 乗り換えの画面（★V6 33-4）はこの次に作る。**行き先の無い青字を
-      // 置かない**——押せるのに行き止まりだと、壊れていると読まれる。
-      blockedReason: '乗り換えの画面は、この次に作ります。',
+      blockedReason: null,
     },
     {
       key: 'archive',

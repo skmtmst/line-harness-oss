@@ -89,10 +89,10 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     */
     const actions = accountActions(account())
     const blocked = actions.filter((a) => a.blockedReason !== null).map((a) => a.key)
-    // 乗り換えの画面（33-4）はこの次。**行き先の無い青字を置かない。**
-    expect(blocked).toEqual(['copy', 'handover', 'archive'])
+    expect(blocked).toEqual(['copy', 'archive'])
     // 押せるものには理由を付けない。
     expect(actions.find((a) => a.key === 'stop')?.blockedReason).toBeNull()
+    expect(actions.find((a) => a.key === 'handover')?.blockedReason).toBeNull()
   })
 
   it('止める・再開するで言葉が変わる', () => {

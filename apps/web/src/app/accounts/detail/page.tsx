@@ -134,6 +134,10 @@ function AccountDetail() {
                   */}
                   {action.blockedReason ? (
                     <p className="text-ink-faint mt-2 text-xs leading-relaxed">{action.blockedReason}</p>
+                  ) : action.key === 'handover' ? (
+                    <Button href={`/accounts/handover?id=${account.id}`} className="mt-2">
+                      {action.actionLabel}
+                    </Button>
                   ) : (
                     <Button type="button" className="mt-2" onClick={() => setStopTarget(account)}>
                       {action.actionLabel}
@@ -204,10 +208,9 @@ function AccountDetail() {
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
             別のLINEアカウントへ、友だちと設定を引き継ぎます。事前確認をしてから本実行します。
           </p>
-          {/* 行き先の無い青字を置かない。画面ができたらここに口を出す。 */}
-          <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-            乗り換えの画面は、この次に作ります。
-          </p>
+          <Button href={`/accounts/handover?id=${account.id}`} variant="primary" className="mt-3">
+            乗り換えを始める
+          </Button>
         </section>
       )}
 
