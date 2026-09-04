@@ -2996,6 +2996,11 @@ export const api = {
       ),
   },
   broadcasts: {
+    /** 予約中の配信だけを、内容を残した下書きへ安全に戻す。 */
+    cancelReservation: (id: string) =>
+      fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
+        method: 'POST',
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<ApiBroadcast[]>>('/api/broadcasts' + query)
