@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS analytics_projection_metric_stage (
   metric_date     TEXT NOT NULL,
   event_type      TEXT NOT NULL,
   event_count     INTEGER NOT NULL,
+  unique_friend_count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (line_account_id, cycle_id, metric_date, event_type)
 );
 
@@ -37,3 +38,9 @@ CREATE TABLE IF NOT EXISTS analytics_projection_friend_stage (
   friend_id       TEXT NOT NULL,
   PRIMARY KEY (line_account_id, cycle_id, metric_date, event_type, friend_id)
 );
+
+-- INSERT OR IGNORE で本当に増えた友だちだけを増分集計する。
+-- 完走時に全中間行を COUNT し直さず、1回の読込上限を守る。
+CREATE TRIGGER IF NOT EXISTS analytics_projection_friend_stage_count
+AFTER INSERT ON analytics_projection_friend_stage
+BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;

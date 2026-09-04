@@ -436,10 +436,10 @@ export async function rebuildAnalyticsDailyMetricsChunk(
          numerator, denominator, value, state, data_cutoff_at, updated_at
        )
        SELECT line_account_id, metric_date, 'unique_friends', 'event_type', event_type,
-              COUNT(*), NULL, COUNT(*), 'available', ?, datetime('now')
-         FROM analytics_projection_friend_stage
+              unique_friend_count, NULL, unique_friend_count, 'available', ?, datetime('now')
+         FROM analytics_projection_metric_stage
         WHERE line_account_id = ? AND cycle_id = ?
-        GROUP BY line_account_id, metric_date, event_type`,
+      `,
     ).bind(state.data_cutoff_at, state.line_account_id, state.cycle_id),
   ]);
   const projected = await db.prepare(

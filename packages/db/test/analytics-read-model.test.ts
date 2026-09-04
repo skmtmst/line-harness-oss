@@ -17,8 +17,9 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-function asD1(sqlite: Database.Database): D1Database {
+function asD1(sqlite: Database.Database, queries?: string[]): D1Database {
   function prepare(query: string): D1PreparedStatement {
+    queries?.push(query);
     const statement = sqlite.prepare(query);
     const make = (params: unknown[]): D1PreparedStatement => ({
       bind: (...next: unknown[]) => make(next),
@@ -177,18 +178,27 @@ describe('V6分析イベントと日別投影', () => {
   });
 
   it('1万件超を8千件ずつ再開し、一括再構築と同じ日別値で確定する', async () => {
+    const projectionQueries: string[] = [];
+    db = asD1(sqlite, projectionQueries);
+    const insertFriend = sqlite.prepare(`
+      INSERT INTO friends (id, line_user_id, line_account_id)
+      VALUES (?, ?, 'account-a')
+    `);
     const insert = sqlite.prepare(`
       INSERT INTO analytics_events (
         id, line_account_id, friend_id, event_type, source_kind, source_id,
         occurred_at, idempotency_key
-      ) VALUES (?, 'account-a', 'friend-a', 'message_received', 'test', ?,
+      ) VALUES (?, 'account-a', ?, 'message_received', 'test', ?,
                 '2026-08-26T00:00:00.000Z', ?)
     `);
     sqlite.transaction(() => {
       for (let index = 0; index < 10_501; index += 1) {
         const id = `event-${String(index).padStart(5, '0')}`;
-        insert.run(id, id, id);
+        const friendId = `chunk-friend-${String(index).padStart(5, '0')}`;
+        insertFriend.run(friendId, `chunk-line-user-${String(index).padStart(5, '0')}`);
+        insert.run(id, friendId, id, id);
       }
+      insert.run('event-10501', 'chunk-friend-00000', 'event-10501', 'event-10501');
     })();
     const input = {
       accountId: 'account-a',
@@ -203,9 +213,9 @@ describe('V6分析イベントと日別投影', () => {
     expect(first).toMatchObject({ completed: false, readRows: 8_000, sourceEventCount: 8_000 });
     expect(second).toMatchObject({
       completed: true,
-      readRows: 2_501,
-      sourceEventCount: 10_501,
-      projectedCount: 10_501,
+      readRows: 2_502,
+      sourceEventCount: 10_502,
+      projectedCount: 10_502,
       mismatchCount: 0,
       status: 'matched',
     });
@@ -222,9 +232,12 @@ describe('V6分析イベントと日別投影', () => {
         ORDER BY metric_key
     `).all()).toEqual(chunkedMetrics);
     expect(chunkedMetrics).toEqual([
-      { metric_key: 'event_total', dimension_value: 'message_received', numerator: 10_501 },
-      { metric_key: 'unique_friends', dimension_value: 'message_received', numerator: 1 },
+      { metric_key: 'event_total', dimension_value: 'message_received', numerator: 10_502 },
+      { metric_key: 'unique_friends', dimension_value: 'message_received', numerator: 10_501 },
     ]);
+    expect(projectionQueries.some((query) =>
+      /COUNT\(\*\)[\s\S]*FROM analytics_projection_friend_stage/.test(query),
+    )).toBe(false);
   });
 
   it('直近7日をアカウントの暦日で作る', () => {
