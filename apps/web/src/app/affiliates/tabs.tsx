@@ -381,7 +381,7 @@ export function AffiliatorsTab() {
           kind="error"
           title="紹介者を表示できませんでした"
           description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={<Button onClick={() => void loadList()}>紹介者を再読み込み</Button>}
+          onRetry={() => void loadList()}
         />
       ) : loading ? (
         <ListState kind="loading" title="紹介者を読み込んでいます" />
@@ -1416,7 +1416,7 @@ function OffersList({
         kind="error"
         title="案件を読み込めませんでした"
         description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-        action={<Button onClick={onRefresh}>案件を再読み込み</Button>}
+        onRetry={onRefresh}
       />
     )
   }

@@ -168,13 +168,15 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       </div>
 
       {/*
-        設計 `qlVLJ` はここに「使い道をつくる」を置く。**まだ置かない。**
-        つくる面（`p9CcEB` = `/mileage/rewards/edit`）が development に無く、
-        押した先が無いボタンは**行き止まり**になる。面ができた回で足す。
+        設計 `qlVLJ` の「使い道をつくる」。**つくる面（`p9CcEB` =
+        `/mileage/rewards/edit`）ができたので置く。** 行き止まりにならない。
       */}
-      <p className="text-ink-secondary mb-4 text-xs leading-5">
-        使い道がないと、マイルはためてもらっても動きにつながりません。まず1つ、すぐ交換できる小さな使い道を出すのがおすすめです。
-      </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <p className="text-ink-secondary text-xs leading-5">
+          使い道がないと、マイルはためてもらっても動きにつながりません。まず1つ、すぐ交換できる小さな使い道を出すのがおすすめです。
+        </p>
+        <Button variant="primary" href="/mileage/rewards/edit">使い道をつくる</Button>
+      </div>
 
       <DataTable>
         <thead>
@@ -184,13 +186,14 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
             <Th>交換すると渡るもの</Th>
             <Th align="right">今月 交換された</Th>
             <Th>状態</Th>
+            <Th align="right">操作</Th>
           </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
-          {status === 'loading' ? <tr><td colSpan={5} className="p-0"><ListState kind="loading" /></td></tr>
-            : status === 'forbidden' ? <tr><td colSpan={5} className="p-0"><ListState kind="forbidden" description="マイルの使い道を見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
-              : status === 'error' ? <tr><td colSpan={5} className="p-0"><ListState kind="error" description="マイルの使い道を読み込めませんでした。" action={<Button variant="secondary" onClick={() => void load()}>使い道を再読み込み</Button>} /></td></tr>
-                : rewards.length === 0 ? <tr><td colSpan={5} className="p-0"><ListState kind="empty" title="いまのところ特典なし" description="ここに1つ足すと動きが変わります。交換するとクーポンやタグが自動で渡ります。" /></td></tr>
+          {status === 'loading' ? <tr><td colSpan={6} className="p-0"><ListState kind="loading" /></td></tr>
+            : status === 'forbidden' ? <tr><td colSpan={6} className="p-0"><ListState kind="forbidden" description="マイルの使い道を見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
+              : status === 'error' ? <tr><td colSpan={6} className="p-0"><ListState kind="error" description="マイルの使い道を読み込めませんでした。" action={<Button variant="secondary" onClick={() => void load()}>使い道を再読み込み</Button>} /></td></tr>
+                : rewards.length === 0 ? <tr><td colSpan={6} className="p-0"><ListState kind="empty" title="いまのところ特典なし" description="ここに1つ足すと動きが変わります。交換するとクーポンやタグが自動で渡ります。" /></td></tr>
                   : rewards.map((reward) => {
                     const stock = stockText(reward)
                     return (
@@ -204,6 +207,10 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                         <Td>{KIND_LABEL[reward.rewardKind]}</Td>
                         <Td align="right" className="tabular-nums">{reward.exchangedThisMonth.toLocaleString('ja-JP')}回</Td>
                         <Td>{STATUS_LABEL[reward.status]}</Td>
+                        <Td align="right">
+                          {/* 行から直に直せる。名前を控えて探し直さなくてよい。 */}
+                          <Button href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}>内容を編集</Button>
+                        </Td>
                       </Tr>
                     )
                   })}

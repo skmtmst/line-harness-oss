@@ -824,7 +824,7 @@ export default function TagsPageV4({
                   ) : status === 'forbidden' ? (
                     <tr><td colSpan={10} className="p-0"><ListState kind="forbidden" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。" /></td></tr>
                   ) : status === 'error' ? (
-                    <tr><td colSpan={10} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" /></td></tr>
+                    <tr><td colSpan={10} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} /></td></tr>
                   ) : items.length === 0 ? (
                     // まだ1件も作っていない。「条件を変える」は言えない。
                     <tr><td colSpan={10} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" /></td></tr>

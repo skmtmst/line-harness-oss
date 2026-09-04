@@ -109,6 +109,50 @@ describe('api.affiliates.paymentSummaries', () => {
   })
 })
 
+describe('api.mileage reward draft contract', () => {
+  it('版IDつきのPATCHで保存し、確認ヘッダーを付けて公開する', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { id: 'reward/1' } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const draft = {
+      name: '先行案内',
+      rewardKind: 'early_access' as const,
+      requiredMiles: 500,
+      commonActionVersionId: 'action-version-1',
+    }
+
+    await api.mileage.createRewardDraft('reward/1', 'account 1')
+    await api.mileage.saveRewardDraft('reward/1', 'account 1', 'draft-version-1', draft)
+    await api.mileage.publishReward('reward/1', 'account 1')
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/mileage/rewards/reward%2F1/draft',
+      'https://worker.example.com/api/mileage/rewards/reward%2F1/draft',
+      'https://worker.example.com/api/mileage/rewards/reward%2F1/publish',
+    ])
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account 1' }),
+    })
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({
+        accountId: 'account 1',
+        expectedVersionId: 'draft-version-1',
+        draft,
+      }),
+    })
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'X-Confirm-Irreversible': 'mileage-reward-publish',
+      }),
+    })
+  })
+})
+
 describe('eventsApi.createSlots', () => {
   const slots = Array.from({ length: 900 }, (_, index) => ({
     starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),

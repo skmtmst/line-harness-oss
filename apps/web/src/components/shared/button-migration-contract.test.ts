@@ -72,7 +72,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-09-04: 流入経路の一覧へ「CSVで書き出す」を1つ追加（設計 `Q4bkTg`）。
     //   development 側で口が無いまま置かれていたものを一度外してあり、
     //   今回は**押すと実際に書き出せる**ものとして戻す。42 → 43。
-    expect(openings).toHaveLength(43)
+    // 2026-09-04: 取得失敗の再読み込み2個は、画面ごとの `action` から
+    // `ListState.onRetry` へ移した。共通部品が描くので、この7ルートでは数えない。
+    expect(openings).toHaveLength(41)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
