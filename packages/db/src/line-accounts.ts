@@ -156,7 +156,7 @@ export async function createLineAccount(
           og_site_name, og_default_image_url, og_default_description,
           parent_line_account_id, tenant_id,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
          CASE WHEN EXISTS (
            SELECT 1 FROM line_accounts
             WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
