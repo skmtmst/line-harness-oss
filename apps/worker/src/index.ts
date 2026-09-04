@@ -53,6 +53,9 @@ import { broadcasts } from './routes/broadcasts.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccounts } from './routes/line-accounts.js';
+import { gettingStarted } from './routes/getting-started.js';
+import { recipes } from './routes/recipes.js';
+import { manualLinks } from './routes/manual-links.js';
 import { brand } from './routes/brand.js';
 import { conversions } from './routes/conversions.js';
 import { affiliates } from './routes/affiliates.js';
@@ -309,6 +312,9 @@ app.use('*', tenantScopeMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', gettingStarted);
+app.route('/', recipes);
+app.route('/', manualLinks);
 app.route('/', friendBulkRuns);
 app.route('/', friends);
 app.route('/', tags);

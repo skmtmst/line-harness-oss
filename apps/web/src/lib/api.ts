@@ -1736,6 +1736,43 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
   return s ? `?${s}` : ''
 }
 
+
+/** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
+export interface GettingStartedStep {
+  key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
+  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
+  /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
+}
+
+/** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
+export interface Recipe {
+  id: string
+  name: string
+  purpose: string
+  creates: string
+  version: number
+  origin: 'builtin' | 'org'
+  requiredFeatures: string[]
+  /** オフの機能。**空配列は「全部オン」。** */
+  missingFeatures: string[]
+  /** 作られるものの内訳。**決まっていなければ null**（0 件の表を描かない）。 */
+  items: Array<{ kind: string; name: string; note: string }> | null
+  itemCount: number | null
+  cloneCount: number
+}
+
+export interface ManualLink {
+  key: string
+  keyKind: 'screen' | 'task'
+  name: string
+  url: string | null
+  /** **確かめていない URL は `ok` にならない。** */
+  status: 'ok' | 'broken' | 'unset'
+  lastCheckedAt: string | null
+  lastError: string | null
+}
+
 export const api = {
   system: {
     health: () =>
@@ -3169,6 +3206,79 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ name }),
       }),
+  },
+  /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
+  gettingStarted: {
+    get: (accountId?: string) =>
+      fetchApi<ApiResponse<{
+        steps: GettingStartedStep[]
+        doneCount: number
+        total: number
+        allDone: boolean
+      }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+  },
+  /** レシピ。台帳 #134。 */
+  recipes: {
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<Recipe[]>>(
+        `/api/recipes${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+      ),
+    get: (id: string, accountId?: string) =>
+      fetchApi<ApiResponse<Recipe>>(
+        `/api/recipes/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+      ),
+    /**
+     * 複製する。**冪等キーが要る。** 同じキーで2回呼んでも2回作らない。
+     * 途中失敗は全部戻る（部分的に作らない）。
+     */
+    clone: (id: string, input: { accountId: string; namePrefix?: string | null }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        runId: string
+        status: 'running' | 'succeeded' | 'failed'
+        createdCount: number
+        items?: Array<{ kind: string; target_id: string; name: string }>
+      }>>(`/api/recipes/${id}/clone`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(input),
+      }),
+    run: (runId: string) =>
+      fetchApi<ApiResponse<{
+        runId: string
+        status: 'running' | 'succeeded' | 'failed'
+        createdCount: number
+        failureReason: string | null
+        items: Array<{ kind: string; target_id: string; name: string }>
+      }>>(`/api/recipes/clone-runs/${runId}`),
+  },
+  /*
+    設計 ★V6 34-4 の正本表。台帳 #134。**直せるのは運営だけ。**
+
+    語をそのまま書かないのは、`design-structure.test.ts` が
+    「画面が設計の語を出しているか」を、読み込んだファイルの中身で見ているため。
+    ここに書くと、トップバーにしか無いものを画面が出していることになってしまう。
+  */
+  manualLinks: {
+    /** 画面から1つ引く。**開けないと分かっているものは URL が null で返る。** */
+    lookup: (screen: string) =>
+      fetchApi<ApiResponse<{ key: string; url: string | null; status: 'ok' | 'broken' | 'unset' }>>(
+        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}`,
+      ),
+    list: () =>
+      fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(
+        '/api/manual-links',
+      ),
+    update: (key: string, data: { name?: string; url?: string | null; keyKind?: 'screen' | 'task' }) =>
+      fetchApi<ApiResponse<ManualLink>>(`/api/manual-links/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    /** いま全部を確かめる。 */
+    check: () =>
+      fetchApi<ApiResponse<{ checked: number; ok: number; broken: number; unset: number }>>(
+        '/api/manual-links/check',
+        { method: 'POST' },
+      ),
   },
   lineAccounts: {
     list: (live = false) =>
