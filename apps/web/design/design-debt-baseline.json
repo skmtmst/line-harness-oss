@@ -395,7 +395,7 @@
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
     "direct-primary-button": 2,
-    "arbitrary-value": 13,
+    "arbitrary-value": 12,
     "direct-secondary-button": 1
   },
   "app/updates/page.tsx": {
