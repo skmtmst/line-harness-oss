@@ -38,6 +38,7 @@ import {
 } from '../services/booking-types.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const booking = new Hono<Env>();
@@ -493,6 +494,17 @@ booking.post('/api/liff/booking/requests', async (c) => {
       metadata: { bookingType: 'salon', menuId: body.menu_id, staffId: body.staff_id },
       occurredAt: nowIso,
     }),
+  );
+  c.executionCtx.waitUntil(
+    applyActionScoreEvent(c.env.DB, {
+      lineAccountId: accountId,
+      friendId,
+      eventType: 'booking_created',
+      source: 'booking',
+      sourceEventId: bookingId,
+      subjectKey: body.menu_id,
+      occurredAt: nowIso,
+    }).catch((error) => console.error('booking action score failed:', error)),
   );
 
   // 予約をきっかけにするリマインダへ登録する。通知やタグ付与と同じく

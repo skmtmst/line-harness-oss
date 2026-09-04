@@ -6,7 +6,7 @@ import {
   getBroadcastSummary,
   getTagFieldCross,
   buildFunnelResult,
-  getFunnels,
+  getFunnelsWithCurrentVersions,
   getLegacyFunnels,
   getFunnelById,
   getFunnelSteps,
@@ -497,18 +497,29 @@ analytics.get('/api/analytics/funnels', async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
-    const funnels = await getFunnels(c.env.DB, account.accountId);
-    const items = await Promise.all(funnels.map(async (funnel) => {
-      const version = await getCurrentFunnelVersion(c.env.DB, account.accountId, funnel.id);
-      return {
-        ...serializeFunnel(funnel),
-        currentVersion: version
-          ? { id: version.id, versionNumber: version.versionNumber, createdAt: version.createdAt }
-          : null,
-        migrationState: version ? 'ready' : 'needs_migration',
-      };
+    const page = Number(c.req.query('page') ?? 1);
+    const pageSize = Number(c.req.query('pageSize') ?? 200);
+    if (!Number.isInteger(page) || page < 1) {
+      return c.json({ success: false, error: 'ページは1以上の整数で指定してください' }, 400);
+    }
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 200) {
+      return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
+    }
+    const result = await getFunnelsWithCurrentVersions(
+      c.env.DB,
+      account.accountId,
+      { page, pageSize },
+    );
+    const items = result.items.map((funnel) => ({
+      ...serializeFunnel(funnel),
+      currentVersion: funnel.currentVersion,
+      migrationState: funnel.currentVersion ? 'ready' : 'needs_migration',
     }));
-    return c.json({ success: true, data: items });
+    return c.json({
+      success: true,
+      data: items,
+      pagination: { page: result.page, pageSize: result.pageSize, total: result.total },
+    });
   } catch (error) {
     console.error('GET /api/analytics/funnels error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
