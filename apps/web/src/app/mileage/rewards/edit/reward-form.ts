@@ -42,4 +42,3 @@ export function validateReward(form: FormState): string[] {
   }
   return errors
 }
-
