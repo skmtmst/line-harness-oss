@@ -348,7 +348,7 @@ friendId=friend-uuid&eventType=payment_intent.succeeded&limit=50" \
 POST /api/integrations/stripe/webhook
 ```
 
-環境変数 `STRIPE_WEBHOOK_SECRET` が設定されている場合、`Stripe-Signature` ヘッダーで HMAC-SHA256 署名検証を行う。未設定の場合はバイパス (開発環境向け)。
+`STRIPE_WEBHOOK_SECRET` は必須。`Stripe-Signature` ヘッダーで HMAC-SHA256 署名検証を行い、未設定時は Webhook を 503 で拒否する。ローカル開発でも Stripe CLI の署名キーを設定し、署名検証を省略しない。
 
 **自動処理内容:**
 1. 冪等性チェック (`stripe_event_id` の重複排除)

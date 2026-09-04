@@ -128,7 +128,7 @@ wrangler secret put LINE_LOGIN_CHANNEL_ID
 wrangler secret put LINE_LOGIN_CHANNEL_SECRET
 wrangler secret put LIFF_URL
 
-# オプション
+# Stripe Webhookを利用する環境では必須（未設定時はWebhookが503）
 wrangler secret put STRIPE_WEBHOOK_SECRET
 ```
 
@@ -265,11 +265,11 @@ wrangler d1 create line-crm
 | `LINE_LOGIN_CHANNEL_ID` | LINE Login チャネルID | `wrangler secret put` |
 | `LINE_LOGIN_CHANNEL_SECRET` | LINE Login チャネルシークレット | `wrangler secret put` |
 
-### Worker (オプション)
+### Worker (Stripe Webhook利用時は必須)
 
 | 変数名 | 説明 | 設定方法 |
 |--------|------|----------|
-| `STRIPE_WEBHOOK_SECRET` | Stripe Webhook 署名検証キー | `wrangler secret put` |
+| `STRIPE_WEBHOOK_SECRET` | Stripe Webhook 署名検証キー。未設定時は受信を503で拒否 | `wrangler secret put` |
 
 ---
 
