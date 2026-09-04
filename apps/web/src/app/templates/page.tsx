@@ -71,12 +71,29 @@ const ASSET_KINDS: readonly BroadcastAssetKind[] = [
   'research',
 ]
 
+/**
+ * 種類の名前。**内部の値をそのまま画面へ出さない。**
+ *
+ * `Flex` `Carousel` は LINE の作りの名前で、運用する人には通じない。
+ * 一斉配信の一覧（`rowExcerpt`）は既に「カード型」「カルーセル」と
+ * 出しているので、同じ言葉にそろえる。
+ */
 const messageTypeLabels: Record<string, string> = {
   text: 'テキスト',
   image: '画像',
-  flex: 'Flex',
-  carousel: 'Carousel',
+  flex: 'カード型',
+  carousel: 'カルーセル',
   question: '質問',
+}
+
+/**
+ * 知らない種類でも内部の値を出さない。
+ *
+ * 前は `?? t.messageType` で落としていたので、`sticker` や `video` の
+ * ひな形が並ぶと**画面に英語の値がそのまま出た**。
+ */
+function messageTypeText(type: string): string {
+  return messageTypeLabels[type] ?? 'その他'
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -126,6 +143,8 @@ export default function TemplatesPage() {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
+  /** いま置き場を移している行。二重に押させない。 */
+  const [movingId, setMovingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   /**
@@ -286,6 +305,28 @@ export default function TemplatesPage() {
       setFolderError('並び順を変えられませんでした。')
     } finally {
       setFolderBusy(false)
+    }
+  }
+
+  /**
+   * 置き場を移す。
+   *
+   * **返事を待ってから一覧を書き換える。** 先に画面を変えると、
+   * 断られたとき（消えたフォルダを指したなど）に、移っていないものが
+   * 移ったように見えたままになる。
+   */
+  const moveTemplate = async (template: { id: string; folderId: string | null }, folderId: string | null) => {
+    if (template.folderId === folderId) return
+    setMovingId(template.id)
+    setFolderError('')
+    try {
+      const res = await api.templates.update(template.id, { folderId })
+      if (!res.success) throw new Error(res.error ?? '移せませんでした')
+      setTemplates((prev) => prev.map((t) => (t.id === template.id ? { ...t, folderId } : t)))
+    } catch (err) {
+      setFolderError(err instanceof Error ? err.message : '置き場を変えられませんでした。')
+    } finally {
+      setMovingId(null)
     }
   }
 
@@ -525,15 +566,8 @@ export default function TemplatesPage() {
             フォルダを追加
           </Button>
           {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
-          {/*
-            **移せないことを、その場で断る。** フォルダは作れるが、
-            テンプレートを入れる口がまだ無い（`POST`/`PUT /api/templates` が
-            `folderId` を受けない）。作れるのに移せないと、
-            「入れたのに反映されない」と読まれる。
-          */}
           <p className="text-ink-faint text-xs leading-relaxed">
-            テンプレートをフォルダへ移す操作は、まだ繋がっていません。
-            置き場を保存する口が接続されると使えます。
+            テンプレートは一覧の「置き場」から移せます。
           </p>
         </FolderPanel>
       </div>
@@ -574,7 +608,7 @@ export default function TemplatesPage() {
         {([
           { key: 'all', label: 'すべて' },
           { key: 'text', label: 'テキスト' },
-          { key: 'flex', label: 'Flex' },
+          { key: 'flex', label: 'カード型' },
           { key: 'image', label: '画像' },
           { key: 'question', label: '質問' },
           { key: 'unused', label: '未使用' },
@@ -619,7 +653,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
-              <SelectField value={form.messageType} onChange={(e) => setForm({ ...form, messageType: e.target.value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "Flex" }, { value: "image", label: "画像" }]} className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas" />
+              <SelectField value={form.messageType} onChange={(e) => setForm({ ...form, messageType: e.target.value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
@@ -733,6 +767,7 @@ export default function TemplatesPage() {
                 <TableHeadRow>
                   <Th>テンプレート</Th>
                   <Th>中身</Th>
+                  <Th>置き場</Th>
                   <Th>使われている場所</Th>
                   <Th>送信数</Th>
                   <Th>更新</Th>
@@ -754,9 +789,31 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
+                        {messageTypeText(t.question ? 'question' : t.messageType)}
                       </span>
-                      <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
+                      {/*
+                        **`category` は内部の値**（`text` `general` など）。
+                        そのまま出すと、種類の欄に英語が2つ並ぶ。
+                        分け方はフォルダ（`folderId`）が受け持つので、
+                        ここには出さない。
+                      */}
+                    </td>
+                    {/*
+                      置き場。**行から直接移せる。** 移す前に開く手間を挟むと、
+                      まとめて片づけたいときに 1 件ずつ開くことになる。
+                    */}
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <SelectField
+                        size="compact"
+                        aria-label={`${t.name} の置き場`}
+                        value={t.folderId ?? ''}
+                        disabled={movingId === t.id}
+                        onChange={(e) => void moveTemplate(t, e.target.value === '' ? null : e.target.value)}
+                        options={[
+                          { value: '', label: '未分類' },
+                          ...folders.map((f) => ({ value: f.id, label: f.name })),
+                        ]}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
@@ -886,7 +943,7 @@ export default function TemplatesPage() {
                         try {
                           return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                         } catch {
-                          return <p className="text-xs text-red-500">Flex JSON parse 失敗</p>
+                          return <p className="text-danger text-xs">カード型の中身を読めませんでした。作り直すか、テキストで作り直してください。</p>
                         }
                       })()
                     ) : drawerData.messageType === 'image' ? (
