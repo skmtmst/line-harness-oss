@@ -70,12 +70,29 @@ const ASSET_KINDS: readonly BroadcastAssetKind[] = [
   'research',
 ]
 
+/**
+ * 種類の名前。**内部の値をそのまま画面へ出さない。**
+ *
+ * `Flex` `Carousel` は LINE の作りの名前で、運用する人には通じない。
+ * 一斉配信の一覧（`rowExcerpt`）は既に「カード型」「カルーセル」と
+ * 出しているので、同じ言葉にそろえる。
+ */
 const messageTypeLabels: Record<string, string> = {
   text: 'テキスト',
   image: '画像',
-  flex: 'Flex',
-  carousel: 'Carousel',
+  flex: 'カード型',
+  carousel: 'カルーセル',
   question: '質問',
+}
+
+/**
+ * 知らない種類でも内部の値を出さない。
+ *
+ * 前は `?? t.messageType` で落としていたので、`sticker` や `video` の
+ * ひな形が並ぶと**画面に英語の値がそのまま出た**。
+ */
+function messageTypeText(type: string): string {
+  return messageTypeLabels[type] ?? 'その他'
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -573,7 +590,7 @@ export default function TemplatesPage() {
         {([
           { key: 'all', label: 'すべて' },
           { key: 'text', label: 'テキスト' },
-          { key: 'flex', label: 'Flex' },
+          { key: 'flex', label: 'カード型' },
           { key: 'image', label: '画像' },
           { key: 'question', label: '質問' },
           { key: 'unused', label: '未使用' },
@@ -624,7 +641,7 @@ export default function TemplatesPage() {
                 onChange={(e) => setForm({ ...form, messageType: e.target.value })}
               >
                 <option value="text">テキスト</option>
-                <option value="flex">Flex</option>
+                <option value="flex">カード型</option>
                 <option value="image">画像</option>
               </select>
             </div>
@@ -761,9 +778,14 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
+                        {messageTypeText(t.question ? 'question' : t.messageType)}
                       </span>
-                      <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
+                      {/*
+                        **`category` は内部の値**（`text` `general` など）。
+                        そのまま出すと、種類の欄に英語が2つ並ぶ。
+                        分け方はフォルダ（`folderId`）が受け持つので、
+                        ここには出さない。
+                      */}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
@@ -893,7 +915,7 @@ export default function TemplatesPage() {
                         try {
                           return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                         } catch {
-                          return <p className="text-xs text-red-500">Flex JSON parse 失敗</p>
+                          return <p className="text-danger text-xs">カード型の中身を読めませんでした。作り直すか、テキストで作り直してください。</p>
                         }
                       })()
                     ) : drawerData.messageType === 'image' ? (
