@@ -70,9 +70,9 @@ CSVで書き出す
 
 申込
 
-3人
+0人
 
-定員 12 ・ 残り9
+定員なし
 
 承認待ち
 
@@ -88,7 +88,7 @@ CSVで書き出す
 
 キャンセル
 
-1件
+0件
 
 この一覧のうち
 
@@ -100,21 +100,4 @@ CSVで書き出す
 参加済
 無断
 全件
-友だち	経由アカウント	予約枠	状態	受付日時	操作
-friend-1		Invalid Date	確定	Invalid Date
-参加済
-無断
-キャンセル
-
-friend-2		Invalid Date	確定	Invalid Date
-参加済
-無断
-キャンセル
-
-friend-3		Invalid Date	確定	Invalid Date
-参加済
-無断
-キャンセル
-
-friend-4		Invalid Date	waitlist	Invalid Date
-friend-5		Invalid Date	キャンセル	Invalid Date
+該当する予約はありません

@@ -10,9 +10,11 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  // development の基準に、この枝が足す2面（下書き編集・マイルの使い道）で 2 増える。
-  it('共通Buttonを直接importする91ファイルを利用先に数える', () => {
-    expect(directImporters(files, button)).toHaveLength(91)
+  // development の基準 93 に、この枝が足す2面（下書き編集・マイルの使い道）で 2 増える。
+  it('共通Buttonを直接importする95ファイルを利用先に数える', () => {
+    // 2026-09-04: LINEアカウントの一覧・登録・詳細・乗り換え（★V6 33-1〜33-4）の
+    // 4画面が共通 Button を使う。統合 PR #834 #845 のぶんと合わせて実測し直す。
+    expect(directImporters(files, button)).toHaveLength(95)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -20,7 +22,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする19ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする20ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -31,6 +33,9 @@ describe('共通部品の影響範囲', () => {
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
+      // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
+      // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
+      'app/events/page.tsx',
       'app/form-submissions/page.tsx',
       'app/inflow-links/page.tsx',
       'app/mileage/action-score-tab.tsx',
