@@ -67,7 +67,9 @@ describe('標準ボタンの第1段階移行', () => {
     // **片方を選ぶともう片方の増減が数から消える**ので、統合後の木で数え直した。
     // 2026-09-02: テンプレート一覧の取得失敗は主要操作ではなく、状態表示の
     // 「再読み込み」として副次操作へ寄せた。統合後の木で主要16個を実測した。
-    expect(openings).toHaveLength(41)
+    // 2026-09-04: テンプレート一覧のフォルダ帯を共通 `FolderPanel` へ寄せ、
+    // 「フォルダを追加」を共通 Button にした。41 → 42。
+    expect(openings).toHaveLength(42)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
