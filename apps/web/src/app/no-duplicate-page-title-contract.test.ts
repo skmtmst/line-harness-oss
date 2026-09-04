@@ -80,7 +80,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(133)  // 2026-09-04: 自動応答の公開（`auto-replies/publish`）とLINEアカウントの乗り換え（`accounts/detail`・`accounts/handover`）が入って 133。
+    expect(PAGES.length).toBe(134)  // 2026-09-04: 自動応答の公開・友だち追加時配信の実行結果と、LINEアカウントの登録・詳細・乗り換えが入って 134。
   })
 
   it('page.tsx が h1 を直接持たない', () => {
