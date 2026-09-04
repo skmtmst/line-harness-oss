@@ -29,6 +29,7 @@ import {
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
   COMMON_VAR_DELETE_IMPACT,
+  commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
   MEDIA_DELETE_IMPACT,
   MEDIA_DELETE_IMPACT_EMPTY,
@@ -1301,6 +1302,24 @@ const server = createServer((req, res) => {
     // DB更新はせず、ほかのPOSTは従来どおり405にする。
     if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
       res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
+      return
+    }
+    /*
+      共通情報を**変える前**の確認（`uNBlA`）。**POST だが保存はしない。**
+      長い本文を投げるために `POST` なので、ここで 405 を返すと
+      「口はあるのに画面が壊れている」ように見える絵が撮れてしまう。
+    */
+    if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/impact-preview$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let nextValue = ''
+        try { nextValue = JSON.parse(raw || '{}').nextValue ?? '' } catch { nextValue = '' }
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
+        }))
+      })
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname)

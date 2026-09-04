@@ -1822,3 +1822,81 @@ export const LOGIN_AUDIT = [
   { id: 'la-4', adminUserId: 'stf-4', userName: '高田 誠', role: 'staff', lineLinked: false, isActive: true, action: 'delete', screen: 'テンプレート', ip: '203.0.113.13', connectionSource: '社外', result: 'success', createdAt: '2026-08-23T08:20:00.000Z' },
   { id: 'la-5', adminUserId: null, userName: '名前を取得できませんでした', role: null, lineLinked: false, isActive: false, action: 'login', screen: null, ip: '198.51.100.7', connectionSource: '社外', result: 'failure', createdAt: '2026-08-22T19:44:00.000Z' },
 ]
+
+/**
+ * 共通情報を**変える前**の確認（`uNBlA` 14-1-B。口は #773）。
+ *
+ * 削除前の使用先に、保存すると何がどう変わるかを足したもの。
+ * `nextValue` は呼ぶ側が入れる。ここでは形と**言い分けの見本**だけを持つ。
+ *
+ * わざと4通りを混ぜてある。1通りだけだと、画面の書き分けが撮れない：
+ *   1. ふつうに変わる行
+ *   2. 送信済みで**変わらない**行
+ *   3. 差し込みの目印を読み取れず、**保存後の文を作れない**行
+ *   4. 上限を超えて、**保存を止める**行
+ */
+export function commonVarChangeImpact(nextValue) {
+  const long = 'あ'.repeat(80)
+  const items = [
+    {
+      kind: 'template', kindLabel: 'テンプレート', name: '来店後のご案内',
+      status: '使われています', href: '/templates/edit?id=template-usage-1',
+      blocksDeletion: true, currentPreview: '営業時間は10:00〜19:00です',
+      changesOnSave: true, previewAvailable: true,
+      nextPreview: `営業時間は${nextValue}です`,
+      currentCharacterCount: 15, nextCharacterCount: 5 + nextValue.length,
+      characterLimit: 5000, exceedsCharacterLimit: false, errors: [], warnings: [],
+    },
+    {
+      kind: 'broadcast', kindLabel: '一斉配信', name: '夏季営業のお知らせ',
+      status: '送信済み・変わりません', href: '/broadcasts/detail?id=broadcast-history-1',
+      blocksDeletion: false, currentPreview: '本日は10:00〜19:00で営業しました',
+      changesOnSave: false, previewAvailable: true,
+      nextPreview: '本日は10:00〜19:00で営業しました',
+      currentCharacterCount: 18, nextCharacterCount: 18,
+      characterLimit: 5000, exceedsCharacterLimit: false, errors: [], warnings: [],
+    },
+    {
+      kind: 'scenario', kindLabel: 'シナリオ', name: '新規登録7日間フォロー',
+      status: '使われています', href: '/scenarios/detail?id=scenario-usage-1',
+      blocksDeletion: true, currentPreview: '（本文を読み取れませんでした）',
+      changesOnSave: true, previewAvailable: false,
+      nextPreview: null,
+      currentCharacterCount: 14, nextCharacterCount: null,
+      characterLimit: 5000, exceedsCharacterLimit: false,
+      errors: [], warnings: ['変更後の文は使用先を開いて確認してください'],
+    },
+    {
+      kind: 'reminder', kindLabel: 'リマインダ', name: '前日のご案内',
+      status: '使われています', href: '/reminders/edit?id=reminder-usage-1',
+      blocksDeletion: true, currentPreview: `${long}10:00〜19:00`,
+      changesOnSave: true, previewAvailable: true,
+      nextPreview: `${long}${nextValue}`,
+      currentCharacterCount: 5010, nextCharacterCount: 5010,
+      characterLimit: 5000, exceedsCharacterLimit: true,
+      errors: ['変更後の文が5,000文字を超えます'], warnings: [],
+    },
+  ]
+  return {
+    variable: {
+      id: 'common-var-delete-target', name: '営業時間', varKey: 'shop_hours',
+      currentValue: '10:00〜19:00', nextValue,
+    },
+    total: items.length,
+    blockingTotal: items.filter((item) => item.changesOnSave).length,
+    historicalTotal: 1,
+    unscopedFormTotal: 1,
+    canDelete: false,
+    byKind: { template: 1, broadcast: 1, scenario: 1, reminder: 1, auto_reply: 0, form: 1, automation: 0 },
+    items,
+    unavailableReferences: [{
+      kind: 'form', kindLabel: '回答フォーム', count: 1,
+      reason: '所属するLINEアカウントを確認できないため、名前と内容は表示しません',
+    }],
+    checkedAt: '2026-09-04T10:00:00.000+09:00',
+    errorTotal: items.reduce((sum, item) => sum + item.errors.length, 0),
+    warningTotal: items.reduce((sum, item) => sum + item.warnings.length, 0),
+    canSave: items.every((item) => item.errors.length === 0),
+    recommendedAction: 'fix_errors',
+  }
+}
