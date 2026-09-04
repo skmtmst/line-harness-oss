@@ -305,7 +305,7 @@ function jsonInsertStatements(
   return statements;
 }
 
-/** cron向け。最大4,000イベントだけを読み、確定後の中間行整理も分割する。 */
+/** cron向け。最大3,000イベントだけを読み、確定後の中間行整理も分割する。 */
 export async function rebuildAnalyticsDailyMetricsChunk(
   db: D1Database,
   input: {
@@ -317,7 +317,7 @@ export async function rebuildAnalyticsDailyMetricsChunk(
   },
 ): Promise<AnalyticsProjectionChunkResult> {
   const state = await loadOrCreateProjectionProgress(db, input);
-  const limit = Math.max(1, Math.min(input.limit ?? 4_000, 4_000));
+  const limit = Math.max(1, Math.min(input.limit ?? 3_000, 3_000));
   if (state.phase === 'cleanup') {
     const reconciliation = await db.prepare(
       `SELECT projected_count, mismatch_count, status
@@ -329,7 +329,7 @@ export async function rebuildAnalyticsDailyMetricsChunk(
       status: 'matched' | 'mismatched';
     }>();
     if (!reconciliation) throw new Error('analytics_projection_reconciliation_unavailable');
-    const deleted = await db.prepare(
+    const deletedFriends = await db.prepare(
       `DELETE FROM analytics_projection_friend_stage
         WHERE rowid IN (
           SELECT rowid FROM analytics_projection_friend_stage
@@ -337,19 +337,27 @@ export async function rebuildAnalyticsDailyMetricsChunk(
            LIMIT ?
         )`,
     ).bind(state.line_account_id, state.cycle_id, limit).run();
-    const readRows = Number(deleted.meta?.changes ?? 0);
+    const deletedFriendRows = Number(deletedFriends.meta?.changes ?? 0);
+    const remaining = limit - deletedFriendRows;
+    let deletedMetricRows = 0;
+    if (remaining > 0) {
+      const deletedMetrics = await db.prepare(
+        `DELETE FROM analytics_projection_metric_stage
+          WHERE rowid IN (
+            SELECT rowid FROM analytics_projection_metric_stage
+             WHERE line_account_id = ? AND cycle_id = ?
+             LIMIT ?
+          )`,
+      ).bind(state.line_account_id, state.cycle_id, remaining).run();
+      deletedMetricRows = Number(deletedMetrics.meta?.changes ?? 0);
+    }
+    const readRows = deletedFriendRows + deletedMetricRows;
     const completed = readRows < limit;
     if (completed) {
-      await db.batch([
-        db.prepare(
-          `DELETE FROM analytics_projection_metric_stage
-            WHERE line_account_id = ? AND cycle_id = ?`,
-        ).bind(state.line_account_id, state.cycle_id),
-        db.prepare(
-          `DELETE FROM analytics_projection_progress
-            WHERE line_account_id = ? AND cycle_id = ?`,
-        ).bind(state.line_account_id, state.cycle_id),
-      ]);
+      await db.prepare(
+        `DELETE FROM analytics_projection_progress
+          WHERE line_account_id = ? AND cycle_id = ?`,
+      ).bind(state.line_account_id, state.cycle_id).run();
     }
     return {
       accountId: state.line_account_id,
