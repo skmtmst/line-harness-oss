@@ -117,6 +117,29 @@ function serializeLineAccountFull(row: DbLineAccount) {
   return serializeLineAccount(row);
 }
 
+const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(items[index]!);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 // GET /api/line-accounts - list all. LINE live data is opt-in with ?live=1.
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
@@ -142,9 +165,12 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
     const expectedWebhookUrl = `${base}/webhook`;
 
-    // Live LINE calls are intentionally outside the mandatory list path.
-    const results = await Promise.all(
-      items.map(async (item) => {
+    // 1アカウントにつき最大3接続を同時に開くため、2アカウントずつに抑える。
+    // Workersの同時外向き接続上限6を越えない。
+    const results = await mapWithConcurrency(
+      items,
+      LINE_LIVE_ACCOUNT_CONCURRENCY,
+      async (item) => {
         const [profile, webhook, plan] = await Promise.all([
           fetchBotProfile(item.channel_access_token),
           fetchWebhookEndpointState(item.channel_access_token, expectedWebhookUrl),
@@ -159,7 +185,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
           webhook,
           plan,
         };
-      }),
+      },
     );
     return c.json({ success: true, data: results });
   } catch (err) {
