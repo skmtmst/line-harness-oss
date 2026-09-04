@@ -1103,6 +1103,55 @@ export type ActionScoreOverview = {
   }>
   pagination: { total: number; limit: number; offset: number }
 }
+export type ActionScoreRuleOperation = 'delta' | 'set'
+export type ActionScoreFrequencyKind =
+  | 'unlimited'
+  | 'per_day'
+  | 'per_subject'
+  | 'per_subject_per_day'
+  | 'once_per_period'
+export type ActionScoreRule = {
+  id: string
+  name: string
+  eventType: string
+  source: string | null
+  operation: ActionScoreRuleOperation
+  value: number
+  frequency: { kind: ActionScoreFrequencyKind; limit: number }
+  sameSourceEventOnce: true
+  validFrom: string | null
+  validUntil: string | null
+  enabled: boolean
+}
+export type ActionScoreBands = {
+  min: number
+  max: number
+  normalMin: number
+  highMin: number
+}
+export type ActionScoreRuleBundle = { rules: ActionScoreRule[]; bands: ActionScoreBands }
+export type ActionScoreRuleVersion = ActionScoreRuleBundle & {
+  id: string | null
+  versionNumber: number
+  status: 'draft' | 'published'
+  createdAt: string | null
+  publishedAt: string | null
+}
+export type ActionScoreRuleConfiguration = {
+  configured: boolean
+  status: 'not_configured' | 'draft' | 'published' | 'stopped'
+  currentDraftVersionId: string | null
+  currentPublishedVersionId: string | null
+  editableVersion: ActionScoreRuleVersion
+  publishedVersion: ActionScoreRuleVersion | null
+}
+export type ActionScoreRuleTestResult = {
+  scoreBefore: number
+  scoreAfter: number
+  bandBefore: ActionScoreBand
+  bandAfter: ActionScoreBand
+  matched: Array<{ ruleId: string; ruleName: string; scoreBefore: number; scoreAfter: number }>
+}
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
@@ -4258,6 +4307,44 @@ export const api = {
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<ActionScoreOverview>>(`/api/action-scores/friends?${query.toString()}`)
     },
+    rules: (accountId: string) =>
+      fetchApi<ApiResponse<ActionScoreRuleConfiguration>>(
+        `/api/action-scores/rules?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    bands: (accountId: string) =>
+      fetchApi<ApiResponse<ActionScoreBands>>(
+        `/api/action-scores/bands?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    saveDraft: (data: {
+      accountId: string
+      expectedDraftVersionId: string | null
+      configuration: ActionScoreRuleBundle
+    }) => fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/draft', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    testRules: (data: {
+      accountId: string
+      configuration: ActionScoreRuleBundle
+      currentScore: number
+      eventType: string
+      source?: string | null
+      occurredAt?: string
+    }) => fetchApi<ApiResponse<ActionScoreRuleTestResult>>('/api/action-scores/rules/test', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    publishRules: (data: { accountId: string; draftVersionId: string }) =>
+      fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/publish', {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'action-score-rules-publish' },
+        body: JSON.stringify(data),
+      }),
+    stopRules: (accountId: string) =>
+      fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/stop', {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
   },
   webhooks: {
     incoming: {
