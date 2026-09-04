@@ -1,0 +1,21 @@
+/* LINEプレビュー（設計 `PV1Vh` ほか）。トーク画面の色で、アプリの色ではない。 */
+.panel {
+  display: flex; flex-direction: column; gap: 8px;
+  border-radius: var(--radius-card); background: #7C8CB5; padding: 16px;
+}
+.title { color: #FFFFFF; font-size: var(--text-caption); font-weight: 700; text-align: center; }
+.badge {
+  align-self: center; border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.22); padding: 3px 10px;
+  color: #FFFFFF; font-size: var(--text-nano); font-weight: 600;
+}
+.bubble {
+  display: flex; flex-direction: column; gap: 8px;
+  border-radius: var(--radius-tile); background: #FFFFFF; padding: 12px;
+}
+.body { color: #1F2937; font-size: var(--text-micro); line-height: 1.6; white-space: pre-wrap; }
+.empty { color: #6B7280; font-size: var(--text-micro); line-height: 1.6; }
+.button {
+  border-radius: var(--radius-control); background: #06C755; padding: 7px 0;
+  color: #FFFFFF; font-size: var(--text-micro); font-weight: 700; text-align: center;
+}
