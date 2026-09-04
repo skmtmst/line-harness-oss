@@ -9,6 +9,7 @@ import QuestionEditor, {
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -230,10 +231,10 @@ function QuestionTemplatePageInner() {
         </aside>
       </div>
 
-      <footer className="bg-canvas border-hairline fixed inset-x-0 bottom-0 z-20 border-t px-6 py-3 lg:left-64">
-        <div className="max-w-shell mx-auto flex flex-wrap items-center justify-between gap-3">
-          <p className="text-ink-faint text-xs">下書きはシナリオの選択肢に出ません。</p>
-          <div className="flex flex-wrap gap-2">
+      <StickyBar
+        status="下書きはシナリオの選択肢に出ません。"
+        actions={(
+          <>
             <Button href="/templates" variant="secondary">
               キャンセル
             </Button>
@@ -243,9 +244,9 @@ function QuestionTemplatePageInner() {
             <Button type="button" variant="primary" disabled={saving} onClick={() => void save('published')}>
               {saving ? '保存中…' : 'テンプレートを保存'}
             </Button>
-          </div>
-        </div>
-      </footer>
+          </>
+        )}
+      />
     </div>
   )
 }

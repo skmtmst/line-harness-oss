@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -358,10 +359,10 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </section>
       </details>
 
-      <div className="sticky bottom-3 z-10 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-        <span className="hidden text-xs text-slate-500 sm:block">変更内容を確認して本番へ反映します</span>
-        <button onClick={requestSave} disabled={saving} className="ml-auto rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>
-      </div>
+      <StickyBar
+        status="変更内容を確認して本番へ反映します"
+        actions={<button onClick={requestSave} disabled={saving} className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+      />
 
       {/*
         公開の確認（設計 `D6yO7e` 10-1-G）。**押した瞬間に友だちへ出さない。**
