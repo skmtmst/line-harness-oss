@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
@@ -303,19 +304,12 @@ export default function NewConversionPointPage() {
           htmlFor="cv-account"
           note="1つに絞ると、そのアカウントで起きた成果だけを数えます。"
         >
-          <select
+          <SelectField
             id="cv-account"
             value={lineAccountId}
             onChange={(e) => setLineAccountId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">すべてのアカウント</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
         </Field>
       </FormSection>
     </CreatePage>
