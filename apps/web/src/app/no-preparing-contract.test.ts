@@ -84,10 +84,11 @@ const DESIGN_WORDS: Record<string, number> = {
  * 共通部品（`components/shared`）はこの表に載せない。載せない＝0 件。
  *
  * 2026-09-03 時点で 33 ファイル・73 件。
+ * 2026-09-04: 自動応答（`app/auto-replies/page.tsx`）の 2 件を外して 0 になったので行を消した。
+ *   絞り込みの「30日以上の絞り込みは準備中」と、行き先の決まっていない「マニュアル」。
  */
 const REMAINING: Record<string, number> = {
   'app/accounts/migration.tsx': 2,
-  'app/auto-replies/page.tsx': 2,
   'app/booking/bookings/detail/page.tsx': 4,
   'app/booking/bookings/page.tsx': 5,
   'app/booking/menus/staff/page.tsx': 1,
