@@ -76,3 +76,7 @@
 ## 2026-09-04
 - 指摘: 自分の PR はマージせず、ゲート合格後に Issue へ記録して次へ進む。統合は司令塔がまとめて行う
 - 今後: required-pr-gate が SUCCESS になったら対応 Issue に「ゲート合格」とコメントし、自分ではマージせず次の仕事へ進む
+
+## 2026-09-04
+- 指摘: 統合 PR で基準点が動いたら、今の作業の区切りで最新 base を取り込み、自分の PR の衝突を最優先で直す
+- 今後: 司令塔から統合完了の連絡を受けたら `git fetch origin && git merge origin/codex/development` を実行し、PR が CONFLICTING なら次タスクより先に解消する
