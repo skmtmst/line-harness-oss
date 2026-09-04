@@ -8,6 +8,7 @@ import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
 
 /**
  * リマインダの編集。
@@ -452,21 +453,25 @@ function ReminderEditInner() {
             </div>
           </section>
 
-          <div className="border-hairline flex justify-end gap-2 border-t pt-4">
-            <Link
-              href="/reminders"
-              className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
-            >
-              一覧へ戻る
-            </Link>
-            <button
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </div>
+          <StickyBar
+            actions={(
+              <>
+                <Link
+                  href="/reminders"
+                  className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  一覧へ戻る
+                </Link>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {saving ? '保存中...' : '保存'}
+                </button>
+              </>
+            )}
+          />
         </div>
       )}
 

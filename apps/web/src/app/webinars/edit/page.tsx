@@ -18,6 +18,7 @@ import {
 import WebinarForm from '@/components/webinars/webinar-form'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import {
   fetchApi,
   webinarApi,
@@ -200,7 +201,8 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
           ))}
         </tbody>
       </table>
-      <div className="flex gap-2">
+      <StickyBar actions={(
+        <>
         <button
           onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}
           className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -213,7 +215,8 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
         >
           保存
         </button>
-      </div>
+        </>
+      )} />
     </div>
   )
 }
@@ -820,7 +823,8 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
           />
         </div>
       ))}
-      <div className="flex gap-2">
+      <StickyBar actions={(
+        <>
         <button
           onClick={() => {
             setCtas((prev) => [...prev, {
@@ -840,7 +844,8 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
         >
           {saving ? '保存中...' : '保存'}
         </button>
-      </div>
+        </>
+      )} />
     </div>
   )
 }
