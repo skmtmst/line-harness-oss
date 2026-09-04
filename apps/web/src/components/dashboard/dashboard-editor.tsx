@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   closestCenter,
   DndContext,
@@ -244,8 +244,6 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
-  const visibleTodayCount = useMemo(() => draft.today.filter((item) => item.visible).length, [draft.today])
-
   useEffect(() => {
     if (open) {
       setDraft(preferences)
@@ -326,7 +324,7 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
                   </DndContext>
                   {group === 'today' ? (
                     <div className="bg-status-warn-soft text-status-warn-deep mt-3 rounded-control px-3 py-2.5 text-xs leading-relaxed">
-                      <p className="font-semibold">「今日やること」は4枠までです（現在 {visibleTodayCount}枠）</p>
+                      <p className="font-semibold">「今日やること」は4枠までです</p>
                       <p className="mt-1">5つ目をONにすると、いちばん下のカードが自動でOFFになります。順番を入れ替えて、先に出したい4つを上に置いてください。</p>
                     </div>
                   ) : null}
