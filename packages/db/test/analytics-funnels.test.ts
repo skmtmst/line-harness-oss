@@ -13,6 +13,7 @@ import {
   evaluateChronologicalFunnel,
   getLatestFunnelRun,
   getCurrentFunnelVersion,
+  getFunnelsWithCurrentVersions,
   runChronologicalFunnel,
   validateFunnelComparisonGroups,
   validateV6FunnelSteps,
@@ -196,6 +197,84 @@ describe('V6ファネルの版・結果・一時対象者', () => {
 
     const items = await getLegacyFunnels(db, 'account-a');
     expect(items.map((item) => item.id)).toEqual(['legacy-1']);
+  });
+
+  it('205件のファネルと現在版を件数に関係なく2問い合わせでページ取得する', async () => {
+    const insertFunnel = sqlite.prepare(
+      `INSERT INTO funnels (id, line_account_id, name, segment_json, window_days, created_at)
+       VALUES (?, 'account-a', ?, NULL, 30, ?)`,
+    );
+    const insertVersion = sqlite.prepare(
+      `INSERT INTO analytics_funnel_versions (
+         id, funnel_id, line_account_id, version_number, window_days,
+         steps_json, segment_json, comparison_groups_json, created_at
+       ) VALUES (?, ?, 'account-a', ?, 30, '[]', NULL, '[]', ?)`,
+    );
+    sqlite.transaction(() => {
+      for (let index = 1; index <= 205; index += 1) {
+        const id = `funnel-${String(index).padStart(3, '0')}`;
+        const createdAt = `2026-08-${String(Math.ceil(index / 10)).padStart(2, '0')}T00:00:00.000Z`;
+        insertFunnel.run(id, `ファネル${index}`, createdAt);
+        insertVersion.run(`${id}-v1`, id, 1, createdAt);
+        if (index === 205) insertVersion.run(`${id}-v2`, id, 2, '2026-09-01T00:00:00.000Z');
+      }
+    })();
+
+    let queryCount = 0;
+    const measuredDb = {
+      ...db,
+      prepare(query: string) {
+        queryCount += 1;
+        return db.prepare(query);
+      },
+    } as D1Database;
+
+    const first = await getFunnelsWithCurrentVersions(
+      measuredDb, 'account-a', { page: 1, pageSize: 200 },
+    );
+    expect(first).toMatchObject({ total: 205, page: 1, pageSize: 200 });
+    expect(first.items).toHaveLength(200);
+    expect(first.items[0]).toMatchObject({
+      id: 'funnel-205', currentVersion: { id: 'funnel-205-v2', versionNumber: 2 },
+    });
+    expect(queryCount).toBe(2);
+
+    queryCount = 0;
+    const second = await getFunnelsWithCurrentVersions(
+      measuredDb, 'account-a', { page: 2, pageSize: 200 },
+    );
+    expect(second.items).toHaveLength(5);
+    expect(queryCount).toBe(2);
+  });
+
+  it('一覧と現在版をLINEアカウント内に閉じ、版がない既存ファネルはnullで返す', async () => {
+    sqlite.exec(`
+      INSERT INTO funnels (id, line_account_id, name, segment_json, window_days, created_at)
+      VALUES ('legacy-a', 'account-a', 'Aの既存ファネル', NULL, 30, '2026-08-01T00:00:00.000Z'),
+             ('versioned-b', 'account-b', 'Bの版付きファネル', NULL, 30, '2026-08-02T00:00:00.000Z');
+      INSERT INTO analytics_funnel_versions (
+        id, funnel_id, line_account_id, version_number, window_days,
+        steps_json, segment_json, comparison_groups_json, created_at
+      ) VALUES (
+        'versioned-b-v1', 'versioned-b', 'account-b', 1, 30,
+        '[]', NULL, '[]', '2026-08-02T00:00:00.000Z'
+      );
+    `);
+
+    const accountA = await getFunnelsWithCurrentVersions(db, 'account-a');
+    expect(accountA.total).toBe(1);
+    expect(accountA.items).toEqual([
+      expect.objectContaining({ id: 'legacy-a', currentVersion: null }),
+    ]);
+
+    const accountB = await getFunnelsWithCurrentVersions(db, 'account-b');
+    expect(accountB.total).toBe(1);
+    expect(accountB.items).toEqual([
+      expect.objectContaining({
+        id: 'versioned-b',
+        currentVersion: { id: 'versioned-b-v1', versionNumber: 1, createdAt: '2026-08-02T00:00:00.000Z' },
+      }),
+    ]);
   });
 
   it('公開済み版を変えずに新版を作り、結果と対象者をアカウント内へ固定する', async () => {
