@@ -256,8 +256,8 @@
       "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 17,
+      "needsFix": 1,
+      "unjudged": 16,
       "remaining": 17,
       "capturedAt": [
         {
