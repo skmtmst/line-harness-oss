@@ -113,3 +113,5 @@ Kentaさん、明日のGoogle Meet相談のご案内です。
 日時：8/25（火）10:00
 参加URL：meet.google.com/xxx-xxxx-xxx
 Google Meetに参加
+リマインダの一覧へ
+設定した内容を見る
