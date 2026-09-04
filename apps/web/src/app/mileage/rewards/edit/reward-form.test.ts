@@ -97,6 +97,14 @@ describe('V6 17-1-G の配線', () => {
     expect(API).toContain("'X-Confirm-Irreversible': 'mileage-reward-publish'")
   })
 
+  it('保存した下書きを、残高と在庫を動かさず交換テストする', () => {
+    expect(PAGE).toContain('自分で交換をテスト')
+    expect(PAGE).toContain('api.mileage.testReward(saved.id, selectedAccountId)')
+    expect(PAGE).toContain('残高と在庫は動かしていません')
+    expect(API).toContain('/api/mileage/rewards/${encodeURIComponent(id)}/test')
+    expect(API).toContain('ApiResponse<MileageRewardTestResult>')
+  })
+
   it('一覧から行き止まりを作らない', () => {
     expect(LIST).toContain('href="/mileage/rewards/edit"')
     expect(LIST).toContain('使い道をつくる')
