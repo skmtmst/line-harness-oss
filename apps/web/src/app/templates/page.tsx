@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import SelectField from '@/components/shared/select-field'
 import type { Folder } from '@line-crm/shared'
 import {
   createBlockedReason,
@@ -125,6 +126,8 @@ export default function TemplatesPage() {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
+  /** いま置き場を移している行。二重に押させない。 */
+  const [movingId, setMovingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   /**
@@ -285,6 +288,28 @@ export default function TemplatesPage() {
       setFolderError('並び順を変えられませんでした。')
     } finally {
       setFolderBusy(false)
+    }
+  }
+
+  /**
+   * 置き場を移す。
+   *
+   * **返事を待ってから一覧を書き換える。** 先に画面を変えると、
+   * 断られたとき（消えたフォルダを指したなど）に、移っていないものが
+   * 移ったように見えたままになる。
+   */
+  const moveTemplate = async (template: { id: string; folderId: string | null }, folderId: string | null) => {
+    if (template.folderId === folderId) return
+    setMovingId(template.id)
+    setFolderError('')
+    try {
+      const res = await api.templates.update(template.id, { folderId })
+      if (!res.success) throw new Error(res.error ?? '移せませんでした')
+      setTemplates((prev) => prev.map((t) => (t.id === template.id ? { ...t, folderId } : t)))
+    } catch (err) {
+      setFolderError(err instanceof Error ? err.message : '置き場を変えられませんでした。')
+    } finally {
+      setMovingId(null)
     }
   }
 
@@ -524,15 +549,8 @@ export default function TemplatesPage() {
             フォルダを追加
           </Button>
           {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
-          {/*
-            **移せないことを、その場で断る。** フォルダは作れるが、
-            テンプレートを入れる口がまだ無い（`POST`/`PUT /api/templates` が
-            `folderId` を受けない）。作れるのに移せないと、
-            「入れたのに反映されない」と読まれる。
-          */}
           <p className="text-ink-faint text-xs leading-relaxed">
-            テンプレートをフォルダへ移す操作は、まだ繋がっていません。
-            置き場を保存する口が接続されると使えます。
+            テンプレートは一覧の「置き場」から移せます。
           </p>
         </FolderPanel>
       </div>
@@ -740,6 +758,7 @@ export default function TemplatesPage() {
                 <TableHeadRow>
                   <Th>テンプレート</Th>
                   <Th>中身</Th>
+                  <Th>置き場</Th>
                   <Th>使われている場所</Th>
                   <Th>送信数</Th>
                   <Th>更新</Th>
@@ -764,6 +783,23 @@ export default function TemplatesPage() {
                         {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
                       </span>
                       <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
+                    </td>
+                    {/*
+                      置き場。**行から直接移せる。** 移す前に開く手間を挟むと、
+                      まとめて片づけたいときに 1 件ずつ開くことになる。
+                    */}
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <SelectField
+                        size="compact"
+                        aria-label={`${t.name} の置き場`}
+                        value={t.folderId ?? ''}
+                        disabled={movingId === t.id}
+                        onChange={(e) => void moveTemplate(t, e.target.value === '' ? null : e.target.value)}
+                        options={[
+                          { value: '', label: '未分類' },
+                          ...folders.map((f) => ({ value: f.id, label: f.name })),
+                        ]}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
