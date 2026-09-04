@@ -17,6 +17,8 @@ export function filterVisibleLineAccounts(
   accounts: LineAccount[] | undefined,
   staff: AuthenticatedStaff | undefined,
 ): LineAccount[] {
+  // 認証されていない呼び出しを、既定統括のスタッフとして扱わない。
+  if (!staff) return [];
   const staffTenant = staff?.tenantId ?? DEFAULT_TENANT_ID;
   return (accounts ?? []).filter(
     (account) => (account.tenant_id ?? DEFAULT_TENANT_ID) === staffTenant,
@@ -46,6 +48,14 @@ export async function getVisibleLineAccountScope(
   db: D1Database,
   staff: AuthenticatedStaff | undefined,
 ): Promise<VisibleLineAccountScope> {
+  if (!staff) {
+    return {
+      accounts: [],
+      allowedAccountIds: [],
+      canSeeUnassigned: false,
+      ids: [],
+    };
+  }
   const allAccounts = await getLineAccounts(db);
   const tenantAccounts = filterVisibleLineAccounts(allAccounts, staff);
   if (staff?.id === 'env-owner') {

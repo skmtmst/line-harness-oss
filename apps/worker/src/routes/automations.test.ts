@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 // We assert on the SQL/binds the route forwards to D1. The DB-helper path
 // (no lineAccountId query) is mocked separately on @line-crm/db.
@@ -64,9 +65,22 @@ function makeAutomationDb(rows: AutomationRow[]) {
 }
 
 function setupApp(db: D1Database) {
-  const app = new Hono<{ Bindings: { DB: D1Database } }>();
+  const app = new Hono<{
+    Bindings: { DB: D1Database };
+    Variables: { staff: AuthenticatedStaff };
+  }>();
   app.use('*', async (c, next) => {
     c.env = { DB: db };
+    c.set('staff', {
+      id: 'staff-1',
+      name: 'Staff',
+      role: 'admin',
+      readOnly: false,
+      permissionKeys: [],
+      assignedLineAccountId: null,
+      canAccessDescendantAccounts: false,
+      tenantId: '00000000-0000-4000-8000-000000000001',
+    });
     await next();
   });
   app.route('/', automations);

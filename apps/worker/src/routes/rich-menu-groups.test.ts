@@ -71,10 +71,15 @@ function makeMinimalDbStub(): D1Database {
   } as unknown as D1Database;
 }
 
-function setupApp(opts: { r2?: R2Bucket; db?: D1Database } = {}) {
+function setupApp(opts: {
+  r2?: R2Bucket;
+  db?: D1Database;
+  staff?: TestEnv['Variables']['staff'] | null;
+} = {}) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', role: 'owner' });
+    const staff = opts.staff === undefined ? { id: 'staff-1', role: 'owner' as const } : opts.staff;
+    if (staff) c.set('staff', staff);
     c.env = { DB: opts.db ?? makeMinimalDbStub(), IMAGES: opts.r2 ?? makeR2Stub() };
     await next();
   });
@@ -85,7 +90,9 @@ function setupApp(opts: { r2?: R2Bucket; db?: D1Database } = {}) {
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
   accountAccessMocks.canAccessAllLineAccounts.mockReset();
-  accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  accountAccessMocks.canAccessAllLineAccounts.mockImplementation(
+    async (_db, staff) => Boolean(staff),
+  );
   dbMocks.getRichMenuGroupById.mockResolvedValue({
     id: 'g1', account_id: 'acc-1', status: 'draft', size: 'large',
   });
@@ -590,6 +597,15 @@ describe('POST /api/rich-menu-groups/:groupId/pages/:pageId/image', () => {
 });
 
 describe('GET /api/rich-menu-images/:key', () => {
+  test('匿名では既定統括のR2画像を返さない', async () => {
+    const r2 = makeR2Stub();
+    const key = 'rich-menus/acc-1/g1/p1/image.png';
+    await r2.put(key, PNG_2500x1686);
+    const res = await setupApp({ r2, staff: null }).request(`/api/rich-menu-images/${key}`);
+
+    expect(res.status).toBe(404);
+  });
+
   test('別LINEアカウントのR2画像を返さない', async () => {
     accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
     const r2 = makeR2Stub();
@@ -598,6 +614,55 @@ describe('GET /api/rich-menu-images/:key', () => {
     const res = await app.request('/api/rich-menu-images/rich-menus/other-account/g1/p1/image.png');
 
     expect(res.status).toBe(404);
+  });
+
+  test('同じ統括のスタッフにはR2画像を返す', async () => {
+    const r2 = makeR2Stub();
+    const key = 'rich-menus/acc-1/g1/p1/image.png';
+    await r2.put(key, PNG_2500x1686, { httpMetadata: { contentType: 'image/png' } });
+    const res = await setupApp({ r2 }).request(`/api/rich-menu-images/${key}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+  });
+});
+
+describe('GET /api/rich-menu-groups/external/:richMenuId/image', () => {
+  test('匿名ではLINE画像を取りに行かない', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res = await setupApp({ staff: null }).request(
+      '/api/rich-menu-groups/external/rich-menu-id/image?accountId=acc-1',
+    );
+
+    expect(res.status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  test('別統括のLINE画像を取りに行かない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res = await setupApp().request(
+      '/api/rich-menu-groups/external/rich-menu-id/image?accountId=other-account',
+    );
+
+    expect(res.status).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  test('同じ統括のスタッフにはLINE画像を返す', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'line-token' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(PNG_2500x1686, { headers: { 'Content-Type': 'image/png' } }),
+    );
+    const res = await setupApp().request(
+      '/api/rich-menu-groups/external/rich-menu-id/image?accountId=acc-1',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+    fetchSpy.mockRestore();
   });
 });
 

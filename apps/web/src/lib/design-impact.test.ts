@@ -10,10 +10,9 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする102ファイルを利用先に数える', () => {
-    // 2026-09-04: 最新 development の100ファイルに、この枝の下書き編集と
-    // マイルの使い道の2画面を加えた実測値。
-    expect(directImporters(files, button)).toHaveLength(102)
+  it('共通Buttonを直接importする103ファイルを利用先に数える', () => {
+    // development 側の102件をすべて残し、流入リンク詳細の削除確認を加えた実測値。
+    expect(directImporters(files, button)).toHaveLength(103)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
