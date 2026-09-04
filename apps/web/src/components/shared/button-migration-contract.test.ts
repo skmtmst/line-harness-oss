@@ -69,7 +69,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 「再読み込み」として副次操作へ寄せた。統合後の木で主要16個を実測した。
     // 2026-09-04: テンプレート一覧のフォルダ帯を共通 `FolderPanel` へ寄せ、
     // 「フォルダを追加」を共通 Button にした。41 → 42。
-    expect(openings).toHaveLength(42)
+    // 2026-09-04: 流入経路の一覧へ「CSVで書き出す」を1つ追加（設計 `Q4bkTg`）。
+    //   development 側で口が無いまま置かれていたものを一度外してあり、
+    //   今回は**押すと実際に書き出せる**ものとして戻す。42 → 43。
+    expect(openings).toHaveLength(43)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
@@ -290,11 +293,11 @@ describe('標準ボタンの第1段階移行', () => {
     // text-[30px] / text-[#202020] / text-[#777] の3つが減って 1180。
     // 2026-09-04: ウェビナー編集の横並びタブを段の帯へ替えたとき、
     // タブの `shadow-[0_-1px_0_0_rgba(226,232,240,1)]` が1つ消えて 1179。
-    // 2026-09-04: テンプレート一覧から内部の値 `category` の行を外して減り、
-    // LINEアカウント一覧（★V6 33-1）の表の最小幅 `min-w-[56rem]` と
-    // 登録（★V6 33-2）の右の欄の幅 `xl:grid-cols-[minmax(0,1fr)_22rem]` で増えた。
-    // 合わせて実測し直す。ほかの一覧の表も同じ書き方（`templates` は `min-w-[640px]`）。
-    expect(debt['arbitrary-value']).toBe(1180)
+    // 2026-09-04: LINEアカウント一覧（★V6 33-1）の表の最小幅 `min-w-[56rem]` と
+    // 登録（★V6 33-2）の右の欄の幅 `xl:grid-cols-[minmax(0,1fr)_22rem]` で増え、
+    // テンプレート一覧から内部の値 `category` の行を外し、素の選び口を
+    // 共通部品へ寄せたぶんで減った。**両方が動いたので実測へ締め直す。**
+    expect(debt['arbitrary-value']).toBe(1179)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

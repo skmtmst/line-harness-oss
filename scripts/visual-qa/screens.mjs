@@ -291,7 +291,7 @@ export const SCREENS = [
     verdictHead: 'b8359655',
   },
   {
-    ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
+    ...INBOX, node: 'IYjvu', name: '2-10 対応状況変更を開く',
     steps: [...OPEN_CHAT, { click: '対応状況を変える' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** 一致。未対応・対応中・保留・対応済の並び、色の丸、色付きの札、選択中の✓まで設計どおり',
     verdictSource: 'inbox-v6/IYjvu-1920.png', verdictHead: '7b509106',
@@ -354,10 +354,10 @@ export const SCREENS = [
       「検索名を入力してください。」は、開いた時点で出ている。
     */
     steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 名前が空のあいだは保存できない形にして撮り直した（board#50）。** ルート `/chats`（「保存した検索」→「この条件を保存」）。1440・1920とも横スクロール0。 **設計と合ったところ**：名前が空のとき保存ボタンが**押せない見た目になっている**。設計 `AuSDY` も同じく灰色で押せない形。「0 / 40文字」も一致。**押してから断るのではなく、押せない形にしてから何をすれば進めるかを書く。** 空のときの文言も設計の「検索名を入力してください。」をそのまま使った。 **残る差（P2）**：(1) 設計はその文を**赤い帯（⚠つき）**で出し、入力欄の枠も赤い。実装は灰色の小さな案内 → board#57 で直す。(2) 設計の入力欄の初期表示は「検索名を入力してください」、実装は「例：未対応・期限超過」。(3) 設計の「保存する条件」は**その場で変えられる選び口**（対応マーク・期限・受信経路・担当者）、実装は読むだけ。(4) 設計にある「よく使うに追加」の切り替えが実装に無い。(5) ボタンが設計「検索条件を保存」／実装「この条件を保存」。 **撮り方も直した**——前は「この条件を保存」を2回押して断られる形を撮っていたが、押せなくなったので窓を開いたところまでで撮る。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-04 未入力の断りを共通の赤い帯に寄せて撮り直した（board#57）。** ルート `/chats`（「保存した検索」→「この条件を保存」）。1440・1920とも横スクロール0。 **設計 `AuSDY`（2-16）と合った**：入力欄の枠が赤い／⚠つきの赤い帯で「検索名を入力してください。」／保存ボタンは灰色で押せない／「0 / 40文字」。**押してから断るのではなく、開いた時点で直しどころが分かる。** 前は小さな灰色の字だったので、**赤い枠だけ見えて理由が読まれない**形だった。共通部品 `Notice`（tone=error）に寄せて、自前の赤字をやめた。 **空のときと押して断られたときで同じ見た目にした。** 片方だけ帯にすると、同じ「入力してください」が2通りの見え方をして、別のことを言われたように読める。 **残る差（P2、第2段）**：設計の入力欄の初期表示は「検索名を入力してください」、実装は「例：未対応・期限超過」。設計の「保存する条件」は**その場で変えられる選び口**（対応マーク・期限・受信経路・担当者）、実装は読むだけ。設計にある「よく使うに追加」の切り替えが無い。ボタンが設計「検索条件を保存」／実装「この条件を保存」。',
     verdictSource: 'inbox-v6/AuSDY.txt',
-    verdictHead: '15d9cf71',
+    verdictHead: '2f016fcd5',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -1078,11 +1078,7 @@ export const SCREENS = [
       固定データに2行入れてある。
     */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/auto-replies/runs` の page.tsx が `codex/development` に無い。',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/runs` が development に無い。判定は未マージ枝 `93edbe17` で書かれたもの',
-    why: '`/auto-replies/runs` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 一致', verdictSource: 'auto-replies-v6/design-qa-execution-results-501.md', verdictHead: '93edbe17',
     route: '/auto-replies/runs?id=rule-a',
     states: {
       apis: ['**/api/auto-reply-runs*'],
@@ -1261,11 +1257,10 @@ export const SCREENS = [
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/webinars/published` の page.tsx が `codex/development` に無い。',
     route: '/webinars/published?id=webinar-1', mode: 'page',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/webinars/published` が development に無い。判定は未マージ枝 `61eeb3c7` で書かれたもの',
-    why: '`/webinars/published` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **2026-09-03 に確かめ直した：まだ本流に無い。** `/webinars/published?id=webinar-1` は HTTP 404 で、`apps/web/src/app/webinars/published/page.tsx` も無い。以前ここには「#507 → #508 で公開完了が入った」と書いていたが、**それは未マージのPRの枝で見たもの**だった。以下の観察も同じ枝のもの。 「公開しました」＋公開状態・公開URL・動画の長さ43分・配信枠2件。**出せないものを出さない**のが良い：「所属するLINE公式アカウントのLIFF IDを確認できないため、公開ページのボタンは出していません。」と理由を添えて隠す。「公開後の申込数や視聴結果は、編集画面の「概要・分析」で確認できます。」も書いてある。完了画面へ渡すIDは公開の口が実際に返したものだけ（契約試験が `?status=success` を禁じている）。P2 設計との細かな差は未確認（設計 TimXl の面と1枚ずつ並べるのは次の回） **ルート**：`/webinars/published?id=webinar-1`。**取得元**：`webinars-v6/design-qa.md` ＋ #508 の契約試験。**推奨修正**：LIFF IDが無いときにボタンを隠して理由を書く形は、ほかの公開完了画面にも写せる。**残作業**：設計 `TimXl` の面と1枚ずつ並べる。',
+    verdictSource: '/webinars/published?id=webinar-1 が HTTP 404（2026-09-03 確認）＋ apps/web/src/app/webinars/published/page.tsx が無い',
+    verdictHead: '61eeb3c7',
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
@@ -1861,11 +1856,7 @@ export const SCREENS = [
       `publishedVersion` の2つしか持たない。
     */
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/score-rules',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/mileage/score-rules` が development に無い。判定は未マージ枝 `642b8222` で書かれたもの',
-    why: '`/mileage/score-rules` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    verdict: 'needs_fix', verdictNote: 'P2（つながる先・パンくず・読む場面と直す場面の分離） **ルート**：`/mileage/score-rules`。**取得元**：`mileage-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：読む場面と直す場面を分け、パンくずとつながる先を足す。**残作業**：この画面の本文を撮って差を数え直す。いまの判定は括弧書きだけで、具体的な差を出せていない。', verdictSource: 'mileage-v6/design-qa-score-rules-496.md', verdictHead: '642b8222',
+    verdict: 'needs_fix', verdictNote: '**2026-09-04 画面を載せ直した（board#75）。** それまで development に `page.tsx` が無かった——PR #496 が閉じられ、#770 は**口だけ**を入れ直したので、画面の半分が落ちたままだった。行動スコアのタブから決めごとへ行く先が無く、**点数の付け方を画面から変えられなかった。** 旧 PR #499 の直し（失敗の言い方・表の幅）を載せ、あわせて2つそろえた：(1) 呼び方を「層」→**「帯」**（タブ側は統一済みで、この面だけ戻ると同じ機能の中で名前が2つになる。§7 #48）。(2) 断り文をタブ側と同じ「スコアはマイルではありません。お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。」に（前は「顧客には表示しません…顧客の価値を表す点数ではありません」で、**「マイルが減るのでは」に答えられなかった**）。 **失敗の言い方**：`ApiError` の `message` は 400 以外だと `API error: <番号>` に落ちるので、素通しすると **`API error: 405` が利用者に見える**。403/404/405/409 と通信断を言葉にした。 **表の幅**：`table-layout: fixed` の6列が等分され「こちらに返信した」が切れていた。列ごとに幅を決め、右の柱は 1536px から戻す。 **見るだけの人にスイッチを出さない**：共通 `Toggle` に「押せないが状態は見せる」入口が無く、`locked` は**オンに固定して描く**印なので、止めているルールが動いて見える。動かせない相手には文字だけで状態を伝える。 撮影用の固定データ `ACTION_SCORE_RULES` を足し、**帯の境目を 30 / 70 にそろえた**（`/api/action-scores/friends` が `normalMin: 40` を返していて、一覧と決めごとで同じ人が別の帯に入って見えた。40 に根拠は無い）。 残る差（P2）：つながる先・パンくず・読む場面と直す場面の分離。**設計画像との突き合わせはこれから**——この画面の `.txt` はまだ取れていない。', verdictSource: '実装（board#75 で載せ直した枝）', verdictHead: '2f016fcd5',
     states: {
       apis: ['**/api/action-scores/rules?*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
@@ -2642,8 +2633,10 @@ export const SCREENS = [
   {
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
     dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** **`7b509106` の1440・1920を設計と見比べて、書き直した。判定は据え置き。** **入ったもの**：押せない主要操作に理由が付いた——「フォルダを追加」が灰色のとき、本文に「フォルダ名を入力すると保存できます」と出る。フォルダ名（必須）・フォルダの色・一覧での表示、「フォルダをあとで削除しても、中に入れたタグや友だち情報欄は削除されず『未分類』に残ります。」の言い分けも設計どおり。**残る差**：①設計は**一覧の上に開く1つの窓**で、「このダイアログは追加のときも編集のときも同じものを使います。」と明記されている。実装は `/tags/folders/new` という**別ページ**なので、追加と編集を1つにできていない（設計の窓には「フォルダを削除」も並ぶ）。②実装だけに「作成する場所（タグ／友だち情報欄）」の節がある。③色の並びが違う（設計は緑始まりの8色、実装は青始まりの8色）。**壊れ値・内部IDは0件。** **推奨修正**：①窓に寄せて編集と1つにする。②は残してよいが、設計にも足すかを決める。',
-    verdictSource: 'friend-attributes-v6/byqIW.txt', verdictHead: '7b509106',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 色の並びと読み上げを設計・要件へ寄せて撮り直した（board#141）。** ルート `/tags/folders/new`。1440・1920とも横スクロール0。 **直したところ**：(1) 色を**緑始まり**にした（`#06C755` が先頭）。V6 の基調色は `--color-accent`（#06c755）で、設計 `byqIW` も緑始まり。**青始まりだと、既定で選ばれる色が基調色から外れる。** 一覧での表示の丸も緑になった。(2) **色に名前を付けた**（緑・青・水色・紫・ピンク・赤・黄・グレー）。前は読み上げが「色 #3B82F6」で、**色が見えない人には16進数しか届かなかった**（要件 04 §13「すべての色選択に名前またはラベルを付ける」）。選択中は枠と✓の両方で示し、色だけに頼らない（同 §13「色だけで区別しない」）。 **P1 まだ窓になっていない。** 要件 04 §4 のルート表は「タグフォルダ｜**タグ一覧内のオーバーレイ**」だが、実装は `/tags/folders/new` の別ページ。設計の窓は追加と編集で同じものを使い、「フォルダを削除」も並ぶ。いまは追加と編集が1つになっていない。 **P2 実装だけに「作成する場所（タグ／友だち情報欄）」がある。** 出どころを調べたところ、要件ではなく **V2 の `87c37b840`「友だち詳細の上に情報欄のタブを出す」** で入ったもので、`friend_fields.folder_id` として実在し、友だち詳細のタブに使われている。**外すと動いているものが壊れる**ので、要件 §7 に足すかを board#141 で人へ返した。',
+    verdictSource: 'friend-attributes-v6/byqIW.txt',
+    verdictHead: '807937c87',
   },
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
@@ -2713,6 +2706,106 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
     verdictHead: '7b509106',
   },
+
+  // ── pen から届いた新画面（台帳 kentavndng/line-harness-board#18） ──────────
+
+  {
+    /*
+      §7 #6「CSV操作の専用画面」。3-4 UID移行（`vtBCu`）と同じ束で、
+      移行そのものの口がまだ無い。
+    */
+    node: 'ux7of', feature: 3, name: '3-4-A UID・顧客データ移行／CSV',
+    dir: 'friends-v6', route: '/friends/migrations', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: '取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束',
+    why: '`/friends/migrations` が実装に無い。3-4 UID移行そのものが `gap: api` のまま',
+  },
+  {
+    /*
+      §7 #108 で描いた「担当者の未読が数えられないとき」。
+      **実装はもう在る**——skmtmst/line-harness-oss#741 で、集計が読めないときは
+      数だけ `—` にして担当者一覧そのものは残す形にした。
+      `YZaDK` の `-error` と同じ面だが、設計が別ノードを持つので別行で撮る。
+    */
+    ...INBOX, node: 'ohj8J', name: '2-8-A 担当者の未読が数えられないとき',
+    steps: [{ click: '担当者で絞り込む' }],
+    states: { apis: ['**/api/chats/stats**'], kinds: ['error'] },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-04 台帳へ登録して初めて撮った（board#18 の pen からの申し送り）。** ルート `/chats`（「担当者で絞り込む」を開いた形）。通常と集計失敗の2状態を1440・1920で撮った（4枚、はみ出し0）。 **実装はもう在った**——skmtmst/line-harness-oss#741 で、集計が読めないときは**数だけ `—` にして担当者一覧そのものは残す**形にしてある。担当者は `/api/operators` の別の口なので、集計が落ちても消さない。 **実値0と未取得を別の文字にしている**（0件なら「Kenta 0」、読めないなら「Kenta —」）。 P2 設計 `ohj8J` の文字がまだ書き出されていないので、文言の突き合わせは書き出し後。',
+    verdictSource: 'inbox-v6/ohj8J-error.txt', verdictHead: 'f3946713',
+  },
+
+  // ── 機能33 LINEアカウント設定（§7 #28） ──────────────────────────────
+
+  /*
+    **`/accounts` と `/accounts/new` は、いま別の画面への転送になっている。**
+
+      /accounts      → /hq（統括コンソール）
+      /accounts/new  → /restaurant-test/stores/new（飲食店向けのテスト機能）
+
+    そのまま撮ると**別の画面を 33-1・33-2 として台帳に入れる**ので、
+    実装が無いものとして扱う。撮影ハーネスの「飛ばされた」検査が拾った。
+    どちらのルートを 33 に使うかは決めごとが要る（board#18 へ返した）。
+  */
+  {
+    node: 'QT91v', feature: 33, name: '33-1 LINEアカウント一覧',
+    dir: 'accounts-v6', route: '/accounts', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: 'LINEアカウントを読む口はもう在る（`/api/line-accounts`）。一覧の画面を作るだけ',
+    why: '`/accounts` は `/hq`（統括コンソール）への転送で、33-1 の画面は無い',
+  },
+  {
+    node: 'b2NGxk', feature: 33, name: '33-2 LINEアカウントを登録する',
+    dir: 'accounts-v6', route: '/accounts/new', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '登録の口は在る。**飲食店向けの店舗登録とは別の画面**として作る',
+    why: '`/accounts/new` は `/restaurant-test/stores/new`（飲食店向けのテスト機能）への転送で、33-2 の画面は無い',
+  },
+  {
+    node: 'T9rA9', feature: 33, name: '33-3 LINEアカウントの詳細・編集',
+    dir: 'accounts-v6', route: '/accounts/detail?id=visual-qa-account', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '一覧と登録は在るので、読む口はそろっている。詳細・編集の画面を作るだけ',
+    why: '`/accounts` の詳細・編集にあたるルートが実装に無い（一覧と `/accounts/new` だけ）',
+  },
+  {
+    node: 'nx3XW', feature: 33, name: '33-4 乗り換え・引き継ぎ',
+    dir: 'accounts-v6', route: '/accounts/handover?id=visual-qa-account', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: '別のチャネルへ友だち・配信・履歴を引き継ぐ口が要る。既存の口では足りない',
+    why: '`/accounts/handover` が実装に無く、引き継ぎの口も無い',
+  },
+
+  // ── 機能34 はじめの設定と案内（§7 #29） ──────────────────────────────
+
+  {
+    node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
+    dir: 'getting-started-v6', route: '/getting-started', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '進み具合はいまある口（接続状態・友だち数・配信）から組み立てられる。画面を作るだけ',
+    why: '`/getting-started` が実装に無い',
+  },
+  {
+    node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
+    dir: 'getting-started-v6', route: '/recipes', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: 'レシピ（ひな形の組み合わせ）を持つ口がまだ無い',
+    why: '`/recipes` が実装に無く、レシピを読む口も無い',
+  },
+  {
+    node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
+    dir: 'getting-started-v6', route: '/recipes/clone?id=recipe-1', mode: 'page',
+    status: 'unimplemented', gap: 'api',
+    gapNote: 'レシピを複製して各機能へ展開する口が要る。`y0P0Qx` と同じ束',
+    why: '`/recipes` の複製にあたるルートが実装に無い',
+  },
+  {
+    node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
+    dir: 'getting-started-v6', route: '/settings/manual-links', mode: 'page',
+    status: 'unimplemented', gap: 'build',
+    gapNote: '正本の場所を持つだけの表。新しい口は要らない',
+    why: '`/settings/manual-links` が実装に無い',
+  },
 ]
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
@@ -2730,9 +2823,13 @@ export const DESIGN_SIZE = {
   xfYLn: [1920, 1080], r6Gzsu: [1920, 1080], hz9ti: [1920, 1080], dqFft: [1920, 1080],
   EvVO5: [1920, 1080], RUxNf: [1920, 1080], NrBkW: [1920, 1080], g2UNV: [1920, 1080],
   M2b2B: [1920, 1080], q5G45: [1920, 1080],
-  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1107],
-  I6UAdr: [1920, 1384], bzDn6: [1920, 1080], YzxU1: [1920, 1431], InCDe: [1920, 1080],
-  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1080],
+  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1251],
+  I6UAdr: [1920, 1384], bzDn6: [1920, 1220], YzxU1: [1920, 1431], InCDe: [1920, 1220],
+  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1064],
+  /* pen から届いた新画面（台帳 kentavndng/line-harness-board#18 の実測）。 */
+  ux7of: [1920, 1080], ohj8J: [1920, 1840],
+  QT91v: [1920, 1080], b2NGxk: [1920, 1940], T9rA9: [1920, 1120], nx3XW: [1920, 1100],
+  RAW35: [1920, 1010], y0P0Qx: [1920, 720], D5UaX: [1920, 856], f9oUm: [1920, 700],
   vUXKb: [1920, 1668], ZN0ov: [1920, 1754], JN6mQ: [1920, 1668],
   NjK9q: [1920, 1668], Alekb: [1920, 1668],
   l25rlp: [1920, 1080], tP0RW: [1920, 1320], LfrQs: [1920, 1320],

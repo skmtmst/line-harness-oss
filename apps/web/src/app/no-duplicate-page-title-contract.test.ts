@@ -80,7 +80,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(139)  // 2026-09-04: 34 の 4 画面とマイルの使い道を作る・編集する画面が入り 139。
+    expect(PAGES.length).toBe(142)  // 2026-09-04: 統合 PR #869 とマイルの使い道作成・編集画面を合わせた実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

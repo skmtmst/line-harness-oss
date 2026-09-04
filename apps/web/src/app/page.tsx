@@ -29,6 +29,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
+import SelectField from '@/components/shared/select-field'
 import {
   hasInboundSupportMark,
   summarizeTwoFactor,
@@ -160,15 +161,16 @@ function FriendAddLinkCard() {
         <div className="flex flex-wrap items-center gap-2">
           <label className="border-hairline bg-canvas rounded-control flex min-w-[220px] items-center gap-2 border px-3 py-2">
             <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
-            <select
+            <SelectField
               value={routeId}
               onChange={(event) => setRouteId(event.target.value)}
               aria-label="発行中の追加URL"
               className="text-ink min-w-0 flex-1 bg-transparent text-xs font-medium focus:outline-none"
-            >
-              <option value="">基本の追加URL</option>
-              {routes.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-            </select>
+              options={[
+                { value: '', label: '基本の追加URL' },
+                ...routes.map((entry) => ({ value: entry.id, label: entry.name })),
+              ]}
+            />
           </label>
           <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-medium">経路を分けて発行</Link>
         </div>

@@ -257,16 +257,11 @@ export default function NewBookingStaffPage() {
           </p>
         </div>
 
-        <Field label="予約枠の色" htmlFor="bs-color" note="カレンダーでの見分けに使います。">
-          {/* 色を持つ列がまだ無い。増やすと消せないので、決まってから足す。 */}
-          <select
-            id="bs-color"
-            disabled
-            title="予約枠の色は準備中です"
-            className={`${inputClass} opacity-50`}
-          >
-            <option>グリーン</option>
-          </select>
+        <Field label="予約枠の色" note="カレンダーでの見分けに使います。">
+          {/* 色を持つ列がまだ無いため、選べるように見せず現在値だけを示す。 */}
+          <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
+            現在はグリーンで固定です
+          </p>
         </Field>
 
         <label className="flex cursor-pointer items-start gap-2">
