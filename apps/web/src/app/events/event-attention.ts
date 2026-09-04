@@ -70,3 +70,15 @@ export function daysUntilEvent(item: EventListItem, nowMs = Date.now()): number 
   if (start === null) return null
   return Math.max(0, Math.ceil((start - nowMs) / DAY_MS))
 }
+
+/**
+ * 申込者一覧の帯で、定員の数を「次に何をするか」へ変える。
+ * 一覧の「あと少しで満席」と同じく、残り1〜3席を声かけの目安にする。
+ */
+export function describeBookingCapacity(applied: number, capacity: number | null): string {
+  if (capacity === null || capacity <= 0) return '定員なし'
+  const remaining = Math.max(0, capacity - applied)
+  if (remaining === 0) return `定員 ${capacity} ・ 満席です`
+  if (remaining <= 3) return `あと${remaining}人で満席です。声をかけると埋まります`
+  return `定員 ${capacity} ・ 残り${remaining}`
+}
