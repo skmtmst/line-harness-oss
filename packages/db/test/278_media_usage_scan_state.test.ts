@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   getMediaUsageScanState,
   recordMediaUsages,
+  pruneStaleMediaUsagesBatch,
   saveMediaUsageScanState,
 } from '../src/media.js';
 
@@ -57,6 +58,10 @@ describe('メディア使用先の分割走査台帳', () => {
       join(import.meta.dirname, '..', 'migrations', '278_media_usage_scan_state.sql'),
       'utf8',
     ));
+    sqlite.exec(readFileSync(
+      join(import.meta.dirname, '..', 'migrations', '281_media_usage_prune_index.sql'),
+      'utf8',
+    ));
     batchSizes = [];
     db = asD1(sqlite, (size) => batchSizes.push(size));
   });
@@ -95,5 +100,31 @@ describe('メディア使用先の分割走査台帳', () => {
       .toEqual({ count: 45 });
     expect(sqlite.prepare('SELECT COUNT(DISTINCT scanned_at) AS count FROM media_usages').get())
       .toEqual({ count: 1 });
+  });
+
+  it('古い使用先を指定件数までに限定して整理する', async () => {
+    sqlite.prepare('INSERT INTO media (id) VALUES (?)').run('media-1');
+    const insert = sqlite.prepare(
+      'INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at) VALUES (?, ?, ?, ?)',
+    );
+    for (let index = 0; index < 12; index += 1) {
+      insert.run('media-1', 'template', `template-${index}`, '2026-09-01T00:00:00.000');
+    }
+
+    await expect(pruneStaleMediaUsagesBatch(
+      db,
+      '2026-09-04T00:00:00.000',
+      ['media-1'],
+      5,
+    )).resolves.toBe(5);
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM media_usages').get())
+      .toEqual({ count: 7 });
+    const plan = sqlite.prepare(
+      `EXPLAIN QUERY PLAN
+       SELECT rowid FROM media_usages
+        WHERE scanned_at < ? AND media_id IN (?)
+        LIMIT ?`,
+    ).all('2026-09-04T00:00:00.000', 'media-1', 5) as Array<{ detail: string }>;
+    expect(plan.some((row) => row.detail.includes('idx_media_usages_media_scanned'))).toBe(true);
   });
 });
