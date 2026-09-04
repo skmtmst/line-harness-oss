@@ -62,6 +62,15 @@ export default function SavedViewDialog({
 
   if (!open || typeof document === 'undefined') return null
 
+  /*
+    **名前が空のあいだは、最初から押せない。**
+
+    前は空のまま押せて、押してはじめて「検索名を入力してください」と赤字が
+    出た。**押せる形で置いてあるものは、押せば進むと読む。** 押してから
+    断るのではなく、何をすれば進めるかを先に書く。
+  */
+  const nameMissing = name.trim() === ''
+
   const submit = async () => {
     const trimmed = name.trim()
     /*
@@ -127,8 +136,19 @@ export default function SavedViewDialog({
                 onChange={(event) => { setName(event.target.value); setError('') }}
                 maxLength={NAME_LIMIT}
                 placeholder="例：未対応・期限超過"
+                aria-describedby={!error && nameMissing ? 'saved-view-name-hint' : undefined}
                 className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${error ? 'border-danger' : 'border-hairline'}`}
               />
+              {/*
+                **断りではなく、次に何をすれば進めるかを書く。** 赤字ではない
+                ——まだ間違えていないので、注意ではなく案内。
+                文言は設計 `AuSDY`（2-16）の「検索名を入力してください。」に合わせる。
+              */}
+              {!error && nameMissing ? (
+                <p id="saved-view-name-hint" className="text-ink-faint mt-1.5 text-xs">
+                  検索名を入力してください。
+                </p>
+              ) : null}
               {error ? <p className="text-danger mt-1.5 text-xs" role="alert">{error}</p> : null}
             </div>
 
@@ -159,7 +179,9 @@ export default function SavedViewDialog({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={saving}
+                disabled={saving || nameMissing}
+                title={nameMissing ? '検索名を入力してください' : undefined}
+                /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
                 className="rounded-control bg-accent-deep text-on-accent px-5 py-2 text-sm font-bold disabled:opacity-40"
               >
                 {saving ? '保存中' : 'この条件を保存'}

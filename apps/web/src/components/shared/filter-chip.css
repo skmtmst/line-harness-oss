@@ -20,6 +20,17 @@
   background: var(--color-canvas-sunken);
 }
 
+/*
+ * **押せる部品にはフォーカスの輪郭を入れる。**
+ * キーボードだけで操作する人が、いまどこにいるか分からなくなる。
+ * `:focus` ではなく `:focus-visible` にするのは、マウスで押したときに
+ * 輪郭を出さないため（出すと「選んだ」と読み違える）。
+ */
+.v6-filter-chip:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
 .v6-filter-chip[aria-pressed='true'] {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
