@@ -15,6 +15,18 @@ const EVENT_TRIGGER_TYPES = new Set([
   'form_submitted',
   'link_clicked',
   'calendar_booked',
+  'score_threshold_crossed',
+  'score_band_changed',
+  'manual_reply_sent',
+  'staff_assigned',
+  'response_overdue',
+]);
+const SUPPORT_MARK_TRIGGER_TYPE = 'support_mark_change';
+const SUPPORT_MARK_EVENTS = new Set([
+  'message_received',
+  'manual_reply_sent',
+  'staff_assigned',
+  'response_overdue',
 ]);
 const SCHEDULE_TRIGGER_TYPES = new Set(['datetime', 'daily', 'weekly']);
 const EVENT_FILTER_KEYS: Record<string, ReadonlySet<string>> = {
@@ -24,10 +36,22 @@ const EVENT_FILTER_KEYS: Record<string, ReadonlySet<string>> = {
   form_submitted: new Set(['formId']),
   link_clicked: new Set(['trackedLinkId']),
   calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
+  score_threshold_crossed: new Set([
+    'ruleId', 'ruleVersionId', 'scoreBefore', 'currentScore',
+    'previousBand', 'currentBand', 'thresholdBand',
+  ]),
+  score_band_changed: new Set([
+    'ruleId', 'ruleVersionId', 'scoreBefore', 'currentScore',
+    'previousBand', 'currentBand',
+  ]),
+  manual_reply_sent: new Set(['staffId']),
+  staff_assigned: new Set(['staffId']),
+  response_overdue: new Set(['dueAt']),
 };
 
 interface AutomationCandidate {
   automation_id: string;
+  priority: number;
   trigger_type: string;
   trigger_config: string;
   condition_config: string;
@@ -94,6 +118,12 @@ function equalFilter(actual: unknown, expected: unknown): boolean {
 }
 
 function matchesEventTrigger(candidate: AutomationCandidate, input: AutomationEventInput): boolean {
+  if (candidate.trigger_type === SUPPORT_MARK_TRIGGER_TYPE) {
+    const config = parseObject(candidate.trigger_config, 'trigger_config');
+    const event = typeof config.event === 'string' ? config.event : '';
+    if (event === 'condition_matched') return EVENT_TRIGGER_TYPES.has(input.eventType);
+    return event === input.eventType && SUPPORT_MARK_EVENTS.has(event);
+  }
   if (!EVENT_TRIGGER_TYPES.has(candidate.trigger_type) || candidate.trigger_type !== input.eventType) {
     return false;
   }
@@ -186,8 +216,9 @@ export async function dispatchAutomationEvent(
 ): Promise<AutomationDispatchItem[]> {
   if (!input.lineAccountId || !input.sourceEventId || !EVENT_TRIGGER_TYPES.has(input.eventType)) return [];
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
-  const rows = await db.prepare(
-    `SELECT d.id AS automation_id, v.trigger_type, v.trigger_config, v.condition_config
+  const [eventRows, supportRows] = await Promise.all([
+    db.prepare(
+    `SELECT d.id AS automation_id, d.priority, v.trigger_type, v.trigger_config, v.condition_config
        FROM automation_definitions d
        JOIN automation_versions v
          ON v.id = d.current_published_version_id
@@ -195,12 +226,31 @@ export async function dispatchAutomationEvent(
       WHERE d.line_account_id = ? AND d.status = 'active' AND v.trigger_type = ?
       ORDER BY d.priority DESC, d.created_at ASC
       LIMIT ?`,
-  ).bind(input.lineAccountId, input.eventType, limit).all<AutomationCandidate>();
+    ).bind(input.lineAccountId, input.eventType, limit).all<AutomationCandidate>(),
+    db.prepare(
+      `SELECT d.id AS automation_id, d.priority, v.trigger_type, v.trigger_config, v.condition_config
+         FROM automation_definitions d
+         JOIN automation_versions v
+           ON v.id = d.current_published_version_id
+          AND v.automation_id = d.id AND v.status = 'published'
+        WHERE d.line_account_id = ? AND d.status = 'active'
+          AND v.trigger_type = 'support_mark_change'
+        ORDER BY d.priority DESC, d.created_at ASC
+        LIMIT ?`,
+    ).bind(input.lineAccountId, limit).all<AutomationCandidate>(),
+  ]);
 
   const results: AutomationDispatchItem[] = [];
-  for (const candidate of rows.results ?? []) {
+  let supportMarkWinnerChosen = false;
+  for (const candidate of [...(eventRows.results ?? []), ...(supportRows.results ?? [])]) {
     try {
       if (!matchesEventTrigger(candidate, input)) continue;
+      if (candidate.trigger_type === SUPPORT_MARK_TRIGGER_TYPE) {
+        if (supportMarkWinnerChosen || !input.friendId) continue;
+        const condition = parseTargetCondition(candidate.condition_config);
+        if (condition && !await matchesCondition(db, input.friendId, condition)) continue;
+        supportMarkWinnerChosen = true;
+      }
       results.push(await startCandidate(db, candidate, input, options));
     } catch (error) {
       results.push({
@@ -348,7 +398,7 @@ export async function processScheduledAutomationTriggers(
   if (Number.isNaN(now.getTime())) throw new Error('scheduled_now_invalid');
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
   const candidates = await db.prepare(
-    `SELECT d.id AS automation_id, d.line_account_id, v.trigger_type, v.trigger_config, v.condition_config,
+    `SELECT d.id AS automation_id, d.priority, d.line_account_id, v.trigger_type, v.trigger_config, v.condition_config,
             a.timezone
        FROM automation_definitions d
        JOIN automation_versions v
@@ -399,4 +449,39 @@ export async function processScheduledAutomationTriggers(
     }
   }
   return { due, results };
+}
+
+/** 返信期限を過ぎた会話を、期限そのものを冪等キーにして一度だけ評価する。 */
+export async function processOverdueSupportMarkTriggers(
+  db: D1Database,
+  options: AutomationTriggerOptions = {},
+): Promise<AutomationDispatchItem[]> {
+  const now = options.now ?? new Date().toISOString();
+  const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
+  const rows = await db.prepare(
+    `SELECT c.id AS chat_id, c.friend_id, c.line_account_id, c.next_response_due_at
+       FROM chats c
+      WHERE c.next_response_due_at IS NOT NULL
+        AND datetime(c.next_response_due_at) <= datetime(?)
+        AND c.status != 'resolved'
+        AND c.line_account_id IS NOT NULL
+      ORDER BY c.next_response_due_at ASC, c.id ASC
+      LIMIT ?`,
+  ).bind(now, limit).all<{
+    chat_id: string;
+    friend_id: string;
+    line_account_id: string;
+    next_response_due_at: string;
+  }>();
+  const results: AutomationDispatchItem[] = [];
+  for (const row of rows.results ?? []) {
+    results.push(...await dispatchAutomationEvent(db, {
+      lineAccountId: row.line_account_id,
+      eventType: 'response_overdue',
+      sourceEventId: `response-overdue:${row.chat_id}:${row.next_response_due_at}`,
+      friendId: row.friend_id,
+      eventData: { dueAt: row.next_response_due_at },
+    }, { ...options, now }));
+  }
+  return results;
 }

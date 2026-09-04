@@ -445,7 +445,7 @@ function VarsPageInner() {
                   <button
                     onClick={() => void addFolder()}
                     disabled={!folderName.trim() || savingFolder}
-                    className="bg-accent text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
+                    className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
                   >
                     決定
                   </button>

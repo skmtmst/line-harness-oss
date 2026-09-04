@@ -514,7 +514,7 @@ function TagPicker({
                 onChange(on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id])
               }
               className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
+                on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
               }`}
             >
               {tag.name}

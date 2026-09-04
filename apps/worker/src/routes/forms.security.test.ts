@@ -273,6 +273,26 @@ describe('submission pagination compatibility', () => {
     );
     expect(mocks.getFormSubmissions).not.toHaveBeenCalled();
   });
+
+  test.each([
+    ['999999', 200],
+    ['-1', 20],
+    ['NaN', 20],
+  ])('回答一覧の limit=%s を最大200件以内へ直す', async (raw, expected) => {
+    mocks.getFormSubmissionsPage.mockResolvedValue({ items: [], total: 0, page: 1, limit: expected });
+    const { bindings } = env();
+    const res = await app(true).request(
+      `/api/forms/form-1/submissions?page=-1&limit=${raw}&account_id=account-a`,
+      {},
+      bindings,
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.getFormSubmissionsPage).toHaveBeenCalledWith(
+      bindings.DB,
+      'form-1',
+      { page: 1, limit: expected },
+    );
+  });
 });
 
 describe('回答フォームの削除影響と保管', () => {

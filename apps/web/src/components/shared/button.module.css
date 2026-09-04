@@ -11,7 +11,7 @@
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, filter 120ms ease-out;
 }
 
 .button[hidden] {
@@ -27,15 +27,31 @@
   opacity: 0.4;
 }
 
+/*
+ * 主ボタンは `$accent-deep`(#087a3e) + 白文字。
+ *
+ * LINE の緑 `$accent`(#06c755) に白文字を乗せると **2.26:1** しかない。
+ * ラベルは `$size-label`(13px) なので、AA が求める 4.5:1 に届かない。
+ * `$accent-deep` なら **5.44:1**。新しい色は作らない——Pencil の
+ * トークン表にある色だけを使う（正本は要件索引 §5-2）。
+ *
+ * **`$accent` は消さない。** 選択状態・チップ・有効表示には残す
+ * （文字が乗らない用途）。
+ */
 .primary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
+/*
+ * 押したときはさらに沈める。**新しい色は作らない。**
+ * `$accent-deep` より濃い緑は Pencil のトークン表に無いので、
+ * 同じ色を暗くして出す。暗くするぶん白文字との比は 5.44:1 より上がる。
+ * `$accent-hover`(#05b34c) へ戻すと、押した瞬間だけ 2.78:1 に落ちる。
+ */
 .primary:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
-  background: var(--color-accent-hover);
+  filter: brightness(0.92);
 }
 
 .secondary {

@@ -692,6 +692,8 @@ export interface WebinarRegistration {
   friend_id: string;
   session_start_at: number;
   notified_at: string | null;
+  status: 'active' | 'cancelled';
+  cancelled_at: string | null;
   created_at: string;
 }
 
@@ -705,8 +707,8 @@ export async function upsertWebinarRegistration(
   await db
     .prepare(
       `INSERT OR IGNORE INTO webinar_registrations
-         (id, webinar_id, friend_id, session_start_at, notified_at, created_at)
-       VALUES (?, ?, ?, ?, NULL, ?)`,
+         (id, webinar_id, friend_id, session_start_at, notified_at, created_at, status, cancelled_at)
+       VALUES (?, ?, ?, ?, NULL, ?, 'active', NULL)`,
     )
     .bind(crypto.randomUUID(), webinarId, friendId, sessionStartAt, jstNow())
     .run();
@@ -722,7 +724,7 @@ export async function getUpcomingWebinarRegistration(
   return db
     .prepare(
       `SELECT * FROM webinar_registrations
-       WHERE webinar_id = ? AND friend_id = ? AND session_start_at > ?
+       WHERE webinar_id = ? AND friend_id = ? AND session_start_at > ? AND status = 'active'
        ORDER BY session_start_at ASC LIMIT 1`,
     )
     .bind(webinarId, friendId, nowEpochSeconds)
@@ -739,7 +741,7 @@ export async function getWebinarRegistration(
   return db
     .prepare(
       `SELECT * FROM webinar_registrations
-       WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ?`,
+       WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ? AND status = 'active'`,
     )
     .bind(webinarId, friendId, sessionStartAt)
     .first<WebinarRegistration>();
@@ -778,6 +780,10 @@ export async function getDueWebinarRegistrations(
        FROM webinar_registrations r
        JOIN webinars w ON w.id = r.webinar_id
        WHERE r.notified_at IS NULL
+         AND r.status = 'active'
+         AND NOT EXISTS (
+           SELECT 1 FROM webinar_notification_settings ns WHERE ns.webinar_id = r.webinar_id
+         )
          AND w.status = 'active'
          AND r.session_start_at <= ?
          AND r.session_start_at + w.duration_seconds > ?
