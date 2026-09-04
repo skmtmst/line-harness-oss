@@ -592,6 +592,9 @@
   "components/friend-fields/saved-search-list.tsx": {
     "arbitrary-value": 7
   },
+  "components/friend-fields/support-mark-rules-panel.tsx": {
+    "unresolved-classname": 42
+  },
   "components/friend-fields/tag-csv-import-dialog.tsx": {
     "unresolved-classname": 55
   },
