@@ -3109,8 +3109,8 @@ export const api = {
       }),
   },
   lineAccounts: {
-    list: (live = true) =>
-      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '' : '?live=0'}`),
+    list: (live = false) =>
+      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
