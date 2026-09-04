@@ -279,18 +279,17 @@ function LegacyNewTagPage() {
             htmlFor="tag-priority"
             note="複数のタグを持つ場合、いちばん高いもの1枚だけが効きます。"
           >
-            <select
+            <SelectField
               id="tag-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
+              aria-label="タグの優先度"
               className={inputClass}
-            >
-              {[0, 1, 2, 3, 4, 5].map((p) => (
-                <option key={p} value={String(p)}>
-                  {p}
-                </option>
-              ))}
-            </select>
+              options={[0, 1, 2, 3, 4, 5].map((priorityValue) => ({
+                value: String(priorityValue),
+                label: String(priorityValue),
+              }))}
+            />
           </Field>
         </div>
         </div>
