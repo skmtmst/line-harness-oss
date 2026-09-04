@@ -28,6 +28,25 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')
   })
 
+  it('一覧は種別を出さず、WuKzUの6列を固定する', () => {
+    const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
+      .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+      .slice(1)
+    expect(headings).toEqual([
+      '共通情報',
+      '差し込みキー',
+      '中身',
+      '使われている場所',
+      '更新・次の変更',
+      '操作',
+    ])
+    expect(headings).not.toContain('種別')
+    expect(PAGE).not.toContain('VAR_TYPE_LABELS[item.type]')
+    expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
+    expect(PAGE).toContain('item.usageCount === 0')
+    expect(PAGE).toContain('formatListDate(item.updatedAt)')
+  })
+
   it('初回空と検索0件を言い分ける', () => {
     expect(PAGE).toContain('まだ共通情報がありません')
     expect(PAGE).toContain('条件に合う共通情報はありません')
@@ -47,5 +66,6 @@ describe('V6共通情報一覧', () => {
     expect(API).toContain('accountId=${encodeURIComponent(accountId)}')
     expect(WORKER).toContain("c.req.query('accountId')")
     expect(WORKER).toContain('canAccessAllLineAccounts')
+    expect(WORKER).toContain('getCommonVarUsageCounts')
   })
 })

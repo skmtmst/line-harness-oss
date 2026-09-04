@@ -3633,6 +3633,7 @@ export const api = {
       commissionRate?: number
       friendId?: string
       issueInitialLink?: boolean
+      lineAccountId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',

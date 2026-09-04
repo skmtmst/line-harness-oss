@@ -58,7 +58,9 @@ const OFFER_ROW = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
+  ]);
 });
 
 describe('POST /api/affiliate-offers', () => {
@@ -127,7 +129,7 @@ describe('GET /api/affiliate-offers', () => {
     expect(body.data[0].id).toBe('off-1');
     expect(dbMocks.listAffiliateOffers).toHaveBeenCalledWith(
       expect.anything(),
-      { activeOnly: false },
+      { activeOnly: false, includeUnassigned: true, lineAccountIds: ['account-1'] },
     );
   });
 
@@ -136,7 +138,7 @@ describe('GET /api/affiliate-offers', () => {
     await req('GET', '/api/affiliate-offers?activeOnly=true');
     expect(dbMocks.listAffiliateOffers).toHaveBeenCalledWith(
       expect.anything(),
-      { activeOnly: true },
+      { activeOnly: true, includeUnassigned: true, lineAccountIds: ['account-1'] },
     );
   });
 });
