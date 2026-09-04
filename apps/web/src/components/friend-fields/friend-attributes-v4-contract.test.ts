@@ -97,7 +97,11 @@ describe('友だち属性 V4 contract', () => {
     expect(migrate).toContain('友だちの値や既存の項目は変更しません')
     expect(migrate).not.toContain('migrationExecute')
     // 回答フォームはまだアカウント所属を持たない。全体件数を0件と偽らない。
-    expect(list).toContain("formLinks === null ? '未取得'")
+    // **見るのは「口が無いときに数を作らないか」。言い方の字面は固定しない。**
+    // 「未取得」の一語だけでは、待てば出るのか・壊れているのかが分からないので、
+    // 共通部品の文へ広げた（`field-list-kpi-reason-contract.test.ts` が中身を見る）。
+    expect(list).toContain('summary?.formLinks === null')
+    expect(list).toContain("notConnectedText('回答フォームの登録先')")
     // 画面名は共通トップバーだけに置く。本文の大見出しへ戻さない。
     expect(create).not.toContain("import Header from '@/components/layout/header'")
     expect(migrate).not.toContain("import Header from '@/components/layout/header'")

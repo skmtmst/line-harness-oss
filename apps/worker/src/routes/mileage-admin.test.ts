@@ -23,11 +23,32 @@ const dbMocks = {
   setMileageManualAdjustmentPolicy: vi.fn(),
   postMileageAdjustment: vi.fn(),
   getActionScoreOverview: vi.fn(),
+  getActionScoreBands: vi.fn().mockResolvedValue({ min: 0, max: 100, normalMin: 30, highMin: 70 }),
+  createMileageRewardDraft: vi.fn(),
+  createMileageRewardDraftFromPublished: vi.fn(),
+  getMileageReward: vi.fn(),
+  getMileageRewardAdminOverview: vi.fn(),
+  getMileageRedemption: vi.fn(),
+  importMileageRewardCodes: vi.fn(),
+  publishMileageReward: vi.fn(),
+  reorderMileageRewards: vi.fn(),
+  reserveMileageRewardRedemption: vi.fn(),
+  setMileageRewardStatus: vi.fn(),
+  updateMileageRewardDraft: vi.fn(),
+  encryptCredential: vi.fn(),
+  MileageRewardError: class MileageRewardError extends Error {
+    constructor(public readonly code: string, message: string, public readonly status = 400) {
+      super(message);
+    }
+  },
   MileageAdjustmentError: class MileageAdjustmentError extends Error {
     constructor(public readonly code: string) { super(code); }
   },
 };
 vi.mock('@line-crm/db', () => dbMocks);
+
+const deliveryMocks = { deliverMileageReward: vi.fn() };
+vi.mock('../services/mileage-reward-delivery.js', () => deliveryMocks);
 
 const accountAccessMocks = {
   getVisibleLineAccountScope: vi.fn(),
@@ -67,9 +88,173 @@ beforeEach(() => {
   accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
   });
+  dbMocks.getMileageRewardAdminOverview.mockResolvedValue({ rewards: [], summary: {} });
+  deliveryMocks.deliverMileageReward.mockResolvedValue({
+    status: 'succeeded', rewardName: '交換品', customerMessage: '', rewardCode: null,
+    retryAt: null, failurePolicy: 'retry', message: null,
+  });
 });
 
 describe('mileage admin API', () => {
+  it('keeps the reward list inside the selected account boundary', async () => {
+    expect((await call('/api/mileage/rewards?accountId=account-1')).status).toBe(200);
+    expect(dbMocks.getMileageRewardAdminOverview).toHaveBeenCalledWith(env.DB, 'account-1');
+
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValueOnce({
+      allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
+    });
+    expect((await call('/api/mileage/rewards?accountId=hidden')).status).toBe(404);
+    expect(dbMocks.getMileageRewardAdminOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports the canonical PATCH draft and POST stop contracts', async () => {
+    dbMocks.updateMileageRewardDraft.mockResolvedValueOnce({ id: 'reward-1' });
+    const draft = await call('/api/mileage/rewards/reward-1/draft', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        accountId: 'account-1', expectedVersionId: 'version-1',
+        draft: { name: '交換品', rewardKind: 'coupon', requiredMiles: 300 },
+      }),
+    });
+    expect(draft.status).toBe(200);
+    expect(dbMocks.updateMileageRewardDraft).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      id: 'reward-1', lineAccountId: 'account-1', expectedVersionId: 'version-1',
+    }));
+
+    dbMocks.setMileageRewardStatus.mockResolvedValueOnce({ id: 'reward-1', status: 'stopped' });
+    const stopped = await call('/api/mileage/rewards/reward-1/stop', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(stopped.status).toBe(200);
+    expect(dbMocks.setMileageRewardStatus).toHaveBeenCalledWith(env.DB, {
+      id: 'reward-1', lineAccountId: 'account-1', status: 'stopped',
+    });
+  });
+
+  it('requires explicit confirmation before publishing a reward', async () => {
+    const request = {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    } satisfies RequestInit;
+    expect((await call('/api/mileage/rewards/reward-1/publish', request)).status).toBe(428);
+    expect(dbMocks.publishMileageReward).not.toHaveBeenCalled();
+
+    dbMocks.publishMileageReward.mockResolvedValueOnce({ id: 'reward-1', status: 'published' });
+    const response = await call('/api/mileage/rewards/reward-1/publish', {
+      ...request,
+      headers: { 'X-Confirm-Irreversible': 'mileage-reward-publish' },
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.publishMileageReward).toHaveBeenCalledWith(env.DB, {
+      id: 'reward-1', lineAccountId: 'account-1', publishedBy: 'env-owner',
+    });
+  });
+
+  it('deduplicates and encrypts exchange codes before saving them', async () => {
+    dbMocks.encryptCredential
+      .mockResolvedValueOnce('encrypted-a')
+      .mockResolvedValueOnce('encrypted-b');
+    dbMocks.importMileageRewardCodes.mockResolvedValueOnce({ imported: 2, duplicates: 0 });
+
+    const response = await call('/api/mileage/rewards/reward-1/codes', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1', codes: [' CODE-A ', 'CODE-A', 'CODE-B'] }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(dbMocks.encryptCredential).toHaveBeenCalledTimes(2);
+    expect(dbMocks.encryptCredential).toHaveBeenNthCalledWith(1, 'CODE-A', undefined);
+    expect(dbMocks.encryptCredential).toHaveBeenNthCalledWith(2, 'CODE-B', undefined);
+    expect(dbMocks.importMileageRewardCodes).toHaveBeenCalledWith(env.DB, {
+      rewardId: 'reward-1',
+      lineAccountId: 'account-1',
+      codes: [
+        { ciphertext: 'encrypted-a', fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/) },
+        { ciphertext: 'encrypted-b', fingerprint: expect.stringMatching(/^[0-9a-f]{64}$/) },
+      ],
+    });
+    expect(await response.text()).not.toContain('CODE-A');
+  });
+
+  it('tests a reward without writing mileage or inventory', async () => {
+    dbMocks.getMileageReward.mockResolvedValueOnce({
+      id: 'reward-1', rewardKind: 'coupon', availableCodeCount: 0,
+      currentVersion: { id: 'version-1', requiredMiles: 300 },
+    });
+    const response = await call('/api/mileage/rewards/reward-1/test', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { rewardId: 'reward-1', canDeliver: false, ledgerChanged: false },
+    });
+    expect(dbMocks.reserveMileageRewardRedemption).not.toHaveBeenCalled();
+    expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
+  });
+
+  it('requires confirmation and returns a safe result for an operator redemption', async () => {
+    const request = {
+      method: 'POST',
+      headers: { 'Idempotency-Key': '11111111-2222-4333-8444-555555555555' },
+      body: JSON.stringify({ accountId: 'account-1', friendId: 'friend-1', rewardId: 'reward-1' }),
+    } satisfies RequestInit;
+    expect((await call('/api/mileage/redemptions', request)).status).toBe(428);
+    expect(dbMocks.reserveMileageRewardRedemption).not.toHaveBeenCalled();
+
+    dbMocks.reserveMileageRewardRedemption.mockResolvedValueOnce({
+      kind: 'created',
+      redemption: {
+        id: 'redemption-1', lineAccountId: 'account-1', idempotencyKey: 'secret-key',
+        requestFingerprint: 'secret-fingerprint', status: 'reserved',
+      },
+    });
+    const response = await call('/api/mileage/redemptions', {
+      ...request,
+      headers: { ...request.headers, 'X-Confirm-Irreversible': 'mileage-redemption' },
+    });
+    expect(response.status).toBe(201);
+    const text = await response.text();
+    expect(text).not.toContain('secret-key');
+    expect(text).not.toContain('secret-fingerprint');
+    expect(dbMocks.reserveMileageRewardRedemption).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      lineAccountId: 'account-1', friendId: 'friend-1', rewardId: 'reward-1',
+    }));
+  });
+
+  it('does not expose or retry another account redemption', async () => {
+    dbMocks.getMileageRedemption.mockResolvedValue({
+      id: 'redemption-hidden', lineAccountId: 'hidden', idempotencyKey: 'key', requestFingerprint: 'fp',
+    });
+    expect((await call('/api/mileage/redemptions/redemption-hidden?accountId=account-1')).status).toBe(404);
+    const retry = await call('/api/mileage/redemptions/redemption-hidden/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(retry.status).toBe(404);
+    expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
+  });
+
+  it('maps insufficient mileage and out-of-stock exchange failures without a 500', async () => {
+    for (const code of ['insufficient_miles', 'out_of_stock']) {
+      dbMocks.reserveMileageRewardRedemption.mockRejectedValueOnce(
+        new dbMocks.MileageRewardError(code, code === 'insufficient_miles'
+          ? '交換に必要なマイルが足りません'
+          : '交換コードの在庫がありません', 409),
+      );
+      const response = await call('/api/mileage/redemptions', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': code === 'insufficient_miles'
+            ? '11111111-2222-4333-8444-555555555555'
+            : 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          'X-Confirm-Irreversible': 'mileage-redemption',
+        },
+        body: JSON.stringify({ accountId: 'account-1', friendId: 'friend-1', rewardId: 'reward-1' }),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code });
+    }
+  });
+
   it('queues a generic authenticated engagement event', async () => {
     dbMocks.applyMileageRulesForEvent.mockResolvedValue({ event: { id: 'event-1' }, granted: [], queued: true });
     const response = await call('/api/mileage/events', {
@@ -144,6 +329,7 @@ describe('mileage admin API', () => {
     expect(response.status).toBe(200);
     expect(dbMocks.getActionScoreOverview).toHaveBeenCalledWith(env.DB, {
       accountId: 'account-1', search: '', filter: 'decreased', sort: 'change_asc', limit: 100, offset: 0,
+      highMin: 70, normalMin: 30,
     });
   });
 

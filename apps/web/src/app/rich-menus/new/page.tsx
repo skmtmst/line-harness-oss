@@ -276,7 +276,7 @@ export default function NewRichMenuPage() {
           <button
             type="submit"
             disabled={submitting || !selectedAccount}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
           >
             {submitting ? '作成中...' : '作成して編集へ'}
           </button>

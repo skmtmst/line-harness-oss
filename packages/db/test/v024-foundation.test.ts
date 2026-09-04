@@ -19,6 +19,7 @@ import {
   getDefaultSupportMark,
   getSupportMarks,
   getSupportMarksWithUsage,
+  setFriendSupportMark,
   setFriendSupportMarkBulk,
   applyInboundSupportMark,
   replaceAndArchiveSupportMark,
@@ -379,6 +380,33 @@ describe('対応マーク', () => {
     insertFriend('f-2');
     const n = await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], working.id, SCOPE);
     expect(n).toBe(2);
+  });
+
+  test('1人の変更は前後値と根拠を監査へ残し、同じ値の再指定は重複記録しない', async () => {
+    const working = (await getSupportMarks(db, SCOPE)).find((mark) => mark.name === '対応中')!;
+    insertFriend('f-1');
+    expect(await setFriendSupportMark(db, 'f-1', working.id, SCOPE, null, {
+      source: 'automation',
+      reason: 'staff_assigned',
+    })).toBe(true);
+    expect(await setFriendSupportMark(db, 'f-1', working.id, SCOPE, null, {
+      source: 'automation',
+      reason: 'staff_assigned',
+    })).toBe(true);
+
+    const rows = sqlite.prepare(
+      `SELECT target_id, actor_id, detail_json
+         FROM operation_audit
+        WHERE friend_id = 'f-1' AND target_kind = 'support_mark' AND action = 'changed'`,
+    ).all() as Array<{ target_id: string; actor_id: string | null; detail_json: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ target_id: working.id, actor_id: null });
+    expect(JSON.parse(rows[0]!.detail_json)).toEqual({
+      beforeMarkId: null,
+      afterMarkId: working.id,
+      source: 'automation',
+      reason: 'staff_assigned',
+    });
   });
 
   test('一覧の使用先を固定文言ではなく実参照から数える', async () => {

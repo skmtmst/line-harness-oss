@@ -199,7 +199,7 @@ function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
   }
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
@@ -213,7 +213,7 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
   const textRef = useRef<HTMLTextAreaElement>(null)
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
     <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent">{index + 1}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
       <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
         {Object.entries(TYPE_LABELS).map(([value, label]) => {
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
@@ -736,7 +736,14 @@ export default function BroadcastForm({
         </section>
         <section id="broadcast-step-audience" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="text-sm font-bold text-ink">1. 送る相手</p>
+            {/*
+              番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
+              以前は 1・3・2 と振ってあり、画面には「1. 送る相手 → 3. 送る内容 →
+              2. 送る時間」の順に並んでいた。**番号が飛んで見えるので、
+              間の節を見落としたと読まれる。** 設計 `zZ9fA` の段は
+              基本設定 → 対象者 → メッセージ → 送信設定 → 確認。
+            */}
+            <p className="text-sm font-bold text-ink">2. 送る相手</p>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-bold text-accent">送信対象</p>
               <p className="text-2xl font-black text-accent">
@@ -846,7 +853,7 @@ export default function BroadcastForm({
               基本設定 → 対象者 → メッセージ → 送信設定 の順なので、
               並べ替えではなく番号のほうを直す。
             */}
-            <p className="text-ink text-sm font-bold">2. 送る内容</p>
+            <p className="text-ink text-sm font-bold">3. 送る内容</p>
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
@@ -962,7 +969,7 @@ export default function BroadcastForm({
         )}
         {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         <section id="broadcast-step-schedule" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
-          <p className="text-ink mb-3 text-sm font-bold">3. 送る時間</p>
+          <p className="text-ink mb-3 text-sm font-bold">4. 送る時間</p>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
               type="button"
@@ -1196,7 +1203,7 @@ export default function BroadcastForm({
         disabled={saving || lengthNotice.tone === 'error'}
         title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
         onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}
-        className="bg-accent text-on-accent hover:bg-accent-hover rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
+        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
       >
         {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
       </button>
