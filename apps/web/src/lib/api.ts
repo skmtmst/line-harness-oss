@@ -211,6 +211,39 @@ export type RichMenuDeleteImpact = {
   recommendedAction: 'delete' | 'unpublish' | 'review_references'
 }
 
+/**
+ * 対応マークの自動変更ルール（設計 `GMvBd` 4-3-A）。
+ *
+ * きっかけは5つ。**Worker の `SUPPORT_MARK_RULE_EVENTS` と同じ並び**で持つ。
+ * 画面側で足すと、選べるのに保存できない選択肢ができる。
+ */
+export type SupportMarkAutomationEvent =
+  | 'message_received'
+  | 'manual_reply_sent'
+  | 'staff_assigned'
+  | 'response_overdue'
+  | 'condition_matched'
+
+export type SupportMarkAutomationRule = {
+  id: string
+  name: string
+  markId: string
+  event: SupportMarkAutomationEvent
+  condition: SegmentCondition | null
+  priority: number
+  /** 手で変えたマークを守る時間（分）。**0は「保護しない」で、未取得ではない。** */
+  manualProtectionMinutes: number
+  isActive: boolean
+  /** 取り合いを見つけるための版。読んだ版と違えば 409。 */
+  version: number
+  updatedAt: string
+}
+
+export type SaveSupportMarkAutomationRule = Omit<
+  SupportMarkAutomationRule,
+  'id' | 'markId' | 'version' | 'updatedAt'
+>
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -2072,6 +2105,37 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ friendIds, markId }),
         },
+      ),
+    /*
+      自動変更ルール。**まだ Worker に無い口を呼ぶことがある**（API は
+      skmtmst/line-harness-oss#758）。呼び出し側は 404 を「未接続」として
+      扱い、押しても何も起きない操作を並べない。
+    */
+    automationRules: (markId: string, accountId: string) =>
+      fetchApi<ApiResponse<SupportMarkAutomationRule[]>>(
+        `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    createAutomationRule: (
+      markId: string,
+      accountId: string,
+      data: SaveSupportMarkAutomationRule,
+    ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
+      `/api/support-marks/${markId}/automation-rules?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    updateAutomationRule: (
+      ruleId: string,
+      accountId: string,
+      expectedVersion: number,
+      data: SaveSupportMarkAutomationRule,
+    ) => fetchApi<ApiResponse<SupportMarkAutomationRule>>(
+      `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'PATCH', body: JSON.stringify({ ...data, expectedVersion }) },
+    ),
+    archiveAutomationRule: (ruleId: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/support-mark-rules/${ruleId}?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
       ),
   },
   /** 保存した検索。上限50件。 */
