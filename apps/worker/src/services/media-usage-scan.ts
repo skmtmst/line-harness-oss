@@ -1,4 +1,12 @@
-import { recordMediaUsage, pruneStaleMediaUsages, type MediaRefKind } from '@line-crm/db';
+import {
+  getMediaUsageScanState,
+  recordMediaUsage,
+  recordMediaUsages,
+  pruneStaleMediaUsages,
+  pruneStaleMediaUsagesBatch,
+  saveMediaUsageScanState,
+  type MediaRefKind,
+} from '@line-crm/db';
 
 /**
  * メディアの使用箇所を数え直す。
@@ -36,36 +44,36 @@ export interface ScanResult {
   scanned: number;
   matched: number;
   pruned: number;
+  source?: MediaRefKind;
+  sourceRows?: number;
+  cycleCompleted?: boolean;
 }
 
 type MediaToScan = { id: string; r2_key: string };
 
+const MAX_SOURCE_ROWS = 4_000;
+const MAX_USAGE_WRITES = 4_000;
+const MAX_PRUNE_ROWS = 1_000;
+
+function isMissingSourceTable(error: unknown, table: string): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('no such table') && message.includes(table);
+}
+
 async function findMatches(
   db: D1Database,
   item: MediaToScan,
-  skipMissingSources: boolean,
 ): Promise<Array<{ refKind: MediaRefKind; refId: string }>> {
   const matches: Array<{ refKind: MediaRefKind; refId: string }> = [];
   for (const source of SOURCES) {
     const conditions = source.columns.map((col) => `${col} LIKE ?`).join(' OR ');
     const binds = source.columns.map(() => `%${item.r2_key}%`);
-    // 定期走査は全体の処理量を抑える。削除直前は、使用先を200件に
-    // 丸めると「全使用先を外した」か確かめられないため全件読む。
-    const limit = skipMissingSources ? ' LIMIT 200' : '';
-    let rows;
-    try {
-      rows = await db
-        .prepare(
-          `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}${limit}`,
-        )
-        .bind(...binds)
-        .all<{ ref_id: string }>();
-    } catch (err) {
-      if (!skipMissingSources) throw err;
-      // 定期走査は、機能を使っていない古い環境で表が無くても続ける。
-      console.error(`media usage scan skipped ${source.table}:`, err);
-      continue;
-    }
+    const rows = await db
+      .prepare(
+        `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
+      )
+      .bind(...binds)
+      .all<{ ref_id: string }>();
     for (const row of rows.results) matches.push({ refKind: source.refKind, refId: row.ref_id });
   }
   return matches;
@@ -82,7 +90,7 @@ export async function scanSingleMediaUsage(
   now: string,
   item: MediaToScan,
 ): Promise<ScanResult> {
-  const matches = await findMatches(db, item, false);
+  const matches = await findMatches(db, item);
   for (const match of matches) {
     await recordMediaUsage(db, {
       mediaId: item.id,
@@ -103,32 +111,128 @@ export async function scanSingleMediaUsage(
 export async function scanMediaUsage(
   db: D1Database,
   now: string,
-  opts: { limit?: number } = {},
+  opts: { limit?: number; sourceRowLimit?: number } = {},
 ): Promise<ScanResult> {
+  const state = await getMediaUsageScanState(db, now);
   const media = await db
-    .prepare(`SELECT id, r2_key FROM media ORDER BY created_at DESC LIMIT ?`)
-    .bind(opts.limit ?? 500)
+    .prepare(
+      `SELECT id, r2_key FROM media
+        WHERE created_at <= ?
+        ORDER BY created_at DESC, id DESC LIMIT ?`,
+    )
+    .bind(state.cycleStartedAt, opts.limit ?? 500)
     .all<{ id: string; r2_key: string }>();
+  if (media.results.length === 0) return { scanned: 0, matched: 0, pruned: 0 };
 
-  let matched = 0;
-  for (const item of media.results) {
-    const matches = await findMatches(db, item, true);
-    for (const match of matches) {
-      await recordMediaUsage(db, { mediaId: item.id, ...match });
-      matched++;
-    }
+  const stateIsValid = state.sourceIndex >= 0 && state.sourceIndex <= SOURCES.length;
+  const sourceIndex = stateIsValid ? state.sourceIndex : 0;
+  const lastRefId = stateIsValid ? state.lastRefId : '';
+
+  // 参照走査と古い記録の整理を同じcronへ載せると、整理件数分だけ上限を超える。
+  // 7種類を読み終えた次のcronから、整理だけを上限付きで続ける。
+  if (sourceIndex === SOURCES.length) {
+    const pruned = await pruneStaleMediaUsagesBatch(
+      db,
+      state.cycleStartedAt,
+      media.results.map((item) => item.id),
+      MAX_PRUNE_ROWS,
+    );
+    const cycleCompleted = pruned < MAX_PRUNE_ROWS;
+    await saveMediaUsageScanState(db, cycleCompleted ? {
+      sourceIndex: 0,
+      lastRefId: '',
+      cycleStartedAt: now,
+    } : {
+      ...state,
+      sourceIndex: SOURCES.length,
+      lastRefId: '',
+    }, now);
+    return {
+      scanned: media.results.length,
+      matched: 0,
+      pruned,
+      sourceRows: 0,
+      cycleCompleted,
+    };
   }
 
-  // 今回の走査で触らなかった記録を落とす。本文から画像が外されたとき、
-  // 記録だけが残ると「使われている」と言い続けることになる。
-  //
-  // 対象は今回走査したメディアだけ。上限で外れたものまで消すと、
-  // それらが「どこでも使われていない」ことになり、削除前の警告が効かなくなる。
-  const pruned = await pruneStaleMediaUsages(
-    db,
-    now,
-    media.results.map((m) => m.id),
-  );
+  const source = SOURCES[sourceIndex];
+  // 参照行と使用先の既存行確認を各4,000件までにし、media 500件・state 1件を
+  // 足しても1回のcronで読むDB行を1万件未満に固定する。
+  const rowLimit = Math.min(Math.max(opts.sourceRowLimit ?? 1_000, 1), MAX_SOURCE_ROWS);
+  const selectedColumns = source.columns.map((column) => `, ${column}`).join('');
+  let rows: Array<Record<string, unknown> & { ref_id: string }> = [];
+  let sourceMissing = false;
+  try {
+    const result = await db.prepare(
+      `SELECT ${source.idColumn} AS ref_id${selectedColumns}
+         FROM ${source.table}
+        WHERE ${source.idColumn} > ?
+        ORDER BY ${source.idColumn} ASC
+        LIMIT ?`,
+    ).bind(lastRefId, rowLimit).all<Record<string, unknown> & { ref_id: string }>();
+    rows = result.results;
+  } catch (err) {
+    // 古い検証環境などで機能の表がまだ無ければ、その読み口だけ次へ送る。
+    // 一時的なD1障害まで「走査済み」にすると、1周後の整理で使用先を消してしまう。
+    if (!isMissingSourceTable(err, source.table)) throw err;
+    console.error(`media usage scan skipped ${source.table}:`, err);
+    sourceMissing = true;
+  }
 
-  return { scanned: media.results.length, matched, pruned };
+  const usages: Array<{ mediaId: string; refKind: MediaRefKind; refId: string }> = [];
+  let processedRows = 0;
+  let writeBudgetExhausted = false;
+  for (const row of rows) {
+    const searchable = source.columns
+      .map((column) => row[column])
+      .filter((value): value is string => typeof value === 'string')
+      .join('\n');
+    const rowUsages: typeof usages = [];
+    for (const item of media.results) {
+      if (item.r2_key && searchable.includes(item.r2_key)) {
+        rowUsages.push({ mediaId: item.id, refKind: source.refKind, refId: String(row.ref_id) });
+      }
+    }
+    if (usages.length + rowUsages.length > MAX_USAGE_WRITES) {
+      writeBudgetExhausted = true;
+      break;
+    }
+    usages.push(...rowUsages);
+    processedRows += 1;
+  }
+  await recordMediaUsages(db, usages, now);
+
+  const sourceCompleted = sourceMissing || (!writeBudgetExhausted && rows.length < rowLimit);
+  let cycleCompleted = false;
+  let pruned = 0;
+  if (sourceCompleted && sourceIndex === SOURCES.length - 1) {
+    // 整理は読込予算を分けるため、次のcronへ送る。
+    await saveMediaUsageScanState(db, {
+      sourceIndex: SOURCES.length,
+      lastRefId: '',
+      cycleStartedAt: state.cycleStartedAt,
+    }, now);
+  } else if (sourceCompleted) {
+    await saveMediaUsageScanState(db, {
+      ...state,
+      sourceIndex: sourceIndex + 1,
+      lastRefId: '',
+    }, now);
+  } else {
+    await saveMediaUsageScanState(db, {
+      ...state,
+      sourceIndex,
+      lastRefId: String(rows[processedRows - 1]?.ref_id ?? lastRefId),
+    }, now);
+  }
+
+  return {
+    scanned: media.results.length,
+    matched: usages.length,
+    pruned,
+    source: source.refKind,
+    sourceRows: rows.length,
+    cycleCompleted,
+  };
 }

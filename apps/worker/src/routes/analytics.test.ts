@@ -8,7 +8,7 @@ const mocks = {
   getLinkClickSummary: vi.fn(),
   getBroadcastSummary: vi.fn(),
   getTagFieldCross: vi.fn(),
-  getFunnels: vi.fn(),
+  getFunnelsWithCurrentVersions: vi.fn(),
   getLegacyFunnels: vi.fn(),
   getFunnelById: vi.fn(),
   getFunnelSteps: vi.fn(),
@@ -111,7 +111,17 @@ beforeEach(() => {
   mocks.getLinkClickSummary.mockResolvedValue([]);
   mocks.getBroadcastSummary.mockResolvedValue([]);
   mocks.getTagFieldCross.mockResolvedValue([]);
-  mocks.getFunnels.mockResolvedValue([FUNNEL]);
+  mocks.getFunnelsWithCurrentVersions.mockResolvedValue({
+    items: [{
+      ...FUNNEL,
+      currentVersion: {
+        id: 'fv-1', versionNumber: 1, createdAt: '2026-08-01T00:00:00.000Z',
+      },
+    }],
+    total: 1,
+    page: 1,
+    pageSize: 200,
+  });
   mocks.getLegacyFunnels.mockResolvedValue([FUNNEL]);
   mocks.getFunnelById.mockResolvedValue(FUNNEL);
   mocks.getFunnelSteps.mockResolvedValue([
@@ -475,12 +485,48 @@ describe('V6ファネルAPI', () => {
   };
 
   it('一覧で現行定義の移行要否を分ける', async () => {
-    mocks.getCurrentFunnelVersion.mockResolvedValueOnce(null);
-    const res = await req(`/api/analytics/funnels?${ACCOUNT}`);
+    mocks.getFunnelsWithCurrentVersions.mockResolvedValueOnce({
+      items: [{ ...FUNNEL, currentVersion: null }], total: 1, page: 2, pageSize: 50,
+    });
+    const res = await req(`/api/analytics/funnels?${ACCOUNT}&page=2&pageSize=50`);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       data: [{ id: 'fn-1', currentVersion: null, migrationState: 'needs_migration' }],
+      pagination: { page: 2, pageSize: 50, total: 1 },
     });
+    expect(mocks.getFunnelsWithCurrentVersions).toHaveBeenCalledWith(
+      env.DB, 'account-a', { page: 2, pageSize: 50 },
+    );
+    expect(mocks.getCurrentFunnelVersion).not.toHaveBeenCalled();
+  });
+
+  it('一覧の表示件数を最大200件に制限する', async () => {
+    const res = await req(`/api/analytics/funnels?${ACCOUNT}&pageSize=201`);
+    expect(res.status).toBe(400);
+    expect(mocks.getFunnelsWithCurrentVersions).not.toHaveBeenCalled();
+  });
+
+  it.each(['0', '1.5', 'invalid'])(
+    '一覧の不正なページ番号 %s は取得前に400で止める',
+    async (page) => {
+      const res = await req(`/api/analytics/funnels?${ACCOUNT}&page=${page}`);
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        success: false,
+        error: 'ページは1以上の整数で指定してください',
+      });
+      expect(mocks.getFunnelsWithCurrentVersions).not.toHaveBeenCalled();
+    },
+  );
+
+  it('一覧の一括取得に失敗したときは空一覧と偽らず500を返す', async () => {
+    mocks.getFunnelsWithCurrentVersions.mockRejectedValueOnce(new Error('D1 unavailable'));
+
+    const res = await req(`/api/analytics/funnels?${ACCOUNT}`);
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
   });
 
   it('作成時に第1版を固定する', async () => {
