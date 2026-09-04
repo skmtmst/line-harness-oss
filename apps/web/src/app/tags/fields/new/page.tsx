@@ -10,6 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
+import SelectField from '@/components/shared/select-field'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
@@ -95,10 +96,10 @@ function NewFriendFieldForm() {
             <label className="block text-sm font-semibold text-ink">項目名（必須）<input value={name} onChange={(event) => { setName(event.target.value); if (!keyTouched) setFieldKey(suggestKey(event.target.value)) }} placeholder="例：愛犬のお名前" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal outline-none focus:border-accent" /></label>
             <label className="block text-sm font-semibold text-ink">差し込み名（必須）<input value={fieldKey} onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }} placeholder="pet_name" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal outline-none focus:border-accent" /></label>
             <p className="font-mono text-xs font-semibold text-accent">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
-            <label className="block text-sm font-semibold text-ink">種類<select value={type} onChange={(event) => setType(event.target.value as FriendFieldType)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"><option value={type}>{FIELD_TYPE_LABELS[type]} — {FIELD_TYPE_HINTS[type]}</option>{TYPES.filter((item) => item !== type).map((item) => <option key={item} value={item}>{FIELD_TYPE_LABELS[item]} — {FIELD_TYPE_HINTS[item]}</option>)}</select></label>
+            <label className="block text-sm font-semibold text-ink">種類<SelectField value={type} onChange={(event) => setType(event.target.value as FriendFieldType)} aria-label="友だち情報欄の種類" className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" options={[{ value: type, label: `${FIELD_TYPE_LABELS[type]} — ${FIELD_TYPE_HINTS[type]}` }, ...TYPES.filter((item) => item !== type).map((item) => ({ value: item, label: `${FIELD_TYPE_LABELS[item]} — ${FIELD_TYPE_HINTS[item]}` }))]} /></label>
             <p className="text-xs text-ink-faint">{TYPES.map((item) => FIELD_TYPE_LABELS[item]).join(' ／ ')}</p>
             {NEEDS_OPTIONS.has(type) ? <label className="block text-sm font-semibold text-ink">選択肢（1行に1つ）<textarea rows={5} value={options} onChange={(event) => setOptions(event.target.value)} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas p-3 font-normal" /></label> : null}
-            <label className="block text-sm font-semibold text-ink">フォルダ<select value={folderId} onChange={(event) => setFolderId(event.target.value)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"><option value="">未分類</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select><span className="mt-1 block text-xs font-normal text-ink-faint">フォルダは友だち詳細のタブになります。</span></label>
+            <label className="block text-sm font-semibold text-ink">フォルダ<SelectField value={folderId} onChange={(event) => setFolderId(event.target.value)} aria-label="友だち情報欄のフォルダ" className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} /><span className="mt-1 block text-xs font-normal text-ink-faint">フォルダは友だち詳細のタブになります。</span></label>
           </div>
         </section>
 

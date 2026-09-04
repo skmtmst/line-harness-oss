@@ -45,40 +45,14 @@ const count = (s: string) => (s.match(/<select[\s>]/g) ?? []).length
  * §4「守ること」で S0 は機能の画面を触らない）。ここは**増やせないこと**
  * だけを見張る。0 になったら行ごと消す——消し忘れるとこの試験が落ちる。
  *
- * 2026-09-04 時点で 23 画面・39 か所（83 か所から 44 か所を寄せた）。
- * **残りは中身に条件分岐が混ざるもの**——`{cond && <option/>}` や、
- * 選んだ値で並びが変わるもの。意味を読まないと壊せるので、機械で
- * 置き換えず1つずつ見る。
+ * 2026-09-04 に 41 画面・83 か所すべてを共通部品へ寄せ終えた。
+ * 空の表を残し、今後も素の要素を画面へ戻せないように見張る。
  */
-const NOT_YET: Record<string, number> = {
-  'affiliate-offers/new/page.tsx': 1,
-  'analytics/page.tsx': 4,
-  'automations/new/page.tsx': 1,
-  'booking/staff/new/page.tsx': 1,
-  'chats/page.tsx': 1,
-  'conversions/new/page.tsx': 1,
-  'emergency/page.tsx': 2,
-  'friend-add-settings/page.tsx': 1,
-  'friends/detail/page.tsx': 1,
-  'health/page.tsx': 1,
-  'inflow-links/new/page.tsx': 5,
-  'mileage/earning-rules/new/page.tsx': 2,
-  'nen-campaigns/page.tsx': 2,
-  'page.tsx': 1,
-  'pools/new/page.tsx': 1,
-  'reminders/new/page.tsx': 5,
-  'scenarios/first-step/page.tsx': 2,
-  'scenarios/mode/page.tsx': 1,
-  'tags/edit/page.tsx': 1,
-  'tags/fields/migrate/page.tsx': 1,
-  'tags/fields/new/page.tsx': 2,
-  'tags/new/page.tsx': 1,
-  'webhooks/page.tsx': 1,
-}
+const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(138)  // 2026-09-04: 自動応答の公開・友だち追加時配信の実行結果、LINEアカウントの登録・詳細・乗り換え、34 の 4 画面が入って 138。
+    expect(PAGES.length).toBe(141)  // 2026-09-04: 合流ブランチと development の追加画面を合わせた実測値。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {

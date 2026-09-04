@@ -9,6 +9,7 @@ import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import FriendTimeline from '@/components/friends/friend-timeline'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * 友だち詳細。
@@ -73,19 +74,17 @@ function FieldInput({
     // 複数選択も、いまは1つ選ぶ形にしている。複数選択のUIは
     // 値の持ち方（区切り文字）を決めてから作る。
     return (
-      <select
+      <SelectField
         value={value}
         disabled={readOnly}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={`${field.name}の値`}
         className={base}
-      >
-        <option value="">— 未設定 —</option>
-        {(field.options ?? []).map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
+        options={[
+          { value: '', label: '— 未設定 —' },
+          ...(field.options ?? []).map((option) => ({ value: option, label: option })),
+        ]}
+      />
     )
   }
   if (field.type === 'checkbox') {

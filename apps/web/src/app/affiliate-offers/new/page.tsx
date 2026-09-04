@@ -185,12 +185,11 @@ export default function NewAffiliateOfferPage() {
             'default' で入る。選べる形にすると、選べないものが選べて見える。 */}
         <Field
           label="マイルのプログラム"
-          htmlFor="of-program"
           note="マイルで払う場合に選びます。いまは標準プログラムのみです。"
         >
-          <select id="of-program" disabled className={`${inputClass} opacity-50`}>
-            <option>標準プログラム</option>
-          </select>
+          <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
+            標準プログラム
+          </p>
         </Field>
       </FormSection>
 
