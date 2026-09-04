@@ -3576,8 +3576,10 @@ export const api = {
       carouselTapLimitMode?: 'none' | 'once'
       /** 162: 制限を超えたときに返すテキスト。 */
       carouselTapLimitText?: string | null
+      /** 置き場。省略・null は未分類。 */
+      folderId?: string | null
     }) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
@@ -3587,9 +3589,14 @@ export const api = {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
+        /**
+         * 置き場。**`null` は「未分類へ戻す」。** 送らなければいまのまま。
+         * 消えたフォルダを指すと 422 で断られる（黙って未分類にはならない）。
+         */
+        folderId?: string | null
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
