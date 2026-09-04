@@ -619,3 +619,32 @@ export async function pruneStaleMediaUsages(
   }
   return changes;
 }
+
+/** 定期走査用。古い使用先の整理も1回の上限内に分ける。 */
+export async function pruneStaleMediaUsagesBatch(
+  db: D1Database,
+  scannedBefore: string,
+  mediaIds: string[],
+  limit: number,
+): Promise<number> {
+  if (mediaIds.length === 0 || limit <= 0) return 0;
+  let changes = 0;
+  for (let index = 0; index < mediaIds.length && changes < limit; index += LOOKUP_CHUNK) {
+    const chunk = mediaIds.slice(index, index + LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const remaining = limit - changes;
+    const result = await db
+      .prepare(
+        `DELETE FROM media_usages
+          WHERE rowid IN (
+            SELECT rowid FROM media_usages
+             WHERE scanned_at < ? AND media_id IN (${placeholders})
+             LIMIT ?
+          )`,
+      )
+      .bind(scannedBefore, ...chunk, remaining)
+      .run();
+    changes += result.meta?.changes ?? 0;
+  }
+  return changes;
+}
