@@ -19,13 +19,14 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(storesPage).toContain("redirect('/hq')")
     expect(stores).toContain("router.replace('/hq')")
     /*
-      2026-09-04: `/accounts` の転送はやめた。**統括の店舗管理と、
-      LINE公式アカウントの設定は別のもの**（要件
-      `v6-33-account-settings` §5-3）。店舗の入口はここで見張るが、
-      `/accounts` は設計 ★V6 33-1 の一覧になった。
+      2026-09-04: `/accounts` と `/accounts/new` の転送はどちらもやめた。
+      **統括の店舗管理と、LINE公式アカウントの設定は別のもの。**
+      **店舗を作ることと、アカウントを登録することも別**（要件 §5-3）。
+      店舗の入口はここで見張るが、`/accounts` は設計 ★V6 33-1 の一覧、
+      `/accounts/new` は 33-2 の登録になった。
     */
     expect(accountsPage).not.toContain("redirect('/hq')")
-    expect(accountsNewPage).toContain("redirect('/restaurant-test/stores/new')")
+    expect(accountsNewPage).not.toContain("redirect('/restaurant-test/stores/new')")
   })
 
   it('デモ作成UIと公開bootstrap呼出しを持たず、空組織を統括へ案内する', () => {

@@ -2,6 +2,9 @@
   "app/accounts/migration.tsx": {
     "direct-secondary-button": 2
   },
+  "app/accounts/new/page.tsx": {
+    "arbitrary-value": 1
+  },
   "app/accounts/page.tsx": {
     "arbitrary-value": 1
   },
@@ -24,7 +27,7 @@
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,
-    "direct-secondary-button": 4,
+    "direct-secondary-button": 2,
     "direct-primary-button": 1,
     "direct-th": 10
   },
