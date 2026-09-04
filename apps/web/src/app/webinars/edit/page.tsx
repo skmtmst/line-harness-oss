@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -754,25 +755,13 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
                 className="w-20 rounded border px-2 py-1"
               />
             </label>
-            <select
-              value={c.kind}
-              onChange={(e) => update(i, { kind: e.target.value as 'form' | 'url' })}
-              className="rounded border px-2 py-1"
-            >
-              <option value="form">フォーム</option>
-              <option value="url">URL</option>
-            </select>
+            <SelectField value={c.kind} onChange={(e) => update(i, { kind: e.target.value as 'form' | 'url' })} options={[{ value: "form", label: "フォーム" }, { value: "url", label: "URL" }]} className="rounded border px-2 py-1" />
             {c.kind === 'form' ? (
-              <select
+              <SelectField
                 value={c.formId ?? ''}
                 onChange={(e) => update(i, { formId: e.target.value || null })}
-                className="min-w-40 rounded border px-2 py-1"
-              >
-                <option value="">フォームを選択...</option>
-                {forms.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
+                options={[{ value: '', label: 'フォームを選択...' }, ...forms.map((f) => ({ value: f.id, label: f.name }))]}
+              />
             ) : (
               <input
                 value={c.url ?? ''}
