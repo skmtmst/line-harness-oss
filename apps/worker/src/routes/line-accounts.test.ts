@@ -14,7 +14,7 @@ const dbMocks = {
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
-  deleteLineAccount: vi.fn(),
+  deleteUncommittedLineAccount: vi.fn(),
   getLineAccountArchiveBlockers: vi.fn(),
   setDefaultLineAccount: vi.fn(),
   archiveLineAccount: vi.fn(),
@@ -136,6 +136,10 @@ beforeEach(() => {
 
 describe('LINE account default and archive lifecycle', () => {
   test('owner switches the one organization default', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, tenant_id: 'tenant-a' });
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, tenant_id: 'tenant-a', parent_line_account_id: null },
+    ]);
     const res = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-a' }).request(
       '/api/line-accounts/default',
       {
@@ -189,15 +193,19 @@ describe('LINE account default and archive lifecycle', () => {
     expect(dbMocks.archiveLineAccount).toHaveBeenLastCalledWith(
       expect.anything(), 'acc-1', 'test-staff', '旧DELETE APIからのアーカイブ',
     );
-    expect(dbMocks.deleteLineAccount).not.toHaveBeenCalled();
+    expect(dbMocks.deleteUncommittedLineAccount).not.toHaveBeenCalled();
   });
 
   test('archived accounts remain readable but reject writes with ACCOUNT_ARCHIVED', async () => {
-    dbMocks.getLineAccountById.mockResolvedValue({
+    const archivedAccount = {
       ...fakeAccount,
       is_active: 0,
       archived_at: '2026-08-10T12:00:00.000+09:00',
-    });
+    };
+    dbMocks.getLineAccountById.mockResolvedValue(archivedAccount);
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...archivedAccount, parent_line_account_id: null },
+    ]);
     const app = setupApp('owner');
 
     expect((await app.request('/api/line-accounts/acc-1')).status).toBe(200);

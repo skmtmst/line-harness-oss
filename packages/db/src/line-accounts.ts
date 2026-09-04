@@ -627,12 +627,14 @@ export async function getLineAccountArchiveBlockers(
 export async function setDefaultLineAccount(
   db: D1Database,
   id: string,
+  expectedTenantId?: string,
 ): Promise<LineAccount | null> {
   const account = await getLineAccountById(db, id);
   if (!account) return null;
   if (account.archived_at) throw new LineAccountLifecycleError('ACCOUNT_ARCHIVED');
   if (!account.is_active) throw new LineAccountLifecycleError('ACCOUNT_INACTIVE');
   const tenantId = account.tenant_id ?? DEFAULT_TENANT_ID;
+  if (expectedTenantId && tenantId !== expectedTenantId) return null;
   const now = jstNow();
   await db.batch([
     db
