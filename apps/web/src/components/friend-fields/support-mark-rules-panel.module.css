@@ -1,0 +1,66 @@
+/* 対応マークの自動変更ルール（設計 `GMvBd`）。 */
+.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.headText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.title { color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }
+.note { color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: 1.6; }
+
+.warn, .notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  border-radius: var(--radius-mini); padding: 10px 12px;
+  font-size: var(--text-micro); font-weight: 600; line-height: 1.5;
+}
+.warn { background: var(--color-danger-bg); color: var(--color-danger); }
+.notice { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+.row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-card);
+  background: var(--color-canvas); padding: 12px;
+}
+.rank {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 24px; height: 24px;
+  border-radius: var(--radius-pill); background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary); font-size: var(--text-nano); font-weight: 700;
+}
+.rowBody { display: flex; flex-direction: column; gap: 2px; flex: 1 1 220px; min-width: 0; }
+.rowName { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; }
+.rowMeta { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.dot { color: var(--color-ink-faint); }
+.rowActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.on, .off { border-radius: var(--radius-pill); padding: 2px 10px; font-size: var(--text-nano); font-weight: 700; }
+.on { background: var(--color-success-bg); color: var(--color-success); }
+.off { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+
+.form {
+  display: flex; flex-direction: column; gap: 12px;
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken); padding: 16px;
+}
+.formTitle { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { color: var(--color-ink); font-size: var(--text-micro); font-weight: 700; }
+.input {
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
+  background: var(--color-canvas); padding: 8px 10px;
+  color: var(--color-ink); font-family: inherit; font-size: var(--text-caption);
+}
+.hint { color: var(--color-ink-faint); font-size: var(--text-nano); }
+.fieldError { color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+
+.events { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.event, .eventOn {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
+  background: var(--color-canvas); padding: 10px; text-align: left;
+}
+.eventOn { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.eventLabel { color: var(--color-ink); font-size: var(--text-micro); font-weight: 700; }
+.eventNote { color: var(--color-ink-secondary); font-size: var(--text-nano); }
+
+.check { display: flex; align-items: center; gap: 8px; color: var(--color-ink); font-size: var(--text-micro); }
+.formActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
