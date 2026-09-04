@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 
 /**
  * 共通情報の登録。
@@ -289,18 +291,16 @@ export default function NewCommonVarPage() {
         {error && <p className="text-danger text-sm">{error}</p>}
       </div>
 
-      <div className="border-hairline mt-4 flex max-w-3xl items-center justify-between border-t pt-4">
-        <Link href="/contents/vars" className="text-info text-sm hover:underline">
-          共通情報一覧へ戻る
-        </Link>
-        <button
-          onClick={() => void save()}
-          disabled={saving}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-        >
-          {saving ? '登録中...' : '登録'}
-        </button>
-      </div>
+      <StickyBar
+        actions={(
+          <>
+            <Button href="/contents/vars">共通情報一覧へ戻る</Button>
+            <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
+              {saving ? '登録中…' : '登録'}
+            </Button>
+          </>
+        )}
+      />
     </div>
   )
 }

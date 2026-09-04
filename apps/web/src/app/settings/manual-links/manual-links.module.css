@@ -1,0 +1,43 @@
+/*
+ * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`、1920）。運営側だけの一覧型。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 12px; /* gap: 12 */
+}
+
+.count {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.url {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  word-break: break-all;
+}
+
+/* 決めていない URL を URL の形に見せない。 */
+.urlEmpty {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+}
+
+/* 押せない操作。**ボタンの形にしない。** */
+.blocked {
+  padding: 8px 12px; /* padding: 8 12 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+}
+
+.footNote {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  line-height: 1.6;
+}

@@ -29,12 +29,64 @@ function pages(dir: string, out: string[] = []): string[] {
   return out
 }
 
+/**
+ * 画面が読み込んでいるものも一緒に見る。
+ *
+ * **帯は部品の中にあることがある。** `tags/edit` は
+ * `components/friend-fields/edit-tag-page-v4.tsx` に、
+ * `tags/marks/new` は `support-mark-editor.tsx` に本体がある。
+ * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
+ */
+function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {
+  if (depth > 2 || seen.has(file)) return ''
+  seen.add(file)
+  let source: string
+  try {
+    source = fs.readFileSync(file, 'utf8')
+  } catch {
+    return ''
+  }
+  let combined = source
+  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+    const base = path.join(SRC, m[1], m[2])
+    for (const ext of ['.tsx', '.ts', '/index.tsx']) {
+      if (fs.existsSync(base + ext)) {
+        combined += readWithParts(base + ext, depth + 1, seen)
+        break
+      }
+    }
+  }
+  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
+    const base = path.join(path.dirname(file), m[1])
+    for (const ext of ['.tsx', '.ts']) {
+      if (fs.existsSync(base + ext)) {
+        combined += readWithParts(base + ext, depth + 1, seen)
+        break
+      }
+    }
+  }
+  return combined
+}
+
+/**
+ * 転送だけの画面は数えない。
+ *
+ * **帯を置けないものを「まだ置いていない」と数えない。** `scoring/new` は
+ * `/mileage/earning-rules/new` へ送るだけで、フォームも保存も無い。
+ * 表に残すと永久に空にならず、見張りとして働かなくなる。
+ */
+function isRedirectOnly(source: string): boolean {
+  return /\b(permanentRedirect|redirect)\(/.test(source) && !/<form|onSubmit|保存/.test(source)
+}
+
 const EDIT_PAGES = pages(path.join(SRC, 'app'))
   .map((p) => ({
     p: path.relative(path.join(SRC, 'app'), p).split(path.sep).join('/'),
-    s: fs.readFileSync(p, 'utf8'),
+    s: readWithParts(p),
+    own: fs.readFileSync(p, 'utf8'),
   }))
   .filter((f) => /\/(new|edit)\/page\.tsx$/.test(f.p))
+  .filter((f) => !isRedirectOnly(f.own))
 
 /**
  * **まだ帯を使っていない作成・編集画面。減る一方の表。**
@@ -43,16 +95,18 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  * §4「守ること」で S0 は機能の画面を触らない）。ここは**増やせないこと**
  * だけを見張る。使い始めたら行ごと消す——消し忘れるとこの試験が落ちる。
  *
- * 2026-09-04 時点で 24 画面。
+ * 2026-09-04: 24 画面と数えていたが、**数え方が2つ間違っていた**（台帳 #109）。
+ *   転送するだけの画面（`accounts/new` `scoring/new`）を数えていた。
+ *     置けないものを「まだ置いていない」と数えると、表が永久に空にならない。
+ *   帯が部品の中にある画面（`tags/edit` `tags/marks/*` `events/new`
+ *     `templates/edit`）を「無い」と数えていた。`page.tsx` だけ読んでいたため。
+ * 読み込んだ部品まで見て数え直し、17 画面。
  */
 const NOT_YET = [
   'auto-replies/edit/page.tsx',
   'booking/bookings/new/page.tsx',
   'broadcasts/new/page.tsx',
-  'contents/vars/edit/page.tsx',
-  'contents/vars/new/page.tsx',
   'events/edit/page.tsx',
-  'events/new/page.tsx',
   'form-submissions/edit/page.tsx',
   'nen-campaigns/columns/new/page.tsx',
   'nen-campaigns/edit/page.tsx',
@@ -60,12 +114,6 @@ const NOT_YET = [
   'restaurant-test/stores/new/page.tsx',
   'rich-menus/edit/page.tsx',
   'rich-menus/new/page.tsx',
-  'scoring/new/page.tsx',
-  'tags/edit/page.tsx',
-  'tags/folders/new/page.tsx',
-  'tags/marks/edit/page.tsx',
-  'tags/marks/new/page.tsx',
-  'templates/edit/page.tsx',
   'templates/questions/new/page.tsx',
   'webinars/edit/page.tsx',
   'webinars/new/page.tsx',
