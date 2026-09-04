@@ -31,6 +31,7 @@ import StepPreview from '@/components/scenarios/step-preview'
 import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -339,18 +340,16 @@ function FirstStepContent() {
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 タグで絞り込み <span className="text-danger">*</span>
               </span>
-              <select
+              <SelectField
                 value={targetTagId}
                 onChange={e => setTargetTagId(e.target.value)}
+                aria-label="絞り込みに使うタグ"
                 className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
-              >
-                <option value="">-- 選んでください --</option>
-                {tags.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: '-- 選んでください --' },
+                  ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                ]}
+              />
             </label>
           )}
 
@@ -495,22 +494,23 @@ function FirstStepContent() {
               <div>
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">テンプレート</span>
-                  <select
+                  <SelectField
                     value={templateId}
                     onChange={e => setTemplateId(e.target.value)}
+                    aria-label="配信するテンプレート"
                     className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
-                  >
-                    <option value="">選んでください</option>
-                    {templates.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}（{
+                    options={[
+                      { value: '', label: '選んでください' },
+                      ...templates.map((template) => ({
+                        value: template.id,
+                        label: `${template.name}（${
                           { text: 'テキスト', image: 'リッチメッセージ', flex: 'カードタイプ', carousel: 'カルーセル' }[
-                            t.messageType as 'text' | 'image' | 'flex' | 'carousel'
-                          ] ?? t.messageType
-                        }）
-                      </option>
-                    ))}
-                  </select>
+                            template.messageType as 'text' | 'image' | 'flex' | 'carousel'
+                          ] ?? template.messageType
+                        }）`,
+                      })),
+                    ]}
+                  />
                 </label>
                 {/* テンプレートを指す形にしておくと、テンプレート側を直したときに
                     この通の中身も一緒に変わる。 */}

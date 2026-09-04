@@ -41,4 +41,22 @@ describe('受信箱 保存した検索の完了判定', () => {
     // 空を押させてから赤字を出す形へ戻さない。
     expect(DIALOG).not.toContain('disabled={saving}')
   })
+
+  it('未入力の断りを共通の赤い帯で出し、欄の枠も赤くする', () => {
+    /*
+      設計 `AuSDY`（2-16）は ⚠ の付いた**赤い帯**で「検索名を入力してください。」と言い、
+      入力欄の枠も赤い。**小さな灰色の字だと、赤い枠だけ見えて理由が読まれない。**
+
+      空のときと押して断られたときで**同じ見た目**にする。片方だけ帯にすると、
+      同じ「入力してください」が2通りの見え方をして、別のことを言われたように読める。
+    */
+    expect(DIALOG).toContain("import Notice from '@/components/shared/notice'")
+    expect(DIALOG).toContain('tone="error"')
+    expect(DIALOG).toContain("message={error || '検索名を入力してください。'}")
+    // 空のあいだも枠を赤くする。押すまで直しどころが分からない形へ戻さない。
+    expect(DIALOG).toContain('aria-invalid={Boolean(error) || nameMissing}')
+    expect(DIALOG).toContain("${error || nameMissing ? 'border-danger' : 'border-hairline'}")
+    // 自前の小さな赤字へ戻さない（共通部品を通す）。
+    expect(DIALOG).not.toContain('className="text-danger mt-1.5 text-xs" role="alert"')
+  })
 })
