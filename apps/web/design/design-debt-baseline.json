@@ -271,6 +271,12 @@
   "app/pools/new/page.tsx": {
     "unresolved-classname": 3
   },
+  "app/recipes/clone/page.tsx": {
+    "unresolved-classname": 32
+  },
+  "app/recipes/page.tsx": {
+    "unresolved-classname": 17
+  },
   "app/reminders/edit/page.tsx": {
     "unresolved-classname": 9,
     "arbitrary-value": 7,
