@@ -186,6 +186,8 @@ export type Env = {
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
+    /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
+    STRIPE_WEBHOOK_SECRET?: string;
     TOTP_ENCRYPTION_KEY?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.

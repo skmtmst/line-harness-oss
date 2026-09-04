@@ -155,6 +155,7 @@ describe('affiliate-links CRUD', () => {
 
   test('createAffiliateLink returns correct fields', async () => {
     insertLineAccount(sqlite, 'la-001');
+    sqlite.prepare(`UPDATE affiliates SET line_account_id = ? WHERE id = ?`).run('la-001', AFF_ID);
     const link = await createAffiliateLink(db, {
       affiliateId: AFF_ID,
       label: 'Test Label',
@@ -275,6 +276,20 @@ describe('affiliate-links CRUD', () => {
   test('listAffiliateLinks returns empty array for unknown affiliate', async () => {
     const links = await listAffiliateLinks(db, 'nonexistent');
     expect(links).toEqual([]);
+  });
+
+  test('紹介者と別のLINEアカウントではリンクを作成・一覧取得できない', async () => {
+    insertLineAccount(sqlite, 'la-own');
+    insertLineAccount(sqlite, 'la-other');
+    sqlite.prepare(`UPDATE affiliates SET line_account_id = ? WHERE id = ?`).run('la-own', AFF_ID);
+
+    await expect(createAffiliateLink(db, {
+      affiliateId: AFF_ID,
+      lineAccountId: 'la-other',
+    })).rejects.toThrow('affiliate link account mismatch');
+
+    await createAffiliateLink(db, { affiliateId: AFF_ID, lineAccountId: 'la-own' });
+    expect(await listAffiliateLinks(db, AFF_ID, { lineAccountId: 'la-other' })).toEqual([]);
   });
 
   // ── countAffiliateLinks ──────────────────────────────────────────────────

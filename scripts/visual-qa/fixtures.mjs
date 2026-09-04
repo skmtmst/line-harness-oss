@@ -558,13 +558,13 @@ export const COMMON_VARS = [
     id: 'common-var-delete-target', lineAccountId: 'visual-qa-account', folderId: null,
     name: '営業時間', varKey: 'shop_hours', type: 'text', value: '10:00〜19:00',
     createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-20T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0,
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 3,
   },
   {
     id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
     name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '通常どおり営業します',
     createdAt: '2026-08-02T10:00:00.000+09:00', updatedAt: '2026-08-21T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0,
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
   },
 ]
 

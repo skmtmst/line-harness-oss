@@ -4,6 +4,7 @@ import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import {
   calculateWebinarNotificationSchedule,
   enqueueWebinarCompletedNotification,
+  getWebinarNotificationOverview,
   processWebinarNotificationJobs,
   registerWebinarSession,
   saveWebinarNotificationSettings,
@@ -56,6 +57,28 @@ describe('calculateWebinarNotificationSchedule', () => {
 });
 
 describe('webinar notification jobs', () => {
+  test('通知対象は有効予約の人数と予約枠数を分けて数える', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    insertFriend(raw, 'friend-2', { line_account_id: 'account-1', line_user_id: 'U002' });
+    const insert = raw.prepare(
+      `INSERT INTO webinar_registrations
+         (id, webinar_id, friend_id, session_start_at, status, created_at)
+       VALUES (?, 'webinar-1', ?, ?, ?, ?)`,
+    );
+    insert.run('registration-1', 'friend-1', SESSION, 'active', NOW.toISOString());
+    insert.run('registration-2', 'friend-1', SESSION + 3600, 'active', NOW.toISOString());
+    insert.run('registration-3', 'friend-2', SESSION, 'active', NOW.toISOString());
+    insert.run('registration-4', 'friend-2', SESSION + 3600, 'cancelled', NOW.toISOString());
+
+    const result = await getWebinarNotificationOverview(db, 'webinar-1');
+
+    expect(result).toMatchObject({
+      total: 0,
+      audience: { people: 2, bookings: 3, definition: 'active_registrations' },
+    });
+  });
+
   test('設定の版を上げ、古い未送信予定を取り消して新しい予定を作る', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);

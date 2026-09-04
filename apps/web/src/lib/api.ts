@@ -3656,6 +3656,7 @@ export const api = {
       commissionRate?: number
       friendId?: string
       issueInitialLink?: boolean
+      lineAccountId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -6211,6 +6212,33 @@ export type WebinarNotificationOverview = {
   failed: number
   skipped: number
   cancelled: number
+  audience: {
+    people: number
+    bookings: number
+    definition: 'active_registrations'
+  }
+}
+
+export type WebinarOverviewMetric = {
+  value: number | null
+  state: 'available' | 'unavailable'
+  reason: string | null
+}
+
+export type WebinarOverview = {
+  state: 'partial'
+  registrationMode: 'people'
+  metrics: {
+    webinars: WebinarOverviewMetric
+    activeWebinars: WebinarOverviewMetric
+    registrations: WebinarOverviewMetric
+    registrationBookings: WebinarOverviewMetric
+    viewers: WebinarOverviewMetric
+    viewRate: WebinarOverviewMetric
+    averageWatchSeconds: WebinarOverviewMetric
+    ctaUniquePeople: WebinarOverviewMetric
+    ctaTotalClicks: WebinarOverviewMetric
+  }
 }
 
 export type WebinarSakuraComment = { id?: string; atSeconds: number; authorName: string; body: string }
@@ -6286,6 +6314,9 @@ export type WebinarCtaCard = {
 export const webinarApi = {
   list: (accountId?: string) => fetchApi<{ data: Webinar[] }>(
     `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+  ),
+  overview: (accountId: string) => fetchApi<{ data: WebinarOverview }>(
+    `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   create: (input: WebinarInput) =>

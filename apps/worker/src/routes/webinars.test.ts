@@ -27,6 +27,7 @@ const dbMocks = {
   getWebinarAnalyticsSummary: vi.fn(),
   getWebinarDailyStats: vi.fn(),
   getWebinarFormFunnelStats: vi.fn(),
+  getWebinarOverview: vi.fn(),
   getFriendByLineUserId: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
@@ -129,6 +130,9 @@ beforeEach(() => {
   dbMocks.getFriendByLineUserId.mockResolvedValue({ id: 'friend-1' });
   dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-1' });
   dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar());
+  dbMocks.getWebinarOverview.mockResolvedValue({
+    state: 'partial', registrationMode: 'people', metrics: {},
+  });
   dbMocks.getWebinarComments.mockResolvedValue([
     { id: 'c1', webinar_id: 'w1', at_seconds: 10, author_name: '田中', body: '楽しみ!', created_at: 'x' },
   ]);
@@ -175,6 +179,37 @@ beforeEach(() => {
 });
 
 describe('admin webinar tenant scope', () => {
+  test('概要は選択中アカウントの実測値を返す', async () => {
+    dbMocks.getWebinarOverview.mockResolvedValue({
+      state: 'partial',
+      registrationMode: 'people',
+      metrics: {
+        webinars: { value: 2, state: 'available', reason: null },
+        registrations: { value: 3, state: 'available', reason: null },
+        viewers: { value: null, state: 'unavailable', reason: '未集計' },
+      },
+    });
+
+    const res = await adminReq('/api/webinars/overview?account_id=account-a');
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.getWebinarOverview).toHaveBeenCalledWith({}, 'account-a');
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { registrationMode: 'people', metrics: { registrations: { value: 3 } } },
+    });
+  });
+
+  test('概要はaccount_id必須で、別統括のアカウントを拒否する', async () => {
+    const missing = await adminReq('/api/webinars/overview');
+    expect(missing.status).toBe(400);
+
+    accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
+    const forbidden = await adminReq('/api/webinars/overview?account_id=account-b');
+    expect(forbidden.status).toBe(403);
+    expect(dbMocks.getWebinarOverview).not.toHaveBeenCalled();
+  });
+
   test('一覧はリクエスト元の統括から見えるアカウントだけをSQLで絞る', async () => {
     const all = vi.fn(async () => ({ results: [makeWebinar({ account_id: 'account-a' })] }));
     const bind = vi.fn(() => ({ all }));
@@ -872,8 +907,9 @@ describe('webinar notification settings', () => {
       hourBeforeMinutes: 60, startEnabled: true, missedEnabled: true,
       missedTime: '10:00', completedEnabled: true, updatedAt: 'x',
     });
-    webinarNotificationMocks.getWebinarNotificationOverview.mockResolvedValue({
+  webinarNotificationMocks.getWebinarNotificationOverview.mockResolvedValue({
       total: 8, pending: 4, sent: 2, failed: 1, skipped: 1, cancelled: 0,
+      audience: { people: 3, bookings: 4, definition: 'active_registrations' },
     });
 
     const res = await adminReq('/api/webinars/w1/notifications');
@@ -883,7 +919,11 @@ describe('webinar notification settings', () => {
       success: true,
       data: expect.objectContaining({
         settings: expect.objectContaining({ version: 2 }),
-        overview: expect.objectContaining({ total: 8, failed: 1 }),
+        overview: expect.objectContaining({
+          total: 8,
+          failed: 1,
+          audience: { people: 3, bookings: 4, definition: 'active_registrations' },
+        }),
       }),
     }));
   });

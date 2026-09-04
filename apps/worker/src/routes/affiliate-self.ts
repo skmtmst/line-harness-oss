@@ -23,6 +23,7 @@ import {
   type AffiliateLink,
   type AffiliateLinkStat,
 } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
 import type { Env } from '../index.js';
@@ -69,7 +70,7 @@ async function resolveFriendFromLineToken(
 ): Promise<
   | { status: 'invalid_token' }
   | { status: 'no_friend' }
-  | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null }
+  | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null; tenantId: string }
 > {
   const db = env.DB;
   const v = await fetch(
@@ -106,12 +107,18 @@ async function resolveFriendFromLineToken(
   const { userId } = await prof.json<{ userId: string }>();
   if (!userId) return { status: 'invalid_token' };
 
-  const lineAccountId = dbAccounts.find(
+  const lineAccount = dbAccounts.find(
     (account) => account.login_channel_id === tokenClientId,
-  )?.id ?? null;
+  );
+  const lineAccountId = lineAccount?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
   if (!friend) return { status: 'no_friend' };
-  return { status: 'ok', friend: friend as unknown as ResolvedFriend, lineAccountId };
+  return {
+    status: 'ok',
+    friend: friend as unknown as ResolvedFriend,
+    lineAccountId,
+    tenantId: lineAccount?.tenant_id ?? DEFAULT_TENANT_ID,
+  };
 }
 
 /** Map a non-ok resolution to its JSON error response. */
@@ -157,8 +164,14 @@ function serializeLink(
  * offer-scoped links without an N+1 fetch. Includes inactive offers so an
  * already-issued link's name still resolves after its offer is deactivated.
  */
-async function loadOfferNames(db: D1Database): Promise<Map<string, string>> {
-  const offers = await listAffiliateOffers(db, { activeOnly: false });
+async function loadOfferNames(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<Map<string, string>> {
+  const offers = await listAffiliateOffers(db, {
+    activeOnly: false,
+    lineAccountIds: [lineAccountId],
+  });
   return new Map(offers.map((o) => [o.id, o.name]));
 }
 
@@ -347,13 +360,18 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const existing = await getAffiliateByFriendId(db, friend.id);
+    const existing = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (existing) {
-      const links = await listAffiliateLinks(db, existing.id);
+      const links = await listAffiliateLinks(db, existing.id, {
+        lineAccountId: resolved.lineAccountId,
+      });
       const baseUrl = await resolveLinkBaseUrl(db, c.env);
-      const stats = await getAffiliateLinkStats(db, existing.id);
-      const offerNames = await loadOfferNames(db);
+      const stats = await getAffiliateLinkStats(db, existing.id, resolved.lineAccountId);
+      const offerNames = await loadOfferNames(db, resolved.lineAccountId);
       return c.json({
         affiliate: serializeAffiliate(existing),
         links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
@@ -366,6 +384,8 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
         name: friend.display_name || 'Affiliate',
         code: generateRefSlug(),
         friendId: friend.id,
+        tenantId: resolved.tenantId,
+        lineAccountId: resolved.lineAccountId,
       });
     } catch (createErr) {
       // Concurrent double-register: two requests both passed the getAffiliateBy-
@@ -373,19 +393,24 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
       // the loser throw — recover by returning the winner's row so register stays
       // idempotent even under a race. Re-throw anything that isn't the expected
       // uniqueness collision.
-      const raced = await getAffiliateByFriendId(db, friend.id);
+      const raced = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
       if (!raced) throw createErr;
-      const links = await listAffiliateLinks(db, raced.id);
+      const links = await listAffiliateLinks(db, raced.id, {
+        lineAccountId: resolved.lineAccountId,
+      });
       const baseUrl = await resolveLinkBaseUrl(db, c.env);
-      const stats = await getAffiliateLinkStats(db, raced.id);
-      const offerNames = await loadOfferNames(db);
+      const stats = await getAffiliateLinkStats(db, raced.id, resolved.lineAccountId);
+      const offerNames = await loadOfferNames(db, resolved.lineAccountId);
       return c.json({
         affiliate: serializeAffiliate(raced),
         links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
       });
     }
     // Auto-issue the first link on registration.
-    const firstLink = await createAffiliateLink(db, { affiliateId: affiliate.id });
+    const firstLink = await createAffiliateLink(db, {
+      affiliateId: affiliate.id,
+      lineAccountId: resolved.lineAccountId,
+    });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
     return c.json({
       affiliate: serializeAffiliate(affiliate),
@@ -414,16 +439,21 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
 
-    const links = await listAffiliateLinks(db, affiliate.id);
+    const links = await listAffiliateLinks(db, affiliate.id, {
+      lineAccountId: resolved.lineAccountId,
+    });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
-    const stats = await getAffiliateLinkStats(db, affiliate.id);
-    const offerNames = await loadOfferNames(db);
+    const stats = await getAffiliateLinkStats(db, affiliate.id, resolved.lineAccountId);
+    const offerNames = await loadOfferNames(db, resolved.lineAccountId);
     return c.json({
       affiliate: serializeAffiliate(affiliate),
       links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
@@ -464,8 +494,11 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
@@ -484,12 +517,17 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
     const offerId = typeof body.offerId === 'string' && body.offerId ? body.offerId : null;
     let offerLineAccountId: string | null = null;
     if (offerId) {
-      const activeOffers = await listAffiliateOffers(db, { activeOnly: true });
+      const activeOffers = await listAffiliateOffers(db, {
+        activeOnly: true,
+        lineAccountIds: [resolved.lineAccountId],
+      });
       const offer = activeOffers.find((o) => o.id === offerId);
       if (!offer) {
         return c.json({ success: false, error: 'Offer not found' }, 404);
       }
-      const existingLinks = await listAffiliateLinks(db, affiliate.id);
+      const existingLinks = await listAffiliateLinks(db, affiliate.id, {
+        lineAccountId: resolved.lineAccountId,
+      });
       const enrolled = existingLinks.some((l) => l.offer_id === offerId);
       if (!enrolled) {
         return c.json({ success: false, error: '先に案件に参加してください' }, 400);
@@ -505,7 +543,9 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
       lineAccountId: offerLineAccountId,
     });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
-    const offerNames = offerId ? await loadOfferNames(db) : undefined;
+    const offerNames = offerId
+      ? await loadOfferNames(db, resolved.lineAccountId)
+      : undefined;
     return c.json({ link: serializeLink(link, baseUrl, undefined, offerNames) });
   } catch (err) {
     console.error('POST /api/liff/affiliate/links error:', err);
@@ -534,14 +574,22 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
 
-    const offers = await listAffiliateOffers(db, { activeOnly: true });
-    const links = await listAffiliateLinks(db, affiliate.id);
+    const offers = await listAffiliateOffers(db, {
+      activeOnly: true,
+      lineAccountIds: [resolved.lineAccountId],
+    });
+    const links = await listAffiliateLinks(db, affiliate.id, {
+      lineAccountId: resolved.lineAccountId,
+    });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
 
     // Map offerId → the earliest link for this affiliate scoped to that offer.
@@ -596,8 +644,11 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
       return unresolvedResponse(c, resolved);
     }
     const friend = resolved.friend;
+    if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
-    const affiliate = await getAffiliateByFriendId(db, friend.id);
+    const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
     if (!affiliate) {
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
@@ -605,7 +656,10 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
     // Guard on active offers only. Enrolling in a hidden/inactive offer must not
     // be possible from the self-serve LIFF surface. (enrollAffiliateInOffer
     // itself throws on a truly-missing offer; the activeOnly list is the gate.)
-    const activeOffers = await listAffiliateOffers(db, { activeOnly: true });
+    const activeOffers = await listAffiliateOffers(db, {
+      activeOnly: true,
+      lineAccountIds: [resolved.lineAccountId],
+    });
     const offer = activeOffers.find((o) => o.id === c.req.param('id'));
     if (!offer) {
       return c.json({ success: false, error: 'Offer not found' }, 404);
