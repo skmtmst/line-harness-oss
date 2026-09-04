@@ -5,6 +5,7 @@ import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
   reorderDashboardItems,
+  toggleDashboardItem,
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
 import { hasInboundSupportMark, summarizeTwoFactor } from './live-summary'
@@ -39,6 +40,21 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
 }
 
 describe('ダッシュボードV4の初期表示', () => {
+  it('編集パネルとQRコードをPencil V6の文言・寸法にそろえる', () => {
+    const editor = readFileSync(path.join(process.cwd(), 'src/components/dashboard/dashboard-editor.tsx'), 'utf8')
+    const qrDialog = readFileSync(path.join(process.cwd(), 'src/components/dashboard/qr-dialog.tsx'), 'utf8')
+
+    expect(editor).toContain('max-w-[540px]')
+    expect(editor).toContain('表示するカードと位置を変更します')
+    expect(editor).toContain('ダッシュボードに反映')
+    expect(editor).toContain('5つ目をONにすると、いちばん下のカードが自動でOFFになります。')
+    expect(qrDialog).toContain('style={{ maxWidth: 820 }}')
+    expect(qrDialog).toContain("{ value: '300x300', label: '小（300px）'")
+    expect(qrDialog).toContain('ダウンロード形式')
+    expect(qrDialog).toContain('画像をダウンロード')
+    expect(qrDialog).not.toContain('PNGをダウンロード')
+  })
+
   it('画面名はV6共通トップバーだけに表示する', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
     expect(source).not.toContain("import Header from '@/components/layout/header'")
@@ -135,6 +151,17 @@ describe('ダッシュボードV4の初期表示', () => {
       'today-bookings',
     ])
     expect(reordered.find((item) => item.id === 'today-photo-review')?.visible).toBe(false)
+  })
+
+  it('今日やることの5枚目をONにすると並びのいちばん下をOFFにする', () => {
+    const items = [
+      ...defaultDashboardPreferences().today,
+      { id: 'scenario-status' as const, visible: false },
+    ]
+    const toggled = toggleDashboardItem(items, 'scenario-status', 4)
+
+    expect(toggled.filter((item) => item.visible)).toHaveLength(4)
+    expect(toggled.at(-1)).toEqual({ id: 'scenario-status', visible: false })
   })
 })
 
