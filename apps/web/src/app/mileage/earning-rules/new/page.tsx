@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -290,21 +291,16 @@ export default function NewMileageRulePage() {
         </Field>
 
         <Field label="きっかけ" htmlFor="sc-event" required note={selected.note}>
-          <select
+          <SelectField
             id="sc-event"
             value={eventType}
             onChange={(e) => {
               setEventType(e.target.value)
               setSource('')
             }}
+            options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
             className={inputClass}
-          >
-            {EVENT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
 
         <Field
@@ -312,18 +308,14 @@ export default function NewMileageRulePage() {
           htmlFor="sc-source"
           note="同じ行動でも、経由した場所ごとに分けられます。"
         >
-          <select
+          <SelectField
             id="sc-source"
             value={source}
             onChange={(e) => setSource(e.target.value)}
+            aria-label="行動の出どころ"
             className={inputClass}
-          >
-            {selected.sources.map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
+            options={selected.sources.map(([value, label]) => ({ value, label }))}
+          />
         </Field>
       </FormSection>
 
@@ -382,31 +374,18 @@ export default function NewMileageRulePage() {
           htmlFor="sc-cap"
           note="同じ人が1日に何回まで対象になるかです。"
         >
-          <select
+          <SelectField
             id="sc-cap"
             value={dailyCap}
             onChange={(e) => setDailyCap(e.target.value)}
+            aria-label="1日に数える回数"
             className={inputClass}
-          >
-            {DAILY_CAPS.map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
+            options={DAILY_CAPS.map(([value, label]) => ({ value, label }))}
+          />
         </Field>
 
         <Field label="同じ対象の数えかた" htmlFor="sc-unique">
-          <select
-            id="sc-unique"
-            value={uniqueMode}
-            onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)}
-            className={inputClass}
-          >
-            <option value="">何度でも数える</option>
-            <option value="subject">同じ対象は1回だけ</option>
-            <option value="subjectPerDay">同じ対象は1日1回だけ</option>
-          </select>
+          <SelectField id="sc-unique" value={uniqueMode} onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)} options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} className={inputClass} />
         </Field>
         <p className="text-ink-faint text-xs leading-relaxed">
           同じフォームやウェビナーを、何度でも1回として数えるかどうかです。1日1回にすると、日をまたげばまた対象になります。

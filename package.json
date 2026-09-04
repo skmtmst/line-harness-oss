@@ -18,6 +18,7 @@
     "db:dry-run-v6-analytics": "tsx scripts/dry-run-v6-analytics.ts",
     "db:dry-run-v6-funnels": "tsx scripts/dry-run-v6-funnels.ts",
     "db:dry-run-scenario-delivery-timestamps": "tsx scripts/dry-run-scenario-delivery-timestamps.ts",
+    "db:dry-run-affiliate-account-scope": "tsx scripts/dry-run-affiliate-account-scope.ts",
     "deploy:setup": "node packages/create-line-harness/dist/index.js",
     "deploy:update": "node packages/create-line-harness/dist/index.js update",
     "sandbox:create-line-harness": "bash scripts/run-create-line-harness-sandbox.sh",

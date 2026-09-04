@@ -13,6 +13,7 @@
  * それまでの回答と結びつかなくなる。画面には出すだけで、編集させない。
  */
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -33,6 +34,7 @@ import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import OptionsDialog from '@/components/forms/options-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -438,13 +440,6 @@ function FormEditInner() {
               >
                 オプション設定
               </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-              >
-                {saving ? '保存中...' : 'フォームを保存'}
-              </button>
             </div>
           }
         />
@@ -471,15 +466,7 @@ function FormEditInner() {
             </Field>
 
             <Field label="公開状態" htmlFor="fm-active">
-              <select
-                id="fm-active"
-                value={isActive ? '1' : '0'}
-                onChange={(e) => setIsActive(e.target.value === '1')}
-                className={inputClass}
-              >
-                <option value="1">公開中</option>
-                <option value="0">停止中</option>
-              </select>
+              <SelectField id="fm-active" value={isActive ? '1' : '0'} onChange={(e) => setIsActive(e.target.value === '1')} options={[{ value: "1", label: "公開中" }, { value: "0", label: "停止中" }]} className={inputClass} />
             </Field>
 
             <Field
@@ -487,19 +474,12 @@ function FormEditInner() {
               htmlFor="fm-tag"
               note="このフォームに答えた人を、あとから絞り込めます。"
             >
-              <select
+              <SelectField
                 id="fm-tag"
                 value={onSubmitTagId}
                 onChange={(e) => setOnSubmitTagId(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">— 付けない —</option>
-                {refs.tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                options={[{ value: '', label: '— 付けない —' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+              />
             </Field>
 
             <Field
@@ -746,6 +726,18 @@ function FormEditInner() {
           </div>
         </>
       )}
+
+      <StickyBar
+        actions={(
+          <button
+            onClick={save}
+            disabled={saving}
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          >
+            {saving ? '保存中...' : 'フォームを保存'}
+          </button>
+        )}
+      />
 
       {/*
         ページを消す前の確認。**「元に戻す」で戻せるので `destructive` は付けない。**

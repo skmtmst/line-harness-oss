@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import StickyBar from '@/components/shared/sticky-bar'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
 
@@ -142,7 +143,9 @@ function NenColumnEditInner() {
                 aria-label={`${column.title}の紹介文`}
                 className="border-hairline rounded-control w-full resize-y border px-3 py-2 text-sm"
               />
-              <div className="mt-2">
+              <StickyBar
+                className="mt-2"
+                actions={(
                 <button
                   onClick={() => save(column)}
                   disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.intro_text ?? '')}
@@ -150,7 +153,8 @@ function NenColumnEditInner() {
                 >
                   {savingId === column.id ? '保存中...' : '保存'}
                 </button>
-              </div>
+                )}
+              />
             </div>
           ))}
         </div>

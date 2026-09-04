@@ -1,0 +1,174 @@
+/*
+ * 設計 ★V6 34-3「レシピを複製する」（`D5UaX`、1920）。
+ *
+ * 左が中身、右が 390px の「気をつけること」。下に固定帯。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 20px; /* gap: 20 */
+  padding-bottom: 72px; /* 下の固定帯のぶん */
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 20px; /* gap: 20 */
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 16px; /* gap: 16 */
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 16px; /* gap: 16 */
+}
+
+.block {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 8px; /* gap: 8 */
+  padding: 20px; /* padding: 20 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
+  background: var(--color-canvas); /* fill: $canvas */
+}
+
+.blockTitle {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-heading); /* fontSize: $size-heading */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.hint {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  line-height: 1.6;
+}
+
+.accountName {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-lead); /* fontSize: $size-lead */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+/* --- 作られるもの ------------------------------------------------------ */
+
+.items {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 160px 220px minmax(0, 1fr) auto;
+  gap: 12px; /* gap: 12 */
+  align-items: center;
+  padding: 12px 0; /* padding: 12 0 */
+  border-top: 1px solid var(--color-hairline); /* stroke: $hairline */
+}
+
+@media (max-width: 900px) {
+  .item {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.itemKind {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+}
+
+.itemName {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.itemNote {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-label); /* fontSize: $size-label */
+}
+
+/* 内訳が決まっていないとき。**0件の表を描かない。** */
+.undecided {
+  padding: 16px; /* padding: 16 */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+}
+
+/* --- 必要な機能・作ったあと ------------------------------------------- */
+
+.features,
+.notes {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 8px; /* gap: 8 */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* gap: 8 */
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-body); /* fontSize: $size-body */
+}
+
+.notes > li {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  line-height: 1.6;
+}
+
+/* --- 下の帯 ----------------------------------------------------------- */
+
+.cancel {
+  padding: 10px 16px; /* padding: 10 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+/* 作れないものを、作れる形にしない。 */
+.blocked {
+  padding: 10px 16px; /* padding: 10 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.backLink {
+  padding: 10px 16px; /* padding: 10 16 */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
+  color: var(--color-on-accent); /* fill: $on-accent */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}

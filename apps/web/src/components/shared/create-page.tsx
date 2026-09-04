@@ -40,6 +40,8 @@ export interface CreatePageProps {
   /** 保存する。作ったもののIDを返すと、一覧で目立たせる */
   onSave: () => Promise<string | void>
   /** 「保存して続けて作る」で入力を空に戻す。省略するとボタンを出さない */
+  /** 一覧以外へ続く作成フロー。IDを受けて次の画面を決める。 */
+  successHref?: (id: string | void) => string
   onReset?: () => void
   /** 保存前の確認。文字列を返すとその内容をエラーとして出し、保存しない */
   validate?: () => string | null
@@ -66,6 +68,7 @@ export default function CreatePage({
   description,
   parent,
   onSave,
+  successHref,
   onReset,
   validate,
   aside,
@@ -99,7 +102,7 @@ export default function CreatePage({
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(id ? `${parent[1]}?highlight=${id}` : parent[1])
+      router.push(successHref ? successHref(id) : id ? `${parent[1]}?highlight=${id}` : parent[1])
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.message)
@@ -175,7 +178,7 @@ export default function CreatePage({
         <div
           data-design="Left"
           className={`bg-canvas border-hairline border ${
-            v6 ? 'rounded-tile space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
+            v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
           {children}

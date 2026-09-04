@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
 import {
+  MILEAGE_REWARDS,
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
   COMMON_VAR_DELETE_IMPACT,
@@ -51,8 +52,12 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
+  ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
+  COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
+  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -360,10 +365,13 @@ const SHAPES = {
       approvalStatus: 'pending', duplicateFlag: true,
     },
   ],
+  '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
     summary: {
       scoredFriends: 5, high: 1, normal: 3, low: 1, decreased30d: 0,
-      highMin: 70, normalMin: 40,
+      /* `packages/db` の `DEFAULT_BANDS` と同じ 30 / 70。40 は根拠が無く、
+         決めごとの画面と一覧で同じ人が別の帯に入って見えていた。 */
+      highMin: 70, normalMin: 30,
     },
     items: [
       { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
@@ -512,6 +520,7 @@ const SHAPES = {
       ],
     },
   },
+  '/api/mileage/rewards': MILEAGE_REWARDS,
   '/api/mileage/history': {
     items: [
       {
@@ -544,7 +553,7 @@ const SHAPES = {
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
-  '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 1, members: 0, consultations: 0 },
+  '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
   /*
    * 一斉配信の帯（設計 `q76C35`）。**型どおりに返す。**
    * ここが無かったせいで、一覧の帯が「予約中 undefined」「失敗 undefined」
@@ -636,11 +645,13 @@ const RAW = {
     どちらも「画面を表示できませんでした」になっていて、
     **実装の不具合に見えていた。**
   */
-  '/api/booking/admin/menus': { menus: [] },
-  '/api/booking/admin/staff': { staff: [] },
-  '/api/events/admin/events': { items: [] },
+  /* 空いている時間。包むと `res.by_staff` が undefined になり、選ぶ口が0件になる。 */
+  '/api/booking/admin/availability': BOOKING_AVAILABILITY,
+  '/api/booking/admin/menus': { menus: BOOKING_MENUS },
+  '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  '/api/events/admin/events': { items: ADMIN_EVENTS },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
-  '/api/booking/admin/requests': { requests: [] },
+  '/api/booking/admin/requests': { requests: BOOKING_REQUESTS },
 }
 
 /**
@@ -653,7 +664,9 @@ const RAW = {
  * `29-1-B 申込者の一覧` が `.filter` で「画面を表示できませんでした」になっていた。
  */
 const RAW_PATTERNS = [
-  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: [] }],
+  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: EVENT_BOOKINGS }],
+  /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
+  [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
 ]
 
 /** 参照が1つも無ければ消せる（`packages/db` の `canDelete` と同じ数え方）。 */
@@ -895,6 +908,59 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
+  /*
+    いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
+    一覧の形（items/total）ではなく 1 人ぶんを返す。
+  */
+  /*
+    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
+    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
+    描いている状態を、そのまま固定データにする。
+  */
+  if (pathname === '/api/friend-add-routing')
+    return {
+      success: true,
+      data: {
+        configured: true,
+        routing: {
+          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
+          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
+          criteria: { firstTime: 'never_added' },
+        },
+        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
+        tags: [],
+      },
+    }
+  if (pathname === '/api/friend-add-routing/draft')
+    return {
+      success: true,
+      data: {
+        accountId: 'visual-qa-account',
+        versionId: 'visual-qa-draft',
+        versionNumber: 1,
+        status: 'draft',
+        routing: {
+          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
+          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
+          criteria: { firstTime: 'never_added' },
+        },
+        lastTestStatus: null,
+        lastTestedAt: null,
+        publishedAt: null,
+      },
+    }
+  if (pathname === '/api/staff/me')
+    return {
+      success: true,
+      data: {
+        id: 'visual-qa-staff',
+        name: 'Kenta Kawano',
+        email: null,
+        role: 'owner',
+        permissionKeys: [],
+        isActive: true,
+      },
+    }
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'
@@ -935,6 +1001,31 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
+
+  /*
+    紹介者・案件・マイル・成果地点。**空だと一覧の中身を設計と比べられない。**
+
+    `/api/mileage/overview` は器の形まで要る。画面の `isMileageAdminOverview` は
+    `summary` の5つの数と `pagination` を見ていて、1つでも欠けると
+    「友だちのマイルを表示できませんでした」に落ちる。
+  */
+  if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
+  if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
+  if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
+  if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
+  if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
+  /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
+  if (pathname === '/api/ec-commerce/events') {
+    return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
+  }
+  if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATE_REPORT }
+  /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
+  if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
+  if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
+  if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {

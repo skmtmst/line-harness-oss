@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * 配信方式の選択（設計）。
@@ -259,7 +260,7 @@ function ScenarioModeContent() {
 
           <label className="block">
             <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ</span>
-            <select
+            <SelectField
               value={folderId}
               disabled={!scenario || folderState !== 'ready' || detailsSaving || saving !== null}
               onChange={(event) => {
@@ -267,14 +268,14 @@ function ScenarioModeContent() {
                 setFolderId(nextFolderId)
                 void saveDetails(nextFolderId)
               }}
+              aria-label="シナリオのフォルダ"
               className="v6-select border-hairline rounded-control bg-canvas text-ink focus:ring-accent disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-            >
-              <option value="">未分類</option>
-              {selectedFolderMissing && <option value={folderId}>名前を確認できません</option>}
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>{folder.name}</option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: '未分類' },
+                ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
+                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+              ]}
+            />
             <span className="text-ink-faint mt-1 block text-xs">
               {folderState === 'loading'
                 ? 'フォルダを読み込んでいます。'

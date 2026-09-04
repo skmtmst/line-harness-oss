@@ -76,6 +76,24 @@ export async function createAffiliateLink(
 ): Promise<AffiliateLink> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  const affiliate = await db
+    .prepare(`SELECT line_account_id FROM affiliates WHERE id = ?`)
+    .bind(input.affiliateId)
+    .first<{ line_account_id: string | null }>();
+  if (!affiliate) throw new Error('affiliate not found');
+  const lineAccountId = input.lineAccountId ?? affiliate.line_account_id;
+  if (lineAccountId !== affiliate.line_account_id) {
+    throw new Error('affiliate link account mismatch');
+  }
+  if (input.offerId) {
+    const offer = await db
+      .prepare(`SELECT line_account_id FROM affiliate_offers WHERE id = ?`)
+      .bind(input.offerId)
+      .first<{ line_account_id: string | null }>();
+    if (!offer || offer.line_account_id !== affiliate.line_account_id) {
+      throw new Error('affiliate offer account mismatch');
+    }
+  }
 
   let attempt = 0;
   while (true) {
@@ -95,7 +113,7 @@ export async function createAffiliateLink(
           input.affiliateId,
           refCode,
           input.label ?? null,
-          input.lineAccountId ?? null,
+          lineAccountId,
           input.offerId ?? null,
           now,
         )
@@ -139,12 +157,16 @@ export async function getAffiliateLinkByRefCode(
 export async function listAffiliateLinks(
   db: D1Database,
   affiliateId: string,
+  opts: { lineAccountId?: string | null } = {},
 ): Promise<AffiliateLink[]> {
+  const hasAccount = Object.prototype.hasOwnProperty.call(opts, 'lineAccountId');
   const result = await db
     .prepare(
-      `SELECT * FROM affiliate_links WHERE affiliate_id = ? ORDER BY created_at DESC`,
+      `SELECT * FROM affiliate_links
+        WHERE affiliate_id = ?${hasAccount ? ' AND line_account_id IS ?' : ''}
+        ORDER BY created_at DESC`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, ...(hasAccount ? [opts.lineAccountId ?? null] : []))
     .all<AffiliateLink>();
   return result.results;
 }
@@ -181,9 +203,13 @@ export async function incrementAffiliateLinkClick(
 export async function getAffiliateByFriendId(
   db: D1Database,
   friendId: string,
+  lineAccountId?: string | null,
 ): Promise<Affiliate | null> {
+  const hasAccount = arguments.length >= 3;
   return db
-    .prepare(`SELECT * FROM affiliates WHERE friend_id = ?`)
-    .bind(friendId)
+    .prepare(
+      `SELECT * FROM affiliates WHERE friend_id = ?${hasAccount ? ' AND line_account_id IS ?' : ''}`,
+    )
+    .bind(friendId, ...(hasAccount ? [lineAccountId ?? null] : []))
     .first<Affiliate>();
 }

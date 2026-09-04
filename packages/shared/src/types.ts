@@ -385,6 +385,8 @@ export interface CommonVar {
     value: string;
   } | null;
   pendingScheduleCount?: number;
+  /** 一覧で確認する、差し込まれている場所の合計。 */
+  usageCount?: number;
 }
 
 /** 共通情報の日付での切り替え予約 */
@@ -996,6 +998,12 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  channelAccessTokenLast4: string | null;
+  channelAccessTokenUpdatedAt: string | null;
+  channelSecretLast4: string | null;
+  channelSecretUpdatedAt: string | null;
+  loginChannelSecretLast4: string | null;
+  loginChannelSecretUpdatedAt: string | null;
   /** 統括内で最初に選ぶ既定アカウントか。 */
   isDefault: boolean;
   /** アーカイブ日時。null なら通常利用中。 */
@@ -1189,6 +1197,10 @@ export interface ConversionEvent {
 export interface Affiliate {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所属テナント */
+  tenantId: string;
+  /** 所属LINE公式アカウント */
+  lineAccountId: string | null;
   /** アフィリエイト名 */
   name: string;
   /** トラッキングコード (ユニーク) */
@@ -1983,4 +1995,256 @@ export interface AutoReplyPublishResult {
   versionNumber: number;
   publishedAt: string;
   acknowledgedConflictIds: string[];
+}
+
+export type ReminderLifecycleStatus = "draft" | "published" | "stopped";
+
+export interface ReminderStopConditions {
+  bookingCancelled: boolean;
+  supportMarkCompleted: boolean;
+  daysAfterTarget: number | null;
+  friendBlocked: boolean;
+}
+
+export interface ReminderDraftStep {
+  stableStepId: string;
+  offsetMinutes: number;
+  messageType: MessageType;
+  messageContent: string;
+  offsetDays?: number | null;
+  sendAtTime?: string | null;
+  templateId?: string | null;
+  targetCondition?: Record<string, unknown>;
+  action?: Record<string, unknown>;
+}
+
+export interface ReminderDraftSettings {
+  name: string;
+  description?: string | null;
+  lineAccountId: string;
+  triggerType: ReminderTriggerType;
+  deliveryMode: "time" | "countdown";
+  triggerFieldId?: string | null;
+  repeatYearly?: boolean;
+  triggerOffsetMinutes?: number | null;
+  sendAtTime?: string | null;
+  targetTagId?: string | null;
+  folderId?: string | null;
+  stopConditions: ReminderStopConditions;
+  steps: ReminderDraftStep[];
+}
+
+export interface ReminderDraftVersion {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "superseded";
+  settings: ReminderDraftSettings;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export interface ReminderValidationResult {
+  valid: boolean;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: "passed" | "failed" | "warning";
+    message: string;
+  }>;
+  audience: { matched: number | null; excluded: number | null };
+}
+
+export interface ReminderPreviewResult {
+  targetDate: string;
+  items: Array<{
+    stableStepId: string;
+    stepNumber: number;
+    scheduledAt: string;
+    label: string;
+    state: "scheduled" | "past" | "duplicate";
+  }>;
+  summary: {
+    audience: number | null;
+    next7Days: number | null;
+    next30Days: number | null;
+    duplicateCount: number;
+  };
+}
+
+export interface ReminderPublishResult {
+  reminderId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  audience: number | null;
+  plannedDeliveries: number | null;
+  nextScheduledAt: string | null;
+}
+
+/** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */
+export type ExecutionOwnerKind =
+  | "broadcast"
+  | "reminder"
+  | "scenario"
+  | "auto_reply"
+  | "manual"
+  | "user"
+  | "automation"
+  | "notification"
+  | "integration";
+
+export type ExecutionRunStatus =
+  | "succeeded"
+  | "failed"
+  | "partial"
+  | "skipped"
+  | "pending"
+  | "cancelled";
+
+/** リマインダの書込台帳だけが持つ詳細状態。共通状態へ潰さず保存する。 */
+export type ReminderDeliveryRunStatus =
+  | "planned"
+  | "claimed"
+  | "succeeded"
+  | "skipped"
+  | "retry_wait"
+  | "permanent_failed"
+  | "cancelled";
+
+export interface ExecutionRunIdentity {
+  ownerKind: ExecutionOwnerKind;
+  ownerId: string;
+  lineAccountId: string | null;
+}
+
+/** 7機能の実行記録一覧が共通で読む9項目。 */
+export interface ExecutionRunListItem extends ExecutionRunIdentity {
+  occurredAt: string;
+  subject: string | null;
+  accountLabel: string | null;
+  triggerLabel: string;
+  reference: string | null;
+  status: ExecutionRunStatus;
+  detail: string | null;
+  durationMs: number | null;
+  canRetry: boolean;
+}
+
+export interface ReminderDeliveryRun extends ExecutionRunListItem {
+  id: string;
+  reminderId: string;
+  friendReminderId: string;
+  friendId: string;
+  friendName: string | null;
+  reminderStepId: string;
+  stepNumber: number;
+  scheduledAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  domainStatus: ReminderDeliveryRunStatus;
+  attemptCount: number;
+  nextRetryAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  /** LINEが返した要求ID。取れなかった場合はnullのままにし、作らない。 */
+  lineRequestId: string | null;
+  /** 実際に送った本文へ辿るためのmessages_log ID。成功前はnull。 */
+  messageLogId: string | null;
+}
+
+export interface ReminderDeliveryRunsResponse {
+  reminder: {
+    id: string;
+    name: string;
+    isActive: boolean;
+  };
+  summary: {
+    sent: number;
+    scheduled: number;
+    stopped: number;
+    errors: number;
+    targetCount: number;
+    nextScheduledAt: string | null;
+  };
+  steps: Array<{
+    id: string;
+    stepNumber: number;
+    offsetMinutes: number;
+    messageType: MessageType;
+    messageContent: string;
+    sent: number;
+    /** LINE Messaging APIは友だち単位の既読を返さないため、null。 */
+    openRate: number | null;
+    errors: number;
+  }>;
+  items: ReminderDeliveryRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
+/** 自動応答の書込台帳が持つ詳細状態。実行の途中と最終結果を混ぜない。 */
+export type AutoReplyEvaluationStatus =
+  | "received"
+  | "evaluated"
+  | "matched"
+  | "skipped"
+  | "reply_accepted"
+  | "reply_failed"
+  | "actions_running"
+  | "completed"
+  | "partial_failed"
+  | "failed";
+
+export interface AutoReplyRun extends ExecutionRunListItem {
+  id: string;
+  autoReplyId: string | null;
+  autoReplyName: string | null;
+  friendId: string;
+  friendName: string | null;
+  messageKind: string;
+  inputPreview: string | null;
+  matchedKeyword: string | null;
+  versionNumber: number | null;
+  domainStatus: AutoReplyEvaluationStatus;
+  replyStatus: "not_attempted" | "accepted" | "failed";
+  actionSummary: Record<string, number>;
+  lineRequestId: string | null;
+}
+
+export interface AutoReplyRunsResponse {
+  rule: {
+    id: string | null;
+    name: string;
+    isActive: boolean | null;
+    priorityPosition: number | null;
+  };
+  summary: {
+    monthHits: number;
+    totalHits: number;
+    handovers: number;
+    errors: number;
+    lastRunAt: string | null;
+    averageResponseMs: number | null;
+  };
+  handovers: {
+    waiting: number;
+    inProgress: number;
+    completed: number;
+  };
+  triggerBreakdown: Array<{
+    trigger: string;
+    count: number;
+    share: number | null;
+  }>;
+  items: AutoReplyRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
 }

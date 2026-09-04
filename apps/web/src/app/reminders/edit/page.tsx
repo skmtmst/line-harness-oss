@@ -1,5 +1,9 @@
 'use client'
 
+import ReminderPublishFlow, {
+  type ReminderPublishStage,
+} from '@/components/reminders/reminder-publish-flow'
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -8,6 +12,7 @@ import { describeReminderTiming } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
 
 /**
  * リマインダの編集。
@@ -42,7 +47,28 @@ function emptyStep(mode: 'time' | 'countdown'): StepDraft {
   }
 }
 
+/**
+ * 公開までの段（設計 7-1-C〜G）。`?stage=` が付いていたらそちらへ渡す。
+ *
+ * **同じ `/reminders/edit` のまま段を切り替える。** 別のルートにすると、
+ * 直しに戻るたびに URL が変わり、どこまで進んだのか分からなくなる。
+ */
+const PUBLISH_STAGES = new Set<ReminderPublishStage>(['target', 'preview', 'test', 'confirm', 'done'])
+
 function ReminderEditInner() {
+  const params = useSearchParams()
+  const id = params.get('id') ?? ''
+  const rawStage = params.get('stage')
+  if (rawStage && PUBLISH_STAGES.has(rawStage as ReminderPublishStage)) {
+    if (!id) {
+      return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
+    }
+    return <ReminderPublishFlow reminderId={id} stage={rawStage as ReminderPublishStage} />
+  }
+  return <LegacyReminderEditInner />
+}
+
+function LegacyReminderEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
@@ -295,18 +321,11 @@ function ReminderEditInner() {
                 タグを選ぶと、そのタグを持つ人だけに送ります。
               </p>
             </div>
-            <select
+            <SelectField
               value={targetTagId}
               onChange={(e) => setTargetTagId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">対象になった友だち全員</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: '対象になった友だち全員' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            />
           </section>
 
           <section className="bg-canvas border-hairline rounded-card space-y-4 border p-5">
@@ -414,18 +433,11 @@ function ReminderEditInner() {
                 <span className="text-ink-faint block text-[11px]">
                   選ぶと、下の本文の代わりにテンプレートの中身が届きます。
                 </span>
-                <select
+                <SelectField
                   value={newStep.templateId}
                   onChange={(e) => setNewStep({ ...newStep, templateId: e.target.value })}
-                  className={`mt-1 ${inputClass}`}
-                >
-                  <option value="">使わない（下に直接書く）</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: '', label: '使わない（下に直接書く）' }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+                />
               </label>
 
               <label className="block">
@@ -452,21 +464,25 @@ function ReminderEditInner() {
             </div>
           </section>
 
-          <div className="border-hairline flex justify-end gap-2 border-t pt-4">
-            <Link
-              href="/reminders"
-              className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
-            >
-              一覧へ戻る
-            </Link>
-            <button
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </div>
+          <StickyBar
+            actions={(
+              <>
+                <Link
+                  href="/reminders"
+                  className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  一覧へ戻る
+                </Link>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {saving ? '保存中...' : '保存'}
+                </button>
+              </>
+            )}
+          />
         </div>
       )}
 

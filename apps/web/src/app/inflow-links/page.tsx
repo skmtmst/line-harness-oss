@@ -11,6 +11,7 @@ import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@l
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
+import { exportFileName, toCsv } from './inflow-export'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AdIntegration from './ad-integration'
@@ -531,6 +532,28 @@ function InflowLinksPageInner() {
     ? Math.round((totalFriends / totalClicks) * 100)
     : null
 
+  const exportCurrentRows = () => {
+    const csv = toCsv(sortedRows.map((row) => ({
+      name: row.name,
+      ref: row.refCode,
+      /*
+        **取れていない数を 0 にしない。** 書き出したあとは画面の断り書きが
+        付いてこないので、ここで 0 と書くと**手元のファイルだけが残って、
+        あとから「クリックが1回も無かった」と読まれる。**
+      */
+      clicks: row.stats?.clickCount ?? null,
+      friendAdds: row.stats?.friendCount ?? null,
+      lastAddedAt: row.stats?.latestAt ?? null,
+    })))
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = exportFileName(sortedRows.length, new Date().toISOString().slice(0, 10))
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div>
       <div data-design="Head">
@@ -580,8 +603,24 @@ function InflowLinksPageInner() {
                 : '読み込めませんでした'
           }
         />
-        {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
-        <KpiCard title="今月の追加" value={null} unit="人" detail="前月比は出せません" />
+        {/*
+          設計は「今月 友だちになった 312人／そのうち経路が分かる人 289人」。
+          **今月ぶんに絞る術が無い**（`stats` は期間を受け取らず累計で返る）ので、
+          今月とは名乗らずに累計で出す。**経路が分かる人の数は口が返している**
+          （`friendsWithRef`）ので、設計が分けて見せたかった値はここで出せる。
+        */}
+        <KpiCard
+          title="友だちになった"
+          value={summaryAvailable ? (summary?.totalFriends ?? null) : null}
+          unit="人"
+          detail={
+            summaryAvailable && summary
+              ? `累計。そのうち経路が分かる人 ${summary.friendsWithRef.toLocaleString('ja-JP')}人`
+              : loading
+                ? '読み込んでいます'
+                : '取得できません'
+          }
+        />
         <KpiCard
           title="クリック"
           value={summaryAvailable ? totalClicks : null}
@@ -595,6 +634,16 @@ function InflowLinksPageInner() {
           detail="クリックのうち"
         />
       </div>
+
+      {/*
+        設計の帯。**なぜこの画面が要るのか**を先に書く。
+        「友だち追加」だけでは経路が分からないことを知らないと、
+        ここで発行したURLを通さずに配って、あとから数が合わないことになる。
+      */}
+      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
+        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
+        ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
+      </p>
 
       <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside>
@@ -625,22 +674,22 @@ function InflowLinksPageInner() {
                   return (
                     <div
                       key={genre.id}
-                      className={`flex items-center transition ${active ? 'bg-v6-accent-soft text-v6-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                      className={`flex items-center transition ${active ? 'bg-accent-soft text-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                     >
                       <button
                         onClick={() => setSelectedGenre(genre.name)}
                         className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
                       >
                         <span className="flex min-w-0 items-center gap-2">
-                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-v6-accent' : 'text-ink-faint'}`} />
+                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-accent' : 'text-ink-faint'}`} />
                           <span className="truncate text-sm font-semibold">{genre.name}</span>
                         </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-v6-accent-soft text-v6-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{count}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{count}</span>
                       </button>
                       {!genre.id.startsWith('legacy-') && (
                         <button
                           onClick={() => setEditingGenre(genre)}
-                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-ink-faint hover:bg-canvas hover:text-v6-action"
+                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-ink-faint hover:bg-canvas hover:text-action"
                           aria-label={`${genre.name}を編集`}
                         >
                           編集
@@ -652,7 +701,7 @@ function InflowLinksPageInner() {
                 {hasUncategorized && (
                   <button
                     onClick={() => setSelectedGenre(UNCATEGORIZED)}
-                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-v6-warning-bg text-v6-warning' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-status-warn-soft text-status-warn-deep' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                   >
                     <span className="flex items-center gap-2 text-sm font-semibold">
                       <FolderIcon className="h-5 w-5 shrink-0" />
@@ -716,7 +765,14 @@ function InflowLinksPageInner() {
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
                 title={selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
               >
-                このフォルダにURLを発行
+                ＋ このフォルダにURLを発行
+              </Button>
+              {/*
+                **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
+                無視して全件を出すと、画面と手元のファイルが食い違う。
+              */}
+              <Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>
+                CSVで書き出す
               </Button>
             </div>
           </div>
@@ -838,7 +894,7 @@ function InflowLinksPageInner() {
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
                           href={`/inflow-links/detail?id=${r.entryRouteId}`}
-                          className="block truncate whitespace-nowrap text-v6-action hover:underline"
+                          className="block truncate whitespace-nowrap text-action hover:underline"
                           onClick={(e) => e.stopPropagation()}
                           title={r.name}
                         >
@@ -848,7 +904,7 @@ function InflowLinksPageInner() {
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-v6-accent-border bg-v6-accent-soft px-1 py-0.5 text-[9px] text-v6-accent-hover"
+                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-hover"
                             title="tracked_links 登録済み — クリック計測 + シナリオ起動が設定されています。Pool 振り分けは持ちません。"
                           >
                             計測済
@@ -858,7 +914,7 @@ function InflowLinksPageInner() {
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-v6-warning-bg bg-v6-warning-bg px-1 py-0.5 text-[9px] text-v6-warning"
+                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-[9px] text-status-warn-deep"
                             title="entry_routes / tracked_links いずれにも未登録 — X Harness など外部システムが発行した ref。流入実績のみ集計。"
                           >
                             未登録
@@ -866,7 +922,7 @@ function InflowLinksPageInner() {
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-3 font-mono text-v6-action" title={r.refCode}>
+                    <td className="px-2 py-3 font-mono text-action" title={r.refCode}>
                       <span className="block truncate whitespace-nowrap">{r.refCode}</span>
                     </td>
                     <td className="px-2 py-3 text-ink-secondary">
@@ -932,14 +988,14 @@ function InflowLinksPageInner() {
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => onCopy(r.refCode, r.refCode)}
-                          className="text-[11px] font-medium text-v6-action hover:underline"
+                          className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
                         >
                           {copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-[11px] font-medium text-v6-accent-hover hover:underline"
+                          className="text-[11px] font-medium text-accent-hover hover:underline"
                           aria-label={`${r.name}のQRコードを表示`}
                         >
                           QR
@@ -950,7 +1006,7 @@ function InflowLinksPageInner() {
                       {editTarget ? (
                         <button
                           onClick={() => setEditing(editTarget)}
-                          className="whitespace-nowrap rounded-md border border-hairline bg-v6-action-soft px-2 py-1 text-[11px] font-medium text-v6-action hover:bg-v6-surface"
+                          className="whitespace-nowrap rounded-md border border-hairline bg-action-soft px-2 py-1 text-[11px] font-medium text-action hover:bg-surface-pearl"
                           aria-label={`${r.name}のリンクを編集`}
                         >
                           編集
@@ -965,7 +1021,7 @@ function InflowLinksPageInner() {
                       ) : (
                         <button
                           onClick={() => setEditing({ register: r.refCode })}
-                          className="text-xs text-v6-action hover:underline"
+                          className="text-xs text-action hover:underline"
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
                           登録
@@ -1083,7 +1139,7 @@ function FragmentRow({
                     <Link
                       key={f.id}
                       href={`/chats?friend=${f.id}`}
-                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-v6-action"
+                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-action"
                     >
                       <span className="text-sm text-ink font-medium truncate">
                         {f.displayName}
@@ -1130,7 +1186,7 @@ function ReferralQrModal({
       <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium text-v6-accent-hover">リファラルリンク・QRコード</p>
+            <p className="text-xs font-medium text-accent-hover">リファラルリンク・QRコード</p>
             <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
             <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
           </div>
@@ -1138,7 +1194,7 @@ function ReferralQrModal({
         </div>
         <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
           <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-v6-action">
+          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action">
             {copied ? 'コピーしました' : 'URLをコピー'}
           </button>
         </div>

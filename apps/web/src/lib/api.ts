@@ -1,6 +1,12 @@
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
+  ReminderDraftSettings,
+  ReminderDraftVersion,
+  ReminderPreviewResult,
+  ReminderPublishResult,
+  ReminderValidationResult,
+  AutoReplyRunsResponse,
   AutoReplyConflict,
   AutoReplyDraftInput,
   AutoReplyDraftVersion,
@@ -1031,6 +1037,65 @@ export type MileageAdjustmentResult = {
   balanceAfter: number
   replayed: boolean
 }
+/*
+ * マイルの使い道（`/api/mileage/rewards`）。#772 で口が入った。
+ *
+ * **版を分けて持つ。** 公開中の版と直しかけの下書きは別で、
+ * 直しても公開中の交換条件は変わらない。画面でもそこを混ぜない。
+ */
+export type MileageRewardKind = 'coupon' | 'tag' | 'scenario' | 'template' | 'early_access' | 'rank'
+export type MileageRewardStatus = 'draft' | 'published' | 'stopped' | 'archived'
+export type MileageRewardFailurePolicy = 'retry' | 'refund' | 'manual'
+
+export type MileageRewardVersion = {
+  id: string
+  versionNumber: number
+  status: 'draft' | 'published'
+  requiredMiles: number
+  /** 数に限りがあるとき。null なら限りなし。**0 と混ぜない。** */
+  stockLimit: number | null
+  perFriendLimit: number | null
+  startsAt: string | null
+  endsAt: string | null
+  benefitExpiresDays: number | null
+  commonActionVersionId: string | null
+  failurePolicy: MileageRewardFailurePolicy
+  customerMessage: string
+  publishedAt: string | null
+}
+
+export type MileageRewardSummary = {
+  id: string
+  lineAccountId: string
+  programId: string
+  name: string
+  description: string | null
+  imageUrl: string | null
+  rewardKind: MileageRewardKind
+  status: MileageRewardStatus
+  sortOrder: number
+  currentDraftVersionId: string | null
+  currentPublishedVersionId: string | null
+  currentVersion: MileageRewardVersion | null
+  exchangedThisMonth: number
+  /** 引換コードの残り。数える経路が無いときは null。**0 と混ぜない。** */
+  availableCodeCount: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type MileageRewardAdminOverview = {
+  rewards: MileageRewardSummary[]
+  summary: {
+    publishedCount: number
+    redeemedMilesThisMonth: number
+    /** 1回も使っていない人。数える経路が無いときは null。 */
+    neverRedeemedFriendCount: number | null
+    mostRedeemedRewardName: string | null
+    mostRedeemedRewardCount: number | null
+  }
+}
+
 export type MileageRule = {
   id: string
   name: string
@@ -1735,6 +1800,97 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
   if (params?.accountId) q.set('account_id', params.accountId)
   const s = q.toString()
   return s ? `?${s}` : ''
+}
+
+
+/** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
+export interface GettingStartedStep {
+  key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
+  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
+  /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
+}
+
+/** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
+export interface Recipe {
+  id: string
+  name: string
+  purpose: string
+  creates: string
+  version: number
+  origin: 'builtin' | 'org'
+  requiredFeatures: string[]
+  /** オフの機能。**空配列は「全部オン」。** */
+  missingFeatures: string[]
+  /** 作られるものの内訳。**決まっていなければ null**（0 件の表を描かない）。 */
+  items: Array<{ kind: string; name: string; note: string }> | null
+  itemCount: number | null
+  cloneCount: number
+}
+
+export interface ManualLink {
+  key: string
+  keyKind: 'screen' | 'task'
+  name: string
+  url: string | null
+  /** **確かめていない URL は `ok` にならない。** */
+  status: 'ok' | 'broken' | 'unset'
+  lastCheckedAt: string | null
+  lastError: string | null
+}
+
+/** 事前確認の4区分。設計 ★V6 33-4 の言葉と1対1。 */
+export type HandoverMatchBucket = 'auto' | 'review' | 'unmatched' | 'lookalike'
+
+export type HandoverMatchCounts = Record<HandoverMatchBucket, number>
+
+export interface AccountHandover {
+  id: string
+  fromAccountId: string
+  /** 受け取り先。コードが読まれるまでは null。 */
+  toAccountId: string | null
+  code: string
+  codeExpiresAt: string
+  status:
+    | 'code_issued'
+    | 'linked'
+    | 'previewed'
+    | 'resolved'
+    | 'executing'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+  /**
+   * プロバイダーが同じか。**`unknown` を「同じ」と読まない。**
+   * LINE は返さないので、こちらに入っていなければ分からない。
+   */
+  providerMatch: 'same' | 'different' | 'unknown'
+  /**
+   * 事前確認の結果。**まとめて出るか、まとめて出ないか。**
+   * 片方だけ出ることはない（合計が合わない表示を作らないため）。
+   */
+  counts: (HandoverMatchCounts & { sourceTotal: number }) | null
+  movedCount: number
+  failedCount: number
+  failureReason: string | null
+  createdAt: string
+  linkedAt: string | null
+  previewedAt: string | null
+  resolvedAt: string | null
+  executedAt: string | null
+  completedAt: string | null
+}
+
+export interface AccountHandoverDecision {
+  id: string
+  handover_id: string
+  from_friend_id: string
+  to_friend_id: string | null
+  decision: 'link' | 'new' | 'skip'
+  bucket: HandoverMatchBucket
+  note: string | null
+  decided_by: string | null
+  decided_at: string
 }
 
 export const api = {
@@ -3182,6 +3338,143 @@ export const api = {
         body: JSON.stringify({ name }),
       }),
   },
+  /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
+  gettingStarted: {
+    get: (accountId?: string) =>
+      fetchApi<ApiResponse<{
+        steps: GettingStartedStep[]
+        doneCount: number
+        total: number
+        allDone: boolean
+      }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+  },
+  /** レシピ。台帳 #134。 */
+  recipes: {
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<Recipe[]>>(
+        `/api/recipes${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+      ),
+    get: (id: string, accountId?: string) =>
+      fetchApi<ApiResponse<Recipe>>(
+        `/api/recipes/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+      ),
+    /**
+     * 複製する。**冪等キーが要る。** 同じキーで2回呼んでも2回作らない。
+     * 途中失敗は全部戻る（部分的に作らない）。
+     */
+    clone: (id: string, input: { accountId: string; namePrefix?: string | null }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        runId: string
+        status: 'running' | 'succeeded' | 'failed'
+        createdCount: number
+        items?: Array<{ kind: string; target_id: string; name: string }>
+      }>>(`/api/recipes/${id}/clone`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(input),
+      }),
+    run: (runId: string) =>
+      fetchApi<ApiResponse<{
+        runId: string
+        status: 'running' | 'succeeded' | 'failed'
+        createdCount: number
+        failureReason: string | null
+        items: Array<{ kind: string; target_id: string; name: string }>
+      }>>(`/api/recipes/clone-runs/${runId}`),
+  },
+  /*
+    設計 ★V6 34-4 の正本表。台帳 #134。**直せるのは運営だけ。**
+
+    語をそのまま書かないのは、`design-structure.test.ts` が
+    「画面が設計の語を出しているか」を、読み込んだファイルの中身で見ているため。
+    ここに書くと、トップバーにしか無いものを画面が出していることになってしまう。
+  */
+  manualLinks: {
+    /** 画面から1つ引く。**開けないと分かっているものは URL が null で返る。** */
+    lookup: (screen: string) =>
+      fetchApi<ApiResponse<{ key: string; url: string | null; status: 'ok' | 'broken' | 'unset' }>>(
+        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}`,
+      ),
+    list: () =>
+      fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(
+        '/api/manual-links',
+      ),
+    update: (key: string, data: { name?: string; url?: string | null; keyKind?: 'screen' | 'task' }) =>
+      fetchApi<ApiResponse<ManualLink>>(`/api/manual-links/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    /** いま全部を確かめる。 */
+    check: () =>
+      fetchApi<ApiResponse<{ checked: number; ok: number; broken: number; unset: number }>>(
+        '/api/manual-links/check',
+        { method: 'POST' },
+      ),
+  },
+  /**
+   * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+   *
+   * 5 段の流れ。**事前確認（段3）だけでは元のアカウントは何も変わらない。**
+   */
+  accountHandovers: {
+    /** 段1。引き継ぎコードを出す。生きているコードがあればそれを返す。 */
+    issue: (fromAccountId: string) =>
+      fetchApi<ApiResponse<AccountHandover>>('/api/account-handovers', {
+        method: 'POST',
+        body: JSON.stringify({ fromAccountId }),
+      }),
+    /** 段2。受け取り先でコードを読む。 */
+    link: (code: string, toAccountId: string) =>
+      fetchApi<ApiResponse<AccountHandover>>('/api/account-handovers/link', {
+        method: 'POST',
+        body: JSON.stringify({ code, toAccountId }),
+      }),
+    get: (id: string) =>
+      fetchApi<ApiResponse<AccountHandover & {
+        decisions: AccountHandoverDecision[]
+        /** 段4でまだ決めていない「要確認」の数。0 になるまで本実行できない。 */
+        unresolvedReviews: number | null
+      }>>(`/api/account-handovers/${id}`),
+    listForAccount: (accountId: string) =>
+      fetchApi<ApiResponse<AccountHandover[]>>(`/api/line-accounts/${accountId}/handovers`),
+    /**
+     * 段3。事前確認の結果を保存する。
+     * **4区分の合計が `sourceFriendTotal` と合わないと 422 で断られる。**
+     */
+    preview: (
+      id: string,
+      input: { sourceFriendTotal: number; counts: HandoverMatchCounts },
+    ) =>
+      fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/preview`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    /** 段4。競合の判断を保存する。`link` は相手が要る。 */
+    saveDecisions: (
+      id: string,
+      decisions: Array<{
+        fromFriendId: string
+        toFriendId?: string | null
+        decision: 'link' | 'new' | 'skip'
+        bucket: HandoverMatchBucket
+        note?: string | null
+      }>,
+    ) =>
+      fetchApi<ApiResponse<AccountHandover & { unresolvedReviews: number | null }>>(
+        `/api/account-handovers/${id}/decisions`,
+        { method: 'PUT', body: JSON.stringify({ decisions }) },
+      ),
+    /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。 */
+    execute: (id: string) =>
+      fetchApi<ApiResponse<AccountHandover & { plannedCount: number }>>(
+        `/api/account-handovers/${id}/execute`,
+        { method: 'POST' },
+      ),
+    cancel: (id: string) =>
+      fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/cancel`, {
+        method: 'POST',
+      }),
+  },
   lineAccounts: {
     list: (live = false) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
@@ -3352,6 +3645,7 @@ export const api = {
       commissionRate?: number
       friendId?: string
       issueInitialLink?: boolean
+      lineAccountId?: string
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
@@ -3566,6 +3860,19 @@ export const api = {
       }>>(`/api/templates/${id}/usages`),
   },
   autoReplies: {
+    /**
+     * 実行の記録（設計 `t7UtYQ` 8-1-H）。
+     * **どのルールが、いつ、誰へ、どう返したか。** 設定だけ見ても、
+     * 実際に返したのかは分からない。
+     */
+    runs: (params?: { ruleId?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.ruleId) query.set('rule_id', params.ruleId)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query}` : ''
+      return fetchApi<ApiResponse<AutoReplyRunsResponse>>(`/api/auto-reply-runs${suffix}`)
+    },
     /*
       公開までの4段（下書き→検査→競合→試験→公開）。**口はすべて
       `apps/worker/src/routes/auto-replies.ts` に在るものを読むだけ。**
@@ -4211,6 +4518,48 @@ export const api = {
     },
   },
   reminders: {
+    /*
+      公開までの段（下書き→検査→予定の下見→試験送信→公開）。
+      **口はすべて `apps/worker/src/routes/reminders.ts` に在るものを読むだけ。**
+      試験送信は `Idempotency-Key` を付ける——二度押しで2通届くと、
+      受け取った人には本番と見分けが付かない。
+    */
+    createDraft: (settings: ReminderDraftSettings) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>('/api/reminders/drafts', {
+        method: 'POST',
+        body: JSON.stringify(settings),
+      }),
+    getDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`),
+    saveDraft: (id: string, settings: ReminderDraftSettings) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      }),
+    validateDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
+        method: 'POST',
+      }),
+    previewDraft: (id: string, targetDate?: string) =>
+      fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {
+        method: 'POST',
+        body: JSON.stringify(targetDate ? { targetDate } : {}),
+      }),
+    testDraft: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        sent: number
+        recipientName: string
+        replayed: boolean
+        requestId: string | null
+        testedAt: string
+      }>>(
+        `/api/reminders/${id}/test-send`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
+    publishDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderPublishResult>>(`/api/reminders/${id}/publish`, {
+        method: 'POST',
+      }),
     /** 161: 渡した順に並べ替える。見えているものだけ送る。 */
     reorder: (ids: string[]) =>
       fetchApi<ApiResponse<{ updated: number }>>('/api/reminders/reorder', {
@@ -4328,6 +4677,14 @@ export const api = {
       ),
   },
   mileage: {
+    /*
+      使い道の一覧（#772 の口）。**アカウント単位で返る。**
+      渡さないと、ほかの店の使い道まで混ざる。
+    */
+    rewards: (accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardAdminOverview>>(
+        `/api/mileage/rewards?accountId=${encodeURIComponent(accountId)}`,
+      ),
     overview: (params?: { accountId?: string; search?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams()
       if (params?.accountId) query.set('accountId', params.accountId)
@@ -5803,6 +6160,33 @@ export type WebinarNotificationOverview = {
   failed: number
   skipped: number
   cancelled: number
+  audience: {
+    people: number
+    bookings: number
+    definition: 'active_registrations'
+  }
+}
+
+export type WebinarOverviewMetric = {
+  value: number | null
+  state: 'available' | 'unavailable'
+  reason: string | null
+}
+
+export type WebinarOverview = {
+  state: 'partial'
+  registrationMode: 'people'
+  metrics: {
+    webinars: WebinarOverviewMetric
+    activeWebinars: WebinarOverviewMetric
+    registrations: WebinarOverviewMetric
+    registrationBookings: WebinarOverviewMetric
+    viewers: WebinarOverviewMetric
+    viewRate: WebinarOverviewMetric
+    averageWatchSeconds: WebinarOverviewMetric
+    ctaUniquePeople: WebinarOverviewMetric
+    ctaTotalClicks: WebinarOverviewMetric
+  }
 }
 
 export type WebinarSakuraComment = { id?: string; atSeconds: number; authorName: string; body: string }
@@ -5878,6 +6262,9 @@ export type WebinarCtaCard = {
 export const webinarApi = {
   list: (accountId?: string) => fetchApi<{ data: Webinar[] }>(
     `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+  ),
+  overview: (accountId: string) => fetchApi<{ data: WebinarOverview }>(
+    `/api/webinars/overview?account_id=${encodeURIComponent(accountId)}`,
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   create: (input: WebinarInput) =>

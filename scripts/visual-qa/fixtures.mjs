@@ -558,13 +558,13 @@ export const COMMON_VARS = [
     id: 'common-var-delete-target', lineAccountId: 'visual-qa-account', folderId: null,
     name: '営業時間', varKey: 'shop_hours', type: 'text', value: '10:00〜19:00',
     createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-20T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0,
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 3,
   },
   {
     id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
     name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '通常どおり営業します',
     createdAt: '2026-08-02T10:00:00.000+09:00', updatedAt: '2026-08-21T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0,
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
   },
 ]
 
@@ -1719,6 +1719,504 @@ export const LOGIN_AUDIT = [
   { id: 'la-4', adminUserId: 'stf-4', userName: '高田 誠', role: 'staff', lineLinked: false, isActive: true, action: 'delete', screen: 'テンプレート', ip: '203.0.113.13', connectionSource: '社外', result: 'success', createdAt: '2026-08-23T08:20:00.000Z' },
   { id: 'la-5', adminUserId: null, userName: '名前を取得できませんでした', role: null, lineLinked: false, isActive: false, action: 'login', screen: null, ip: '198.51.100.7', connectionSource: '社外', result: 'failure', createdAt: '2026-08-22T19:44:00.000Z' },
 ]
+
+/*
+  紹介者。設計 `PouPn` の「アフィリエイター 12」のうち、札の内訳が撮れる6人。
+
+  **状態を混ぜる。** 全員を有効にすると、設計の札（すべて12／有効10／停止中2／
+  未払いあり4／重複の疑い1）が撮れない。停止中を1人、率0%（定額の人）を1人入れる。
+  `code` は運用者が決めてURLに出す符号なので、設計と同じ値を使う。
+*/
+export const AFFILIATES = [
+  { id: 'af-1', name: '田中 明', code: 'tanaka01', commissionRate: 10, isActive: true, email: 'tanaka@example.com', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'af-2', name: '合同会社ノース', code: 'north', commissionRate: 0, isActive: true, email: 'north@example.com', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: false, createdAt: '2026-03-12T00:00:00.000Z' },
+  { id: 'af-3', name: '木村 亮', code: 'miyuki', commissionRate: 15, isActive: true, email: 'miyuki.s@example.jp', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-04-02T00:00:00.000Z' },
+  { id: 'af-4', name: '中村 彩', code: 'aya-n', commissionRate: 10, isActive: true, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false, createdAt: '2026-05-20T00:00:00.000Z' },
+  { id: 'af-5', name: '山口 商店', code: 'yamaguchi', commissionRate: 5, isActive: true, email: 'yamaguchi@example.com', holdDays: 60, payoutCycle: '四半期', notifyOnConversion: false, createdAt: '2026-01-15T00:00:00.000Z' },
+  { /* 設計の「停止中 2」のうち1人。 */ id: 'af-6', name: '旧パートナーA', code: 'old-a', commissionRate: 10, isActive: false, email: null, holdDays: 30, payoutCycle: null, notifyOnConversion: false, createdAt: '2025-11-01T00:00:00.000Z' },
+]
+
+/** 案件。設計 `GH8VL` の「案件 5」。金額は設計の ¥3,000／¥5,000／¥100／¥1,500／¥8,000。 */
+export const AFFILIATE_OFFERS = [
+  { id: 'ao-1', name: '体験の申し込み', description: 'はじめての方の体験予約', rewardAmount: 3000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-trial', scenarioId: 'scenario-0', isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'ao-2', name: '定期便のお申し込み', description: '定期便の初回', rewardAmount: 5000, rewardMiles: 500, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-02-10T00:00:00.000Z' },
+  { id: 'ao-3', name: '友だち追加', description: null, rewardAmount: 100, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-03-01T00:00:00.000Z' },
+  { id: 'ao-4', name: '資料請求', description: null, rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-03-15T00:00:00.000Z' },
+  { /* 設計の「停止・終了 1」。 */ id: 'ao-5', name: '春の紹介キャンペーン', description: '2026春で終了', rewardAmount: 8000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-01-05T00:00:00.000Z' },
+]
+
+/*
+  マイルの残高。設計 `s98Vfw` の並びそのまま。
+
+  **`/api/mileage/overview` は器の形が要る。** 画面の `isMileageAdminOverview` は
+  `summary` の5つの数と `pagination` を見て、1つでも欠けると
+  「友だちのマイルを表示できませんでした」に落ちる。既定の器が返っていたので、
+  固定データ以前に**この画面は一度も中身が撮れていなかった。**
+*/
+const mileageMember = (id, name, available, pending, lifetime, actions, days) => ({
+  identityKey: `ik-${id}`, primaryFriendId: id, displayName: name, pictureUrl: null,
+  accountCount: 1, accountNames: ['LINE 本店'],
+  available, pending, lifetimeEarned: lifetime,
+  actionCount: actions, messageCount: 0, linkClickCount: 0, formCount: 0,
+  bookingCount: 0, webinarCount: 0, instagramCount: 0,
+  followingDays: days, unfollowCount: 0, referralMiles: 0, qualityReferralCount: 0,
+  lastActivityAt: '2026-08-25T00:00:00.000Z',
+})
+
+export const MILEAGE_OVERVIEW = {
+  summary: {
+    totalMembers: 1284,
+    totalAvailable: 486200,
+    activeMembers30d: 642,
+    totalActions: 4180,
+    queuedEvents: 12,
+  },
+  members: [
+    mileageMember('friend-1', '高橋 直人', 8420, 0, 12400, 42, 296),
+    mileageMember('friend-2', '前田 さくら', 6150, 300, 9800, 31, 216),
+    mileageMember('friend-3', '木村 亮', 4980, 0, 7200, 24, 377),
+    mileageMember('friend-4', '中村 彩', 2310, 0, 3100, 12, 120),
+    mileageMember('friend-5', '石田 未来', 860, 0, 1200, 6, 64),
+    mileageMember('friend-6', '松本 圭', 120, 0, 200, 2, 21),
+  ],
+  pagination: { total: 1284, limit: 20, offset: 0 },
+}
+
+/*
+  たまる決めごと。設計 `N46cQ` の「すべて 9／動いている 7／止めている 2」。
+  **止めているものを2本入れる。** 全部動いていると、その札が撮れない。
+*/
+/**
+ * たまる決めごと1本。**`conditions` を空にしない。**
+ * 画面（`earning-rule-view.ts`）は `rule.conditions.uniquePerReferredFriendPerSubject` を
+ * 直に読むので、`conditions` ごと無いと `Cannot read properties of undefined` で
+ * 一覧が丸ごと落ちる。
+ */
+const mileageRule = (id, name, eventType, amount, conditions, isActive = true) => ({
+  id, name, eventType, source: null, amount,
+  initialStatus: 'available', conditions, isActive,
+  validFrom: null, validUntil: null,
+  createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
+})
+
+export const MILEAGE_RULES = [
+  mileageRule('mr-1', 'LINEでメッセージを送ってくれた', 'message_received', 50, { dailyCapActions: 1 }),
+  mileageRule('mr-2', 'Instagramから戻ってきた', 'inflow_return', 100, { uniquePerSubjectPerDay: true }),
+  mileageRule('mr-3', 'ストーリーズのリンクからLINEに来た人', 'inflow_story', 120, { uniquePerSubject: true }),
+  mileageRule('mr-4', '予約してくれた', 'booking_created', 300, {}),
+  mileageRule('mr-5', '回答フォームに答えてくれた', 'form_submitted', 80, { uniquePerSubject: true }),
+  mileageRule('mr-6', 'ウェビナーを見てくれた', 'webinar_watched', 200, {}),
+  mileageRule('mr-7', '口コミを書いてくれた', 'review_posted', 200, { uniquePerSubject: true }),
+  /* 設計の「止めている 2」。全部動いていると、その札が撮れない。 */
+  mileageRule('mr-8', '誕生日クーポンを受け取った', 'birthday', 500, {}, false),
+  mileageRule('mr-9', '旧キャンペーン（終了）', 'campaign_2025', 1000, {}, false),
+]
+
+/*
+  成果地点。設計 `ZrpKn` の「すべて 12／動いている 10／止めている 2／
+  どこからも使われていない 2」の内訳が撮れる6件。
+*/
+export const CONVERSION_POINTS = [
+  { id: 'cp-1', name: 'ECの注文が確定したとき', eventType: 'ec_order_confirmed', value: 12800, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-2', name: 'ECの定期が確定したとき', eventType: 'ec_subscription_confirmed', value: 24000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-3', name: 'サイトの /download を見たとき', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'cp-4', name: '体験の申し込み', eventType: 'form_submitted', value: 3000, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
+  { /* どこからも使われていない1件。 */ id: 'cp-5', name: '資料請求', eventType: 'form_submitted', value: 1500, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
+  { /* 止めている1件。 */ id: 'cp-6', name: '春の来店（終了）', eventType: 'manual', value: 800, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: null, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+]
+
+/*
+  紹介者ごとの集計。設計 `jwrbf`（成果内訳）が読む。
+
+  **紹介者の一覧に居る人は、ここにも全員入れる。** 片方に居て片方に居ないと、
+  内訳の面が `Cannot read properties of undefined (reading 'toLocaleString')` で
+  落ちる（実装が行の有無を確かめずに数を整形しているため。別途 Issue に出した）。
+*/
+export const AFFILIATE_REPORT = [
+  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 24, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
+  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 16, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
+  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 9, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
+  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 5, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
+  { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', commissionRate: 5, totalClicks: 90, totalConversions: 1, totalRevenue: 60000, confirmedReward: 3000, linkCount: 1, friendAdds: 4 },
+  { /* 成果0の人。0と未取得を混ぜないため、0はきちんと0で返す。 */ affiliateId: 'af-6', affiliateName: '旧パートナーA', code: 'old-a', commissionRate: 10, totalClicks: 0, totalConversions: 0, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 0 },
+]
+
+/*
+  紹介者ひとりぶんの内訳。設計 `jwrbf` が読む（`/api/affiliates/:id/report`）。
+
+  **器そのものが要る。** 既定の配列が返っていたので、内訳の面は
+  `report.clicks.toLocaleString()` で落ちていた。
+  `duplicateFlags` に1件入れてあるのは、設計の「重複の疑い 1」を撮るため。
+*/
+export const AFFILIATE_REPORT_DETAIL = {
+  affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10,
+  clicks: 820, linkClicks: 760, friendAdds: 58,
+  conversions: 24, conversionsApproved: 18, conversionsPending: 4, conversionsRejected: 2,
+  conversionsByPoint: [
+    { conversionPointId: 'cp-1', name: 'ECの注文が確定したとき', count: 14, value: 512000 },
+    { conversionPointId: 'cp-4', name: '体験の申し込み', count: 8, value: 24000 },
+    { conversionPointId: 'cp-5', name: '資料請求', count: 2, value: 3000 },
+  ],
+  byOffer: [
+    { offerId: 'ao-1', offerName: '体験の申し込み', rewardAmount: 3000, conversionsApproved: 12, conversionsPending: 2, confirmedReward: 36000 },
+    { offerId: 'ao-2', offerName: '定期便のお申し込み', rewardAmount: 5000, conversionsApproved: 5, conversionsPending: 1, confirmedReward: 25000 },
+    { offerId: 'ao-4', offerName: '資料請求', rewardAmount: 1500, conversionsApproved: 1, conversionsPending: 1, confirmedReward: 1500 },
+  ],
+  revenue: 860000, estimatedCommission: 86000, confirmedReward: 86000,
+  duplicateFlags: [{ friendId: 'friend-4', identityKey: 'ik-friend-4' }],
+}
+
+/** 紹介者が配っているリンク。設計 `jwrbf` の下半分。 */
+export const AFFILIATE_LINKS = [
+  { id: 'al-1', ref_code: 'tanaka01', label: '体験の申し込み用', click_count: 620, friend_adds: 42, conversions: 18, is_active: true, offer_id: 'ao-1', offer_name: '体験の申し込み' },
+  { id: 'al-2', ref_code: 'tanaka01-ig', label: 'Instagram用', click_count: 160, friend_adds: 12, conversions: 5, is_active: true, offer_id: 'ao-2', offer_name: '定期便のお申し込み' },
+  { /* 止めているリンク。全部有効だと、止めた行の見え方が撮れない。 */ id: 'al-3', ref_code: 'tanaka01-mail', label: 'メール署名用', click_count: 40, friend_adds: 4, conversions: 1, is_active: false, offer_id: null, offer_name: null },
+]
+
+/*
+  共通アクション。設計 `xOpDs` の「共通アクション 14」のうち、札の内訳が撮れる5本。
+
+  **版と呼び出し元を混ぜる。** 設計の札は 公開中11／下書き3／**古い版あり2**／
+  **呼ばれていない1**。全部が公開中・呼ばれている状態だと、その4つが撮れない。
+  版が見えないと「直してよいか」が判断できない、というのが設計の言いたいこと。
+*/
+export const COMMON_ACTIONS = [
+  { id: 'ca-1', name: '来店後のご案内', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 3, bindingCount: 5, oldVersionBindingCount: 0, updatedAt: '2026-08-25T01:00:00.000Z' },
+  { id: 'ca-2', name: '定期便のご案内', description: 'メッセージ ほか2つ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
+  { id: 'ca-3', name: '予約のリマインド', description: 'リマインダ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
+  { /* 設計の「呼ばれていない 1」。 */ id: 'ca-4', name: '休業のお知らせ', description: 'メッセージ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T09:00:00.000Z' },
+  { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: '口コミのお願い（下書き）', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
+]
+
+/*
+  予約メニュー。設計 `QSLEH` の「メニュー 8／止めているもの 2つ」。
+  料金は設計の ¥8,400／¥12,600／¥4,200／¥1,200／¥2,800。
+  **`is_active` は 0/1 の数**（この口は DB の行をそのまま返す）。
+*/
+export const BOOKING_MENUS = [
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 90, buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
+  { id: 'bm-2', name: 'トリミング（大型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
+  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 45, buffer_after_minutes: 10, base_price: 4200, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12 },
+  { id: 'bm-4', name: '爪切りだけ', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
+  { id: 'bm-5', name: '歯みがき', category_label: 'お手入れ', description: null, duration_minutes: 30, buffer_after_minutes: 5, base_price: 2800, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6 },
+  { /* 設計の「止めているもの 2つ」。 */ id: 'bm-6', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null },
+]
+
+/** 予約スタッフ。設計 `tksPc` の押し口「佐々木」を含む。 */
+export const BOOKING_STAFF = [
+  { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: '小型犬が得意です。', sort_order: 1, is_designation_optional: 0, is_active: 1 },
+  { id: 'bs-2', name: '中川 由美', display_name: '中川', role: '受付', profile_image_url: null, bio: null, sort_order: 2, is_designation_optional: 1, is_active: 1 },
+  { id: 'bs-3', name: '高田 誠', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 3, is_designation_optional: 0, is_active: 1 },
+]
+
+/*
+  メニューに就ける担当。設計 `GFDqW`（代理予約・内容確認）が読む。
+
+  **`/api/booking/admin/menus/:id/staff` は道の途中にIDが入る。**
+  `RAW` に載せられないので `RAW_PATTERNS` で返す。器は `{staff}` で、
+  包むと `res.staff` が `undefined` になり、選ぶ口が0件のまま撮れない。
+*/
+export const BOOKING_MENU_STAFF = [
+  { id: 'bs-1', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: '小型犬が得意です。', is_designation_optional: 0, price: 8400, duration_minutes: 90 },
+  { id: 'bs-3', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, is_designation_optional: 0, price: 8400, duration_minutes: 90 },
+]
+
+/*
+  空いている時間。設計 `GFDqW`（代理予約・内容確認）が読む。
+
+  **時刻は動かさない。** 撮るたびに枠が変わると画像が毎回違うものになる。
+  `10:00〜11:45` は「トリミング（小型犬）」の90分＋間隔15分ぶん。
+  台帳の手順がこの表記で選ぶので、幅を変えるときは両方を直す。
+*/
+export const BOOKING_AVAILABILITY = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        { date: '2026-09-03', start: '10:00', end: '11:45' },
+        { date: '2026-09-03', start: '13:00', end: '14:45' },
+        /* 台帳の `Lg8ff`（予約枠の重なりと入力エラー）が選ぶ枠。 */
+        { date: '2026-09-03', start: '14:00', end: '15:45' },
+        { date: '2026-09-04', start: '10:00', end: '11:45' },
+      ],
+    },
+    {
+      staff_id: 'bs-3', display_name: '高田',
+      slots: [{ date: '2026-09-03', start: '15:00', end: '16:45' }],
+    },
+  ],
+}
+
+/*
+  予約。設計 `TV2DI`（予約管理）の台帳そのまま。
+
+  **LINEからと電話からを混ぜる。** 設計は「LINEから 9・電話 3」を色で分けて
+  同じところに並べる。片方だけだと、その読み分けが撮れない。
+  **LINEの友だちと結びついていない行**も1つ入れる（設計の
+  「LINEの友だちと結びついていません。当日の連絡ができません」を出すため）。
+*/
+const booking = (id, friendId, name, start, end, menu, staff, price, status = 'confirmed') => ({
+  id, friend_id: friendId, starts_at: start, ends_at: end, status,
+  customer_note: null, internal_note: null, price_at_booking: price,
+  menu_name: menu, staff_name: staff, friend_name: name,
+  requested_at: '2026-09-02T02:00:00.000Z', decided_at: '2026-09-02T02:05:00.000Z',
+  external_event_id: null,
+})
+
+export const BOOKING_REQUESTS = [
+  booking('bk-1', 'friend-1', '高橋 直人', '2026-09-03T00:00:00.000Z', '2026-09-03T01:45:00.000Z', 'トリミング（小型犬）', '佐々木', 8400),
+  booking('bk-2', 'friend-2', '前田 さくら', '2026-09-03T02:00:00.000Z', '2026-09-03T03:45:00.000Z', 'トリミング（大型犬）', '佐々木', 12600),
+  booking('bk-3', 'friend-3', '木村 亮', '2026-09-03T04:00:00.000Z', '2026-09-03T04:45:00.000Z', 'シャンプーのみ', '高田', 4200),
+  booking('bk-4', 'friend-4', '中村 彩', '2026-09-03T05:00:00.000Z', '2026-09-03T05:15:00.000Z', '爪切りだけ', '中川', 1200),
+  /* 電話で受けた予約。**LINEの友だちと結びついていない。** */
+  { ...booking('bk-5', '', null, '2026-09-03T06:00:00.000Z', '2026-09-03T07:45:00.000Z', 'トリミング（小型犬）', '佐々木', 8400), friend_name: null },
+  /* まだ決めていない1件。設計の「承認待ち」。 */
+  booking('bk-6', 'friend-5', '石田 未来', '2026-09-04T01:00:00.000Z', '2026-09-04T02:45:00.000Z', 'トリミング（小型犬）', '高田', 8400, 'requested'),
+]
+
+/*
+  お知らせの種類。設計 `festr`（24-1 LINE通知）の「お知らせの種類 9つ」。
+
+  **止めているものを2つ入れる。** 設計の札は 出している7／止めている2／
+  文面が未設定1。全部が出ている状態だと、その3つが撮れない。
+  台帳の `Q55bb`（お知らせの中身を編集する）は「発送した」を押すので、
+  その名前の行が要る。
+*/
+const ecNotification = (eventType, label, category, order, isEnabled = true, title = null) => ({
+  eventType, label, isEnabled,
+  title: title ?? label,
+  introText: 'いつもご利用ありがとうございます。',
+  outroText: 'ご不明な点はこのままご返信ください。',
+  category, buttonLabel: '注文を見る', buttonUrl: 'https://example.com/orders',
+  imageUrl: '', displayOrder: order,
+  fixedFields: ['注文番号', '金額'],
+  fixedPreview: 'ご注文 NEN-1001 / ¥12,800',
+  updatedAt: '2026-08-25T00:00:00.000Z',
+})
+
+export const EC_NOTIFICATION_SETTINGS = [
+  ecNotification('ec_order.confirmed', '注文が確定した', 'order', 1),
+  ecNotification('ec_payment.received', '入金を確認した', 'payment', 2),
+  ecNotification('ec_shipping.shipped', '発送した', 'shipping', 3),
+  ecNotification('ec_shipping.delivered', 'お届けした', 'shipping', 4),
+  ecNotification('ec_subscription.renewed', '定期便が続いた', 'subscription', 5),
+  ecNotification('ec_subscription.paused', '定期便を止めた', 'subscription', 6),
+  ecNotification('ec_support.cancelled', 'キャンセルした', 'support', 7),
+  /* 設計の「止めている 2」。 */
+  ecNotification('ec_support.refunded', '返金した', 'support', 8, false),
+  /* 設計の「文面が未設定 1」。**空文字は「まだ決めていない」で、0件ではない。** */
+  { ...ecNotification('ec_order.backordered', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
+]
+
+/*
+  イベント。設計 `ugP5y`（29-1 イベント予約）の
+  「これからの回 6／受付前 2／終わった回 24」の内訳が撮れる4件。
+*/
+const adminEvent = (id, name, nextSlot, capacity, active, pending, published = 1) => ({
+  id, name, venue_name: '店内スペース（2階）', venue_url: null, image_url: null,
+  description: 'はじめての方むけに、おうちでできるコツをお伝えします。',
+  description_centered: 0, max_bookings_per_friend: 1, requires_approval: 1,
+  cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: 3,
+  is_published: published, sort_order: 1,
+  created_at: '2026-09-01T01:00:00.000Z', updated_at: '2026-09-02T01:00:00.000Z',
+  next_slot_starts_at: nextSlot,
+  total_capacity: capacity, total_active: active, pending_count: pending,
+  visible_tag_id: null, visible_tag_name: null,
+})
+
+/*
+  イベント。設計 `ugP5y` の「これからの回 6／受付前 2／終わった回 24」の内訳が撮れる4件。
+
+  **`total_active` と `pending_count` は必ず数で入れる。** 画面は
+  `items.reduce((sum, e) => sum + e.total_active, 0)` で足すので、
+  入っていないと帯が `NaN人` `NaN件` になる（一度そうなった）。
+*/
+export const ADMIN_EVENTS = [
+  adminEvent('ev-1', '秋のしつけ教室（第1回）', '2026-09-25T05:00:00.000Z', 12, 9, 2),
+  adminEvent('ev-2', 'ごはん相談会', '2026-09-28T02:00:00.000Z', 8, 8, 1),
+  /* 設計の「申し込みが少ない 1」。 */
+  adminEvent('ev-3', '爪切り体験', '2026-10-02T06:00:00.000Z', 10, 1, 0),
+  /* 設計の「受付前 2」。公開していないので、埋まり具合の分母にも入らない。 */
+  adminEvent('ev-4', '冬のしつけ教室', '2026-12-05T05:00:00.000Z', 12, 0, 0, 0),
+]
+
+/*
+  イベントの申込者。設計 `i5SN2j` の「申し込み12／キャンセル待ち3／取り消した2」。
+  **同伴のペット**も入れる（設計は「ももちゃん（犬・4歳）」のように出す）。
+*/
+export const EVENT_BOOKINGS = [
+  { id: 'eb-1', event_id: 'ev-1', friend_id: 'friend-1', friend_name: '高橋 直人', status: 'confirmed', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, created_at: '2026-09-01T02:00:00.000Z' },
+  { id: 'eb-2', event_id: 'ev-1', friend_id: 'friend-2', friend_name: '前田 さくら', status: 'confirmed', companion_count: 1, companion_note: 'そらくん（猫・2歳）', is_first_time: 0, created_at: '2026-09-01T03:00:00.000Z' },
+  { id: 'eb-3', event_id: 'ev-1', friend_id: 'friend-3', friend_name: '木村 亮', status: 'confirmed', companion_count: 1, companion_note: 'こむぎちゃん（犬・7歳）', is_first_time: 1, created_at: '2026-09-01T04:00:00.000Z' },
+  { /* キャンセル待ち。全部が確定だと、その札が撮れない。 */ id: 'eb-4', event_id: 'ev-1', friend_id: 'friend-4', friend_name: '中村 彩', status: 'waitlist', companion_count: 1, companion_note: 'ぷりんちゃん（うさぎ・3歳）', is_first_time: 1, created_at: '2026-09-02T01:00:00.000Z' },
+  { /* 取り消した1件。 */ id: 'eb-5', event_id: 'ev-1', friend_id: 'friend-5', friend_name: '石田 未来', status: 'cancelled', companion_count: 1, companion_note: 'レオくん（犬・1歳）', is_first_time: 0, created_at: '2026-09-01T05:00:00.000Z' },
+]
+
+/*
+  写真審査。設計 `Qu6Vk` の格子。
+
+  **状態を4つとも混ぜる。** 設計の札は 審査待ち／通したもの／戻したもの／すべて。
+  全部が審査待ちだと、残り3つの札が撮れない。
+  戻したものには**理由**を入れる（`N2J629`「写真を戻す理由をえらぶ」の元）。
+  `image_url` は作り物の SVG。外の絵を読みに行かないので、撮るたびに同じになる。
+*/
+const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = null) => ({
+  id, owner_name: owner, pet_name: pet, caption,
+  image_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="%23eef6f0"/></svg>',
+  status,
+  created_at: new Date(Date.parse('2026-08-25T09:00:00.000Z') - hours * 3600 * 1000).toISOString(),
+  publication_consent_at: '2026-08-20T00:00:00.000Z',
+  publication_withdrawn_at: null,
+  review_reason_code: reason, review_reason_note: note,
+  review_notification_status: status === 'rejected' ? 'sent' : null,
+})
+
+/*
+  **名前に「ちゃん」を入れない。** 画面が `{pet_name}ちゃん` と後ろに付けるので、
+  ここにも入れると「ももちゃんちゃん」になる。
+  なお設計 `Qu6Vk` は「そらくん」「レオくん」と**子によって呼び方を変えている**が、
+  実装は全員に「ちゃん」を付ける。呼び方は画面ではなく飼い主が決めるものなので、
+  そこは別に直す（板 #739 の判定に書いた）。
+*/
+export const NEN_PHOTOS = [
+  petPhoto('ph-1', '高橋 直人', 'もも', '朝のおさんぽ', 'pending', 48),
+  petPhoto('ph-2', '前田 さくら', 'そら', 'はじめてのトリミング', 'pending', 44),
+  petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
+  petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'approved', 14),
+  petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'approved', 8),
+  /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。** */
+  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'other_person', '人の顔が写っています'),
+]
+
+/*
+  ECの取り込み記録。設計 `eI3gs` の一覧。
+
+  **成功だけにしない。** 設計の札は 送信完了／処理中／送信なし／失敗。
+  `identity_pending`（LINEの友だちが見つからない）と `failed` を混ぜないと、
+  「LINEとのつき合わせが必要」の行と失敗の行が撮れない。
+*/
+const ecEvent = (id, type, label, order, friendId, friendName, status, minutes, error = null) => ({
+  id, externalEventId: `ext-${id}`, eventType: type, eventLabel: label,
+  customerId: `cus-${id}`, friendId, friendName, orderNumber: order, status,
+  errorMessage: error,
+  receivedAt: new Date(Date.parse('2026-08-25T09:00:00.000Z') - minutes * 60 * 1000).toISOString(),
+  processedAt: status === 'processed'
+    ? new Date(Date.parse('2026-08-25T09:00:00.000Z') - (minutes - 1) * 60 * 1000).toISOString()
+    : null,
+})
+
+export const EC_EVENTS = [
+  ecEvent('ece-1', 'ec_order.confirmed', '注文が確定した', 'NEN-12492', 'friend-1', '高橋 直人', 'processed', 12),
+  ecEvent('ece-2', 'ec_payment.received', '入金を確認した', 'NEN-12488', 'friend-2', '前田 さくら', 'processed', 40),
+  ecEvent('ece-3', 'ec_shipping.shipped', '発送した', 'NEN-12471', 'friend-3', '木村 亮', 'processed', 90),
+  /* LINEの友だちが見つからない。**取り込めたが送れていない**、を分けて出すため。 */
+  ecEvent('ece-4', 'ec_order.confirmed', '注文が確定した', 'NEN-12486', null, null, 'identity_pending', 20),
+  ecEvent('ece-5', 'ec_subscription.renewed', '定期便が続いた', 'NEN-12480', 'friend-4', '中村 彩', 'processing', 5),
+  /* 失敗。理由を空にしない。 */
+  ecEvent('ece-6', 'ec_support.refunded', '返金した', 'NEN-12402', 'friend-5', '石田 未来', 'failed', 180, 'LINEへの送信が拒否されました（ブロック済み）'),
+]
+
+/** 取り込みの帯。設計 `eI3gs` の「注文96・入金32・発送20」。 */
+export const EC_OVERVIEW = {
+  total: 2486, processed: 2412, identityPending: 24, failed: 2, skipped: 48,
+  last24h: 148, lastReceivedAt: '2026-08-25T08:48:00.000Z',
+  byType: [
+    { eventType: 'ec_order.confirmed', label: '注文', count: 96 },
+    { eventType: 'ec_payment.received', label: '入金', count: 32 },
+    { eventType: 'ec_shipping.shipped', label: '発送', count: 20 },
+  ],
+}
+
+/**
+ * `/api/mileage/rewards` — マイルの使い道（`qlVLJ` 17-1-B）。
+ *
+ * 設計の数字をそのまま置いている。**`neverRedeemedFriendCount` は null。**
+ * 本物の口（`packages/db/src/mileage-rewards.ts`）がいま固定で null を返すので、
+ * ここで 786 を入れると、**撮った絵だけが本物より良く見える**。
+ * 設計の 786人 と実装の `—` の差は、絵ではなく台帳の判定で言う。
+ */
+function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
+  return {
+    id: `mrv-${requiredMiles}`, versionNumber: 1, status: 'published',
+    requiredMiles, stockLimit, perFriendLimit: null,
+    startsAt: null, endsAt: null, benefitExpiresDays: 30,
+    commonActionVersionId: null, failurePolicy: 'refund',
+    customerMessage: '交換ありがとうございます。', publishedAt: '2026-08-01T00:00:00.000Z',
+    ...extra,
+  }
+}
+
+export const MILEAGE_REWARDS = {
+  rewards: [
+    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
+    { id: 'mr-2', name: '誕生月クーポン', description: '誕生月に使える 10%オフ', rewardKind: 'coupon', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1200, 200), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', name: '先行案内', description: '新商品を先にお知らせします', rewardKind: 'early_access', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(2000, null), exchangedThisMonth: 6, availableCodeCount: null },
+    { id: 'mr-4', name: 'ゴールドのタグ', description: 'タグ「ゴールド」が付きます', rewardKind: 'tag', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(5000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
+    { id: 'mr-5', name: 'お試しセット', description: null, rewardKind: 'coupon', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(800, 50), exchangedThisMonth: 0, availableCodeCount: null },
+  ].map((reward) => ({
+    lineAccountId: 'acc-1', programId: 'mp-1', imageUrl: null,
+    currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,
+    createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-30T00:00:00.000Z',
+    ...reward,
+  })),
+  summary: {
+    publishedCount: 4,
+    redeemedMilesThisMonth: 18900,
+    neverRedeemedFriendCount: null,
+    mostRedeemedRewardName: '送料無料',
+    mostRedeemedRewardCount: 32,
+  },
+}
+
+/*
+  行動スコアの決めごと（`s6MBc` 17-2-A `/mileage/score-rules`）。
+
+  **帯の境目は 30 / 70。** `packages/db` の `DEFAULT_BANDS` と同じ値にしてある。
+  同じファイルの `/api/action-scores/friends` は長く `normalMin: 40` を返していて、
+  一覧と決めごとの画面で**同じ人が別の帯に入って見えた**。40 に根拠は無かったので
+  30 にそろえた。
+
+  **止めているルールを1本入れる。** 全部動かしていると、スイッチが切れている行と
+  「止める」の文字が撮れない。
+*/
+function scoreRule(id, name, eventType, source, operation, value, kind, limit, enabled = true) {
+  return {
+    id, name, eventType, source, operation, value,
+    frequency: { kind, limit }, sameSourceEventOnce: true,
+    validFrom: null, validUntil: null, enabled,
+  }
+}
+
+const ACTION_SCORE_BUNDLE = {
+  rules: [
+    scoreRule('asr-1', 'メッセージに返信した', 'message_received', 'line_webhook', 'delta', 4, 'per_day', 1),
+    scoreRule('asr-2', '配信のURLを押した', 'link_clicked', 'tracked_link', 'delta', 2, 'per_subject_per_day', 1),
+    scoreRule('asr-3', '回答フォームに答えた', 'form_submitted', 'form', 'delta', 6, 'per_subject', 1),
+    scoreRule('asr-4', '予約した', 'booking_created', null, 'delta', 10, 'unlimited', 1),
+    scoreRule('asr-5', '購入した', 'purchase_completed', 'stripe', 'delta', 12, 'unlimited', 1),
+    scoreRule('asr-6', '30日間反応がない', 'inactivity_30d', 'scheduler', 'delta', -6, 'once_per_period', 1),
+    scoreRule('asr-7', 'ブロックした', 'friend_unfollow', 'line_webhook', 'set', 0, 'unlimited', 1, false),
+  ],
+  bands: { min: 0, max: 100, normalMin: 30, highMin: 70 },
+}
+
+export const ACTION_SCORE_RULES = {
+  configured: true,
+  status: 'published',
+  currentDraftVersionId: 'asrv-3',
+  currentPublishedVersionId: 'asrv-2',
+  editableVersion: {
+    ...ACTION_SCORE_BUNDLE,
+    id: 'asrv-3', versionNumber: 3, status: 'draft',
+    createdAt: '2026-08-30T10:00:00.000Z', publishedAt: null,
+  },
+  publishedVersion: {
+    ...ACTION_SCORE_BUNDLE,
+    id: 'asrv-2', versionNumber: 2, status: 'published',
+    createdAt: '2026-08-20T10:00:00.000Z', publishedAt: '2026-08-21T02:00:00.000Z',
+  },
+}
 
 /**
  * 共通情報を**変える前**の確認（`uNBlA` 14-1-B。口は #773）。

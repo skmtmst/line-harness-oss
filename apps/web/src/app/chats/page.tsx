@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1410,13 +1411,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   {item.key === 'all' && item.label}
                 </button>
               ))}
-              <select
-                aria-label="並び順"
-                defaultValue="newest"
-                className="ml-auto shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-1.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#2563EB] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15"
-              >
-                <option value="newest">新しい順</option>
-              </select>
+              <SelectField aria-label="並び順" defaultValue="newest" options={[{ value: "newest", label: "新しい順" }]} className="ml-auto shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-1.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#2563EB] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15" />
               {/*
                 設計 `f0zn6` の「自分の未読」。担当ではなく**自分が読んだか**で
                 絞る。対応状況の絞り込み（下の帯）とは別の物差しなので、
@@ -1428,7 +1423,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 onClick={() => setMineUnreadOnly((current) => !current)}
                 aria-pressed={mineUnreadOnly}
                 className={`inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-1 text-[11px] font-semibold whitespace-nowrap ${
-                  mineUnreadOnly ? 'bg-status-danger-soft text-v6-danger-text' : 'text-ink-secondary hover:bg-canvas-sunken'
+                  mineUnreadOnly ? 'bg-status-danger-soft text-danger' : 'text-ink-secondary hover:bg-canvas-sunken'
                 }`}
               >
                 <span className="bg-status-danger text-on-accent text-nano inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-bold">
@@ -1633,7 +1628,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               設計 `f0zn6` は、自分あての未読だけ行の地を薄い赤に
                               する。丸い点だけだと、行を目で追うときに見落とす。
                             */
-                            ? 'bg-status-danger-soft hover:bg-v6-danger-selected'
+                            ? 'bg-status-danger-soft hover:bg-status-danger-selected'
                             : 'hover:bg-[#F7F8F6]'
                       }`}
                     >
@@ -1804,7 +1799,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
                   </button>
                   {/*
-                    素の `<select>` から専用のプルダウンへ替えた。
+                    素の select 要素から専用のプルダウンへ替えた。
                     **開いた中身がブラウザ任せだと画像に写らない。** 設計の
                     2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
                     ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
@@ -1840,7 +1835,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     data-inbox-v6="customer-info-toggle"
                     onClick={() => setShowFriendInfo((current) => !current)}
                     aria-expanded={showFriendInfo}
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-v6-control border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                   >
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
@@ -1934,7 +1929,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             chatDetail.friendPictureUrl ? (
                               <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
                             ) : (
-                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-v6-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
                                 {chatDetail.friendName.charAt(0)}
                               </div>
                             )
@@ -2036,7 +2031,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       data-inbox-v6="internal-memo-toggle"
                       onClick={() => setShowMemoEditor((current) => !current)}
                       aria-expanded={showMemoEditor}
-                      className={`inline-flex items-center gap-1.5 rounded-v6-control border px-3 py-2 text-xs font-semibold ${
+                      className={`inline-flex items-center gap-1.5 rounded-control border px-3 py-2 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
                           : 'border-[#E5E7EB] bg-canvas text-[#344054] hover:bg-[#F7F8F6]'
@@ -2094,7 +2089,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       setMemoError('')
                       setShowMemoEditor(false)
                     }}
-                    className="border-hairline rounded-v6-dialog shadow-float absolute bottom-full left-4 z-30 mb-2 w-[calc(100%-2rem)] max-w-[760px] border bg-canvas p-5"
+                    className="border-hairline rounded-panel shadow-float absolute bottom-full left-4 z-30 mb-2 w-[calc(100%-2rem)] max-w-[760px] border bg-canvas p-5"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <h2 id="chat-internal-memo-title" className="text-ink flex items-center gap-2 text-sm font-bold">
@@ -2116,7 +2111,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       rows={4}
                       autoFocus
                       placeholder="例：次回返信時に配送先住所を確認する"
-                      className="border-hairline focus:border-accent focus:ring-accent/15 rounded-v6-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
+                      className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
                     />
                     {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
                     <div className="mt-3 flex items-center justify-between gap-3">

@@ -27,7 +27,10 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain('folderId: nextFolder')
     expect(page).toContain('folderId: folderId || null')
     expect(page).toContain("setFolderId(res.data.folderId ?? '')")
-    expect(page).toContain('<option value="">未分類</option>')
+    expect(page).toContain("import SelectField from '@/components/shared/select-field'")
+    expect(page).toContain("{ value: '', label: '未分類' }")
+    expect(page).toContain("...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : [])")
+    expect(page).toContain("...folders.map((folder) => ({ value: folder.id, label: folder.name }))")
     expect(page).toContain('className="v6-select ')
   })
 

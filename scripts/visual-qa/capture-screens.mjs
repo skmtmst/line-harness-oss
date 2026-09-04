@@ -306,24 +306,38 @@ async function applyState(page, screen, kind) {
       try {
         const original = await response.json()
         const data = original?.data
-        if (Array.isArray(data)) shape = []
-        else if (data && typeof data === 'object') {
-          shape = {}
-          for (const [key, value] of Object.entries(data)) {
-            /*
-              **1ページの件数や現在ページを0にしない。**
-              `limit` を0にすると呼ぶ側が `total / limit` で 0 割りをして、
-              ページ送りに `NaN` が並ぶ。空なのは中身であって、器ではない。
-            */
-            const keepsShape = key === 'limit' || key === 'page' || key === 'pageSize' || key === 'perPage'
-            shape[key] = Array.isArray(value) ? [] : (typeof value === 'number' && !keepsShape) ? 0 : value
-          }
-        }
+        shape = emptyLike(data) ?? shape
       } catch { /* 返事が JSON でないときは既定の器 */ }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: shape }) })
     })
   }
   return hits
+}
+
+/**
+ * 空の返事を、**器の形を保ったまま**作る。
+ *
+ * **入れ子の中まで空にする。** 帯の数が `summary` のような入れ子に入って
+ * いる画面では、表を空にしても帯だけ元の数が残り、**「4つ出しています」と
+ * 言いながら一覧が空**という、実際には起きない絵が撮れていた。
+ * 撮った絵で判定する以上、絵が矛盾していると判定も間違える。
+ *
+ * **1ページの件数や現在ページは0にしない。** `limit` を0にすると呼ぶ側が
+ * `total / limit` で 0 割りをして、ページ送りに `NaN` が並ぶ。
+ * 空なのは中身であって、器ではない。
+ */
+function emptyLike(value) {
+  if (Array.isArray(value)) return []
+  if (!value || typeof value !== 'object') return null
+  const out = {}
+  for (const [key, child] of Object.entries(value)) {
+    const keepsShape = key === 'limit' || key === 'page' || key === 'pageSize' || key === 'perPage'
+    if (Array.isArray(child)) out[key] = []
+    else if (child && typeof child === 'object') out[key] = emptyLike(child)
+    else if (typeof child === 'number' && !keepsShape) out[key] = 0
+    else out[key] = child
+  }
+  return out
 }
 
 /**

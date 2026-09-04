@@ -27,6 +27,8 @@ function account(
     channel_access_token: 'token', channel_secret: 'secret', login_channel_id: '1',
     login_channel_secret: 'secret', liff_id: '1-X', is_active: 1, is_default: 0,
     archived_at: null, archived_by: null, archived_reason: null, country: null,
+    channel_access_token_updated_at: null, channel_secret_updated_at: null,
+    login_channel_secret_updated_at: null,
     role: null, display_order: 0, token_expires_at: null, og_site_name: null,
     og_default_image_url: null, og_default_description: null, friend_capacity: null,
     capacity_warn_at: null, icon_url: null,
@@ -69,6 +71,22 @@ describe('filterVisibleLineAccounts', () => {
   it('tenantIdがNULLのスタッフは既定統括として扱う', () => {
     expect(filterVisibleLineAccounts(accounts, staff(null)).map((item) => item.id))
       .toEqual(['parent', 'child', 'grandchild']);
+  });
+
+  it('匿名利用者には既定統括のアカウントを返さない', async () => {
+    expect(filterVisibleLineAccounts(accounts, undefined)).toEqual([]);
+    expect(canAccessLineAccount(accounts, undefined, 'parent')).toBe(false);
+    await expect(getVisibleLineAccountScope({} as D1Database, undefined)).resolves.toEqual({
+      accounts: [],
+      allowedAccountIds: [],
+      canSeeUnassigned: false,
+      ids: [],
+    });
+  });
+
+  it('同一統括だけを許可し、別統括を許可しない', () => {
+    expect(canAccessLineAccount(accounts, staff(), 'parent')).toBe(true);
+    expect(canAccessLineAccount(accounts, staff('tenant-B'), 'parent')).toBe(false);
   });
 
   it('tenant_idがNULLのアカウントは既定統括から見える', () => {

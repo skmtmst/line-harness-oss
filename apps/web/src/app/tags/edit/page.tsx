@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -243,19 +244,12 @@ function EditTagInner() {
                 htmlFor="tag-group"
                 note="どの分類に入れるかを選びます。未選択なら「未分類」になります。"
               >
-                <select
+                <SelectField
                   id="tag-group"
                   value={groupId}
                   onChange={(e) => setGroupId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">未分類</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: '', label: '未分類' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]}
+                />
               </Field>
             </section>
 
@@ -275,36 +269,30 @@ function EditTagInner() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="倍率" htmlFor="tag-multiplier">
-                  <select
+                  <SelectField
                     id="tag-multiplier"
                     value={multiplier}
                     onChange={(e) => setMultiplier(e.target.value)}
+                    options={MULTIPLIERS.map((m) => ({ value: m.value, label: m.label }))}
                     className={inputClass}
-                  >
-                    {MULTIPLIERS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </Field>
                 <Field
                   label="優先度"
                   htmlFor="tag-priority"
                   note="複数のタグを持つ場合、いちばん高いもの1枚だけが効きます。"
                 >
-                  <select
+                  <SelectField
                     id="tag-priority"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
+                    aria-label="タグの優先度"
                     className={inputClass}
-                  >
-                    {[0, 1, 2, 3, 4, 5].map((p) => (
-                      <option key={p} value={String(p)}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+                    options={[0, 1, 2, 3, 4, 5].map((priorityValue) => ({
+                      value: String(priorityValue),
+                      label: String(priorityValue),
+                    }))}
+                  />
                 </Field>
               </div>
 

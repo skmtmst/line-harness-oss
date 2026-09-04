@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import StickyBar from '@/components/shared/sticky-bar'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -58,6 +60,36 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
+
+  /** 下書きから公開へ変えるときだけ、確認を挟む。 */
+  const isPublishing = status === 'active' && initial?.status !== 'active'
+
+  /**
+   * 公開してよいか。**足りないまま公開すると、友だちの画面で気づくことになる。**
+   * 動画が無ければ視聴できず、枠が無ければ「次の回」が出ない。
+   */
+  const publicationProblem = (): string => {
+    if (!videoPrefix.trim()) return '公開する前に動画を設定してください。動画が無いままでは友だちが視聴できません。'
+    if (rules.length === 0) return '公開する前に配信枠を1件以上設定してください。'
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return '動画の長さを1分以上で設定してください。'
+    return ''
+  }
+
+  /** 下書き保存はそのまま。公開は足りないものを先に言い、確認を挟む。 */
+  const requestSave = () => {
+    if (!isPublishing) {
+      void save()
+      return
+    }
+    const problem = publicationProblem()
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setError(null)
+    setPublishConfirmOpen(true)
+  }
 
   const updateRule = (i: number, patch: Partial<WebinarScheduleRule>) =>
     setRules((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)))
@@ -102,11 +134,13 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
     }
     try {
       if (initial) {
-        await webinarApi.update(initial.id, input)
-        router.push('/webinars')
+        const updated = await webinarApi.update(initial.id, input)
+        /* 公開したときは完了の面へ。**何が公開されたのかを最後に読ませる。** */
+        router.push(isPublishing ? `/webinars/published?id=${updated.data.id}` : '/webinars')
       } else {
         const created = await webinarApi.create(input)
-        router.push(`/webinars/edit?id=${created.data.id}`)
+        /* 作ってすぐ公開したときも、完了の面へ。 */
+        router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -325,10 +359,43 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </section>
       </details>
 
-      <div className="sticky bottom-3 z-10 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-        <span className="hidden text-xs text-slate-500 sm:block">変更内容を確認して本番へ反映します</span>
-        <button onClick={() => void save()} disabled={saving} className="ml-auto rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : '変更を保存'}</button>
-      </div>
+      <StickyBar
+        status="変更内容を確認して本番へ反映します"
+        actions={<button onClick={requestSave} disabled={saving} className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+      />
+
+      {/*
+        公開の確認（設計 `D6yO7e` 10-1-G）。**押した瞬間に友だちへ出さない。**
+        公開すると申込と視聴が始まるので、何が起きるかを先に読ませる。
+        下書き保存には出さない——誰にも届かないので、段を増やすと手間が増える
+        だけになる。
+      */}
+      <ConfirmDialog
+        open={publishConfirmOpen}
+        title={`「${title || '無題のウェビナー'}」を公開しますか？`}
+        description="公開すると、友だちが申込・視聴できるようになります。公開ページのURLもすぐに開けるようになります。"
+        confirmLabel="この内容で公開する"
+        busy={saving}
+        onCancel={() => {
+          if (saving) return
+          setPublishConfirmOpen(false)
+        }}
+        onConfirm={() => {
+          setPublishConfirmOpen(false)
+          void save()
+        }}
+      >
+        <dl className="text-ink-secondary space-y-1 text-xs">
+          <div className="flex gap-2">
+            <dt className="text-ink-faint shrink-0">公開ページ</dt>
+            <dd className="min-w-0">/webinar/{slug || '未設定'}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="text-ink-faint shrink-0">配信枠</dt>
+            <dd className="min-w-0">{rules.length}件</dd>
+          </div>
+        </dl>
+      </ConfirmDialog>
     </div>
   )
 }

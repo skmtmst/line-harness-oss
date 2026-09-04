@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
@@ -286,7 +287,9 @@ export default function RichMenusListPage() {
       )
       await reload()
     } catch (e) {
-      alert(richMenuError(e, 'reorder'))
+      // **`alert()` では出さない。** 見た目がブラウザ任せで、画像比較にも
+      // 写らない。画面の帯に出して、押したあとも読み返せるようにする。
+      setError(richMenuError(e, 'reorder'))
     } finally {
       setReorderBusy(false)
     }
@@ -588,30 +591,15 @@ export default function RichMenusListPage() {
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
-          aria-label="並び順"
-          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
-        >
-          <option value="priority">出す順番（自分で決めた順）</option>
-          <option value="taps">タップ数が多い順</option>
-          <option value="updated">更新が新しい順</option>
-          <option value="name">名前順</option>
-        </select>
+        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <select
+        <SelectField
+          size="compact"
           value={pageSize}
           onChange={(e) => setPageSize(Number(e.target.value))}
           aria-label="表示件数"
-          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
-        >
-          {[20, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n}件
-            </option>
-          ))}
-        </select>
+          options={[{ value: '20', label: '20件' }, { value: '50', label: '50件' }, { value: '100', label: '100件' }]}
+        />
         <button
           onClick={() => {
             // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。

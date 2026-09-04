@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
@@ -411,35 +412,23 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
-            <select
-              value={rowKind}
-              onChange={(event) => setRowKind(event.target.value as typeof rowKind)}
-              className="v6-select w-full"
-            >
-              <option value="tag">タグ</option>
-              <option value="route">流入経路</option>
-              <option value="score_band">スコア帯</option>
-              <option value="conversion_point">成果地点</option>
-              <option value="booking_status">予約状態</option>
-              <option value="purchase_status">購入状態</option>
-            </select>
+            <SelectField value={rowKind} onChange={(event) => setRowKind(event.target.value as typeof rowKind)} options={[{ value: "tag", label: "タグ" }, { value: "route", label: "流入経路" }, { value: "score_band", label: "スコア帯" }, { value: "conversion_point", label: "成果地点" }, { value: "booking_status", label: "予約状態" }, { value: "purchase_status", label: "購入状態" }]} className="v6-select w-full" />
           </div>
           <div>
             <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-xs font-medium">
               よこの軸
             </label>
-            <select
+            <SelectField
               id="cross-field"
               value={fieldId}
               onChange={(e) => setFieldId(e.target.value)}
+              aria-label="よこの軸"
               className="v6-select w-full"
-            >
-              {fields.map((f) => (
-                <option key={f.id} value={f.id}>
-                  友だち情報 / {f.name}
-                </option>
-              ))}
-            </select>
+              options={fields.map((field) => ({
+                value: field.id,
+                label: `友だち情報 / ${field.name}`,
+              }))}
+            />
           </div>
           <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
             {loading ? '集計中' : 'この30日を集計'}
@@ -848,18 +837,14 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
                 ファネル
               </label>
-              <select
+              <SelectField
                 id="funnel-select"
                 value={selected}
                 onChange={(e) => setSelected(e.target.value)}
+                aria-label="ファネル"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
-              >
-                {funnels.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+                options={funnels.map((funnel) => ({ value: funnel.id, label: funnel.name }))}
+              />
               {selectedFunnel && (
                 <p className="text-ink-faint mt-1 text-xs">
                   {selectedFunnel.windowDays}日以内に通った人を数えます。
@@ -894,9 +879,17 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
                 <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
-                <select id="funnel-group" value={groupKey} onChange={(event) => setGroupKey(event.target.value)} className="v6-select w-full">
-                  {run.groups.map((group) => <option key={group.key} value={group.key}>{group.label}（入口 {group.entrants}人）</option>)}
-                </select>
+                <SelectField
+                  id="funnel-group"
+                  value={groupKey}
+                  onChange={(event) => setGroupKey(event.target.value)}
+                  aria-label="比較する条件"
+                  className="v6-select w-full"
+                  options={run.groups.map((group) => ({
+                    value: group.key,
+                    label: `${group.label}（入口 ${group.entrants}人）`,
+                  }))}
+                />
               </div>
             )}
           </section>
@@ -1167,21 +1160,17 @@ function FunnelForm({
             </div>
             <div>
               <label className="text-ink-faint mb-1 block text-xs">何をしたら</label>
-              <select
+              <SelectField
                 value={step.kind}
                 onChange={(e) =>
                   setSteps((prev) =>
                     prev.map((s, j) => (i === j ? { ...s, kind: e.target.value } : s)),
                   )
                 }
+                aria-label={`${i + 1}段目で何をしたら進むか`}
                 className="border-hairline rounded-control border px-2 py-1.5 text-sm"
-              >
-                {KINDS.map((k) => (
-                  <option key={k.key} value={k.key}>
-                    {k.label}
-                  </option>
-                ))}
-              </select>
+                options={KINDS.map((kind) => ({ value: kind.key, label: kind.label }))}
+              />
             </div>
             <div className="min-w-[10rem] flex-1">
               <label className="text-ink-faint mb-1 block text-xs">

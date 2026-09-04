@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
@@ -240,10 +241,10 @@ export default function NewConversionPointPage() {
         {/* 設計は「毎回同じ金額」以外の決め方（率など）も見据えた作りだが、
             持っているのは1件あたりの固定額だけ。選べる形にすると、
             選べないものが選べるように見える。 */}
-        <Field label="金額の決め方" htmlFor="cv-value-mode" note="率での指定は準備中です。">
-          <select id="cv-value-mode" disabled className={`${inputClass} opacity-50`}>
-            <option>毎回同じ金額</option>
-          </select>
+        <Field label="金額の決め方" note="率での指定は準備中です。">
+          <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
+            毎回同じ金額
+          </p>
         </Field>
 
         {/* 一覧の列名は「成果単価」だが、作る画面では「1件あたりの金額」。
@@ -303,19 +304,12 @@ export default function NewConversionPointPage() {
           htmlFor="cv-account"
           note="1つに絞ると、そのアカウントで起きた成果だけを数えます。"
         >
-          <select
+          <SelectField
             id="cv-account"
             value={lineAccountId}
             onChange={(e) => setLineAccountId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">すべてのアカウント</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
         </Field>
       </FormSection>
     </CreatePage>

@@ -10,6 +10,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * リンクを発行する（設計 V2 6-2-2）。
@@ -191,31 +192,22 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-tag"
           note="あとで配信の絞り込みに使えます。"
         >
-          <select
+          <SelectField
             id="ir-tag"
             value={tagId}
             onChange={(e) => setTagId(e.target.value)}
+            aria-label="自動で付けるタグ"
             className={inputClass}
-          >
-            <option value="">（なし）</option>
-            {tagOptionGroups.map((group) =>
-              group.label ? (
-                <optgroup key={group.id ?? 'unfiled'} label={group.label}>
-                  {group.tags.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : (
-                group.tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))
+            options={[
+              { value: '', label: '（なし）' },
+              ...tagOptionGroups.flatMap((group) =>
+                group.tags.map((tag) => ({
+                  value: tag.id,
+                  label: group.label ? `${group.label} / ${tag.name}` : tag.name,
+                })),
               ),
-            )}
-          </select>
+            ]}
+          />
         </Field>
 
         <Field
@@ -223,19 +215,17 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-scenario"
           note="経路ごとに違う案内を送れます。"
         >
-          <select
+          <SelectField
             id="ir-scenario"
             value={scenarioId}
             onChange={(e) => setScenarioId(e.target.value)}
+            aria-label="開始するシナリオ配信"
             className={inputClass}
-          >
-            <option value="">（なし）</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '（なし）' },
+              ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
+            ]}
+          />
         </Field>
 
         <Field
@@ -243,19 +233,17 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-intro"
           note="シナリオとは別に、その場で1通だけ送ります。"
         >
-          <select
+          <SelectField
             id="ir-intro"
             value={introTemplateId}
             onChange={(e) => setIntroTemplateId(e.target.value)}
+            aria-label="追加直後に送るメッセージ"
             className={inputClass}
-          >
-            <option value="">送らない</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '送らない' },
+              ...templates.map((template) => ({ value: template.id, label: template.name })),
+            ]}
+          />
         </Field>
 
         <Field
@@ -263,27 +251,25 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-pool"
           note="選ばないと、全体の既定の振り分けに従います。"
         >
-          <select
+          <SelectField
             id="ir-pool"
             value={poolId}
             onChange={(e) => setPoolId(e.target.value)}
+            aria-label="友だちの追加先アカウント"
             className={inputClass}
-          >
-            <option value="">メインプールで自動振り分け</option>
-            {pools.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'メインプールで自動振り分け' },
+              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+            ]}
+          />
         </Field>
 
         {/* 有効期限を持つ列が無い。入れられるように見せると、期限が来ても
             止まらないリンクができる。 */}
         <Field label="有効期限" note="期限での自動停止は、まだ保存する場所がありません。">
-          <select disabled className={`${inputClass} opacity-50`}>
-            <option>期限なし</option>
-          </select>
+          <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
+            期限なし
+          </p>
         </Field>
 
         <Field

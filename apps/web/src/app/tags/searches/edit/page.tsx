@@ -107,11 +107,11 @@ function ConditionEditor({
   const rawValue = typeof condition.value === 'string' ? condition.value : ''
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-v6-control border border-hairline bg-canvas p-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-control border border-hairline bg-canvas p-2">
       <Select aria-label="条件の種類" value={condition.kind} disabled={unsupported} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={unsupported ? [{ value: condition.kind, label: condition.kind === 'form' ? '回答フォーム' : '購入履歴' }] : EDITABLE_KINDS} className="w-36" />
 
       {unsupported ? (
-        <span className="min-w-0 flex-1 text-xs text-v6-warning">この条件は実行口が未接続です。削除するまで保存・実行できません。</span>
+        <span className="min-w-0 flex-1 text-xs text-status-warn-deep">この条件は実行口が未接続です。削除するまで保存・実行できません。</span>
       ) : condition.kind === 'tag' ? (
         <>
           <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: '次を含む' }, { value: 'excludes', label: '次を含まない' }]} className="w-32" />
@@ -170,7 +170,7 @@ function ConditionEditor({
       ) : condition.kind === 'created_at' ? (
         <div className="flex min-w-80 flex-1 items-center gap-2">
           <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: event.target.value } })} className="flex-1" />
-          <span className="text-v6-ink-faint">〜</span>
+          <span className="text-ink-faint">〜</span>
           <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { to?: string }).to ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), to: event.target.value } })} className="flex-1" />
         </div>
       ) : (
@@ -204,9 +204,9 @@ function ConditionGroup({
   onChange: (next: SavedSearchCondition[]) => void
 }) {
   return (
-    <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-      <h2 className="text-base font-bold text-v6-ink">{title}（{operator}）</h2>
-      {items.length === 0 ? <p className="mt-2 text-xs text-v6-ink-faint">条件はまだありません。必要な場合だけ追加します。</p> : null}
+    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+      <h2 className="text-base font-bold text-ink">{title}（{operator}）</h2>
+      {items.length === 0 ? <p className="mt-2 text-xs text-ink-faint">条件はまだありません。必要な場合だけ追加します。</p> : null}
       <div className="mt-3 space-y-2">
         {items.map((condition, index) => (
           <ConditionEditor
@@ -373,9 +373,9 @@ function SavedSearchEditInner() {
     }
   }
 
-  if (loading) return <p className="text-sm text-v6-ink-faint">読み込んでいます</p>
-  if (!selectedAccountId) return <p className="rounded-v6-card border border-hairline bg-canvas p-5 text-sm text-v6-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
-  if (!original) return <p className="rounded-v6-card border border-hairline bg-canvas p-5 text-sm text-v6-danger">{error || '保存した検索が見つかりません'}</p>
+  if (loading) return <p className="text-sm text-ink-faint">読み込んでいます</p>
+  if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
+  if (!original) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-danger">{error || '保存した検索が見つかりません'}</p>
 
   return (
     <div data-design-node="XBkiQ" className="pb-24">
@@ -384,19 +384,19 @@ function SavedSearchEditInner() {
         <Button href="/tags?tab=searches">保存した検索へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-v6-control border border-v6-danger-border bg-v6-danger-bg p-3 text-sm text-v6-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-4 rounded-control border border-status-danger-border bg-status-danger-soft p-3 text-sm text-danger">{error}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
-          <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-            <h2 className="text-base font-bold text-v6-ink">条件名・説明</h2>
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <h2 className="text-base font-bold text-ink">条件名・説明</h2>
             <div className="mt-3 grid gap-3">
               <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} className="max-w-xl" aria-label="条件名" />
               <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" className="max-w-xl" aria-label="説明" />
             </div>
             <fieldset className="mt-4">
-              <legend className="text-xs font-semibold text-v6-ink-faint">共有範囲</legend>
-              <div className="mt-2 flex gap-6 text-sm text-v6-ink-secondary">
+              <legend className="text-xs font-semibold text-ink-faint">共有範囲</legend>
+              <div className="mt-2 flex gap-6 text-sm text-ink-secondary">
                 <label className="flex items-center gap-2"><input type="radio" checked={isShared} onChange={() => setIsShared(true)} /> 全員（他の担当者からも使えます）</label>
                 <label className="flex items-center gap-2"><input type="radio" checked={!isShared} onChange={() => setIsShared(false)} /> 自分だけ</label>
               </div>
@@ -406,7 +406,7 @@ function SavedSearchEditInner() {
                 順番にしない。件数は一覧の取得結果そのものなので、読めて
                 いないときは数を出さずに上限だけ書く。
               */}
-              <p className="mt-2 text-xs leading-5 text-v6-ink-faint">
+              <p className="mt-2 text-xs leading-5 text-ink-faint">
                 {savedCount === null
                   ? '保存できるのは50件までです。'
                   : `保存できるのは50件までです（いま${savedCount}件）。`}
@@ -420,48 +420,48 @@ function SavedSearchEditInner() {
         </div>
 
         <aside className="space-y-4">
-          <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-            <h2 className="text-base font-bold text-v6-ink">該当プレビュー</h2>
-            <p className="mt-3 text-3xl font-bold tabular-nums text-v6-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
-            <p className="mt-2 text-xs text-v6-ink-faint">{previewStale ? '変更を保存すると再計算します' : '保存済み条件で集計'}</p>
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
+            <p className="mt-3 text-3xl font-bold tabular-nums text-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            <p className="mt-2 text-xs text-ink-faint">{previewStale ? '変更を保存すると再計算します' : '保存済み条件で集計'}</p>
             <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary" className="mt-3">該当者を確認</Button>
           </section>
 
-          <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-            <h2 className="text-base font-bold text-v6-ink">この条件の使用先</h2>
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <h2 className="text-base font-bold text-ink">この条件の使用先</h2>
             {original.usedIn === undefined ? (
-              <p className="mt-3 text-sm text-v6-ink-faint">—</p>
+              <p className="mt-3 text-sm text-ink-faint">—</p>
             ) : original.usedIn.length === 0 ? (
-              <p className="mt-3 text-sm font-semibold text-v6-ink-secondary">使用先はありません</p>
+              <p className="mt-3 text-sm font-semibold text-ink-secondary">使用先はありません</p>
             ) : (
-              <ul className="mt-3 space-y-2 text-sm text-v6-ink-secondary">
+              <ul className="mt-3 space-y-2 text-sm text-ink-secondary">
                 {original.usedIn.map((usage) => (
-                  <li key={`${usage.kind}:${usage.id}`} className="rounded-v6-control bg-v6-warning-bg p-2">
+                  <li key={`${usage.kind}:${usage.id}`} className="rounded-control bg-status-warn-soft p-2">
                     <span className="font-bold">{USAGE_KIND_LABELS[usage.kind]}</span>
                     <span className="ml-1">{usage.name}</span>
-                    <span className="ml-1 text-xs text-v6-ink-faint">{usage.mode === 'live' ? '条件を自動反映' : '固定した条件'}</span>
+                    <span className="ml-1 text-xs text-ink-faint">{usage.mode === 'live' ? '条件を自動反映' : '固定した条件'}</span>
                   </li>
                 ))}
               </ul>
             )}
-            <p className="mt-2 text-xs leading-5 text-v6-ink-faint">使用先がある検索は、先に参照を外すまで削除できません。</p>
+            <p className="mt-2 text-xs leading-5 text-ink-faint">使用先がある検索は、先に参照を外すまで削除できません。</p>
           </section>
 
-          <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-            <h2 className="text-base font-bold text-v6-ink">一覧での表示</h2>
-            <label className="mt-3 block text-xs font-semibold text-v6-ink-faint">並び順
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <h2 className="text-base font-bold text-ink">一覧での表示</h2>
+            <label className="mt-3 block text-xs font-semibold text-ink-faint">並び順
               <Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '最終接触が新しい順' }, { value: 'oldest', label: '最終接触が古い順' }]} size="full" className="mt-1" />
             </label>
-            <label className="mt-3 block text-xs font-semibold text-v6-ink-faint">表示件数
+            <label className="mt-3 block text-xs font-semibold text-ink-faint">表示件数
               <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="full" className="mt-1" />
             </label>
-            <p className="mt-3 rounded-v6-control border border-hairline bg-v6-surface p-2 text-xs text-v6-ink-secondary">表示列：{conditions.list?.columns?.join('・') || '名前・タグ・担当者'}</p>
+            <p className="mt-3 rounded-control border border-hairline bg-surface-pearl p-2 text-xs text-ink-secondary">表示列：{conditions.list?.columns?.join('・') || '名前・タグ・担当者'}</p>
           </section>
         </aside>
       </div>
 
       <StickyBar
-        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-v6-control bg-v6-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
+        destructive={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-control bg-status-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
@@ -476,5 +476,5 @@ function SavedSearchEditInner() {
 }
 
 export default function SavedSearchEditPage() {
-  return <Suspense fallback={<p className="text-sm text-v6-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense>
+  return <Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense>
 }

@@ -53,6 +53,10 @@ import { broadcasts } from './routes/broadcasts.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccounts } from './routes/line-accounts.js';
+import { gettingStarted } from './routes/getting-started.js';
+import { recipes } from './routes/recipes.js';
+import { manualLinks } from './routes/manual-links.js';
+import { accountHandovers } from './routes/account-handovers.js';
 import { brand } from './routes/brand.js';
 import { conversions } from './routes/conversions.js';
 import { affiliates } from './routes/affiliates.js';
@@ -182,6 +186,8 @@ export type Env = {
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
+    /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
+    STRIPE_WEBHOOK_SECRET?: string;
     TOTP_ENCRYPTION_KEY?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.
@@ -309,6 +315,10 @@ app.use('*', tenantScopeMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', gettingStarted);
+app.route('/', recipes);
+app.route('/', manualLinks);
+app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
 app.route('/', friends);
 app.route('/', tags);

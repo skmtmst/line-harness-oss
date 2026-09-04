@@ -1,11 +1,13 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { NotConnected } from '@/components/shared/not-connected'
 import WebinarLinePreview from '@/components/webinars/webinar-line-preview'
+import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { ctaPreview, notificationPreview, videoPreview } from './preview-body'
 import {
   STEPS,
@@ -18,6 +20,7 @@ import {
 import WebinarForm from '@/components/webinars/webinar-form'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import {
   fetchApi,
   webinarApi,
@@ -200,7 +203,8 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
           ))}
         </tbody>
       </table>
-      <div className="flex gap-2">
+      <StickyBar actions={(
+        <>
         <button
           onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}
           className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -213,7 +217,8 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
         >
           保存
         </button>
-      </div>
+        </>
+      )} />
     </div>
   )
 }
@@ -753,25 +758,13 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
                 className="w-20 rounded border px-2 py-1"
               />
             </label>
-            <select
-              value={c.kind}
-              onChange={(e) => update(i, { kind: e.target.value as 'form' | 'url' })}
-              className="rounded border px-2 py-1"
-            >
-              <option value="form">フォーム</option>
-              <option value="url">URL</option>
-            </select>
+            <SelectField value={c.kind} onChange={(e) => update(i, { kind: e.target.value as 'form' | 'url' })} options={[{ value: "form", label: "フォーム" }, { value: "url", label: "URL" }]} className="rounded border px-2 py-1" />
             {c.kind === 'form' ? (
-              <select
+              <SelectField
                 value={c.formId ?? ''}
                 onChange={(e) => update(i, { formId: e.target.value || null })}
-                className="min-w-40 rounded border px-2 py-1"
-              >
-                <option value="">フォームを選択...</option>
-                {forms.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
+                options={[{ value: '', label: 'フォームを選択...' }, ...forms.map((f) => ({ value: f.id, label: f.name }))]}
+              />
             ) : (
               <input
                 value={c.url ?? ''}
@@ -820,7 +813,8 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
           />
         </div>
       ))}
-      <div className="flex gap-2">
+      <StickyBar actions={(
+        <>
         <button
           onClick={() => {
             setCtas((prev) => [...prev, {
@@ -840,7 +834,8 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
         >
           {saving ? '保存中...' : '保存'}
         </button>
-      </div>
+        </>
+      )} />
     </div>
   )
 }
@@ -1115,12 +1110,11 @@ function EditWebinarInner() {
             )}
             {pane === 'notifications' && (
               <div className="flex flex-col gap-6 xl:flex-row">
+                <div className="min-w-0 flex-1"><WebinarNotifications webinarId={webinar.id} /></div>
                 {/*
-                  **口がまだ無い段**（台帳 Issue #93）。押せる形で置かず、
-                  理由を見える文字で出す。
+                  通知の本文はまだこの画面で書けない（送る中身は共通の文面）。
+                  プレビューは「何を入れれば埋まるか」だけを出す。
                 */}
-                <div className="min-w-0 flex-1"><NotConnected source="通知・リマインドの設定" /></div>
-                {/* 送る文がまだ無いので、プレビューも「何を入れれば埋まるか」だけ。 */}
                 <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...notificationPreview(null)} /></div>
               </div>
             )}

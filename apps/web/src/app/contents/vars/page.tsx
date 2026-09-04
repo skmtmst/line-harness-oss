@@ -6,11 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import FolderPanel from '@/components/shared/folder-panel'
-import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
+import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   blockedReason,
   canDelete as canDeleteVar,
@@ -38,6 +39,12 @@ const UNGROUPED = '__ungrouped__'
 
 /** 1ページに出す件数。Lステップと同じく、下にページ番号を並べる。 */
 const PER_PAGE = 20
+
+/** 一覧の更新日は、次回変更と同じセルに収まる短い形で出す。 */
+function formatListDate(value: string): string {
+  const match = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
+  return match ? `${match[1]}/${match[2]}` : value
+}
 
 function VarsPageInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -479,10 +486,10 @@ function VarsPageInner() {
 
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px]">
+              <table className="w-full min-w-[820px] table-fixed">
                 <thead>
-                  <tr className="bg-canvas-sunken border-hairline border-b">
-                    <th className="w-10 px-3 py-3">
+                  <TableHeadRow className="bg-canvas-sunken border-hairline border-b">
+                    <Th className="w-10 px-3 py-3">
                       <input
                         type="checkbox"
                         checked={allOnPageSelected}
@@ -499,30 +506,33 @@ function VarsPageInner() {
                         aria-label="このページの共通情報をすべて選ぶ"
                         className="accent-green-500"
                       />
-                    </th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                      共通情報名
-                    </th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                      種別
-                    </th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">値</th>
-                    <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
-                      スケジュール
-                    </th>
-                    <th className="px-4 py-3" />
-                  </tr>
+                    </Th>
+                    <Th className="px-4 py-3" style={{ width: '14%' }}>
+                      共通情報
+                    </Th>
+                    <Th className="px-4 py-3" style={{ width: '17%' }}>
+                      差し込みキー
+                    </Th>
+                    <Th className="px-4 py-3">中身</Th>
+                    <Th className="px-4 py-3" style={{ width: '14%' }}>
+                      使われている場所
+                    </Th>
+                    <Th className="px-4 py-3" style={{ width: '21%' }}>
+                      更新・次の変更
+                    </Th>
+                    <Th align="right" className="w-28 px-4 py-3">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
+                      <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
                         <ListState kind="loading" title="共通情報を読み込んでいます" />
                       </td>
                     </tr>
                   ) : current.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
+                      <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
                         <ListState
                           kind="empty"
                           title={items.length === 0
@@ -554,36 +564,43 @@ function VarsPageInner() {
                           <td className="px-4 py-3">
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
-                              className="text-info text-sm font-medium hover:underline"
+                              title={item.name}
+                              className="text-info block truncate text-sm font-medium hover:underline"
                             >
                               {item.name}
                             </Link>
-                            {/* 差し込みの書き方を一覧に出す。編集画面を開かないと
-                                分からないと、テンプレートを書く手が止まる。 */}
-                            <code className="text-ink-faint block text-xs">{`{{var.${item.varKey}}}`}</code>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
-                              {VAR_TYPE_LABELS[item.type] ?? item.type}
-                            </span>
+                            {/* 差し込みの書き方を独立した列に出す。名前と混ぜず、
+                                テンプレートを書くときに横へ追って確認できる。 */}
+                            <code
+                              title={`{{var.${item.varKey}}}`}
+                              className="text-ink-faint block truncate whitespace-nowrap text-xs"
+                            >{`{{var.${item.varKey}}}`}</code>
                           </td>
-                          <td className="text-ink max-w-[18rem] truncate px-4 py-3 text-sm">
+                          <td title={item.value || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
                             {item.value || <span className="text-ink-faint">（空）</span>}
                           </td>
+                          <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-xs">
+                            {item.usageCount === 0
+                              ? '使われていません'
+                              : `${(item.usageCount ?? 0).toLocaleString('ja-JP')}か所`}
+                          </td>
                           <td className="text-ink-secondary px-4 py-3 text-xs">
+                            <span className="whitespace-nowrap">{formatListDate(item.updatedAt)}</span>
                             {!pending ? (
-                              <span className="text-ink-faint">—</span>
+                              <span className="text-ink-faint whitespace-nowrap"> ／ 予定なし</span>
                             ) : (
                               <>
-                                {formatStamp(pending.effectiveFrom)} から
-                                <span className="text-ink-faint"> → {pending.value || '（空）'}</span>
+                                <span className="text-ink-faint whitespace-nowrap"> ／ {formatStamp(pending.effectiveFrom)} に</span>
+                                <span className="text-ink-faint"> {pending.value || '（空）'}へ</span>
                                 {(item.pendingScheduleCount ?? 0) > 1 && (
                                   <span className="text-ink-faint"> ほか{(item.pendingScheduleCount ?? 1) - 1}件</span>
                                 )}
                               </>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
                               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"

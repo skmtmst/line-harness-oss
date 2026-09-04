@@ -1,0 +1,163 @@
+/*
+ * 設計 ★V6 34-1「はじめの設定」（`RAW35`、1920）。
+ *
+ * 左が順路（5 段）、右が 390px の案内カラム。
+ * 右カラムの並びは「いま止まっている理由 → つながる先 → 気をつけること」で固定
+ * （要件 §5-2）。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 20px; /* gap: 20 */
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px; /* 右カラムは 390 固定 */
+  gap: 20px; /* gap: 20 */
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- 左：順路 --------------------------------------------------------- */
+
+.steps {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 12px; /* gap: 12 */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 16px; /* gap: 16 */
+  padding: 16px; /* padding: 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
+  background: var(--color-canvas); /* fill: $canvas */
+}
+
+/* 番号の丸。終わった段だけ塗る。**丸の色だけで状態を言わない**（右に文字がある）。 */
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: 999px;
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.markDone {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep); /* fill: $accent-deep */
+  color: var(--color-on-accent); /* fill: $on-accent */
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 8px; /* gap: 8 */
+  min-width: 0;
+}
+
+.stepHead {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* gap: 8 */
+}
+
+.stepTitle {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-heading); /* fontSize: $size-heading */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.stepLine {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  line-height: 1.6;
+}
+
+.stepLabel {
+  margin-right: 4px;
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+}
+
+.stepAction {
+  align-self: flex-start;
+  padding: 8px 16px; /* padding: 8 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-accent-deep); /* fill: $accent-deep */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.stepAction:hover {
+  background: var(--color-canvas-sunken);
+}
+
+/* 押せないときは、押せそうな形にしない。**理由だけを文字で置く。** */
+.stepBlocked {
+  align-self: flex-start;
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+}
+
+/* --- 右：いま止まっている理由 ----------------------------------------- */
+
+.side {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 16px; /* gap: 16 */
+}
+
+.reason {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 8px; /* gap: 8 */
+  padding: 16px; /* padding: 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+}
+
+.reasonTitle {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.reasonLine {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  line-height: 1.6;
+}
+
+/* --- 案内帯の中身 ----------------------------------------------------- */
+
+.headline {
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+/* 補足は帯の2行目。**言い切りの1行と、条件の1行を混ぜない。** */
+.headlineNote {
+  display: block;
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+}
