@@ -894,6 +894,59 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
+  /*
+    いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
+    一覧の形（items/total）ではなく 1 人ぶんを返す。
+  */
+  /*
+    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
+    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
+    描いている状態を、そのまま固定データにする。
+  */
+  if (pathname === '/api/friend-add-routing')
+    return {
+      success: true,
+      data: {
+        configured: true,
+        routing: {
+          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
+          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
+          criteria: { firstTime: 'never_added' },
+        },
+        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
+        tags: [],
+      },
+    }
+  if (pathname === '/api/friend-add-routing/draft')
+    return {
+      success: true,
+      data: {
+        accountId: 'visual-qa-account',
+        versionId: 'visual-qa-draft',
+        versionNumber: 1,
+        status: 'draft',
+        routing: {
+          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
+          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
+          criteria: { firstTime: 'never_added' },
+        },
+        lastTestStatus: null,
+        lastTestedAt: null,
+        publishedAt: null,
+      },
+    }
+  if (pathname === '/api/staff/me')
+    return {
+      success: true,
+      data: {
+        id: 'visual-qa-staff',
+        name: 'Kenta Kawano',
+        email: null,
+        role: 'owner',
+        permissionKeys: [],
+        isActive: true,
+      },
+    }
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'
