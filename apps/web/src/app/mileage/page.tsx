@@ -254,7 +254,7 @@ function MileagePageInner() {
           kind="error"
           title="友だちのマイルを表示できませんでした"
           description="再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button onClick={() => void reloadAll()}>残高を再読み込み</Button>}
+          onRetry={() => void reloadAll()}
         />
       ) : null}
 
@@ -312,7 +312,7 @@ function MileagePageInner() {
             kind="error"
             title="たまる決めごとを読み込めませんでした"
             description="再読み込みしても直らない場合はエラー報告へ。"
-            action={<Button onClick={() => void reloadAll()}>決めごとを再読み込み</Button>}
+            onRetry={() => void reloadAll()}
           />
         ) : rules.length === 0 ? (
           <ListState

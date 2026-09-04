@@ -245,7 +245,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
               ) : status === 'forbidden' ? (
                 <tr><td colSpan={7} className="p-0"><ListState kind="forbidden" description="対応マークを見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
               ) : status === 'error' ? (
-                <tr><td colSpan={7} className="p-0"><ListState kind="error" description="対応マークを読み込めませんでした。再読み込みしてください。" /></td></tr>
+                <tr><td colSpan={7} className="p-0"><ListState kind="error" description="対応マークを読み込めませんでした。再読み込みしてください。" onRetry={() => void load()} /></td></tr>
               ) : items.length === 0 ? (
                 <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを追加」から最初のマークを作ってください。" /></td></tr>
               ) : visible.length === 0 ? (

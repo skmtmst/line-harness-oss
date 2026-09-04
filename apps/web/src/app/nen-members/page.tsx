@@ -201,7 +201,7 @@ export default function PhotoReviewsPage() {
 
       <div className={styles.body}>
       <div className="min-w-0 space-y-6">
-      {!selectedAccountId ? <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" action={<Button onClick={() => void load()}>写真を再読み込み</Button>} /> : visiblePhotos.length === 0 ? <ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /> : <section className="grid gap-4 sm:grid-cols-2">
+      {!selectedAccountId ? <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /> : <section className="grid gap-4 sm:grid-cols-2">
         {visiblePhotos.map((photo) => <article key={text(photo.id)} className="overflow-hidden rounded-tile border border-hairline bg-canvas shadow-v6-card">
           <img src={text(photo.image_url)} alt={`${text(photo.pet_name)}ちゃんの投稿写真`} className="aspect-square w-full object-cover" />
           <div className="p-4">

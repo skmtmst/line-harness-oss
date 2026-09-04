@@ -431,7 +431,7 @@ export default function FormSubmissionsPage() {
             kind="error"
             title="回答フォームを読み込めませんでした"
             description="通信状態を確認して、もう一度読み込んでください。"
-            action={<Button onClick={() => void loadForms()}>回答フォームを再読み込み</Button>}
+            onRetry={() => void loadForms()}
           />
         ) : forms.length === 0 ? (
           <ListState
@@ -590,7 +590,7 @@ export default function FormSubmissionsPage() {
               kind="error"
               title="回答を読み込めませんでした"
               description="通信状態を確認して、もう一度読み込んでください。"
-              action={<Button onClick={() => void loadSubmissions(selectedForm.id, page, pageSize)}>回答を再読み込み</Button>}
+              onRetry={() => void loadSubmissions(selectedForm.id, page, pageSize)}
             />
           ) : submissions.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">回答がありません</div>

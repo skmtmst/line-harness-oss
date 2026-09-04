@@ -429,7 +429,7 @@ function FriendsPageInner({
           kind="error"
           title="友だちを表示できませんでした"
           description="登録した友だちは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={<Button variant="secondary" onClick={() => void loadFriends()}>友だちを再読み込み</Button>}
+          onRetry={() => void loadFriends()}
         />
       ) : friends.length === 0 ? (
         /*

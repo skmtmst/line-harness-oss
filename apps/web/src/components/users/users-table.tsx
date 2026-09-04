@@ -23,6 +23,7 @@ interface Props {
   pageSize: number
   loading: boolean
   error: boolean
+  onRetry: () => void
   onPageChange: (page: number) => void
   onOpenMergedPerson?: (personId: string) => void
 }
@@ -34,6 +35,7 @@ export default function UsersTable({
   pageSize,
   loading,
   error,
+  onRetry,
   onPageChange,
   onOpenMergedPerson,
 }: Props) {
@@ -88,6 +90,7 @@ export default function UsersTable({
                     kind="error"
                     title="統合ユーザーを表示できませんでした"
                     description="再計算するか、時間をおいてもう一度お試しください。"
+                    onRetry={onRetry}
                   />
                 ) : (
                   <ListState

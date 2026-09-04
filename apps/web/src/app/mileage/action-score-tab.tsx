@@ -254,7 +254,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
         {loading ? (
           <ListState kind="loading" title="行動スコアを読み込んでいます" description="友だちの現在点と30日間の変化を集計しています。" />
         ) : error ? (
-          <ListState kind="error" title="行動スコアを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>行動スコアを再読み込み</Button>} />
+          <ListState kind="error" title="行動スコアを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
         ) : !overview?.items.length ? (
           <ListState kind="empty" title="条件に合う友だちがいません" description="帯または検索条件を変えてください。" />
         ) : (

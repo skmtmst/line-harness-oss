@@ -359,7 +359,7 @@ export default function BulkRunDialog({
                 kind="error"
                 title="対象を数えられませんでした"
                 description="選んだ友だちは変わっていません。読み直してから、もう一度お試しください。"
-                action={<Button onClick={() => void loadPreview()}>数え直す</Button>}
+                onRetry={() => void loadPreview()}
               />
             ) : null}
             {previewState === 'forbidden' ? (

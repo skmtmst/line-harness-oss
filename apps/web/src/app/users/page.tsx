@@ -179,6 +179,7 @@ export default function UsersPage() {
         pageSize={PAGE_SIZE}
         loading={loading}
         error={Boolean(error)}
+        onRetry={() => void load()}
         onPageChange={setPage}
         onOpenMergedPerson={setOpenedPersonId}
       />
