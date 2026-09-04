@@ -101,7 +101,7 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  *   帯が部品の中にある画面（`tags/edit` `tags/marks/*` `events/new`
  *     `templates/edit`）を「無い」と数えていた。`page.tsx` だけ読んでいたため。
  * 読み込んだ部品まで見て数え直すと17画面で、そのうち3画面を #856 で移行した。
- * 残る14画面は台帳 #109 の仕上げで共通バーへ移し、この表を空にした。
+ * 残る14画面は台帳 #109 の仕上げ（PR #866）で共通バーへ移し、この表を空にした。
  */
 const NOT_YET: string[] = []
 
