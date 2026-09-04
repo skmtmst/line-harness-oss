@@ -15,6 +15,8 @@ import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText } from '../delete-impact'
+import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import {
   changePreviewNotConnected,
   changeSummaryText,
@@ -535,26 +537,29 @@ function EditCommonVarInner() {
             {saved && <p className="text-success text-sm">保存しました。</p>}
           </div>
 
-          <div className="border-hairline mt-4 flex max-w-3xl items-center justify-between gap-3 border-t pt-4">
-            <div className="flex items-center gap-4">
-              <Link href="/contents/vars" className="text-info text-sm hover:underline">
-                共通情報一覧へ戻る
-              </Link>
+          {/*
+            削除は左端、保存は中央。**消す操作を保存の隣に置かない。**
+            隣にあると、押し間違いが「保存したつもりが消えていた」になる。
+          */}
+          <StickyBar
+            destructive={(
               <button
+                type="button"
                 onClick={() => void openDelete()}
-                className="text-danger hover:bg-danger-bg rounded-control px-3 py-2 text-sm"
+                className="rounded-control bg-v6-danger text-on-accent px-4 py-2 text-sm font-bold"
               >
                 削除
               </button>
-            </div>
-            <button
-              onClick={() => void save()}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </div>
+            )}
+            actions={(
+              <>
+                <Button href="/contents/vars">共通情報一覧へ戻る</Button>
+                <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
+                  {saving ? '保存中…' : '保存'}
+                </Button>
+              </>
+            )}
+          />
         </>
       )}
 
