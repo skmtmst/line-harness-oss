@@ -7,6 +7,7 @@ import { Check } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import StickyBar from '@/components/shared/sticky-bar'
 import {
   folderSaveErrorMessage,
   isCurrentFolderRequest,
@@ -247,10 +248,14 @@ function FolderEditor() {
               <p className="text-ink-faint mt-4 text-xs">{blockedReason}</p>
             )}
 
-            <div className="mt-7 flex justify-end gap-2">
-              <button type="button" onClick={() => router.back()} className="rounded-control border-hairline text-ink-secondary border px-5 py-2.5 text-sm font-medium">キャンセル</button>
-              <button type="button" disabled={saving || blockedReason !== null} onClick={() => void save()} className="rounded-control bg-accent-deep text-on-accent px-5 py-2.5 text-sm font-bold disabled:opacity-40">{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</button>
-            </div>
+            <StickyBar
+              actions={(
+                <>
+                  <Button type="button" onClick={() => router.back()}>キャンセル</Button>
+                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</Button>
+                </>
+              )}
+            />
           </>
         )}
       </section>
