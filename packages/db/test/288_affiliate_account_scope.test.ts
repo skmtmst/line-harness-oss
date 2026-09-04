@@ -19,7 +19,7 @@ function execSafe(db: Database.Database, sql: string): void {
   }
 }
 
-function setupBefore287(): Database.Database {
+function setupBefore288(): Database.Database {
   const db = new Database(':memory:');
   execSafe(db, readFileSync(join(ROOT, 'schema.sql'), 'utf8'));
   for (const file of readdirSync(MIGRATIONS).filter((name) => {
@@ -55,11 +55,11 @@ function asD1(sqlite: Database.Database): D1Database {
   } as unknown as D1Database;
 }
 
-describe('287 affiliate account scope migration', () => {
+describe('288 affiliate account scope migration', () => {
   let db: Database.Database;
 
   beforeEach(() => {
-    db = setupBefore287();
+    db = setupBefore288();
     db.prepare(`INSERT OR IGNORE INTO tenants (id, name, created_at, updated_at)
       VALUES (?, '既定統括', '2026-09-04', '2026-09-04')`).run(DEFAULT_TENANT_ID);
     db.prepare(`INSERT INTO tenants (id, name, created_at, updated_at)
@@ -89,7 +89,7 @@ describe('287 affiliate account scope migration', () => {
   });
 
   test('候補が一意な既存紹介者だけを同じ統括・アカウントへ補完する', () => {
-    execSafe(db, readFileSync(join(MIGRATIONS, '287_affiliate_account_scope.sql'), 'utf8'));
+    execSafe(db, readFileSync(join(MIGRATIONS, '288_affiliate_account_scope.sql'), 'utf8'));
 
     const rows = db.prepare(`SELECT id, tenant_id, line_account_id FROM affiliates ORDER BY id`)
       .all() as Array<{ id: string; tenant_id: string; line_account_id: string | null }>;
@@ -101,7 +101,7 @@ describe('287 affiliate account scope migration', () => {
   });
 
   test('一覧・詳細・更新はテナントとLINEアカウントを越えない', async () => {
-    execSafe(db, readFileSync(join(MIGRATIONS, '287_affiliate_account_scope.sql'), 'utf8'));
+    execSafe(db, readFileSync(join(MIGRATIONS, '288_affiliate_account_scope.sql'), 'utf8'));
     const d1 = asD1(db);
     const ownScope = {
       tenantId: DEFAULT_TENANT_ID,
