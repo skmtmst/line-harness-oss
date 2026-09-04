@@ -87,6 +87,28 @@ export interface WebinarAnalyticsSummaryRow {
   form_submissions: number;
 }
 
+export interface WebinarOverviewMetric {
+  value: number | null;
+  state: 'available' | 'unavailable';
+  reason: string | null;
+}
+
+export interface WebinarOverview {
+  state: 'partial';
+  registrationMode: 'people';
+  metrics: {
+    webinars: WebinarOverviewMetric;
+    activeWebinars: WebinarOverviewMetric;
+    registrations: WebinarOverviewMetric;
+    registrationBookings: WebinarOverviewMetric;
+    viewers: WebinarOverviewMetric;
+    viewRate: WebinarOverviewMetric;
+    averageWatchSeconds: WebinarOverviewMetric;
+    ctaUniquePeople: WebinarOverviewMetric;
+    ctaTotalClicks: WebinarOverviewMetric;
+  };
+}
+
 export type WebinarFunnelEventType =
   | 'cta_impression'
   | 'cta_click'
@@ -126,6 +148,67 @@ export async function getWebinars(db: D1Database): Promise<Webinar[]> {
     .prepare('SELECT * FROM webinars ORDER BY created_at DESC')
     .all<Webinar>();
   return results ?? [];
+}
+
+export async function getWebinarOverview(
+  db: D1Database,
+  accountId: string,
+): Promise<WebinarOverview> {
+  const row = await db.prepare(
+    `WITH visible_webinars AS (
+       SELECT id, status
+         FROM webinars
+        WHERE account_id = ? AND status <> 'archived'
+     )
+     SELECT
+       (SELECT COUNT(*) FROM visible_webinars) AS webinar_count,
+       (SELECT COUNT(*) FROM visible_webinars WHERE status = 'active') AS active_webinar_count,
+       (SELECT COUNT(DISTINCT r.friend_id)
+          FROM webinar_registrations r
+          JOIN visible_webinars w ON w.id = r.webinar_id
+         WHERE r.status = 'active') AS registration_people,
+       (SELECT COUNT(*)
+          FROM webinar_registrations r
+          JOIN visible_webinars w ON w.id = r.webinar_id
+         WHERE r.status = 'active') AS registration_bookings,
+       (SELECT COUNT(DISTINCT v.friend_id)
+          FROM webinar_viewers v
+          JOIN visible_webinars w ON w.id = v.webinar_id
+         WHERE v.cta_clicked_at IS NOT NULL) AS cta_unique_people`,
+  ).bind(accountId).first<{
+    webinar_count: number;
+    active_webinar_count: number;
+    registration_people: number;
+    registration_bookings: number;
+    cta_unique_people: number;
+  }>();
+
+  const available = (value: number): WebinarOverviewMetric => ({
+    value,
+    state: 'available',
+    reason: null,
+  });
+  const unavailable = (reason: string): WebinarOverviewMetric => ({
+    value: null,
+    state: 'unavailable',
+    reason,
+  });
+
+  return {
+    state: 'partial',
+    registrationMode: 'people',
+    metrics: {
+      webinars: available(row?.webinar_count ?? 0),
+      activeWebinars: available(row?.active_webinar_count ?? 0),
+      registrations: available(row?.registration_people ?? 0),
+      registrationBookings: available(row?.registration_bookings ?? 0),
+      viewers: unavailable('実際に見た区間の記録をまだ集計できないため'),
+      viewRate: unavailable('視聴人数を取得できないため'),
+      averageWatchSeconds: unavailable('実際に見た時間の記録をまだ集計できないため'),
+      ctaUniquePeople: available(row?.cta_unique_people ?? 0),
+      ctaTotalClicks: unavailable('同じ視聴中の複数クリックを数える記録がないため'),
+    },
+  };
 }
 
 export async function getWebinarById(db: D1Database, id: string): Promise<Webinar | null> {
