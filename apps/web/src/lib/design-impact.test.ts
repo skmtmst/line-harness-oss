@@ -10,9 +10,9 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする105ファイルを利用先に数える', () => {
-    // development 側の104件を残し、マイルの使い道作成・編集画面を加えた実測値。
-    expect(directImporters(files, button)).toHaveLength(105)
+  it('共通Buttonを直接importする106ファイルを利用先に数える', () => {
+    // マイルの使い道作成・編集画面とリマインダ実行結果を加えた実測値。
+    expect(directImporters(files, button)).toHaveLength(106)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -41,6 +41,8 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/action-score-tab.tsx',
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',
+      // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
+      'app/reminders/detail/page.tsx',
       'app/reminders/page.tsx',
       'app/rich-menus/page.tsx',
       'app/webhooks/webhook-interactions.tsx',

@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 216,
-  "unimplemented": 28,
+  "compared": 217,
+  "unimplemented": 27,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 28,
   "match": 0,
   "structureMatchDataPending": 29,
-  "needsFix": 113,
+  "needsFix": 114,
   "unjudged": 98,
   "remaining": 268,
   "features": [
@@ -761,14 +761,14 @@
       "feature": 7,
       "name": "リマインダ",
       "total": 11,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "needsFix": 11,
       "unjudged": 0,
       "remaining": 11,
       "capturedAt": [
@@ -2496,13 +2496,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 7,
-      "node": "GC4St",
-      "name": "7-1-H 実行結果",
-      "gap": "pending",
-      "gapNote": "画面 `/reminders/detail` が development に無い。判定は未マージ枝 `4bc71249` で書かれたもの"
     },
     {
       "feature": 9,
