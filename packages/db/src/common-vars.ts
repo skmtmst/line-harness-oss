@@ -25,6 +25,8 @@ export interface CommonVar {
   next_effective_from?: string | null;
   next_value?: string | null;
   pending_schedule_count?: number;
+  /** 一覧用。現在・過去を含め、差し込まれている場所の合計。 */
+  usage_count?: number;
 }
 
 export type CommonVarUsageKind =
@@ -245,6 +247,48 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
     values: (varKey, token, account) => [account, token, varKey],
   },
 ];
+
+const COMMON_VAR_USAGE_TOTAL_SQL = `SELECT
+  ${COMMON_VAR_USAGE_QUERIES.map((source) =>
+    `(SELECT COUNT(*) FROM (${source.sql}))`).join('\n  + ')}
+  + (SELECT COUNT(*) FROM forms f
+      WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
+        AND (instr(coalesce(f.on_submit_message_content, ''), ?) > 0
+          OR instr(coalesce(f.fields, ''), ?) > 0
+          OR instr(coalesce(f.layout, ''), ?) > 0)) AS total`;
+
+/**
+ * 一覧に出す使用先件数をまとめて数える。
+ *
+ * ブラウザから1行ずつ影響APIを呼ぶと、一覧表示だけで多数のHTTP往復が起きる。
+ * ここでは各キーの9種類の走査を1文へまとめ、D1のbatchも80件ずつに区切る。
+ */
+export async function getCommonVarUsageCounts(
+  db: D1Database,
+  varKeys: string[],
+  lineAccountId: string,
+): Promise<Map<string, number>> {
+  const uniqueKeys = [...new Set(varKeys)];
+  const counts = new Map<string, number>();
+  const batchSize = 80;
+
+  for (let offset = 0; offset < uniqueKeys.length; offset += batchSize) {
+    const keys = uniqueKeys.slice(offset, offset + batchSize);
+    const statements = keys.map((varKey) => {
+      const token = `{{var.${varKey}}}`;
+      const values = COMMON_VAR_USAGE_QUERIES.flatMap((source) =>
+        source.values(varKey, token, lineAccountId));
+      return db.prepare(COMMON_VAR_USAGE_TOTAL_SQL)
+        .bind(...values, token, token, token);
+    });
+    const results = await db.batch<{ total: number }>(statements);
+    keys.forEach((varKey, index) => {
+      counts.set(varKey, Number(results[index]?.results[0]?.total ?? 0));
+    });
+  }
+
+  return counts;
+}
 
 export interface CommonVarSchedule {
   id: string;
