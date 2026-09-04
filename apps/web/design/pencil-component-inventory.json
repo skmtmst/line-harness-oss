@@ -26,131 +26,2339 @@
     "investigate": "判断が終わるまで実装しない"
   },
   "families": {
-    "data-table": { "props": ["columns", "rows", "rowKey", "loading", "empty", "error"], "requiredStates": ["loading", "empty", "error", "populated", "row-hover", "row-selected"] },
-    "pagination": { "props": ["page", "pageCount", "onPageChange", "ariaLabel"], "requiredStates": ["first", "middle", "last", "disabled", "ellipsis"] },
-    "select": { "props": ["label", "value", "options", "disabled", "error", "onChange"], "requiredStates": ["closed", "open", "selected", "disabled", "error", "focus"] },
-    "checkbox": { "props": ["label", "checked", "indeterminate", "disabled", "error", "onChange"], "requiredStates": ["unchecked", "checked", "indeterminate", "disabled", "error", "focus"] },
-    "switch": { "props": ["label", "checked", "disabled", "loading", "onChange"], "requiredStates": ["off", "on", "disabled", "loading", "focus"] },
-    "dialog": { "props": ["open", "title", "description", "tone", "busy", "onConfirm", "onCancel"], "requiredStates": ["default", "destructive", "busy", "error", "focus"] },
-    "notice": { "props": ["tone", "message", "duration", "onClose"], "requiredStates": ["success", "validation-error", "error"] },
-    "data-state": { "props": ["state", "title", "description", "onRetry"], "requiredStates": ["loading", "empty", "error"] },
-    "breadcrumb": { "props": ["items", "maxItems"], "requiredStates": ["default", "truncated", "focus"] },
-    "tabs": { "props": ["items", "activeKey", "disabledKeys", "onChange"], "requiredStates": ["default", "selected", "hover", "focus", "disabled"] },
-    "summary-card": { "props": ["title", "value", "unit", "detail", "tone", "loading", "href"], "requiredStates": ["default", "accent", "warning", "loading", "error"] },
-    "status-badge": { "props": ["label", "tone", "icon"], "requiredStates": ["default", "success", "warning", "danger", "disabled"] },
-    "toolbar": { "props": ["search", "filters", "sort", "pageSize", "actions"], "requiredStates": ["default", "searching", "filtered", "disabled"] },
-    "bulk-actions": { "props": ["selectedCount", "actions", "busy", "onClear"], "requiredStates": ["hidden", "selected", "busy", "disabled"] },
-    "detail-panel": { "props": ["open", "title", "dirty", "busy", "onClose", "onSave"], "requiredStates": ["open", "dirty", "busy", "error", "focus"] },
-    "inbox-metadata": { "props": ["channel", "assignee", "status", "receivedAt"], "requiredStates": ["default", "unassigned", "unread"] },
-    "display-settings": { "props": ["items", "onReorder", "onToggle", "onApply"], "requiredStates": ["open", "dragging", "enabled", "disabled", "dirty"] },
-    "folder": { "props": ["folders", "activeId", "onSelect", "onCreate", "onEdit", "onDelete"], "requiredStates": ["default", "selected", "empty", "overflow", "disabled"] },
-    "favorite-toggle": { "props": ["checked", "label", "disabled", "onChange"], "requiredStates": ["off", "on", "hover", "focus", "disabled"] },
-    "filter-panel": { "props": ["open", "conditions", "onApply", "onReset"], "requiredStates": ["open", "empty", "dirty", "error"] },
-    "saved-search": { "props": ["items", "activeId", "name", "error", "onSave", "onDelete"], "requiredStates": ["list", "input", "validation-error", "duplicate-error", "success"] },
-    "search": { "props": ["value", "placeholder", "loading", "onChange", "onClear"], "requiredStates": ["default", "focus", "filled", "loading", "disabled"] },
-    "identity": { "props": ["name", "avatarUrl", "secondary", "status"], "requiredStates": ["default", "missing-avatar", "long-name"] },
-    "advanced-search": { "props": ["open", "conditions", "onApply", "onReset"], "requiredStates": ["open", "empty", "dirty", "error"] },
-    "row-action": { "props": ["label", "icon", "tone", "disabled", "onClick"], "requiredStates": ["default", "hover", "focus", "disabled", "danger"] },
-    "stepper": { "props": ["steps", "currentStep", "completedSteps", "onStepChange"], "requiredStates": ["upcoming", "current", "complete", "error", "disabled"] },
-    "workflow-block": { "props": ["title", "summary", "children", "onEdit", "onDelete"], "requiredStates": ["default", "complete", "error", "disabled"] },
-    "settings-summary": { "props": ["title", "items"], "requiredStates": ["default", "empty", "error"] },
-    "line-preview": { "props": ["messages", "timing", "account"], "requiredStates": ["default", "empty", "overflow"] },
-    "checklist": { "props": ["items"], "requiredStates": ["complete", "incomplete", "error"] },
-    "button": { "props": ["variant", "children", "href", "disabled", "loading", "onClick"], "requiredStates": ["default", "hover", "focus", "pressed", "disabled", "loading"] },
-    "app-shell": { "props": ["account", "navigation", "currentRoute", "badges", "user", "onAccountChange"], "requiredStates": ["default", "selected", "collapsed", "mobile", "permission-hidden", "long-label"] },
-    "input": { "props": ["label", "value", "note", "required", "disabled", "readOnly", "error", "onChange"], "requiredStates": ["default", "focus", "filled", "read-only", "disabled", "error"] },
-    "card-header": { "props": ["title", "description", "action"], "requiredStates": ["default", "with-description", "with-action", "long-title"] },
-    "assignment": { "props": ["status", "assignee"], "requiredStates": ["default", "unassigned", "needs-action", "complete"] },
-    "table-header": { "props": ["children", "scope", "align", "width", "hidden"], "requiredStates": ["default", "sortable", "sorted", "hidden"] },
-    "sticky-bar": { "props": ["dirty", "actions"], "requiredStates": ["hidden", "dirty", "saving", "error"] },
-    "notification-panel": { "props": ["open", "items", "filters", "unreadCount", "loading", "error", "onMarkRead", "onClose"], "requiredStates": ["closed", "open", "loading", "empty", "error", "unread"] },
-    "condition-palette": { "props": ["axes", "disabledAxes", "onSelect"], "requiredStates": ["default", "selected", "disabled", "empty"] }
+    "data-table": {
+      "props": [
+        "columns",
+        "rows",
+        "rowKey",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "requiredStates": [
+        "loading",
+        "empty",
+        "error",
+        "populated",
+        "row-hover",
+        "row-selected"
+      ]
+    },
+    "pagination": {
+      "props": [
+        "page",
+        "pageCount",
+        "onPageChange",
+        "ariaLabel"
+      ],
+      "requiredStates": [
+        "first",
+        "middle",
+        "last",
+        "disabled",
+        "ellipsis"
+      ]
+    },
+    "select": {
+      "props": [
+        "label",
+        "value",
+        "options",
+        "disabled",
+        "error",
+        "onChange"
+      ],
+      "requiredStates": [
+        "closed",
+        "open",
+        "selected",
+        "disabled",
+        "error",
+        "focus"
+      ]
+    },
+    "checkbox": {
+      "props": [
+        "label",
+        "checked",
+        "indeterminate",
+        "disabled",
+        "error",
+        "onChange"
+      ],
+      "requiredStates": [
+        "unchecked",
+        "checked",
+        "indeterminate",
+        "disabled",
+        "error",
+        "focus"
+      ]
+    },
+    "switch": {
+      "props": [
+        "label",
+        "checked",
+        "disabled",
+        "loading",
+        "onChange"
+      ],
+      "requiredStates": [
+        "off",
+        "on",
+        "disabled",
+        "loading",
+        "focus"
+      ]
+    },
+    "dialog": {
+      "props": [
+        "open",
+        "title",
+        "description",
+        "tone",
+        "busy",
+        "onConfirm",
+        "onCancel"
+      ],
+      "requiredStates": [
+        "default",
+        "destructive",
+        "busy",
+        "error",
+        "focus"
+      ]
+    },
+    "notice": {
+      "props": [
+        "tone",
+        "message",
+        "duration",
+        "onClose"
+      ],
+      "requiredStates": [
+        "success",
+        "validation-error",
+        "error"
+      ]
+    },
+    "data-state": {
+      "props": [
+        "state",
+        "title",
+        "description",
+        "onRetry"
+      ],
+      "requiredStates": [
+        "loading",
+        "empty",
+        "error"
+      ]
+    },
+    "breadcrumb": {
+      "props": [
+        "items",
+        "maxItems"
+      ],
+      "requiredStates": [
+        "default",
+        "truncated",
+        "focus"
+      ]
+    },
+    "tabs": {
+      "props": [
+        "items",
+        "activeKey",
+        "disabledKeys",
+        "onChange"
+      ],
+      "requiredStates": [
+        "default",
+        "selected",
+        "hover",
+        "focus",
+        "disabled"
+      ]
+    },
+    "summary-card": {
+      "props": [
+        "title",
+        "value",
+        "unit",
+        "detail",
+        "tone",
+        "loading",
+        "href"
+      ],
+      "requiredStates": [
+        "default",
+        "accent",
+        "warning",
+        "loading",
+        "error"
+      ]
+    },
+    "status-badge": {
+      "props": [
+        "label",
+        "tone",
+        "icon"
+      ],
+      "requiredStates": [
+        "default",
+        "success",
+        "warning",
+        "danger",
+        "disabled"
+      ]
+    },
+    "toolbar": {
+      "props": [
+        "search",
+        "filters",
+        "sort",
+        "pageSize",
+        "actions"
+      ],
+      "requiredStates": [
+        "default",
+        "searching",
+        "filtered",
+        "disabled"
+      ]
+    },
+    "bulk-actions": {
+      "props": [
+        "selectedCount",
+        "actions",
+        "busy",
+        "onClear"
+      ],
+      "requiredStates": [
+        "hidden",
+        "selected",
+        "busy",
+        "disabled"
+      ]
+    },
+    "detail-panel": {
+      "props": [
+        "open",
+        "title",
+        "dirty",
+        "busy",
+        "onClose",
+        "onSave"
+      ],
+      "requiredStates": [
+        "open",
+        "dirty",
+        "busy",
+        "error",
+        "focus"
+      ]
+    },
+    "inbox-metadata": {
+      "props": [
+        "channel",
+        "assignee",
+        "status",
+        "receivedAt"
+      ],
+      "requiredStates": [
+        "default",
+        "unassigned",
+        "unread"
+      ]
+    },
+    "display-settings": {
+      "props": [
+        "items",
+        "onReorder",
+        "onToggle",
+        "onApply"
+      ],
+      "requiredStates": [
+        "open",
+        "dragging",
+        "enabled",
+        "disabled",
+        "dirty"
+      ]
+    },
+    "folder": {
+      "props": [
+        "folders",
+        "activeId",
+        "onSelect",
+        "onCreate",
+        "onEdit",
+        "onDelete"
+      ],
+      "requiredStates": [
+        "default",
+        "selected",
+        "empty",
+        "overflow",
+        "disabled"
+      ]
+    },
+    "favorite-toggle": {
+      "props": [
+        "checked",
+        "label",
+        "disabled",
+        "onChange"
+      ],
+      "requiredStates": [
+        "off",
+        "on",
+        "hover",
+        "focus",
+        "disabled"
+      ]
+    },
+    "filter-panel": {
+      "props": [
+        "open",
+        "conditions",
+        "onApply",
+        "onReset"
+      ],
+      "requiredStates": [
+        "open",
+        "empty",
+        "dirty",
+        "error"
+      ]
+    },
+    "saved-search": {
+      "props": [
+        "items",
+        "activeId",
+        "name",
+        "error",
+        "onSave",
+        "onDelete"
+      ],
+      "requiredStates": [
+        "list",
+        "input",
+        "validation-error",
+        "duplicate-error",
+        "success"
+      ]
+    },
+    "search": {
+      "props": [
+        "value",
+        "placeholder",
+        "loading",
+        "onChange",
+        "onClear"
+      ],
+      "requiredStates": [
+        "default",
+        "focus",
+        "filled",
+        "loading",
+        "disabled"
+      ]
+    },
+    "identity": {
+      "props": [
+        "name",
+        "avatarUrl",
+        "secondary",
+        "status"
+      ],
+      "requiredStates": [
+        "default",
+        "missing-avatar",
+        "long-name"
+      ]
+    },
+    "advanced-search": {
+      "props": [
+        "open",
+        "conditions",
+        "onApply",
+        "onReset"
+      ],
+      "requiredStates": [
+        "open",
+        "empty",
+        "dirty",
+        "error"
+      ]
+    },
+    "row-action": {
+      "props": [
+        "label",
+        "icon",
+        "tone",
+        "disabled",
+        "onClick"
+      ],
+      "requiredStates": [
+        "default",
+        "hover",
+        "focus",
+        "disabled",
+        "danger"
+      ]
+    },
+    "stepper": {
+      "props": [
+        "steps",
+        "currentStep",
+        "completedSteps",
+        "onStepChange"
+      ],
+      "requiredStates": [
+        "upcoming",
+        "current",
+        "complete",
+        "error",
+        "disabled"
+      ]
+    },
+    "workflow-block": {
+      "props": [
+        "title",
+        "summary",
+        "children",
+        "onEdit",
+        "onDelete"
+      ],
+      "requiredStates": [
+        "default",
+        "complete",
+        "error",
+        "disabled"
+      ]
+    },
+    "settings-summary": {
+      "props": [
+        "title",
+        "items"
+      ],
+      "requiredStates": [
+        "default",
+        "empty",
+        "error"
+      ]
+    },
+    "line-preview": {
+      "props": [
+        "messages",
+        "timing",
+        "account"
+      ],
+      "requiredStates": [
+        "default",
+        "empty",
+        "overflow"
+      ]
+    },
+    "checklist": {
+      "props": [
+        "items"
+      ],
+      "requiredStates": [
+        "complete",
+        "incomplete",
+        "error"
+      ]
+    },
+    "button": {
+      "props": [
+        "variant",
+        "children",
+        "href",
+        "disabled",
+        "loading",
+        "onClick"
+      ],
+      "requiredStates": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "disabled",
+        "loading"
+      ]
+    },
+    "app-shell": {
+      "props": [
+        "account",
+        "navigation",
+        "currentRoute",
+        "badges",
+        "user",
+        "onAccountChange"
+      ],
+      "requiredStates": [
+        "default",
+        "selected",
+        "collapsed",
+        "mobile",
+        "permission-hidden",
+        "long-label"
+      ]
+    },
+    "input": {
+      "props": [
+        "label",
+        "value",
+        "note",
+        "required",
+        "disabled",
+        "readOnly",
+        "error",
+        "onChange"
+      ],
+      "requiredStates": [
+        "default",
+        "focus",
+        "filled",
+        "read-only",
+        "disabled",
+        "error"
+      ]
+    },
+    "card-header": {
+      "props": [
+        "title",
+        "description",
+        "action"
+      ],
+      "requiredStates": [
+        "default",
+        "with-description",
+        "with-action",
+        "long-title"
+      ]
+    },
+    "assignment": {
+      "props": [
+        "status",
+        "assignee"
+      ],
+      "requiredStates": [
+        "default",
+        "unassigned",
+        "needs-action",
+        "complete"
+      ]
+    },
+    "table-header": {
+      "props": [
+        "children",
+        "scope",
+        "align",
+        "width",
+        "hidden"
+      ],
+      "requiredStates": [
+        "default",
+        "sortable",
+        "sorted",
+        "hidden"
+      ]
+    },
+    "sticky-bar": {
+      "props": [
+        "dirty",
+        "actions"
+      ],
+      "requiredStates": [
+        "hidden",
+        "dirty",
+        "saving",
+        "error"
+      ]
+    },
+    "notification-panel": {
+      "props": [
+        "open",
+        "items",
+        "filters",
+        "unreadCount",
+        "loading",
+        "error",
+        "onMarkRead",
+        "onClose"
+      ],
+      "requiredStates": [
+        "closed",
+        "open",
+        "loading",
+        "empty",
+        "error",
+        "unread"
+      ]
+    },
+    "condition-palette": {
+      "props": [
+        "axes",
+        "disabledAxes",
+        "onSelect"
+      ],
+      "requiredStates": [
+        "default",
+        "selected",
+        "disabled",
+        "empty"
+      ]
+    }
   },
   "components": {
-    "AWHUI": { "name": "標準一覧表（最終行は下線なし）", "family": "data-table", "classification": "global", "designState": "populated", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "investigate", "target": "DataTable" }, "lastCheckedAt": "2026-08-24" },
-    "Blot6": { "name": "ページネーション", "family": "pagination", "classification": "global", "designState": "middle", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "same" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Pagination" }, "lastCheckedAt": "2026-08-24" },
-    "niGPF": { "name": "20件表示", "family": "select", "classification": "global", "designState": "closed", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Select.pageSize" }, "lastCheckedAt": "2026-08-24" },
-    "Gfsb4": { "name": "プルダウン開状態", "family": "select", "classification": "global", "designState": "open", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Select.open" }, "lastCheckedAt": "2026-08-24" },
-    "J6x4Q": { "name": "標準確認モーダル", "family": "dialog", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Dialog" }, "lastCheckedAt": "2026-08-24" },
-    "ApbSZ": { "name": "保存しました", "family": "notice", "classification": "global", "designState": "success", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Notice.success" }, "lastCheckedAt": "2026-08-24" },
-    "zPRvi": { "name": "入力内容を確認してください", "family": "notice", "classification": "global", "designState": "validation-error", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Notice.validation" }, "lastCheckedAt": "2026-08-24" },
-    "I5rKbM": { "name": "処理に失敗しました", "family": "notice", "classification": "global", "designState": "error", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Notice.error" }, "lastCheckedAt": "2026-08-24" },
-    "BDOJu": { "name": "データがありません", "family": "data-state", "classification": "global", "designState": "empty", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "DataState.empty" }, "lastCheckedAt": "2026-08-24" },
-    "sZE9Q": { "name": "読み込んでいます", "family": "data-state", "classification": "global", "designState": "loading", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "DataState.loading" }, "lastCheckedAt": "2026-08-24" },
-    "OLMp0": { "name": "表示できませんでした", "family": "data-state", "classification": "global", "designState": "error", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "DataState.error" }, "lastCheckedAt": "2026-08-24" },
-    "R098Z": { "name": "パンくず", "family": "breadcrumb", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Breadcrumb" }, "lastCheckedAt": "2026-08-24" },
-    "z9TQJ": { "name": "ページ内タブ", "family": "tabs", "classification": "global", "designState": "group", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Tabs.segmented" }, "lastCheckedAt": "2026-08-24" },
-    "crE5N": { "name": "対応が必要", "family": "summary-card", "classification": "global", "designState": "warning", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "XywGr.warning" }, "lastCheckedAt": "2026-08-24" },
-    "j9cdlp": { "name": "今月の付与", "family": "summary-card", "classification": "global", "designState": "default", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "XywGr" }, "lastCheckedAt": "2026-08-24" },
-    "hjekI": { "name": "未確認", "family": "summary-card", "classification": "global", "designState": "warning", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "XywGr.warning" }, "lastCheckedAt": "2026-08-24" },
-    "n18zLK": { "name": "ツールバー", "family": "toolbar", "classification": "global", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "ListToolbar" }, "lastCheckedAt": "2026-08-24" },
-    "eHPwj": { "name": "一括操作バー", "family": "bulk-actions", "classification": "global", "designState": "selected", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "BulkActionBar" }, "lastCheckedAt": "2026-08-24" },
-    "VJKAT": { "name": "右詳細パネル", "family": "detail-panel", "classification": "global", "designState": "open", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Drawer" }, "lastCheckedAt": "2026-08-24" },
-    "H2S1T4": { "name": "重要操作確認", "family": "dialog", "classification": "global", "designState": "destructive", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "J6x4Q.destructive" }, "lastCheckedAt": "2026-08-24" },
-    "nOJ6C": { "name": "受信箱 メッセージ補足情報", "family": "inbox-metadata", "classification": "feature", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "MessageMetadata" }, "lastCheckedAt": "2026-08-24" },
-    "j0GlT": { "name": "受信箱 20件ページ切り替え", "family": "pagination", "classification": "feature", "designState": "middle", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "Pagination+Select.pageSize" }, "lastCheckedAt": "2026-08-24" },
-    "AQ3vW": { "name": "受信箱 内部メモ入力ポップアップ", "family": "dialog", "classification": "feature", "designState": "default", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "Dialog.internalNote" }, "lastCheckedAt": "2026-08-24" },
-    "CsaTl": { "name": "受信箱 担当者プルダウン", "family": "select", "classification": "feature", "designState": "closed", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "AssigneeSelect" }, "lastCheckedAt": "2026-08-24" },
-    "lJ1CF": { "name": "受信箱 担当者プルダウン開状態", "family": "select", "classification": "feature", "designState": "open", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "CsaTl" }, "lastCheckedAt": "2026-08-24" },
-    "EcKWJ": { "name": "受信箱 ヘッダー担当者プルダウン", "family": "select", "classification": "feature", "designState": "closed", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "HeaderAssigneeSelect" }, "lastCheckedAt": "2026-08-24" },
-    "ynZo0": { "name": "受信箱 ヘッダー対応マークプルダウン", "family": "select", "classification": "feature", "designState": "closed", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "HeaderStatusSelect" }, "lastCheckedAt": "2026-08-24" },
-    "QSOOv": { "name": "受信箱 ヘッダー担当者プルダウン開状態", "family": "select", "classification": "feature", "designState": "open", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "EcKWJ" }, "lastCheckedAt": "2026-08-24" },
-    "k6lHgo": { "name": "受信箱 ヘッダー対応マークプルダウン開状態", "family": "select", "classification": "feature", "designState": "open", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "ynZo0" }, "lastCheckedAt": "2026-08-24" },
-    "sMpET": { "name": "共通 表示項目並び替え・オンオフパネル", "family": "display-settings", "classification": "global", "designState": "open", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "ColumnVisibilityPanel" }, "lastCheckedAt": "2026-08-24" },
-    "XPkeN": { "name": "テンプレート フォルダ横スクロール", "family": "folder", "classification": "screen", "designState": "overflow", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/templates"], "migration": { "action": "replace", "target": "Pw4WX.responsive" }, "lastCheckedAt": "2026-08-24" },
-    "N01eW": { "name": "テンプレート お気に入りスター", "family": "favorite-toggle", "classification": "feature", "designState": "off", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/templates"], "migration": { "action": "merge", "target": "yujK7" }, "lastCheckedAt": "2026-08-24" },
-    "xQCmt": { "name": "テンプレート お気に入り登録済み", "family": "favorite-toggle", "classification": "feature", "designState": "on", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/templates"], "migration": { "action": "merge", "target": "yujK7" }, "lastCheckedAt": "2026-08-24" },
-    "bXyEA": { "name": "受信箱 絞り込みパネル", "family": "filter-panel", "classification": "feature", "designState": "open", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "InboxFilterPanel" }, "lastCheckedAt": "2026-08-24" },
-    "tOOws": { "name": "受信箱 保存した検索パネル", "family": "saved-search", "classification": "feature", "designState": "list", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "SavedSearchPanel" }, "lastCheckedAt": "2026-08-24" },
-    "Ln4zS": { "name": "受信箱 保存した検索名入力モーダル", "family": "saved-search", "classification": "feature", "designState": "input", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "implement", "target": "SavedSearchDialog" }, "lastCheckedAt": "2026-08-24" },
-    "mxpHZ": { "name": "受信箱 保存した検索名・未入力エラー", "family": "saved-search", "classification": "feature", "designState": "validation-error", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "Ln4zS.validation" }, "lastCheckedAt": "2026-08-24" },
-    "xIbXt": { "name": "受信箱 保存した検索名・重複エラー", "family": "saved-search", "classification": "feature", "designState": "duplicate-error", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "Ln4zS.duplicate" }, "lastCheckedAt": "2026-08-24" },
-    "WtxZM": { "name": "受信箱 保存した検索・保存完了", "family": "saved-search", "classification": "feature", "designState": "success", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/chats"], "migration": { "action": "merge", "target": "Notice.success" }, "lastCheckedAt": "2026-08-24" },
-    "CsGTC": { "name": "共通 フォルダ 追加・編集・削除", "family": "dialog", "classification": "global", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "FolderDialog" }, "lastCheckedAt": "2026-08-24" },
-    "phlR1": { "name": "友だち 標準検索ボックス", "family": "search", "classification": "feature", "designState": "default", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "reuse", "target": "SearchField" }, "lastCheckedAt": "2026-08-24" },
-    "g4FSG3": { "name": "友だち アバター・名前", "family": "identity", "classification": "screen", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "implement", "target": "FriendIdentity" }, "lastCheckedAt": "2026-08-24" },
-    "a1CUt8": { "name": "友だち 一括操作バー", "family": "bulk-actions", "classification": "feature", "designState": "selected", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "merge", "target": "eHPwj.friends" }, "lastCheckedAt": "2026-08-24" },
-    "tT9S1": { "name": "友だち 一覧上部ツールバー", "family": "toolbar", "classification": "feature", "designState": "default", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "merge", "target": "n18zLK.friends" }, "lastCheckedAt": "2026-08-24" },
-    "z7O873": { "name": "友だち 詳細検索モーダル", "family": "advanced-search", "classification": "screen", "designState": "open", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "implement", "target": "FriendAdvancedSearch" }, "lastCheckedAt": "2026-08-24" },
-    "BZfoh": { "name": "友だち 操作・詳細を見る", "family": "row-action", "classification": "screen", "designState": "default", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "merge", "target": "RowAction.link" }, "lastCheckedAt": "2026-08-24" },
-    "SM7TT": { "name": "属性 名前クリックで編集", "family": "row-action", "classification": "screen", "designState": "default", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/tags"], "migration": { "action": "merge", "target": "RowAction.inlineEdit" }, "lastCheckedAt": "2026-08-24" },
-    "K65Uhe": { "name": "一覧 並び替えハンドル", "family": "row-action", "classification": "global", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "DragHandle" }, "lastCheckedAt": "2026-08-24" },
-    "Ls12y": { "name": "一覧 削除（赤いゴミ箱）", "family": "row-action", "classification": "global", "designState": "danger", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "DeleteAction" }, "lastCheckedAt": "2026-08-24" },
-    "y0Ye5q": { "name": "一覧 削除不可", "family": "row-action", "classification": "global", "designState": "disabled", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "Ls12y.disabled" }, "lastCheckedAt": "2026-08-24" },
-    "mNUQ3": { "name": "配信 KPIカード", "family": "summary-card", "classification": "feature", "designState": "accent", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "same" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies"], "migration": { "action": "reuse", "target": "SummaryCard.broadcast" }, "lastCheckedAt": "2026-08-24" },
-    "Pw4WX": { "name": "共通 フォルダレール", "family": "folder", "classification": "global", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "FolderRail" }, "lastCheckedAt": "2026-08-24" },
-    "xRvDB": { "name": "配信 ステータスバッジ", "family": "status-badge", "classification": "feature", "designState": "group", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/", "/broadcasts", "/scenarios", "/reminders", "/auto-replies"], "migration": { "action": "merge", "target": "StatusBadge" }, "lastCheckedAt": "2026-08-24" },
-    "LMiL2": { "name": "配信 5ステップタブ", "family": "stepper", "classification": "feature", "designState": "five-step", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies"], "migration": { "action": "investigate", "target": "Stepper" }, "lastCheckedAt": "2026-08-24" },
-    "Z9Rb6I": { "name": "配信 条件ブロック", "family": "workflow-block", "classification": "feature", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies", "/friend-add-settings"], "migration": { "action": "implement", "target": "ConditionBlock" }, "lastCheckedAt": "2026-08-24" },
-    "sALQb": { "name": "配信 アクションブロック", "family": "workflow-block", "classification": "feature", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies", "/friend-add-settings"], "migration": { "action": "implement", "target": "ActionBlock" }, "lastCheckedAt": "2026-08-24" },
-    "RXwdd": { "name": "配信 設定サマリー", "family": "settings-summary", "classification": "feature", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies"], "migration": { "action": "implement", "target": "DeliverySettingsSummary" }, "lastCheckedAt": "2026-08-24" },
-    "NLsw4": { "name": "配信 LINEプレビュー", "family": "line-preview", "classification": "feature", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies", "/templates"], "migration": { "action": "implement", "target": "LinePreview" }, "lastCheckedAt": "2026-08-24" },
-    "QxIlC": { "name": "配信 配信前チェック", "family": "checklist", "classification": "feature", "designState": "incomplete", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies"], "migration": { "action": "implement", "target": "DeliveryPreflightChecklist" }, "lastCheckedAt": "2026-08-24" },
-    "E61lJ": { "name": "配信 削除確認ダイアログ", "family": "dialog", "classification": "feature", "designState": "destructive", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies"], "migration": { "action": "merge", "target": "J6x4Q.destructive" }, "lastCheckedAt": "2026-08-24" },
-    "wBIDY": { "name": "共通 詳細条件ボタン", "family": "button", "classification": "global", "designState": "secondary", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "Button.secondary" }, "lastCheckedAt": "2026-08-24" },
-    "vRoju": { "name": "共通 保存した検索ボタン", "family": "button", "classification": "global", "designState": "secondary", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "Button.secondary" }, "lastCheckedAt": "2026-08-24" },
-    "xdthE": { "name": "共通 検索実行ボタン", "family": "button", "classification": "global", "designState": "primary", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "merge", "target": "Button.primary" }, "lastCheckedAt": "2026-08-24" },
-    "rpot9": { "name": "共通 標準プルダウン（閉）", "family": "select", "classification": "global", "designState": "closed", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Select" }, "lastCheckedAt": "2026-08-24" },
-    "QB99A": { "name": "共通 並び順プルダウン", "family": "select", "classification": "global", "designState": "closed", "role": "sample", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Select.sort" }, "lastCheckedAt": "2026-08-24" },
-    "J33xq": { "name": "V5s 正式共通メニュー", "family": "app-shell", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "AppShell+Sidebar" }, "lastCheckedAt": "2026-08-24" },
-    "dzDZ2": { "name": "友だち詳細 共通ページ内タブ（8項目）", "family": "tabs", "classification": "screen", "designState": "group", "role": "deprecated", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends/detail"], "migration": { "action": "replace", "target": "x3IQf" }, "lastCheckedAt": "2026-08-24" },
-    "VPn1F": { "name": "共通 ページ内タブ項目（選択中）", "family": "tabs", "classification": "global", "designState": "selected", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "TabItem.selected" }, "lastCheckedAt": "2026-08-24" },
-    "ISA1Q": { "name": "共通 ページ内タブ項目（通常）", "family": "tabs", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "TabItem.default" }, "lastCheckedAt": "2026-08-24" },
-    "x3IQf": { "name": "友だち詳細 ページ内タブ（10項目・共通様式）", "family": "tabs", "classification": "screen", "designState": "group", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends/detail"], "migration": { "action": "merge", "target": "Tabs.friendDetail" }, "lastCheckedAt": "2026-08-24" },
-    "uzNEC": { "name": "共通 ボタン（副次・白）", "family": "button", "classification": "global", "designState": "secondary", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Button.secondary" }, "lastCheckedAt": "2026-08-24" },
-    "nBRKk": { "name": "共通 ボタン（主要・緑）", "family": "button", "classification": "global", "designState": "primary", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Button.primary" }, "lastCheckedAt": "2026-08-24" },
-    "ytG7l": { "name": "共通 入力欄", "family": "input", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "TextInput" }, "lastCheckedAt": "2026-08-24" },
-    "keKe3": { "name": "共通 入力欄（複数行）", "family": "input", "classification": "global", "designState": "multiline", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "TextArea" }, "lastCheckedAt": "2026-08-24" },
-    "hGpFq": { "name": "共通 フォルダ操作メニュー", "family": "folder", "classification": "global", "designState": "open", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "FolderActionMenu" }, "lastCheckedAt": "2026-08-24" },
-    "t0jk8p": { "name": "標準カード見出し（上詰まり防止）", "family": "card-header", "classification": "global", "designState": "with-action", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "CardHeader" }, "lastCheckedAt": "2026-08-24" },
-    "XywGr": { "name": "共通 サマリーカード", "family": "summary-card", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "variant" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "SummaryCard" }, "lastCheckedAt": "2026-08-24" },
-    "aeUEr": { "name": "友だち 対応・担当者表示", "family": "assignment", "classification": "screen", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/friends"], "migration": { "action": "implement", "target": "FriendAssignment" }, "lastCheckedAt": "2026-08-24" },
-    "yujK7": { "name": "共通 一覧スター（注目）", "family": "favorite-toggle", "classification": "global", "designState": "off", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "FavoriteToggle" }, "lastCheckedAt": "2026-08-24" },
-    "tPTMp": { "name": "共通 表見出しセル", "family": "table-header", "classification": "global", "designState": "default", "role": "canonical", "status": "active", "version": { "base": "V5", "v6": "same" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "Th" }, "lastCheckedAt": "2026-08-24" },
-    "H0V8EK": { "name": "共通 その他操作（…）", "family": "row-action", "classification": "global", "designState": "default", "role": "canonical", "status": "implemented", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "IconButton" }, "lastCheckedAt": "2026-08-24" },
-    "Ai3fq": { "name": "共通 編集追従バー", "family": "sticky-bar", "classification": "global", "designState": "dirty", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "implement", "target": "StickyEditBar" }, "lastCheckedAt": "2026-08-24" },
-    "z6TmF": { "name": "共通 通知パネル", "family": "notification-panel", "classification": "global", "designState": "open", "role": "canonical", "status": "implemented", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["*"], "migration": { "action": "reuse", "target": "NotificationCenter" }, "lastCheckedAt": "2026-08-24" },
-    "gk4ne": { "name": "シナリオ作成 3ステップ", "family": "stepper", "classification": "feature", "designState": "three-step", "role": "sample", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/scenarios"], "migration": { "action": "investigate", "target": "Stepper" }, "lastCheckedAt": "2026-08-24" },
-    "mghEh": { "name": "共通 条件軸パレット", "family": "condition-palette", "classification": "feature", "designState": "default", "role": "canonical", "status": "pending", "version": { "base": "V5", "v6": "unverified" }, "impactRoutes": ["/broadcasts", "/scenarios", "/reminders", "/auto-replies", "/friend-add-settings"], "migration": { "action": "implement", "target": "ConditionAxisPalette" }, "lastCheckedAt": "2026-08-24" }
+    "AWHUI": {
+      "name": "標準一覧表（最終行は下線なし）",
+      "family": "data-table",
+      "classification": "global",
+      "designState": "populated",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "investigate",
+        "target": "DataTable"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "Blot6": {
+      "name": "ページネーション",
+      "family": "pagination",
+      "classification": "global",
+      "designState": "middle",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "same"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Pagination"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "niGPF": {
+      "name": "20件表示",
+      "family": "select",
+      "classification": "global",
+      "designState": "closed",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Select.pageSize"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "Gfsb4": {
+      "name": "プルダウン開状態",
+      "family": "select",
+      "classification": "global",
+      "designState": "open",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Select.open"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "J6x4Q": {
+      "name": "標準確認モーダル",
+      "family": "dialog",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Dialog"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "ApbSZ": {
+      "name": "保存しました",
+      "family": "notice",
+      "classification": "global",
+      "designState": "success",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Notice.success"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "zPRvi": {
+      "name": "入力内容を確認してください",
+      "family": "notice",
+      "classification": "global",
+      "designState": "validation-error",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Notice.validation"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "I5rKbM": {
+      "name": "処理に失敗しました",
+      "family": "notice",
+      "classification": "global",
+      "designState": "error",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Notice.error"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "BDOJu": {
+      "name": "データがありません",
+      "family": "data-state",
+      "classification": "global",
+      "designState": "empty",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "DataState.empty"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/list-state.tsx"
+    },
+    "sZE9Q": {
+      "name": "読み込んでいます",
+      "family": "data-state",
+      "classification": "global",
+      "designState": "loading",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "DataState.loading"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/list-state.tsx"
+    },
+    "OLMp0": {
+      "name": "表示できませんでした",
+      "family": "data-state",
+      "classification": "global",
+      "designState": "error",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "DataState.error"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/list-state.tsx"
+    },
+    "R098Z": {
+      "name": "パンくず",
+      "family": "breadcrumb",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Breadcrumb"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "z9TQJ": {
+      "name": "ページ内タブ",
+      "family": "tabs",
+      "classification": "global",
+      "designState": "group",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Tabs.segmented"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "crE5N": {
+      "name": "対応が必要",
+      "family": "summary-card",
+      "classification": "global",
+      "designState": "warning",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "XywGr.warning"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "j9cdlp": {
+      "name": "今月の付与",
+      "family": "summary-card",
+      "classification": "global",
+      "designState": "default",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "XywGr"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "hjekI": {
+      "name": "未確認",
+      "family": "summary-card",
+      "classification": "global",
+      "designState": "warning",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "XywGr.warning"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "n18zLK": {
+      "name": "ツールバー",
+      "family": "toolbar",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "ListToolbar"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/list-toolbar.tsx"
+    },
+    "eHPwj": {
+      "name": "一括操作バー",
+      "family": "bulk-actions",
+      "classification": "global",
+      "designState": "selected",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "BulkActionBar"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "VJKAT": {
+      "name": "右詳細パネル",
+      "family": "detail-panel",
+      "classification": "global",
+      "designState": "open",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Drawer"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "H2S1T4": {
+      "name": "重要操作確認",
+      "family": "dialog",
+      "classification": "global",
+      "designState": "destructive",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "J6x4Q.destructive"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "nOJ6C": {
+      "name": "受信箱 メッセージ補足情報",
+      "family": "inbox-metadata",
+      "classification": "feature",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "MessageMetadata"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "j0GlT": {
+      "name": "受信箱 20件ページ切り替え",
+      "family": "pagination",
+      "classification": "feature",
+      "designState": "middle",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Pagination+Select.pageSize"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "AQ3vW": {
+      "name": "受信箱 内部メモ入力ポップアップ",
+      "family": "dialog",
+      "classification": "feature",
+      "designState": "default",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Dialog.internalNote"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "CsaTl": {
+      "name": "受信箱 担当者プルダウン",
+      "family": "select",
+      "classification": "feature",
+      "designState": "closed",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "AssigneeSelect"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "lJ1CF": {
+      "name": "受信箱 担当者プルダウン開状態",
+      "family": "select",
+      "classification": "feature",
+      "designState": "open",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "CsaTl"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "EcKWJ": {
+      "name": "受信箱 ヘッダー担当者プルダウン",
+      "family": "select",
+      "classification": "feature",
+      "designState": "closed",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "HeaderAssigneeSelect"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "ynZo0": {
+      "name": "受信箱 ヘッダー対応マークプルダウン",
+      "family": "select",
+      "classification": "feature",
+      "designState": "closed",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "HeaderStatusSelect"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "QSOOv": {
+      "name": "受信箱 ヘッダー担当者プルダウン開状態",
+      "family": "select",
+      "classification": "feature",
+      "designState": "open",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "EcKWJ"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "k6lHgo": {
+      "name": "受信箱 ヘッダー対応マークプルダウン開状態",
+      "family": "select",
+      "classification": "feature",
+      "designState": "open",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "ynZo0"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "sMpET": {
+      "name": "共通 表示項目並び替え・オンオフパネル",
+      "family": "display-settings",
+      "classification": "global",
+      "designState": "open",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "ColumnVisibilityPanel"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "XPkeN": {
+      "name": "テンプレート フォルダ横スクロール",
+      "family": "folder",
+      "classification": "screen",
+      "designState": "overflow",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/templates"
+      ],
+      "migration": {
+        "action": "replace",
+        "target": "Pw4WX.responsive"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "N01eW": {
+      "name": "テンプレート お気に入りスター",
+      "family": "favorite-toggle",
+      "classification": "feature",
+      "designState": "off",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/templates"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "yujK7"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "xQCmt": {
+      "name": "テンプレート お気に入り登録済み",
+      "family": "favorite-toggle",
+      "classification": "feature",
+      "designState": "on",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/templates"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "yujK7"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "bXyEA": {
+      "name": "受信箱 絞り込みパネル",
+      "family": "filter-panel",
+      "classification": "feature",
+      "designState": "open",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "InboxFilterPanel"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "tOOws": {
+      "name": "受信箱 保存した検索パネル",
+      "family": "saved-search",
+      "classification": "feature",
+      "designState": "list",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "SavedSearchPanel"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "Ln4zS": {
+      "name": "受信箱 保存した検索名入力モーダル",
+      "family": "saved-search",
+      "classification": "feature",
+      "designState": "input",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "SavedSearchDialog"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "mxpHZ": {
+      "name": "受信箱 保存した検索名・未入力エラー",
+      "family": "saved-search",
+      "classification": "feature",
+      "designState": "validation-error",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Ln4zS.validation"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "xIbXt": {
+      "name": "受信箱 保存した検索名・重複エラー",
+      "family": "saved-search",
+      "classification": "feature",
+      "designState": "duplicate-error",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Ln4zS.duplicate"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "WtxZM": {
+      "name": "受信箱 保存した検索・保存完了",
+      "family": "saved-search",
+      "classification": "feature",
+      "designState": "success",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/chats"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Notice.success"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "CsGTC": {
+      "name": "共通 フォルダ 追加・編集・削除",
+      "family": "dialog",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "FolderDialog"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/folder-add-dialog.tsx"
+    },
+    "phlR1": {
+      "name": "友だち 標準検索ボックス",
+      "family": "search",
+      "classification": "feature",
+      "designState": "default",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "SearchField"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "g4FSG3": {
+      "name": "友だち アバター・名前",
+      "family": "identity",
+      "classification": "screen",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "FriendIdentity"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "a1CUt8": {
+      "name": "友だち 一括操作バー",
+      "family": "bulk-actions",
+      "classification": "feature",
+      "designState": "selected",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "eHPwj.friends"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "tT9S1": {
+      "name": "友だち 一覧上部ツールバー",
+      "family": "toolbar",
+      "classification": "feature",
+      "designState": "default",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "n18zLK.friends"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "z7O873": {
+      "name": "友だち 詳細検索モーダル",
+      "family": "advanced-search",
+      "classification": "screen",
+      "designState": "open",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "FriendAdvancedSearch"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "BZfoh": {
+      "name": "友だち 操作・詳細を見る",
+      "family": "row-action",
+      "classification": "screen",
+      "designState": "default",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "RowAction.link"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "SM7TT": {
+      "name": "属性 名前クリックで編集",
+      "family": "row-action",
+      "classification": "screen",
+      "designState": "default",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/tags"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "RowAction.inlineEdit"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "K65Uhe": {
+      "name": "一覧 並び替えハンドル",
+      "family": "row-action",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "DragHandle"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/row-actions.tsx"
+    },
+    "Ls12y": {
+      "name": "一覧 削除（赤いゴミ箱）",
+      "family": "row-action",
+      "classification": "global",
+      "designState": "danger",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "DeleteAction"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/row-actions.tsx"
+    },
+    "y0Ye5q": {
+      "name": "一覧 削除不可",
+      "family": "row-action",
+      "classification": "global",
+      "designState": "disabled",
+      "role": "sample",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Ls12y.disabled"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/row-actions.tsx"
+    },
+    "mNUQ3": {
+      "name": "配信 KPIカード",
+      "family": "summary-card",
+      "classification": "feature",
+      "designState": "accent",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "same"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "SummaryCard.broadcast"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "Pw4WX": {
+      "name": "共通 フォルダレール",
+      "family": "folder",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "FolderRail"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/folder-panel.tsx"
+    },
+    "xRvDB": {
+      "name": "配信 ステータスバッジ",
+      "family": "status-badge",
+      "classification": "feature",
+      "designState": "group",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/",
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "StatusBadge"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "LMiL2": {
+      "name": "配信 5ステップタブ",
+      "family": "stepper",
+      "classification": "feature",
+      "designState": "five-step",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies"
+      ],
+      "migration": {
+        "action": "investigate",
+        "target": "Stepper"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "Z9Rb6I": {
+      "name": "配信 条件ブロック",
+      "family": "workflow-block",
+      "classification": "feature",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies",
+        "/friend-add-settings"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "ConditionBlock"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "sALQb": {
+      "name": "配信 アクションブロック",
+      "family": "workflow-block",
+      "classification": "feature",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies",
+        "/friend-add-settings"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "ActionBlock"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "RXwdd": {
+      "name": "配信 設定サマリー",
+      "family": "settings-summary",
+      "classification": "feature",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "DeliverySettingsSummary"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "NLsw4": {
+      "name": "配信 LINEプレビュー",
+      "family": "line-preview",
+      "classification": "feature",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies",
+        "/templates"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "LinePreview"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "QxIlC": {
+      "name": "配信 配信前チェック",
+      "family": "checklist",
+      "classification": "feature",
+      "designState": "incomplete",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "DeliveryPreflightChecklist"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "E61lJ": {
+      "name": "配信 削除確認ダイアログ",
+      "family": "dialog",
+      "classification": "feature",
+      "designState": "destructive",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "J6x4Q.destructive"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "wBIDY": {
+      "name": "共通 詳細条件ボタン",
+      "family": "button",
+      "classification": "global",
+      "designState": "secondary",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Button.secondary"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "vRoju": {
+      "name": "共通 保存した検索ボタン",
+      "family": "button",
+      "classification": "global",
+      "designState": "secondary",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Button.secondary"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "xdthE": {
+      "name": "共通 検索実行ボタン",
+      "family": "button",
+      "classification": "global",
+      "designState": "primary",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Button.primary"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "rpot9": {
+      "name": "共通 標準プルダウン（閉）",
+      "family": "select",
+      "classification": "global",
+      "designState": "closed",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Select"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "QB99A": {
+      "name": "共通 並び順プルダウン",
+      "family": "select",
+      "classification": "global",
+      "designState": "closed",
+      "role": "sample",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Select.sort"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "J33xq": {
+      "name": "V5s 正式共通メニュー",
+      "family": "app-shell",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "AppShell+Sidebar"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "dzDZ2": {
+      "name": "友だち詳細 共通ページ内タブ（8項目）",
+      "family": "tabs",
+      "classification": "screen",
+      "designState": "group",
+      "role": "deprecated",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends/detail"
+      ],
+      "migration": {
+        "action": "replace",
+        "target": "x3IQf"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "VPn1F": {
+      "name": "共通 ページ内タブ項目（選択中）",
+      "family": "tabs",
+      "classification": "global",
+      "designState": "selected",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "TabItem.selected"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "ISA1Q": {
+      "name": "共通 ページ内タブ項目（通常）",
+      "family": "tabs",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "TabItem.default"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "x3IQf": {
+      "name": "友だち詳細 ページ内タブ（10項目・共通様式）",
+      "family": "tabs",
+      "classification": "screen",
+      "designState": "group",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends/detail"
+      ],
+      "migration": {
+        "action": "merge",
+        "target": "Tabs.friendDetail"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "uzNEC": {
+      "name": "共通 ボタン（副次・白）",
+      "family": "button",
+      "classification": "global",
+      "designState": "secondary",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Button.secondary"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "nBRKk": {
+      "name": "共通 ボタン（主要・緑）",
+      "family": "button",
+      "classification": "global",
+      "designState": "primary",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Button.primary"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "ytG7l": {
+      "name": "共通 入力欄",
+      "family": "input",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "TextInput"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "keKe3": {
+      "name": "共通 入力欄（複数行）",
+      "family": "input",
+      "classification": "global",
+      "designState": "multiline",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "TextArea"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "hGpFq": {
+      "name": "共通 フォルダ操作メニュー",
+      "family": "folder",
+      "classification": "global",
+      "designState": "open",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "FolderActionMenu"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "t0jk8p": {
+      "name": "標準カード見出し（上詰まり防止）",
+      "family": "card-header",
+      "classification": "global",
+      "designState": "with-action",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "CardHeader"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "XywGr": {
+      "name": "共通 サマリーカード",
+      "family": "summary-card",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "variant"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "SummaryCard"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "aeUEr": {
+      "name": "友だち 対応・担当者表示",
+      "family": "assignment",
+      "classification": "screen",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/friends"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "FriendAssignment"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "yujK7": {
+      "name": "共通 一覧スター（注目）",
+      "family": "favorite-toggle",
+      "classification": "global",
+      "designState": "off",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "FavoriteToggle"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "tPTMp": {
+      "name": "共通 表見出しセル",
+      "family": "table-header",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "same"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Th"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "H0V8EK": {
+      "name": "共通 その他操作（…）",
+      "family": "row-action",
+      "classification": "global",
+      "designState": "default",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "IconButton"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "Ai3fq": {
+      "name": "共通 編集追従バー",
+      "family": "sticky-bar",
+      "classification": "global",
+      "designState": "dirty",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "StickyEditBar"
+      },
+      "lastCheckedAt": "2026-09-04",
+      "implementedAt": "apps/web/src/components/shared/sticky-bar.tsx"
+    },
+    "z6TmF": {
+      "name": "共通 通知パネル",
+      "family": "notification-panel",
+      "classification": "global",
+      "designState": "open",
+      "role": "canonical",
+      "status": "implemented",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "NotificationCenter"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "gk4ne": {
+      "name": "シナリオ作成 3ステップ",
+      "family": "stepper",
+      "classification": "feature",
+      "designState": "three-step",
+      "role": "sample",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/scenarios"
+      ],
+      "migration": {
+        "action": "investigate",
+        "target": "Stepper"
+      },
+      "lastCheckedAt": "2026-08-24"
+    },
+    "mghEh": {
+      "name": "共通 条件軸パレット",
+      "family": "condition-palette",
+      "classification": "feature",
+      "designState": "default",
+      "role": "canonical",
+      "status": "pending",
+      "version": {
+        "base": "V5",
+        "v6": "unverified"
+      },
+      "impactRoutes": [
+        "/broadcasts",
+        "/scenarios",
+        "/reminders",
+        "/auto-replies",
+        "/friend-add-settings"
+      ],
+      "migration": {
+        "action": "implement",
+        "target": "ConditionAxisPalette"
+      },
+      "lastCheckedAt": "2026-08-24"
+    }
   }
 }

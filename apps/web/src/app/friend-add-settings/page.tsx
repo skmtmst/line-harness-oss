@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { FriendAddRouting, FriendAddAction } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 
 type Option = { id: string; name: string }
 
@@ -222,6 +223,11 @@ export default function FriendAddSettingsPage() {
   return (
     <div>
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        {/*
+          実行結果への行き来（設計 9-1-H `P2J0Te`）。**設定だけ見ても、
+          実際に動いたのかは分からない。** 設定と結果を往復できるようにする。
+        */}
+        <Button href="/friend-add-settings/runs">実行結果を見る</Button>
         <TestRunButton accountId={accountId} scenarioName={scenarioName} />
         <button
           type="button"
