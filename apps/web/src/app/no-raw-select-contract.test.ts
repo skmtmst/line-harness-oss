@@ -93,7 +93,7 @@ const NOT_YET: Record<string, number> = {
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(132)  // 2026-09-04: 自動応答の公開とウェビナーの公開完了が入って 132。
+    expect(PAGES.length).toBe(134)  // 2026-09-04: 合流ブランチ。自動応答の公開・実行結果、ウェビナーの公開完了、友だち追加時配信の実行結果が入って 134。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {
