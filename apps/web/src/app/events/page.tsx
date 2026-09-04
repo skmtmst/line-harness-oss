@@ -1,10 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 /**
  * イベント予約（設計 V2 8-3 / node Ih3xS）。
@@ -31,28 +35,38 @@ function formatJpDate(iso: string | null): string {
 export default function EventsListPage() {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
   const [page, setPage] = useState(1)
+  const loadRequestRef = useRef(0)
 
   const refresh = useCallback(async () => {
-    if (!selectedAccountId) return
-    setLoading(true)
-    setError(null)
+    const requestId = ++loadRequestRef.current
+    if (!selectedAccountId) {
+      setItems([])
+      setLoadStatus('ready')
+      return
+    }
+    setLoadStatus('loading')
+    setItems([])
     try {
       const res = await eventsApi.listEvents(selectedAccountId)
+      if (requestId !== loadRequestRef.current) return
       setItems(res.items)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setItems([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     void refresh()
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [refresh])
 
   useEffect(() => {
@@ -92,6 +106,7 @@ export default function EventsListPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  const dataReady = loadStatus === 'ready'
 
   return (
     <div>
@@ -134,25 +149,19 @@ export default function EventsListPage() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="イベント"
-          value={String(items.length)}
-          unit="件"
-          detail={`受付中 ${kpi.open}`}
+          value={dataReady ? String(items.length) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={dataReady ? `受付中 ${kpi.open}` : '取得できませんでした'}
         />
-        <Kpi title="申込" value={String(kpi.applied)} unit="人" detail="累計" />
+        <Kpi title="申込" value={dataReady ? String(kpi.applied) : '—'} unit={dataReady ? '人' : ''} detail={dataReady ? '累計' : '取得できませんでした'} />
         <Kpi
           title="定員の充足"
-          value={kpi.rate === null ? '—' : String(kpi.rate)}
-          unit="%"
-          detail="受付中のもの"
+          value={dataReady && kpi.rate !== null ? String(kpi.rate) : '—'}
+          unit={dataReady && kpi.rate !== null ? '%' : ''}
+          detail={dataReady ? '受付中のもの' : '取得できませんでした'}
         />
-        <Kpi title="承認待ち" value={String(kpi.pending)} unit="件" detail="要対応" />
+        <Kpi title="承認待ち" value={dataReady ? String(kpi.pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '要対応' : '取得できませんでした'} />
       </div>
-
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
-          {error}
-        </div>
-      )}
 
       <div
         data-design="Bar"
@@ -215,13 +224,11 @@ export default function EventsListPage() {
       </div>
 
       {!selectedAccountId ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-          サイドバーでアカウントを選択してください
-        </div>
-      ) : loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-          読み込み中...
-        </div>
+        <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
+      ) : loadStatus === 'loading' ? (
+        <ListState kind="loading" />
+      ) : loadStatus === 'error' ? (
+        <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
           <p className="text-ink mb-2 font-medium">イベントがまだありません</p>
