@@ -1224,9 +1224,9 @@ async function runFrequentHeavyJobs(
       name: 'friend field reminders',
       run: async () => {
         const result = await processFriendFieldReminders(env.DB);
-        if (result.enrolled > 0) {
+        if (result.enrolled > 0 || result.hasMore) {
           console.log(
-            `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
+            `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped} scanned=${result.scanned} has_more=${result.hasMore}`,
           );
         }
       },
