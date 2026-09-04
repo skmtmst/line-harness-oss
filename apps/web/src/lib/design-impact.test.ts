@@ -10,8 +10,9 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする83ファイルを利用先に数える', () => {
-    expect(directImporters(files, button)).toHaveLength(83)
+  // development の基準 85 に、この枝が足す使い道の面（`mileage-rewards-tab.tsx`）で 1 増える。
+  it('共通Buttonを直接importする86ファイルを利用先に数える', () => {
+    expect(directImporters(files, button)).toHaveLength(86)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {

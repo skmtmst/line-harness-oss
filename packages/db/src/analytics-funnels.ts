@@ -1,5 +1,5 @@
 import { ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from './analytics-event-types.js';
-import { getFunnelById, getFunnelSteps, type FunnelStepKind } from './funnels.js';
+import { getFunnelById, getFunnelSteps, type Funnel, type FunnelStepKind } from './funnels.js';
 
 const DAY_MS = 86_400_000;
 
@@ -91,6 +91,21 @@ export interface FunnelVersion {
   comparisonGroups: FunnelComparisonGroup[];
   createdBy: string | null;
   createdAt: string;
+}
+
+export interface FunnelWithCurrentVersion extends Funnel {
+  currentVersion: {
+    id: string;
+    versionNumber: number;
+    createdAt: string;
+  } | null;
+}
+
+export interface FunnelWithCurrentVersionPage {
+  items: FunnelWithCurrentVersion[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface FunnelRunResult {
@@ -512,6 +527,73 @@ export async function getCurrentFunnelVersion(
     comparison_groups_json: string; created_by: string | null; created_at: string;
   }>();
   return row ? parseStoredVersion(row) : null;
+}
+
+/**
+ * ファネル一覧と各ファネルの現在版を、件数に関係なく2問い合わせで返す。
+ *
+ * 以前は一覧取得後に getCurrentFunnelVersion を1件ずつ呼んでいたため、
+ * ファネル数に比例してD1への往復が増えていた。現在版の決定はDB内のJOINで行う。
+ */
+export async function getFunnelsWithCurrentVersions(
+  db: D1Database,
+  lineAccountId: string,
+  options: { page?: number; pageSize?: number } = {},
+): Promise<FunnelWithCurrentVersionPage> {
+  const page = Math.max(1, Math.floor(options.page ?? 1));
+  const pageSize = Math.min(200, Math.max(1, Math.floor(options.pageSize ?? 200)));
+  const offset = (page - 1) * pageSize;
+
+  const countPromise = db.prepare(
+    `SELECT COUNT(*) AS total FROM funnels WHERE line_account_id = ?`,
+  ).bind(lineAccountId).first<{ total: number }>();
+  const rowsPromise = db.prepare(
+    `WITH latest_versions AS (
+       SELECT funnel_id, MAX(version_number) AS version_number
+         FROM analytics_funnel_versions
+        WHERE line_account_id = ?
+        GROUP BY funnel_id
+     )
+     SELECT f.*,
+            v.id AS current_version_id,
+            v.version_number AS current_version_number,
+            v.created_at AS current_version_created_at
+       FROM funnels f
+       LEFT JOIN latest_versions latest ON latest.funnel_id = f.id
+       LEFT JOIN analytics_funnel_versions v
+         ON v.line_account_id = f.line_account_id
+        AND v.funnel_id = f.id
+        AND v.version_number = latest.version_number
+      WHERE f.line_account_id = ?
+      ORDER BY f.created_at DESC, f.id DESC
+      LIMIT ? OFFSET ?`,
+  ).bind(lineAccountId, lineAccountId, pageSize, offset).all<Funnel & {
+    current_version_id: string | null;
+    current_version_number: number | null;
+    current_version_created_at: string | null;
+  }>();
+
+  const [count, rows] = await Promise.all([countPromise, rowsPromise]);
+  return {
+    items: rows.results.map((row) => ({
+      id: row.id,
+      line_account_id: row.line_account_id,
+      name: row.name,
+      segment_json: row.segment_json,
+      window_days: row.window_days,
+      created_at: row.created_at,
+      currentVersion: row.current_version_id === null
+        ? null
+        : {
+            id: row.current_version_id,
+            versionNumber: row.current_version_number!,
+            createdAt: row.current_version_created_at!,
+          },
+    })),
+    total: Number(count?.total ?? 0),
+    page,
+    pageSize,
+  };
 }
 
 export async function createFunnelVersion(

@@ -1079,6 +1079,65 @@ export const INBOX_SAVED_VIEWS = [
   createdAt: '2026-08-17T03:00:00.000Z',
 }))
 
+/*
+  対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
+
+  **「保留」を必ず入れる。** 撮影の手順が「保留」を押して編集画面へ進む。
+  行が無いと押しどころが描かれず、4-3-A が1枚も撮れない
+  （kentavndng/line-harness-board#105 に挙げていた欠け）。
+*/
+export const SUPPORT_MARKS = [
+  {
+    id: 'mark-default', name: '未対応', color: '#F59E0B', isDefault: true,
+    autoOnInbound: true, displayOrder: 0, createdAt: '2026-01-01T00:00:00.000Z',
+    isInherited: false, friendCount: 8,
+  },
+  {
+    id: 'mark-hold', name: '保留', color: '#94A3B8', isDefault: false,
+    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
+    isInherited: false, friendCount: 3,
+  },
+  {
+    id: 'mark-unused', name: '確認待ち', color: '#3B82F6', isDefault: false,
+    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
+    isInherited: false, friendCount: 0,
+  },
+]
+
+/*
+  対応マークの自動変更ルール。
+
+  **止めているルールを1件混ぜる。** 全部動いていると、「動いています／
+  止めています」の描き分けと、止めたものが実行順から外れて見えるかを
+  一度も確かめられない。優先度も変えて、実行順の並びが出るようにする。
+*/
+export const SUPPORT_MARK_AUTOMATION_RULES = [
+  {
+    id: 'support-rule-assigned',
+    name: '担当者が決まったら対応中へ',
+    markId: 'mark-hold',
+    event: 'staff_assigned',
+    condition: null,
+    priority: 100,
+    manualProtectionMinutes: 60,
+    isActive: true,
+    version: 2,
+    updatedAt: '2026-08-31T10:00:00+09:00',
+  },
+  {
+    id: 'support-rule-overdue',
+    name: '期限を過ぎたら確認待ちへ',
+    markId: 'mark-hold',
+    event: 'response_overdue',
+    condition: { operator: 'AND', rules: [] },
+    priority: 50,
+    manualProtectionMinutes: 0,
+    isActive: false,
+    version: 1,
+    updatedAt: '2026-08-30T15:00:00+09:00',
+  },
+]
+
 // V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
 // 0件と未取得を混ぜないため、通常・空・失敗は同じ配列の増減ではなく
 // API状態として切り替える。ここには「取得できた通常値」だけを置く。
