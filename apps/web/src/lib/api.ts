@@ -1083,6 +1083,16 @@ export type MileageRewardSummary = {
   updatedAt: string
 }
 
+export type MileageRewardTestResult = {
+  rewardId: string
+  versionId: string
+  requiredMiles: number
+  canDeliver: boolean
+  warning: string | null
+  /** テストでは残高・在庫を動かさない。 */
+  ledgerChanged: false
+}
+
 /**
  * 使い道の下書きの中身（`p9CcEB` 17-1-G）。
  *
@@ -4725,6 +4735,12 @@ export const api = {
       fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/publish`, {
         method: 'POST',
         headers: { 'X-Confirm-Irreversible': 'mileage-reward-publish' },
+        body: JSON.stringify({ accountId }),
+      }),
+    /** 下書きで受け渡せるかだけ確かめる。残高・在庫は動かさない。 */
+    testReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardTestResult>>(`/api/mileage/rewards/${encodeURIComponent(id)}/test`, {
+        method: 'POST',
         body: JSON.stringify({ accountId }),
       }),
     /** 出すのをやめる。**消さない**——交換の記録が残るため。 */

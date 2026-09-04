@@ -20,6 +20,7 @@ import {
   type MileageRewardFailurePolicy,
   type MileageRewardKind,
   type MileageRewardSummary,
+  type MileageRewardTestResult,
 } from '@/lib/api'
 
 /**
@@ -124,6 +125,8 @@ function MileageRewardEditorInner() {
   const [reward, setReward] = useState<MileageRewardSummary | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>(editing ? 'loading' : 'ready')
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<MileageRewardTestResult | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [failure, setFailure] = useState('')
   const [touched, setTouched] = useState(false)
@@ -153,6 +156,33 @@ function MileageRewardEditorInner() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((now) => ({ ...now, [key]: value }))
     setFailure('')
+    setTestResult(null)
+  }
+
+  const persistDraft = async () => {
+    if (!selectedAccountId) throw new Error('account-required')
+    const draft = draftOf(form)
+    let saved
+    if (rewardId) {
+      let expectedVersionId = reward?.currentDraftVersionId
+      if (!expectedVersionId) {
+        const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
+        if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
+        expectedVersionId = createdDraft.data.currentDraftVersionId
+      }
+      saved = await api.mileage.saveRewardDraft(
+        rewardId,
+        selectedAccountId,
+        expectedVersionId,
+        draft,
+      )
+    } else {
+      saved = await api.mileage.createReward(selectedAccountId, draft)
+    }
+    if (!saved.success) throw new Error('failed')
+    setReward(saved.data)
+    if (!rewardId) router.replace(`/mileage/rewards/edit?id=${encodeURIComponent(saved.data.id)}`)
+    return saved.data
   }
 
   const save = async (thenPublish: boolean) => {
@@ -161,27 +191,9 @@ function MileageRewardEditorInner() {
     setSaving(true)
     setFailure('')
     try {
-      const draft = draftOf(form)
-      let saved
-      if (rewardId) {
-        let expectedVersionId = reward?.currentDraftVersionId
-        if (!expectedVersionId) {
-          const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
-          if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
-          expectedVersionId = createdDraft.data.currentDraftVersionId
-        }
-        saved = await api.mileage.saveRewardDraft(
-          rewardId,
-          selectedAccountId,
-          expectedVersionId,
-          draft,
-        )
-      } else {
-        saved = await api.mileage.createReward(selectedAccountId, draft)
-      }
-      if (!saved.success) throw new Error('failed')
+      const saved = await persistDraft()
       if (thenPublish) {
-        const published = await api.mileage.publishReward(saved.data.id, selectedAccountId)
+        const published = await api.mileage.publishReward(saved.id, selectedAccountId)
         if (!published.success) throw new Error('failed')
       }
       setPublishOpen(false)
@@ -199,6 +211,29 @@ function MileageRewardEditorInner() {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  const testExchange = async () => {
+    setTouched(true)
+    if (!selectedAccountId || errors.length > 0) return
+    setTesting(true)
+    setFailure('')
+    setTestResult(null)
+    try {
+      /* 保存結果の版を試すので、この順番は依存している。 */
+      const saved = await persistDraft()
+      const tested = await api.mileage.testReward(saved.id, selectedAccountId)
+      if (!tested.success) throw new Error('failed')
+      setTestResult(tested.data)
+    } catch (err) {
+      setFailure(
+        err instanceof ApiError && err.message && !/^API error/.test(err.message)
+          ? err.message
+          : '交換テストを実行できませんでした。時間をおいてもう一度お試しください。',
+      )
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -225,6 +260,16 @@ function MileageRewardEditorInner() {
       </div>
 
       {failure ? <NoteBar tone="danger">{failure}</NoteBar> : null}
+      {testResult ? (
+        <div
+          role="status"
+          className={`rounded-control px-4 py-3 text-sm ${testResult.canDeliver ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}
+        >
+          {testResult.canDeliver
+            ? `交換テストに合格しました。${testResult.requiredMiles.toLocaleString('ja-JP')}マイルで受け渡せます。残高と在庫は動かしていません。`
+            : `交換テストで確認が必要です。${testResult.warning ?? '受け渡す内容を確認してください'}。残高と在庫は動かしていません。`}
+        </div>
+      ) : null}
       {published ? (
         <NoteBar tone="info">
           {/* 画面に出る文なので、強調の記号を書かない（そのまま文字として出る）。 */}
@@ -341,10 +386,13 @@ function MileageRewardEditorInner() {
         actions={(
           <>
             <Button href="/mileage?tab=rewards">キャンセル</Button>
-            <Button onClick={() => void save(false)} disabled={saving}>
+            <Button onClick={() => void testExchange()} disabled={saving || testing}>
+              {testing ? '交換テスト中' : '自分で交換をテスト'}
+            </Button>
+            <Button onClick={() => void save(false)} disabled={saving || testing}>
               {saving ? '保存中' : '下書きを保存'}
             </Button>
-            <Button variant="primary" onClick={requestPublish} disabled={saving}>
+            <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
               保存して出す
             </Button>
           </>
