@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { NotConnected } from '@/components/shared/not-connected'
 import WebinarLinePreview from '@/components/webinars/webinar-line-preview'
+import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { ctaPreview, notificationPreview, videoPreview } from './preview-body'
 import {
   STEPS,
@@ -1104,12 +1105,11 @@ function EditWebinarInner() {
             )}
             {pane === 'notifications' && (
               <div className="flex flex-col gap-6 xl:flex-row">
+                <div className="min-w-0 flex-1"><WebinarNotifications webinarId={webinar.id} /></div>
                 {/*
-                  **口がまだ無い段**（台帳 Issue #93）。押せる形で置かず、
-                  理由を見える文字で出す。
+                  通知の本文はまだこの画面で書けない（送る中身は共通の文面）。
+                  プレビューは「何を入れれば埋まるか」だけを出す。
                 */}
-                <div className="min-w-0 flex-1"><NotConnected source="通知・リマインドの設定" /></div>
-                {/* 送る文がまだ無いので、プレビューも「何を入れれば埋まるか」だけ。 */}
                 <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...notificationPreview(null)} /></div>
               </div>
             )}

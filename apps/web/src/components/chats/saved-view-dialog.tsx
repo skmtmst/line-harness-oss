@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Notice from '@/components/shared/notice'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -136,20 +137,32 @@ export default function SavedViewDialog({
                 onChange={(event) => { setName(event.target.value); setError('') }}
                 maxLength={NAME_LIMIT}
                 placeholder="例：未対応・期限超過"
-                aria-describedby={!error && nameMissing ? 'saved-view-name-hint' : undefined}
-                className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${error ? 'border-danger' : 'border-hairline'}`}
+                /*
+                  **空のあいだも枠を赤くする。** 設計 `AuSDY`（2-16）は
+                  未入力の欄を赤い枠で描く。押してから赤くするのでは、
+                  **どこを直せばよいかが押すまで分からない。**
+                */
+                aria-invalid={Boolean(error) || nameMissing}
+                aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
+                className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${error || nameMissing ? 'border-danger' : 'border-hairline'}`}
               />
               {/*
-                **断りではなく、次に何をすれば進めるかを書く。** 赤字ではない
-                ——まだ間違えていないので、注意ではなく案内。
-                文言は設計 `AuSDY`（2-16）の「検索名を入力してください。」に合わせる。
+                **断りは共通の赤い帯で出す。** 設計 `AuSDY`（2-16）は
+                ⚠ の付いた赤い帯で「検索名を入力してください。」と言う。
+                小さな灰色の字だと、**赤い枠だけ見えて理由が読まれない。**
+
+                空のときと、押して断られたときで**同じ見た目**にする。
+                片方だけ帯にすると、同じ「入力してください」が2通りの
+                見え方をして、別のことを言われたように読める。
               */}
-              {!error && nameMissing ? (
-                <p id="saved-view-name-hint" className="text-ink-faint mt-1.5 text-xs">
-                  検索名を入力してください。
-                </p>
+              {error || nameMissing ? (
+                <Notice
+                  id={error ? 'saved-view-error' : 'saved-view-name-hint'}
+                  tone="error"
+                  message={error || '検索名を入力してください。'}
+                  className="mt-1.5"
+                />
               ) : null}
-              {error ? <p className="text-danger mt-1.5 text-xs" role="alert">{error}</p> : null}
             </div>
 
             <div>
