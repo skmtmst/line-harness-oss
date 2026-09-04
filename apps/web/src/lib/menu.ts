@@ -159,6 +159,7 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '設定',
     title: '設定',
     items: [
+      { href: '/getting-started', label: 'はじめの設定', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', id: 'getting-started', note: '最初にやることの順路と、いまどこまで終わったか', required: true },
       // 「設定」区分の先頭。要件 `v6-33-account-settings` §5-3。
       // **統括の店舗管理（/hq）とは別のもの。** こちらは送受信に使う
       // LINE公式アカウントそのものの設定。
