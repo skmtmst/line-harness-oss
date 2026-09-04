@@ -216,6 +216,7 @@ type AnalyticsProjectionProgress = {
   last_occurred_at: string;
   last_event_id: string;
   source_event_count: number;
+  phase: 'scan' | 'cleanup';
 };
 
 export type AnalyticsProjectionChunkResult = AnalyticsProjectionResult & {
@@ -304,7 +305,7 @@ function jsonInsertStatements(
   return statements;
 }
 
-/** cron向け。最大8,000イベントだけを読み、最終ページで既存の日別集計へ確定する。 */
+/** cron向け。最大4,000イベントだけを読み、確定後の中間行整理も分割する。 */
 export async function rebuildAnalyticsDailyMetricsChunk(
   db: D1Database,
   input: {
@@ -316,7 +317,53 @@ export async function rebuildAnalyticsDailyMetricsChunk(
   },
 ): Promise<AnalyticsProjectionChunkResult> {
   const state = await loadOrCreateProjectionProgress(db, input);
-  const limit = Math.max(1, Math.min(input.limit ?? 8_000, 8_000));
+  const limit = Math.max(1, Math.min(input.limit ?? 4_000, 4_000));
+  if (state.phase === 'cleanup') {
+    const reconciliation = await db.prepare(
+      `SELECT projected_count, mismatch_count, status
+         FROM analytics_reconciliation_runs
+        WHERE line_account_id = ? AND range_to = ?`,
+    ).bind(state.line_account_id, state.range_to).first<{
+      projected_count: number;
+      mismatch_count: number;
+      status: 'matched' | 'mismatched';
+    }>();
+    if (!reconciliation) throw new Error('analytics_projection_reconciliation_unavailable');
+    const deleted = await db.prepare(
+      `DELETE FROM analytics_projection_friend_stage
+        WHERE rowid IN (
+          SELECT rowid FROM analytics_projection_friend_stage
+           WHERE line_account_id = ? AND cycle_id = ?
+           LIMIT ?
+        )`,
+    ).bind(state.line_account_id, state.cycle_id, limit).run();
+    const readRows = Number(deleted.meta?.changes ?? 0);
+    const completed = readRows < limit;
+    if (completed) {
+      await db.batch([
+        db.prepare(
+          `DELETE FROM analytics_projection_metric_stage
+            WHERE line_account_id = ? AND cycle_id = ?`,
+        ).bind(state.line_account_id, state.cycle_id),
+        db.prepare(
+          `DELETE FROM analytics_projection_progress
+            WHERE line_account_id = ? AND cycle_id = ?`,
+        ).bind(state.line_account_id, state.cycle_id),
+      ]);
+    }
+    return {
+      accountId: state.line_account_id,
+      fromDate: state.range_from,
+      toDate: state.range_to,
+      sourceEventCount: Number(state.source_event_count),
+      projectedCount: Number(reconciliation.projected_count),
+      mismatchCount: Number(reconciliation.mismatch_count),
+      status: reconciliation.status,
+      completed,
+      readRows,
+      cursor: null,
+    };
+  }
   const page = await db.prepare(
     `SELECT id, event_type, friend_id, occurred_at
        FROM analytics_events
@@ -468,17 +515,10 @@ export async function rebuildAnalyticsDailyMetricsChunk(
       state.data_cutoff_at, completedAt,
     ),
     db.prepare(
-      `DELETE FROM analytics_projection_metric_stage
+      `UPDATE analytics_projection_progress
+          SET phase = 'cleanup', updated_at = ?
         WHERE line_account_id = ? AND cycle_id = ?`,
-    ).bind(state.line_account_id, state.cycle_id),
-    db.prepare(
-      `DELETE FROM analytics_projection_friend_stage
-        WHERE line_account_id = ? AND cycle_id = ?`,
-    ).bind(state.line_account_id, state.cycle_id),
-    db.prepare(
-      `DELETE FROM analytics_projection_progress
-        WHERE line_account_id = ? AND cycle_id = ?`,
-    ).bind(state.line_account_id, state.cycle_id),
+    ).bind(completedAt, state.line_account_id, state.cycle_id),
   ]);
   return {
     accountId: state.line_account_id,
@@ -488,7 +528,7 @@ export async function rebuildAnalyticsDailyMetricsChunk(
     projectedCount,
     mismatchCount,
     status,
-    completed: true,
+    completed: false,
     readRows: page.results.length,
     cursor: null,
   };

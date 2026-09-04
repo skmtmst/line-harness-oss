@@ -177,7 +177,7 @@ describe('V6分析イベントと日別投影', () => {
       .toEqual({ count: 1 });
   });
 
-  it('1万件超を8千件ずつ再開し、一括再構築と同じ日別値で確定する', async () => {
+  it('1万件超の読込・確定後の中間行整理を4千件ずつ再開する', async () => {
     const projectionQueries: string[] = [];
     db = asD1(sqlite, projectionQueries);
     const insertFriend = sqlite.prepare(`
@@ -207,18 +207,31 @@ describe('V6分析イベントと日別投影', () => {
       dataCutoffAt: '2026-08-26T01:00:00.000Z',
     };
 
-    const first = await rebuildAnalyticsDailyMetricsChunk(db, input);
-    const second = await rebuildAnalyticsDailyMetricsChunk(db, input);
+    const results = [];
+    for (let index = 0; index < 6; index += 1) {
+      results.push(await rebuildAnalyticsDailyMetricsChunk(db, input));
+    }
 
-    expect(first).toMatchObject({ completed: false, readRows: 8_000, sourceEventCount: 8_000 });
-    expect(second).toMatchObject({
-      completed: true,
+    expect(results[0]).toMatchObject({ completed: false, readRows: 4_000, sourceEventCount: 4_000 });
+    expect(results[1]).toMatchObject({ completed: false, readRows: 4_000, sourceEventCount: 8_000 });
+    expect(results[2]).toMatchObject({
+      completed: false,
       readRows: 2_502,
       sourceEventCount: 10_502,
       projectedCount: 10_502,
       mismatchCount: 0,
       status: 'matched',
     });
+    expect(results.slice(3).map((result) => result.readRows)).toEqual([4_000, 4_000, 2_501]);
+    expect(results.slice(0, 5).every((result) => result.completed === false)).toBe(true);
+    expect(results[5]?.completed).toBe(true);
+    for (const table of [
+      'analytics_projection_friend_stage',
+      'analytics_projection_metric_stage',
+      'analytics_projection_progress',
+    ]) {
+      expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()).toEqual({ count: 0 });
+    }
     const chunkedMetrics = sqlite.prepare(`
       SELECT metric_key, dimension_value, numerator
         FROM analytics_daily_metrics WHERE line_account_id = 'account-a'
