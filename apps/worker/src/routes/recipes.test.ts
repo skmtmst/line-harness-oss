@@ -38,8 +38,14 @@ vi.mock('../services/account-access.js', () => accountAccess);
 const { recipes } = await import('./recipes.js');
 
 const run = vi.fn();
-const bind = vi.fn(() => ({ run, first: vi.fn(), all: vi.fn(async () => ({ results: [] })) }));
-const prepare = vi.fn(() => ({ bind }));
+const bind = vi.fn((..._values: unknown[]) => ({
+  run,
+  first: vi.fn(),
+  all: vi.fn(async () => ({ results: [] })),
+}));
+// 引数の型を書いておく。書かないと `prepare.mock.calls[n][0]` が
+// 長さ0のタプル扱いになり、CI の型検査だけが落ちる。
+const prepare = vi.fn((_sql: string) => ({ bind }));
 const env = { DB: { prepare } as unknown as D1Database };
 
 function makeApp() {
