@@ -91,14 +91,16 @@ export default function ListState({
       <Icon aria-hidden="true" size={24} className={iconClass} />
       <p className={titleClass}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
-      {danger && onRetry ? (
+      {(danger && onRetry) || action ? (
         <div className={styles.action}>
-          <Button type="button" onClick={onRetry} disabled={retrying}>
-            {retrying ? STATE_TEXT.loading : STATE_TEXT.retry}
-          </Button>
+          {danger && onRetry ? (
+            <Button type="button" onClick={onRetry} disabled={retrying}>
+              {retrying ? STATE_TEXT.loading : STATE_TEXT.retry}
+            </Button>
+          ) : null}
+          {action}
         </div>
       ) : null}
-      {action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )
 }
