@@ -1833,6 +1833,61 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
   return s ? `?${s}` : ''
 }
 
+
+/** 事前確認の4区分。設計 ★V6 33-4 の言葉と1対1。 */
+export type HandoverMatchBucket = 'auto' | 'review' | 'unmatched' | 'lookalike'
+
+export type HandoverMatchCounts = Record<HandoverMatchBucket, number>
+
+export interface AccountHandover {
+  id: string
+  fromAccountId: string
+  /** 受け取り先。コードが読まれるまでは null。 */
+  toAccountId: string | null
+  code: string
+  codeExpiresAt: string
+  status:
+    | 'code_issued'
+    | 'linked'
+    | 'previewed'
+    | 'resolved'
+    | 'executing'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+  /**
+   * プロバイダーが同じか。**`unknown` を「同じ」と読まない。**
+   * LINE は返さないので、こちらに入っていなければ分からない。
+   */
+  providerMatch: 'same' | 'different' | 'unknown'
+  /**
+   * 事前確認の結果。**まとめて出るか、まとめて出ないか。**
+   * 片方だけ出ることはない（合計が合わない表示を作らないため）。
+   */
+  counts: (HandoverMatchCounts & { sourceTotal: number }) | null
+  movedCount: number
+  failedCount: number
+  failureReason: string | null
+  createdAt: string
+  linkedAt: string | null
+  previewedAt: string | null
+  resolvedAt: string | null
+  executedAt: string | null
+  completedAt: string | null
+}
+
+export interface AccountHandoverDecision {
+  id: string
+  handover_id: string
+  from_friend_id: string
+  to_friend_id: string | null
+  decision: 'link' | 'new' | 'skip'
+  bucket: HandoverMatchBucket
+  note: string | null
+  decided_by: string | null
+  decided_at: string
+}
+
 export const api = {
   system: {
     health: () =>
@@ -3276,6 +3331,70 @@ export const api = {
       fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me', {
         method: 'PATCH',
         body: JSON.stringify({ name }),
+      }),
+  },
+  /**
+   * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+   *
+   * 5 段の流れ。**事前確認（段3）だけでは元のアカウントは何も変わらない。**
+   */
+  accountHandovers: {
+    /** 段1。引き継ぎコードを出す。生きているコードがあればそれを返す。 */
+    issue: (fromAccountId: string) =>
+      fetchApi<ApiResponse<AccountHandover>>('/api/account-handovers', {
+        method: 'POST',
+        body: JSON.stringify({ fromAccountId }),
+      }),
+    /** 段2。受け取り先でコードを読む。 */
+    link: (code: string, toAccountId: string) =>
+      fetchApi<ApiResponse<AccountHandover>>('/api/account-handovers/link', {
+        method: 'POST',
+        body: JSON.stringify({ code, toAccountId }),
+      }),
+    get: (id: string) =>
+      fetchApi<ApiResponse<AccountHandover & {
+        decisions: AccountHandoverDecision[]
+        /** 段4でまだ決めていない「要確認」の数。0 になるまで本実行できない。 */
+        unresolvedReviews: number | null
+      }>>(`/api/account-handovers/${id}`),
+    listForAccount: (accountId: string) =>
+      fetchApi<ApiResponse<AccountHandover[]>>(`/api/line-accounts/${accountId}/handovers`),
+    /**
+     * 段3。事前確認の結果を保存する。
+     * **4区分の合計が `sourceFriendTotal` と合わないと 422 で断られる。**
+     */
+    preview: (
+      id: string,
+      input: { sourceFriendTotal: number; counts: HandoverMatchCounts },
+    ) =>
+      fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/preview`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    /** 段4。競合の判断を保存する。`link` は相手が要る。 */
+    saveDecisions: (
+      id: string,
+      decisions: Array<{
+        fromFriendId: string
+        toFriendId?: string | null
+        decision: 'link' | 'new' | 'skip'
+        bucket: HandoverMatchBucket
+        note?: string | null
+      }>,
+    ) =>
+      fetchApi<ApiResponse<AccountHandover & { unresolvedReviews: number | null }>>(
+        `/api/account-handovers/${id}/decisions`,
+        { method: 'PUT', body: JSON.stringify({ decisions }) },
+      ),
+    /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。 */
+    execute: (id: string) =>
+      fetchApi<ApiResponse<AccountHandover & { plannedCount: number }>>(
+        `/api/account-handovers/${id}/execute`,
+        { method: 'POST' },
+      ),
+    cancel: (id: string) =>
+      fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/cancel`, {
+        method: 'POST',
       }),
   },
   lineAccounts: {
