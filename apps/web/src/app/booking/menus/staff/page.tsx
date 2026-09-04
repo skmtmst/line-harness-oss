@@ -162,7 +162,7 @@ function MenuStaffMatrixContent() {
             // error が出ている間は押させない。読み込みに失敗した状態で
             // 保存すると、空の割り当てで上書きしてしまう。
             disabled={saving || !selectedAccountId || loading || Boolean(error)}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {saving ? '保存中…' : '変更を保存'}
           </button>
@@ -220,7 +220,7 @@ function MenuStaffMatrixContent() {
           </div>
           <a
             href={`#menu-${orphans[0].id}`}
-            className="bg-accent text-on-accent rounded-control px-3 py-2 text-xs font-medium"
+            className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-medium"
           >
             割り当てる
           </a>

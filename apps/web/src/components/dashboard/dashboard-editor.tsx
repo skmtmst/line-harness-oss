@@ -314,7 +314,7 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
 
         <footer className="border-hairline flex items-center justify-end gap-2 border-t px-[22px] py-4">
           <button type="button" onClick={onCancel} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium">キャンセル</button>
-          <button type="button" onClick={() => onApply(draft)} className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium">変更を適用</button>
+          <button type="button" onClick={() => onApply(draft)} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium">変更を適用</button>
         </footer>
       </aside>
     </div>

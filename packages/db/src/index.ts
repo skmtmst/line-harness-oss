@@ -21,6 +21,7 @@ export * from './friend-add-routing-versions';
 export * from './calendar';
 export * from './reminders';
 export * from './scoring';
+export * from './action-score-rules';
 export * from './templates';
 export * from './chats';
 export * from './inbox-reads';
@@ -43,8 +44,10 @@ export * from './rich-menus';
 export * from './affiliate-links';
 export * from './affiliate-offers';
 export * from './mileage';
+export * from './mileage-rewards';
 export * from './affiliate-attribution';
 export * from './affiliate-report';
+export * from './affiliate-payments';
 export * from './account-settings';
 export * from './webinars';
 

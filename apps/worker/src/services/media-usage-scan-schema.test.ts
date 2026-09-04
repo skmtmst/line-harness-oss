@@ -3,10 +3,10 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { scanSingleMediaUsage } from './media-usage-scan.js';
+import { scanMediaUsage, scanSingleMediaUsage } from './media-usage-scan.js';
 
 function asD1(sqlite: Database.Database): D1Database {
-  return {
+  const d1 = {
     prepare(query: string) {
       const prepared = () => sqlite.prepare(query);
       return {
@@ -26,7 +26,11 @@ function asD1(sqlite: Database.Database): D1Database {
         },
       };
     },
-  } as unknown as D1Database;
+    async batch(statements: D1PreparedStatement[]) {
+      return Promise.all(statements.map((statement) => statement.run()));
+    },
+  };
+  return d1 as unknown as D1Database;
 }
 
 describe('登録メディアの厳密走査と実DBスキーマ', () => {
@@ -122,5 +126,44 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
     expect(sqlite.prepare(
       `SELECT COUNT(*) AS count FROM media_usages WHERE media_id = 'media-1'`,
     ).get()).toEqual({ count: 205 });
+  });
+
+  it('定期走査は7回へ分け、1周が終わるまで古い記録を消さない', async () => {
+    sqlite.prepare(
+      `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
+       VALUES ('template-1', '案内', 'image', 'https://example.com/media/guide.png', 'account-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+       VALUES ('media-1', 'event', 'deleted-event', '2026-08-01T00:00:00.000')`,
+    ).run();
+
+    for (let index = 0; index < 6; index += 1) {
+      const result = await scanMediaUsage(db, `2026-09-0${index + 1}T00:00:00.000`);
+      expect(result.cycleCompleted).toBe(false);
+    }
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM media_usages WHERE ref_id = 'deleted-event'`,
+    ).get()).toEqual({ count: 1 });
+
+    const queued = await scanMediaUsage(db, '2026-09-07T00:00:00.000');
+    expect(queued).toMatchObject({ source: 'webinar', cycleCompleted: false, pruned: 0 });
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM media_usages WHERE ref_id = 'deleted-event'`,
+    ).get()).toEqual({ count: 1 });
+
+    const completed = await scanMediaUsage(db, '2026-09-08T00:00:00.000');
+
+    expect(completed).toMatchObject({ cycleCompleted: true, pruned: 1 });
+    expect(sqlite.prepare(
+      `SELECT ref_kind, ref_id FROM media_usages ORDER BY ref_kind, ref_id`,
+    ).all()).toEqual([{ ref_kind: 'template', ref_id: 'template-1' }]);
+    expect(sqlite.prepare(
+      `SELECT source_index, last_ref_id, cycle_started_at FROM media_usage_scan_state WHERE id = 1`,
+    ).get()).toEqual({
+      source_index: 0,
+      last_ref_id: '',
+      cycle_started_at: '2026-09-08T00:00:00.000',
+    });
   });
 });

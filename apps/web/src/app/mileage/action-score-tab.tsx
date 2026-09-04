@@ -154,7 +154,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
       safeReason(item.lastReason),
       formatMileageDate(item.lastChangedAt),
     ])
-    const csv = [['友だち', 'いまの点数', '層', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
+    const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
       .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
@@ -168,22 +168,28 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
   return (
     <section data-design-node="z3PB2" className="space-y-3.5">
       <div className="rounded-v6-control border border-v6-warning/25 bg-v6-warning-bg px-4 py-3 text-xs text-v6-ink-secondary">
+        {/*
+          設計 `z3PB2` の文そのまま。**「顧客には表示されず」だけでは足りない。**
+          「マイルが減るのでは」と聞かれたときに答えられる形にする——
+          交換できないこと、残高が動かないことを先に言う。
+        */}
         <strong className="text-v6-ink">スコアはマイルではありません。</strong>
-        顧客には表示されず、反応の目安として配信や対応の優先順位に使います。顧客の価値を表すものではありません。
+        お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
+        反応の目安として、配信や対応の順番を決めるために使います。
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="選択中のLINEアカウント" />
-        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="よく反応している層" />
-        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="反応が続いている層" />
-        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="直近の反応が少ない層" />
+        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="よく反応している帯" />
+        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="反応が続いている帯" />
+        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="直近の反応が少ない帯" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この層の友だちを見る</Button> : null}
-          {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この層に配信する</Button> : null}
-          {filter === 'all' ? <span className="text-xs text-v6-ink-faint">高い・ふつう・低いの層を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
+          {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この帯の人を見る</Button> : null}
+          {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この帯に配信する</Button> : null}
+          {filter === 'all' ? <span className="text-xs text-v6-ink-faint">高い・ふつう・低いの帯を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
           {filter === 'decreased' ? <span className="text-xs text-v6-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
         <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
@@ -250,14 +256,14 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
         ) : error ? (
           <ListState kind="error" title="行動スコアを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>行動スコアを再読み込み</Button>} />
         ) : !overview?.items.length ? (
-          <ListState kind="empty" title="条件に合う友だちがいません" description="層または検索条件を変えてください。" />
+          <ListState kind="empty" title="条件に合う友だちがいません" description="帯または検索条件を変えてください。" />
         ) : (
           <DataTable>
               <thead className="bg-v6-surface text-left text-xs text-v6-ink-faint">
                 <TableHeadRow>
                   <Th className="w-1/4">友だち</Th>
                   <Th className="w-1/12" align="right">いまの点数</Th>
-                  <Th className="w-1/12">層</Th>
+                  <Th className="w-1/12">帯</Th>
                   <Th className="w-1/6" align="right">30日間の変化</Th>
                   <Th className="w-1/4">最後の反応</Th>
                   <Th className="w-1/6" align="right">操作</Th>

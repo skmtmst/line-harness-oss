@@ -203,7 +203,14 @@ export function analyzeSource(full, text, parts) {
             if (c.includes('[')) bump(file, 'arbitrary-value')
           }
           const isControl = tag === 'button' || tag === 'Link' || tag === 'a'
-          if (isControl && read.classes.includes('bg-accent')) bump(file, 'direct-primary-button')
+          /*
+            主ボタンの地は 2 つある。**`bg-accent` だけを数えていると、
+            白文字が乗る側（`bg-accent-deep`）が数から消える。**
+            2026-09-04 に白文字が乗る 138 か所を deep へ寄せたとき、
+            この数が 130 → 11 に落ちて気づいた。借金が減ったのではない。
+          */
+          if (isControl && (read.classes.includes('bg-accent') || read.classes.includes('bg-accent-deep')))
+            bump(file, 'direct-primary-button')
           if (isControl && read.classes.includes('border-hairline')) bump(file, 'direct-secondary-button')
 
           // 共通部品へ表示制御を渡してはいけない。部品のCSSはレイヤーに

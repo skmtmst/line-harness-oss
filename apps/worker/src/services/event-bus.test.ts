@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent } from './event-bus.js';
 
+const actionScoreMocks = vi.hoisted(() => ({
+  applyActionScoreEvent: vi.fn(),
+}));
+
 interface CapturedInsert {
   sql: string;
   binds: unknown[];
@@ -79,6 +83,8 @@ vi.mock('./outgoing-webhook-delivery.js', () => ({
 vi.mock('./automation-triggers.js', () => ({
   dispatchAutomationEventWithLogging: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock('./action-score-events.js', () => actionScoreMocks);
 
 describe('fireEvent — send_message action logging', () => {
   let captured: CapturedInsert[];
@@ -241,6 +247,11 @@ describe('fireEvent — send_message action logging', () => {
 describe('fireEvent — V6分析イベント', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
+      configured: false,
+      status: 'legacy',
+      applications: [],
+    });
   });
 
   it('発生元ID・時刻・アカウントがそろったイベントだけを追記基盤へ渡す', async () => {
@@ -285,6 +296,50 @@ describe('fireEvent — V6分析イベント', () => {
     }, undefined, 'account-a');
 
     expect(dbModule.recordAnalyticsEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('fireEvent — V6行動スコア', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const dbModule = await import('@line-crm/db');
+    (dbModule.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([]);
+  });
+
+  it('元イベントを識別できれば公開版を使い、旧ルールへ二重加点しない', async () => {
+    const dbModule = await import('@line-crm/db');
+    actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
+      configured: true,
+      status: 'published',
+      applications: [],
+    });
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'message_received', {
+      sourceEventId: 'webhook-1',
+      sourceKind: 'line_webhook',
+      occurredAt: '2026-08-28T00:00:00.000Z',
+      friendId: 'friend-1',
+      eventData: {},
+    }, undefined, 'account-1');
+
+    expect(actionScoreMocks.applyActionScoreEvent).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-1',
+      friendId: 'friend-1',
+      eventType: 'message_received',
+      source: 'line_webhook',
+      sourceEventId: 'webhook-1',
+    }));
+    expect(dbModule.applyScoring).not.toHaveBeenCalled();
+  });
+
+  it('元イベントを識別できない旧経路は、移行前のルールを維持する', async () => {
+    const dbModule = await import('@line-crm/db');
+    const db = fakeDb({ capturedInserts: [] });
+    await fireEvent(db, 'message_received', { friendId: 'friend-1', eventData: {} });
+    expect(actionScoreMocks.applyActionScoreEvent).not.toHaveBeenCalled();
+    expect(dbModule.applyScoring).toHaveBeenCalledWith(db, 'friend-1', 'message_received');
   });
 });
 

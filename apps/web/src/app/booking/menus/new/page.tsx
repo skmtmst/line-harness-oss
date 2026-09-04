@@ -132,7 +132,7 @@ export default function NewBookingMenuPage() {
                   {basePrice ? `¥${Number(basePrice).toLocaleString()}` : '料金は当日ご案内'}
                 </span>
               </div>
-              <div className="bg-accent text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
+              <div className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center text-xs font-medium">
                 このメニューで予約する
               </div>
             </div>
