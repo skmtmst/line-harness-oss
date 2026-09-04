@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
@@ -411,18 +412,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
-            <select
-              value={rowKind}
-              onChange={(event) => setRowKind(event.target.value as typeof rowKind)}
-              className="v6-select w-full"
-            >
-              <option value="tag">タグ</option>
-              <option value="route">流入経路</option>
-              <option value="score_band">スコア帯</option>
-              <option value="conversion_point">成果地点</option>
-              <option value="booking_status">予約状態</option>
-              <option value="purchase_status">購入状態</option>
-            </select>
+            <SelectField value={rowKind} onChange={(event) => setRowKind(event.target.value as typeof rowKind)} options={[{ value: "tag", label: "タグ" }, { value: "route", label: "流入経路" }, { value: "score_band", label: "スコア帯" }, { value: "conversion_point", label: "成果地点" }, { value: "booking_status", label: "予約状態" }, { value: "purchase_status", label: "購入状態" }]} className="v6-select w-full" />
           </div>
           <div>
             <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-xs font-medium">

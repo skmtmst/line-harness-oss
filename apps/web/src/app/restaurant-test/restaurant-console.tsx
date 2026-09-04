@@ -5,6 +5,7 @@ import Header from '@/components/layout/header'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import StoreContextBanner from './stores/store-context-banner'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   restaurantTestApi,
   type RestaurantApproval,
@@ -208,6 +209,7 @@ function IntakeAddressPanel({ accountId, store }: { accountId: string; store: Re
   const [addresses, setAddresses] = useState<RestaurantIntakeAddress[]>([])
   const [loading, setLoading] = useState(false)
   const [issuing, setIssuing] = useState(false)
+  const [reissueOpen, setReissueOpen] = useState(false)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
@@ -239,9 +241,14 @@ function IntakeAddressPanel({ accountId, store }: { accountId: string; store: Re
 
   useEffect(() => { void loadAddresses() }, [loadAddresses])
 
+  /*
+    **確認はブラウザの `confirm()` を使わない。**
+    見た目がブラウザ任せで設計の確認窓と違ううえ、**画像比較に写らない**ので
+    確認の絵をそもそも撮れない。共通の確認窓（`ConfirmDialog`）で出す。
+  */
   const issue = async () => {
     if (!storeId || error) return
-    if (addresses.length > 0 && !confirm('新しい取り込みアドレスを発行しますか？\n旧アドレスは90日後に失効します。媒体側の通知先を新しいアドレスへ変更してください。')) return
+    setReissueOpen(false)
     setIssuing(true)
     setNotice('')
     setActionError('')
@@ -290,9 +297,18 @@ function IntakeAddressPanel({ accountId, store }: { accountId: string; store: Re
               </div>
               <p className="mt-2 text-[11px] text-ink-faint">発行日時: {intakeDate(item.createdAt)}</p>
             </div>)}</div>}
-          <div className="flex justify-end"><button type="button" disabled={issuing} onClick={() => void issue()} className="rounded-control bg-nen-green px-5 py-2.5 text-sm font-bold text-on-accent disabled:opacity-50">{issuing ? '発行中…' : 'アドレスを発行'}</button></div>
+          <div className="flex justify-end"><button type="button" disabled={issuing} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }} className="rounded-control bg-nen-green px-5 py-2.5 text-sm font-bold text-on-accent disabled:opacity-50">{issuing ? '発行中…' : 'アドレスを発行'}</button></div>
         </>}
     </div>
+    <ConfirmDialog
+      open={reissueOpen}
+      title="新しい取り込みアドレスを発行しますか？"
+      description="いまのアドレスは90日後に失効します。それまでに、媒体側の通知先を新しいアドレスへ変えてください。変えないと予約の取り込みが止まります。"
+      confirmLabel="発行する"
+      busy={issuing}
+      onCancel={() => setReissueOpen(false)}
+      onConfirm={() => void issue()}
+    />
   </Panel>
 }
 

@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
-  "total": 262,
-  "compared": 212,
-  "unimplemented": 22,
+  "total": 272,
+  "compared": 213,
+  "unimplemented": 31,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 28,
   "match": 0,
-  "structureMatchDataPending": 27,
+  "structureMatchDataPending": 28,
   "needsFix": 112,
   "unjudged": 97,
-  "remaining": 258,
+  "remaining": 268,
   "features": [
     {
       "feature": 1,
@@ -45,17 +45,17 @@
     {
       "feature": 2,
       "name": "受信箱",
-      "total": 17,
-      "compared": 17,
+      "total": 18,
+      "compared": 18,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 3,
       "unjudged": 13,
-      "remaining": 17,
+      "remaining": 18,
       "capturedAt": [
         {
           "pr": 513,
@@ -151,9 +151,9 @@
     {
       "feature": 3,
       "name": "友だち",
-      "total": 11,
+      "total": 12,
       "compared": 10,
-      "unimplemented": 1,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -161,7 +161,7 @@
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 10,
-      "remaining": 11,
+      "remaining": 12,
       "capturedAt": [
         {
           "pr": 520,
@@ -2455,6 +2455,38 @@
           "note": "development そのもので撮った"
         }
       ]
+    },
+    {
+      "feature": 33,
+      "name": "LINEアカウント設定",
+      "total": 4,
+      "compared": 0,
+      "unimplemented": 4,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 4,
+      "capturedAt": null
+    },
+    {
+      "feature": 34,
+      "name": "はじめの設定と案内",
+      "total": 4,
+      "compared": 0,
+      "unimplemented": 4,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 4,
+      "capturedAt": null
     }
   ],
   "gaps": [
@@ -2611,6 +2643,69 @@
       "name": "25-1-B オートメーションが動いた記録",
       "gap": "pending",
       "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
+    },
+    {
+      "feature": 3,
+      "node": "ux7of",
+      "name": "3-4-A UID・顧客データ移行／CSV",
+      "gap": "api",
+      "gapNote": "取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束"
+    },
+    {
+      "feature": 33,
+      "node": "QT91v",
+      "name": "33-1 LINEアカウント一覧",
+      "gap": "build",
+      "gapNote": "LINEアカウントを読む口はもう在る（`/api/line-accounts`）。一覧の画面を作るだけ"
+    },
+    {
+      "feature": 33,
+      "node": "b2NGxk",
+      "name": "33-2 LINEアカウントを登録する",
+      "gap": "build",
+      "gapNote": "登録の口は在る。**飲食店向けの店舗登録とは別の画面**として作る"
+    },
+    {
+      "feature": 33,
+      "node": "T9rA9",
+      "name": "33-3 LINEアカウントの詳細・編集",
+      "gap": "build",
+      "gapNote": "一覧と登録は在るので、読む口はそろっている。詳細・編集の画面を作るだけ"
+    },
+    {
+      "feature": 33,
+      "node": "nx3XW",
+      "name": "33-4 乗り換え・引き継ぎ",
+      "gap": "api",
+      "gapNote": "別のチャネルへ友だち・配信・履歴を引き継ぐ口が要る。既存の口では足りない"
+    },
+    {
+      "feature": 34,
+      "node": "RAW35",
+      "name": "34-1 はじめの設定",
+      "gap": "build",
+      "gapNote": "進み具合はいまある口（接続状態・友だち数・配信）から組み立てられる。画面を作るだけ"
+    },
+    {
+      "feature": 34,
+      "node": "y0P0Qx",
+      "name": "34-2 レシピ一覧",
+      "gap": "api",
+      "gapNote": "レシピ（ひな形の組み合わせ）を持つ口がまだ無い"
+    },
+    {
+      "feature": 34,
+      "node": "D5UaX",
+      "name": "34-3 レシピを複製する",
+      "gap": "api",
+      "gapNote": "レシピを複製して各機能へ展開する口が要る。`y0P0Qx` と同じ束"
+    },
+    {
+      "feature": 34,
+      "node": "f9oUm",
+      "name": "34-4 マニュアルの正本表",
+      "gap": "build",
+      "gapNote": "正本の場所を持つだけの表。新しい口は要らない"
     }
   ]
 }

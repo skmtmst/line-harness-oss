@@ -45,50 +45,35 @@ const count = (s: string) => (s.match(/<select[\s>]/g) ?? []).length
  * §4「守ること」で S0 は機能の画面を触らない）。ここは**増やせないこと**
  * だけを見張る。0 になったら行ごと消す——消し忘れるとこの試験が落ちる。
  *
- * 2026-09-04 時点で 41 画面・83 か所。
+ * 2026-09-04 時点で 23 画面・39 か所（83 か所から 44 か所を寄せた）。
+ * **残りは中身に条件分岐が混ざるもの**——`{cond && <option/>}` や、
+ * 選んだ値で並びが変わるもの。意味を読まないと壊せるので、機械で
+ * 置き換えず1つずつ見る。
  */
 const NOT_YET: Record<string, number> = {
-  'affiliate-offers/new/page.tsx': 4,
-  'analytics/page.tsx': 5,
-  'auto-replies/page.tsx': 2,
-  'automations/new/page.tsx': 3,
-  'automations/page.tsx': 1,
-  'booking/bookings/page.tsx': 2,
-  'booking/menus/page.tsx': 1,
+  'affiliate-offers/new/page.tsx': 1,
+  'analytics/page.tsx': 4,
+  'automations/new/page.tsx': 1,
   'booking/staff/new/page.tsx': 1,
-  'broadcasts/page.tsx': 1,
-  'chats/page.tsx': 2,
-  'contents/vars/edit/page.tsx': 1,
-  'contents/vars/new/page.tsx': 1,
-  'conversions/new/page.tsx': 2,
-  'emergency/page.tsx': 3,
-  'events/page.tsx': 2,
-  'form-submissions/edit/page.tsx': 2,
+  'chats/page.tsx': 1,
+  'conversions/new/page.tsx': 1,
+  'emergency/page.tsx': 2,
   'friend-add-settings/page.tsx': 1,
   'friends/detail/page.tsx': 1,
   'health/page.tsx': 1,
   'inflow-links/new/page.tsx': 5,
-  'mileage/earning-rules/new/page.tsx': 4,
-  'nen-campaigns/page.tsx': 4,
+  'mileage/earning-rules/new/page.tsx': 2,
+  'nen-campaigns/page.tsx': 2,
   'page.tsx': 1,
   'pools/new/page.tsx': 1,
-  'pools/page.tsx': 2,
-  'reminders/edit/page.tsx': 2,
   'reminders/new/page.tsx': 5,
-  'reminders/page.tsx': 1,
-  'rich-menus/edit/page.tsx': 1,
-  'rich-menus/page.tsx': 2,
   'scenarios/first-step/page.tsx': 2,
   'scenarios/mode/page.tsx': 1,
-  'tags/edit/page.tsx': 3,
+  'tags/edit/page.tsx': 1,
   'tags/fields/migrate/page.tsx': 1,
   'tags/fields/new/page.tsx': 2,
-  'tags/new/page.tsx': 3,
-  'templates/edit/page.tsx': 1,
-  'templates/page.tsx': 1,
+  'tags/new/page.tsx': 1,
   'webhooks/page.tsx': 1,
-  'webinars/edit/page.tsx': 2,
-  'webinars/page.tsx': 2,
 }
 
 describe('素の <select> を画面に書かない', () => {
