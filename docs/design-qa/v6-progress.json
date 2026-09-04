@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 232,
-  "unimplemented": 26,
+  "compared": 237,
+  "unimplemented": 21,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 4,
   "match": 0,
   "structureMatchDataPending": 0,
-  "needsFix": 3,
-  "unjudged": 229,
+  "needsFix": 6,
+  "unjudged": 231,
   "remaining": 258,
   "features": [
     {
@@ -871,15 +871,15 @@
       "feature": 8,
       "name": "自動応答",
       "total": 11,
-      "compared": 6,
-      "unimplemented": 5,
+      "compared": 10,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 6,
+      "unjudged": 10,
       "remaining": 11,
       "capturedAt": [
         {
@@ -1559,14 +1559,14 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 9,
-      "unimplemented": 2,
+      "compared": 10,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
+      "needsFix": 2,
       "unjudged": 8,
       "remaining": 11,
       "capturedAt": [
@@ -2474,34 +2474,6 @@
     },
     {
       "feature": 8,
-      "node": "U9hzqH",
-      "name": "8-1-D 競合と優先順位",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "g46ja",
-      "name": "8-1-E 自動応答テスト",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "Yj6CQ",
-      "name": "8-1-F 最終確認",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
-      "node": "e6iJG",
-      "name": "8-1-G 有効化完了",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの"
-    },
-    {
-      "feature": 8,
       "node": "t7UtYQ",
       "name": "8-1-H 実行結果",
       "gap": "pending",
@@ -2590,13 +2562,6 @@
       "name": "17-1-G マイルの使い道をつくる",
       "gap": "pending",
       "gapNote": "画面 `/mileage/rewards/edit` が development に無い。判定は未マージ枝 `5e8f32d3` で書かれたもの"
-    },
-    {
-      "feature": 17,
-      "node": "s6MBc",
-      "name": "17-2-A スコアのルール",
-      "gap": "pending",
-      "gapNote": "画面 `/mileage/score-rules` が development に無い。判定は未マージ枝 `642b8222` で書かれたもの"
     },
     {
       "feature": 20,

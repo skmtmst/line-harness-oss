@@ -50,6 +50,7 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
+  ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
 } from './fixtures.mjs'
@@ -359,10 +360,13 @@ const SHAPES = {
       approvalStatus: 'pending', duplicateFlag: true,
     },
   ],
+  '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
     summary: {
       scoredFriends: 5, high: 1, normal: 3, low: 1, decreased30d: 0,
-      highMin: 70, normalMin: 40,
+      /* `packages/db` の `DEFAULT_BANDS` と同じ 30 / 70。40 は根拠が無く、
+         決めごとの画面と一覧で同じ人が別の帯に入って見えていた。 */
+      highMin: 70, normalMin: 30,
     },
     items: [
       { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
