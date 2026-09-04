@@ -1287,8 +1287,8 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 表記統一。設計画像は `docs/design-reference/templates-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カードセットを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0 **推奨修正**：カードごとの並べ替えと画像の比率の指定を足す。**カルーセルの中身は `NNDMR`（質問を作る）が選択肢の開閉で似た作りを持っている**ので、並べ替えの部品はそこから写せる。', verdictSource: 'templates-v6/FRkls.txt',
-    steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 表記統一。設計画像は `docs/design-reference/templates-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カルーセルを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0 **推奨修正**：カードごとの並べ替えと画像の比率の指定を足す。**カルーセルの中身は `NNDMR`（質問を作る）が選択肢の開閉で似た作りを持っている**ので、並べ替えの部品はそこから写せる。', verdictSource: 'templates-v6/FRkls.txt',
+    steps: [{ click: 'カルーセル' }, { click: 'カルーセルを作る' }],
     verdictHead: '7b509106',
   },
   {
