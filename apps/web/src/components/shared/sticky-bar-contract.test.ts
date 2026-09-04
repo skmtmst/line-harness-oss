@@ -100,23 +100,10 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  *     置けないものを「まだ置いていない」と数えると、表が永久に空にならない。
  *   帯が部品の中にある画面（`tags/edit` `tags/marks/*` `events/new`
  *     `templates/edit`）を「無い」と数えていた。`page.tsx` だけ読んでいたため。
- * 読み込んだ部品まで見て数え直し、17 画面。
+ * 読み込んだ部品まで見て数え直すと17画面で、そのうち3画面を #856 で移行した。
+ * 残る14画面は台帳 #109 の仕上げ（PR #866）で共通バーへ移し、この表を空にした。
  */
-const NOT_YET = [
-  'auto-replies/edit/page.tsx',
-  'booking/bookings/new/page.tsx',
-  'broadcasts/new/page.tsx',
-  'events/edit/page.tsx',
-  'form-submissions/edit/page.tsx',
-  'nen-campaigns/columns/new/page.tsx',
-  'nen-campaigns/edit/page.tsx',
-  'restaurant-test/stores/new/page.tsx',
-  'rich-menus/edit/page.tsx',
-  'rich-menus/new/page.tsx',
-  'templates/questions/new/page.tsx',
-  'webinars/edit/page.tsx',
-  'webinars/new/page.tsx',
-]
+const NOT_YET: string[] = []
 
 const uses = (s: string) => /StickyBar|CreatePage/.test(s)
 
@@ -149,5 +136,10 @@ describe('下部追従バーの並びを部品で固定する', () => {
 
   it('1440 で横スクロールさせずに折り返す', () => {
     expect(CSS).toMatch(/@media \(max-width: 1100px\)/)
+  })
+
+  it('画面の下に追従する', () => {
+    expect(CSS).toMatch(/position:\s*sticky/)
+    expect(CSS).toMatch(/bottom:\s*0/)
   })
 })

@@ -97,7 +97,7 @@ describe('V6 流入経路一覧の契約', () => {
     ]) {
       expect(PAGE, `${raw} が残っています`).not.toContain(raw)
     }
-    expect(PAGE).toContain('bg-v6-accent')
-    expect(PAGE).toContain('text-v6-action')
+    expect(PAGE).toContain('bg-accent')
+    expect(PAGE).toContain('text-action')
   })
 })

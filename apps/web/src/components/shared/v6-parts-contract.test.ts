@@ -40,7 +40,7 @@ describe('V6共通部品のトークン', () => {
       '--color-accent-deep: #087a3e;',
       '--color-step-idle: #eef0f3;',
       '--color-surface-chrome: #ebedf1;',
-      '--radius-tiny: 3px;',
+      '--radius-icon: 3px;',
       '--text-body: 14px;',
       '--text-display: 30px;',
     ]
