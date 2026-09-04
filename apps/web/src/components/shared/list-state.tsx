@@ -1,6 +1,8 @@
 import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock, TriangleAlert } from 'lucide-react'
+import Button from './button'
+import { STATE_TEXT } from './not-connected'
 import styles from './list-state.module.css'
 
 /**
@@ -50,6 +52,8 @@ export default function ListState({
   title,
   description,
   action,
+  onRetry,
+  retrying = false,
   className,
 }: {
   kind: ListStateKind
@@ -58,6 +62,10 @@ export default function ListState({
   description?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
+  /** もう一度読み込む。`error` のときだけ押し口を出す。 */
+  onRetry?: () => void
+  /** 読み直している間。二度押しを止める。 */
+  retrying?: boolean
   className?: string
 }) {
   const preset = PRESETS[kind]
@@ -83,6 +91,13 @@ export default function ListState({
       <Icon aria-hidden="true" size={24} className={iconClass} />
       <p className={titleClass}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
+      {danger && onRetry ? (
+        <div className={styles.action}>
+          <Button type="button" onClick={onRetry} disabled={retrying}>
+            {retrying ? STATE_TEXT.loading : STATE_TEXT.retry}
+          </Button>
+        </div>
+      ) : null}
       {action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )
