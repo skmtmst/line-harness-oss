@@ -79,43 +79,40 @@
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #fff7e6;
   --color-status-warn-deep: #a15c00;
-  --color-status-warning: #a15c00;
-  --color-status-warning-soft: #fff7e6;
   --color-status-danger: #e5484d;
   --color-status-danger-soft: #fef0f0;
   --color-step-idle: #eef0f3;
   --color-surface-chrome: #ebedf1;
 
-  /* ★V6で実測した一覧・操作の色。既存V5画面へ波及させないため、
-   * 共通色を上書きせずV6の意味名で固定する。 */
-  --color-v6-accent: #07c653;
-  --color-v6-accent-hover: #079b45;
-  --color-v6-accent-soft: #e9f9ef;
-  --color-v6-accent-border: #a8e9c1;
-  --color-v6-action: #0067d9;
-  --color-v6-action-soft: #f3f8ff;
-  --color-v6-ink: #1d1d1f;
-  --color-v6-ink-secondary: #565f59;
-  --color-v6-ink-faint: #8b938d;
-  --color-v6-ink-disabled: #b8bcc2;
-  --color-v6-divider: #eaebed;
-  --color-v6-surface: #f9fafa;
-  --color-v6-surface-strong: #f6f6f8;
-  --color-v6-danger: #d34851;
-  --color-v6-danger-bg: #fff1f2;
-  --color-v6-danger-selected: #ffe4e7;
-  --color-v6-danger-text: #b4232b;
-  --color-v6-danger-border: #f3b8bb;
-  --color-v6-warning: #a66a00;
-  --color-v6-warning-strong: #d99017;
-  --color-v6-warning-bg: #fff7e8;
-  --color-v6-purple: #7651c9;
-  --color-v6-purple-bg: #f0ebff;
-  --color-v6-avatar-bg: #eef0f2;
-  --color-v6-avatar-indigo: #5545e6;
-  --color-v6-avatar-blue: #1260c9;
-  --color-v6-avatar-slate: #536170;
-  --color-v6-avatar-green: #079b45;
+  /*
+   * ★V6 で実測した色は、**別系統として持たない。**
+   *
+   * 以前ここには `--color-v6-*` が 28 個あり、緑が2色（#06c755 と #07c653）、
+   * 赤が3色（#b3261e・#d34851・#e5484d）並んでいた。**同じ意味の色が
+   * 名前違いで2つあると、片方だけ直した画面が出る。** 実際 `v6-ink-faint`
+   * (#8b938d) は白地で 3.16:1 しかなく、AA に届かないまま10画面に残っていた。
+   *
+   * 実装の色の正本は `docs/v6-common-rules.md` の色表（＝上の共通色）。
+   * V6 だけが持っていて上に無かったものは、`v6-` を外してここへ移した。
+   */
+  --color-accent-border: #a8e9c1;
+  --color-ink-disabled: #b8bcc2;
+  --color-divider-soft: #eaebed;
+  --color-status-danger-selected: #ffe4e7;
+  --color-status-danger-border: #f3b8bb;
+  /*
+   * 2つ目以降のタグの札。1つ目は `accent` 系で、それと分けるための色。
+   *
+   * **色の名前（purple）では呼ばない。** Tailwind に同じ名前の組み込み
+   * 色があり、`text-purple` が「生の色を直書きしている」と見なされる。
+   */
+  --color-chip-alt: #7651c9;
+  --color-chip-alt-soft: #f0ebff;
+  --color-avatar-bg: #eef0f2;
+  --color-avatar-indigo: #5545e6;
+  --color-avatar-blue: #1260c9;
+  --color-avatar-slate: #536170;
+  --color-avatar-green: #079b45;
 
   /* LINEトークのプレビュー。実画面の青いトーク面と回答操作の緑。 */
   --color-line-preview: #789bc5;
@@ -150,42 +147,36 @@
    * / `eHPwj` 一括操作バー(h=56) — いずれも `$radius-md`。
    */
   --radius-card: 10px;
-  --radius-control: 0.5rem;
-  --radius-tile: 10px;
+  /*
+   * 8px。**`0.5rem` ではなく `8px` と書く。** 単位が混ざると、同じ値の
+   * トークンが2つあることを機械で見つけられない（`radius-v6-control` が
+   * 8px で別名のまま残っていたのがそれ）。
+   */
+  --radius-control: 8px;
   --radius-panel: 12px;
   --radius-icon: 3px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
-  --radius-tiny: 3px;
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
-     保存条件チップ用。Tailwind 既定の `rounded-lg` を上書きすると、
-     既存85ファイルの角丸まで8pxから18pxへ変わるため、V6専用名にする。 */
-  --radius-v6-large: 18px;
+     保存条件チップ用。Tailwind 既定の `rounded-lg` は上書きしない
+     （既存85ファイルの角丸が8pxから18pxへ変わってしまう）。 */
+  --radius-large: 18px;
   --radius-pill: 9999px;
   /*
-   * V6の4つ。**以前は 7 / 9 / 14 / 16 だったが、設計にその値は無い。**
-   * 設計の角丸は 3 / 6 / 8 / 10 / 12 / 18 / 9999 の7段だけで、
-   * この4つには由来の記録も無かった（他は「Pencil `$radius-xs`(6px)」の
-   * ように書いてある）。**多数決ではなく、実装がその class を貼っている
-   * 場所の正本Nodeを1つずつ測って**合わせた。
+   * 設計の角丸は 3 / 6 / 8 / 10 / 12 / 18 / 9999 の7段だけ。
    *
-   *   option  7 → 8px  表示項目パネルの行。`sMpET`「表示項目 基本情報」
-   *                    (h=46, `$radius-sm`)。使用1箇所も同じ行。
-   *                    ※チェック枠(`$radius-xs` 6)と取り違えない。
-   *   control 9 → 8px  `Gfsb4`「プルダウン開状態」(`$radius-sm`)。
-   *                    使用39箇所は 操作(select/input/button 19) と
-   *                    注記(p/div/span 20) に割れるが、**注記の正本である
-   *                    案内バーも `$radius-sm`** で、別々に確かめて同値。
-   *   card   14 → 10px 容器。`pRHvc`「検索と絞り込み」(h=132)、
-   *                    `k4Hz0X`「友だち一覧カード」、`eHPwj`「一括操作バー」
-   *                    (h=56) がいずれも `$radius-md`。使用18箇所も全て容器。
-   *   dialog 16 → 12px `z7O873`「友だち 詳細検索モーダル」(w=760 h=936,
-   *                    `$radius-panel`)。使用3箇所はその窓と保存検索の窓。
+   * V6 用に `option`(8) `control`(8) `card`(10) `dialog`(12) を別名で
+   * 持っていたが、**どれも上の段と同じ値**だった。`tile`(10) は `card` と、
+   * `tiny`(3) は `icon` と同値。**同じ値に名前が2つあると、片方だけ
+   * 直した画面が出る。** 名前を1本にして、同値の別名は契約試験で禁じた。
+   *
+   *   v6-option  8 → `--radius-control`  表示項目パネルの行（`sMpET`、`$radius-sm`）
+   *   v6-control 8 → `--radius-control`  プルダウン開状態（`Gfsb4`、`$radius-sm`）
+   *   v6-card   10 → `--radius-card`     容器（`pRHvc` `k4Hz0X` `eHPwj`、`$radius-md`）
+   *   v6-dialog 12 → `--radius-panel`    詳細検索モーダル（`z7O873`、`$radius-panel`）
+   *   tile      10 → `--radius-card`
+   *   tiny       3 → `--radius-icon`
    */
-  --radius-v6-option: 8px;
-  --radius-v6-control: 8px;
-  --radius-v6-card: 10px;
-  --radius-v6-dialog: 12px;
 
   /* --- 文字サイズ ---------------------------------------------------------
    * V5/V6の共通部品が使う意味名。既存のTailwind組み込みサイズは残し、
@@ -220,14 +211,17 @@
    */
   --container-shell: 104rem;
 
-  --shadow-v6-card: 1px 1px 2px #1d1d1f21;
-}
-
-/*
- * Tailwindは影の値をユーティリティへ直接埋め込むため、共通部品から
- * var()で参照できるよう、影だけは@themeの外に置く。
- */
-:root {
+  /*
+   * カードの影。**1つだけ持つ。**
+   *
+   * 以前は `--shadow-v6-card`(#1d1d1f21) が `@theme` の中に、
+   * `--shadow-card`(#1920261a) が外の `:root` に、と2つ並んでいた。
+   * 中にある方だけ `shadow-v6-card` というクラスになり、外の方は
+   * `var()` からしか読めない。**同じ「カードの影」に、書き方の違う
+   * 入口が2つあった。** 名前を1本にして、`@theme` の中へ移した
+   * （`@theme` の変数は `:root` にも出るので、`var(--shadow-card)` は
+   * これまでどおり読める）。
+   */
   --shadow-card: 1px 1px 2px #1920261a;
   --shadow-float: 0 6px 18px #19202626;
 }

@@ -67,12 +67,12 @@ describe('友だちV6の画面契約', () => {
 
   it('V6のカード影と操作色を守る', () => {
     for (const source of [PAGE, TABLE]) {
-      expect(source).toContain('shadow-v6-card')
+      expect(source).toContain('shadow-card')
     }
     expect(KPIS).toContain("import SummaryCard from '@/components/shared/summary-card'")
     expect(SUMMARY_CARD_CSS).toContain('box-shadow: var(--shadow-card)')
-    expect(PAGE).toContain('text-v6-action')
-    expect(PAGE).toContain('bg-v6-accent')
+    expect(PAGE).toContain('text-action')
+    expect(PAGE).toContain('bg-accent')
   })
 
   it('一覧の不要な開く列を除き、件数・表示項目・表示件数を見出し右へ置く', () => {
@@ -114,7 +114,7 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('未対応・注目・表示列の選択状態を目と再読み込み後の両方で確認できる', () => {
-    expect(PAGE).toContain("responseFilter === 'unhandled' ? 'bg-v6-danger-selected ring-2")
+    expect(PAGE).toContain("responseFilter === 'unhandled' ? 'bg-status-danger-selected ring-2")
     expect(PAGE).toContain('aria-pressed={attentionOnly}')
     expect(TABLE).toContain("localStorage.getItem('friends.visibleColumns')")
     expect(TABLE).toContain("localStorage.setItem('friends.visibleColumns'")
@@ -140,8 +140,8 @@ describe('友だちV6の画面契約', () => {
     expect(DUPLICATES).toContain('rounded-[14px]')
     expect(DUPLICATES).toContain('#DADDE2')
     expect(USERS_PAGE).toContain('data-design-node="r7eSi"')
-    expect(USERS_TABLE).toContain('rounded-v6-card')
-    expect(USER_ROW).toContain('border-v6-divider')
+    expect(USERS_TABLE).toContain('rounded-card')
+    expect(USER_ROW).toContain('border-divider-soft')
     expect(USER_ROW).toContain('登録アカウント詳細')
   })
 

@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import StickyBar from '@/components/shared/sticky-bar'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -248,26 +249,30 @@ function NewNenColumnInner() {
         </aside>
       </div>
 
-      <div className={styles.footer}>
-        <p className={styles.note}>
+      <StickyBar
+        status={(
+          <span className={styles.note}>
           {canSubmit({ draft, busy })
             ? 'まだ保存していません。保存すると下書きとして一覧に並びます。'
             : '題名と記事のURLを入れると保存できます。'}
-        </p>
-        <div className={styles.actions}>
-          <Button href="/nen-campaigns?tab=columns">キャンセル</Button>
-          <Button
-            type="button"
-            variant="primary"
-            data-qa-open="ymXJK"
-            disabled={!canSubmit({ draft, busy })}
-            onMouseDown={() => setTouched(true)}
-            onClick={() => void save()}
-          >
-            {busy ? '保存中…' : '下書きに保存'}
-          </Button>
-        </div>
-      </div>
+          </span>
+        )}
+        actions={(
+          <>
+            <Button href="/nen-campaigns?tab=columns">キャンセル</Button>
+            <Button
+              type="button"
+              variant="primary"
+              data-qa-open="ymXJK"
+              disabled={!canSubmit({ draft, busy })}
+              onMouseDown={() => setTouched(true)}
+              onClick={() => void save()}
+            >
+              {busy ? '保存中…' : '下書きに保存'}
+            </Button>
+          </>
+        )}
+      />
     </div>
   )
 }
