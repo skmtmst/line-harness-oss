@@ -676,6 +676,17 @@ export interface InboxStats {
   /** 今日の受信。 */
   todayInbound: number;
   todayByChannel: { line: number; email: number };
+  /**
+   * 担当者ごとの未読数。担当がまだ決まっていない会話は operatorId/name が null。
+   *
+   * 一覧はページ送りされるため、画面側で見えている行を数えてはいけない。
+   * 0件の担当者はこの配列に現れず、担当者一覧と結合する画面側が実値0として描く。
+   */
+  assigneeUnread: Array<{
+    operatorId: string | null;
+    operatorName: string | null;
+    unread: number;
+  }>;
 }
 
 /**
@@ -715,6 +726,20 @@ export async function getInboxStats(
       )
     : await count(db, `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND ${friendScope.sql}`, ...friendScope.binds);
 
+  const assigneeUnreadRows = await db
+    .prepare(
+      `SELECT c.operator_id, o.name AS operator_name, COUNT(*) AS unread
+         FROM chats c
+         JOIN friends f ON f.id = c.friend_id
+         LEFT JOIN operators o ON o.id = c.operator_id
+        WHERE c.status = 'unread' AND ${friendScope.sql}
+        GROUP BY c.operator_id, o.name
+        ORDER BY CASE WHEN c.operator_id IS NULL THEN 0 ELSE 1 END,
+                 o.name ASC, c.operator_id ASC`,
+    )
+    .bind(...friendScope.binds)
+    .all<{ operator_id: string | null; operator_name: string | null; unread: number }>();
+
   // source は 'line' 以外にメール由来などが入る。line 以外をまとめてメール扱いに
   // すると、将来 source が増えたときに黙って混ざる。line と email だけを数える。
   const byChannel = await db
@@ -739,6 +764,11 @@ export async function getInboxStats(
     mine,
     todayInbound: byChannel?.total ?? 0,
     todayByChannel: { line: byChannel?.line_n ?? 0, email: byChannel?.email_n ?? 0 },
+    assigneeUnread: assigneeUnreadRows.results.map((row) => ({
+      operatorId: row.operator_id,
+      operatorName: row.operator_name,
+      unread: Number(row.unread),
+    })),
   };
 }
 

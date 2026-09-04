@@ -125,11 +125,29 @@ describe('GET /api/conversions/approvals', () => {
     expect(callArgs.limit).toBe(200);
   });
 
-  it('clamps oversized limit to 500', async () => {
+  it('clamps oversized limit to 200', async () => {
     dbMocks.getConversionApprovalQueue.mockResolvedValue([]);
     await req('GET', '/api/conversions/approvals?limit=99999');
     const callArgs = dbMocks.getConversionApprovalQueue.mock.calls[0][1];
-    expect(callArgs.limit).toBe(500);
+    expect(callArgs.limit).toBe(200);
+  });
+
+  it('does not pass a negative limit or offset to the database', async () => {
+    dbMocks.getConversionApprovalQueue.mockResolvedValue([]);
+    await req('GET', '/api/conversions/approvals?limit=-1&offset=-2');
+    const callArgs = dbMocks.getConversionApprovalQueue.mock.calls[0][1];
+    expect(callArgs).toMatchObject({ limit: 200, offset: 0 });
+  });
+});
+
+describe('GET /api/conversions/events', () => {
+  it('clamps huge, negative, and non-numeric pagination values', async () => {
+    dbMocks.getConversionEvents.mockResolvedValue([]);
+    await req('GET', '/api/conversions/events?limit=999999&offset=-1');
+    expect(dbMocks.getConversionEvents.mock.calls[0][1]).toMatchObject({ limit: 200, offset: 0 });
+
+    await req('GET', '/api/conversions/events?limit=NaN');
+    expect(dbMocks.getConversionEvents.mock.calls[1][1]).toMatchObject({ limit: 100, offset: 0 });
   });
 });
 

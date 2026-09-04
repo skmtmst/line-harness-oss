@@ -48,6 +48,8 @@ function within28Days(iso: string): boolean {
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
+import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
+import { useAccount } from '@/contexts/account-context'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -78,6 +80,13 @@ const MERGED_TABS = [
   { key: 'approvals', label: '成果承認' },
   { key: 'points', label: '成果地点（CV）' },
   { key: 'report', label: 'レポート' },
+  /*
+    **「支払い」を戻した。** 設計 `njLGA`（16-1-C）はこのタブを持つのに、
+    `MERGED_TABS` に無かったので `?tab=payment` は既定タブへ落ち、
+    **画面からは「無い」ことすら分からなかった**（#739 で未実装と判定した）。
+    口は #763 で入ったので、読むだけの面をつなぐ。
+  */
+  { key: 'payment', label: '支払い' },
 ]
 
 const DEFAULT_TAB = 'points'
@@ -556,6 +565,7 @@ function ReportTab() {
 
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
+  const { selectedAccountId } = useAccount()
   /**
    * タブごとのV6実Node。5タブすべてを埋める。
    *
@@ -589,6 +599,9 @@ function ConversionsPageHost() {
       {tab === 'offers' && <OffersTab />}
       {tab === 'approvals' && <ApprovalQueue />}
       {tab === 'report' && <ReportTab />}
+      {tab === 'payment' && (selectedAccountId
+        ? <AffiliatePaymentTab accountId={selectedAccountId} />
+        : <p className="text-ink-secondary p-8 text-center text-sm">上のバーからLINEアカウントを選んでください。</p>)}
     </div>
   )
 }

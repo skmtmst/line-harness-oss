@@ -6,6 +6,7 @@ let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
 let extractApiErrorData: typeof import('./api').extractApiErrorData
 let eventsApi: typeof import('./api').eventsApi
+let webinarApi: typeof import('./api').webinarApi
 let api: typeof import('./api').api
 
 beforeAll(async () => {
@@ -17,6 +18,7 @@ beforeAll(async () => {
     extractApiErrorCode,
     extractApiErrorData,
     eventsApi,
+    webinarApi,
     api,
   } = await import('./api'))
 })
@@ -52,6 +54,58 @@ describe('api.nenCampaigns.createColumn', () => {
       imageUrl: null,
       publishedAt: null,
     })
+  })
+})
+
+describe('webinarApi notifications', () => {
+  it('設定保存とテスト送信を専用APIへ渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const input = {
+      registrationEnabled: true,
+      dayBeforeEnabled: true,
+      dayBeforeTime: '20:00',
+      hourBeforeEnabled: true,
+      hourBeforeMinutes: 60,
+      startEnabled: true,
+      missedEnabled: true,
+      missedTime: '10:00',
+      completedEnabled: true,
+    }
+
+    await webinarApi.saveNotifications('webinar/1', input)
+    await webinarApi.testNotifications('webinar/1')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/webinars/webinar/1/notifications',
+    )
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify(input),
+    })
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe(
+      'https://worker.example.com/api/webinars/webinar/1/notifications/test',
+    )
+    expect(fetchSpy.mock.calls[1]?.[1]).toMatchObject({ method: 'POST' })
+  })
+})
+
+describe('api.affiliates.paymentSummaries', () => {
+  it('選択中のLINE公式アカウントを必ずクエリへ含める', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: [] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.affiliates.paymentSummaries('account/1')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/affiliate-payments?lineAccountId=account%2F1',
+    )
   })
 })
 
@@ -149,6 +203,64 @@ describe('api.friendAddRouting draft/test/publish contract', () => {
         }),
       }),
     )
+  })
+})
+
+describe('api.actionScores rule contract', () => {
+  const configuration = {
+    rules: [{
+      id: 'rule-1',
+      name: 'リンククリック',
+      eventType: 'link_clicked',
+      source: 'tracked_link',
+      operation: 'delta' as const,
+      value: 5,
+      frequency: { kind: 'per_subject_per_day' as const, limit: 1 },
+      sameSourceEventOnce: true as const,
+      validFrom: null,
+      validUntil: null,
+      enabled: true,
+    }],
+    bands: { min: 0, max: 100, normalMin: 30, highMin: 70 },
+  }
+
+  it('下書き・試験・公開・停止を選択中のLINEアカウントへ送る', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.actionScores.rules('account 1')
+    await api.actionScores.saveDraft({
+      accountId: 'account 1',
+      expectedDraftVersionId: null,
+      configuration,
+    })
+    await api.actionScores.testRules({
+      accountId: 'account 1',
+      configuration,
+      currentScore: 10,
+      eventType: 'link_clicked',
+      source: 'tracked_link',
+    })
+    await api.actionScores.publishRules({ accountId: 'account 1', draftVersionId: 'draft-1' })
+    await api.actionScores.stopRules('account 1')
+
+    expect(spy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/action-scores/rules?accountId=account%201',
+      'https://worker.example.com/api/action-scores/rules/draft',
+      'https://worker.example.com/api/action-scores/rules/test',
+      'https://worker.example.com/api/action-scores/rules/publish',
+      'https://worker.example.com/api/action-scores/rules/stop',
+    ])
+    expect(spy.mock.calls[3]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'X-Confirm-Irreversible': 'action-score-rules-publish',
+      }),
+    })
+    expect(JSON.parse(String(spy.mock.calls[4]?.[1]?.body))).toEqual({ accountId: 'account 1' })
   })
 })
 
