@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import {
   CredentialEncryptionKeyError,
   createLineAccount,
-  deleteLineAccount,
+  deleteUncommittedLineAccount,
   getLineAccounts,
   type LineAccount,
 } from '@line-crm/db';
@@ -631,7 +631,7 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
   } catch (error) {
     if (createdLineAccountId) {
       try {
-        await deleteLineAccount(dbFor(c.env), createdLineAccountId);
+        await deleteUncommittedLineAccount(dbFor(c.env), createdLineAccountId);
       } catch {
         console.error(JSON.stringify({ event: 'restaurant_store_wizard_rollback_failed' }));
       }
