@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   api,
   ApiError,
@@ -75,6 +76,8 @@ function MenusPageInner() {
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
   // 直近にコピーした行だけ「コピー済」が出る。
   const [copiedMenuId, setCopiedMenuId] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<BookingMenu | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [staff, setStaff] = useState<BookingStaff[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
@@ -213,11 +216,21 @@ function MenusPageInner() {
     await load()
   }
 
+  /**
+   * 消す前に、**何が消えて何が残るかを本文で読ませる。**
+   * ブラウザの `confirm()` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
+   * 画像比較にも写らない（確認の絵をそもそも撮れない）。
+   */
   async function remove(id: string) {
     if (!selectedAccountId) return
-    if (!confirm('このメニューを削除しますか？（既存予約は維持されます）')) return
-    await bookingApi.deleteMenu(selectedAccountId, id)
-    await load()
+    setDeleting(true)
+    try {
+      await bookingApi.deleteMenu(selectedAccountId, id)
+      setRemoveTarget(null)
+      await load()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const thisMonth = monthKey(0)
@@ -489,7 +502,7 @@ function MenusPageInner() {
                         >
                           スタッフ割当
                         </Link>
-                        <button onClick={() => remove(m.id)} className="text-red-600 hover:underline">
+                        <button onClick={() => setRemoveTarget(m)} className="text-red-600 hover:underline">
                           削除
                         </button>
                       </div>
@@ -507,6 +520,17 @@ function MenusPageInner() {
       </div>
 
       {editing && <Modal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget?.name ?? ''}」を削除しますか？`}
+        description="このメニューを一覧から削除します。すでに入っている予約はそのまま残ります。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        onCancel={() => setRemoveTarget(null)}
+        onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
+      />
     </div>
   )
 }
