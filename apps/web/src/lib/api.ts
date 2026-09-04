@@ -1,6 +1,11 @@
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
+  ReminderDraftSettings,
+  ReminderDraftVersion,
+  ReminderPreviewResult,
+  ReminderPublishResult,
+  ReminderValidationResult,
   AutoReplyConflict,
   AutoReplyDraftInput,
   AutoReplyDraftVersion,
@@ -4187,6 +4192,48 @@ export const api = {
     },
   },
   reminders: {
+    /*
+      公開までの段（下書き→検査→予定の下見→試験送信→公開）。
+      **口はすべて `apps/worker/src/routes/reminders.ts` に在るものを読むだけ。**
+      試験送信は `Idempotency-Key` を付ける——二度押しで2通届くと、
+      受け取った人には本番と見分けが付かない。
+    */
+    createDraft: (settings: ReminderDraftSettings) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>('/api/reminders/drafts', {
+        method: 'POST',
+        body: JSON.stringify(settings),
+      }),
+    getDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`),
+    saveDraft: (id: string, settings: ReminderDraftSettings) =>
+      fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      }),
+    validateDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
+        method: 'POST',
+      }),
+    previewDraft: (id: string, targetDate?: string) =>
+      fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {
+        method: 'POST',
+        body: JSON.stringify(targetDate ? { targetDate } : {}),
+      }),
+    testDraft: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        sent: number
+        recipientName: string
+        replayed: boolean
+        requestId: string | null
+        testedAt: string
+      }>>(
+        `/api/reminders/${id}/test-send`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
+    publishDraft: (id: string) =>
+      fetchApi<ApiResponse<ReminderPublishResult>>(`/api/reminders/${id}/publish`, {
+        method: 'POST',
+      }),
     /** 161: 渡した順に並べ替える。見えているものだけ送る。 */
     reorder: (ids: string[]) =>
       fetchApi<ApiResponse<{ updated: number }>>('/api/reminders/reorder', {

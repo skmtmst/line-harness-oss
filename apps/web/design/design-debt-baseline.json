@@ -661,6 +661,9 @@
   "components/merged-person/merged-person-sections.tsx": {
     "unresolved-classname": 46
   },
+  "components/reminders/reminder-publish-flow.tsx": {
+    "unresolved-classname": 5
+  },
   "components/rich-menus/area-properties.tsx": {
     "arbitrary-value": 12,
     "unresolved-classname": 13
