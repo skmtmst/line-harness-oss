@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
+/** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
+const FAILURE = fs.readFileSync(path.join(__dirname, 'webinar-load-failure.ts'), 'utf8')
 
 describe('V6 ウェビナー一覧の契約', () => {
   it('既存データで判定できる並び順と表示件数だけを選べる', () => {
@@ -45,10 +47,17 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('取得失敗を空の一覧と混ぜず、同じ画面で再取得できる', () => {
-    expect(PAGE).toContain('ウェビナーを読み込めませんでした')
-    expect(PAGE).toContain('通信状態を確認して、もう一度読み込んでください。')
+    /*
+      文言は `webinar-load-failure.ts` へ移した。**理由ごとに言い分ける**
+      ようにしたので、1つの文字列を画面に直書きする形ではなくなっている。
+    */
+    expect(FAILURE).toContain('ウェビナーを表示できませんでした')
+    expect(FAILURE).toContain('通信状態を確認して、もう一度読み込んでください。')
     expect(PAGE).not.toContain('e instanceof Error ? e.message')
     expect(PAGE).toContain('onClick={() => void refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
+    /* 失敗の1枚と、空の1枚が別であること。 */
+    expect(PAGE).toContain(') : loadFailure ? (')
+    expect(PAGE).toContain(') : visibleItems.length === 0 ? (')
   })
 })
