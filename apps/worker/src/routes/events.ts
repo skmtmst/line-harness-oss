@@ -43,6 +43,7 @@ import {
 } from '../services/event-booking-state.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
@@ -1264,6 +1265,21 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
     metadata: { bookingType: 'event', eventId: event.id, slotId: slot.id },
     occurredAt: nowIso,
   });
+  const actionScorePromise = applyActionScoreEvent(c.env.DB, {
+    lineAccountId: account_id,
+    friendId: friend.id,
+    eventType: 'booking_created',
+    source: 'event_booking',
+    sourceEventId: id,
+    subjectKey: event.id,
+    occurredAt: nowIso,
+  }).catch((error) => {
+    // 予約成立後の派生処理なので、スコア側の障害で予約を失敗扱いにしない。
+    console.error('event booking action score failed:', error);
+  });
+  const actionScoreExecutionCtx = optionalExecutionCtx(c);
+  if (actionScoreExecutionCtx) actionScoreExecutionCtx.waitUntil(actionScorePromise);
+  else await actionScorePromise;
 
   if (status === 'confirmed') {
     const reminders = computeRemindersForBooking({
