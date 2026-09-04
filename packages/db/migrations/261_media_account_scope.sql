@@ -5,6 +5,7 @@ ALTER TABLE media
 
 -- D1ではTEMP TABLEを使わず、移行内だけで使う作業表を最後に削除する。
 -- 主キーで分割間の重複を除く。NULLは従来どおりCOUNT(DISTINCT)の対象外。
+DROP TABLE IF EXISTS _migration_261_usage_accounts;
 CREATE TABLE _migration_261_usage_accounts (
   media_id TEXT,
   account_id TEXT,
