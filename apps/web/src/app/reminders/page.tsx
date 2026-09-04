@@ -8,6 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import FolderPanel from '@/components/shared/folder-panel'
+import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -137,7 +138,14 @@ export default function RemindersPage() {
         setError(res.error)
       }
     } catch {
-      setError('リマインダの読み込みに失敗しました。もう一度お試しください。')
+      /*
+        **失敗の言い方は共通部品にそろえる。** 画面ごとに書くと、同じ事故が
+        画面によって違う言葉になる。`ListState` の `error` は
+        「表示できませんでした」＋「再読み込みしても直らない場合は…」。
+        「もう一度お試しください」だけだと、**押し直しても直らないときに
+        次の手が無い。**
+      */
+      setError(`${LIST_STATE_PRESETS.error.title}。${LIST_STATE_PRESETS.error.description}`)
     } finally {
       setLoading(false)
     }
@@ -439,7 +447,7 @@ export default function RemindersPage() {
                             * ものが消えたように読める**。
                             */}
                           {error
-                            ? 'いまは読み込めていません。上の案内をご覧ください。'
+                            ? `${LIST_STATE_PRESETS.error.title}。上の案内をご覧ください。`
                             : reminders.length === 0
                               ? 'リマインダがありません。「＋ 新しいリマインダ」から作成してください。'
                               : 'この条件に合うリマインダはありません。'}
