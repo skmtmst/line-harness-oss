@@ -42,6 +42,7 @@ import type {
   MediaReplacementImpact,
   MediaReplacementResult,
   CommonVar,
+  CommonVarChangeImpact,
   CommonVarDeleteImpact,
   CommonVarSchedule,
   Scenario,
@@ -2820,6 +2821,17 @@ export const api = {
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
+      }),
+    /*
+      変える前に、どこがどう変わるかを見る（設計 `uNBlA` 14-1-B）。
+
+      **`nextValue` を渡して問い合わせるだけで、値は保存されない。**
+      口が `POST` なのは長い本文を投げるためで、書き換えではない。
+    */
+    impactPreview: (id: string, accountId: string, nextValue: string) =>
+      fetchApi<ApiResponse<CommonVarChangeImpact>>(`/api/common-vars/${id}/impact-preview`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, nextValue }),
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
