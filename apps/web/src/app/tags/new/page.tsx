@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { TagGroup } from '@line-crm/shared'
@@ -171,19 +172,12 @@ function LegacyNewTagPage() {
           htmlFor="tag-group"
           note="どの分類に入れるかを選びます。未選択なら「未分類」になります。"
         >
-          <select
+          <SelectField
             id="tag-group"
             value={groupId}
             onChange={(e) => setGroupId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">未分類</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: '未分類' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]}
+          />
         </Field>
 
         <Field label="タグ名" htmlFor="tag-name" required>

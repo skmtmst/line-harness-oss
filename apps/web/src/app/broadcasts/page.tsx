@@ -304,13 +304,11 @@ function BroadcastList() {
               className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
             <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-            <select
-              disabled
-              title="並び替えは準備中です"
-              className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-            >
-              <option>配信日が新しい順</option>
-            </select>
+            {/*
+              **押しても何も起きない並び替えを出さない**（`v6-common-rules` §5-5
+              「動くまで描かない」）。一覧は配信日が新しい順に固定なので、
+              選べない選び口を置いても、いつ使えるようになるのか読めない。
+            */}
             <span className="text-ink-faint text-xs whitespace-nowrap">配信日</span>
             <input
               type="date"

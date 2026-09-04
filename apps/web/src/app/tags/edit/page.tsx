@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -243,19 +244,12 @@ function EditTagInner() {
                 htmlFor="tag-group"
                 note="どの分類に入れるかを選びます。未選択なら「未分類」になります。"
               >
-                <select
+                <SelectField
                   id="tag-group"
                   value={groupId}
                   onChange={(e) => setGroupId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">未分類</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: '', label: '未分類' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]}
+                />
               </Field>
             </section>
 
