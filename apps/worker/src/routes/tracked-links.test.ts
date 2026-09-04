@@ -16,6 +16,12 @@ const dbMocks = {
   enrollFriendInScenario: vi.fn(),
   getTrackedLinkBaseUrl: vi.fn(),
   getLinkBaseUrl: vi.fn(),
+  applyMileageRulesForEvent: vi.fn().mockResolvedValue([]),
+  applyPublishedActionScoreRules: vi.fn().mockResolvedValue({
+    configured: false,
+    status: 'not_configured',
+    applications: [],
+  }),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
