@@ -1799,7 +1799,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
                   </button>
                   {/*
-                    素の `<select>` から専用のプルダウンへ替えた。
+                    素の select 要素から専用のプルダウンへ替えた。
                     **開いた中身がブラウザ任せだと画像に写らない。** 設計の
                     2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
                     ままでは永久に見比べられない。色の丸と札も設計どおりに出す。

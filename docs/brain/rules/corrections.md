@@ -78,9 +78,9 @@
 - 今後: 「調査して」「教えて」の依頼では実行に移らず、確認済み事実と推測を分けた評価と提案を返す
 
 ## 2026-09-04
-- 指摘: 自分の PR はマージせず、ゲート合格後に Issue へ記録して次へ進む。統合は司令塔がまとめて行う
-- 今後: required-pr-gate が SUCCESS になったら対応 Issue に「ゲート合格」とコメントし、自分ではマージせず次の仕事へ進む
+- 指摘: 自分のPRはマージせず、required gateがSUCCESSになったらIssueへ「ゲート合格」とコメントして次の仕事へ進む
+- 今後: マージは司令塔の統合PRに任せ、個別PRのbase更新競争を起こさない。既にマージ済みのPRはそのままとする
 
 ## 2026-09-04
-- 指摘: 統合 PR で基準点が動いたら、今の作業の区切りで最新 base を取り込み、自分の PR の衝突を最優先で直す
-- 今後: 司令塔から統合完了の連絡を受けたら `git fetch origin && git merge origin/codex/development` を実行し、PR が CONFLICTING なら次タスクより先に解消する
+- 指摘: 統合PRで基準点が動いた作業区切りでは最新baseを取り込み、自分のPRがCONFLICTINGなら最優先で直す
+- 今後: 作業区切りに `git fetch origin && git merge origin/codex/development` を実行し、競合解消を新規作業より先に行う
