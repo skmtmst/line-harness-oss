@@ -348,6 +348,9 @@
     "arbitrary-value": 11,
     "direct-th": 5
   },
+  "app/settings/manual-links/page.tsx": {
+    "unresolved-classname": 5
+  },
   "app/settings/page.tsx": {
     "arbitrary-value": 52,
     "unresolved-classname": 1,
