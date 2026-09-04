@@ -50,6 +50,7 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
+  SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
 } from './fixtures.mjs'
 
@@ -866,6 +867,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  /* 自動変更ルール（設計 `GMvBd` 4-3-A）。マークごとに返す。 */
+  if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
+    return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
+  }
   /*
     いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
     一覧の形（items/total）ではなく 1 人ぶんを返す。
