@@ -285,8 +285,10 @@ export const SCREENS = [
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
     steps: [...OPEN_CHAT, { click: '担当者を変える' }],
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態を受信箱に／#36 開いたプルダウンが欄から11px浮いていたのを直す（`YZaDK` `L35UOV` `IYjvu`。`L35UOV` は横も8pxずれ）／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当てほかの表記統一。設計画像は `docs/design-reference/inbox-v6/` を撮り直した。**実装との突き合わせはこれから。** **#604 `6011cfeb` で撮り直した。前の「段が0件で確かめられていない」は解消している。** ルート `/chats`。1440・1920とも横スクロール0。 担当の変更はトークの見出しの「担当： Kenta」の選び口へ移っていた（設計の「担当者を変える」ボタンは無い）。押すとその場で変えられる。 P2 設計は名前と顔を並べた専用の選び口。実装は素の選び口で、誰に渡すのかを名前だけで選ぶ。 取得元：`inbox-v6/L35UOV.txt:106`',
-    verdictSource: 'inbox-v6/design-qa.md', verdictHead: '7b509106',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-04 担当変更から絞り込み専用の「すべて」を外して撮り直した（board#66）。** ルート `/chats`（トーク見出しの「担当：」）。1440・1920とも横スクロール0。 **「すべて」は一覧を絞るための行で、担当者ではない。** 担当を変える口に出したままだと、押せば「すべて」という人へ割り当てようとする。設計 `L35UOV` も 河野・菅野・未割り当て の3つだけで「すべて」を置いていない。 実際に開いて確かめた：**担当を変える → 未割り当て／Masato／Kenta**、**一覧を絞る → すべて／未割り当て／Masato／Kenta**。絞り込み側の「すべて」は残っている。 P2 設計は名前と顔を並べた選び口。実装は名前だけで顔が出ない（第2段）。',
+    verdictSource: 'inbox-v6/L35UOV.txt',
+    verdictHead: 'b8359655',
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応状況変更を開く',
@@ -1106,10 +1108,6 @@ export const SCREENS = [
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
     route: '/friend-add-settings/runs', mode: 'page',
     states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/friend-add-settings/runs` が development に無い。判定は未マージ枝 `5dc99107` で書かれたもの',
-    why: '`/friend-add-settings/runs` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged',
     verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **2026-09-03 に確かめ直した：まだ本流に無い。** `/friend-add-settings/runs` は HTTP 404 で、`apps/web/src/app/friend-add-settings/runs/page.tsx` も無い。以前ここには「#506 で実行結果の画面が入った」と書いていたが、**それは未マージのPRの枝で見たもの**だった。以下の観察も同じ枝のもの。 未取得の扱いが設計より丁寧で、上の案内に「LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。**取得できない記録は0件にせず「経路は取得できません」と表示します。**」と書き、実際に行でもそう出る。処理できなかった行の処理日時は「—」。P1 設計の右側3枚（稼働状況＝状態・二重送信防止・最終配信・平均送信0.8秒／要テスト＝未送信3件とテストの導線／担当者シナリオ開始＝テスト待ち8・対応中21・完了7）が無い。「流入経路別の内訳」（予約128回59.8%／Webサイト54回25.2%／紹介キャンペーン32回15.0%）も無い。実行結果をCSVで書き出す、配信を一時停止 の導線も無い。P2 帯4つの中身が設計と違う（設計は 直近28日の追加214人／累計配信1,842通／シナリオ開始198件／エラー3件） **ルート**：`/friend-add-settings/runs`。**取得元**：`friend-add-v6/P2J0Te.txt`。**推奨修正**：**「取得できない記録は0件にせず『経路は取得できません』と表示します」の断りはそのまま残す**（束4の手本）。右側3枚と流入経路別の内訳は、`Q4bkTg`（流入と計測）の「経路が分かる何人か」と同じ口が要るので、そちらと同時に。',
     verdictSource: '/friend-add-settings/runs が HTTP 404（2026-09-03 確認）＋ apps/web/src/app/friend-add-settings/runs/page.tsx が無い',
@@ -1262,8 +1260,8 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 表記統一。設計画像は `docs/design-reference/templates-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カードセットを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0 **推奨修正**：カードごとの並べ替えと画像の比率の指定を足す。**カルーセルの中身は `NNDMR`（質問を作る）が選択肢の開閉で似た作りを持っている**ので、並べ替えの部品はそこから写せる。', verdictSource: 'templates-v6/FRkls.txt',
-    steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
+    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 表記統一。設計画像は `docs/design-reference/templates-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 カルーセルを作る面が設計とそろわない。** ルート `/templates`（カルーセル→カルーセルを作る）。設計との差はカードごとの並べ替えと画像の比率の指定。取得元：`templates-v6/FRkls.txt`。1440・1920とも横スクロール0 **推奨修正**：カードごとの並べ替えと画像の比率の指定を足す。**カルーセルの中身は `NNDMR`（質問を作る）が選択肢の開閉で似た作りを持っている**ので、並べ替えの部品はそこから写せる。', verdictSource: 'templates-v6/FRkls.txt',
+    steps: [{ click: 'カルーセル' }, { click: 'カルーセルを作る' }],
     verdictHead: '7b509106',
   },
   {

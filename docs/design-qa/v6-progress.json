@@ -1,13 +1,13 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 267,
-  "compared": 237,
-  "unimplemented": 26,
+  "compared": 238,
+  "unimplemented": 25,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 4,
   "match": 0,
-  "structureMatchDataPending": 1,
+  "structureMatchDataPending": 2,
   "needsFix": 5,
   "unjudged": 231,
   "remaining": 263,
@@ -52,9 +52,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 3,
-      "unjudged": 14,
+      "unjudged": 13,
       "remaining": 18,
       "capturedAt": [
         {
@@ -941,15 +941,15 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 6,
-      "compared": 5,
-      "unimplemented": 1,
+      "compared": 6,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 5,
+      "unjudged": 6,
       "remaining": 6,
       "capturedAt": [
         {
@@ -2510,13 +2510,6 @@
       "name": "8-1-H 実行結果",
       "gap": "pending",
       "gapNote": "画面 `/auto-replies/runs` が development に無い。判定は未マージ枝 `93edbe17` で書かれたもの"
-    },
-    {
-      "feature": 9,
-      "node": "P2J0Te",
-      "name": "9-1-H 実行結果",
-      "gap": "pending",
-      "gapNote": "画面 `/friend-add-settings/runs` が development に無い。判定は未マージ枝 `5dc99107` で書かれたもの"
     },
     {
       "feature": 10,

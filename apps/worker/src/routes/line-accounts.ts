@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import {
   getLineAccounts,
@@ -9,7 +9,12 @@ import {
   updateLineAccount,
   updateLineAccountFields,
   updateLineAccountOrder,
-  deleteLineAccount,
+  deleteUncommittedLineAccount,
+  getLineAccountArchiveBlockers,
+  setDefaultLineAccount,
+  archiveLineAccount,
+  restoreLineAccount,
+  LineAccountLifecycleError,
 } from '@line-crm/db';
 import type { LineAccount as DbLineAccount } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
@@ -83,6 +88,8 @@ function serializeLineAccount(row: DbLineAccount) {
     channelId: row.channel_id,
     name: row.name,
     isActive: Boolean(row.is_active),
+    isDefault: Boolean(row.is_default),
+    archivedAt: row.archived_at ?? null,
     country: row.country,
     role: row.role,
     displayOrder: row.display_order,
@@ -115,6 +122,11 @@ function serializeLineAccountFull(row: DbLineAccount) {
   // Owners rotate them by submitting a new value; the UI only sees whether
   // each credential is configured.
   return serializeLineAccount(row);
+}
+
+function lifecycleConflict(error: unknown): { success: false; error: string } | null {
+  if (!(error instanceof LineAccountLifecycleError)) return null;
+  return { success: false, error: error.code };
 }
 
 const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
@@ -309,6 +321,102 @@ lineAccounts.post(
   },
 );
 
+// PUT /api/line-accounts/default - switch the organization default.
+lineAccounts.put('/api/line-accounts/default', requireRole('owner'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: string }>();
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    const account = await getLineAccountById(c.env.DB, body.accountId);
+    if (!account || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    if (account.archived_at) {
+      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    }
+    if (!account.is_active) {
+      return c.json({ success: false, error: '停止中のLINEアカウントは既定にできません' }, 409);
+    }
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    if ((account.tenant_id ?? DEFAULT_TENANT_ID) !== tenantId) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const updated = await setDefaultLineAccount(c.env.DB, account.id, tenantId);
+    if (!updated?.is_default) {
+      return c.json({ success: false, error: '既定のLINEアカウントを変更できませんでした' }, 409);
+    }
+    return c.json({ success: true, data: serializeLineAccount(updated) });
+  } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
+    console.error('PUT /api/line-accounts/default error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+async function archiveAccountResponse(
+  c: Context<Env>,
+  defaultReason: string,
+) {
+  const id = c.req.param('id')!;
+  const account = await getLineAccountById(c.env.DB, id);
+  if (!account || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
+    return c.json({ success: false, error: 'LINE account not found' }, 404);
+  }
+  if (account.archived_at) {
+    return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+  }
+  const blockers = await getLineAccountArchiveBlockers(c.env.DB, id);
+  if (blockers.length > 0) {
+    return c.json({
+      success: false,
+      error: 'LINE_ACCOUNT_ARCHIVE_BLOCKED',
+      details: { blockers },
+    }, 409);
+  }
+  const body: { reason?: unknown } = await c.req
+    .json<{ reason?: unknown }>()
+    .catch(() => ({} as { reason?: unknown }));
+  const reason = typeof body.reason === 'string' && body.reason.trim()
+    ? body.reason.trim()
+    : defaultReason;
+  if (reason.length > 500) {
+    return c.json({ success: false, error: 'reason must be 500 characters or fewer' }, 422);
+  }
+  const archived = await archiveLineAccount(c.env.DB, id, c.get('staff').id, reason);
+  if (!archived) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  return c.json({ success: true, data: serializeLineAccount(archived) });
+}
+
+lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), async (c) => {
+  try {
+    return await archiveAccountResponse(c, '運用者によるアーカイブ');
+  } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
+    console.error('POST /api/line-accounts/:id/archive error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), async (c) => {
+  try {
+    const id = c.req.param('id')!;
+    const account = await getLineAccountById(c.env.DB, id);
+    if (!account || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const restored = await restoreLineAccount(c.env.DB, id);
+    return c.json({ success: true, data: serializeLineAccount(restored!) });
+  } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
+    console.error('POST /api/line-accounts/:id/restore error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
   try {
@@ -372,7 +480,6 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-
     const client = new LineClient(account.channel_access_token);
     const insight = await client.getFollowersInsight(date);
     return c.json({
@@ -416,6 +523,9 @@ lineAccounts.post(
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
+      if (account.archived_at) {
+        return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+      }
       const client = new LineClient(account.channel_access_token);
       const state = await detectFollowerImportCapability(
         c.env.DB,
@@ -440,6 +550,9 @@ lineAccounts.post(
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
+    if (account.archived_at) {
+      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    }
     try {
       const state = await startFollowerImport(c.env.DB, account.id);
       return c.json({ success: true, data: state });
@@ -460,6 +573,9 @@ lineAccounts.post(
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    if (account.archived_at) {
+      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
     const client = new LineClient(account.channel_access_token);
     const result = await processFollowerImportStep(
@@ -662,7 +778,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       try {
         await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
       } catch (copyError) {
-        await deleteLineAccount(c.env.DB, account.id);
+        await deleteUncommittedLineAccount(c.env.DB, account.id);
         console.error('[line-accounts] account setting copy failed', copyError);
         return c.json({ success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' }, 500);
       }
@@ -742,6 +858,15 @@ lineAccounts.patch(
       ) {
         return c.json({ success: false, error: '権限のないLINEアカウントは変更できません' }, 403);
       }
+      if (relationships.some((item) => {
+        const target = allAccounts.find((account) => account.id === item.id);
+        const parent = item.parentLineAccountId
+          ? allAccounts.find((account) => account.id === item.parentLineAccountId)
+          : null;
+        return Boolean(target?.archived_at || parent?.archived_at);
+      })) {
+        return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+      }
       const hierarchyError = validateAccountHierarchy(allAccounts, relationships);
       if (hierarchyError) return c.json({ success: false, error: hierarchyError }, 400);
 
@@ -785,14 +910,25 @@ lineAccounts.patch(
         }
       }
 
-      const visibleIds = new Set((await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts.map((item) => item.id));
+      const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
+      const visibleIds = new Set(visibleAccounts.map((item) => item.id));
       if (body.ordered.some((item) => !visibleIds.has(item.id))) {
         return c.json({ success: false, error: '権限のないLINEアカウントは並べ替えできません' }, 403);
+      }
+      const archivedIds = new Set(
+        visibleAccounts
+          .filter((account) => Boolean(account.archived_at))
+          .map((account) => account.id),
+      );
+      if (body.ordered.some((item) => archivedIds.has(item.id))) {
+        return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
       }
 
       await updateLineAccountOrder(c.env.DB, body.ordered);
       return c.json({ success: true });
     } catch (err) {
+      const conflict = lifecycleConflict(err);
+      if (conflict) return c.json(conflict, 409);
       console.error('PATCH /api/line-accounts/order error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
@@ -818,6 +954,13 @@ lineAccounts.patch(
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
+      const currentAccount = await getLineAccountById(c.env.DB, id);
+      if (!currentAccount) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      if (currentAccount.archived_at) {
+        return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+      }
       const body = await c.req.json<{
         name?: string;
         isActive?: boolean;
@@ -833,6 +976,9 @@ lineAccounts.patch(
         capacityWarnAt?: unknown;
         iconUrl?: string | null;
       }>();
+      if (body.isActive === false && currentAccount.is_default) {
+        return c.json({ success: false, error: 'ACCOUNT_DEFAULT' }, 409);
+      }
 
       // Normalize: trim non-empty strings; treat empty/whitespace-only as null.
       // Empty-string-from-UI represents "user cleared the field" — store as NULL,
@@ -854,7 +1000,7 @@ lineAccounts.patch(
         Object.prototype.hasOwnProperty.call(body, 'capacityWarnAt');
       const capacity = readCapacity(
         body,
-        touchesCapacity ? await getLineAccountById(c.env.DB, id) : null,
+        touchesCapacity ? currentAccount : null,
       );
       if (!capacity.ok) return c.json({ success: false, error: capacity.error }, 400);
 
@@ -873,12 +1019,10 @@ lineAccounts.patch(
         loginChannelId !== undefined || loginChannelSecret !== undefined;
       const touchesLoginOrLiff = touchesLogin || liffId !== undefined;
       if (touchesLoginOrLiff) {
-        const current = await getLineAccountById(c.env.DB, id);
-        if (!current) return c.json({ success: false, error: 'not found' }, 404);
         if (touchesLogin) {
           const pairError = validateLoginChannelPair(
             { loginChannelId, loginChannelSecret },
-            current,
+            currentAccount,
           );
           if (pairError) return c.json({ success: false, error: pairError }, 400);
         }
@@ -940,6 +1084,8 @@ lineAccounts.patch(
       if (!updated) return c.json({ success: false, error: 'LINE account not found' }, 404);
       return c.json({ success: true, data: serializeLineAccount(updated) });
     } catch (err) {
+      const conflict = lifecycleConflict(err);
+      if (conflict) return c.json(conflict, 409);
       console.error('PATCH /api/line-accounts/:id error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
@@ -960,6 +1106,13 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
+    const currentAccount = await getLineAccountById(c.env.DB, id);
+    if (!currentAccount) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    if (currentAccount.archived_at) {
+      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    }
     const body = await c.req.json<{
       name?: string;
       channelAccessToken?: string;
@@ -974,6 +1127,9 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;
     }>();
+    if (body.isActive === false && currentAccount.is_default) {
+      return c.json({ success: false, error: 'ACCOUNT_DEFAULT' }, 409);
+    }
 
     const country = normalizeOptionalString(body.country);
     const role = normalizeOptionalString(body.role);
@@ -990,12 +1146,10 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
     const putTouchesLogin =
       loginChannelId !== undefined || loginChannelSecret !== undefined;
     if (putTouchesLogin || liffId !== undefined) {
-      const current = await getLineAccountById(c.env.DB, id);
-      if (!current) return c.json({ success: false, error: 'LINE account not found' }, 404);
       if (putTouchesLogin) {
         const pairError = validateLoginChannelPair(
           { loginChannelId, loginChannelSecret },
-          current,
+          currentAccount,
         );
         if (pairError) return c.json({ success: false, error: pairError }, 400);
       }
@@ -1056,6 +1210,8 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
 
     return c.json({ success: true, data: serializeLineAccountFull(updated) });
   } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
     if (err instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }
@@ -1064,16 +1220,13 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   }
 });
 
-// DELETE /api/line-accounts/:id - delete
+// DELETE /api/line-accounts/:id - backward-compatible archive endpoint.
 lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   try {
-    const id = c.req.param('id')!;
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
-    }
-    await deleteLineAccount(c.env.DB, id);
-    return c.json({ success: true, data: null });
+    return await archiveAccountResponse(c, '旧DELETE APIからのアーカイブ');
   } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
     console.error('DELETE /api/line-accounts/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
