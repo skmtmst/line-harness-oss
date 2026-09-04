@@ -29,6 +29,14 @@ const FORMATS = [
   { value: 'svg', label: 'SVG' },
 ]
 
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export default function QrDialog({
   open,
   onClose,
@@ -274,9 +282,9 @@ export default function QrDialog({
             <div className="flex flex-wrap gap-2">
               <a
                 href={saveHref}
-                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
               >
-                ↓ 画像をダウンロード
+                <DownloadIcon />画像をダウンロード
               </a>
               <button
                 type="button"
