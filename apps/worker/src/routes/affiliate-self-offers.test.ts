@@ -47,8 +47,10 @@ function call(path: string, init?: RequestInit) {
 }
 
 const TOKEN_TO_USER: Record<string, string> = { 'tok-alice': 'U-alice' };
-const FRIENDS: Record<string, { id: string; display_name: string }> = {
-  'U-alice': { id: 'friend-alice', display_name: 'Alice' },
+const FRIENDS: Record<string, { id: string; display_name: string; line_account_id: string }> = {
+  'U-alice': {
+    id: 'friend-alice', display_name: 'Alice', line_account_id: 'account-main',
+  },
 };
 const AFFILIATE = {
   id: 'aff-alice',
@@ -100,7 +102,7 @@ const ACTIVE_OFFER = {
   name: '案件A',
   description: 'desc',
   reward_amount: 1000,
-  line_account_id: null,
+  line_account_id: 'account-main',
   tag_id: null,
   scenario_id: null,
   is_active: 1,

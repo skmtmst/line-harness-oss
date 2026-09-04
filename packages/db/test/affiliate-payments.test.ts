@@ -28,9 +28,10 @@ describe('getAffiliatePaymentSummaries', () => {
       CREATE TABLE friends (id TEXT PRIMARY KEY, line_account_id TEXT);
       CREATE TABLE affiliates (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
-        commission_rate REAL NOT NULL, friend_id TEXT, hold_days INTEGER, payout_cycle TEXT
+        commission_rate REAL NOT NULL, friend_id TEXT, hold_days INTEGER, payout_cycle TEXT,
+        line_account_id TEXT
       );
-      CREATE TABLE conversion_points (id TEXT PRIMARY KEY, value INTEGER);
+      CREATE TABLE conversion_points (id TEXT PRIMARY KEY, value INTEGER, line_account_id TEXT);
       CREATE TABLE affiliate_offers (
         id TEXT PRIMARY KEY, reward_amount INTEGER NOT NULL, line_account_id TEXT
       );
@@ -44,7 +45,7 @@ describe('getAffiliatePaymentSummaries', () => {
         approval_status TEXT, approved_at TEXT, value_snapshot REAL
       );
       INSERT INTO friends VALUES ('friend-1', 'account-1'), ('friend-2', 'account-2');
-      INSERT INTO conversion_points VALUES ('purchase', 99999);
+      INSERT INTO conversion_points VALUES ('purchase', 99999, 'account-1');
     `);
     db = asD1(sqlite);
   });
@@ -52,8 +53,8 @@ describe('getAffiliatePaymentSummaries', () => {
   test('割合方式と定額方式を選択中アカウントの承認済み成果だけから集計する', async () => {
     sqlite.exec(`
       INSERT INTO affiliates VALUES
-        ('rate', '割合さん', 'rate-code', 10, NULL, 0, '月末締め'),
-        ('fixed', '定額さん', 'fixed-code', 0, NULL, 0, NULL);
+        ('rate', '割合さん', 'rate-code', 10, NULL, 0, '月末締め', 'account-1'),
+        ('fixed', '定額さん', 'fixed-code', 0, NULL, 0, NULL, 'account-1');
       INSERT INTO affiliate_offers VALUES ('offer-fixed', 3000, 'account-1');
       INSERT INTO affiliate_links VALUES ('link-fixed', 'fixed', 'fixed-ref', 'account-1', 'offer-fixed');
       INSERT INTO conversion_events VALUES
@@ -76,8 +77,8 @@ describe('getAffiliatePaymentSummaries', () => {
   test('別アカウントの紹介者名と成果金額を返さない', async () => {
     sqlite.exec(`
       INSERT INTO affiliates VALUES
-        ('mine', '自店', 'mine-code', 10, 'friend-1', 0, NULL),
-        ('other', '他店', 'other-code', 10, 'friend-2', 0, NULL);
+        ('mine', '自店', 'mine-code', 10, 'friend-1', 0, NULL, 'account-1'),
+        ('other', '他店', 'other-code', 10, 'friend-2', 0, NULL, 'account-2');
       INSERT INTO conversion_events VALUES
         ('mine-cv', 'purchase', 'friend-1', 'mine', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 1000),
         ('other-cv', 'purchase', 'friend-2', 'other', NULL, NULL, 'approved', '2026-09-01T00:00:00Z', 50000);
@@ -91,8 +92,8 @@ describe('getAffiliatePaymentSummaries', () => {
   test('保留期間内と承認日時が無い成果を区別し、成果なしは実値0を返す', async () => {
     sqlite.exec(`
       INSERT INTO affiliates VALUES
-        ('held', '保留あり', 'held-code', 10, 'friend-1', 7, '毎月末締め'),
-        ('empty', '成果なし', 'empty-code', 0, 'friend-1', NULL, NULL);
+        ('held', '保留あり', 'held-code', 10, 'friend-1', 7, '毎月末締め', 'account-1'),
+        ('empty', '成果なし', 'empty-code', 0, 'friend-1', NULL, NULL, 'account-1');
       INSERT INTO conversion_events VALUES
         ('recent', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-09-03T00:00:00Z', 10000),
         ('old', 'purchase', 'friend-1', 'held', NULL, NULL, 'approved', '2026-08-01T00:00:00Z', 10000),

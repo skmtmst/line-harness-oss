@@ -1160,6 +1160,10 @@ export interface ConversionEvent {
 export interface Affiliate {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所属テナント */
+  tenantId: string;
+  /** 所属LINE公式アカウント */
+  lineAccountId: string | null;
   /** アフィリエイト名 */
   name: string;
   /** トラッキングコード (ユニーク) */
