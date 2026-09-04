@@ -127,7 +127,7 @@ function ResultsInner() {
       </div>
 
       {loading ? <ListState kind="loading" title="配信結果を読み込んでいます" /> : null}
-      {!loading && error ? <ListState kind="error" description={error} action={<Button onClick={() => void load()}>配信結果を再読み込み</Button>} /> : null}
+      {!loading && error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : null}
 
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>

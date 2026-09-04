@@ -1083,6 +1083,29 @@ export type MileageRewardSummary = {
   updatedAt: string
 }
 
+/**
+ * 使い道の下書きの中身（`p9CcEB` 17-1-G）。
+ *
+ * **Worker の `MileageRewardDraftInput` と同じ形にする。** 画面で足すと、
+ * 入れられるのに保存できない欄ができる。
+ */
+export type MileageRewardDraftInput = {
+  name: string
+  description?: string | null
+  imageUrl?: string | null
+  rewardKind: MileageRewardKind
+  requiredMiles: number
+  /** 数に限りがあるとき。**`null` は「限りなし」で、0（品切れ）とは別。** */
+  stockLimit?: number | null
+  perFriendLimit?: number | null
+  startsAt?: string | null
+  endsAt?: string | null
+  benefitExpiresDays?: number | null
+  /** 交換後に渡すもの。**クーポン以外では必須**（Worker が弾く）。 */
+  commonActionVersionId?: string | null
+  failurePolicy?: MileageRewardFailurePolicy
+  customerMessage?: string
+}
 export type MileageRewardAdminOverview = {
   rewards: MileageRewardSummary[]
   summary: {
@@ -4669,6 +4692,47 @@ export const api = {
       使い道の一覧（#772 の口）。**アカウント単位で返る。**
       渡さないと、ほかの店の使い道まで混ざる。
     */
+    /** 1件を読む（編集のとき）。 */
+    reward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(
+        `/api/mileage/rewards/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    /** 新しく作る。**下書きとして作られる。** その場では公開しない。 */
+    createReward: (accountId: string, draft: MileageRewardDraftInput) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>('/api/mileage/rewards', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, draft }),
+      }),
+    /** 公開中の使い道から、編集用の下書き版を作る。 */
+    createRewardDraft: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/draft`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
+    /** 下書きを書き換える。読み込んだ版IDで同時編集を検知する。 */
+    saveRewardDraft: (
+      id: string,
+      accountId: string,
+      expectedVersionId: string,
+      draft: MileageRewardDraftInput,
+    ) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/draft`, {
+        method: 'PATCH',
+        body: JSON.stringify({ accountId, expectedVersionId, draft }),
+      }),
+    /** 下書きを公開する。**ここで初めてお客様に見える。** */
+    publishReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/publish`, {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'mileage-reward-publish' },
+        body: JSON.stringify({ accountId }),
+      }),
+    /** 出すのをやめる。**消さない**——交換の記録が残るため。 */
+    stopReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/stop`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
     rewards: (accountId: string) =>
       fetchApi<ApiResponse<MileageRewardAdminOverview>>(
         `/api/mileage/rewards?accountId=${encodeURIComponent(accountId)}`,
