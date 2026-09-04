@@ -84,13 +84,29 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     expect(DIALOG).toContain("{folder ? 'フォルダを直す' : 'フォルダを追加'}")
   })
 
-  it('移せないことを、その場で断る', () => {
-    /*
-      フォルダは作れるが、テンプレートを入れる口がまだ無い
-      （`POST`/`PUT /api/templates` が `folderId` を受けない）。
-      **作れるのに移せないと「入れたのに反映されない」と読まれる。**
-      口ができたら、この断りを消して「移す」操作を足す（台帳 #124）。
-    */
-    expect(PAGE).toContain('テンプレートをフォルダへ移す操作は、まだ繋がっていません。')
+  /*
+    2026-09-04（台帳 #124）: 置き場を書く口ができたので、断りを消して
+    実際に移せるようにした。**断り文言を残したまま操作を足さない。**
+    残すと、動くのに「動きません」と書いてある画面になる。
+  */
+  it('一覧の行から置き場を移せる', () => {
+    expect(PAGE).not.toContain('テンプレートをフォルダへ移す操作は、まだ繋がっていません。')
+    expect(PAGE).toContain('<Th>置き場</Th>')
+    expect(PAGE).toContain('の置き場')
+    expect(PAGE).toContain('api.templates.update(template.id, { folderId })')
+  })
+
+  /*
+    **返事を待ってから一覧を書き換える。** 先に画面を変えると、
+    断られたとき（消えたフォルダを指したなど）に、移っていないものが
+    移ったように見えたままになる。
+  */
+  it('移せたと分かってから一覧を書き換える', () => {
+    const move = PAGE.slice(PAGE.indexOf('const moveTemplate'), PAGE.indexOf('const removeFolder'))
+    expect(move.indexOf('if (!res.success)')).toBeLessThan(move.indexOf('setTemplates('))
+  })
+
+  it('移している行は二重に押させない', () => {
+    expect(PAGE).toContain('disabled={movingId === t.id}')
   })
 })
