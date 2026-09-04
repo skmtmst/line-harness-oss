@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 216,
-  "unimplemented": 28,
+  "compared": 217,
+  "unimplemented": 27,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 28,
   "match": 3,
   "structureMatchDataPending": 31,
   "needsFix": 113,
-  "unjudged": 93,
+  "unjudged": 94,
   "remaining": 265,
   "features": [
     {
@@ -1559,15 +1559,15 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 6,
-      "unjudged": 1,
+      "unjudged": 2,
       "remaining": 11,
       "capturedAt": [
         {
@@ -2573,13 +2573,6 @@
       "name": "16-1-H 支払いを確定する",
       "gap": "api",
       "gapNote": "同上（締める操作）"
-    },
-    {
-      "feature": 17,
-      "node": "p9CcEB",
-      "name": "17-1-G マイルの使い道をつくる",
-      "gap": "pending",
-      "gapNote": "画面 `/mileage/rewards/edit` が development に無い。判定は未マージ枝 `5e8f32d3` で書かれたもの"
     },
     {
       "feature": 20,
