@@ -80,7 +80,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(135)  // 2026-09-04: development の枚数に、この枝が足す下書き編集で 135。
+    expect(PAGES.length).toBe(139)  // 2026-09-04: 最新 development の 138 枚に、この枝の下書き編集 1 枚を足して 139。
   })
 
   it('page.tsx が h1 を直接持たない', () => {
