@@ -68,5 +68,7 @@ Webhook
 Webhookを追加
 こちらで受け取る
 こちらから送る
-
-こちらで受け取る設定はまだありません。「Webhookを追加」から作成してください。
+名前	どこから来るか	エンドポイントURL	シークレット	ステータス	作成日
+予約サービスから	予約サービス	http://localhost:3104/api/webhooks/incoming/iwh-booking/receive	設定済	有効	2026/3/1	シークレット更新削除
+ECサイトから（注文）	ECサイト	http://localhost:3104/api/webhooks/incoming/iwh-ec/receive	設定済	有効	2026/3/1	シークレット更新削除
+外部フォームから	アンケートツール	http://localhost:3104/api/webhooks/incoming/iwh-form/receive	未設定	有効	2026/6/1	シークレット設定削除

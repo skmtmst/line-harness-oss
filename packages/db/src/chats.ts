@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 // オペレーター＆チャット管理クエリヘルパー
 
 export interface OperatorRow {
@@ -72,23 +72,29 @@ export async function deleteOperator(db: D1Database, id: string): Promise<void> 
 
 // --- チャット ---
 
-export async function getChats(db: D1Database, opts: { status?: string; operatorId?: string } = {}): Promise<ChatRow[]> {
+export async function getChats(
+  db: D1Database,
+  opts: { status?: string; operatorId?: string; limit?: number; offset?: number } = {},
+): Promise<ChatRow[]> {
+  const limit = boundedListLimit(opts.limit, 200);
+  const offset = nonNegativeListOffset(opts.offset);
   if (opts.status && opts.operatorId) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? AND operator_id = ? ORDER BY last_message_at DESC`)
-      .bind(opts.status, opts.operatorId).all<ChatRow>();
+    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? AND operator_id = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+      .bind(opts.status, opts.operatorId, limit, offset).all<ChatRow>();
     return result.results;
   }
   if (opts.status) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? ORDER BY last_message_at DESC`)
-      .bind(opts.status).all<ChatRow>();
+    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+      .bind(opts.status, limit, offset).all<ChatRow>();
     return result.results;
   }
   if (opts.operatorId) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE operator_id = ? ORDER BY last_message_at DESC`)
-      .bind(opts.operatorId).all<ChatRow>();
+    const result = await db.prepare(`SELECT * FROM chats WHERE operator_id = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+      .bind(opts.operatorId, limit, offset).all<ChatRow>();
     return result.results;
   }
-  const result = await db.prepare(`SELECT * FROM chats ORDER BY last_message_at DESC`).all<ChatRow>();
+  const result = await db.prepare(`SELECT * FROM chats ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+    .bind(limit, offset).all<ChatRow>();
   return result.results;
 }
 

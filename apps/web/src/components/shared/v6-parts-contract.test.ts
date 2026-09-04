@@ -33,9 +33,11 @@ describe('V6共通部品のトークン', () => {
       '--color-status-warn-deep: #a15c00;',
       '--color-status-danger: #e5484d;',
       '--color-status-danger-soft: #fef0f0;',
-      // 2026-09-03: 白文字を載せる緑を #068a3c（4.46:1）にした。
+      // 2026-09-04: #068a3c は **4.46:1 で AA の 4.5:1 に届かない**。
+      // 要件索引 §5-2 の決定どおり、既存トークン $accent-deep(#087a3e、5.44:1)
+      // へ戻した。新しい色トークンは作らない。
       // #087a3e（5.44:1）から少し明るくなるが、決定どおり。
-      '--color-accent-deep: #068a3c;',
+      '--color-accent-deep: #087a3e;',
       '--color-step-idle: #eef0f3;',
       '--color-surface-chrome: #ebedf1;',
       '--radius-tiny: 3px;',

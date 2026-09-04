@@ -8,10 +8,11 @@ import { processAutomationRun, startAutomationRun, type ActionDefinition } from 
 const NOW = '2026-08-26T05:00:00.000Z';
 
 function addAccount(raw: Database.Database, id: string): void {
+  raw.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', '本部')`).run();
   raw.prepare(
     `INSERT INTO line_accounts
-       (id, channel_id, name, channel_access_token, channel_secret, is_active)
-     VALUES (?, ?, ?, '', '', 1)`,
+       (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+     VALUES (?, ?, ?, '', '', 1, 'tenant-1')`,
   ).run(id, `channel-${id}`, id);
 }
 
@@ -111,6 +112,94 @@ describe('V6オートメーションの既存処理接続', () => {
     expect(testDb.raw.prepare(
       `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'tag'`,
     ).get(result.runId)).toEqual({ error_code: 'tag_not_found' });
+  });
+
+  it('対応マークを変更し、変更前後と自動変更の根拠を監査へ残す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO support_marks (id, name, color) VALUES ('mark-working', '対応中', '#3B82F6')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+       VALUES ('mark-working', 'tenant-1', 'account-1', datetime('now'))`,
+    ).run();
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'mark', type: 'set_support_mark',
+        params: { markId: 'mark-working', manualProtectionMinutes: 0 }, onFailure: 'stop',
+      },
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ support_mark_id: 'mark-working' });
+    const audit = testDb.raw.prepare(
+      `SELECT actor_id, detail_json FROM operation_audit WHERE friend_id = 'friend-1'`,
+    ).get() as { actor_id: string | null; detail_json: string };
+    expect(audit.actor_id).toBeNull();
+    expect(JSON.parse(audit.detail_json)).toMatchObject({
+      beforeMarkId: null,
+      afterMarkId: 'mark-working',
+      source: 'automation',
+    });
+  });
+
+  it('手で変更した直後は保護時間が切れるまで自動変更で上書きしない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO support_marks (id, name, color) VALUES ('mark-protected', '確認中', '#F59E0B')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+       VALUES ('mark-protected', 'tenant-1', 'account-1', datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_audit
+         (id, target_kind, target_id, action, actor_id, friend_id, created_at)
+       VALUES ('audit-manual', 'support_mark', NULL, 'changed', 'staff-1', 'friend-1', ?)`,
+    ).run(NOW);
+
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'mark', type: 'set_support_mark',
+        params: { markId: 'mark-protected', manualProtectionMinutes: 60 }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({ now: () => NOW }),
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ support_mark_id: null });
+  });
+
+  it('手動変更の保護時間が切れた後は自動変更を再開する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO support_marks (id, name, color) VALUES ('mark-resumed', '対応再開', '#10B981')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+       VALUES ('mark-resumed', 'tenant-1', 'account-1', datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_audit
+         (id, target_kind, target_id, action, actor_id, friend_id, created_at)
+       VALUES ('audit-manual-expired', 'support_mark', NULL, 'changed', 'staff-1', 'friend-1', ?)`,
+    ).run(NOW);
+
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'mark', type: 'set_support_mark',
+        params: { markId: 'mark-resumed', manualProtectionMinutes: 60 }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        now: () => '2026-08-26T06:01:00.000Z',
+      }),
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ support_mark_id: 'mark-resumed' });
   });
 
   it('友だち情報を同じアカウントの対象だけ更新する', async () => {

@@ -161,8 +161,11 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
   ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
-  ['/api/mileage', '/mileage'],
-  ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'], ['/api/common-actions', '/automations'], ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
+  ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
+  ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
+  ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
+  ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
 ];
 
