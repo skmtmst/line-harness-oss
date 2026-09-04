@@ -1079,6 +1079,65 @@ export const INBOX_SAVED_VIEWS = [
   createdAt: '2026-08-17T03:00:00.000Z',
 }))
 
+/*
+  対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
+
+  **「保留」を必ず入れる。** 撮影の手順が「保留」を押して編集画面へ進む。
+  行が無いと押しどころが描かれず、4-3-A が1枚も撮れない
+  （kentavndng/line-harness-board#105 に挙げていた欠け）。
+*/
+export const SUPPORT_MARKS = [
+  {
+    id: 'mark-default', name: '未対応', color: '#F59E0B', isDefault: true,
+    autoOnInbound: true, displayOrder: 0, createdAt: '2026-01-01T00:00:00.000Z',
+    isInherited: false, friendCount: 8,
+  },
+  {
+    id: 'mark-hold', name: '保留', color: '#94A3B8', isDefault: false,
+    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
+    isInherited: false, friendCount: 3,
+  },
+  {
+    id: 'mark-unused', name: '確認待ち', color: '#3B82F6', isDefault: false,
+    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
+    isInherited: false, friendCount: 0,
+  },
+]
+
+/*
+  対応マークの自動変更ルール。
+
+  **止めているルールを1件混ぜる。** 全部動いていると、「動いています／
+  止めています」の描き分けと、止めたものが実行順から外れて見えるかを
+  一度も確かめられない。優先度も変えて、実行順の並びが出るようにする。
+*/
+export const SUPPORT_MARK_AUTOMATION_RULES = [
+  {
+    id: 'support-rule-assigned',
+    name: '担当者が決まったら対応中へ',
+    markId: 'mark-hold',
+    event: 'staff_assigned',
+    condition: null,
+    priority: 100,
+    manualProtectionMinutes: 60,
+    isActive: true,
+    version: 2,
+    updatedAt: '2026-08-31T10:00:00+09:00',
+  },
+  {
+    id: 'support-rule-overdue',
+    name: '期限を過ぎたら確認待ちへ',
+    markId: 'mark-hold',
+    event: 'response_overdue',
+    condition: { operator: 'AND', rules: [] },
+    priority: 50,
+    manualProtectionMinutes: 0,
+    isActive: false,
+    version: 1,
+    updatedAt: '2026-08-30T15:00:00+09:00',
+  },
+]
+
 // V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
 // 0件と未取得を混ぜないため、通常・空・失敗は同じ配列の増減ではなく
 // API状態として切り替える。ここには「取得できた通常値」だけを置く。
@@ -1543,6 +1602,122 @@ export const AUTO_REPLIES = [
     keywords: [{ word: '営業時間' }],
     actions: [], hits: { period: 0, total: 411 }, createdAt: '2026-01-20T00:00:00.000Z',
   },
+]
+
+/*
+  外部連携。設計 `k3WxrO` の「こちらから送る 6／こちらで受け取る 3」そのまま。
+
+  **つなぎ先はサービス名で持つ。** 設計は Slack・Googleスプレッドシート・kintone と
+  相手の名前で見せる。`Webhook` は仕組みの名前で、運用者が探すときの手がかりにならない。
+  URLは設計と同じく途中を伏せる（実在しない作り物）。
+*/
+export const OUTGOING_WEBHOOKS = [
+  {
+    id: 'owh-slack-order', name: 'Slack ／ #注文チャンネル',
+    url: 'https://hooks.slack.com/services/T0XXXXXXXXX/BXXXXXXXXX/visual-qa',
+    eventTypes: ['conversion.confirmed'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 2, lastFailedAt: '2026-08-24T05:12:00.000Z',
+    createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-24T05:12:00.000Z',
+  },
+  {
+    id: 'owh-sheets', name: 'Googleスプレッドシート ／ 顧客台帳',
+    url: 'https://script.google.com/macros/s/visual-qa/exec',
+    eventTypes: ['friend.added'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-03-10T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z',
+  },
+  {
+    id: 'owh-kintone', name: 'kintone ／ 案件アプリ',
+    url: 'https://visual-qa.cybozu.com/k/v1/record.json',
+    eventTypes: ['form.submitted'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T01:10:00.000Z',
+  },
+  {
+    id: 'owh-chatwork', name: 'Chatwork ／ 店舗連絡',
+    url: 'https://api.chatwork.com/v2/rooms/000000/messages',
+    eventTypes: ['booking.created'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-05-20T00:00:00.000Z', updatedAt: '2026-08-23T09:00:00.000Z',
+  },
+  {
+    id: 'owh-zapier', name: 'Zapier ／ 申込のふり分け',
+    url: 'https://hooks.zapier.com/hooks/catch/000000/visual-qa/',
+    eventTypes: ['form.submitted'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T04:00:00.000Z',
+  },
+  {
+    /* 設計の「止めているもの 1本」。**合言葉なしの1本**でもある（健全性チェックの「注意」の元）。 */
+    id: 'owh-paused', name: 'テスト用の受け口 ／ 検証中',
+    url: 'https://example.com/hook/visual-qa',
+    eventTypes: ['friend.added'], hasSecret: false, isActive: false,
+    maxRetries: 0, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+]
+
+/** 受け取る口。設計 `M0Gb7` の3本。 */
+export const INCOMING_WEBHOOKS = [
+  {
+    id: 'iwh-booking', name: '予約サービスから', sourceType: 'booking',
+    hasSecret: true, isActive: true,
+    createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
+  },
+  {
+    id: 'iwh-ec', name: 'ECサイトから（注文）', sourceType: 'ec',
+    hasSecret: true, isActive: true,
+    createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
+  },
+  {
+    id: 'iwh-form', name: '外部フォームから', sourceType: 'form',
+    hasSecret: false, isActive: true,
+    createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+]
+
+/*
+  流入経路。設計 `Q4bkTg` の6本そのまま。
+
+  **`refCode` は運用者が決めてURLに出す符号**なので、値は設計の `summer-ig` などを使う。
+  出してはいけないのは列名のほう（`v6-no-internal-ids.test.ts` が見張っている）。
+*/
+export const ENTRY_ROUTES = [
+  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
+  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
+  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
+  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
+]
+
+/*
+  ログインユーザー。設計 `e3jz3` の並びそのまま。
+
+  **2段階の確認を入れていない人を混ぜる**（設計の帯「2段階の確認 6／8人」）。
+  全員 true にすると、帯が「全員入れています」に化けて、見張りたい状態が撮れない。
+*/
+export const STAFF_MEMBERS = [
+  { id: 'stf-1', name: '佐々木 亮太', email: 'sasaki@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: true, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T00:02:00.000Z', assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all' },
+  { id: 'stf-2', name: '山本 京子', email: 'yamamoto@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: true, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-24T23:40:00.000Z', assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all' },
+  { id: 'stf-3', name: '中川 由美', email: 'nakagawa@example.com', role: 'staff', lineLinked: true, twoFactorEnabled: true, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-24T10:00:00.000Z', assignedLineAccountId: 'visual-qa-account', canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: ['visual-qa-account'] },
+  { id: 'stf-4', name: '高田 誠', email: 'takada@example.com', role: 'staff', lineLinked: false, twoFactorEnabled: false, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-18T10:00:00.000Z', assignedLineAccountId: 'visual-qa-account', canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: ['visual-qa-account'] },
+  { id: 'stf-5', name: '外部デザイン', email: 'design@partner.example.com', role: 'viewer', lineLinked: false, twoFactorEnabled: true, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-08-01T10:00:00.000Z', assignedLineAccountId: 'visual-qa-account', canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: ['visual-qa-account'] },
+  { /* 設計の「90日 入っていない 1」。 */ id: 'stf-6', name: '佐野 直人', email: 'sano@example.com', role: 'viewer', lineLinked: false, twoFactorEnabled: false, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-05-20T10:00:00.000Z', assignedLineAccountId: null, canAccessDescendantAccounts: false, accountScope: 'all' },
+  { /* 設計の「招待中 2」。 */ id: 'stf-7', name: '新井 千夏', email: 'arai@example.com', role: 'staff', lineLinked: false, twoFactorEnabled: false, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'pending_email', createdAt: '2026-08-18T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z', assignedLineAccountId: 'visual-qa-account', canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: ['visual-qa-account'] },
+  { id: 'stf-8', name: '森 涼太', email: 'mori@example.com', role: 'staff', lineLinked: false, twoFactorEnabled: false, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'pending_line', createdAt: '2026-08-20T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z', assignedLineAccountId: 'visual-qa-account', canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: ['visual-qa-account'] },
+]
+
+/*
+  入った記録。設計 `jwVlo` は「気になるもの 1」を札で持つので、
+  **失敗した記録を1件混ぜる**。全部成功にすると、その札が撮れない。
+*/
+export const LOGIN_AUDIT = [
+  { id: 'la-1', adminUserId: 'stf-1', userName: '佐々木 亮太', role: 'admin', lineLinked: true, isActive: true, action: 'login', screen: null, ip: '203.0.113.10', connectionSource: '社内', result: 'success', createdAt: '2026-08-25T00:02:00.000Z' },
+  { id: 'la-2', adminUserId: 'stf-2', userName: '山本 京子', role: 'admin', lineLinked: true, isActive: true, action: 'settings_changed', screen: '機能設定', ip: '203.0.113.11', connectionSource: '社内', result: 'success', createdAt: '2026-08-24T23:41:00.000Z' },
+  { id: 'la-3', adminUserId: 'stf-3', userName: '中川 由美', role: 'staff', lineLinked: true, isActive: true, action: 'broadcast_sent', screen: '一斉配信', ip: '203.0.113.12', connectionSource: '社内', result: 'success', createdAt: '2026-08-24T10:05:00.000Z' },
+  { id: 'la-4', adminUserId: 'stf-4', userName: '高田 誠', role: 'staff', lineLinked: false, isActive: true, action: 'delete', screen: 'テンプレート', ip: '203.0.113.13', connectionSource: '社外', result: 'success', createdAt: '2026-08-23T08:20:00.000Z' },
+  { id: 'la-5', adminUserId: null, userName: '名前を取得できませんでした', role: null, lineLinked: false, isActive: false, action: 'login', screen: null, ip: '198.51.100.7', connectionSource: '社外', result: 'failure', createdAt: '2026-08-22T19:44:00.000Z' },
 ]
 
 /*
