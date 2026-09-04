@@ -176,7 +176,7 @@ export default function LineNotificationsPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
         </>
-        return <div key={label} className="bg-canvas rounded-tile border-hairline border p-4">
+        return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
           {body}
           {/* 0件のときは押し口を出さない。押しても何も無い。 */}
           {canOpenCustomerNotificationKpi(kpi) && href
@@ -186,14 +186,14 @@ export default function LineNotificationsPage() {
       })}
     </div>
     <main className="grid min-w-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="bg-canvas rounded-tile border-hairline h-fit border p-2 lg:sticky lg:top-4">
+      <aside className="bg-canvas rounded-card border-hairline h-fit border p-2 lg:sticky lg:top-4">
         <p className="text-ink-faint px-3 pb-2 pt-3 text-xs font-bold">通知の種類</p>
         {categories.map(([value, label]) => <button key={value} type="button" onClick={() => setCategory(value)} className={`${styles.category} ${category === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{value === 'all' ? settings.length : settings.filter((x) => x.category === value).length}</span></button>)}
         <div className="border-hairline mt-3 border-t p-3 text-xs leading-5 text-ink-faint">通知のON/OFFを切り替えても、ECから受け取った履歴は残ります。</div>
       </aside>
       <section className="min-w-0 space-y-3">
         {notice && <div className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
-        {loading ? <div className="bg-canvas rounded-tile border-hairline border p-12 text-center text-sm text-ink-faint">読み込み中...</div> : visible.map((setting) => <article key={setting.eventType} className="bg-canvas rounded-tile border-hairline overflow-hidden border">
+        {loading ? <div className="bg-canvas rounded-card border-hairline border p-12 text-center text-sm text-ink-faint">読み込み中...</div> : visible.map((setting) => <article key={setting.eventType} className="bg-canvas rounded-card border-hairline overflow-hidden border">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-ink">{setting.label}</h2><span className={`rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '通知ON' : '通知OFF'}</span></div><p className="mt-0.5 truncate text-xs text-ink-faint">{categoryLabel(setting.category)}・{formatUpdatedAt(setting.updatedAt)}</p></div></div>
             <button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className={styles.rowAction}>{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button>

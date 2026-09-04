@@ -11,6 +11,7 @@ import { AreaProperties, intentOf } from '@/components/rich-menus/area-propertie
 import type { RichMenuAreaTapCount } from '@/lib/api'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -556,7 +557,8 @@ function Editor({
       <Header
         description="トーク画面の下に出るメニューを作ります。エリアを選んで、押したときの動きを設定してください。"
         action={
-          <div className="flex items-center gap-2">
+          <StickyBar actions={(
+            <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-sm text-gray-600 mr-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -587,7 +589,8 @@ function Editor({
                   ? 'LINE に再登録'
                   : 'LINE に登録'}
             </button>
-          </div>
+            </div>
+          )} />
         }
       />
 

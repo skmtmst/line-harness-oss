@@ -11,6 +11,7 @@ import {
   type BroadcastMessageAsset,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import StickyBar from '@/components/shared/sticky-bar'
 import {
   MAX_BUBBLES,
   MAX_TEXT_LENGTH,
@@ -1176,7 +1177,8 @@ export default function BroadcastForm({
         <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
       </div>
     )}
-    <div className="flex flex-wrap justify-end gap-3">
+    <StickyBar actions={(
+      <>
       <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">
         キャンセル
       </button>
@@ -1207,7 +1209,8 @@ export default function BroadcastForm({
       >
         {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
       </button>
-    </div>
+      </>
+    )} />
       </div>
       <aside className="xl:sticky xl:top-6 xl:h-fit"><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
     {sendMode === 'scheduled' && scheduledDate && (

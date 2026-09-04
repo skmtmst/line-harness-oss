@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import MileageRewardsTab from './mileage-rewards-tab'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
@@ -32,6 +33,13 @@ const PAGE_SIZE = 50
 const TABS = [
   { key: 'balances', label: '友だちの残高' },
   { key: 'earning-rules', label: 'たまる決めごと' },
+  /*
+    **「使い道」を足した。** 設計 `qlVLJ`（17-1-B）はこのタブを持つのに、
+    ここに無かったので `?tab=rewards` は既定タブへ落ち、
+    **画面からは「無い」ことすら分からなかった**（#739 で未実装と判定した）。
+    口は #772 で入ったので、一覧をつなぐ。
+  */
+  { key: 'rewards', label: '使い道' },
   { key: 'history', label: '履歴' },
   { key: 'score', label: '行動スコア' },
 ] as const
@@ -216,7 +224,7 @@ function MileagePageInner() {
   }, [accounts, selectedAccountId])
 
   return (
-    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
+    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
       <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
@@ -429,6 +437,7 @@ function MileagePageInner() {
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
+      {tab === 'rewards' ? <MileageRewardsTab key={selectedAccountId ?? 'none'} accountId={selectedAccountId} /> : null}
       {tab === 'score' && selectedAccountId ? <ActionScoreTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
       {tab === 'balances' && !loading && !loadError && <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
