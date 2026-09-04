@@ -150,12 +150,22 @@ function Editor({
    * 開いている窓は1つだけ。`ConfirmDialog` を3つ並べるより、どれが開いて
    * いるかを1か所で見たほうが、二重に開く形を作りにくい。
    */
-  const [confirmKind, setConfirmKind] = useState<'removePage' | 'publish' | 'unpublish' | null>(null)
+  const [confirmKind, setConfirmKind] = useState<'removePage' | 'publish' | 'unpublish' | 'deleteGroup' | null>(null)
+  /** 消す前に打ち込んでもらう名前。**打ち間違いを止めるための二重確認。** */
+  const [deleteTyped, setDeleteTyped] = useState('')
+  const [deleting, setDeleting] = useState(false)
   /** 押した時点のページ。窓を開けたまま別のページに切り替えても、対象は動かさない。 */
   const [removePageTarget, setRemovePageTarget] = useState<Page | null>(null)
   const [confirmError, setConfirmError] = useState('')
   /** 登録・取り下げの結果。`alert()` の代わりに画面へ残す。 */
   const [notice, setNotice] = useState('')
+  /**
+   * 下見で押したときに「何が起きるか」。
+   *
+   * ここも `alert()` だった。**押した瞬間しか読めず、消えると確かめ直せない。**
+   * 画面に残せば、区画を押しながら設定と見比べられる。
+   */
+  const [previewMessage, setPreviewMessage] = useState('')
 
   const closeConfirm = () => {
     if (publishing || unpublishing) return
@@ -444,36 +454,47 @@ function Editor({
     }
   }
 
-  async function handleDelete() {
+  /**
+   * 消す押し口。**ブラウザの `alert()` と `prompt()` を使わない。**
+   *
+   * 見た目がブラウザ任せで設計の確認窓と違ううえ、**画像比較に写らない**ので
+   * 確認と失敗の絵をそもそも撮れない。理由も窓の中に出して、押した場所から
+   * 動かさない。
+   */
+  function handleDelete() {
     if (!group) return
     if (group.status === 'published') {
-      alert(
-        'このリッチメニューは LINE に登録中です。\n\n' +
-          '先に「LINE から取り下げ」を実行してから削除してください。',
-      )
+      setError('このリッチメニューはLINEに登録中です。先に「LINEから取り下げ」をしてから削除してください。')
       return
     }
-    // 二重確認: メニュー名を入力してもらう
-    const typed = prompt(
-      `この操作は元に戻せません。\n\n削除を確定するには、リッチメニュー名「${group.name}」を入力してください。`,
-    )
-    if (typed === null) return
-    if (typed !== group.name) {
-      alert('入力が一致しませんでした。削除をキャンセルしました。')
+    setDeleteTyped('')
+    setConfirmError('')
+    setConfirmKind('deleteGroup')
+  }
+
+  async function runDelete() {
+    if (!group) return
+    if (deleteTyped !== group.name) {
+      setConfirmError('名前が一致しません。上の名前をそのまま打ち込んでください。')
       return
     }
+    setDeleting(true)
+    setConfirmError('')
     try {
       const res = await api.richMenuGroups.delete(groupId)
-      if (!res.success) throw new Error(res.error ?? '削除失敗')
+      if (!res.success) throw new Error(res.error ?? '削除できませんでした')
       router.push('/rich-menus')
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      setConfirmError(e instanceof Error ? e.message : '削除できませんでした。しばらくおいてから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
     }
   }
 
   async function handleImageUpload(pageId: string, file: File) {
     if (pageId.startsWith('tmp-')) {
-      alert('まず Save Draft でページを保存してから画像を upload してください。')
+      // **内部語を出さない。** 押し口の名前は画面に出ている言葉で書く。
+      setError('先に「下書きを保存」でページを保存してから、画像を選んでください。')
       return
     }
     setBusy(true)
@@ -486,7 +507,7 @@ function Editor({
       })
       setImageVersion((v) => v + 1)
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      setError(e instanceof Error ? e.message : '画像を読み込めませんでした。もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -645,6 +666,7 @@ function Editor({
               onPreviewAction={(area) => {
                 // プレビューは「押すと何が起きるか」を確かめるためのもの。
                 // 実際に送ったり電話をかけたりはせず、起きることを文で見せる。
+                setPreviewMessage('')
                 const data = area.actionData as {
                   uri?: string
                   tel?: string
@@ -656,24 +678,24 @@ function Editor({
                 switch (intentOf(area)) {
                   case 'url':
                     if (area.trackedLinkId) {
-                      alert(`計測リンクを開きます: ${nameOf(trackedLinks, area.trackedLinkId)}`)
+                      setPreviewMessage(`計測リンクを開きます：${nameOf(trackedLinks, area.trackedLinkId)}`)
                     } else if (data.uri) {
                       window.open(data.uri, '_blank')
                     } else {
-                      alert('URLが未設定です')
+                      setPreviewMessage('URLがまだ設定されていません。右の設定で入れてください。')
                     }
                     break
                   case 'tel':
-                    alert(`電話をかけます: ${data.tel || '(未設定)'}`)
+                    setPreviewMessage(data.tel ? `電話をかけます：${data.tel}` : '電話番号がまだ設定されていません。')
                     break
                   case 'text':
-                    alert(`「${data.text || '(未設定)'}」を送ったことになります`)
+                    setPreviewMessage(data.text ? `「${data.text}」を送ります。` : '送る文がまだ設定されていません。')
                     break
                   case 'template':
-                    alert(`テンプレートを送ります: ${nameOf(templates, area.templateId)}`)
+                    setPreviewMessage(`テンプレートを送ります：${nameOf(templates, area.templateId)}`)
                     break
                   case 'form':
-                    alert(`回答フォームを開きます: ${nameOf(forms, area.formId)}`)
+                    setPreviewMessage(`回答フォームを開きます：${nameOf(forms, area.formId)}`)
                     break
                   case 'switch': {
                     const targetId = data.targetPageId
@@ -681,17 +703,29 @@ function Editor({
                       setActivePageId(targetId)
                       setSelectedAreaId(null)
                     } else {
-                      alert('切り替え先のページが未設定です')
+                      setPreviewMessage('切り替え先のページがまだ設定されていません。')
                     }
                     break
                   }
                   default:
-                    alert(`合図を送ります: ${JSON.stringify(area.actionData)}`)
+                    // **中身をそのまま出さない。** `actionData` は機械が読む値で、
+                    // 運用者に見せる言葉ではない。
+                    setPreviewMessage('この区画の動きは、下見では試せません。')
                 }
               }}
             />
           ) : (
             <p className="text-sm text-gray-500">ページがありません</p>
+          )}
+
+          {/*
+            下見で押したときに起きること。**`alert()` と違い、押したあとも
+            読み返せる。** 区画を押しながら右の設定と見比べられる。
+          */}
+          {previewMessage && (
+            <p role="status" className="bg-status-info-soft text-status-info rounded-control mt-3 px-3 py-2 text-xs">
+              {previewMessage}
+            </p>
           )}
         </section>
 
@@ -1009,6 +1043,35 @@ function Editor({
             <li>・戻せます: 保存する前なら、この画面を開き直せば元に戻ります。</li>
           </ul>
         )}
+      </ConfirmDialog>
+
+      {/*
+        消す前に名前を打ち込んでもらう。**押し間違いだけでは消えない。**
+        以前はブラウザの `prompt()` で聞いていたので、設計の窓と形が違い、
+        画像比較にも写らなかった。
+      */}
+      <ConfirmDialog
+        open={confirmKind === 'deleteGroup'}
+        title={group ? `「${group.name}」を削除しますか？` : ''}
+        description="このリッチメニューと、中のページ・ボタンをすべて削除します。この操作は取り消せません。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleting}
+        error={confirmError}
+        onCancel={closeConfirm}
+        onConfirm={() => void runDelete()}
+      >
+        <label className="block text-xs">
+          <span className="text-ink-secondary font-semibold">
+            確かめるため、リッチメニュー名「{group?.name}」を打ち込んでください
+          </span>
+          <input
+            value={deleteTyped}
+            onChange={(e) => setDeleteTyped(e.target.value)}
+            aria-label="削除を確かめるリッチメニュー名"
+            className="border-hairline rounded-control text-ink mt-1 w-full border px-3 py-2 text-sm"
+          />
+        </label>
       </ConfirmDialog>
 
       {/*

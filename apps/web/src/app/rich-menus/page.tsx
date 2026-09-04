@@ -286,7 +286,9 @@ export default function RichMenusListPage() {
       )
       await reload()
     } catch (e) {
-      alert(richMenuError(e, 'reorder'))
+      // **`alert()` では出さない。** 見た目がブラウザ任せで、画像比較にも
+      // 写らない。画面の帯に出して、押したあとも読み返せるようにする。
+      setError(richMenuError(e, 'reorder'))
     } finally {
       setReorderBusy(false)
     }
