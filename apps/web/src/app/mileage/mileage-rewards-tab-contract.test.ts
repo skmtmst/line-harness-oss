@@ -75,3 +75,18 @@ describe('マイルのタブ', () => {
     expect(PAGE).toMatch(/<MileageRewardsTab[\s\S]{0,120}accountId=/)
   })
 })
+
+describe('いちばん使われた', () => {
+  const code = withoutComments(TAB)
+
+  it('1回も交換されていないときは名指ししない', () => {
+    // 名前を出すと「これがよく使われている」と読め、伸ばす先を取り違える。
+    expect(code).toMatch(/mostRedeemedRewardCount\s*\?\s*summary\.mostRedeemedRewardName/)
+    expect(code).toContain('まだ交換されていません')
+  })
+
+  it('数えられないときと0回を、同じ文にしない', () => {
+    expect(code).toMatch(/mostRedeemedRewardCount\s*==\s*null/)
+    expect(code).toMatch(/mostRedeemedRewardCount\s*===\s*0/)
+  })
+})
