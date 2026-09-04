@@ -15,6 +15,7 @@ const mocks = {
   applyMediaReplacementPlan: vi.fn(),
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
+  getCommonVarUsageCounts: vi.fn(),
   getCommonVarById: vi.fn(),
   createCommonVar: vi.fn(),
   updateCommonVar: vi.fn(),
@@ -179,6 +180,7 @@ beforeEach(() => {
   mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
   mocks.applyMediaReplacementPlan.mockResolvedValue(1);
   mocks.getCommonVars.mockResolvedValue([VAR]);
+  mocks.getCommonVarUsageCounts.mockResolvedValue(new Map([['shop_hours', 3]]));
   mocks.getCommonVarById.mockResolvedValue(VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
   mocks.updateCommonVar.mockResolvedValue(VAR);
@@ -517,6 +519,19 @@ describe('共通情報', () => {
       lineAccountId: 'account-1',
       folderId: undefined,
     });
+    expect(mocks.getCommonVarUsageCounts).toHaveBeenCalledWith(
+      env.DB,
+      ['shop_hours'],
+      'account-1',
+    );
+    const body = (await res.json()) as { data: Array<{ usageCount: number }> };
+    expect(body.data[0]?.usageCount).toBe(3);
+  });
+
+  it('使用先件数を確認できないときは0件と見せず一覧取得を止める', async () => {
+    mocks.getCommonVarUsageCounts.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/common-vars?accountId=account-1', 'GET');
+    expect(res.status).toBe(500);
   });
 
   it('差し込み名の形が違えば422', async () => {

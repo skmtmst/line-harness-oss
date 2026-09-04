@@ -40,6 +40,8 @@ export const FRIEND_ADD_WINNER_SUBQUERY = `
     JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
     JOIN affiliates a2 ON a2.id = al2.affiliate_id
    WHERE rt2.friend_id = f.id
+     AND al2.line_account_id IS f.line_account_id
+     AND a2.line_account_id IS f.line_account_id
      AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
      AND julianday(rt2.created_at) <= julianday(f.created_at)
      AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
@@ -97,6 +99,8 @@ export interface AffiliateReportV2 {
 export interface AffiliateReportOptions {
   startDate?: string;
   endDate?: string;
+  /** 所属外のlink・friend・offerを集計へ混ぜない。NULLはlegacy同士だけ一致。 */
+  lineAccountId?: string | null;
   /**
    * The canonical IDENTITY_KEY_SQL fragment (from the worker's lib/identity-key).
    * Passed in so packages/db stays decoupled from apps/worker while reusing the
@@ -115,16 +119,23 @@ export async function getAffiliateReportV2(
   opts: AffiliateReportOptions,
 ): Promise<AffiliateReportV2 | null> {
   const affiliate = await db
-    .prepare(`SELECT id, name, code, commission_rate FROM affiliates WHERE id = ?`)
+    .prepare(`SELECT id, name, code, commission_rate, line_account_id FROM affiliates WHERE id = ?`)
     .bind(affiliateId)
-    .first<{ id: string; name: string; code: string; commission_rate: number }>();
+    .first<{
+      id: string;
+      name: string;
+      code: string;
+      commission_rate: number;
+      line_account_id: string | null;
+    }>();
   if (!affiliate) return null;
 
   const { startDate, endDate, identityKeySql } = opts;
+  const lineAccountId = opts.lineAccountId ?? affiliate.line_account_id ?? null;
 
   // ── clicks: ref_tracking touches on this affiliate's links ─────────────────
-  const clickConds: string[] = ['al.affiliate_id = ?'];
-  const clickBinds: unknown[] = [affiliateId];
+  const clickConds: string[] = ['al.affiliate_id = ?', 'al.line_account_id IS ?'];
+  const clickBinds: unknown[] = [affiliateId, lineAccountId];
   if (startDate) {
     clickConds.push('julianday(rt.created_at) >= julianday(?)');
     clickBinds.push(startDate);
@@ -147,17 +158,20 @@ export async function getAffiliateReportV2(
   const linkClicksRow = await db
     .prepare(
       `SELECT COALESCE(SUM(click_count), 0) AS link_clicks
-         FROM affiliate_links WHERE affiliate_id = ?`,
+         FROM affiliate_links WHERE affiliate_id = ? AND line_account_id IS ?`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, lineAccountId)
     .first<{ link_clicks: number }>();
 
   // ── friendAdds: friends whose add-time last-touch is this affiliate ────────
   // Correlated subquery resolves each friend's winning affiliate at their
   // created_at; the outer WHERE keeps only friends won by this affiliate.
   // friends.created_at date filter (if given) bounds which adds are counted.
-  const friendAddConds: string[] = [`(${FRIEND_ADD_WINNER_SUBQUERY}) = ?`];
-  const friendAddBinds: unknown[] = [affiliateId];
+  const friendAddConds: string[] = [
+    `(${FRIEND_ADD_WINNER_SUBQUERY}) = ?`,
+    'f.line_account_id IS ?',
+  ];
+  const friendAddBinds: unknown[] = [affiliateId, lineAccountId];
   if (startDate) {
     friendAddConds.push('julianday(f.created_at) >= julianday(?)');
     friendAddBinds.push(startDate);
@@ -189,8 +203,20 @@ export async function getAffiliateReportV2(
   // is applied consistently.
   const STATUS_EXPR = `COALESCE(ce.approval_status, 'pending')`;
 
-  const cvConds: string[] = ['ce.affiliate_id = ?'];
-  const cvBinds: unknown[] = [affiliateId];
+  const cvConds: string[] = [
+    'ce.affiliate_id = ?',
+    `EXISTS (
+      SELECT 1 FROM friends cv_friend
+       WHERE cv_friend.id = ce.friend_id
+         AND cv_friend.line_account_id IS ?
+    )`,
+    `EXISTS (
+      SELECT 1 FROM conversion_points cv_point
+       WHERE cv_point.id = ce.conversion_point_id
+         AND cv_point.line_account_id IS ?
+    )`,
+  ];
+  const cvBinds: unknown[] = [affiliateId, lineAccountId, lineAccountId];
   if (startDate) {
     cvConds.push('julianday(ce.created_at) >= julianday(?)');
     cvBinds.push(startDate);
@@ -210,11 +236,13 @@ export async function getAffiliateReportV2(
               COALESCE(SUM(cp.value), 0) AS value
          FROM conversion_events ce
          JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-        WHERE ${cvWhere} AND ${STATUS_EXPR} != 'rejected'
+        WHERE ${cvWhere}
+          AND cp.line_account_id IS ?
+          AND ${STATUS_EXPR} != 'rejected'
         GROUP BY cp.id, cp.name
         ORDER BY count DESC`,
     )
-    .bind(...cvBinds)
+    .bind(...cvBinds, lineAccountId)
     .all<{ conversion_point_id: string; name: string; count: number; value: number }>();
 
   const conversionsByPoint = byPoint.results.map((r) => ({
@@ -264,11 +292,14 @@ export async function getAffiliateReportV2(
          FROM conversion_events ce
          JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
          JOIN affiliate_offers off ON off.id = al.offer_id
-        WHERE ${cvWhere} AND ${STATUS_EXPR} != 'rejected'
+        WHERE ${cvWhere}
+          AND al.line_account_id IS ?
+          AND off.line_account_id IS ?
+          AND ${STATUS_EXPR} != 'rejected'
         GROUP BY off.id, off.name, off.reward_amount
         ORDER BY approved DESC, off.name ASC`,
     )
-    .bind(...cvBinds)
+    .bind(...cvBinds, lineAccountId, lineAccountId)
     .all<{ offer_id: string; offer_name: string; reward_amount: number; approved: number; pending: number }>();
 
   const byOffer = offerRows.results.map((r) => ({
@@ -292,12 +323,15 @@ export async function getAffiliateReportV2(
       `WITH attributed AS (
          SELECT friends.id AS friend_id, (${identityKeySql}) AS identity_key
            FROM friends
-          WHERE (
+          WHERE friends.line_account_id IS ?
+            AND (
             SELECT al2.affiliate_id
               FROM ref_tracking rt2
               JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
               JOIN affiliates a2 ON a2.id = al2.affiliate_id
              WHERE rt2.friend_id = friends.id
+               AND al2.line_account_id IS friends.line_account_id
+               AND a2.line_account_id IS friends.line_account_id
                AND julianday(rt2.created_at) >= julianday(friends.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
                AND julianday(rt2.created_at) <= julianday(friends.created_at)
                AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
@@ -314,7 +348,7 @@ export async function getAffiliateReportV2(
          JOIN dup_keys d ON d.identity_key = a.identity_key
         ORDER BY a.identity_key, a.friend_id`,
     )
-    .bind(affiliateId)
+    .bind(lineAccountId, affiliateId)
     .all<{ friend_id: string; identity_key: string }>();
 
   const duplicateFlags = dupRows.results.map((r) => ({
@@ -383,6 +417,7 @@ export interface AffiliateLinkStat {
 export async function getAffiliateLinkStats(
   db: D1Database,
   affiliateId: string,
+  lineAccountId?: string | null,
 ): Promise<Map<string, AffiliateLinkStat>> {
   const stats = new Map<string, AffiliateLinkStat>();
   const ensure = (refCode: string): AffiliateLinkStat => {
@@ -401,16 +436,20 @@ export async function getAffiliateLinkStats(
   // Approval-aware: rejected CVs are excluded from every count. `conversions`
   // is the non-rejected total (approved + pending) for backward compatibility;
   // NULL approval_status is treated as pending (historical rows).
+  const hasAccount = arguments.length >= 3;
   const cvRows = await db
     .prepare(
       `SELECT attributed_ref_code AS ref_code,
               SUM(CASE WHEN COALESCE(approval_status, 'pending') = 'approved' THEN 1 ELSE 0 END) AS approved,
               SUM(CASE WHEN COALESCE(approval_status, 'pending') = 'pending' THEN 1 ELSE 0 END) AS pending
-         FROM conversion_events
-        WHERE affiliate_id = ? AND attributed_ref_code IS NOT NULL
+         FROM conversion_events ce
+         JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
+         JOIN friends f ON f.id = ce.friend_id
+        WHERE ce.affiliate_id = ? AND ce.attributed_ref_code IS NOT NULL
+          ${hasAccount ? 'AND al.line_account_id IS ? AND f.line_account_id IS ?' : ''}
         GROUP BY attributed_ref_code`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, ...(hasAccount ? [lineAccountId ?? null, lineAccountId ?? null] : []))
     .all<{ ref_code: string; approved: number; pending: number }>();
   for (const r of cvRows.results) {
     const s = ensure(r.ref_code);
@@ -433,6 +472,8 @@ export async function getAffiliateLinkStats(
                JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
                JOIN affiliates a2 ON a2.id = al2.affiliate_id
               WHERE rt2.friend_id = f.id
+                AND al2.line_account_id IS f.line_account_id
+                AND a2.line_account_id IS f.line_account_id
                 AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
                 AND julianday(rt2.created_at) <= julianday(f.created_at)
                 AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
@@ -441,11 +482,12 @@ export async function getAffiliateLinkStats(
            ) AS winner_ref_code
              FROM friends f
             WHERE (${FRIEND_ADD_WINNER_SUBQUERY}) = ?
+              ${hasAccount ? 'AND f.line_account_id IS ?' : ''}
          )
         WHERE winner_ref_code IS NOT NULL
         GROUP BY winner_ref_code`,
     )
-    .bind(affiliateId)
+    .bind(affiliateId, ...(hasAccount ? [lineAccountId ?? null] : []))
     .all<{ ref_code: string; friend_adds: number }>();
   for (const r of faRows.results) {
     ensure(r.ref_code).friendAdds = r.friend_adds;

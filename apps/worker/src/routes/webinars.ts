@@ -36,6 +36,7 @@ import {
   getWebinarAnalyticsSummary,
   getWebinarDailyStats,
   getWebinarFormFunnelStats,
+  getWebinarOverview,
   getFriendByLineUserId,
   getFriendByLineUserIdForAccount,
   getFormById,
@@ -694,6 +695,23 @@ const requireVisibleWebinar: MiddlewareHandler<Env> = async (c, next) => {
   }
   await next();
 };
+
+webinarRoutes.get('/api/webinars/overview', async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) {
+      return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const overview = await getWebinarOverview(c.env.DB, accountId);
+    return c.json({ success: true, data: overview });
+  } catch (err) {
+    console.error('GET /api/webinars/overview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 webinarRoutes.use('/api/webinars/:id', requireVisibleWebinar);
 webinarRoutes.use('/api/webinars/:id/*', requireVisibleWebinar);

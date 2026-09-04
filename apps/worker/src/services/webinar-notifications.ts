@@ -668,16 +668,31 @@ export async function processWebinarNotificationJobs(
 export async function getWebinarNotificationOverview(
   db: D1Database,
   webinarId: string,
-): Promise<{ total: number; pending: number; sent: number; failed: number; skipped: number; cancelled: number }> {
-  const row = await db.prepare(
-    `SELECT COUNT(*) AS total,
+): Promise<{
+  total: number;
+  pending: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  cancelled: number;
+  audience: { people: number; bookings: number; definition: 'active_registrations' };
+}> {
+  const [row, audience] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS total,
             SUM(CASE WHEN status IN ('queued','claimed','retry_wait') THEN 1 ELSE 0 END) AS pending,
             SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) AS sent,
             SUM(CASE WHEN status='permanent_failed' THEN 1 ELSE 0 END) AS failed,
             SUM(CASE WHEN status='skipped' THEN 1 ELSE 0 END) AS skipped,
             SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END) AS cancelled
        FROM webinar_notification_jobs WHERE webinar_id=?`,
-  ).bind(webinarId).first<Record<string, number | null>>();
+    ).bind(webinarId).first<Record<string, number | null>>(),
+    db.prepare(
+      `SELECT COUNT(DISTINCT friend_id) AS people, COUNT(*) AS bookings
+         FROM webinar_registrations
+        WHERE webinar_id=? AND status='active'`,
+    ).bind(webinarId).first<{ people: number | null; bookings: number | null }>(),
+  ]);
   return {
     total: row?.total ?? 0,
     pending: row?.pending ?? 0,
@@ -685,5 +700,10 @@ export async function getWebinarNotificationOverview(
     failed: row?.failed ?? 0,
     skipped: row?.skipped ?? 0,
     cancelled: row?.cancelled ?? 0,
+    audience: {
+      people: audience?.people ?? 0,
+      bookings: audience?.bookings ?? 0,
+      definition: 'active_registrations',
+    },
   };
 }

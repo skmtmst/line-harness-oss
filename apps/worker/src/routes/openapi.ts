@@ -223,6 +223,8 @@ const spec = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
+          tenantId: { type: 'string', format: 'uuid' },
+          lineAccountId: { type: 'string', nullable: true },
           name: { type: 'string' },
           code: { type: 'string' },
           commissionRate: { type: 'number' },
