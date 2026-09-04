@@ -28,6 +28,35 @@ function applyMigration(db: Database.Database): void {
 }
 
 describe('199 common variable account scope', () => {
+  it('counts distinct accounts across every usage source and across insert batches', () => {
+    const db = legacyDb(['a1', 'a2']);
+    try {
+      db.exec(`
+        INSERT INTO common_vars (id, name, var_key) VALUES
+          ('single', 'Single', 'single'), ('shared', 'Shared', 'shared'),
+          ('unknown', 'Unknown', 'unknown');
+        INSERT INTO templates VALUES ('a1', '{{var.single}} {{var.shared}}'),
+          ('a1', '{{var.single}}'), (NULL, '{{var.unknown}}');
+        INSERT INTO broadcasts VALUES ('a1', '{{var.single}}');
+        INSERT INTO scenarios VALUES ('s1', 'a1');
+        INSERT INTO scenario_steps VALUES ('s1', NULL, '{{var.single}}');
+        INSERT INTO reminders VALUES ('r1', 'a1');
+        INSERT INTO reminder_steps VALUES ('r1', '{{var.single}}');
+        INSERT INTO auto_replies VALUES ('a1', NULL, '{{var.single}}');
+        INSERT INTO automations VALUES ('a1', '{{var.single}}', NULL),
+          ('a2', NULL, '{{var.shared}}'), (NULL, '{{var.unknown}}', NULL);
+      `);
+      applyMigration(db);
+      expect(db.prepare('SELECT id, line_account_id FROM common_vars ORDER BY id').all()).toEqual([
+        { id: 'shared', line_account_id: null },
+        { id: 'single', line_account_id: 'a1' },
+        { id: 'unknown', line_account_id: null },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
   it('assigns only an unambiguous referenced account and leaves multi-account values for review', () => {
     const db = legacyDb(['a1', 'a2']);
     db.exec(`
