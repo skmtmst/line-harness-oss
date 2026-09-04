@@ -10,6 +10,7 @@ const mocks = {
   updateTemplate: vi.fn(),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
+  getFolderById: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
 
