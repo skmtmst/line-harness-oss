@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 211,
-  "unimplemented": 23,
+  "compared": 212,
+  "unimplemented": 22,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 28,
   "match": 0,
   "structureMatchDataPending": 27,
-  "needsFix": 111,
+  "needsFix": 112,
   "unjudged": 97,
   "remaining": 258,
   "features": [
@@ -1559,14 +1559,14 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 8,
-      "unimplemented": 3,
+      "compared": 9,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 4,
+      "needsFix": 5,
       "unjudged": 1,
       "remaining": 11,
       "capturedAt": [
@@ -2555,13 +2555,6 @@
       "name": "16-1-H 支払いを確定する",
       "gap": "api",
       "gapNote": "同上（締める操作）"
-    },
-    {
-      "feature": 17,
-      "node": "qlVLJ",
-      "name": "17-1-B マイルの使い道",
-      "gap": "build",
-      "gapNote": "交換できるもの（送料無料クーポン・先行のお知らせ・数量に限りがあるもの）の一覧と、申し込みの受付。`p9CcEB`（使い道をつくる）と対で要る"
     },
     {
       "feature": 17,
