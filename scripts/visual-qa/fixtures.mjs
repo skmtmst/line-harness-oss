@@ -1719,3 +1719,52 @@ export const LOGIN_AUDIT = [
   { id: 'la-4', adminUserId: 'stf-4', userName: '高田 誠', role: 'staff', lineLinked: false, isActive: true, action: 'delete', screen: 'テンプレート', ip: '203.0.113.13', connectionSource: '社外', result: 'success', createdAt: '2026-08-23T08:20:00.000Z' },
   { id: 'la-5', adminUserId: null, userName: '名前を取得できませんでした', role: null, lineLinked: false, isActive: false, action: 'login', screen: null, ip: '198.51.100.7', connectionSource: '社外', result: 'failure', createdAt: '2026-08-22T19:44:00.000Z' },
 ]
+
+/*
+  行動スコアの決めごと（`s6MBc` 17-2-A `/mileage/score-rules`）。
+
+  **帯の境目は 30 / 70。** `packages/db` の `DEFAULT_BANDS` と同じ値にしてある。
+  同じファイルの `/api/action-scores/friends` は長く `normalMin: 40` を返していて、
+  一覧と決めごとの画面で**同じ人が別の帯に入って見えた**。40 に根拠は無かったので
+  30 にそろえた。
+
+  **止めているルールを1本入れる。** 全部動かしていると、スイッチが切れている行と
+  「止める」の文字が撮れない。
+*/
+function scoreRule(id, name, eventType, source, operation, value, kind, limit, enabled = true) {
+  return {
+    id, name, eventType, source, operation, value,
+    frequency: { kind, limit }, sameSourceEventOnce: true,
+    validFrom: null, validUntil: null, enabled,
+  }
+}
+
+const ACTION_SCORE_BUNDLE = {
+  rules: [
+    scoreRule('asr-1', 'メッセージに返信した', 'message_received', 'line_webhook', 'delta', 4, 'per_day', 1),
+    scoreRule('asr-2', '配信のURLを押した', 'link_clicked', 'tracked_link', 'delta', 2, 'per_subject_per_day', 1),
+    scoreRule('asr-3', '回答フォームに答えた', 'form_submitted', 'form', 'delta', 6, 'per_subject', 1),
+    scoreRule('asr-4', '予約した', 'booking_created', null, 'delta', 10, 'unlimited', 1),
+    scoreRule('asr-5', '購入した', 'purchase_completed', 'stripe', 'delta', 12, 'unlimited', 1),
+    scoreRule('asr-6', '30日間反応がない', 'inactivity_30d', 'scheduler', 'delta', -6, 'once_per_period', 1),
+    scoreRule('asr-7', 'ブロックした', 'friend_unfollow', 'line_webhook', 'set', 0, 'unlimited', 1, false),
+  ],
+  bands: { min: 0, max: 100, normalMin: 30, highMin: 70 },
+}
+
+export const ACTION_SCORE_RULES = {
+  configured: true,
+  status: 'published',
+  currentDraftVersionId: 'asrv-3',
+  currentPublishedVersionId: 'asrv-2',
+  editableVersion: {
+    ...ACTION_SCORE_BUNDLE,
+    id: 'asrv-3', versionNumber: 3, status: 'draft',
+    createdAt: '2026-08-30T10:00:00.000Z', publishedAt: null,
+  },
+  publishedVersion: {
+    ...ACTION_SCORE_BUNDLE,
+    id: 'asrv-2', versionNumber: 2, status: 'published',
+    createdAt: '2026-08-20T10:00:00.000Z', publishedAt: '2026-08-21T02:00:00.000Z',
+  },
+}

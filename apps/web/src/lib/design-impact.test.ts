@@ -10,11 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする96ファイルを利用先に数える', () => {
-    // 2026-09-04: LINEアカウントの4画面（★V6 33-1〜33-4）と、下部追従バーへ
-    // 寄せた共通情報の2画面が共通 Button を使う。統合 PR #834 #845 #855 の
-    // ぶんと、一覧失敗時の再読み込みを持つ ListState と合わせて実測し直す。
-    expect(directImporters(files, button)).toHaveLength(96)
+  it('共通Buttonを直接importする101ファイルを利用先に数える', () => {
+    // 2026-09-04: 合流ブランチの追加画面と、development 側で下部追従バーへ
+    // 寄せた画面、一覧失敗時の再読み込みを持つ ListState を合わせた実測値。
+    expect(directImporters(files, button)).toHaveLength(101)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -30,6 +29,8 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
+      // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
+      'app/auto-replies/runs/page.tsx',
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',

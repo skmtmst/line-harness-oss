@@ -50,6 +50,15 @@ function Ellipsis() {
 /**
  * Pencil V5/V6 の `Blot6` を正本にした共通ページネーション。
  * 見た目と省略規則は部品側に置き、呼び出し側は現在ページと変更処理だけを渡す。
+ *
+ * ## 送る先が無いときは描かない
+ *
+ * **1ページしか無い一覧に「前へ 1 次へ」を出さない。** 読み込み中や、
+ * 1件も無いときにも出ていた。押せない口が並ぶと、運用者は
+ * 「まだ何かあるのに出ていない」と読む。
+ *
+ * 画面ごとに `{pageCount > 1 && <Pagination …>}` と書くと、書き忘れた画面
+ * だけ出たままになる（実際そうなっていた）。**部品の側で決める。**
  */
 export default function Pagination({
   page,
@@ -62,6 +71,9 @@ export default function Pagination({
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
+
+  // 送る先が1ページだけなら、そもそも出さない。
+  if (total <= 1) return null
 
   return (
     <nav aria-label={ariaLabel} className={classes}>
