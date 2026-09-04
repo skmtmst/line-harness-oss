@@ -5,6 +5,7 @@ const dbMocks = {
   recordMediaUsage: vi.fn(),
   recordMediaUsages: vi.fn(),
   pruneStaleMediaUsages: vi.fn(),
+  pruneStaleMediaUsagesBatch: vi.fn(),
   saveMediaUsageScanState: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -67,6 +68,7 @@ beforeEach(() => {
     cycleStartedAt: '2026-08-16T00:00:00.000',
   });
   dbMocks.pruneStaleMediaUsages.mockResolvedValue(0);
+  dbMocks.pruneStaleMediaUsagesBatch.mockResolvedValue(0);
 });
 
 describe('定期走査', () => {
@@ -117,25 +119,24 @@ describe('定期走査', () => {
       sourceRowLimit: 50_000,
     });
 
-    // state 1行 + media 500行 + source 9,000行 = 9,501行。
-    expect(result).toMatchObject({ scanned: 500, matched: 9_000, sourceRows: 9_000 });
+    // state 1行 + media 500行 + source 4,000行 + upsert確認最大4,000行 = 8,501行。
+    expect(result).toMatchObject({ scanned: 500, matched: 4_000, sourceRows: 4_000 });
     expect(queries).toHaveLength(2);
     expect(dbMocks.recordMediaUsages).toHaveBeenCalledTimes(1);
     expect(dbMocks.saveMediaUsageScanState).toHaveBeenCalledWith(
       db,
-      expect.objectContaining({ sourceIndex: 0, lastRefId: 'tpl-8999' }),
+      expect.objectContaining({ sourceIndex: 0, lastRefId: 'tpl-3999' }),
       '2026-08-16T06:00:00.000',
     );
     expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
   });
 
-  it('7種類目を終えた時だけ1周開始時刻より古い記録を整理する', async () => {
+  it('7種類目を終えたら整理専用の次回へ進む', async () => {
     dbMocks.getMediaUsageScanState.mockResolvedValue({
       sourceIndex: 6,
       lastRefId: '',
       cycleStartedAt: '2026-08-15T00:00:00.000',
     });
-    dbMocks.pruneStaleMediaUsages.mockResolvedValue(3);
     const { db } = makeDb(
       [{ id: 'md-1', r2_key: 'media/a.png' }],
       { webinars: [{ ref_id: 'webinar-1', video_prefix: 'media/a.png' }] },
@@ -143,17 +144,70 @@ describe('定期走査', () => {
 
     const result = await scanMediaUsage(db, '2026-08-16T06:00:00.000');
 
-    expect(result).toMatchObject({ matched: 1, pruned: 3, cycleCompleted: true });
-    expect(dbMocks.pruneStaleMediaUsages).toHaveBeenCalledWith(
+    expect(result).toMatchObject({ matched: 1, pruned: 0, cycleCompleted: false });
+    expect(dbMocks.pruneStaleMediaUsagesBatch).not.toHaveBeenCalled();
+    expect(dbMocks.saveMediaUsageScanState).toHaveBeenCalledWith(db, {
+      sourceIndex: 7,
+      lastRefId: '',
+      cycleStartedAt: '2026-08-15T00:00:00.000',
+    }, '2026-08-16T06:00:00.000');
+  });
+
+  it('整理を1,000件ずつ続け、残りが無い回だけ1周を完了する', async () => {
+    dbMocks.getMediaUsageScanState.mockResolvedValue({
+      sourceIndex: 7,
+      lastRefId: '',
+      cycleStartedAt: '2026-08-15T00:00:00.000',
+    });
+    const { db } = makeDb([{ id: 'md-1', r2_key: 'media/a.png' }]);
+    dbMocks.pruneStaleMediaUsagesBatch
+      .mockResolvedValueOnce(1_000)
+      .mockResolvedValueOnce(12);
+
+    await expect(scanMediaUsage(db, '2026-08-16T06:00:00.000')).resolves.toMatchObject({
+      pruned: 1_000,
+      cycleCompleted: false,
+    });
+    await expect(scanMediaUsage(db, '2026-08-16T12:00:00.000')).resolves.toMatchObject({
+      pruned: 12,
+      cycleCompleted: true,
+    });
+    expect(dbMocks.pruneStaleMediaUsagesBatch).toHaveBeenNthCalledWith(
+      1,
       db,
       '2026-08-15T00:00:00.000',
       ['md-1'],
+      1_000,
     );
-    expect(dbMocks.saveMediaUsageScanState).toHaveBeenCalledWith(db, {
+    expect(dbMocks.saveMediaUsageScanState).toHaveBeenLastCalledWith(db, {
       sourceIndex: 0,
       lastRefId: '',
-      cycleStartedAt: '2026-08-16T06:00:00.000',
-    }, '2026-08-16T06:00:00.000');
+      cycleStartedAt: '2026-08-16T12:00:00.000',
+    }, '2026-08-16T12:00:00.000');
+  });
+
+  it('1行に多数のメディアがあっても更新予算を越えた行の手前で止める', async () => {
+    const media = Array.from({ length: 500 }, (_, index) => ({
+      id: `md-${index}`,
+      r2_key: `media/${index}.png`,
+    }));
+    const message = media.map((item) => item.r2_key).join(' ');
+    const templates = Array.from({ length: 10 }, (_, index) => ({
+      ref_id: `tpl-${index}`,
+      message_content: message,
+    }));
+    const { db } = makeDb(media, { templates });
+
+    const result = await scanMediaUsage(db, '2026-08-16T06:00:00.000', {
+      sourceRowLimit: 50_000,
+    });
+
+    expect(result).toMatchObject({ matched: 4_000, sourceRows: 10, cycleCompleted: false });
+    expect(dbMocks.saveMediaUsageScanState).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ sourceIndex: 0, lastRefId: 'tpl-7' }),
+      '2026-08-16T06:00:00.000',
+    );
   });
 
   it('表が無い読み口だけ飛ばし、次の種類へ進む', async () => {
