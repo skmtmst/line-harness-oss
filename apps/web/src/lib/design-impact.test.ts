@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  // development の基準 85 に、この枝が足す2面（下書き編集・マイルの使い道）で 2 増える。
+  // development の基準に、この枝が足す2面（下書き編集・マイルの使い道）で 2 増える。
   it('共通Buttonを直接importする87ファイルを利用先に数える', () => {
     expect(directImporters(files, button)).toHaveLength(87)
   })
