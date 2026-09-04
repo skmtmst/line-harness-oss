@@ -60,6 +60,8 @@ export async function createTemplate(
     messageType: string;
     messageContent: string;
     lineAccountId?: string | null;
+    /** 置き場。省略・null は「未分類」。 */
+    folderId?: string | null;
   } & CarouselOptions & QuestionOptions,
 ): Promise<TemplateRow> {
   const id = crypto.randomUUID();
@@ -69,8 +71,9 @@ export async function createTemplate(
       `INSERT INTO templates
          (id, name, category, message_type, message_content,
           carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-          question_json, question_status, created_at, updated_at, line_account_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          question_json, question_status, created_at, updated_at, line_account_id,
+          folder_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -86,6 +89,7 @@ export async function createTemplate(
       now,
       now,
       input.lineAccountId ?? null,
+      input.folderId ?? null,
     )
     .run();
   return (await getTemplateById(db, id))!;
@@ -94,7 +98,14 @@ export async function createTemplate(
 export async function updateTemplate(
   db: D1Database,
   id: string,
-  updates: Partial<{ name: string; category: string; messageType: string; messageContent: string }> &
+  updates: Partial<{
+    name: string;
+    category: string;
+    messageType: string;
+    messageContent: string;
+    /** 置き場。`null` を渡すと未分類へ戻す。 */
+    folderId: string | null;
+  }> &
     CarouselOptions & QuestionOptions,
 ): Promise<void> {
   const sets: string[] = [];
@@ -122,6 +133,14 @@ export async function updateTemplate(
   if (updates.questionStatus !== undefined) {
     sets.push('question_status = ?');
     values.push(updates.questionStatus);
+  }
+  /*
+    置き場。**`null` は「値が来なかった」ではなく「未分類へ戻す」。**
+    だから `undefined` と `null` を分けて見る。
+  */
+  if (updates.folderId !== undefined) {
+    sets.push('folder_id = ?');
+    values.push(updates.folderId);
   }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');

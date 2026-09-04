@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
@@ -109,7 +112,7 @@ const initialForm: CreateFormState = {
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [automations, setAutomations] = useState<Automation[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<CreateFormState>({ ...initialForm })
@@ -128,56 +131,39 @@ export default function AutomationsPage() {
   const [actionError, setActionError] = useState('')
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
+  const loadRequestRef = useRef(0)
 
   const loadAutomations = useCallback(async () => {
-    setLoading(true)
+    const requestId = ++loadRequestRef.current
+    setLoadStatus('loading')
     setError('')
     try {
       const res = await api.automations.list({ accountId: selectedAccountId || undefined })
+      if (requestId !== loadRequestRef.current) return
       if (res.success) {
         setAutomations(res.data)
+        setLoadStatus('ready')
       } else {
-        setError(res.error)
+        setAutomations([])
+        setLoadStatus('error')
       }
     } catch {
-      setError('オートメーションの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      setLoading(false)
+      if (requestId !== loadRequestRef.current) return
+      setAutomations([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     if (accountLoading) return
 
-    let cancelled = false
-
-    const fetchData = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const res = await api.automations.list({ accountId: selectedAccountId || undefined })
-        if (cancelled) return
-        if (res.success) {
-          setAutomations(res.data)
-        } else {
-          setError(res.error)
-        }
-      } catch {
-        if (cancelled) return
-        setError('オートメーションの読み込みに失敗しました。もう一度お試しください。')
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchData()
+    void loadAutomations()
 
     return () => {
-      cancelled = true
+      // アカウント切替前の遅い応答を、次のアカウントの一覧へ混ぜない。
+      loadRequestRef.current += 1
     }
-  }, [selectedAccountId, accountLoading])
+  }, [accountLoading, loadAutomations])
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
@@ -306,11 +292,11 @@ export default function AutomationsPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {automations.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+            {loadStatus === 'ready' ? automations.length : '—'}
+            {loadStatus === 'ready' ? <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span> : null}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            稼働中 {automations.filter((a) => a.isActive).length}
+            稼働中 {loadStatus === 'ready' ? automations.filter((a) => a.isActive).length : '—'}
           </p>
         </div>
         {/* 実行の記録を残していない。何回動いたか、失敗したかが分からない。 */}
@@ -426,20 +412,15 @@ export default function AutomationsPage() {
         </div>
       )}
 
-      {/* Loading skeleton */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-canvas rounded-card border border-hairline p-5 animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-canvas-sunken rounded w-full" />
-              <div className="flex gap-4">
-                <div className="h-3 bg-canvas-sunken rounded w-24" />
-                <div className="h-3 bg-canvas-sunken rounded w-16" />
-              </div>
-            </div>
-          ))}
-        </div>
+      {loadStatus === 'loading' ? (
+        <ListState kind="loading" title="オートメーションを読み込んでいます" />
+      ) : loadStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title="オートメーションを表示できませんでした"
+          description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
+          action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
+        />
       ) : automations.length === 0 && !showCreate ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
           <p className="text-ink-faint">オートメーションがありません。「新規ルール」から作成してください。</p>
