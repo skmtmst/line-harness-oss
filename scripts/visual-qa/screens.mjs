@@ -982,10 +982,6 @@ export const SCREENS = [
       apis: ['**/api/auto-replies/*/draft*', '**/api/auto-replies/*/conflicts*'],
       kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
     },
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **通常・読込・空・失敗・権限不足の5状態を撮った。** 失敗は「下書きを表示できませんでした／**保存した下書きは消えていません。**」、**権限不足は別の文**——「この自動応答を公開する権限がありません／**下書きの中身も表示していません。**担当者に公開を依頼してください。」。**403 を「読めなかった」と混ぜない**——運用者の側でできることが違う（人に頼む）ため。 重なりは**確かなもの（必ず重なります）と、そうでないもの（重なることがあります）を分け**、**どちらが先に返すか**も出す（「この下書きより先に返します」）。空のときは「重なる自動応答はありません」。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
     verdictSource: 'auto-replies-v6/U9hzqH.txt + publish-flow.test.ts', verdictHead: 'edb94936',
   },
@@ -994,10 +990,6 @@ export const SCREENS = [
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 「確認したので次へ」で試す段へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **試験は本番と同じ順番で回す。** 評価の順番と結果を全候補ぶん出し（`1. …これが返します` `2. …見送りました`）、**落ちた理由を日本語**にする（`keyword_not_matched`→「キーワードに当たりません」、`outside_active_window`→「受け付ける時間帯の外です」ほか8種）。**内部の記号を画面へ出さない。** 試す前の帯は **`—（未取得）`まだ試していません**で、0や「当たりません」と混ぜない。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
     verdictSource: 'auto-replies-v6/g46ja.txt + publish-flow.test.ts', verdictHead: 'edb94936',
   },
@@ -1006,10 +998,6 @@ export const SCREENS = [
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 試してから最後の確認へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **公開前の確認は3項目**：競合をすべて確認しました／試験でこの下書きが返しました／入力に不足がありません。**確かめられないものは `—（未取得）`** にし、「**「—」は、この画面から確かめられない項目です。確認済みとしては扱いません。**」と明記。**1つでも `ok` でなければ公開させない**（`unknown` も押させない）。押せないときは `title` に理由が出る。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
     verdictSource: 'auto-replies-v6/Yj6CQ.txt + publish-flow.test.ts', verdictHead: 'edb94936',
   },
@@ -1018,10 +1006,6 @@ export const SCREENS = [
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 公開まで押し切る */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }, { click: 'この内容で公開する', after: 1200 }],
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/publish` が development に無い。判定は未マージ枝 `edb94936` で書かれたもの',
-    why: '`/auto-replies/publish` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#596 で実装した。この画面を実装した本人（Claude）が比較している。** ルート `/auto-replies/publish?id=ar-2`。**#595 の契約（`draft`/`validate`/`conflicts`/`test`/`publish`）をそのまま使い、Worker・DB・migration・APIは変更していない。**1440・1920とも横スクロール0。`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`ar-` `arv-`）・内部の状態名は**8枚すべてで0件**。 **公開の結果を出す**：公開した版 7版「**この版は書き換えられません**」／確認した重なり 2件「公開前に確かめた数」／すでに届いた分 **`—（未取得）`公開前の返信はそのまま残ります**。**「公開より前に届いたメッセージへの返信は、前の版のままです。あとから書き換わることはありません。」**と、**さかのぼらないこと**を明記する。 **安全の決めごとを画面に出した**：①公開するまで返す内容は変わらないことを全段に書く②競合を1件ずつ確認するまで次へ進めない ③試験で下書きが負けたら公開させず、勝った相手を名前で出す④「LINEへの送信、タグの変更、状態の更新はしません」と明記し、帯にも「状態の変化 ありません（試すだけです）」⑤公開は `Idempotency-Key`（`autoReplyId:versionId`）なので押し直しても版が増えない。 **判断は `publish-flow.ts` に切り出して試験した（11件 pass）。わざと壊して2件落ちることも確かめた**（「`unknown` でも押せる」「未確認の競合を無視する」）。 **通したもの**：typecheck／関連26件／build／design-debt 合格。',
     verdictSource: 'auto-replies-v6/e6iJG.txt + publish-flow.test.ts', verdictHead: 'edb94936',
   },
@@ -1739,11 +1723,11 @@ export const SCREENS = [
     states: {
       apis: ['**/api/action-scores/friends*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
-    }, verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** P1 層の境目が設計と違う（設計 ふつう30〜69点・低い29点以下／実装 ふつう40〜69点・低い39点以下）。同じ点数の人が別の層に入る。P1 「内訳を見る」が無く、なぜその点数かを追えない。帯ごとの「この帯の人を見る」「この帯に配信する」も、文だけでボタンが無い。P2 呼び名が設計の「帯」でなく「層」。注意文から「マイル残高はスコアで増えも減りもしません」が落ちている。「点数が変わった理由は未取得」と正直に出しているのは正しい **ルート**：`/mileage?tab=score`。**取得元**：`mileage-v6/z3PB2.txt`。**推奨修正**：**層の境目を設計へそろえるのが先**（ふつう30〜69点・低い29点以下）。**同じ点数の人が別の層に入る**ので、配信の宛先がずれる。「内訳を見る」と帯ごとのボタンはそのあと。**「点数が変わった理由は未取得」と正直に出しているのは正しいので変えない。**', verdictHead: '6a3eb22b',
-    verdict: 'unjudged',
-    verdictNote: '**前の判定を取り消す。** 「層の境目が設計と違う（実装 ふつう40〜69点）」は誤りだった。境目は口が返す値をそのまま描いており、`packages/db` の `DEFAULT_BANDS` は 30 / 70 で**設計と一致**している。40 は**撮影用の固定データ**（`ACTION_SCORES.summary`）に書いてあった値で、同じファイルの `SCORE_BANDS` は 30。**固定データの中で食い違っていた**。30に直して撮り直すと「高い（70点以上）／ふつう（30〜69点）／低い（29点以下）」と設計どおりに出る。#624で呼び名を「層」→「帯」、断りの文を設計どおりにした（**「マイル残高はスコアで増えも減りもしません」が落ちていた**）。「顧客」→「お客様」。残る差：行ごとの「内訳を見る」（点数の内訳を返す口が無い）、タブの件数表示、「点がついている人」の全体比、帯ごとの押し口は帯を選んだときだけ出る（設計は常に出る）',
-    verdictSource: 'Claude実装',
-    verdictHead: '5e8f32d3',
+    },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 断り文と「帯」の言い方を設計にそろえて撮り直した（board#39）。** ルート `/mileage?tab=score`。通常・読込中・0件・取得失敗の5枚を1440・1920で撮った（10枚、はみ出し0）。 **設計と合わせたところ**：(1) 断り文を設計 `z3PB2` そのままに——「スコアはマイルではありません。**お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。**」。前は「顧客には表示されず…顧客の価値を表すものではありません」で、**「マイルが減るのでは」と聞かれたときに答えられなかった。** (2) 点数の集まりの呼び方を「層」→**「帯」**に統一（CSVの見出し・帯の説明・押し口・表の見出し・0件の断りの6か所）。「層」は人を分ける言い方に聞こえる（§7 #48 の表記ゆれ）。 **P1 設計にある「使い道」タブが実装に無い。** 設計のタブは 友だちの残高／たまる決めごと／**使い道**／履歴／行動スコア の5つだが、実装は4つ。17-1-B `qlVLJ`（マイルの使い道）の画面ごと無い。交換の口は skmtmst/line-harness-oss#772 で本流に入ったので、**画面を作れば繋がる**。 **P2 設計にある「スコアのルールを作る」への入口を置いていない。** 押し先の `/mileage/score-rules`（17-2-A `s6MBc`）がまだ実装に無く、**押しても何も起きない口になる**ため（§5-5）。board#75／skmtmst/line-harness-oss#770 が入ってから足す。 残りの差（帯の境目 40/39 と 30/29、件数、CSVボタンの文言）は撮影用の固定データと文言で、第2段で詰める。',
+    verdictSource: 'mileage-v6/z3PB2.txt',
+    verdictHead: 'd2710ef40',
   },
   {
     /*
@@ -2557,12 +2541,14 @@ export const SCREENS = [
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
-    dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
     /*
+      **マークの設定は専用の画面へ移った**（`/tags/marks/edit?id=`）。
+      前は一覧で「保留」を押して撮っていたが、いま一覧の名前は編集画面への
+      入口で、設計 `GMvBd` の印（`data-design-node`）も編集画面が持つ。
+      直接そこを開く。押して辿ると、一覧の固定データ次第で撮れなくなる。
       設計は名前・色・並び順・初期値と自動変更ルールを同じ面で扱う。
-      マークを1つ選ぶとルールが出るので、押してから撮る。
     */
-    steps: [{ click: '保留' }],
+    dir: 'friend-attributes-v6', route: '/tags/marks/edit?id=mark-hold', mode: 'page',
     states: {
       apis: ['**/api/support-marks/*/automation-rules**'],
       kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'],
@@ -2573,17 +2559,16 @@ export const SCREENS = [
         suffix: 'conflict',
         state: { apis: ['**/api/support-marks/**/automation-rules**', '**/api/support-mark-rules/**'], kind: 'conflict' },
         steps: [
-          { click: '保留' },
           { qaOpen: 'GMvBd' },
           { fill: 'ルールの名前', text: '期限を過ぎたら確認待ちへ' },
           { qaOpen: 'GMvBd-save' },
         ],
       },
     ],
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#48 対応済→対応済み・未割当→未割り当て・事前確認ほかの表記統一。設計画像は `docs/design-reference/friend-attributes-v6/` を撮り直した。**実装との突き合わせはこれから。** 契約枝 `codex/kenta-v6-support-mark-rules-api`（head `e95ac2b5`）の上に画面を実装。**未実装から外した。** 名前・色・並び順・初期値と自動変更ルールを同じ面で扱い、きっかけ5つ・優先順位・手動変更の保護時間を確認して保存できる。**並びは実行順そのもの**（Workerの `ORDER BY priority DESC, created_at ASC` と同じ）で、複数一致したときは上から1本だけ動くことを先に言う。読込中・0件・取得失敗・権限不足・版競合を混ぜず、5状態を撮った。**409では窓を閉じず**、書いた内容を残したまま「最新の内容を読み直す」を出す。停止は履歴を消さないことを確認窓に書く。残る差：設計は追加専用の1枚（パンくず「対応マーク > マークを追加」と下部の「キャンセル／対応マークを追加」）で、実装は一覧と同じ面に置いている。設計のルールは畳んだチップ（「担当者を割り当てたとき」→「このマークに変更」）で、実装は行に開いて出す。**条件（`condition`）の組み立ては未対応**——口は `SegmentCondition` を受けるが、組み立ての部品は `XBkiQ` と共通化してから入れる',
-    verdictSource: 'Claude実装',
-    verdictHead: '7b509106',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-04 自動変更ルールを同じ面に載せて撮った（board#34）。前は6状態とも撮れていなかった。** ルート `/tags/marks/edit?id=mark-hold`。通常・読込中・0件・取得失敗・権限不足・版競合の**7枚すべて**を1440・1920で撮った（14枚、はみ出し0）。 **設計 `GMvBd` は「基本情報」と同じ面に「自動変更ルール」を置く。** 別画面にすると「このマークがいつ付くのか」を見るのに行き来する。実装もその並びにした。 出ている中身：「受信・返信・担当割当・期限超過などをきっかけに、「保留」へ自動で変えられます。」「同時にいくつも当てはまったときは、上から順に見て最初に合った1本だけが動きます。」＋実行順の番号つきで2本（担当者が決まったとき・優先順位100・手動変更のあと1時間／返信の期限を過ぎたとき・優先順位50・**保護しない**）。**0は「保護しない」と書き、未取得の `—` と別にしている。** **撮れなかった原因はモックの欠けだった**（board#105）。対応マーク3件（「保留」を含む）と自動変更ルール2件を固定データに足して撮れるようにした。**止めているルールを1件混ぜている**——全部動いていると「動いています／止めています」の描き分けを一度も確かめられない。 **P1 API がまだ本流に無い**（skmtmst/line-harness-oss#758）。**404 を「取得失敗」に混ぜず「まだ接続されていません」と本文で断り、追加の口も押せなくした**（§5-5）。#758 が入るまで一致にしない。 **P2 設計との残る差**：設計はルール行に「担当者を割り当てたとき」「このマークに変更」と**変更先のマーク**まで書くが、実装はきっかけと優先順位まで。',
+    verdictSource: 'friend-attributes-v6/GMvBd.txt',
+    verdictHead: '30448b92',
   },
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
