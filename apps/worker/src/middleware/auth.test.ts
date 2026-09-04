@@ -88,6 +88,8 @@ function app() {
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/automation-runs', (c) => c.json({ success: true }));
+  a.get('/api/rich-menu-images/:key{.+}', (c) => c.json({ success: true }));
+  a.get('/api/rich-menu-groups/external/:richMenuId/image', (c) => c.json({ success: true }));
   a.get('/api/forms/:id', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
   a.put('/api/forms/:id', (c) => c.json({ success: true }));
   a.delete('/api/forms/:id', (c) => c.json({ success: true }));
@@ -276,6 +278,23 @@ describe('topology guard', () => {
 });
 
 describe('protected API access', () => {
+  test.each([
+    '/api/rich-menu-images/rich-menus/account/group/page/image.png',
+    '/api/rich-menu-groups/external/rich-menu-id/image?accountId=account',
+  ])('リッチメニュー画像 %s は匿名アクセスを拒否する', async (path) => {
+    expect((await app().request(path, {}, crossSiteEnv())).status).toBe(401);
+  });
+
+  test.each([
+    '/api/rich-menu-images/rich-menus/account/group/page/image.png',
+    '/api/rich-menu-groups/external/rich-menu-id/image?accountId=account',
+  ])('リッチメニュー画像 %s は管理画面のセッションで取得できる', async (path) => {
+    const res = await app().request(path, {
+      headers: { Cookie: 'lh_admin_session=staff-key' },
+    }, crossSiteEnv());
+    expect(res.status).toBe(200);
+  });
+
   test('accepts the admin session cookie (GET, no CSRF needed)', async () => {
     const res = await app().request('/api/protected', {
       headers: { Cookie: 'lh_admin_session=staff-key' },
