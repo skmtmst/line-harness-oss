@@ -48,6 +48,7 @@ function BookingsInner() {
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
   const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
+  const [capacityStatus, setCapacityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [tab, setTab] = useState<string>('requested')
   /*
    * **読めなかったのか、0件なのかを分ける。**
@@ -58,7 +59,7 @@ function BookingsInner() {
    */
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
   const loadRequestRef = useRef(0)
   /*
@@ -83,11 +84,17 @@ function BookingsInner() {
     if (!selectedAccountId || !eventId) return
     const requestId = ++loadRequestRef.current
     setLoadStatus('loading')
-    setError(null)
+    setActionError(null)
     try {
       const filters = tab === 'all' ? {} : { status: tab }
+      /*
+        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
+        行かない作りだったので、アカウントやイベントを切り替えたあとも
+        **上の帯に前のイベント名と定員が残った。** どのイベントの
+        申込を見ているのか読み違える。毎回取り直す。
+      */
       const [evRes, listRes] = await Promise.all([
-        event == null ? eventsApi.getEvent(selectedAccountId, eventId) : Promise.resolve(event),
+        eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.listBookings(selectedAccountId, eventId, filters),
       ])
       if (requestId !== loadRequestRef.current) return
@@ -100,6 +107,7 @@ function BookingsInner() {
         **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
         古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
       */
+      setEvent(null)
       setItems([])
       setLoadStatus('error')
     }
@@ -110,17 +118,28 @@ function BookingsInner() {
     void refresh()
   }, [refresh])
 
-  // 枠の合計＝定員。一覧APIからしか取れない。
+  /*
+    枠の合計＝定員。一覧APIからしか取れない。
+
+    **「定員なし」と「定員を取れなかった」を分ける。** 前は失敗しても
+    `totalCapacity` が null のままで「定員なし」と出た。**上限が無いのか、
+    読めなかったのかが分からず、締め切りの判断を誤る。**
+  */
   useEffect(() => {
     if (!selectedAccountId || !eventId) return
     let alive = true
+    setCapacityStatus('loading')
+    setTotalCapacity(null)
     eventsApi
       .listEvents(selectedAccountId)
       .then((r) => {
-        if (alive) setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        if (!alive) return
+        setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        setCapacityStatus('ready')
       })
       .catch(() => {
         // 定員が出ないだけ。一覧と操作はできる。
+        if (alive) setCapacityStatus('error')
       })
     return () => {
       alive = false
@@ -143,8 +162,12 @@ function BookingsInner() {
     try {
       await eventsApi.decideBooking(selectedAccountId, eventId, id, action, reason)
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      /*
+        **内部の文字をそのまま出さない。** `e.message` は
+        `API error: 409` のような形で出る。何を直せばよいか分からない。
+      */
+      setActionError('予約を確定・拒否できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -188,8 +211,8 @@ function BookingsInner() {
     try {
       await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -249,7 +272,13 @@ function BookingsInner() {
 
       <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
         <span className="text-ink-faint mr-2 text-xs">イベント</span>
-        <span className="text-ink text-sm font-medium">{event?.name ?? '読み込み中…'}</span>
+        {/*
+          **読めなかったのを「読み込み中」と言わない。** いつまでも
+          読み込んでいるように見え、再読み込みに気づけない。
+        */}
+        <span className="text-ink text-sm font-medium">
+          {event?.name ?? (loadStatus === 'error' ? 'イベント名を取得できませんでした' : '読み込み中…')}
+        </span>
         <Link href="/events" className="text-accent ml-3 text-xs hover:underline">
           ほかのイベントを選ぶ
         </Link>
@@ -265,9 +294,13 @@ function BookingsInner() {
           title="申込"
           value={dataReady ? String(confirmed + pending) : '—'}
           unit={dataReady ? '人' : ''}
-          detail={dataReady
-            ? (capacity > 0 ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}` : '定員なし')
-            : '取得できませんでした'}
+          detail={!dataReady
+            ? '取得できませんでした'
+            : capacityStatus === 'error'
+              ? '定員は取得できませんでした'
+              : capacity > 0
+                ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}`
+                : '定員なし'}
         />
         <EventKpi title="承認待ち" value={dataReady ? String(pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '対応が必要' : '取得できませんでした'} />
         {/* event_bookings に「キャンセル待ち」という状態が無い。
@@ -276,12 +309,29 @@ function BookingsInner() {
         <EventKpi
           title="キャンセル待ち"
           value="—"
-          unit="人"
-          detail={event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
+          unit={dataReady ? '人' : ''}
+          /*
+            **読めていない設定を言い切らない。** `event` が取れていないと
+            `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
+            と出ていた。**受け付ける設定なのに受け付けないと読める。**
+          */
+          detail={!dataReady
+            ? '取得できませんでした'
+            : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
         <EventKpi title="キャンセル" value={dataReady ? String(cancelled) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? 'この一覧のうち' : '取得できませんでした'} />
       </div>
 
+
+        {/*
+          操作の失敗は**一覧を消さずに**上に出す。行が消えると、
+          どの予約に対して失敗したのかが分からなくなる。
+        */}
+        {actionError && (
+          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
+            {actionError}
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex border-b border-gray-200 overflow-x-auto">
