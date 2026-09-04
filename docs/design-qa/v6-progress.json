@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 214,
-  "unimplemented": 20,
+  "compared": 212,
+  "unimplemented": 22,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 28,
   "match": 0,
-  "structureMatchDataPending": 4,
-  "needsFix": 53,
-  "unjudged": 181,
+  "structureMatchDataPending": 27,
+  "needsFix": 112,
+  "unjudged": 97,
   "remaining": 258,
   "features": [
     {
@@ -1362,8 +1362,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1418,9 +1418,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 5,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
         {
@@ -1477,15 +1477,15 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 7,
-      "unimplemented": 2,
+      "compared": 6,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "structureMatchDataPending": 2,
+      "needsFix": 3,
+      "unjudged": 1,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1559,15 +1559,15 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 9,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 8,
+      "structureMatchDataPending": 3,
+      "needsFix": 5,
+      "unjudged": 1,
       "remaining": 11,
       "capturedAt": [
         {
@@ -1702,8 +1702,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 9,
+      "needsFix": 9,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1791,9 +1791,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 2,
+      "unjudged": 1,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1824,9 +1824,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 8,
+      "structureMatchDataPending": 1,
+      "needsFix": 7,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1887,9 +1887,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "structureMatchDataPending": 3,
+      "needsFix": 3,
+      "unjudged": 1,
       "remaining": 7,
       "capturedAt": [
         {
@@ -1958,9 +1958,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
-      "unjudged": 2,
+      "unjudged": 1,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1991,8 +1991,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 2,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2025,9 +2025,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 6,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
+      "unjudged": 1,
       "remaining": 6,
       "capturedAt": [
         {
@@ -2082,9 +2082,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "structureMatchDataPending": 5,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 8,
       "capturedAt": [
         {
@@ -2151,9 +2151,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2206,8 +2206,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "needsFix": 3,
+      "unjudged": 4,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2264,9 +2264,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 2,
+      "needsFix": 1,
+      "unjudged": 1,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2318,9 +2318,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2374,9 +2374,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 1,
+      "unjudged": 2,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2404,8 +2404,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 1,
+      "needsFix": 1,
+      "unjudged": 0,
       "remaining": 1,
       "capturedAt": [
         {
@@ -2430,8 +2430,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2537,6 +2537,13 @@
     },
     {
       "feature": 16,
+      "node": "njLGA",
+      "name": "16-1-C 支払い",
+      "gap": "build",
+      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
+    },
+    {
+      "feature": 16,
       "node": "QX70l",
       "name": "16-1-G アフィリエイターを削除する確認",
       "gap": "drop",
@@ -2548,6 +2555,13 @@
       "name": "16-1-H 支払いを確定する",
       "gap": "api",
       "gapNote": "同上（締める操作）"
+    },
+    {
+      "feature": 17,
+      "node": "qlVLJ",
+      "name": "17-1-B マイルの使い道",
+      "gap": "build",
+      "gapNote": "交換できるもの（送料無料クーポン・先行のお知らせ・数量に限りがあるもの）の一覧と、申し込みの受付。`p9CcEB`（使い道をつくる）と対で要る"
     },
     {
       "feature": 17,
