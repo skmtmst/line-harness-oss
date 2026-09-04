@@ -386,7 +386,7 @@ function TagPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={`タグ名で絞り込む（${tags.length}件）`}
           aria-label="タグ名で絞り込む"
-          className="border-hairline rounded-control focus:ring-accent h-9 w-full border px-3 text-xs focus:ring-2 focus:outline-none sm:max-w-xs"
+          className="border-hairline rounded-control h-9 w-full border px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info sm:max-w-xs"
         />
       )}
       <div className="flex flex-wrap gap-1.5">

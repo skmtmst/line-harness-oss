@@ -103,9 +103,12 @@ Google Meet相談日時
 有効化後は対象者ごとに予定が作成されます。いつでも一時停止できます。
 LINEプレビュー
 1通目は 基準日の1日前 18:00 に届きます
-{{name}}さん、明日のGoogle Meet相談のご案内です。
-日時：{{meet_datetime}}
-参加URL：{{meet_url}}
+名前
+さん、明日のGoogle Meet相談のご案内です。
+日時：
+相談の日時
+参加URL：
+参加URL
 Google Meetに参加
 有効化する内容
 状態
