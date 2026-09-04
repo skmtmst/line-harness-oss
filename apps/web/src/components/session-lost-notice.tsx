@@ -90,7 +90,7 @@ export default function SessionLostNotice() {
               window.localStorage.removeItem(ROLE_KEY)
               window.location.href = '/login'
             }}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control h-10 px-5 text-sm font-bold"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-bold"
           >
             ログインし直す
           </button>

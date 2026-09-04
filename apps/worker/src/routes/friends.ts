@@ -6,6 +6,7 @@ import {
   addTagToFriend,
   removeTagFromFriend,
   getFriendTags,
+  getFriendTagsByFriendIds,
   getFormSubmissionsByFriend,
   getScenarios,
   enrollFriendInScenario,
@@ -32,6 +33,7 @@ import {
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
 import { compileSavedSearch } from '../services/saved-search-filter.js';
+import { listLimit, listOffset } from './list-pagination.js';
 
 const friends = new Hono<Env>();
 
@@ -148,8 +150,8 @@ function serializeTag(row: DbTag) {
 // GET /api/friends - list with pagination
 friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = Number(c.req.query('limit') ?? '50');
-    const offset = Number(c.req.query('offset') ?? '0');
+    const limit = listLimit(c.req.query('limit'), 50);
+    const offset = listOffset(c.req.query('offset'));
     const tagId = c.req.query('tagId');
     const lineAccountId = c.req.query('lineAccountId');
     const audienceId = c.req.query('audienceId')?.trim();
@@ -491,17 +493,15 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     const listResult = await listStmt.bind(...listBinds).all<DbFriend>();
     const items = listResult.results;
 
-    // Fetch tags for each friend in parallel so the list response includes tags.
-    // Skipped when ?includeTags=false (autocomplete consumers don't render
-    // tags and would otherwise pay N D1 reads per keystroke).
-    let itemsWithTags = includeTags
-      ? await Promise.all(
-          items.map(async (friend) => {
-            const tags = await getFriendTags(db, friend.id);
-            return { ...serializeFriendListRow(friend, includeChatStatus), tags: tags.map(serializeTag) };
-          }),
-        )
-      : items.map((friend) => ({ ...serializeFriendListRow(friend, includeChatStatus), tags: [] }));
+    // 表示ページ分のタグを1回で取得する。友だちごとの問い合わせは行わない。
+    // includeTags=false のオートコンプリート経路では、この1回も省略する。
+    const tagsByFriendId = includeTags
+      ? await getFriendTagsByFriendIds(db, items.map((friend) => friend.id))
+      : new Map<string, DbTag[]>();
+    let itemsWithTags = items.map((friend) => ({
+      ...serializeFriendListRow(friend, includeChatStatus),
+      tags: (tagsByFriendId.get(friend.id) ?? []).map(serializeTag),
+    }));
 
     // Optional: hydrate chat status (latest in/out message, active scenario,
     // derived "handled" flag). Three batched queries instead of N×3 to keep

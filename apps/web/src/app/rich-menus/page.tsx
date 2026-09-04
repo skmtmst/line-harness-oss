@@ -569,7 +569,7 @@ export default function RichMenusListPage() {
       >
         <Link
           href="/rich-menus/new"
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
         >
           メニューを作る
         </Link>
@@ -717,7 +717,7 @@ export default function RichMenusListPage() {
           </p>
           <Link
             href="/rich-menus/new"
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium"
+            className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium"
           >
             <span className="text-lg leading-none">+</span> 最初のメニューを作る
           </Link>
