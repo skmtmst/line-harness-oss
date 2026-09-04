@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -337,19 +338,12 @@ function EditCommonVarInner() {
                 >
                   フォルダ
                 </label>
-                <select
+                <SelectField
                   id="cv-folder"
                   value={folderId}
                   onChange={(e) => setFolderId(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  <option value="">未分類</option>
-                  {folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                />
               </div>
             </div>
 
