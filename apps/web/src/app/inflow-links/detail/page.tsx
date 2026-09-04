@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import type {
   EntryRoute,
   EntryRouteFunnel,
@@ -38,6 +40,7 @@ function InflowLinkDetailPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
+  const requestedRefCode = searchParams.get('ref') ?? ''
 
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [stats, setStats] = useState<Map<string, RefRouteStats>>(new Map())
@@ -50,6 +53,11 @@ function InflowLinkDetailPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const selectedId =
+    id || routes.find((entryRoute) => entryRoute.refCode === requestedRefCode)?.id || ''
 
   // 左のリンク一覧。流入件数を添えるので、集計も一緒に引く。
   useEffect(() => {
@@ -65,7 +73,12 @@ function InflowLinkDetailPageContent() {
     ]).then(([r, sum, t, sc, p]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
-      if (sum.status === 'fulfilled' && sum.value.success) {
+      /*
+        **器の形を確かめてから開ける。** `data.routes` が無い返事を
+        そのまま `map` にかけると `undefined is not a function` で
+        **画面ごと落ちる。** 集計が引けないだけなら、詳細は出せる。
+      */
+      if (sum.status === 'fulfilled' && sum.value.success && Array.isArray(sum.value.data?.routes)) {
         setStats(new Map(sum.value.data.routes.map((x) => [x.refCode, x])))
       }
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
@@ -80,7 +93,7 @@ function InflowLinkDetailPageContent() {
 
   // 右の内訳。リンクを選び直すたびに引き直す。
   useEffect(() => {
-    if (!id) {
+    if (!selectedId) {
       setRoute(null)
       setFunnel(null)
       setSources([])
@@ -89,9 +102,9 @@ function InflowLinkDetailPageContent() {
     let cancelled = false
     setError('')
     void Promise.allSettled([
-      api.entryRoutes.get(id),
-      api.entryRoutes.funnel(id),
-      api.entryRoutes.sources(id),
+      api.entryRoutes.get(selectedId),
+      api.entryRoutes.funnel(selectedId),
+      api.entryRoutes.sources(selectedId),
     ]).then(([r, f, s]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoute(r.value.data)
@@ -102,7 +115,7 @@ function InflowLinkDetailPageContent() {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [selectedId])
 
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const url = route ? `${workerBase}/r/${route.refCode}` : null
@@ -115,6 +128,24 @@ function InflowLinkDetailPageContent() {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       window.prompt('コピーしてください:', url)
+    }
+  }
+
+  async function deleteRoute() {
+    if (!route || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const result = await api.entryRoutes.delete(route.id)
+      if (!result.success) throw new Error(result.error)
+      setDeleteOpen(false)
+      router.replace('/inflow-links')
+    } catch {
+      setDeleteError(
+        '流入リンクを削除できませんでした。状態を読み直してから、もう一度お試しください。',
+      )
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -187,7 +218,7 @@ function InflowLinkDetailPageContent() {
           ) : (
             <ul className="space-y-1">
               {routes.map((r) => {
-                const active = r.id === id
+                const active = r.id === selectedId
                 const count = stats.get(r.refCode)?.friendCount ?? 0
                 return (
                   <li key={r.id}>
@@ -227,15 +258,32 @@ function InflowLinkDetailPageContent() {
                       {url} ・ 作成 {route.createdAt.slice(0, 10).replace(/-/g, '/')}
                     </p>
                   </div>
-                  <span
-                    className={`rounded-pill px-2 py-0.5 text-xs ${
-                      route.isActive
-                        ? 'bg-success-bg text-success'
-                        : 'bg-canvas-sunken text-ink-faint'
-                    }`}
-                  >
-                    {route.isActive ? '計測中' : '停止中'}
-                  </span>
+                  {/*
+                    **URLのコピーはここに二つ目を出さない。** 見出しの並びに
+                    すでにある。同じ働きの押し口が2つあると、片方が別の
+                    ことをすると思わせる。
+                  */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      aria-label={`${route.name}の削除を確認`}
+                      onClick={() => {
+                        setDeleteError('')
+                        setDeleteOpen(true)
+                      }}
+                    >
+                      削除の確認
+                    </Button>
+                    <span
+                      className={`rounded-pill px-2 py-0.5 text-xs ${
+                        route.isActive
+                          ? 'bg-success-bg text-success'
+                          : 'bg-canvas-sunken text-ink-faint'
+                      }`}
+                    >
+                      {route.isActive ? '計測中' : '停止中'}
+                    </span>
+                  </div>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -325,6 +373,22 @@ function InflowLinkDetailPageContent() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteOpen && route !== null}
+        designNode="UIaM7"
+        title={`「${route?.name ?? ''}」を削除しますか？`}
+        description="この流入リンクの設定を削除します。過去のクリック・友だち追加・成果の記録と、すでに友だちへ保存された流入元は残ります。削除した設定は元に戻せません。"
+        confirmLabel="流入リンクを削除"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void deleteRoute()}
+        onCancel={() => {
+          if (deleting) return
+          setDeleteError('')
+          setDeleteOpen(false)
+        }}
+      />
     </div>
   )
 }
@@ -369,14 +433,21 @@ function FunnelView({ funnel }: { funnel: EntryRouteFunnel }) {
       {stages.map((s) => {
         // ひとつ前が0のときは割合を出さない。0で割ると Infinity になるし、
         // 「0人のうち何%」は意味を持たない。
-        const pct = s.prev !== null && s.prev > 0 ? ((s.value / s.prev) * 100).toFixed(1) : null
+        const pct = typeof s.value === 'number' && typeof s.prev === 'number' && s.prev > 0
+          ? ((s.value / s.prev) * 100).toFixed(1)
+          : null
         return (
           <li key={s.label} className="border-hairline rounded-control border px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-ink-secondary text-xs">{s.label}</span>
               <span className="text-ink text-sm font-semibold tabular-nums">
-                {s.value.toLocaleString()}
-                {pct !== null && (
+                {/*
+                  **取れていない段は `—`。** 0 と書くと「その段まで誰も
+                  進まなかった」に読める。取れていないだけなら、
+                  施策を止める判断を誤る。
+                */}
+                {typeof s.value === 'number' ? s.value.toLocaleString() : '—'}
+                {typeof s.value === 'number' && pct !== null && (
                   <span className="text-ink-faint ml-1.5 text-xs font-normal">{pct}%</span>
                 )}
               </span>
