@@ -59,6 +59,10 @@ export function createDb(d1: D1Database): D1Database {
   return d1;
 }
 export * from './folders';
+export * from './getting-started';
+export * from './manual-links';
+export * from './recipes';
+export * from './account-handovers';
 export * from './friend-fields';
 export * from './support-marks';
 export * from './saved-searches';

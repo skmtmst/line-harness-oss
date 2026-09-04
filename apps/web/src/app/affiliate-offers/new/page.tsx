@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useState } from 'react'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -134,19 +135,12 @@ export default function NewAffiliateOfferPage() {
           htmlFor="of-account"
           note="1つに絞ると、そのアカウントで起きた成果だけを数えます。"
         >
-          <select
+          <SelectField
             id="of-account"
             value={lineAccountId}
             onChange={(e) => setLineAccountId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">すべてのアカウント</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+          />
         </Field>
 
         <Field label="説明" htmlFor="of-desc" note="紹介する人に見せる説明です。">
@@ -191,12 +185,11 @@ export default function NewAffiliateOfferPage() {
             'default' で入る。選べる形にすると、選べないものが選べて見える。 */}
         <Field
           label="マイルのプログラム"
-          htmlFor="of-program"
           note="マイルで払う場合に選びます。いまは標準プログラムのみです。"
         >
-          <select id="of-program" disabled className={`${inputClass} opacity-50`}>
-            <option>標準プログラム</option>
-          </select>
+          <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-2 text-sm">
+            標準プログラム
+          </p>
         </Field>
       </FormSection>
 
@@ -206,19 +199,12 @@ export default function NewAffiliateOfferPage() {
         note="成果が確定したタイミングで実行されます。"
       >
         <Field label="付けるタグ" htmlFor="of-tag" note="あとで配信の絞り込みに使えます。">
-          <select
+          <SelectField
             id="of-tag"
             value={tagId}
             onChange={(e) => setTagId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">（なし）</option>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: '（なし）' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+          />
         </Field>
 
         <Field
@@ -226,19 +212,12 @@ export default function NewAffiliateOfferPage() {
           htmlFor="of-scenario"
           note="選ばなければ何も送りません。"
         >
-          <select
+          <SelectField
             id="of-scenario"
             value={scenarioId}
             onChange={(e) => setScenarioId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">（なし）</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: '（なし）' }, ...scenarios.map((s) => ({ value: s.id, label: s.name }))]}
+          />
         </Field>
 
         <label className="text-ink-secondary flex items-start gap-2 text-sm">

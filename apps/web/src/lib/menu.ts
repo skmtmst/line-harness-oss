@@ -159,6 +159,11 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '設定',
     title: '設定',
     items: [
+      { href: '/getting-started', label: 'はじめの設定', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', id: 'getting-started', note: '最初にやることの順路と、いまどこまで終わったか', required: true },
+      // 「設定」区分の先頭。要件 `v6-33-account-settings` §5-3。
+      // **統括の店舗管理（/hq）とは別のもの。** こちらは送受信に使う
+      // LINE公式アカウントそのものの設定。
+      { href: '/accounts', label: 'LINEアカウント', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 21l1.9-3.8A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' , id: 'line-accounts', note: '送受信に使うLINE公式アカウントと接続の状態', required: true },
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' , id: 'staff', note: '管理画面に入る人と、その権限', required: true },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' , id: 'settings', note: 'この画面。項目の表示と並びを決めます', required: true },
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },

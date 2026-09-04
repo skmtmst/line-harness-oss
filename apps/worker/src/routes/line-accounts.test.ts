@@ -14,7 +14,11 @@ const dbMocks = {
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
-  deleteLineAccount: vi.fn(),
+  deleteUncommittedLineAccount: vi.fn(),
+  getLineAccountArchiveBlockers: vi.fn(),
+  setDefaultLineAccount: vi.fn(),
+  archiveLineAccount: vi.fn(),
+  restoreLineAccount: vi.fn(),
   getAccountSetting: vi.fn(),
   setAccountSetting: vi.fn(),
   getStaffById: vi.fn(),
@@ -81,6 +85,10 @@ const fakeAccount = {
   login_channel_secret: null,
   liff_id: null,
   is_active: 1,
+  is_default: 0,
+  archived_at: null,
+  archived_by: null,
+  archived_reason: null,
   country: null,
   role: null,
   display_order: 0,
@@ -103,6 +111,17 @@ beforeEach(() => {
     'acc-1': { friendCount: 12, activeScenarios: 3, messagesThisMonth: 8 },
   });
   dbMocks.getLineAccountCredentialHealth.mockResolvedValue(null);
+  dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+  dbMocks.getLineAccountArchiveBlockers.mockResolvedValue([]);
+  dbMocks.setDefaultLineAccount.mockResolvedValue({ ...fakeAccount, is_default: 1 });
+  dbMocks.archiveLineAccount.mockResolvedValue({
+    ...fakeAccount,
+    is_active: 0,
+    archived_at: '2026-08-10T12:00:00.000+09:00',
+    archived_by: 'test-staff',
+    archived_reason: '利用終了',
+  });
+  dbMocks.restoreLineAccount.mockResolvedValue({ ...fakeAccount, is_active: 0 });
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
   lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
@@ -116,6 +135,104 @@ beforeEach(() => {
     if (url.endsWith('/v2/bot/message/quota')) return Response.json({ type: 'limited', value: 200 });
     return new Response(null, { status: 404 });
   }));
+});
+
+describe('LINE account default and archive lifecycle', () => {
+  test('owner switches the one organization default', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, tenant_id: 'tenant-a' });
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, tenant_id: 'tenant-a', parent_line_account_id: null },
+    ]);
+    const res = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-a' }).request(
+      '/api/line-accounts/default',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: 'acc-1' }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.setDefaultLineAccount).toHaveBeenCalledWith(expect.anything(), 'acc-1', 'tenant-a');
+    await expect(res.json()).resolves.toMatchObject({ data: { isDefault: true } });
+  });
+
+  test('archive returns every prerequisite blocker without changing the account', async () => {
+    dbMocks.getLineAccountArchiveBlockers.mockResolvedValue([
+      'account_active',
+      'default_account',
+      'delivery_job_running',
+      'traffic_pool_member',
+    ]);
+
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: '利用終了' }),
+    });
+
+    expect(res.status).toBe(409);
+    expect(dbMocks.archiveLineAccount).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'LINE_ACCOUNT_ARCHIVE_BLOCKED',
+      details: { blockers: ['account_active', 'default_account', 'delivery_job_running', 'traffic_pool_member'] },
+    });
+  });
+
+  test('archive records actor and reason, while DELETE uses the same archive path', async () => {
+    const app = setupApp('owner');
+    const archive = await app.request('/api/line-accounts/acc-1/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: '利用終了' }),
+    });
+    expect(archive.status).toBe(200);
+    expect(dbMocks.archiveLineAccount).toHaveBeenLastCalledWith(
+      expect.anything(), 'acc-1', 'test-staff', '利用終了',
+    );
+
+    const legacyDelete = await app.request('/api/line-accounts/acc-1', { method: 'DELETE' });
+    expect(legacyDelete.status).toBe(200);
+    expect(dbMocks.archiveLineAccount).toHaveBeenLastCalledWith(
+      expect.anything(), 'acc-1', 'test-staff', '旧DELETE APIからのアーカイブ',
+    );
+    expect(dbMocks.deleteUncommittedLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('archived accounts remain readable but reject writes with ACCOUNT_ARCHIVED', async () => {
+    const archivedAccount = {
+      ...fakeAccount,
+      is_active: 0,
+      archived_at: '2026-08-10T12:00:00.000+09:00',
+    };
+    dbMocks.getLineAccountById.mockResolvedValue(archivedAccount);
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...archivedAccount, parent_line_account_id: null },
+    ]);
+    const app = setupApp('owner');
+
+    expect((await app.request('/api/line-accounts/acc-1')).status).toBe(200);
+    const write = await app.request('/api/line-accounts/acc-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '変更不可' }),
+    });
+    expect(write.status).toBe(409);
+    await expect(write.json()).resolves.toEqual({ success: false, error: 'ACCOUNT_ARCHIVED' });
+  });
+
+  test('owner restores an archived account in the stopped state', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({
+      ...fakeAccount,
+      is_active: 0,
+      archived_at: '2026-08-10T12:00:00.000+09:00',
+    });
+    const res = await setupApp('owner').request('/api/line-accounts/acc-1/restore', { method: 'POST' });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.restoreLineAccount).toHaveBeenCalledWith(expect.anything(), 'acc-1');
+    await expect(res.json()).resolves.toMatchObject({ data: { isActive: false, archivedAt: null } });
+  });
 });
 
 describe('GET /api/line-accounts/:id/credential-health', () => {

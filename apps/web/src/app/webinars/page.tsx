@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
@@ -208,27 +209,19 @@ export default function WebinarsPage() {
             className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
           />
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <select
-            value={sortKey}
-            onChange={(event) => setSortKey(event.target.value as SortKey)}
-            aria-label="並び順"
-            className="border-hairline rounded-control border px-2 py-2 text-sm"
-          >
-            <option value="updated">更新が新しい順</option>
-            <option value="created">作成が新しい順</option>
-            <option value="name">名前順</option>
-          </select>
+          <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: "updated", label: "更新が新しい順" }, { value: "created", label: "作成が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
           <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-          <select
+          <SelectField
+            size="compact"
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
             aria-label="表示件数"
-            className="border-hairline rounded-control border px-2 py-2 text-sm"
-          >
-            {[20, 50, 100].map((size) => (
-              <option key={size} value={size}>{size}件表示</option>
-            ))}
-          </select>
+            options={[
+              { value: '20', label: '20件表示' },
+              { value: '50', label: '50件表示' },
+              { value: '100', label: '100件表示' },
+            ]}
+          />
         </div>
 
         <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">

@@ -1,12 +1,15 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import { eventsApi, type EventBookingItem, type EventDetail } from '@/lib/api'
+import { describeBookingCapacity } from '../event-attention'
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '承認待ち' },
@@ -46,10 +49,20 @@ function BookingsInner() {
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
   const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
+  const [capacityStatus, setCapacityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [tab, setTab] = useState<string>('requested')
-  const [loading, setLoading] = useState(true)
+  /*
+   * **読めなかったのか、0件なのかを分ける。**
+   *
+   * 前は `loading` の真偽だけで、失敗しても帯が「申込 0人・承認待ち 0件」、
+   * 表が「該当する予約はありません」になった。**予約が入っていないのか、
+   * 取れなかっただけなのかを画面から区別できない。** 承認待ちを見落とす。
+   */
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  /** 切り替え前の遅い応答を、次のイベント・次の絞り込みの一覧へ混ぜない。 */
+  const loadRequestRef = useRef(0)
   /*
    * **ブラウザの `confirm()` を使わない。**
    *
@@ -66,42 +79,77 @@ function BookingsInner() {
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
   const accountChanged = cancelTarget !== null && cancelTarget.accountId !== selectedAccountId
+  const [rejectTarget, setRejectTarget] = useState<EventBookingItem | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectError, setRejectError] = useState('')
+  const dataReady = loadStatus === 'ready'
 
   const refresh = useCallback(async () => {
     if (!selectedAccountId || !eventId) return
-    setLoading(true)
-    setError(null)
+    const requestId = ++loadRequestRef.current
+    setLoadStatus('loading')
+    setActionError(null)
     try {
       const filters = tab === 'all' ? {} : { status: tab }
+      /*
+        **前のイベントの控えを使い回さない。** `event` が入っていれば取りに
+        行かない作りだったので、アカウントやイベントを切り替えたあとも
+        **上の帯に前のイベント名と定員が残った。** どのイベントの
+        申込を見ているのか読み違える。毎回取り直す。
+      */
       const [evRes, listRes] = await Promise.all([
-        event == null ? eventsApi.getEvent(selectedAccountId, eventId) : Promise.resolve(event),
+        eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.listBookings(selectedAccountId, eventId, filters),
       ])
+      if (requestId !== loadRequestRef.current) return
+      /*
+        **器の形を確かめてから入れる。** `items` が無い返事をそのまま
+        入れると、下の `filter` で**画面ごと落ちる。** 取れなかったのと
+        同じ扱いにして、失敗の言葉を出す。
+      */
+      if (!Array.isArray(listRes?.items)) throw new Error('malformed')
       setEvent(evRes)
       setItems(listRes.items)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      /*
+        **数を持ち越さない。** 前の絞り込みの行を残したまま失敗を出すと、
+        古い数の上に「取れませんでした」が乗って、どちらが本当か読めない。
+      */
+      setEvent(null)
+      setItems([])
+      setLoadStatus('error')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 控えの `event` を読まなくなったので、依存の除外は要らない。
   }, [selectedAccountId, eventId, tab])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  // 枠の合計＝定員。一覧APIからしか取れない。
+  /*
+    枠の合計＝定員。一覧APIからしか取れない。
+
+    **「定員なし」と「定員を取れなかった」を分ける。** 前は失敗しても
+    `totalCapacity` が null のままで「定員なし」と出た。**上限が無いのか、
+    読めなかったのかが分からず、締め切りの判断を誤る。**
+  */
   useEffect(() => {
     if (!selectedAccountId || !eventId) return
     let alive = true
+    setCapacityStatus('loading')
+    setTotalCapacity(null)
     eventsApi
       .listEvents(selectedAccountId)
       .then((r) => {
-        if (alive) setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        if (!alive) return
+        setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        setCapacityStatus('ready')
       })
       .catch(() => {
         // 定員が出ないだけ。一覧と操作はできる。
+        if (alive) setCapacityStatus('error')
       })
     return () => {
       alive = false
@@ -112,20 +160,36 @@ function BookingsInner() {
     return <div className="p-4 text-red-700">id クエリが必要です</div>
   }
 
-  async function decide(id: string, action: 'confirm' | 'reject') {
-    if (!selectedAccountId || !eventId) return
-    let reason: string | undefined
-    if (action === 'reject') {
-      const r = window.prompt('拒否理由（任意・admin内部メモ。友だちには固定文面）')
-      if (r === null) return
-      reason = r || undefined
-    }
+  /*
+   * **ブラウザの `window.prompt` で理由を聞かない。**
+   *
+   * 見た目がブラウザ任せで設計の窓と違ううえ、画像比較にも写らないので
+   * **拒否の絵をそもそも撮れない。** 加えて、prompt は「これが友だちに
+   * 見えるのか」を書ける場所が無く、**内部メモのつもりで書いた文が
+   * 相手に届くと思わせる。** 画面の中の窓で、誰の予約か・理由は
+   * 内部にしか残らないことを読ませる。
+   */
+  async function decide(id: string, action: 'confirm' | 'reject', reason?: string) {
+    if (!selectedAccountId || !eventId || busy) return
     setBusy(true)
     try {
       await eventsApi.decideBooking(selectedAccountId, eventId, id, action, reason)
+      if (action === 'reject') {
+        setRejectTarget(null)
+        setRejectReason('')
+        setRejectError('')
+      }
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      /*
+        **内部の文字をそのまま出さない。** `e.message` は
+        `API error: 409` のような形で出る。何を直せばよいか分からない。
+      */
+      if (action === 'reject') {
+        setRejectError('予約を拒否できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+      } else {
+        setActionError('予約を確定できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+      }
     } finally {
       setBusy(false)
     }
@@ -169,8 +233,8 @@ function BookingsInner() {
     try {
       await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -179,6 +243,7 @@ function BookingsInner() {
   const confirmed = items.filter((b) => b.status === 'confirmed').length
   const pending = items.filter((b) => b.status === 'requested').length
   const cancelled = items.filter((b) => b.status === 'cancelled').length
+  const applied = confirmed + pending
   // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
   const capacity = totalCapacity ?? 0
 
@@ -230,35 +295,86 @@ function BookingsInner() {
 
       <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
         <span className="text-ink-faint mr-2 text-xs">イベント</span>
-        <span className="text-ink text-sm font-medium">{event?.name ?? '読み込み中…'}</span>
+        {/*
+          **読めなかったのを「読み込み中」と言わない。** いつまでも
+          読み込んでいるように見え、再読み込みに気づけない。
+        */}
+        <span className="text-ink text-sm font-medium">
+          {event?.name ?? (loadStatus === 'error' ? 'イベント名を取得できませんでした' : '読み込み中…')}
+        </span>
         <Link href="/events" className="text-accent ml-3 text-xs hover:underline">
           ほかのイベントを選ぶ
         </Link>
       </div>
 
+      {/*
+        **取れていないときは 0 を出さない。** 「承認待ち 0件」は
+        「対応するものが無い」と読める。取れていないだけなら、
+        待たせている人を見落とす。
+      */}
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="申込"
-          value={String(confirmed + pending)}
-          unit="人"
-          detail={capacity > 0 ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}` : '定員なし'}
+          value={dataReady ? String(applied) : '—'}
+          unit={dataReady ? '人' : ''}
+          detail={!dataReady
+            ? '取得できませんでした'
+            : capacityStatus === 'error'
+              ? '定員は取得できませんでした'
+              /*
+                残りの席数を出すだけだと、**あと2席なのか20席なのかで
+                同じ言い方**になる。一覧の「あと少しで満席」と同じ
+                目安（残り1〜3席）で、声をかける回だけ言い方を変える。
+              */
+              : describeBookingCapacity(applied, capacity)}
         />
-        <EventKpi title="承認待ち" value={String(pending)} unit="件" detail="対応が必要" />
+        {/*
+          **数の下に「次にすること」を書く。** 「対応が必要」だけだと、
+          0件のときも同じ文が出て、**対応するものが有るのか無いのかが
+          添え字から読めない。**
+        */}
+        <EventKpi
+          title="承認待ち"
+          value={dataReady ? String(pending) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={dataReady
+            ? pending > 0 ? `対応が必要：${pending}件を確認してください` : '確認待ちはありません'
+            : '取得できませんでした'}
+        />
         {/* event_bookings に「キャンセル待ち」という状態が無い。
             イベント側に waitlist_enabled はあるが、待っている人を数える
             場所がまだない。数を作らずに、受けるかどうかだけ出す。 */}
         <EventKpi
           title="キャンセル待ち"
           value="—"
-          unit="人"
-          detail={event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
+          unit={dataReady ? '人' : ''}
+          /*
+            **読めていない設定を言い切らない。** `event` が取れていないと
+            `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
+            と出ていた。**受け付ける設定なのに受け付けないと読める。**
+          */
+          detail={!dataReady
+            ? '取得できませんでした'
+            : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
-        <EventKpi title="キャンセル" value={String(cancelled)} unit="件" detail="この一覧のうち" />
+        <EventKpi
+          title="キャンセル"
+          value={dataReady ? String(cancelled) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={dataReady
+            ? cancelled > 0 ? '空いた枠を確認してください' : 'キャンセルはありません'
+            : '取得できませんでした'}
+        />
       </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
+
+        {/*
+          操作の失敗は**一覧を消さずに**上に出す。行が消えると、
+          どの予約に対して失敗したのかが分からなくなる。
+        */}
+        {actionError && (
+          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
+            {actionError}
           </div>
         )}
 
@@ -279,8 +395,18 @@ function BookingsInner() {
             ))}
           </div>
 
-          {loading ? (
-            <div className="p-12 text-center text-gray-500">読み込み中...</div>
+          {loadStatus === 'loading' ? (
+            <ListState kind="loading" />
+          ) : loadStatus === 'error' ? (
+            /*
+              **0件と同じ文にしない。** 「該当する予約はありません」だと、
+              予約を消してしまったのかと読める。消えていないことを先に言う。
+            */
+            <ListState
+              kind="error"
+              description="受け付けた予約は消えていません。再読み込みしても直らない場合はエラー報告へ。"
+              action={<Button onClick={() => void refresh()}>予約を再読み込み</Button>}
+            />
           ) : items.length === 0 ? (
             <div className="p-12 text-center text-gray-500 text-sm">
               該当する予約はありません
@@ -303,11 +429,12 @@ function BookingsInner() {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`
-                      : (b.line_account_id ?? '').slice(0, 8)
+                      /* **内部IDを画面に出さない。** 運用者にとって手がかりにならない。 */
+                      : 'アカウントは未取得'
                     return (
                     <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-800">
-                        {b.friend_display_name ?? b.friend_id.slice(0, 8)}
+                        {b.friend_display_name ?? '友だちは未取得'}
                       </td>
                       <td className="px-4 py-3 text-gray-700 text-xs">{accountLabel}</td>
                       <td className="px-4 py-3 text-gray-700">{formatJp(b.slot_starts_at)}</td>
@@ -328,7 +455,12 @@ function BookingsInner() {
                               承認
                             </button>
                             <button
-                              onClick={() => decide(b.id, 'reject')}
+                              data-qa-open="i5SN2j-reject"
+                              onClick={() => {
+                                setRejectReason('')
+                                setRejectError('')
+                                setRejectTarget(b)
+                              }}
                               disabled={busy}
                               className="px-3 py-1 bg-gray-500 text-white rounded-lg text-xs font-medium hover:bg-gray-600 disabled:opacity-50"
                             >
@@ -353,6 +485,7 @@ function BookingsInner() {
                               無断
                             </button>
                             <button
+                              data-qa-open="i5SN2j-cancel"
                               onClick={() => {
                                 if (!selectedAccountId) return
                                 setCancelError('')
@@ -396,7 +529,7 @@ function BookingsInner() {
           <div className="text-ink-secondary space-y-2 text-sm">
             <p>
               友だち：
-              {cancelTarget.booking.friend_display_name ?? cancelTarget.booking.friend_id.slice(0, 8)}
+              {cancelTarget.booking.friend_display_name ?? '友だちは未取得'}
             </p>
             <p>予約枠：{formatJp(cancelTarget.booking.slot_starts_at)}</p>
             <p className="text-ink-faint text-xs">
@@ -407,6 +540,51 @@ function BookingsInner() {
                 押したあとにLINEアカウントが切り替わりました。この窓を閉じて、いまのアカウントの一覧から選び直してください。
               </p>
             )}
+          </div>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={rejectTarget !== null}
+        title="この申し込みを断りますか？"
+        description="予約は「拒否」になり、枠が空きます。友だちにはLINEで断りのお知らせが届きます。送ったお知らせは取り消せません。"
+        confirmLabel="申し込みを断る"
+        cancelLabel="やめる"
+        /* 通知が飛び、この画面からは戻せない。だから赤にする。 */
+        destructive
+        busy={busy}
+        error={rejectError}
+        onConfirm={() => rejectTarget && void decide(rejectTarget.id, 'reject', rejectReason.trim() || undefined)}
+        onCancel={() => {
+          if (busy) return
+          setRejectTarget(null)
+          setRejectReason('')
+          setRejectError('')
+        }}
+      >
+        {rejectTarget && (
+          <div className="text-ink-secondary space-y-2 text-sm">
+            <p>友だち：{rejectTarget.friend_display_name ?? '友だちは未取得'}</p>
+            <p>予約枠：{formatJp(rejectTarget.slot_starts_at)}</p>
+            <label className="block">
+              <span className="text-ink-faint text-xs">断る理由（任意）</span>
+              <textarea
+                value={rejectReason}
+                onChange={(event) => setRejectReason(event.target.value)}
+                rows={3}
+                className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+                placeholder="例：この回は定員に達したため"
+              />
+            </label>
+            {/*
+              **理由がどこへ行くかを書く。** 前はブラウザの prompt で
+              「（任意・admin内部メモ。友だちには固定文面）」と括弧書き
+              していたが、prompt には**書ける場所が無い**ので読み飛ばされ、
+              内部メモのつもりの文が相手に届くと思わせていた。
+            */}
+            <p className="text-ink-faint text-xs">
+              この理由は運営の記録にだけ残ります。友だちには決まったお知らせの文が届きます。
+            </p>
           </div>
         )}
       </ConfirmDialog>

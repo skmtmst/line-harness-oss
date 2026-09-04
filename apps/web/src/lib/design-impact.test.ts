@@ -10,8 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする85ファイルを利用先に数える', () => {
-    expect(directImporters(files, button)).toHaveLength(85)
+  it('共通Buttonを直接importする100ファイルを利用先に数える', () => {
+    // 2026-09-04: 合流ブランチの追加画面と、development 側で下部追従バーへ
+    // 寄せた画面を合わせた実測値。
+    expect(directImporters(files, button)).toHaveLength(100)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -19,7 +21,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする19ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする20ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -27,9 +29,14 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
+      // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
+      'app/auto-replies/runs/page.tsx',
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
+      // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
+      // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
+      'app/events/page.tsx',
       'app/form-submissions/page.tsx',
       'app/inflow-links/page.tsx',
       'app/mileage/action-score-tab.tsx',

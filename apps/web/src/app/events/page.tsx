@@ -1,10 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import { daysUntilEvent, summarizeEventAttention } from './event-attention'
+
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 /**
  * イベント予約（設計 V2 8-3 / node Ih3xS）。
@@ -28,31 +34,57 @@ function formatJpDate(iso: string | null): string {
   })
 }
 
+function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
+  if (!hasAccount) return 'アカウントを選択'
+  if (status === 'loading') return '読み込み中'
+  if (status === 'error') return '取得できませんでした'
+  return readyDetail
+}
+
+function formatShortJpDate(iso: string | null): string {
+  if (!iso) return '日時未設定'
+  return new Date(iso).toLocaleDateString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
 export default function EventsListPage() {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
   const [page, setPage] = useState(1)
+  const loadRequestRef = useRef(0)
 
   const refresh = useCallback(async () => {
-    if (!selectedAccountId) return
-    setLoading(true)
-    setError(null)
+    const requestId = ++loadRequestRef.current
+    if (!selectedAccountId) {
+      setItems([])
+      setLoadStatus('ready')
+      return
+    }
+    setLoadStatus('loading')
+    setItems([])
     try {
       const res = await eventsApi.listEvents(selectedAccountId)
+      if (requestId !== loadRequestRef.current) return
       setItems(res.items)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setItems([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     void refresh()
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [refresh])
 
   useEffect(() => {
@@ -63,20 +95,9 @@ export default function EventsListPage() {
     return e.total_capacity != null && e.total_active >= e.total_capacity
   }
 
-  const kpi = useMemo(() => {
-    const open = items.filter((e) => e.is_published === 1)
-    const applied = items.reduce((sum, e) => sum + e.total_active, 0)
-    const capacity = open.reduce((sum, e) => sum + (e.total_capacity ?? 0), 0)
-    const filled = open.reduce((sum, e) => sum + e.total_active, 0)
-    return {
-      open: open.length,
-      applied,
-      // 受付中のイベントで、定員のうちどれだけ埋まったか。
-      // 定員なしのイベントは分母に入れられないので、混ぜずに省く。
-      rate: capacity > 0 ? Math.round((filled / capacity) * 100) : null,
-      pending: items.reduce((sum, e) => sum + e.pending_count, 0),
-    }
-  }, [items])
+  const attention = useMemo(() => summarizeEventAttention(items), [items])
+  const nearest = attention.upcoming[0]
+  const nearestLow = attention.lowApplications[0]
 
   const filtered = useMemo(() => {
     const q = query.trim()
@@ -92,6 +113,11 @@ export default function EventsListPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  /*
+    **アカウントを選んでいないときも「取れた」にしない。** 選ぶ前は
+    そもそも数える対象が無い。`ready` だけを見ると 0件と出る。
+  */
+  const dataReady = Boolean(selectedAccountId) && loadStatus === 'ready'
 
   return (
     <div>
@@ -133,26 +159,50 @@ export default function EventsListPage() {
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
-          title="イベント"
-          value={String(items.length)}
-          unit="件"
-          detail={`受付中 ${kpi.open}`}
+          title="これからの回"
+          value={dataReady ? String(attention.upcoming.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            nearest ? `いちばん近いのは ${formatShortJpDate(nearest.next_slot_starts_at)}` : '予定されている回はありません',
+          )}
         />
-        <Kpi title="申込" value={String(kpi.applied)} unit="人" detail="累計" />
         <Kpi
-          title="定員の充足"
-          value={kpi.rate === null ? '—' : String(kpi.rate)}
-          unit="%"
-          detail="受付中のもの"
+          title="申込"
+          value={dataReady ? String(attention.applied) : '—'}
+          unit={dataReady ? '人' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            attention.fillRate === null
+              ? '定員を確認できません'
+              : `定員${attention.capacity}人に対して ${attention.fillRate}%`,
+          )}
         />
-        <Kpi title="承認待ち" value={String(kpi.pending)} unit="件" detail="要対応" />
+        <Kpi
+          title="あと少しで満席"
+          value={dataReady ? String(attention.nearlyFull.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            attention.nearlyFull.length > 0 ? '声をかけると埋まります' : '該当する回はありません',
+          )}
+        />
+        <Kpi
+          title="申し込みが少ない"
+          value={dataReady ? String(attention.lowApplications.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            nearestLow
+              ? `${formatShortJpDate(nearestLow.next_slot_starts_at)}の回。あと${daysUntilEvent(nearestLow) ?? '—'}日です`
+              : '該当する回はありません',
+          )}
+        />
       </div>
-
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
-          {error}
-        </div>
-      )}
 
       <div
         data-design="Bar"
@@ -167,21 +217,17 @@ export default function EventsListPage() {
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>開催日が近い順</option>
-        </select>
+        {/*
+          **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
+          「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
+          ようになるのか読む人には分からない。
+        */}
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <select
-          disabled
-          title="表示件数の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>20件</option>
-        </select>
+        {/*
+          **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
+          「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
+          ようになるのか読む人には分からない。
+        */}
         <button
           disabled
           title="保存した条件は準備中です"
@@ -215,13 +261,11 @@ export default function EventsListPage() {
       </div>
 
       {!selectedAccountId ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-          サイドバーでアカウントを選択してください
-        </div>
-      ) : loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-          読み込み中...
-        </div>
+        <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
+      ) : loadStatus === 'loading' ? (
+        <ListState kind="loading" />
+      ) : loadStatus === 'error' ? (
+        <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
           <p className="text-ink mb-2 font-medium">イベントがまだありません</p>
@@ -330,26 +374,25 @@ export default function EventsListPage() {
       )}
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-ink-faint text-xs">全 {filtered.length} 件</span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={current <= 1}
-            className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-          >
-            前へ
-          </button>
-          <span className="text-ink-secondary px-2 text-xs tabular-nums">
-            {current} / {pageCount}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            disabled={current >= pageCount}
-            className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-          >
-            次へ
-          </button>
-        </div>
+        {/*
+          **「全 0 件」と言い切らない。** 取れていないときの 0件は
+          「イベントが無い」に読める。`—` と読み込み中を分ける。
+        */}
+        <span className="text-ink-faint text-xs">
+          {!selectedAccountId || loadStatus === 'error'
+            ? '—'
+            : loadStatus === 'loading'
+              ? '読み込み中'
+              : filtered.length === 0
+                ? '0件'
+                : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, filtered.length)}件 / 全${filtered.length}件`}
+        </span>
+        {/*
+          **送る先が無いページ送りを出さない。** 取れていないときに
+          「1 / 1」と出ると、1ページぶんは取れたように見える。
+          共通の `Pagination` に寄せる。
+        */}
+        {dataReady ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     </div>
   )

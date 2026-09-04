@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import { GRID_DAYS, gridHours, isOpenAt, specialCountByDay } from './shift-grid'
 import { Th } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -65,6 +66,8 @@ function StaffShiftsPageContent() {
   const [savingCalendar, setSavingCalendar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [unlinkOpen, setUnlinkOpen] = useState(false)
+  const [deleteShiftTarget, setDeleteShiftTarget] = useState<{ id: string; date: string } | null>(null)
   const loadRequestRef = useRef(0)
 
   // スタッフの一覧は、誰も選ばれていないうちから要る。
@@ -179,17 +182,24 @@ function StaffShiftsPageContent() {
     }
   }
 
+  /*
+    **確認はブラウザの `confirm()` を使わない。**
+    見た目がブラウザ任せで設計の確認窓と違ううえ、**画像比較に写らない**ので
+    確認の絵をそもそも撮れない。共通の確認窓（`ConfirmDialog`）で出す。
+  */
   async function disconnectCalendar() {
-    if (!selectedAccountId || !staffId || !confirm('Googleカレンダー連携を解除しますか？')) return
+    if (!selectedAccountId || !staffId) return
     await bookingApi.deleteGoogleCalendar(selectedAccountId, staffId)
     setCalendarConnected(false)
     setCalendarId('')
+    setUnlinkOpen(false)
     setSuccess('Googleカレンダー連携を解除しました。')
   }
 
   async function deleteShift(shiftId: string) {
-    if (!selectedAccountId || !confirm('この日付別の応急枠を削除しますか？')) return
+    if (!selectedAccountId) return
     await bookingApi.deleteShift(selectedAccountId, staffId, shiftId)
+    setDeleteShiftTarget(null)
     await load()
   }
 
@@ -422,7 +432,7 @@ function StaffShiftsPageContent() {
                 <span className="mt-1.5 block text-xs text-gray-500">Googleカレンダー → 設定と共有 → カレンダーの統合 → カレンダーID</span>
               </label>
               <div className="flex justify-end gap-2">
-                {calendarConnected && <button onClick={disconnectCalendar} className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600">連携解除</button>}
+                {calendarConnected && <button onClick={() => setUnlinkOpen(true)} className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600">連携解除</button>}
                 <button onClick={connectCalendar} disabled={savingCalendar || !calendarId.trim() || !serviceAccountConfigured} className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
                   {savingCalendar ? '接続確認中…' : calendarConnected ? '再接続して確認' : '接続して確認'}
                 </button>
@@ -443,7 +453,7 @@ function StaffShiftsPageContent() {
               <div className="max-h-72 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-white"><tr className="border-b"><th className="px-5 py-3 text-left">日付</th><th className="px-5 py-3 text-left">時間</th><th className="px-5 py-3 text-right">操作</th></tr></thead>
-                  <tbody>{shifts.map((shift) => <tr key={shift.id} className="border-b border-gray-100"><td className="px-5 py-3 tabular-nums">{shift.work_date}</td><td className="px-5 py-3 tabular-nums">{shift.start_time}〜{shift.end_time}</td><td className="px-5 py-3 text-right"><button onClick={() => deleteShift(shift.id)} className="text-red-600 hover:underline">削除</button></td></tr>)}</tbody>
+                  <tbody>{shifts.map((shift) => <tr key={shift.id} className="border-b border-gray-100"><td className="px-5 py-3 tabular-nums">{shift.work_date}</td><td className="px-5 py-3 tabular-nums">{shift.start_time}〜{shift.end_time}</td><td className="px-5 py-3 text-right"><button onClick={() => setDeleteShiftTarget({ id: shift.id, date: shift.work_date })} className="text-red-600 hover:underline">削除</button></td></tr>)}</tbody>
                 </table>
               </div>
             )}
@@ -460,6 +470,26 @@ function StaffShiftsPageContent() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={unlinkOpen}
+        title="Googleカレンダー連携を解除しますか？"
+        description="このスタッフの予定の取り込みを止めます。すでに取り込んだ予定と、入っている予約はそのまま残ります。あとからつなぎ直せます。"
+        confirmLabel="連携を解除"
+        destructive
+        onCancel={() => setUnlinkOpen(false)}
+        onConfirm={() => void disconnectCalendar()}
+      />
+
+      <ConfirmDialog
+        open={deleteShiftTarget !== null}
+        title={`${deleteShiftTarget?.date ?? ''} の応急枠を削除しますか？`}
+        description="この日だけの受付時間を消して、ふだんの曜日ごとの設定に戻します。すでに入っている予約は取り消されません。"
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setDeleteShiftTarget(null)}
+        onConfirm={() => { if (deleteShiftTarget) void deleteShift(deleteShiftTarget.id) }}
+      />
     </div>
   )
 }

@@ -50,6 +50,7 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
+  ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
 } from './fixtures.mjs'
@@ -359,10 +360,13 @@ const SHAPES = {
       approvalStatus: 'pending', duplicateFlag: true,
     },
   ],
+  '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
     summary: {
       scoredFriends: 5, high: 1, normal: 3, low: 1, decreased30d: 0,
-      highMin: 70, normalMin: 40,
+      /* `packages/db` の `DEFAULT_BANDS` と同じ 30 / 70。40 は根拠が無く、
+         決めごとの画面と一覧で同じ人が別の帯に入って見えていた。 */
+      highMin: 70, normalMin: 30,
     },
     items: [
       { friendId: 'friend-1', displayName: 'さかもとまさと', score: 82, band: 'high', change30d: 4, lastActionAt: '2026-08-24T20:53:00+09:00' },
@@ -711,6 +715,28 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
+  if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
+    /*
+      1件を返す口。**詳細（★V6 33-3）が読む。**
+      資格情報は「入っているか」だけを返す（値そのものは返さない）。
+      これが無いと、詳細の資格情報タブが全部「入っていません」になり、
+      **実装の不具合に見えてしまう。**
+    */
+    return {
+      success: true,
+      data: {
+        ...ACCOUNT,
+        webhook: { status: 'matched', expectedUrl: `${'https://api.example'}/webhook`, actualUrl: `${'https://api.example'}/webhook`, active: true, checkedAt: `${FIXED_TO}T00:00:00.000Z` },
+        channelAccessTokenConfigured: true,
+        channelSecretConfigured: true,
+        loginChannelSecretConfigured: true,
+        friendCapacity: 50000,
+        capacityWarnAt: 45000,
+        country: '日本',
+        role: '検証用。本番の配信には使わない',
+      },
+    }
+  }
   if (pathname === '/api/line-accounts') {
     /*
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
@@ -872,6 +898,59 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
     return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
   }
+  /*
+    いま入っている人。34-1「はじめの設定」の最終確認が役割で言い分けるので、
+    一覧の形（items/total）ではなく 1 人ぶんを返す。
+  */
+  /*
+    友だち追加時の振り分け。34-1 の段3・段4 がこれを読む。
+    下書きはあるが公開していない——設計 `RAW35` が「止まっています」で
+    描いている状態を、そのまま固定データにする。
+  */
+  if (pathname === '/api/friend-add-routing')
+    return {
+      success: true,
+      data: {
+        configured: true,
+        routing: {
+          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
+          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
+          criteria: { firstTime: 'never_added' },
+        },
+        scenarios: [{ id: 'visual-qa-scenario', name: '新規登録 7日間フォロー' }],
+        tags: [],
+      },
+    }
+  if (pathname === '/api/friend-add-routing/draft')
+    return {
+      success: true,
+      data: {
+        accountId: 'visual-qa-account',
+        versionId: 'visual-qa-draft',
+        versionNumber: 1,
+        status: 'draft',
+        routing: {
+          firstTime: { scenarioId: 'visual-qa-scenario', actions: [], timing: 'immediate' },
+          returning: { scenarioId: null, actions: [], mode: 'none', startPosition: 'start' },
+          criteria: { firstTime: 'never_added' },
+        },
+        lastTestStatus: null,
+        lastTestedAt: null,
+        publishedAt: null,
+      },
+    }
+  if (pathname === '/api/staff/me')
+    return {
+      success: true,
+      data: {
+        id: 'visual-qa-staff',
+        name: 'Kenta Kawano',
+        email: null,
+        role: 'owner',
+        permissionKeys: [],
+        isActive: true,
+      },
+    }
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'

@@ -2,28 +2,24 @@
 
 import { useEffect, useState } from 'react'
 import { api, type BroadcastStats } from '@/lib/api'
+import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'
+
+/** 帯の副題に出す数。中身は `broadcast-kpi-values.ts`。 */
+export { countText }
 
 /**
- * 帯の副題に出す数。
+ * 一斉配信の一覧に出す数（設計 `q76C35` ★V6 6-1 一斉配信の帯）。
  *
- * **口が想定の形を返さなくても `undefined` を画面に出さない。**
- * `予約中 undefined` が実際に出ていた（撮影用のモックが
- * `/api/broadcasts/stats` を持たず、別の形が返っていた）。
- * 数が無いなら `—` にして、単位も付けない。
- */
-export function countText(value: unknown, unit: string): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}${unit}`
-    : '—'
-}
-
-/**
- * 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信` の KPIs）。
+ * 設計の4枚は **予約中 / 下書き / 今月の配信 / 平均開封率** で、この順。
+ * 前は「今月の配信 / 到達 / 平均開封率 / 失敗」で、枚数は合っていても
+ * **並びも中身も設計と別物**だった。
  *
- * 設計は「今月の配信 / 到達 / 平均開封率 / 今月の残枠」の4枚。
- * 残枠はダッシュボードと同じく LINE の送信枠から取るが、この画面では
- * それだけのために外部APIを叩くのは重いので、代わりに「失敗」を出す。
- * 到達の隣に失敗があるほうが、配信の成否を1か所で読める。
+ * **「下書き」と「今日」は口が返さないので `—` にする。**
+ * `/api/broadcasts/stats` が返すのは 今月の配信・予約中・到達・失敗・
+ * 平均開封率 だけ。一覧（`/api/broadcasts`）から数えれば出せそうに見えるが、
+ * **一覧はLINEアカウントで絞れるのに集計は絞らない**（`getBroadcastStats`
+ * はテナント全体を数える）。基準の違う数を同じ帯に並べると、足しても
+ * 合わない4枚になる。取れないものは `—` のままにする。
  */
 export default function BroadcastKpis() {
   const [stats, setStats] = useState<BroadcastStats | null>(null)
@@ -46,34 +42,7 @@ export default function BroadcastKpis() {
     }
   }, [])
 
-  const cards = [
-    {
-      title: '今月の配信',
-      value: stats?.thisMonth ?? null,
-      unit: '件',
-      detail: `予約中 ${countText(stats?.scheduled, '件')}`,
-    },
-    {
-      title: '到達',
-      value: stats?.delivered ?? null,
-      unit: '通',
-      detail: `失敗 ${countText(stats?.failed, '通')}`,
-    },
-    {
-      title: '平均開封率',
-      value: stats?.openRate ?? null,
-      unit: '%',
-      // LINEは20人未満の配信だと開封数を返さない。0として混ぜると
-      // 平均が不当に下がるので、その配信は外している。
-      detail: '過去28日 ・ 20人未満の配信は除く',
-    },
-    {
-      title: '失敗',
-      value: stats?.failed ?? null,
-      unit: '通',
-      detail: '過去28日',
-    },
-  ]
+  const cards = buildBroadcastKpiCards(stats)
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">

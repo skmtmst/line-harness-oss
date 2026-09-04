@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import SelectField from '@/components/shared/select-field'
 
 interface LineAccount {
   id: string
@@ -280,21 +281,22 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">移行先アカウント</label>
-                  <select
+                  <SelectField
                     value={migrateToId}
                     onChange={(e) => setMigrateToId(e.target.value)}
+                    aria-label="移行先アカウント"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
                     required
-                  >
-                    <option value="">選択してください</option>
-                    {accounts
-                      .filter((a) => a.id !== migrateFrom && a.isActive)
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} ({a.channelId})
-                        </option>
-                      ))}
-                  </select>
+                    options={[
+                      { value: '', label: '選択してください' },
+                      ...accounts
+                        .filter((account) => account.id !== migrateFrom && account.isActive)
+                        .map((account) => ({
+                          value: account.id,
+                          label: `${account.name} (${account.channelId})`,
+                        })),
+                    ]}
+                  />
                 </div>
                 <div className="flex items-center gap-3">
                   <button
