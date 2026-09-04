@@ -3,7 +3,16 @@
 ALTER TABLE media
   ADD COLUMN line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE;
 
-WITH usage_accounts AS (
+-- D1ではTEMP TABLEを使わず、移行内だけで使う作業表を最後に削除する。
+-- 主キーで分割間の重複を除く。NULLは従来どおりCOUNT(DISTINCT)の対象外。
+DROP TABLE IF EXISTS _migration_261_usage_accounts;
+CREATE TABLE _migration_261_usage_accounts (
+  media_id TEXT,
+  account_id TEXT,
+  PRIMARY KEY (media_id, account_id)
+);
+
+INSERT OR IGNORE INTO _migration_261_usage_accounts (media_id, account_id)
   SELECT DISTINCT u.media_id, t.line_account_id AS account_id
     FROM media_usages u JOIN templates t ON u.ref_kind = 'template' AND t.id = u.ref_id
    WHERE t.line_account_id IS NOT NULL
@@ -21,8 +30,9 @@ WITH usage_accounts AS (
     FROM media_usages u
     JOIN rich_menu_pages p ON u.ref_kind = 'rich_menu' AND p.id = u.ref_id
     JOIN rich_menu_groups g ON g.id = p.group_id
-   WHERE g.account_id IS NOT NULL
-  UNION
+   WHERE g.account_id IS NOT NULL;
+
+INSERT OR IGNORE INTO _migration_261_usage_accounts (media_id, account_id)
   SELECT DISTINCT u.media_id, s.line_account_id
     FROM media_usages u JOIN scenario_steps ss
       ON u.ref_kind = 'scenario_step' AND ss.id = u.ref_id
@@ -40,19 +50,22 @@ WITH usage_accounts AS (
   SELECT DISTINCT u.media_id, CAST(accounts.value AS TEXT)
     FROM media_usages u
     JOIN events e ON u.ref_kind = 'event' AND e.id = u.ref_id
-    JOIN json_each(COALESCE(e.account_ids, '[]')) accounts
-  UNION
+    JOIN json_each(COALESCE(e.account_ids, '[]')) accounts;
+
+INSERT OR IGNORE INTO _migration_261_usage_accounts (media_id, account_id)
   SELECT DISTINCT u.media_id, w.account_id
     FROM media_usages u JOIN webinars w ON u.ref_kind = 'webinar' AND w.id = u.ref_id
-   WHERE w.account_id IS NOT NULL
-)
+   WHERE w.account_id IS NOT NULL;
+
 UPDATE media
    SET line_account_id = (
-     SELECT MIN(ua.account_id) FROM usage_accounts ua WHERE ua.media_id = media.id
+     SELECT MIN(ua.account_id) FROM _migration_261_usage_accounts ua WHERE ua.media_id = media.id
    )
  WHERE 1 = (
-   SELECT COUNT(DISTINCT ua.account_id) FROM usage_accounts ua WHERE ua.media_id = media.id
+   SELECT COUNT(DISTINCT ua.account_id) FROM _migration_261_usage_accounts ua WHERE ua.media_id = media.id
  );
+
+DROP TABLE _migration_261_usage_accounts;
 
 UPDATE media
    SET line_account_id = (SELECT id FROM line_accounts ORDER BY id LIMIT 1)
