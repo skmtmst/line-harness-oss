@@ -14,33 +14,31 @@ function walk(dir: string, out: string[] = []): string[] {
   for (const name of fs.readdirSync(dir)) {
     const full = path.join(dir, name)
     if (fs.statSync(full).isDirectory()) walk(full, out)
-    else if (full.endsWith('.tsx')) out.push(full)
+    else if (full.endsWith('.tsx') || full.endsWith('.ts')) out.push(full)
   }
   return out
 }
 
 /**
- * **ブラウザの `confirm()` を消していく。**
+ * **ブラウザの `confirm()` `alert()` `prompt()` を使わない。**
  *
  * 見た目がブラウザ任せで、設計の確認窓（`J6x4Q` / `H2S1T4`）と違う。
  * 何が消えるのか・戻せるのかを本文で読ませられず、押し間違いを止められない。
- * さらに**画像比較に写らない**ので、確認の絵をそもそも撮れない
+ * さらに**画像比較に写らない**ので、確認と失敗の絵をそもそも撮れない
  * （`Y0Sn3` の失敗状態が撮れなかったのはこれが理由だった）。
  *
- * 代わりに `components/shared/confirm-dialog` を使う。
+ * `alert()` はもう1つ悪いところがある。**押した瞬間しか読めない。**
+ * 消えると理由を確かめ直せないので、原因を追えない。実際
+ * `update failed: …` `rollback not implemented in MVP — use CLI`
+ * `areas は最大 20 個` のように、**内部語がそのまま出ていた**。
  *
- * 下の一覧は**まだ直していないファイル。増やさないこと。**
- * 直したら一覧から消す。空にできたら `confirm(` を全面禁止にする。
+ * 代わりに使うもの:
+ * - 確認 → `components/shared/confirm-dialog`
+ * - 知らせ・失敗 → 画面の中に文で残す（`role="status"` / `role="alert"`）
+ *
+ * **2026-09-04 に 0 件になったので、全面禁止にした。** 一覧は持たない。
+ * 新しく書いたらここで落ちる。
  */
-const NOT_YET_MIGRATED = [
-  'app/booking/bookings/detail/page.tsx',
-  'app/booking/bookings/page.tsx',
-  'app/booking/menus/page.tsx',
-  'app/booking/staff/page.tsx',
-  'app/booking/staff/shifts/page.tsx',
-  'app/reminders/page.tsx',
-  'app/restaurant-test/restaurant-console.tsx',
-]
 
 /**
  * ブラウザの `confirm` の呼び出し。
@@ -52,15 +50,66 @@ const NOT_YET_MIGRATED = [
  */
 const BROWSER_CONFIRM = /(?:^|[^.\w])confirm\(|\b(?:window|globalThis|self)\.confirm\(/
 
-describe('ブラウザのconfirmを使わない', () => {
-  it('confirm を使うファイルを増やさない', () => {
-    const offenders = walk(SRC)
-      .filter((f) => !/confirm-dialog/.test(f))
-      .filter((f) => BROWSER_CONFIRM.test(code(fs.readFileSync(f, 'utf8'))))
-      .map((f) => path.relative(SRC, f))
-      .sort()
-    const unexpected = offenders.filter((f) => !NOT_YET_MIGRATED.includes(f))
-    expect(unexpected, 'ブラウザのconfirmを使う新しいファイルが増えた').toEqual([])
+/**
+ * ブラウザの `alert` と `prompt`。
+ *
+ * `confirm` と同じ理由で使わない。受け側（`window` / `globalThis` / `self`）を
+ * 明示して、`window.alert(` の書き方も捕まえる。
+ */
+const BROWSER_ALERT = /(?:^|[^.\w])alert\(|\b(?:window|globalThis|self)\.alert\(/
+const BROWSER_PROMPT = /(?:^|[^.\w])prompt\(|\b(?:window|globalThis|self)\.prompt\(/
+
+/** `.tsx` と `.ts` を集める（`.test.` は除く）。 */
+function sources(): string[] {
+  return walk(SRC).filter((f) => !/confirm-dialog/.test(f) && !f.includes('.test.'))
+}
+
+const offenders = (re: RegExp) =>
+  sources()
+    .filter((f) => re.test(code(fs.readFileSync(f, 'utf8'))))
+    .map((f) => path.relative(SRC, f))
+    .sort()
+
+describe('ブラウザの確認・知らせの窓を使わない', () => {
+  it('読む先を取り違えていない', () => {
+    // 一覧が空になったので、**数え漏れで素通りしないこと**を先に見る。
+    expect(sources().length).toBeGreaterThan(300)
+  })
+
+  it('confirm を使わない', () => {
+    expect(offenders(BROWSER_CONFIRM), 'ConfirmDialog を使う').toEqual([])
+  })
+
+  it('alert を使わない', () => {
+    expect(offenders(BROWSER_ALERT), '知らせと失敗は画面の中に文で残す').toEqual([])
+  })
+
+  /**
+   * `prompt()` は**まだ残っている。減る一方の表で数える。**
+   *
+   * 多くは「コピーできなかったとき、URLを選べる形で出す」代わりに使って
+   * いる（`navigator.clipboard` が使えない環境の逃げ道）。逃げ道そのものは
+   * 要るが、**窓ではなく画面の中に読み取り専用の欄で出すほうがよい。**
+   *
+   * `app/form-submissions/edit` の「ページの名前」は、そもそも入力欄を持つ窓に
+   * するのが正しい。
+   * 手本は `app/rich-menus/edit/page.tsx`——`ConfirmDialog` の `children` に
+   * 入力欄を置いている。
+   *
+   * **増やせない。0 になったら行ごと消す**（消し忘れるとここで落ちる）。
+   */
+  const PROMPT_NOT_YET = [
+    'app/booking/bookings/page.tsx',
+    'app/booking/menus/page.tsx',
+    'app/form-submissions/edit/page.tsx',
+    'app/inflow-links/detail/page.tsx',
+    'components/events/event-form.tsx',
+  ]
+
+  it('prompt を使うファイルを増やさない', () => {
+    expect(offenders(BROWSER_PROMPT), 'ConfirmDialog の children に入力欄を置く').toEqual(
+      [...PROMPT_NOT_YET].sort(),
+    )
   })
 
   it('リマインダの一括削除が共通の確認窓を使う', () => {

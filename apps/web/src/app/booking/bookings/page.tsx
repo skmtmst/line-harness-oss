@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { bookingApi, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -120,6 +121,9 @@ export default function BookingsPage() {
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
+  const [deciding, setDeciding] = useState(false)
+  const [decideError, setDecideError] = useState('')
   // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -193,18 +197,33 @@ export default function BookingsPage() {
     }
   }, [selectedAccountId])
 
-  async function handleDecide(
-    id: string,
-    action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete',
-  ) {
+  type BookingAction = 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete'
+
+  /**
+   * 予約の状態を変える。**押す前に確認を出す。**
+   *
+   * ブラウザの `confirm()` / `alert()` は見た目がブラウザ任せで、設計の
+   * 確認窓と違ううえ、**画像比較に写らない**（確認と失敗の絵をそもそも
+   * 撮れない）。失敗は窓の中に出して、押した場所から動かさない。
+   */
+  async function runDecide(id: string, action: BookingAction) {
     if (!selectedAccountId) return
-    if (!confirm(`この予約を「${actionLabel[action]}」しますか？`)) return
+    setDeciding(true)
+    setDecideError('')
     try {
       await bookingApi.decideRequest(selectedAccountId, id, action)
+      setDecideTarget(null)
       await load()
     } catch (e) {
-      alert(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
+      setDecideError(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setDeciding(false)
     }
+  }
+
+  function handleDecide(id: string, action: BookingAction) {
+    setDecideError('')
+    setDecideTarget({ id, action })
   }
 
   const kpi = useMemo(() => {
@@ -577,6 +596,18 @@ export default function BookingsPage() {
           onAction={(a) => handleDecide(detail.id, a)}
         />
       )}
+
+      <ConfirmDialog
+        open={decideTarget !== null}
+        title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
+        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
+        confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
+        destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
+        busy={deciding}
+        error={decideError || undefined}
+        onCancel={() => { setDecideTarget(null); setDecideError('') }}
+        onConfirm={() => { if (decideTarget) void runDecide(decideTarget.id, decideTarget.action) }}
+      />
     </div>
   )
 }
