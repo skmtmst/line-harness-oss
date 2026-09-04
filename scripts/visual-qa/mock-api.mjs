@@ -875,6 +875,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /*
+    使い道を1件読む（設計 `p9CcEB` 17-1-G の編集）。
+    **一覧と同じ中身から引く。** 別に持つと、一覧が「送料無料」なのに
+    編集画面は別の名前、という起きない絵ができる。
+  */
+  const rewardOne = /^\/api\/mileage\/rewards\/([^/]+)$/.exec(pathname)
+  if (rewardOne) {
+    const found = MILEAGE_REWARDS.rewards.find((reward) => reward.id === rewardOne[1])
+    return found
+      ? { success: true, data: found }
+      : { success: false, error: '使い道が見つかりません' }
+  }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
   /* 自動変更ルール（設計 `GMvBd` 4-3-A）。マークごとに返す。 */

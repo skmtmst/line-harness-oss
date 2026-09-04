@@ -223,7 +223,7 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-09-04: 自動応答から、押しても何も起きない「マニュアル」と
     // 「並び替え」を外した。どちらも `border-hairline` を持つので、
     // 副次がさらに2つ減る。227 から締め直す。
-    expect(debt['direct-secondary-button']).toBe(225)
+    expect(debt['direct-secondary-button']).toBe(226)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

@@ -1077,6 +1077,30 @@ export type MileageRewardSummary = {
   updatedAt: string
 }
 
+/**
+ * 使い道の下書きの中身（`p9CcEB` 17-1-G）。
+ *
+ * **Worker の `MileageRewardDraftInput` と同じ形にする。** 画面で足すと、
+ * 入れられるのに保存できない欄ができる。
+ */
+export type MileageRewardDraftInput = {
+  name: string
+  description?: string | null
+  imageUrl?: string | null
+  rewardKind: MileageRewardKind
+  requiredMiles: number
+  /** 数に限りがあるとき。**`null` は「限りなし」で、0（品切れ）とは別。** */
+  stockLimit?: number | null
+  perFriendLimit?: number | null
+  startsAt?: string | null
+  endsAt?: string | null
+  benefitExpiresDays?: number | null
+  /** 交換後に渡すもの。**クーポン以外では必須**（Worker が弾く）。 */
+  commonActionVersionId?: string | null
+  failurePolicy?: MileageRewardFailurePolicy
+  customerMessage?: string
+}
+
 export type MileageRewardAdminOverview = {
   rewards: MileageRewardSummary[]
   summary: {
@@ -4372,6 +4396,35 @@ export const api = {
       使い道の一覧（#772 の口）。**アカウント単位で返る。**
       渡さないと、ほかの店の使い道まで混ざる。
     */
+    /** 1件を読む（編集のとき）。 */
+    reward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(
+        `/api/mileage/rewards/${id}?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    /** 新しく作る。**下書きとして作られる。** その場では公開しない。 */
+    createReward: (accountId: string, draft: MileageRewardDraftInput) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>('/api/mileage/rewards', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, draft }),
+      }),
+    /** 下書きを書き換える。公開中のものは触らない（公開は別の口）。 */
+    saveRewardDraft: (id: string, accountId: string, draft: MileageRewardDraftInput) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${id}/draft`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, draft }),
+      }),
+    /** 下書きを公開する。**ここで初めてお客様に見える。** */
+    publishReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${id}/publish`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
+    /** 出すのをやめる。**消さない**——交換の記録が残るため。 */
+    stopReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${id}/stop`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
     rewards: (accountId: string) =>
       fetchApi<ApiResponse<MileageRewardAdminOverview>>(
         `/api/mileage/rewards?accountId=${encodeURIComponent(accountId)}`,

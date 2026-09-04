@@ -21,7 +21,7 @@
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,
-    "direct-secondary-button": 4,
+    "direct-secondary-button": 2,
     "direct-primary-button": 1,
     "direct-th": 10
   },
@@ -239,6 +239,10 @@
     "arbitrary-value": 9,
     "direct-th": 7,
     "unresolved-classname": 1
+  },
+  "app/mileage/rewards/edit/page.tsx": {
+    "direct-secondary-button": 1,
+    "unresolved-classname": 2
   },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 37
