@@ -148,13 +148,21 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">いちばん使われた</p>
+          {/*
+            **1回も交換されていないのに名指ししない。** 口は「いちばん多い」
+            使い道を名前で返すが、その回数が0なら**まだ誰も使っていない。**
+            名前を出すと「これがよく使われている」と読め、
+            **伸ばす先を取り違える。**
+          */}
           <p className="text-ink mt-1 truncate text-2xl font-bold">
-            {reason ?? summary?.mostRedeemedRewardName ?? '—'}
+            {reason ?? (summary?.mostRedeemedRewardCount ? summary.mostRedeemedRewardName ?? '—' : '—')}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {reason ?? (summary?.mostRedeemedRewardCount == null
               ? notConnectedText('交換の回数')
-              : `${summary.mostRedeemedRewardCount.toLocaleString('ja-JP')}回`)}
+              : summary.mostRedeemedRewardCount === 0
+                ? 'まだ交換されていません'
+                : `${summary.mostRedeemedRewardCount.toLocaleString('ja-JP')}回`)}
           </p>
         </div>
       </div>

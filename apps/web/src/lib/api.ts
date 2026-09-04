@@ -1106,7 +1106,6 @@ export type MileageRewardDraftInput = {
   failurePolicy?: MileageRewardFailurePolicy
   customerMessage?: string
 }
-
 export type MileageRewardAdminOverview = {
   rewards: MileageRewardSummary[]
   summary: {

@@ -19,8 +19,8 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
 
   it('色見本は枠38×38の中に20×20の円で、枠ごと塗らない', () => {
     const source = read(FOLDER_EDITOR)
-    // 設計 `byqIW`：枠 38x38 / r=10(`rounded-tile`) / 背景 canvas。
-    expect(source).toContain('rounded-tile bg-canvas flex h-[38px] w-[38px]')
+    // 設計 `byqIW`：枠 38x38 / r=10(`rounded-card`) / 背景 canvas。
+    expect(source).toContain('rounded-card bg-canvas flex h-[38px] w-[38px]')
     // 中の円は 20x20（h-5 w-5）。以前は 36px の丸を色で塗りつぶしていた。
     expect(source).toContain('flex h-5 w-5 items-center justify-center rounded-full')
     expect(source).not.toContain('h-9 w-9 rounded-full')
@@ -32,7 +32,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     const source = read(FOLDER_EDITOR)
     expect(source).toContain('一覧での表示')
     // 設計 r=10 / pad14 / gap7、見出しは nano 10/600。
-    expect(source).toContain('rounded-tile')
+    expect(source).toContain('rounded-card')
     expect(source).toContain('gap-[7px]')
     expect(source).toContain('p-[14px]')
     expect(source).toContain('text-nano')

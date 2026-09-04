@@ -52,7 +52,7 @@ describe('Pen.dev V6の共通画面枠', () => {
     for (const value of [
       'height: 40px',
       'gap: 11px',
-      'border-radius: var(--radius-tile)',
+      'border-radius: var(--radius-card)',
       'background: var(--color-accent-soft)',
       'outline: 2px solid var(--color-accent)',
     ]) expect(sidebarCss).toContain(value)

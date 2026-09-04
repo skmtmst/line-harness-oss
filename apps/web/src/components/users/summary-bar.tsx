@@ -111,7 +111,7 @@ function FailureDetail({ onRetry }: { onRetry: () => void }) {
       <button
         type="button"
         onClick={onRetry}
-        className="ml-1.5 font-semibold text-v6-action underline hover:no-underline"
+        className="ml-1.5 font-semibold text-action underline hover:no-underline"
       >
         再読み込み
       </button>

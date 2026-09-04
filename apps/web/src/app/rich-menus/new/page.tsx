@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import StepTrail from '@/components/shared/step-trail'
+import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import {
@@ -266,21 +267,25 @@ export default function NewRichMenuPage() {
           </div>
         )}
 
-        <div className="border-hairline flex justify-end gap-2 border-t pt-4">
-          <Link
-            href="/rich-menus"
-            className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
-          >
-            キャンセル
-          </Link>
-          <button
-            type="submit"
-            disabled={submitting || !selectedAccount}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
-          >
-            {submitting ? '作成中...' : '作成して編集へ'}
-          </button>
-        </div>
+        <StickyBar
+          actions={(
+            <>
+              <Link
+                href="/rich-menus"
+                className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
+              >
+                キャンセル
+              </Link>
+              <button
+                type="submit"
+                disabled={submitting || !selectedAccount}
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
+              >
+                {submitting ? '作成中...' : '作成して編集へ'}
+              </button>
+            </>
+          )}
+        />
       </form>
     </main>
   )

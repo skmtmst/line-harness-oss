@@ -21,8 +21,8 @@
 }
 
 .validation {
-  background: var(--color-status-warning-soft);
-  color: var(--color-status-warning);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
 }
 
 .error {
