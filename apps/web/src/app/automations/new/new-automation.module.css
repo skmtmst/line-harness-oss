@@ -62,7 +62,7 @@
 
 .card {
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-tile); /* 設計 r10 */
+  border-radius: var(--radius-card); /* 設計 r10 */
   background: var(--color-canvas);
   padding: 20px;
 }
@@ -222,7 +222,7 @@
 
 .sideCard {
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   padding: 16px;
 }

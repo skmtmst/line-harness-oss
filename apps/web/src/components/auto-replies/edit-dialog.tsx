@@ -18,6 +18,7 @@ import {
 } from './draft-fields'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 
 export interface AutoReplyDraft {
   id?: string
@@ -833,16 +834,21 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           </label>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <div className="px-5 py-3 border-t flex gap-2 justify-end">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md">キャンセル</button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-          >
-            {saving ? '保存中...' : '保存'}
-          </button>
-        </div>
+        <StickyBar
+          className="mx-5 mb-4"
+          actions={(
+            <>
+              <button onClick={onClose} className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md">キャンセル</button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '保存'}
+              </button>
+            </>
+          )}
+        />
       </div>
     </div>
   )

@@ -87,20 +87,20 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
 
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
-      <div className="rounded-v6-card border border-hairline bg-canvas p-4">
+      <div className="rounded-card border border-hairline bg-canvas p-4">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="grid w-52 gap-1 text-xs font-semibold text-v6-ink-secondary">
+          <label className="grid w-52 gap-1 text-xs font-semibold text-ink-secondary">
             友だち
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="名前で検索"
-              className="h-10 rounded-v6-control border border-hairline bg-canvas px-3 text-sm font-normal text-v6-ink outline-none focus:border-accent"
+              className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink outline-none focus:border-accent"
             />
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-v6-ink-secondary">
+          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
             種類
-            <select value={entryType} onChange={(event) => resetFilter(() => setEntryType(event.target.value as EntryTypeFilter))} className="v6-select h-10 rounded-v6-control border border-hairline bg-canvas text-sm font-normal text-v6-ink">
+            <select value={entryType} onChange={(event) => resetFilter(() => setEntryType(event.target.value as EntryTypeFilter))} className="v6-select h-10 rounded-control border border-hairline bg-canvas text-sm font-normal text-ink">
               <option value="">すべての種類</option>
               <option value="grant">付与</option>
               <option value="reversal">取消</option>
@@ -109,38 +109,38 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
               <option value="adjustment">手動調整</option>
             </select>
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-v6-ink-secondary">
+          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
             状態
-            <select value={status} onChange={(event) => resetFilter(() => setStatus(event.target.value as StatusFilter))} className="v6-select h-10 rounded-v6-control border border-hairline bg-canvas text-sm font-normal text-v6-ink">
+            <select value={status} onChange={(event) => resetFilter(() => setStatus(event.target.value as StatusFilter))} className="v6-select h-10 rounded-control border border-hairline bg-canvas text-sm font-normal text-ink">
               <option value="">すべての状態</option>
               <option value="available">利用可能</option>
               <option value="pending">確定待ち</option>
               <option value="void">取消済み</option>
             </select>
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-v6-ink-secondary">
+          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
             動かした方法
-            <select value={mode} onChange={(event) => resetFilter(() => setMode(event.target.value as ModeFilter))} className="v6-select h-10 rounded-v6-control border border-hairline bg-canvas text-sm font-normal text-v6-ink">
+            <select value={mode} onChange={(event) => resetFilter(() => setMode(event.target.value as ModeFilter))} className="v6-select h-10 rounded-control border border-hairline bg-canvas text-sm font-normal text-ink">
               <option value="">自動・手動</option>
               <option value="automatic">自動</option>
               <option value="manual">手動</option>
             </select>
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-v6-ink-secondary">
+          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
             開始日
-            <input type="date" value={from} onChange={(event) => resetFilter(() => setFrom(event.target.value))} className="h-10 rounded-v6-control border border-hairline bg-canvas px-3 text-sm font-normal text-v6-ink" />
+            <input type="date" value={from} onChange={(event) => resetFilter(() => setFrom(event.target.value))} className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink" />
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-v6-ink-secondary">
+          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
             終了日
-            <input type="date" value={to} onChange={(event) => resetFilter(() => setTo(event.target.value))} className="h-10 rounded-v6-control border border-hairline bg-canvas px-3 text-sm font-normal text-v6-ink" />
+            <input type="date" value={to} onChange={(event) => resetFilter(() => setTo(event.target.value))} className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink" />
           </label>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-v6-card border border-hairline bg-canvas">
+      <div className="overflow-hidden rounded-card border border-hairline bg-canvas">
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-          <h2 className="text-base font-bold text-v6-ink">マイルの履歴</h2>
-          <span className="text-xs text-v6-ink-faint">{loading || error || total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
+          <h2 className="text-base font-bold text-ink">マイルの履歴</h2>
+          <span className="text-xs text-ink-faint">{loading || error || total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
         </div>
 
         {loading ? (
@@ -168,14 +168,14 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
                     sub="マイル明細を見る"
                   />
                   <Td>
-                    <p className="font-semibold text-v6-ink">{mileageEntryTypeLabel(item.entryType)}</p>
-                    <p className="mt-1 text-xs text-v6-ink-faint">{mileageStatusLabel(item.status)}・{item.mode === 'manual' ? '手動' : '自動'}</p>
+                    <p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p>
+                    <p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}・{item.mode === 'manual' ? '手動' : '自動'}</p>
                   </Td>
-                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-v6-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
-                  <Td><p className="max-w-52 truncate font-medium text-v6-ink" title={item.reason}>{item.reason}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : item.ruleName ?? 'ルール情報なし'}</p></Td>
+                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
+                  <Td><p className="max-w-52 truncate font-medium text-ink" title={item.reason}>{item.reason}</p><p className="mt-1 text-xs text-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : item.ruleName ?? 'ルール情報なし'}</p></Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
-                    <p className="mt-1 text-xs text-v6-ink-faint">
+                    <p className="mt-1 text-xs text-ink-faint">
                       {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.hasSourceEvent })}
                     </p>
                   </Td>
@@ -188,7 +188,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
 
         {!loading && !error && total !== null && total > PAGE_SIZE ? (
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <span className="text-xs text-v6-ink-faint">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString('ja-JP')}件</span>
+            <span className="text-xs text-ink-faint">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString('ja-JP')}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} />
           </div>
         ) : null}

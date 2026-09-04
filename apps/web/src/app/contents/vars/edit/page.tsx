@@ -540,7 +540,7 @@ function EditCommonVarInner() {
               <button
                 type="button"
                 onClick={() => void openDelete()}
-                className="rounded-control bg-v6-danger text-on-accent px-4 py-2 text-sm font-bold"
+                className="rounded-control bg-status-danger text-on-accent px-4 py-2 text-sm font-bold"
               >
                 削除
               </button>

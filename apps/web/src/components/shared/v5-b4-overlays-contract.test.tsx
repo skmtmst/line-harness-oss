@@ -90,7 +90,10 @@ describe('V5 B4 オーバーレイ共通部品', () => {
   it('契約はB4の部品・実ノード・宣言数を固定する', () => {
     const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
     const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
-    expect(contract.required.tokens).toBe(24)
+    // 2026-09-03: 色と角丸を1系統にまとめ、同値の別名3つ
+    // （--radius-tile / --color-status-warning / --color-status-warning-soft）
+    // を消したので 24 → 21。承認は docs/v6-directives.md §4。
+    expect(contract.required.tokens).toBe(21)
     expect(contract.required.parts).toBe(20)
     expect(contract.required.partDeclarations).toBe(301)
     expect(contract.parts.dialog.pencilNodes).toEqual(['J6x4Q', 'H2S1T4'])

@@ -1,5 +1,7 @@
 'use client'
 
+import StickyBar from '@/components/shared/sticky-bar'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
@@ -437,13 +439,16 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
         {/* tab footer */}
         {tab !== 'slots' && (
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-xs text-gray-500">
+          <StickyBar
+            status={(
+              <span className="text-xs text-gray-500">
               {tab === 'overview' && !eventId && '保存するとイベントが作成され、予約枠タブに進みます'}
               {tab === 'overview' && eventId && '変更を「概要を保存」で確定します'}
               {tab === 'publish' && '「公開する」ON で友だちに予約 URL を案内できます'}
-            </div>
-            <div className="flex gap-2">
+              </span>
+            )}
+            actions={(
+              <>
               {tab === 'overview' && eventId && (
                 <button
                   onClick={() => save('slots')}
@@ -460,8 +465,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
               >
                 {saving ? '保存中...' : tab === 'overview' && !eventId ? 'イベントを作成' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存'}
               </button>
-            </div>
-          </div>
+              </>
+            )}
+          />
         )}
       </div>
     </div>
