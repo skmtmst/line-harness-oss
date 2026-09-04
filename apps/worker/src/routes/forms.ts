@@ -37,6 +37,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { applyActionScoreEvent } from '../services/action-score-events.js';
 import {
   applyFormLayoutEffects,
   checkFormGates,
@@ -1019,14 +1020,28 @@ forms.post('/api/forms/:id/submit', async (c) => {
 
     const executionCtx = optionalExecutionCtx(c);
     if (executionCtx && identity.lineAccountId) executionCtx.waitUntil(
-      dispatchAutomationEventWithLogging(c.env.DB, {
-        lineAccountId: identity.lineAccountId,
-        eventType: 'form_submitted',
-        sourceEventId: submission.id,
-        friendId,
-        eventData: { formId, submissionId: submission.id },
-      })
-        .catch((error) => console.error('form automation event failed:', error)),
+      Promise.allSettled([
+        applyActionScoreEvent(c.env.DB, {
+          lineAccountId: identity.lineAccountId,
+          friendId,
+          eventType: 'form_submitted',
+          source: 'form',
+          sourceEventId: submission.id,
+          subjectKey: formId,
+          occurredAt: submission.created_at,
+        }),
+        dispatchAutomationEventWithLogging(c.env.DB, {
+          lineAccountId: identity.lineAccountId,
+          eventType: 'form_submitted',
+          sourceEventId: submission.id,
+          friendId,
+          eventData: { formId, submissionId: submission.id },
+        }),
+      ]).then((results) => {
+        for (const result of results) {
+          if (result.status === 'rejected') console.error('form action event failed:', result.reason);
+        }
+      }),
     );
 
     // Side effects (best-effort, don't fail the request)
