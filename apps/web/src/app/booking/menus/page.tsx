@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
@@ -623,18 +624,11 @@ function Modal({
             />
           </div>
           <Field label="予約申込時に自動付与するタグ">
-            <select
+            <SelectField
               value={form.auto_tag_id ?? ''}
               onChange={(e) => set('auto_tag_id', e.target.value === '' ? null : e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="">— なし —</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: '— なし —' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            />
             <p className="mt-1 text-xs text-ink-faint">
               このメニューが予約されると、申込者の友だちに自動でこのタグが付きます。タグは既存のものから選択してください (友だち画面 / シナリオ等で使われているタグ)。
             </p>

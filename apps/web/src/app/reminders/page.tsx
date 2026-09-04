@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import type { Folder, ReminderTriggerType } from '@line-crm/shared'
@@ -521,19 +522,12 @@ export default function RemindersPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <select
+                            <SelectField
                               value={r.folderId ?? ''}
                               onChange={(e) => void handleMoveFolder(r.id, e.target.value)}
                               aria-label={`${r.name}のフォルダ`}
-                              className="border-hairline rounded-control max-w-[9rem] border px-2 py-1 text-xs"
-                            >
-                              <option value="">未分類</option>
-                              {folders.map((f) => (
-                                <option key={f.id} value={f.id}>
-                                  {f.name}
-                                </option>
-                              ))}
-                            </select>
+                              options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]}
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <button

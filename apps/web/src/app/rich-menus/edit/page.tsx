@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -720,18 +721,11 @@ function Editor({
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
-              <select
+              <SelectField
                 value={folderId}
                 onChange={(e) => setFolderId(e.target.value)}
-                className="border-hairline rounded-control focus:ring-accent mt-1 block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              >
-                <option value="">未分類</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+                options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]}
+              />
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">メニューバーの文字</span>

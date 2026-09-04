@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -170,18 +171,13 @@ function TemplateEditInner() {
               id ? '作ったあとに種類を変えると、中身の書き方も変える必要があります。' : undefined
             }
           >
-            <select
+            <SelectField
               id="tp-type"
               value={messageType}
               onChange={(e) => setMessageType(e.target.value)}
+              options={TYPES.map((t) => ({ value: t.value, label: t.label }))}
               className={inputClass}
-            >
-              {TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
 
           <div>
