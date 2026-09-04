@@ -60,6 +60,10 @@ const RUN_STATUSES: ReminderDeliveryRunStatus[] = [
   'retry_wait', 'permanent_failed', 'cancelled',
 ];
 
+function publicRunStatus(status: ReminderDeliveryRunStatus) {
+  return status === 'queued' ? 'planned' as const : status;
+}
+
 function commonRunStatus(status: ReminderDeliveryRunStatus) {
   if (status === 'succeeded') return 'succeeded' as const;
   if (status === 'permanent_failed') return 'failed' as const;
@@ -619,9 +623,13 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
     }
 
     const rawStatus = c.req.query('status');
-    const status = rawStatus && RUN_STATUSES.includes(rawStatus as ReminderDeliveryRunStatus)
-      ? rawStatus as ReminderDeliveryRunStatus
-      : undefined;
+    // 管理画面と共有契約は「配信予定」を planned と呼ぶ。DB の queued は
+    // 配信処理だけの内部状態として保ち、API 境界で相互変換する。
+    const status = rawStatus === 'planned'
+      ? 'queued'
+      : rawStatus && RUN_STATUSES.includes(rawStatus as ReminderDeliveryRunStatus)
+        ? rawStatus as ReminderDeliveryRunStatus
+        : undefined;
     if (rawStatus && !status) {
       return c.json({ success: false, error: 'statusの値が正しくありません' }, 400);
     }
@@ -675,7 +683,7 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
           scheduledAt: row.scheduled_at,
           startedAt: row.started_at,
           completedAt: row.completed_at,
-          domainStatus: row.status,
+          domainStatus: publicRunStatus(row.status),
           attemptCount: Number(row.attempt_count),
           nextRetryAt: row.next_retry_at,
           lastErrorCode: row.last_error_code,
