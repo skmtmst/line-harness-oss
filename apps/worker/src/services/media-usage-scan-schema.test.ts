@@ -146,9 +146,15 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
       `SELECT COUNT(*) AS count FROM media_usages WHERE ref_id = 'deleted-event'`,
     ).get()).toEqual({ count: 1 });
 
-    const completed = await scanMediaUsage(db, '2026-09-07T00:00:00.000');
+    const queued = await scanMediaUsage(db, '2026-09-07T00:00:00.000');
+    expect(queued).toMatchObject({ source: 'webinar', cycleCompleted: false, pruned: 0 });
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM media_usages WHERE ref_id = 'deleted-event'`,
+    ).get()).toEqual({ count: 1 });
 
-    expect(completed).toMatchObject({ source: 'webinar', cycleCompleted: true, pruned: 1 });
+    const completed = await scanMediaUsage(db, '2026-09-08T00:00:00.000');
+
+    expect(completed).toMatchObject({ cycleCompleted: true, pruned: 1 });
     expect(sqlite.prepare(
       `SELECT ref_kind, ref_id FROM media_usages ORDER BY ref_kind, ref_id`,
     ).all()).toEqual([{ ref_kind: 'template', ref_id: 'template-1' }]);
@@ -157,7 +163,7 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
     ).get()).toEqual({
       source_index: 0,
       last_ref_id: '',
-      cycle_started_at: '2026-09-07T00:00:00.000',
+      cycle_started_at: '2026-09-08T00:00:00.000',
     });
   });
 });
