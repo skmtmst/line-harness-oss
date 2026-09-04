@@ -119,6 +119,8 @@ export async function sendWebinarRegistrationConfirmation(
   friendId: string,
   sessionStartAt: number,
   options: WebinarProxyDeliveryOptions,
+  retryKey = crypto.randomUUID(),
+  followupLabel = '開始5分前',
 ): Promise<void> {
   try {
     const friend = await getFriendById(db, friendId);
@@ -133,10 +135,10 @@ export async function sendWebinarRegistrationConfirmation(
           `✅ ${fmtJstDateTime(sessionStartAt)} の回で受付しました\n\n` +
           `「${webinar.title}」\n\n` +
           `専用の入場リンクです👇\n${admissionUrl}\n\n` +
-          `開始5分前にも同じリンクをお送りします。` +
+          `${followupLabel}にも同じリンクをお送りします。` +
           `閉じた後も何度でも開けます。`,
       },
-    ], crypto.randomUUID(), options.proxyDispatch);
+    ], retryKey, options.proxyDispatch);
   } catch (err) {
     console.error('webinar registration confirmation error:', err);
   }

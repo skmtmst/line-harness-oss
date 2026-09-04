@@ -18,12 +18,26 @@ import {
   getReminderDeliveryStepSummaries,
   listReminderDeliveryRuns,
   retryReminderDeliveryRun,
+  createReminderWithDraftVersion,
+  getReminderDraftVersion,
+  getReminderPublishedVersion,
+  parseReminderVersionSettings,
+  publishReminderDraftVersion,
+  recordReminderDraftTest,
+  saveReminderDraftVersion,
+  type ReminderDraftSettings,
+  type ReminderVersionRow,
   type ReminderDeliveryRunStatus,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import {
+  previewReminderDraft,
+  testReminderDraft,
+  validateReminderDraft,
+} from '../services/reminder-draft.js';
 
 const reminders = new Hono<Env>();
 
@@ -149,6 +163,162 @@ function readTriggerInput(
   return { ok: true, value: out };
 }
 
+const REMINDER_MESSAGE_TYPES = new Set([
+  'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
+]);
+
+function readDraftSettings(
+  raw: unknown,
+): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: '下書きの内容が正しくありません' };
+  }
+  const body = raw as Record<string, unknown>;
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+  if (!name) return { ok: false, error: 'リマインダ名を入力してください' };
+  if (!lineAccountId) return { ok: false, error: 'LINEアカウントを選んでください' };
+  if (!TRIGGER_TYPES.includes(body.triggerType as TriggerType)) {
+    return { ok: false, error: '基準日の種類が正しくありません' };
+  }
+  if (!DELIVERY_MODES.includes(body.deliveryMode as (typeof DELIVERY_MODES)[number])) {
+    return { ok: false, error: '送るタイミングの決め方が正しくありません' };
+  }
+  if (!Array.isArray(body.steps) || body.steps.length > 50) {
+    return { ok: false, error: '通知ステップは50件以内で指定してください' };
+  }
+
+  const stableIds = new Set<string>();
+  const steps: ReminderDraftSettings['steps'] = [];
+  for (const rawStep of body.steps) {
+    if (!rawStep || typeof rawStep !== 'object' || Array.isArray(rawStep)) {
+      return { ok: false, error: '通知ステップの内容が正しくありません' };
+    }
+    const step = rawStep as Record<string, unknown>;
+    const stableStepId = typeof step.stableStepId === 'string' && step.stableStepId.trim()
+      ? step.stableStepId.trim()
+      : crypto.randomUUID();
+    if (stableIds.has(stableStepId)) return { ok: false, error: '同じ通知ステップIDが重複しています' };
+    stableIds.add(stableStepId);
+    const offsetMinutes = Number(step.offsetMinutes ?? 0);
+    const offsetDays = step.offsetDays == null ? null : Number(step.offsetDays);
+    const sendAtTime = step.sendAtTime == null || step.sendAtTime === ''
+      ? null
+      : String(step.sendAtTime);
+    if (!Number.isInteger(offsetMinutes) || Math.abs(offsetMinutes) > 525_600) {
+      return { ok: false, error: '通知時刻は基準日の前後365日以内にしてください' };
+    }
+    if (offsetDays !== null && (!Number.isInteger(offsetDays) || Math.abs(offsetDays) > 365)) {
+      return { ok: false, error: '通知日は基準日の前後365日以内にしてください' };
+    }
+    if (sendAtTime !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sendAtTime)) {
+      return { ok: false, error: '通知時刻はHH:MMで指定してください' };
+    }
+    const messageType = String(step.messageType ?? 'text');
+    if (!REMINDER_MESSAGE_TYPES.has(messageType)) {
+      return { ok: false, error: '送る内容の種類が正しくありません' };
+    }
+    const objectOrEmpty = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+    steps.push({
+      stableStepId,
+      offsetMinutes,
+      messageType,
+      messageContent: typeof step.messageContent === 'string' ? step.messageContent : '',
+      offsetDays,
+      sendAtTime,
+      templateId: typeof step.templateId === 'string' && step.templateId ? step.templateId : null,
+      targetCondition: objectOrEmpty(step.targetCondition),
+      action: objectOrEmpty(step.action),
+    });
+  }
+
+  const stop = body.stopConditions && typeof body.stopConditions === 'object' && !Array.isArray(body.stopConditions)
+    ? body.stopConditions as Record<string, unknown>
+    : {};
+  const daysAfterTarget = stop.daysAfterTarget == null ? null : Number(stop.daysAfterTarget);
+  if (daysAfterTarget !== null && (!Number.isInteger(daysAfterTarget) || daysAfterTarget < 0 || daysAfterTarget > 365)) {
+    return { ok: false, error: '自動終了日は0〜365日で指定してください' };
+  }
+  const triggerOffsetMinutes = body.triggerOffsetMinutes == null
+    ? null
+    : Number(body.triggerOffsetMinutes);
+  if (triggerOffsetMinutes !== null
+      && (!Number.isInteger(triggerOffsetMinutes) || Math.abs(triggerOffsetMinutes) > 43_200)) {
+    return { ok: false, error: '基準日からのずらし方は前後30日以内で指定してください' };
+  }
+  const sendAtTime = typeof body.sendAtTime === 'string' && body.sendAtTime ? body.sendAtTime : null;
+  if (sendAtTime !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sendAtTime)) {
+    return { ok: false, error: '送る時刻はHH:MMで指定してください' };
+  }
+  return {
+    ok: true,
+    value: {
+      name,
+      description: typeof body.description === 'string' ? body.description.trim() || null : null,
+      lineAccountId,
+      triggerType: body.triggerType as ReminderDraftSettings['triggerType'],
+      deliveryMode: body.deliveryMode as ReminderDraftSettings['deliveryMode'],
+      triggerFieldId: typeof body.triggerFieldId === 'string' && body.triggerFieldId ? body.triggerFieldId : null,
+      repeatYearly: body.repeatYearly === true,
+      triggerOffsetMinutes,
+      sendAtTime,
+      targetTagId: typeof body.targetTagId === 'string' && body.targetTagId ? body.targetTagId : null,
+      folderId: typeof body.folderId === 'string' && body.folderId ? body.folderId : null,
+      stopConditions: {
+        bookingCancelled: stop.bookingCancelled !== false,
+        supportMarkCompleted: stop.supportMarkCompleted === true,
+        daysAfterTarget,
+        friendBlocked: stop.friendBlocked !== false,
+      },
+      steps,
+    },
+  };
+}
+
+async function validateReminderDraftReferences(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+): Promise<string | null> {
+  if (settings.targetTagId) {
+    const tag = await db.prepare(
+      `SELECT id FROM tags WHERE id = ? AND (line_account_id = ? OR line_account_id IS NULL)`,
+    ).bind(settings.targetTagId, settings.lineAccountId).first<{ id: string }>();
+    if (!tag) return '対象タグが見つかりません';
+  }
+  if (settings.triggerFieldId) {
+    const field = await db.prepare(
+      `SELECT ff.id FROM friend_fields ff
+        LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
+       WHERE ff.id = ? AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
+    ).bind(settings.triggerFieldId, settings.lineAccountId).first<{ id: string }>();
+    if (!field) return '基準日に使う友だち情報欄が見つかりません';
+  }
+  for (const step of settings.steps) {
+    if (!step.templateId) continue;
+    const template = await db.prepare(
+      `SELECT id FROM templates
+        WHERE id = ? AND (line_account_id = ? OR line_account_id IS NULL)`,
+    ).bind(step.templateId, settings.lineAccountId).first<{ id: string }>();
+    if (!template) return '通知に使うテンプレートが見つかりません';
+  }
+  return null;
+}
+
+function versionResponse(row: ReminderVersionRow) {
+  return {
+    reminderId: row.reminder_id,
+    versionId: row.id,
+    versionNumber: Number(row.version_number),
+    status: row.status,
+    settings: parseReminderVersionSettings(row),
+    lastTestStatus: row.last_test_status,
+    lastTestedAt: row.last_tested_at,
+    publishedAt: row.published_at,
+  };
+}
+
 
 // ========== リマインダCRUD ==========
 
@@ -217,6 +387,9 @@ reminders.get('/api/reminders', async (c) => {
         name: r.name,
         description: r.description,
         isActive: Boolean(r.is_active),
+        lifecycleStatus: r.lifecycle_status,
+        currentDraftVersionId: r.current_draft_version_id,
+        currentPublishedVersionId: r.current_published_version_id,
         triggerType: r.trigger_type ?? 'manual',
         deliveryMode: r.delivery_mode ?? 'countdown',
         triggerFieldId: r.trigger_field_id ?? null,
@@ -237,14 +410,38 @@ reminders.get('/api/reminders', async (c) => {
   }
 });
 
+/** V6 7-1-B: 定義と初版下書きを一度に作る。 */
+reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const parsed = readDraftSettings(await c.req.json<unknown>());
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    const folderError = await validateReminderFolder(c.env.DB, parsed.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
+    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    const created = await createReminderWithDraftVersion(c.env.DB, parsed.value);
+    return c.json({
+      success: true,
+      data: { id: created.reminder.id, ...versionResponse(created.version) },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/reminders/drafts error:', err);
+    return c.json({ success: false, error: '下書きを作成できませんでした' }, 500);
+  }
+});
+
 reminders.use('/api/reminders/:id', requireVisibleReminder);
 reminders.use('/api/reminders/:id/*', requireVisibleReminder);
 reminders.get('/api/reminders/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const [reminder, steps] = await Promise.all([
+    const [reminder, steps, publishedVersion] = await Promise.all([
       getReminderById(c.env.DB, id),
       getReminderSteps(c.env.DB, id),
+      getReminderPublishedVersion(c.env.DB, id),
     ]);
     if (!reminder) return c.json({ success: false, error: 'Reminder not found' }, 404);
     return c.json({
@@ -254,6 +451,10 @@ reminders.get('/api/reminders/:id', async (c) => {
         name: reminder.name,
         description: reminder.description,
         isActive: Boolean(reminder.is_active),
+        lifecycleStatus: reminder.lifecycle_status,
+        currentDraftVersionId: reminder.current_draft_version_id,
+        currentPublishedVersionId: reminder.current_published_version_id,
+        publishedVersion: publishedVersion ? versionResponse(publishedVersion) : null,
         triggerType: reminder.trigger_type ?? 'manual',
         deliveryMode: reminder.delivery_mode ?? 'countdown',
         triggerFieldId: reminder.trigger_field_id ?? null,
@@ -280,6 +481,127 @@ reminders.get('/api/reminders/:id', async (c) => {
   } catch (err) {
     console.error('GET /api/reminders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+reminders.get('/api/reminders/:id/draft', async (c) => {
+  try {
+    const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+    if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+    return c.json({ success: true, data: versionResponse(draft) });
+  } catch (err) {
+    console.error('GET /api/reminders/:id/draft error:', err);
+    return c.json({ success: false, error: '下書きを読み込めませんでした' }, 500);
+  }
+});
+
+reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const parsed = readDraftSettings(await c.req.json<unknown>());
+    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    const folderError = await validateReminderFolder(c.env.DB, parsed.value.folderId);
+    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
+    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    const saved = await saveReminderDraftVersion(c.env.DB, c.req.param('id'), parsed.value);
+    return c.json({ success: true, data: versionResponse(saved) });
+  } catch (err) {
+    console.error('PUT /api/reminders/:id/draft error:', err);
+    return c.json({ success: false, error: '下書きを保存できませんでした' }, 500);
+  }
+});
+
+reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+    if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+    const settings = parseReminderVersionSettings(draft);
+    const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
+    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    return c.json({ success: true, data: await validateReminderDraft(c.env.DB, settings, draft) });
+  } catch (err) {
+    console.error('POST /api/reminders/:id/validate error:', err);
+    return c.json({ success: false, error: '検証できませんでした' }, 500);
+  }
+});
+
+reminders.post('/api/reminders/:id/preview', async (c) => {
+  try {
+    const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+    if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+    const body = await c.req.json<{ targetDate?: unknown }>();
+    if (typeof body.targetDate !== 'string') {
+      return c.json({ success: false, error: '基準日を指定してください' }, 400);
+    }
+    const targetDate = new Date(body.targetDate);
+    if (Number.isNaN(targetDate.getTime())) {
+      return c.json({ success: false, error: '基準日が正しくありません' }, 400);
+    }
+    const settings = parseReminderVersionSettings(draft);
+    return c.json({ success: true, data: await previewReminderDraft(c.env.DB, settings, targetDate) });
+  } catch (err) {
+    console.error('POST /api/reminders/:id/preview error:', err);
+    return c.json({ success: false, error: '配信予定を確認できませんでした' }, 500);
+  }
+});
+
+reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), async (c) => {
+  const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+  if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+  const requestKey = c.req.header('Idempotency-Key')?.trim();
+  if (!isValidIdempotencyKey(requestKey)) {
+    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+  }
+  try {
+    const settings = parseReminderVersionSettings(draft);
+    const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
+    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    const result = await testReminderDraft(c.env.DB, draft, settings, requestKey);
+    await recordReminderDraftTest(c.env.DB, draft.id, {
+      succeeded: true,
+      staffId: c.get('staff').id,
+    });
+    return c.json({ success: true, data: result });
+  } catch (err) {
+    await recordReminderDraftTest(c.env.DB, draft.id, {
+      succeeded: false,
+      staffId: c.get('staff').id,
+    });
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'REMINDER_TEST_RECIPIENT_NOT_CONFIGURED' || code === 'REMINDER_TEST_RECIPIENT_NOT_AVAILABLE') {
+      return c.json({ success: false, error: 'テスト送信先を設定してください' }, 422);
+    }
+    if (code === 'REMINDER_TEST_STEP_NOT_FOUND') {
+      return c.json({ success: false, error: '送る内容を1件以上設定してください' }, 422);
+    }
+    if (code === 'REMINDER_TEST_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じキーが別のテスト送信に使われています' }, 409);
+    }
+    console.error('POST /api/reminders/:id/test-send error:', err);
+    return c.json({ success: false, error: 'テスト送信に失敗しました' }, 502);
+  }
+});
+
+reminders.post('/api/reminders/:id/publish', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const reminderId = c.req.param('id');
+    const draft = await getReminderDraftVersion(c.env.DB, reminderId);
+    if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+    const settings = parseReminderVersionSettings(draft);
+    const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
+    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    const validation = await validateReminderDraft(c.env.DB, settings, draft);
+    if (!validation.valid) {
+      return c.json({ success: false, error: '公開前の確認が完了していません', data: validation }, 422);
+    }
+    const published = await publishReminderDraftVersion(c.env.DB, reminderId, c.get('staff').id);
+    return c.json({ success: true, data: versionResponse(published) });
+  } catch (err) {
+    console.error('POST /api/reminders/:id/publish error:', err);
+    return c.json({ success: false, error: '公開できませんでした' }, 500);
   }
 });
 

@@ -447,7 +447,7 @@ function ModeCard({
             {heads.map(h => (
               <span
                 key={h}
-                className="bg-accent text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-bold"
+                className="bg-accent-deep text-on-accent rounded-control flex-1 px-2 py-1 text-center text-xs font-bold"
               >
                 {h}
               </span>
@@ -476,7 +476,7 @@ function ModeCard({
         type="button"
         onClick={() => onChoose(mode)}
         disabled={disabled || saving !== null}
-        className="bg-accent hover:bg-accent-hover text-on-accent rounded-control mt-auto w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+        className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control mt-auto w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
       >
         {saving === mode ? '作成中…' : `${cta} →`}
       </button>

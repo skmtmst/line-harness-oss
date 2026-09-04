@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getFormSubmissionsPage } from '../src/forms.js';
+import { getFormSubmissions, getFormSubmissionsPage } from '../src/forms.js';
 
 describe('getFormSubmissionsPage', () => {
   it('counts all rows but only returns the requested page', async () => {
@@ -30,7 +30,7 @@ describe('getFormSubmissionsPage', () => {
     expect(calls[1].sql).toContain('LIMIT ? OFFSET ?');
   });
 
-  it('caps display count at 50 and never accepts a page below 1', async () => {
+  it('caps display count at 200 and never accepts a page below 1', async () => {
     const bindings: unknown[][] = [];
     const db = {
       prepare: vi.fn((sql: string) => ({
@@ -44,7 +44,23 @@ describe('getFormSubmissionsPage', () => {
     } as unknown as D1Database;
 
     const result = await getFormSubmissionsPage(db, 'form-1', { page: -5, limit: 500 });
-    expect(result).toMatchObject({ total: 0, page: 1, limit: 50 });
-    expect(bindings[1]).toEqual(['form-1', 50, 0]);
+    expect(result).toMatchObject({ total: 0, page: 1, limit: 200 });
+    expect(bindings[1]).toEqual(['form-1', 200, 0]);
+  });
+
+  it('keeps the compatibility array query capped at 200', async () => {
+    const calls: Array<{ sql: string; bindings: unknown[] }> = [];
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: (...bindings: unknown[]) => {
+          calls.push({ sql, bindings });
+          return { all: vi.fn(async () => ({ results: [] })) };
+        },
+      })),
+    } as unknown as D1Database;
+
+    await getFormSubmissions(db, 'form-1');
+    expect(calls[0].sql).toContain('LIMIT ?');
+    expect(calls[0].bindings).toEqual(['form-1', 200]);
   });
 });

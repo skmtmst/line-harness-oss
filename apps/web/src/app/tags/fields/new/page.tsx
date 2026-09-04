@@ -117,7 +117,7 @@ function NewFriendFieldForm() {
         </div>
       </div>
 
-      <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Link href={back ?? '/tags?tab=fields'} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink">キャンセル</Link><button type="button" disabled={saving} onClick={() => void save()} className="rounded-control bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-40">{saving ? '作成中…' : '項目を作成'}</button></>} />
+      <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Link href={back ?? '/tags?tab=fields'} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink">キャンセル</Link><button type="button" disabled={saving} onClick={() => void save()} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-40">{saving ? '作成中…' : '項目を作成'}</button></>} />
     </div>
   )
 }

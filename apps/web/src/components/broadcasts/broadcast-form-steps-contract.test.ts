@@ -99,6 +99,26 @@ describe('配信名の字数（設計 zZ9fA）', () => {
   })
 })
 
+describe('本文の節の番号', () => {
+  /**
+   * **本文の番号が、画面に並ぶ順と合っていること。**
+   *
+   * 以前は 1・3・2 と振ってあり、画面には「1. 送る相手 → 3. 送る内容 →
+   * 2. 送る時間」の順に出ていた。**番号が飛んで見えるので、間の節を
+   * 見落としたと読まれる。** 設計 `zZ9fA` の段は
+   * 基本設定 → 対象者 → メッセージ → 送信設定 → 確認 の5つ。
+   */
+  it('番号は、画面に並ぶ順と同じ', () => {
+    const headings = [...FORM.matchAll(/font-bold[^>]*>(\d)\.\s*([^<]+)</g)].map((m) => [Number(m[1]), m[2].trim()] as const)
+    expect(headings.length, '番号つきの節が見つからない').toBeGreaterThanOrEqual(3)
+    // 出てくる順に、番号が増えていく
+    const numbers = headings.map(([n]) => n)
+    expect(numbers, `番号が並び順と合っていない: ${JSON.stringify(headings)}`).toEqual([...numbers].sort((a, b) => a - b))
+    // 上の段（STEP 1〜5）と同じ番号を使う。基本設定が 1、確認が 5。
+    expect(headings).toEqual([[2, '送る相手'], [3, '送る内容'], [4, '送る時間']])
+  })
+})
+
 describe('予約の注意書き（設計 Bw0zt）', () => {
   /**
    * 予約は条件を保存するだけで、宛先は予約の時刻に決まる。

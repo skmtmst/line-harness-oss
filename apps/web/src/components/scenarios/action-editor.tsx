@@ -309,7 +309,7 @@ export default function ActionEditor({
                         <div className={`${styles.actionRow} border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5`}>
                           <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
                             {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
-                            <span className={`${styles.orderMark} bg-accent text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
+                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
                               {index + 1}
                             </span>
                             <span>{KIND_LABEL[action.actionType]}</span>
@@ -457,7 +457,7 @@ export function ActionConfigEditor({
                     })
                   }
                   className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
+                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
                   }`}
                 >
                   {tag.name}

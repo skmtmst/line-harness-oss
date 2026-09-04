@@ -13,6 +13,7 @@ import {
   incrementAffiliateLinkClick,
   enqueueFollowingMileageMilestones,
   processPendingMileageEvents,
+  processActionScoreInactivity,
 } from '@line-crm/db';
 import { processStepDeliveries } from './services/step-delivery.js';
 import { processScheduledBroadcasts, processQueuedBroadcasts } from './services/broadcast.js';
@@ -29,7 +30,12 @@ import { processDueMeetConsultationReminders } from './services/meet-consultatio
 import { processDueAutomationRuns } from './services/automation-engine.js';
 import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
-import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
+import {
+  processOverdueSupportMarkTriggers,
+  processScheduledAutomationTriggers,
+} from './services/automation-triggers.js';
+import { dispatchActionScoreApplications } from './services/action-score-events.js';
+import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -63,6 +69,7 @@ import { calendar } from './routes/calendar.js';
 import { meetConsultations } from './routes/meet-consultations.js';
 import { reminders } from './routes/reminders.js';
 import { scoring } from './routes/scoring.js';
+import { actionScoreRules } from './routes/action-score-rules.js';
 import { templates } from './routes/templates.js';
 import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
@@ -123,6 +130,11 @@ import { operations } from './routes/operations.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
+import {
+  runIsolatedScheduledJobs,
+  scheduledLane,
+  type ScheduledJob,
+} from './services/scheduled-job-isolation.js';
 import {
   classifyCodexMonitorError,
   createCodexQueueFailureLog,
@@ -322,6 +334,7 @@ app.route('/', calendar);
 app.route('/', meetConsultations);
 app.route('/', reminders);
 app.route('/', scoring);
+app.route('/', actionScoreRules);
 app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
@@ -1088,22 +1101,275 @@ app.onError((error, c) => {
 
 app.notFound(notFoundHandler);
 
+async function runFrequentHeavyJobs(
+  event: ScheduledEvent,
+  env: Env['Bindings'],
+): Promise<void> {
+  const dbAccounts = await getLineAccounts(env.DB);
+  const lineClients = new Map<string, LineClient>();
+  for (const account of dbAccounts) {
+    if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
+  }
+  const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
+  const jobs: ScheduledJob[] = [
+    {
+      name: 'friend bulk runs',
+      run: async () => {
+        const result = await processDueFriendBulkRuns(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+        });
+        if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
+      },
+    },
+    {
+      name: 'mileage reward delivery retry',
+      run: async () => {
+        const result = await processDueMileageRewardDeliveries(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+          limit: 50,
+        });
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'mileage_reward_delivery_retry', ...result }));
+        }
+      },
+    },
+    {
+      name: 'analytics cross',
+      run: async () => {
+        const {
+          processPendingAnalyticsCrossRuns,
+          recoverStalledAnalyticsCrossRuns,
+        } = await import('@line-crm/db');
+        const recovered = await recoverStalledAnalyticsCrossRuns(
+          env.DB,
+          new Date(event.scheduledTime),
+        );
+        const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
+        if (recovered + result.processed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'analytics_cross_tick', recovered, ...result }));
+        }
+      },
+    },
+    {
+      name: 'mileage projection',
+      run: async () => {
+        const result = await processPendingMileageEvents(env.DB, { limit: 100 });
+        if (result.claimed > 0) {
+          console.log(
+            `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
+          );
+        }
+      },
+    },
+    {
+      name: 'analytics url exposure projection',
+      run: async () => {
+        const { processPendingAnalyticsUrlExposures } = await import('@line-crm/db');
+        const result = await processPendingAnalyticsUrlExposures(env.DB, {
+          limit: 100,
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.claimed > 0) {
+          console.log(JSON.stringify({ event: 'analytics_url_exposure_queue', ...result }));
+        }
+      },
+    },
+    {
+      name: 'analytics projection',
+      run: async () => {
+        const { refreshRecentAnalyticsProjections } = await import('./services/analytics-projection.js');
+        const result = await refreshRecentAnalyticsProjections(
+          env.DB,
+          dbAccounts,
+          new Date(event.scheduledTime),
+        );
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'analytics_projection_tick', ...result }));
+        }
+      },
+    },
+    { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
+    {
+      name: 'broadcast insights',
+      run: async () => { await processInsightFetch(env.DB, lineClients, defaultLineClient); },
+    },
+    {
+      name: 'NEN rich menu jobs',
+      run: async () => {
+        const { processPendingNenRichMenuJobs } = await import('./services/nen-rich-menu.js');
+        const result = await processPendingNenRichMenuJobs(env);
+        if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
+      },
+    },
+  ];
+
+  if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
+    jobs.push({
+      name: 'support email sync',
+      run: async () => {
+        const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
+        const result = await syncXServerSupportMailbox(env);
+        if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
+      },
+    });
+  }
+
+  const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
+
+  // 日本時間の各時01分に、友だち情報欄の日付から当日分のリマインダを立てる。
+  if (jstMinutes === 1) {
+    jobs.push({
+      name: 'friend field reminders',
+      run: async () => {
+        const result = await processFriendFieldReminders(env.DB);
+        if (result.enrolled > 0 || result.hasMore) {
+          console.log(
+            `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped} scanned=${result.scanned} has_more=${result.hasMore}`,
+          );
+        }
+      },
+    });
+  }
+
+  // 通知cronから外した重い処理側で、各時11分に無反応スコアを再評価する。
+  if (jstMinutes === 11) {
+    jobs.push({
+      name: 'action score inactivity',
+      run: async () => {
+        const result = await processActionScoreInactivity(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          limit: 200,
+        });
+        for (const transition of result.transitions) {
+          const account = dbAccounts.find((item) => item.id === transition.lineAccountId);
+          await dispatchActionScoreApplications(env.DB, {
+            ...transition,
+            lineAccessToken: account?.channel_access_token,
+          });
+        }
+        if (result.candidates > 0) {
+          console.log(JSON.stringify({
+            event: 'action_score_inactivity_tick',
+            candidates: result.candidates,
+            applied: result.applied,
+          }));
+        }
+      },
+    });
+  }
+
+  await runIsolatedScheduledJobs(jobs);
+}
+
+async function runSixHourlyHeavyJobs(
+  event: ScheduledEvent,
+  env: Env['Bindings'],
+): Promise<void> {
+  const jobs: ScheduledJob[] = [
+    {
+      name: 'NEN tag refresh',
+      run: async () => {
+        const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
+        const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
+        if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
+      },
+    },
+    {
+      name: 'analytics retention purge',
+      run: async () => {
+        const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
+        const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
+        if (
+          purged.events + purged.dailyMetrics + purged.reconciliationRuns
+          + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
+        ) {
+          console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
+        }
+      },
+    },
+    {
+      name: 'friend snapshot',
+      run: async () => {
+        const { recordFriendSnapshot } = await import('@line-crm/db');
+        await recordFriendSnapshot(env.DB, null);
+      },
+    },
+    {
+      name: 'media usage scan',
+      run: async () => {
+        const { scanMediaUsage } = await import('./services/media-usage-scan.js');
+        const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+        const result = await scanMediaUsage(env.DB, scanStartedAt);
+        if (result.matched > 0 || result.pruned > 0) {
+          console.log(JSON.stringify({ event: 'media_usage_scan', ...result }));
+        }
+      },
+    },
+    {
+      name: 'following mileage',
+      run: async () => {
+        const result = await enqueueFollowingMileageMilestones(env.DB, { limitPerMilestone: 1000 });
+        if (result.eventsCreated + result.queued > 0) {
+          console.log(`[following-mileage] events=${result.eventsCreated} queued=${result.queued}`);
+        }
+      },
+    },
+    {
+      name: 'booking expirer',
+      run: async () => {
+        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification });
+        console.log(
+          `[booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
+        );
+      },
+    },
+    {
+      name: 'event booking expirer',
+      run: async () => {
+        const result = await runEventBookingExpirer(env.DB, { now: new Date() });
+        console.log(
+          `[event-booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
+        );
+      },
+    },
+  ];
+
+  if (restaurantTestEnabled(env)) {
+    jobs.push({
+      name: 'restaurant raw mail retention',
+      run: async () => {
+        const result = await deleteExpiredRestaurantRawEmails(env);
+        if (result.deleted + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
+        }
+      },
+    });
+  }
+
+  await runIsolatedScheduledJobs(jobs);
+}
+
 // Scheduled handler for cron triggers — runs for all active LINE accounts
 async function scheduled(
   event: ScheduledEvent,
   env: Env['Bindings'],
   ctx: ExecutionContext,
 ): Promise<void> {
-  // Get all active accounts from DB
-  const dbAccounts = await getLineAccounts(env.DB);
-
-  // Build LineClient map for insight fetching (keyed by account id)
-  const lineClients = new Map<string, LineClient>();
-  for (const account of dbAccounts) {
-    if (account.is_active) {
-      lineClients.set(account.id, new LineClient(account.channel_access_token));
-    }
+  // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
+  // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
+  const lane = scheduledLane(event.cron);
+  if (lane === 'frequentHeavy') {
+    await runFrequentHeavyJobs(event, env);
+    return;
   }
+  if (lane === 'sixHourlyHeavy') {
+    await runSixHourlyHeavyJobs(event, env);
+    return;
+  }
+  if (lane !== 'delivery') return;
+
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
 
   // 配信系は1回だけ実行（内部でfriendのline_account_idから正しいlineClientを動的解決）
@@ -1142,7 +1408,10 @@ async function scheduled(
     const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
       now, executors, limit: 100,
     });
-    for (const result of scheduledResult.results) {
+    const overdueResults = await processOverdueSupportMarkTriggers(env.DB, {
+      now, executors, limit: 100,
+    });
+    for (const result of [...scheduledResult.results, ...overdueResults]) {
       if (result.kind === 'configuration_error') {
         console.error(JSON.stringify({
           event: 'automation_v6_scheduled_trigger_failed',
@@ -1154,38 +1423,16 @@ async function scheduled(
     const dueResult = await processDueAutomationRuns(env.DB, {
       now, executors, limit: 100,
     });
-    if (scheduledResult.results.length + dueResult.processed > 0) {
+    if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
       console.log(JSON.stringify({
         event: 'automation_v6_cron',
         scheduled: scheduledResult.results.length,
+        support_mark_overdue: overdueResults.length,
         resumed: dueResult.processed,
       }));
     }
   } catch (e) {
     console.error('automation-v6 cron error:', e);
-  }
-
-  // 友だち一括操作は対象IDを固定したサーバ側ジョブ。待機中の共通アクションと、
-  // Worker終了でleaseが切れた対象だけを再開する。失敗分は利用者が再試行するまで触らない。
-  try {
-    const result = await processDueFriendBulkRuns(env.DB, {
-      now: new Date(event.scheduledTime).toISOString(),
-      executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
-    });
-    if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
-  } catch (e) {
-    console.error('friend bulk runs cron error:', e);
-  }
-
-  // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
-  if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
-    try {
-      const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
-      const result = await syncXServerSupportMailbox(env);
-      if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
-    } catch (e) {
-      console.error('support email sync error:', e);
-    }
   }
 
   try {
@@ -1251,6 +1498,25 @@ async function scheduled(
     console.error('webinar-reminders error:', e);
   }
 
+  // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
+  // 同じ申込へ二重送信しない。
+  try {
+    const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
+    const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
+    const result = await processWebinarNotificationJobs(env.DB, {
+      proxyBaseUrl:
+        env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      defaultLiffId: liffMatch?.[1] ?? null,
+      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+    if (result.sent + result.failed + result.skipped > 0) {
+      console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
+    }
+  } catch (e) {
+    console.error('webinar-notifications error:', e);
+  }
+
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
   try {
     const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
@@ -1273,104 +1539,6 @@ async function scheduled(
     console.error('nen-campaign delivery error:', e);
   }
 
-  // 誕生日月・最終購入日・次回発送日など、時間経過だけで条件が変わるタグを6時間ごとに再判定する。
-  // 登録・購入・健康記録・写真審査時は各APIが即時同期するため、ここでは日付条件の補正を担う。
-  if (event.cron === '0 */6 * * *') {
-    try {
-      const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
-      const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
-      if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
-    } catch (e) {
-      console.error('nen-tag refresh error:', e);
-    }
-  }
-
-  // 人を特定できる分析イベントと保存照合は13か月、日別集計は25か月。
-  // 業務の正本は触らず、分析用の読取データだけを期限で削除する。
-  if (event.cron === '0 */6 * * *') {
-    try {
-      const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
-      const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
-      if (
-        purged.events + purged.dailyMetrics + purged.reconciliationRuns
-        + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
-      ) {
-        console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
-      }
-    } catch (e) {
-      console.error('analytics retention purge error:', e);
-    }
-  }
-
-  // クロス分析は最大50×20・15条件を扱うため、HTTP要求の中では計算しない。
-  // 5分ごとに1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
-  if (event.cron === '*/5 * * * *') {
-    try {
-      const {
-        processPendingAnalyticsCrossRuns,
-        recoverStalledAnalyticsCrossRuns,
-      } = await import('@line-crm/db');
-      const recovered = await recoverStalledAnalyticsCrossRuns(
-        env.DB,
-        new Date(event.scheduledTime),
-      );
-      const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
-      if (recovered + result.processed + result.failed > 0) {
-        console.log(JSON.stringify({ event: 'analytics_cross_tick', recovered, ...result }));
-      }
-    } catch (e) {
-      console.error('analytics cross cron error:', e);
-    }
-  }
-
-  // 飲食店向け予約メールの原文は、既定90日で非公開R2から破棄する。
-  // D1の台帳行は残し、r2_keyとstatusで破棄済みを追跡する。
-  if (event.cron === '0 */6 * * *' && restaurantTestEnabled(env)) {
-    try {
-      const result = await deleteExpiredRestaurantRawEmails(env);
-      if (result.deleted + result.failed > 0) {
-        console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
-      }
-    } catch (e) {
-      console.error('restaurant raw mail retention error:', e);
-    }
-  }
-
-  // 友だち数を日次で記録する。
-  //
-  // 6時間ごとにLINEアカウント別（未割り当てを含む）の同じ日を
-  // 上書きするので、その日の最後の値が残る。
-  // ダッシュボードの「友だち数の推移」がこれを読む。
-  //
-  // 記録が無い日はいまの友だちからの逆算で埋まるが、退会して行ごと
-  // 消えた友だちは数に出ないので実態とずれる。今日から正しく残す。
-  if (event.cron === '0 */6 * * *') {
-    try {
-      const { recordFriendSnapshot } = await import('@line-crm/db');
-      await recordFriendSnapshot(env.DB, null);
-    } catch (e) {
-      // 記録が1周飛んでも、その日は逆算で埋まる。配信を止める理由にはならない。
-      console.error('friend snapshot error:', e);
-    }
-  }
-
-  // メディアの使用箇所を数え直す。
-  //
-  // 6時間ごと。削除前の警告に使うだけなので、常に最新である必要はない。
-  // 毎分走らせると、本文の LIKE 検索がメディアの数だけ走って重い。
-  if (event.cron === '0 */6 * * *') {
-    try {
-      const { scanMediaUsage } = await import('./services/media-usage-scan.js');
-      const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
-      const result = await scanMediaUsage(env.DB, scanStartedAt);
-      if (result.matched > 0 || result.pruned > 0) {
-        console.log(JSON.stringify({ event: 'media_usage_scan', ...result }));
-      }
-    } catch (e) {
-      console.error('media usage scan error:', e);
-    }
-  }
-
   // 共通情報の日付での切り替え。
   //
   // applied_at が NULL で、予約した日時を過ぎたものだけを反映する。
@@ -1384,15 +1552,6 @@ async function scheduled(
     if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
   } catch (e) {
     console.error('common-var schedule error:', e);
-  }
-
-  // 管理画面ログインに依存せず、DBに登録された一度限りの設置ジョブを安全に実行する。
-  try {
-    const { processPendingNenRichMenuJobs } = await import('./services/nen-rich-menu.js');
-    const result = await processPendingNenRichMenuJobs(env);
-    if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
-  } catch (e) {
-    console.error('nen-rich-menu job error:', e);
   }
 
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
@@ -1426,120 +1585,8 @@ async function scheduled(
     processReminderDeliveries(env.DB, defaultLineClient),
   );
   jobs.push(processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL));
-  jobs.push(checkAccountHealth(env.DB));
-
-  /*
-   * 友だち情報欄の日付から、リマインダのゴール日を立てる（154）。
-   *
-   * 1日1回でよい。日本時間の 0:05 に動かす。日付が変わった直後に、その日から
-   * 先のぶんを立てる。**送るのはここではない。** リマインダ配信が、立った
-   * ゴール日から逆算して送る。分けているのは、「3日前に送る」通を届けるには
-   * ゴール日がその3日以上前に立っている必要があるため。
-   *
-   * 5分ごとの cron に相乗りしている。専用の Cron Trigger を増やさずに済む
-   * （マイルの処理と同じやり方）。
-   */
-  if (event.cron === '*/5 * * * *') {
-    const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
-    if (jstMinutes === 5) {
-      jobs.push(
-        processFriendFieldReminders(env.DB).then((result) => {
-          if (result.enrolled > 0) {
-            console.log(
-              `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
-            );
-          }
-        }),
-      );
-    }
-  }
-
-  // Mileage is an eventually-consistent projection. Reuse the existing
-  // five-minute cron invocation and drain at most 100
-  // actions per batch so it adds no extra Cron Trigger and keeps D1 load flat.
-  if (event.cron === '*/5 * * * *') {
-    jobs.push(
-      processPendingMileageEvents(env.DB, { limit: 100 }).then((result) => {
-        if (result.claimed > 0) {
-          console.log(
-            `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
-          );
-        }
-      }),
-    );
-    jobs.push(
-      import('@line-crm/db').then(async ({ processPendingAnalyticsUrlExposures }) => {
-        const result = await processPendingAnalyticsUrlExposures(env.DB, {
-          limit: 100,
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_url_exposure_queue', ...result }));
-        }
-      }),
-    );
-    jobs.push(
-      import('./services/analytics-projection.js').then(async ({ refreshRecentAnalyticsProjections }) => {
-        const result = await refreshRecentAnalyticsProjections(
-          env.DB,
-          dbAccounts,
-          new Date(event.scheduledTime),
-        );
-        if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_projection_tick', ...result }));
-        }
-      }),
-    );
-  }
 
   await Promise.allSettled(jobs);
-
-  // Fetch broadcast insights (runs daily, self-throttled)
-  try {
-    await processInsightFetch(env.DB, lineClients, defaultLineClient);
-  } catch (e) {
-    console.error('Insight fetch error:', e);
-  }
-
-  // Booking expirer — runs only on the 6h cron tick.
-  if (event.cron === '0 */6 * * *') {
-    try {
-      const result = await enqueueFollowingMileageMilestones(env.DB, {
-        limitPerMilestone: 1000,
-      });
-      if (result.eventsCreated + result.queued > 0) {
-        console.log(
-          `[following-mileage] events=${result.eventsCreated} queued=${result.queued}`,
-        );
-      }
-    } catch (e) {
-      console.error('following-mileage error:', e);
-    }
-
-    try {
-      const result = await runExpirer(env.DB, {
-        now: new Date(),
-        sender: sendBookingNotification,
-      });
-      console.log(
-        `[booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
-      );
-    } catch (e) {
-      console.error('booking-expirer error:', e);
-    }
-  }
-
-  // Event-booking expirer — 6h cron tick.
-  if (event.cron === '0 */6 * * *') {
-    try {
-      const result = await runEventBookingExpirer(env.DB, { now: new Date() });
-      console.log(
-        `[event-booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
-      );
-    } catch (e) {
-      console.error('event-booking-expirer error:', e);
-    }
-  }
 
   // Cross-account duplicate detection — disabled.
   // The cron used to materialize duplicates into the tag system but the 1k-subrequest

@@ -22,7 +22,41 @@ export interface AutoReplyVersionRow {
   status: 'draft' | 'published' | 'retired';
   published_at: string | null;
   published_by_staff_id: string | null;
+  last_test_status: 'succeeded' | 'failed' | null;
+  last_tested_at: string | null;
+  last_tested_by_staff_id: string | null;
+  publish_idempotency_key: string | null;
   created_at: string;
+  updated_at: string | null;
+}
+
+/**
+ * 編集中の定義。JSON文字列の列は解釈せず、そのまま版へ固定する。
+ * 公開時にだけ auto_replies の実行中定義へ反映する。
+ */
+export interface AutoReplyDraftSettings {
+  keyword: string;
+  matchType: 'exact' | 'contains';
+  responseType: string;
+  responseContent: string;
+  templateId: string | null;
+  lineAccountId: string | null;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  cooldownMinutes: number | null;
+  skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string | null;
+  friendConditions: string | null;
+  actions: string | null;
+  responseWeekdays: string | null;
+  responseHolidayRule: string | null;
+  oncePerFriend: boolean;
+  keywords: string | null;
+  respondToAll: boolean;
+  name: string | null;
+  keywordMatchMode: string;
+  folderId: string | null;
 }
 
 export interface AutoReplyEvaluationRow {
@@ -55,8 +89,8 @@ export interface AutoReplyEvaluationRow {
  * 版の比較に使う定義。画面の表示名も含め、実行時の意味が変わる項目だけを固定する。
  * プロパティ順は変えない。JSON文字列を版の同一判定に使うため。
  */
-export function autoReplyDefinitionSnapshot(rule: AutoReply): string {
-  return JSON.stringify({
+export function autoReplyDraftSettingsFromRow(rule: AutoReply): AutoReplyDraftSettings {
+  return {
     keyword: rule.keyword,
     matchType: rule.match_type,
     responseType: rule.response_type,
@@ -78,7 +112,319 @@ export function autoReplyDefinitionSnapshot(rule: AutoReply): string {
     respondToAll: rule.respond_to_all === 1,
     name: rule.name,
     keywordMatchMode: rule.keyword_match_mode,
-  });
+    folderId: rule.folder_id,
+  };
+}
+
+export function autoReplyDefinitionSnapshot(rule: AutoReply): string {
+  return JSON.stringify(autoReplyDraftSettingsFromRow(rule));
+}
+
+export function parseAutoReplyVersionSettings(row: AutoReplyVersionRow): AutoReplyDraftSettings {
+  const parsed = JSON.parse(row.definition_snapshot) as Partial<AutoReplyDraftSettings>;
+  return {
+    keyword: parsed.keyword ?? '',
+    matchType: parsed.matchType === 'contains' ? 'contains' : 'exact',
+    responseType: parsed.responseType ?? 'text',
+    responseContent: parsed.responseContent ?? '',
+    templateId: parsed.templateId ?? null,
+    lineAccountId: parsed.lineAccountId ?? row.line_account_id ?? null,
+    activeFrom: parsed.activeFrom ?? null,
+    activeUntil: parsed.activeUntil ?? null,
+    cooldownMinutes: parsed.cooldownMinutes ?? null,
+    skipWhenOperatorActive: parsed.skipWhenOperatorActive === true,
+    priority: Number.isInteger(parsed.priority) ? Number(parsed.priority) : 0,
+    messageKinds: parsed.messageKinds ?? null,
+    friendConditions: parsed.friendConditions ?? null,
+    actions: parsed.actions ?? null,
+    responseWeekdays: parsed.responseWeekdays ?? null,
+    responseHolidayRule: parsed.responseHolidayRule ?? null,
+    oncePerFriend: parsed.oncePerFriend === true,
+    keywords: parsed.keywords ?? null,
+    respondToAll: parsed.respondToAll === true,
+    name: parsed.name ?? null,
+    keywordMatchMode: parsed.keywordMatchMode === 'all' ? 'all' : 'any',
+    folderId: parsed.folderId ?? null,
+  };
+}
+
+export function autoReplyRowFromDraftSettings(
+  id: string,
+  settings: AutoReplyDraftSettings,
+  createdAt = jstNow(),
+): AutoReply {
+  return {
+    id,
+    keyword: settings.keyword,
+    match_type: settings.matchType,
+    response_type: settings.responseType,
+    response_content: settings.responseContent,
+    template_id: settings.templateId,
+    line_account_id: settings.lineAccountId,
+    is_active: 0,
+    active_from: settings.activeFrom,
+    active_until: settings.activeUntil,
+    cooldown_minutes: settings.cooldownMinutes,
+    skip_when_operator_active: settings.skipWhenOperatorActive ? 1 : 0,
+    priority: settings.priority,
+    message_kinds_json: settings.messageKinds,
+    friend_conditions_json: settings.friendConditions,
+    folder_id: settings.folderId,
+    display_order: 0,
+    actions_json: settings.actions,
+    response_weekdays_json: settings.responseWeekdays,
+    response_holiday_rule: settings.responseHolidayRule,
+    once_per_friend: settings.oncePerFriend ? 1 : 0,
+    keywords_json: settings.keywords,
+    respond_to_all: settings.respondToAll ? 1 : 0,
+    name: settings.name,
+    keyword_match_mode: settings.keywordMatchMode,
+    created_at: createdAt,
+  };
+}
+
+export async function getAutoReplyVersionById(
+  db: D1Database,
+  versionId: string,
+): Promise<AutoReplyVersionRow | null> {
+  return db.prepare(`SELECT * FROM auto_reply_versions WHERE id = ?`)
+    .bind(versionId)
+    .first<AutoReplyVersionRow>();
+}
+
+export async function getAutoReplyDraftVersion(
+  db: D1Database,
+  autoReplyId: string,
+): Promise<AutoReplyVersionRow | null> {
+  return db.prepare(
+    `SELECT arv.*
+       FROM auto_replies ar
+       JOIN auto_reply_versions arv ON arv.id = ar.current_draft_version_id
+      WHERE ar.id = ? AND arv.status = 'draft'`,
+  ).bind(autoReplyId).first<AutoReplyVersionRow>();
+}
+
+export async function getAutoReplyPublishedVersion(
+  db: D1Database,
+  autoReplyId: string,
+): Promise<AutoReplyVersionRow | null> {
+  return db.prepare(
+    `SELECT arv.*
+       FROM auto_replies ar
+       JOIN auto_reply_versions arv ON arv.id = ar.current_published_version_id
+      WHERE ar.id = ? AND arv.status = 'published'`,
+  ).bind(autoReplyId).first<AutoReplyVersionRow>();
+}
+
+/** 新規定義と下書き版を1回のbatchで作る。作成時点では評価対象にしない。 */
+export async function createAutoReplyWithDraftVersion(
+  db: D1Database,
+  settings: AutoReplyDraftSettings,
+): Promise<{ rule: AutoReply; version: AutoReplyVersionRow }> {
+  const autoReplyId = crypto.randomUUID();
+  const versionId = crypto.randomUUID();
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
+      `INSERT INTO auto_replies
+         (id, keyword, match_type, response_type, response_content,
+          template_id, line_account_id, is_active, active_from, active_until,
+          cooldown_minutes, skip_when_operator_active, priority, message_kinds_json,
+          friend_conditions_json, folder_id, actions_json, response_weekdays_json,
+          response_holiday_rule, once_per_friend, keywords_json, respond_to_all,
+          name, keyword_match_mode, lifecycle_status, current_draft_version_id,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+               'draft', ?, ?)`,
+    ).bind(
+      autoReplyId,
+      settings.keyword,
+      settings.matchType,
+      settings.responseType,
+      settings.responseContent,
+      settings.templateId,
+      settings.lineAccountId,
+      settings.activeFrom,
+      settings.activeUntil,
+      settings.cooldownMinutes,
+      settings.skipWhenOperatorActive ? 1 : 0,
+      settings.priority,
+      settings.messageKinds,
+      settings.friendConditions,
+      settings.folderId,
+      settings.actions,
+      settings.responseWeekdays,
+      settings.responseHolidayRule,
+      settings.oncePerFriend ? 1 : 0,
+      settings.keywords,
+      settings.respondToAll ? 1 : 0,
+      settings.name,
+      settings.keywordMatchMode,
+      versionId,
+      now,
+    ),
+    db.prepare(
+      `INSERT INTO auto_reply_versions
+         (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
+          status, created_at, updated_at)
+       VALUES (?, ?, 1, ?, ?, 'draft', ?, ?)`,
+    ).bind(
+      versionId,
+      autoReplyId,
+      settings.lineAccountId,
+      JSON.stringify(settings),
+      now,
+      now,
+    ),
+  ]);
+  const [rule, version] = await Promise.all([
+    db.prepare(`SELECT * FROM auto_replies WHERE id = ?`).bind(autoReplyId).first<AutoReply>(),
+    getAutoReplyVersionById(db, versionId),
+  ]);
+  if (!rule || !version) throw new Error('AUTO_REPLY_DRAFT_NOT_CREATED');
+  return { rule, version };
+}
+
+/** 公開中の定義は触らず、編集用の版だけを作る／更新する。 */
+export async function saveAutoReplyDraftVersion(
+  db: D1Database,
+  autoReplyId: string,
+  settings: AutoReplyDraftSettings,
+): Promise<AutoReplyVersionRow> {
+  const rule = await db.prepare(`SELECT * FROM auto_replies WHERE id = ?`)
+    .bind(autoReplyId)
+    .first<AutoReply>();
+  if (!rule) throw new Error('AUTO_REPLY_NOT_FOUND');
+  const now = jstNow();
+  let draft = await getAutoReplyDraftVersion(db, autoReplyId);
+  if (!draft) {
+    const next = await db.prepare(
+      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+         FROM auto_reply_versions WHERE auto_reply_id = ?`,
+    ).bind(autoReplyId).first<{ version_number: number }>();
+    const versionId = crypto.randomUUID();
+    await db.batch([
+      db.prepare(
+        `INSERT INTO auto_reply_versions
+           (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
+            status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)`,
+      ).bind(
+        versionId,
+        autoReplyId,
+        Number(next?.version_number ?? 1),
+        settings.lineAccountId,
+        JSON.stringify(settings),
+        now,
+        now,
+      ),
+      db.prepare(
+        `UPDATE auto_replies
+            SET current_draft_version_id = ?
+          WHERE id = ?`,
+      ).bind(versionId, autoReplyId),
+    ]);
+    draft = await getAutoReplyVersionById(db, versionId);
+  } else {
+    await db.prepare(
+      `UPDATE auto_reply_versions
+          SET line_account_id = ?, definition_snapshot = ?,
+              last_test_status = NULL, last_tested_at = NULL,
+              last_tested_by_staff_id = NULL, updated_at = ?
+        WHERE id = ? AND status = 'draft'`,
+    ).bind(settings.lineAccountId, JSON.stringify(settings), now, draft.id).run();
+  }
+  if (!draft) throw new Error('AUTO_REPLY_DRAFT_NOT_SAVED');
+  return (await getAutoReplyVersionById(db, draft.id))!;
+}
+
+export async function recordAutoReplyDraftTest(
+  db: D1Database,
+  versionId: string,
+  input: { succeeded: boolean; staffId: string | null },
+): Promise<void> {
+  const now = jstNow();
+  await db.prepare(
+    `UPDATE auto_reply_versions
+        SET last_test_status = ?, last_tested_at = ?, last_tested_by_staff_id = ?, updated_at = ?
+      WHERE id = ? AND status = 'draft'`,
+  ).bind(input.succeeded ? 'succeeded' : 'failed', now, input.staffId, now, versionId).run();
+}
+
+/** 下書きを公開版へ進め、実行中の定義を同じbatchで差し替える。 */
+export async function publishAutoReplyDraftVersion(
+  db: D1Database,
+  autoReplyId: string,
+  input: { staffId: string | null; idempotencyKey: string },
+): Promise<AutoReplyVersionRow> {
+  const replay = await db.prepare(
+    `SELECT * FROM auto_reply_versions WHERE publish_idempotency_key = ?`,
+  ).bind(input.idempotencyKey).first<AutoReplyVersionRow>();
+  if (replay) {
+    if (replay.auto_reply_id !== autoReplyId) throw new Error('AUTO_REPLY_PUBLISH_KEY_CONFLICT');
+    return replay;
+  }
+  const draft = await getAutoReplyDraftVersion(db, autoReplyId);
+  if (!draft) throw new Error('AUTO_REPLY_DRAFT_NOT_FOUND');
+  if (draft.last_test_status !== 'succeeded') throw new Error('AUTO_REPLY_DRAFT_NOT_TESTED');
+  const settings = parseAutoReplyVersionSettings(draft);
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
+      `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
+        WHERE auto_reply_id = ? AND status = 'published'`,
+    ).bind(now, autoReplyId),
+    db.prepare(
+      `UPDATE auto_reply_versions
+          SET status = 'published', published_at = ?, published_by_staff_id = ?,
+              publish_idempotency_key = ?, updated_at = ?
+        WHERE id = ? AND status = 'draft'`,
+    ).bind(now, input.staffId, input.idempotencyKey, now, draft.id),
+    db.prepare(
+      `UPDATE auto_replies
+          SET keyword = ?, match_type = ?, response_type = ?, response_content = ?,
+              template_id = ?, line_account_id = ?, is_active = 1,
+              active_from = ?, active_until = ?, cooldown_minutes = ?,
+              skip_when_operator_active = ?, priority = ?, message_kinds_json = ?,
+              friend_conditions_json = ?, folder_id = ?, actions_json = ?,
+              response_weekdays_json = ?, response_holiday_rule = ?, once_per_friend = ?,
+              keywords_json = ?, respond_to_all = ?, name = ?, keyword_match_mode = ?,
+              lifecycle_status = 'published', current_published_version_id = ?,
+              current_draft_version_id = NULL
+        WHERE id = ?`,
+    ).bind(
+      settings.keyword,
+      settings.matchType,
+      settings.responseType,
+      settings.responseContent,
+      settings.templateId,
+      settings.lineAccountId,
+      settings.activeFrom,
+      settings.activeUntil,
+      settings.cooldownMinutes,
+      settings.skipWhenOperatorActive ? 1 : 0,
+      settings.priority,
+      settings.messageKinds,
+      settings.friendConditions,
+      settings.folderId,
+      settings.actions,
+      settings.responseWeekdays,
+      settings.responseHolidayRule,
+      settings.oncePerFriend ? 1 : 0,
+      settings.keywords,
+      settings.respondToAll ? 1 : 0,
+      settings.name,
+      settings.keywordMatchMode,
+      draft.id,
+      autoReplyId,
+    ),
+  ]);
+  const published = await getAutoReplyVersionById(db, draft.id);
+  if (!published || published.status !== 'published') throw new Error('AUTO_REPLY_DRAFT_NOT_PUBLISHED');
+  if (published.publish_idempotency_key !== input.idempotencyKey) {
+    throw new Error('AUTO_REPLY_DRAFT_ALREADY_PUBLISHED');
+  }
+  return published;
 }
 
 /** 実行時の定義を不変の版として確保する。既存UIの保存形式は変えない。 */
@@ -87,6 +433,8 @@ export async function ensureAutoReplyPublishedVersion(
   rule: AutoReply,
 ): Promise<AutoReplyVersionRow> {
   const snapshot = autoReplyDefinitionSnapshot(rule);
+  const current = await getAutoReplyPublishedVersion(db, rule.id);
+  if (current?.definition_snapshot === snapshot) return current;
   const latest = await db
     .prepare(
       `SELECT * FROM auto_reply_versions
@@ -95,20 +443,32 @@ export async function ensureAutoReplyPublishedVersion(
     )
     .bind(rule.id)
     .first<AutoReplyVersionRow>();
-  if (latest?.definition_snapshot === snapshot) return latest;
+  if (latest?.status === 'published' && latest.definition_snapshot === snapshot) {
+    await db.prepare(
+      `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
+    ).bind(latest.id, rule.id).run();
+    return latest;
+  }
 
   const versionNumber = Number(latest?.version_number ?? 0) + 1;
   const now = jstNow();
   const id = crypto.randomUUID();
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
+      `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
+        WHERE auto_reply_id = ? AND status = 'published'`,
+    ).bind(now, rule.id),
+    db.prepare(
       `INSERT OR IGNORE INTO auto_reply_versions
          (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
-          status, published_at, published_by_staff_id, created_at)
-       VALUES (?, ?, ?, ?, ?, 'published', ?, NULL, ?)`,
-    )
-    .bind(id, rule.id, versionNumber, rule.line_account_id, snapshot, now, now)
-    .run();
+          status, published_at, published_by_staff_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'published', ?, NULL, ?, ?)`,
+    ).bind(id, rule.id, versionNumber, rule.line_account_id, snapshot, now, now, now),
+    db.prepare(
+      `UPDATE auto_replies SET current_published_version_id = ?, lifecycle_status = 'published'
+        WHERE id = ?`,
+    ).bind(id, rule.id),
+  ]);
 
   const saved = await db
     .prepare(
