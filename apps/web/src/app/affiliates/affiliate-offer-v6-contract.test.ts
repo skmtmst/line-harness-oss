@@ -188,7 +188,7 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
   })
 
   it('V6版だけ設計の余白18pxと右カラム390pxを使い、V5版は動かさない', () => {
-    expect(CREATE_PAGE).toContain("v6 ? 'rounded-tile space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'")
+    expect(CREATE_PAGE).toContain("v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'")
     expect(CREATE_PAGE).toContain("v6 ? 'xl:w-[390px]' : 'xl:w-80'")
   })
 

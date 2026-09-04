@@ -278,7 +278,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   {search.lineAccountId ? (
                     <Link
                       href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
-                      className="text-action rounded-md px-2.5 py-1 text-xs font-semibold hover:bg-v6-action-soft"
+                      className="text-action rounded-md px-2.5 py-1 text-xs font-semibold hover:bg-action-soft"
                     >
                       条件を確認・編集
                     </Link>

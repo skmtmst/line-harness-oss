@@ -42,7 +42,7 @@
   gap: 16px; /* gap: 16 */
   padding: 16px; /* padding: 16 */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
   background: var(--color-canvas); /* fill: $canvas */
 }
 
@@ -133,7 +133,7 @@
   gap: 8px; /* gap: 8 */
   padding: 16px; /* padding: 16 */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
   background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
 }
 
