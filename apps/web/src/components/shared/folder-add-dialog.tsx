@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { api } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -28,6 +29,13 @@ export const FOLDER_COLORS = [
 export interface FolderAddDialogProps {
   /** `folders.kind`。'broadcast' / 'scenario' など。 */
   kind: string
+  /**
+   * 直すフォルダ。渡すと**追加ではなく名前と色を直す窓**になる。
+   *
+   * 設計 `CzndJ` の「名前を変更」「色を変える」。窓を2つ作らないのは、
+   * 入れる項目が同じで、離すと文言や色の並びがまたずれるため。
+   */
+  folder?: Folder
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
   note?: string
   /** 例に出す名前。 */
@@ -39,13 +47,14 @@ export interface FolderAddDialogProps {
 
 export default function FolderAddDialog({
   kind,
+  folder,
   note,
   placeholder = '例: 01_キャンペーン',
   onClose,
   onAdded,
 }: FolderAddDialogProps) {
-  const [name, setName] = useState('')
-  const [color, setColor] = useState(FOLDER_COLORS[0])
+  const [name, setName] = useState(folder?.name ?? '')
+  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -55,7 +64,9 @@ export default function FolderAddDialog({
     setSaving(true)
     setError('')
     try {
-      const res = await api.folders.create({ kind, name: trimmed, color })
+      const res = folder
+        ? await api.folders.update(folder.id, { name: trimmed })
+        : await api.folders.create({ kind, name: trimmed, color })
       if (!res.success) {
         setError(res.error)
         return
@@ -63,7 +74,7 @@ export default function FolderAddDialog({
       onAdded()
       onClose()
     } catch {
-      setError('フォルダを追加できませんでした')
+      setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
     } finally {
       setSaving(false)
     }
@@ -72,7 +83,7 @@ export default function FolderAddDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
-        <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
+        <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
         {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
 
         <label className="mt-4 block">
@@ -123,7 +134,7 @@ export default function FolderAddDialog({
             type="button"
             onClick={() => void add()}
             disabled={saving || !name.trim()}
-            className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+            className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
             {saving ? '追加中…' : '追加する'}
           </button>

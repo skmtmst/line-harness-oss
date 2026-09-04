@@ -68,7 +68,7 @@ export default function TwoFactorLoginPage() {
         {digits.map((digit, index) => <input key={index} ref={(node) => { refs.current[index] = node }} value={digit} inputMode="numeric" autoComplete="one-time-code" aria-label={`認証コード${index + 1}桁目`} onChange={(event) => changeDigit(index, event.target.value)} onKeyDown={(event) => { if (event.key === 'Backspace' && !digit && index > 0) refs.current[index - 1]?.focus() }} className="h-12 min-w-0 rounded-control border border-hairline text-center text-xl font-bold outline-none focus:border-accent" />)}
       </div>
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
-      <button onClick={() => void submit()} disabled={loading || digits.some((digit) => !digit)} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent font-bold text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
+      <button onClick={() => void submit()} disabled={loading || digits.some((digit) => !digit)} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent-deep font-bold text-on-accent hover:brightness-92 disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
       <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-accent hover:underline">別のLINEアカウントでログイン</Link>
     </section>

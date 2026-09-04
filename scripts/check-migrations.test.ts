@@ -123,11 +123,13 @@ describe('checkMigration', () => {
 describe('filterMigrationsByPolicy', () => {
   const sample = [
     '001_round2.sql',
+    '40_not_zero_padded.sql',
     '027_dedup_delivery.sql',
     '029_account_management_v2.sql',
     '040_events_multi_account.sql',
     '041_update_history.sql',
     '042_future.sql',
+    '1000_four_digit_future.sql',
   ];
 
   it('returns only files with prefix >= POLICY_CUTOFF_PREFIX by default', () => {
@@ -135,6 +137,7 @@ describe('filterMigrationsByPolicy', () => {
     expect(filterMigrationsByPolicy(sample)).toEqual([
       '041_update_history.sql',
       '042_future.sql',
+      '1000_four_digit_future.sql',
     ]);
   });
 
@@ -142,6 +145,7 @@ describe('filterMigrationsByPolicy', () => {
     expect(filterMigrationsByPolicy(sample, { all: false })).toEqual([
       '041_update_history.sql',
       '042_future.sql',
+      '1000_four_digit_future.sql',
     ]);
   });
 
@@ -153,6 +157,19 @@ describe('filterMigrationsByPolicy', () => {
     const filtered = filterMigrationsByPolicy(sample);
     expect(filtered).not.toContain('027_dedup_delivery.sql');
     expect(filtered).not.toContain('029_account_management_v2.sql');
+  });
+
+  it('compares prefixes as numbers and keeps four-digit migrations in policy', () => {
+    expect(filterMigrationsByPolicy([
+      '40_old.sql',
+      '041_current.sql',
+      '1000_future.sql',
+      'draft_without_number.sql',
+    ])).toEqual([
+      '041_current.sql',
+      '1000_future.sql',
+      'draft_without_number.sql',
+    ]);
   });
 
   it('returns an empty array when no files meet the cutoff', () => {
@@ -178,6 +195,21 @@ ALTER TABLE broadcasts_new RENAME TO broadcasts;`;
 
   it('印があって、形が合っていれば通す', () => {
     expect(checkMigration(REBUILD).ok).toBe(true);
+  });
+
+  it('_next 接尾辞の作り直しも、印があれば通す', () => {
+    const sql = `-- migration-policy: table-rebuild
+CREATE TABLE broadcasts_next (id TEXT PRIMARY KEY);
+DROP TABLE broadcasts;
+ALTER TABLE broadcasts_next RENAME TO broadcasts;`;
+    expect(checkMigration(sql).ok).toBe(true);
+  });
+
+  it('_next 接尾辞でも印が無ければ止める', () => {
+    const sql = `CREATE TABLE broadcasts_next (id TEXT PRIMARY KEY);
+DROP TABLE broadcasts;
+ALTER TABLE broadcasts_next RENAME TO broadcasts;`;
+    expect(checkMigration(sql).ok).toBe(false);
   });
 
   it('印が無ければ、これまでどおり止める', () => {

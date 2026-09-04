@@ -157,11 +157,11 @@ function isCoherentRebuild(stripped: string): boolean {
   for (const table of dropped) {
     const back = renamed.find((r) => r.to === table);
     if (!back) return false;
-    // 改名の元は、この手順で作った（か、前の手順で作った）`<表名>_new` であること。
-    if (back.from !== `${table}_new`) return false;
+    // 改名の元は、作り直し用と分かる `<表名>_new` / `<表名>_next` に限る。
+    if (![`${table}_new`, `${table}_next`].includes(back.from)) return false;
   }
   for (const r of renamed) {
-    if (r.from !== `${r.to}_new`) return false;
+    if (![`${r.to}_new`, `${r.to}_next`].includes(r.from)) return false;
     // 改名先の表を、この一連で落としているか、既にあるか。落としていない
     // のに同じ名前へ改名すると、その時点で失敗する。
   }
@@ -202,7 +202,8 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
       ok: false,
       violation:
         'table-rebuild の印があるが、作り直しの形になっていない'
-        + '（`<表名>_new` を作って、同じ表を落として、`<表名>` へ改名する組でのみ許される）',
+        + '（`<表名>_new` または `<表名>_next` を作って、同じ表を落とし、'
+        + '`<表名>` へ改名する組でのみ許される）',
     };
   }
 
@@ -227,8 +228,8 @@ const DEFAULT_MIGRATIONS_DIR = 'packages/db/migrations';
  * already been applied to production D1 and cannot be rewritten — they are
  * grandfathered. Bump this only when starting a new policy era.
  *
- * String comparison works here because migration prefixes are numeric and
- * zero-padded (`001`..`041`..), so lexicographic order matches numeric order.
+ * ファイル名は通常3桁でゼロ埋めするが、1000以降も同じ検査へ含めるため、
+ * 比較するときは文字列ではなく数値へ直す。
  */
 export const POLICY_CUTOFF_PREFIX = '041';
 
@@ -237,17 +238,20 @@ export const POLICY_CUTOFF_PREFIX = '041';
  * that fall under the active policy. With `all = true`, returns the input
  * unchanged (escape hatch for ad-hoc full scans).
  *
- * Files whose name starts with a prefix >= POLICY_CUTOFF_PREFIX pass. Files
- * with non-numeric or shorter prefixes pass through too (the comparison is
- * lexicographic and any newer naming scheme is assumed in-policy until we
- * decide otherwise).
+ * Files whose numeric prefix is >= POLICY_CUTOFF_PREFIX pass. Numeric prefix
+ * が読めない名前は、命名を変えて検査を迂回できないよう検査対象へ残す。
  */
 export function filterMigrationsByPolicy(
   names: string[],
   options: { all?: boolean } = {},
 ): string[] {
   if (options.all) return names;
-  return names.filter((name) => name >= POLICY_CUTOFF_PREFIX);
+  const cutoff = Number(POLICY_CUTOFF_PREFIX);
+  return names.filter((name) => {
+    const match = /^(\d+)_/.exec(name);
+    if (!match) return true;
+    return Number(match[1]) >= cutoff;
+  });
 }
 
 function listDefaultMigrations(options: { all?: boolean } = {}): string[] {

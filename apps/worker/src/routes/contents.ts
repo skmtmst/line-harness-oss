@@ -701,6 +701,80 @@ function serializeCommonVarDeleteImpact(
   };
 }
 
+const LINE_TEXT_USAGE_KINDS = new Set<CommonVarUsageKind>([
+  'template', 'broadcast', 'scenario', 'reminder', 'auto_reply', 'form',
+]);
+const LINE_TEXT_CHARACTER_LIMIT = 5_000;
+
+/** 値を保存する前に、表示文の差分と検査結果だけを安全な形で返す。 */
+function serializeCommonVarChangeImpact(
+  variable: CommonVar,
+  impact: CommonVarUsageImpact,
+  nextValue: string,
+) {
+  const base = serializeCommonVarDeleteImpact(variable, impact);
+  const token = `{{var.${variable.var_key}}}`;
+  const items = impact.items.map((item, index) => {
+    const safeSource = readableCommonVarUsage(item.source_content, token);
+    const previewAvailable = safeSource.includes(token);
+    const currentPreview = previewAvailable
+      ? safeSource.replaceAll(token, variable.value)
+      : base.items[index]!.currentPreview;
+    const changesOnSave = item.is_historical !== 1;
+    const nextPreview = !changesOnSave
+      ? currentPreview
+      : previewAvailable
+        ? safeSource.replaceAll(token, nextValue)
+        : null;
+    const characterLimit = LINE_TEXT_USAGE_KINDS.has(item.kind)
+      ? LINE_TEXT_CHARACTER_LIMIT
+      : null;
+    const nextCharacterCount = nextPreview === null ? null : [...nextPreview].length;
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    if (changesOnSave && nextValue.length === 0) errors.push('変更後の値が空になります');
+    if (characterLimit !== null && nextCharacterCount !== null
+      && nextCharacterCount > characterLimit) {
+      errors.push(`変更後の文が${characterLimit.toLocaleString('ja-JP')}文字を超えます`);
+    }
+    if (changesOnSave && !previewAvailable) {
+      warnings.push('変更後の文は使用先を開いて確認してください');
+    }
+    return {
+      ...base.items[index],
+      changesOnSave,
+      previewAvailable,
+      currentPreview,
+      nextPreview,
+      currentCharacterCount: [...currentPreview].length,
+      nextCharacterCount,
+      characterLimit,
+      exceedsCharacterLimit: characterLimit !== null && nextCharacterCount !== null
+        ? nextCharacterCount > characterLimit
+        : false,
+      errors,
+      warnings,
+    };
+  });
+  return {
+    ...base,
+    variable: {
+      ...base.variable,
+      currentValue: variable.value,
+      nextValue,
+    },
+    items,
+    errorTotal: items.reduce((sum, item) => sum + item.errors.length, 0),
+    warningTotal: items.reduce((sum, item) => sum + item.warnings.length, 0),
+    canSave: items.every((item) => item.errors.length === 0),
+    recommendedAction: items.some((item) => item.errors.length > 0)
+      ? 'fix_errors'
+      : impact.blockingTotal > 0
+        ? 'confirm_changes'
+        : 'save',
+  };
+}
+
 contents.get('/api/common-vars', async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -807,6 +881,36 @@ contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin')
     console.error('GET /api/common-vars/:id/delete-impact error:', err);
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
+      503,
+    );
+  }
+});
+
+contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await readBoundedJson(c.req.raw);
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (typeof body.nextValue !== 'string') {
+      return c.json({ success: false, error: '変更後の値を入力してください' }, 400);
+    }
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
+    return c.json({
+      success: true,
+      data: serializeCommonVarChangeImpact(existing, impact, body.nextValue),
+    });
+  } catch (err) {
+    if (err instanceof RequestBodyError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
+    console.error('POST /api/common-vars/:id/impact-preview error:', err);
+    return c.json(
+      { success: false, error: '影響する場所を確認できませんでした' },
       503,
     );
   }

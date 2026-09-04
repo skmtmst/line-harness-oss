@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import PageHeader from '@/components/shared/page-header'
 import { api, type DashboardOverview } from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
@@ -145,18 +146,22 @@ function SummaryCard({ label, value, note }: { label: string; value: string; not
   )
 }
 
-/** PenのV3 10-4だけで使う文字階層。ほかの管理画面の共通Headerは変更しない。 */
+/**
+ * 運用状態の見出し。
+ *
+ * **画面名はトップバーが出すので、本文には出さない。**
+ * 以前はここに `<h1>運用状態</h1>` を直接書いていて、トップバーと合わせて
+ * 同じ言葉が2回見えていた。共通 `PageHeader` は題を `sr-only` で持つ。
+ */
 function OperationPageHeader({ description, action }: { description: string; action?: ReactNode }) {
   return (
-    <div className="mb-6">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="text-ink text-xl leading-tight font-bold tracking-tight">運用状態</h1>
-          <p className="text-ink-secondary mt-1 text-xs">{description}</p>
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
-      </div>
-    </div>
+    <PageHeader
+      className="mb-6"
+      breadcrumb={[{ label: '設定' }, { label: '運用状態' }]}
+      title="運用状態"
+      description={description}
+      actions={action}
+    />
   )
 }
 
@@ -510,7 +515,7 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
+    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
   return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
