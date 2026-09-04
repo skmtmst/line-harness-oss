@@ -23,6 +23,7 @@ const dbMocks = {
   setMileageManualAdjustmentPolicy: vi.fn(),
   postMileageAdjustment: vi.fn(),
   getActionScoreOverview: vi.fn(),
+  getActionScoreBands: vi.fn().mockResolvedValue({ min: 0, max: 100, normalMin: 30, highMin: 70 }),
   createMileageRewardDraft: vi.fn(),
   createMileageRewardDraftFromPublished: vi.fn(),
   getMileageReward: vi.fn(),
@@ -328,6 +329,7 @@ describe('mileage admin API', () => {
     expect(response.status).toBe(200);
     expect(dbMocks.getActionScoreOverview).toHaveBeenCalledWith(env.DB, {
       accountId: 'account-1', search: '', filter: 'decreased', sort: 'change_asc', limit: 100, offset: 0,
+      highMin: 70, normalMin: 30,
     });
   });
 

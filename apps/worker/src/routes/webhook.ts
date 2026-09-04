@@ -579,6 +579,14 @@ async function handleEvent(
       friendId: friend?.id,
       eventType: 'friend_unfollow',
     });
+    if (friend) {
+      await fireEvent(db, 'friend_unfollow', {
+        sourceEventId: event.webhookEventId,
+        sourceKind: 'line_webhook',
+        occurredAt: new Date(event.timestamp).toISOString(),
+        friendId: friend.id,
+      }, lineAccessToken, lineAccountId);
+    }
     return;
   }
 
