@@ -306,14 +306,66 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     const unansweredOnly =
       c.req.query('unansweredOnly') === 'true' || c.req.query('unansweredOnly') === '1';
 
-    let unansweredMap: Map<string, { lastIncomingAt: string; lastIncomingContent: string; lastIncomingType: string }> | null = null;
     if (unansweredOnly) {
-      const { getUnansweredRowsMap } = await import('../services/unanswered-inbox.js');
-      unansweredMap = await getUnansweredRowsMap(c.env.DB);
-      // 空 Map のとき = 未対応ゼロ。早期 return で空配列を返す。
-      if (unansweredMap.size === 0) {
-        return c.json({ success: true, data: [] });
-      }
+      const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(200, Math.max(1, requestedLimit))
+        : 200;
+      const { computeUnansweredInbox } = await import('../services/unanswered-inbox.js');
+      const unanswered = await computeUnansweredInbox(c.env.DB, {
+        q: query || undefined,
+        account: lineAccountId,
+        status,
+        operatorId,
+        page: 1,
+        pageSize: limit,
+        allowedAccountIds: visibleScope.allowedAccountIds,
+        canSeeUnassigned: visibleScope.canSeeUnassigned,
+      });
+      if (unanswered.rows.length === 0) return c.json({ success: true, data: [] });
+
+      // 未対応サービスで確定した最大200人だけの会話メタ情報を取る。
+      // json_each へID配列を1 bindで渡すため、D1の100 bind上限にも当たらない。
+      const chatRows = await c.env.DB.prepare(
+        `SELECT f.id AS friend_id, f.display_name, f.picture_url,
+                c.operator_id, c.status, c.revision, c.notes,
+                CASE
+                  WHEN c.last_customer_message_at IS NOT NULL
+                   AND (sr.last_read_at IS NULL OR c.last_customer_message_at > sr.last_read_at)
+                  THEN 1 ELSE 0
+                END AS is_unread_for_staff,
+                c.created_at, c.updated_at
+           FROM friends f
+           INNER JOIN chats c ON c.friend_id = f.id
+           LEFT JOIN inbox_staff_reads sr
+             ON sr.channel = 'line'
+            AND sr.conversation_id = f.id
+            AND sr.staff_id = ?
+          WHERE f.id IN (SELECT value FROM json_each(?))`,
+      ).bind(staff.id, JSON.stringify(unanswered.rows.map((row) => row.friendId))).all<Record<string, unknown>>();
+      const byFriend = new Map(chatRows.results.map((row) => [row.friend_id as string, row]));
+      const data = unanswered.rows.flatMap((row) => {
+        const chat = byFriend.get(row.friendId);
+        if (!chat) return [];
+        return [{
+          id: row.friendId,
+          friendId: row.friendId,
+          friendName: row.displayName || '名前なし',
+          friendPictureUrl: row.pictureUrl,
+          operatorId: chat.operator_id,
+          status: chat.status,
+          revision: Number(chat.revision ?? 0),
+          notes: chat.notes,
+          lastMessageAt: row.lastIncomingAt,
+          lastMessageContent: row.lastIncomingType === 'text' ? row.lastIncomingContent : null,
+          lastMessageDirection: 'incoming' as const,
+          lastMessageType: row.lastIncomingType,
+          isUnread: Boolean(chat.is_unread_for_staff),
+          createdAt: chat.created_at,
+          updatedAt: chat.updated_at,
+        }];
+      });
+      return c.json({ success: true, data });
     }
 
     // List everyone who has any message history (incoming or outgoing — push/broadcast/scenario included)
@@ -329,8 +381,8 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
     //   単一 MAX() は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
     //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
-    //   preview を計算、(d) デフォルト LIMIT 300 (最終行は last_message_at DESC)。
-    //   同条件の本番実測: 459ms / 165k rows_read (LIMIT 300 時)。
+    //   preview を計算、(d) デフォルト LIMIT 200 (最終行は last_message_at DESC)。
+    //   同条件の本番実測: 459ms / 165k rows_read (旧 LIMIT 300 時)。
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
     //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
@@ -354,7 +406,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     }
 
     // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
-    // 1回の応答を最大200件に止める。未対応一覧そのもののDBページングは #80 で扱う。
+    // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
     const limit = listLimit(c.req.query('limit'), 200);
     // カーソルページング: (last_message_at, friend_id) の複合カーソルより古い行を返す。
     // offset 方式は「取得の合間に新着で行が押し下げられた分が欠落する」構造問題が
@@ -365,12 +417,6 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
 
     const conditions: string[] = [];
     const conditionBindings: unknown[] = [];
-    if (unansweredMap) {
-      // 未対応IDをSQL側で先に絞る。JSON配列を1 bindにすることでD1のbind数上限を避け、
-      // LIMIT適用後のJS絞り込みで対象を取りこぼさない。
-      conditions.push('f.id IN (SELECT value FROM json_each(?))');
-      conditionBindings.push(JSON.stringify([...unansweredMap.keys()]));
-    }
     if (status) {
       conditions.push(`COALESCE(c.status, 'resolved') = ?`);
       conditionBindings.push(status);
@@ -519,7 +565,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     allBindings.push(limit, staff.id);
     const result = await c.env.DB.prepare(sql).bind(...allBindings).all();
 
-    let data = result.results.map((ch: Record<string, unknown>) => ({
+    const data = result.results.map((ch: Record<string, unknown>) => ({
       id: ch.id as string,
       friendId: ch.friend_id,
       friendName: ch.display_name || '名前なし',
@@ -536,28 +582,6 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       createdAt: ch.created_at,
       updatedAt: ch.updated_at,
     }));
-
-    if (unansweredMap) {
-      // 未対応 row の preview / timestamp で上書きして Inbox と一貫させる
-      data = data
-        .filter((row) => unansweredMap!.has(row.id as string))
-        .map((row) => {
-          const u = unansweredMap!.get(row.id as string)!;
-          return {
-            ...row,
-            lastMessageAt: u.lastIncomingAt,
-            lastMessageContent: u.lastIncomingType === 'text' ? u.lastIncomingContent : null,
-            lastMessageDirection: 'incoming' as const,
-            lastMessageType: u.lastIncomingType,
-          };
-        })
-        // 上書きで lastMessageAt が変わったので resort
-        .sort((a, b) => {
-          const aAt = typeof a.lastMessageAt === 'string' ? a.lastMessageAt : '';
-          const bAt = typeof b.lastMessageAt === 'string' ? b.lastMessageAt : '';
-          return bAt.localeCompare(aAt);
-        });
-    }
 
     return c.json({ success: true, data });
   } catch (err) {
