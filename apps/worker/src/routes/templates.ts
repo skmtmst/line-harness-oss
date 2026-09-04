@@ -7,6 +7,7 @@ import {
   updateTemplate,
   deleteTemplate,
   getCarouselTapTotals,
+  getFolderById,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -16,6 +17,35 @@ import { parseQuestion, type ScenarioQuestion } from '../services/scenario-quest
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 
 const templates = new Hono<Env>();
+
+/**
+ * 置き場の指定を読む。
+ *
+ * **3つを分けて扱う。**
+ *   来ない（`undefined`）…… いまの置き場のまま
+ *   `null` / 空文字      …… 未分類へ戻す
+ *   ID                   …… そのフォルダへ入れる
+ *
+ * 消えたフォルダや、別の用途のフォルダ（タグの分類など）を指されたら断る。
+ * **黙って未分類にしない。** 移したつもりが未分類になっていると、
+ * 画面では「移せた」ように見えて、次に開くと消えている。
+ */
+async function readFolderId(
+  db: D1Database,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; folderId?: string | null } | { ok: false; error: string }> {
+  if (!('folderId' in body)) return { ok: true };
+  const raw = body.folderId;
+  if (raw === null || raw === '') return { ok: true, folderId: null };
+  const id = String(raw);
+  const folder = await getFolderById(db, id);
+  if (!folder) return { ok: false, error: 'そのフォルダはありません' };
+  if (folder.kind !== 'template') {
+    return { ok: false, error: 'テンプレートのフォルダではありません' };
+  }
+  return { ok: true, folderId: id };
+}
+
 
 const QUESTION_BEHAVIORS = new Set([
   'none',
@@ -236,6 +266,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
       messageContent: string;
       question?: unknown;
       questionStatus?: 'draft' | 'published';
+      folderId?: string | null;
     }>();
     if (!body.accountId) {
       return c.json({ success: false, error: 'account_id_required' }, 400);
@@ -260,8 +291,11 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
       return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
     }
+    const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>);
+    if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
     const item = await createTemplate(c.env.DB, {
       ...body,
+      folderId: folder.folderId ?? null,
       lineAccountId: body.accountId,
       ...options.value,
       questionJson: question.questionJson,
@@ -271,7 +305,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
         ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text }
         : {}),
     });
-    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, question: questionValue(item.question_json), questionStatus: item.question_status, createdAt: item.created_at } }, 201);
+    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, createdAt: item.created_at } }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -281,7 +315,7 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
 templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json<{ messageType?: string; messageContent?: string; question?: unknown; questionStatus?: 'draft' | 'published' }>();
+    const body = await c.req.json<{ messageType?: string; messageContent?: string; question?: unknown; questionStatus?: 'draft' | 'published'; folderId?: string | null }>();
     // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
     const existing = await getTemplateById(c.env.DB, id);
     if (!existing || !await canAccessAllLineAccounts(
@@ -312,8 +346,11 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
       return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
     }
+    const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>);
+    if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
     await updateTemplate(c.env.DB, id, {
       ...body,
+      ...(folder.folderId !== undefined ? { folderId: folder.folderId } : {}),
       ...options.value,
       questionJson: question.questionJson,
       questionStatus: body.questionStatus,
@@ -334,6 +371,7 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
         messageContent: updated.message_content,
         question: questionValue(updated.question_json),
         questionStatus: updated.question_status,
+        folderId: updated.folder_id ?? null,
         carouselActions: updated.carousel_actions_json
           ? JSON.parse(updated.carousel_actions_json)
           : null,
