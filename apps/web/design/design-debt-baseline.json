@@ -421,7 +421,7 @@
   "app/webinars/edit/page.tsx": {
     "direct-th": 13,
     "unresolved-classname": 8,
-    "arbitrary-value": 23,
+    "arbitrary-value": 22,
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
@@ -806,5 +806,8 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 16,
     "arbitrary-value": 3
+  },
+  "components/webinars/webinar-line-preview.tsx": {
+    "unresolved-classname": 7
   }
 }
