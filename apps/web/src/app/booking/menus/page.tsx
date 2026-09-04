@@ -394,7 +394,7 @@ function MenusPageInner() {
       ) : loading ? (
         <div data-design-node="W6465r"><ListState kind="loading" description="予約メニューと実績を読み込んでいます。" /></div>
       ) : error ? (
-        <div data-design-node="W6465r"><ListState kind="error" description={error} /></div>
+        <div data-design-node="W6465r"><ListState kind="error" description={error} onRetry={() => void load()} /></div>
       ) : shown.length === 0 ? (
         <div data-design-node="W6465r">
           <ListState

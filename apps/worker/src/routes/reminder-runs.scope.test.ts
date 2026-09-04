@@ -148,6 +148,50 @@ describe('リマインダ実行記録のアカウント範囲', () => {
     expect(mocks.listRuns).not.toHaveBeenCalled()
   })
 
+  it('配信予定は公開状態plannedを内部状態queuedへ変換して返す', async () => {
+    mocks.canAccess.mockResolvedValue(true)
+    mocks.listRuns.mockResolvedValue({
+      total: 1,
+      items: [{
+        id: 'run-planned',
+        line_account_id: 'account-1',
+        account_label: '本店',
+        reminder_id: 'reminder-1',
+        friend_reminder_id: 'enrollment-1',
+        friend_id: 'friend-1',
+        friend_name: '田中さくら',
+        reminder_step_id: 'step-1',
+        step_number: 1,
+        scheduled_at: '2026-09-05T09:00:00.000Z',
+        started_at: null,
+        completed_at: null,
+        status: 'queued',
+        attempt_count: 0,
+        next_retry_at: null,
+        last_error_code: null,
+        last_error_message: null,
+        line_request_id: null,
+        message_log_id: null,
+      }],
+    })
+
+    const response = await createApp().request(
+      '/api/reminders/reminder-1/runs?status=planned',
+    )
+    const body = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(mocks.listRuns).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ reminderId: 'reminder-1', status: 'queued' }),
+    )
+    expect(body.data.items[0]).toMatchObject({
+      id: 'run-planned',
+      status: 'pending',
+      domainStatus: 'planned',
+    })
+  })
+
   it('別アカウントの失敗実行は再試行させない', async () => {
     mocks.canAccess.mockResolvedValue(false)
 

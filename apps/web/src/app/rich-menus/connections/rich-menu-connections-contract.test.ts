@@ -33,7 +33,7 @@ describe('V6 リッチメニューの切替つながり', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('もう一度読み込む')
+    expect(PAGE).toContain('onRetry={() => void load()}')
   })
 
   it('一覧から切替のつながりへ進める', () => {

@@ -75,7 +75,6 @@ describe('マイルのタブ', () => {
     expect(PAGE).toMatch(/<MileageRewardsTab[\s\S]{0,120}accountId=/)
   })
 })
-
 describe('いちばん使われた', () => {
   const code = withoutComments(TAB)
 

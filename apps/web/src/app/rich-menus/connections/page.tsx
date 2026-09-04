@@ -84,10 +84,10 @@ function ConnectionsContent() {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="表示するアカウントを上の切替から選んでください。" />
   }
   if (!groupId) {
-    return <ListState kind="error" title="メニューを特定できませんでした" action={<Button href="/rich-menus">メニュー一覧へ戻る</Button>} />
+    return <ListState kind="empty" title="メニューを特定できませんでした" action={<Button href="/rich-menus">メニュー一覧へ戻る</Button>} />
   }
   if (error || !group || !analysis) {
-    return <ListState kind="error" title="切替のつながりを表示できませんでした" description={error} action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
+    return <ListState kind="error" title="切替のつながりを表示できませんでした" description={error} onRetry={() => void load()} />
   }
   if (group.accountId !== selectedAccountId) {
     return <ListState kind="forbidden" title="選択中のアカウントでは表示できません" description="このメニューが所属するLINE公式アカウントへ切り替えてください。" />
