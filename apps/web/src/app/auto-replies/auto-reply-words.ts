@@ -230,8 +230,13 @@ export const NO_WRITE_PERMISSION: Word = {
  * 読み込めていないのに `0件` と出すと、**本当に0件だったのと見分けが
  * つかない**。実際の0だけが `0件` を名乗る。
  */
-export function metricWord(state: LoadState, value: number): string {
-  return state === 'ready' ? String(value) : '—'
+export function metricWord(state: LoadState, value: number | null): string {
+  /*
+    **`null` は「読めたが数えられなかった」。** 一覧は読めていても、
+    ヒット数を持たないルールが1つでもあると合計は足りない。足りない数を
+    そのまま出すと、**実測より小さい数を実測として読ませる**ことになる。
+  */
+  return state === 'ready' && value !== null ? String(value) : '—'
 }
 
 /** 遅れて返った別アカウント・前世代の取得結果を画面へ入れない。 */

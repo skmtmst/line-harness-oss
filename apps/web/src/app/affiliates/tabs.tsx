@@ -142,6 +142,31 @@ interface ReportV2 {
   duplicateFlags: Array<{ friendId: string; identityKey: string }>
 }
 
+/*
+  集計の返事が、数として読める形かを確かめる。
+
+  **`as unknown as ReportV2` は嘘をつく。** 集計は期間で絞れるので、
+  その期間に成果が1件も無い紹介者は**行そのものが返らない**。
+  一覧には載っているので押せてしまい、`report.clicks.toLocaleString()` で
+  **内訳の面ごと落ちていた。**（`Cannot read properties of undefined`）
+
+  0件と「この期間に記録が無い」を混ぜないため、読めないときは `null` にして
+  呼ぶ側で理由を出す。**0で埋めない。**
+*/
+function asReportV2(raw: unknown): ReportV2 | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const value = raw as Partial<ReportV2>
+  const numbers: Array<number | undefined> = [
+    value.clicks, value.friendAdds, value.conversions,
+    value.conversionsApproved, value.conversionsPending, value.conversionsRejected,
+    value.confirmedReward,
+  ]
+  if (numbers.some((n) => typeof n !== 'number' || !Number.isFinite(n))) return null
+  if (!Array.isArray(value.byOffer) || !Array.isArray(value.conversionsByPoint)) return null
+  return value as ReportV2
+}
+
+
 interface JourneySummary {
   friendId: string
   displayName: string | null
@@ -273,7 +298,8 @@ export function AffiliatorsTab() {
         api.affiliates.reportV2(id),
         api.affiliates.links(id),
       ])
-      if (reportRes.success) setReport(reportRes.data as unknown as ReportV2)
+      /* **形を確かめてから入れる。** 読めない返事を入れると、描くときに落ちる。 */
+      setReport(reportRes.success ? asReportV2(reportRes.data) : null)
       if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
     } catch { /* silent — detail is optional */ }
     setDetailLoading(false)
@@ -432,6 +458,21 @@ export function AffiliatorsTab() {
                                   void loadList()
                                 }}
                               />
+
+                              {/*
+                                **読めなかったことを、0件として描かない。**
+                                集計は期間で絞れるので、その期間に成果が無い人は
+                                行そのものが返らない。数を作らずに理由を出す。
+                              */}
+                              {!detailLoading && !report && (
+                                <div className="rounded-card border-hairline bg-canvas border p-4">
+                                  <p className="text-ink text-sm font-bold">この期間の集計を取得できませんでした</p>
+                                  <p className="text-ink-secondary mt-1 text-xs leading-5">
+                                    選んだ期間にこの方の成果が1件も無いか、集計が読めませんでした。
+                                    リンクと成果の記録は消えていません。期間を広げて確かめてください。
+                                  </p>
+                                </div>
+                              )}
 
                               {/* v2 summary cards */}
                               {report && (
