@@ -4,12 +4,14 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 
+const attachTag = vi.hoisted(() => vi.fn().mockResolvedValue({ added: true }));
+
 vi.mock('./friend-tag-attach.js', () => ({
-  attachTagAndFireSideEffects: vi.fn().mockResolvedValue({ added: true }),
+  attachTagAndFireSideEffects: attachTag,
   detachTagAndFireSideEffects: vi.fn().mockResolvedValue({ removed: true }),
 }));
 
-const { refreshAllNenTags } = await import('./nen-tag-sync.js');
+const { NEN_TAG, refreshAllNenTags } = await import('./nen-tag-sync.js');
 
 function asD1(sqlite: Database.Database): D1Database {
   function prepare(query: string): D1PreparedStatement {
@@ -59,6 +61,20 @@ describe('NENタグ定期再判定の実DBカーソル', () => {
        VALUES ('health-00', 'pet-00', 'friend-00', '2026-09-03', 'normal', 'normal',
                '2026-09-03T00:00:00.000')`,
     ).run();
+    const insertPhoto = sqlite.prepare(
+      `INSERT INTO nen_photo_submissions
+         (id, friend_id, pet_id, r2_key, image_url, content_type, status, created_at, updated_at)
+       VALUES (?, 'friend-00', 'pet-00', ?, ?, 'image/jpeg', ?,
+               '2026-09-03T00:00:00.000', '2026-09-03T00:00:00.000')`,
+    );
+    for (const status of ['pending', 'adopted', 'rejected']) {
+      insertPhoto.run(
+        `photo-${status}`,
+        `nen/photo-${status}.jpg`,
+        `https://example.invalid/photo-${status}.jpg`,
+        status,
+      );
+    }
     const db = asD1(sqlite);
 
     const first = await refreshAllNenTags(
@@ -67,6 +83,13 @@ describe('NENタグ定期再判定の実DBカーソル', () => {
       500,
       new Date('2026-09-04T00:00:00.000Z'),
     );
+    for (const tagId of [
+      NEN_TAG.actionPhotoPosted,
+      NEN_TAG.actionPhotoReview,
+      NEN_TAG.actionPhotoApproved,
+    ]) {
+      expect(attachTag).toHaveBeenCalledWith(db, 'friend-00', tagId);
+    }
     const second = await refreshAllNenTags(
       db,
       { allTenants: true },

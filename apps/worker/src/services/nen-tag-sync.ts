@@ -513,6 +513,7 @@ async function refreshScheduledNenTags(
 
   const friendIds = friends.map((friend) => friend.id);
   const placeholders = friendIds.map(() => '?').join(',');
+  const selectedFriendValues = friendIds.map(() => '(?)').join(',');
   // 1人最大200件を1つのUNIONにまとめる。20人でも健康記録は最大4,000行。
   const healthQuery = `${friendIds.map(() => `
     SELECT friend_id, pet_id, logged_on, weight_kg, heart_rate_bpm, respiratory_rate_bpm
@@ -545,10 +546,21 @@ async function refreshScheduledNenTags(
         WHERE status = 'active' AND friend_id IN (${placeholders})`,
     ).bind(...friendIds).all<{ friend_id: string; flag_type: string }>(),
     db.prepare(
-      `SELECT friend_id, COUNT(*) total,
-              SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) pending,
-              SUM(CASE WHEN status='adopted' THEN 1 ELSE 0 END) adopted
-         FROM nen_photo_submissions WHERE friend_id IN (${placeholders}) GROUP BY friend_id`,
+      `WITH selected_friends(friend_id) AS (VALUES ${selectedFriendValues})
+       SELECT selected_friends.friend_id,
+              EXISTS(
+                SELECT 1 FROM nen_photo_submissions
+                 WHERE friend_id = selected_friends.friend_id LIMIT 1
+              ) total,
+              EXISTS(
+                SELECT 1 FROM nen_photo_submissions
+                 WHERE friend_id = selected_friends.friend_id AND status = 'pending' LIMIT 1
+              ) pending,
+              EXISTS(
+                SELECT 1 FROM nen_photo_submissions
+                 WHERE friend_id = selected_friends.friend_id AND status = 'adopted' LIMIT 1
+              ) adopted
+         FROM selected_friends`,
     ).bind(...friendIds).all<{ friend_id: string; total: number; pending: number; adopted: number }>(),
     Promise.all(currentTagQueries),
   ]);

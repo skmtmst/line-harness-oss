@@ -240,6 +240,10 @@ describe('NEN bulk refresh scope', () => {
     expect(Math.max(...rowsReadByRun)).toBe(4_082);
     expect(getState().lastFriendId).toBe('');
     expect(queries.filter((sql) => sql.includes('FROM nen_health_logs'))).toHaveLength(25);
+    const photoQuery = queries.find((sql) => sql.includes('FROM nen_photo_submissions'));
+    expect(photoQuery).toBeDefined();
+    expect(photoQuery).not.toContain('COUNT(*)');
+    expect(photoQuery?.match(/EXISTS\s*\(/g)).toHaveLength(3);
     for (const friend of ['friend-0000', 'friend-0250', 'friend-0499']) {
       expect(tagMocks.tags.get(friend)).toEqual(expect.objectContaining(new Set([
         NEN_TAG.member,
