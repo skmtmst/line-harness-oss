@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import {
   getLineAccounts,
+  getLineAccountListStats,
   getLineAccountById,
   getLineAccountCredentialHealth,
   createLineAccount,
@@ -116,58 +117,75 @@ function serializeLineAccountFull(row: DbLineAccount) {
   return serializeLineAccount(row);
 }
 
-// GET /api/line-accounts - list all (with LINE profile + stats)
+const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(items[index]!);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+// GET /api/line-accounts - list all. LINE live data is opt-in with ?live=1.
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
     const items = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
-    if (c.req.query('live') === '0') {
+    const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
+    const serializeWithStats = (item: DbLineAccount) => ({
+      ...serializeLineAccount(item),
+      displayName: item.name,
+      stats: statsByAccount[item.id] ?? {
+        friendCount: 0,
+        activeScenarios: 0,
+        messagesThisMonth: 0,
+      },
+    });
+
+    if (c.req.query('live') !== '1') {
       return c.json({
         success: true,
-        data: items.map((item) => ({ ...serializeLineAccount(item), displayName: item.name })),
+        data: items.map(serializeWithStats),
       });
     }
     const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
     const expectedWebhookUrl = `${base}/webhook`;
 
-    // Get stats for all accounts in parallel
-    const results = await Promise.all(
-      items.map(async (item) => {
-        const [profile, webhook, plan, friendCount, scenarioCount, msgCount] = await Promise.all([
+    // 1アカウントにつき最大3接続を同時に開くため、2アカウントずつに抑える。
+    // Workersの同時外向き接続上限6を越えない。
+    const results = await mapWithConcurrency(
+      items,
+      LINE_LIVE_ACCOUNT_CONCURRENCY,
+      async (item) => {
+        const [profile, webhook, plan] = await Promise.all([
           fetchBotProfile(item.channel_access_token),
           fetchWebhookEndpointState(item.channel_access_token, expectedWebhookUrl),
           fetchLineMonthlyPlan(item.channel_access_token),
-          db.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`).bind(item.id).first<{ count: number }>(),
-          db.prepare(
-            `SELECT COUNT(*) as count FROM friend_scenarios fs
-             INNER JOIN friends f ON f.id = fs.friend_id
-             WHERE fs.status = 'active' AND f.line_account_id = ?`,
-          ).bind(item.id).first<{ count: number }>(),
-          db.prepare(
-            // 「今月送信」(messagesThisMonth) は LINE 公式ダッシュボードの「配信済みの無料メッセージ数」と
-            // 揃える設計: push 系のみ + 当月 1 日 00:00 以降。reply API 経由 (1-on-1 chat) は LINE quota 外なので
-            // delivery_type='push' で除外。以前は date('now', '-30 days') の rolling window で月初に bias 残って
-            // 公式 dashboard と数桁ズレてた (例: 公式 10 通 vs UI 10,609 通) → start of month に揃えた。
-            `SELECT COUNT(*) as count FROM messages_log ml
-             INNER JOIN friends f ON f.id = ml.friend_id
-             WHERE ml.direction = 'outgoing' AND (ml.delivery_type IS NULL OR ml.delivery_type = 'push') AND ml.created_at >= date('now', 'start of month') AND f.line_account_id = ?`,
-          ).bind(item.id).first<{ count: number }>(),
         ]);
 
         return {
-          ...serializeLineAccount(item),
+          ...serializeWithStats(item),
           displayName: profile.displayName || item.name,
           pictureUrl: profile.pictureUrl || null,
           basicId: profile.basicId || null,
           webhook,
           plan,
-          stats: {
-            friendCount: friendCount?.count ?? 0,
-            activeScenarios: scenarioCount?.count ?? 0,
-            messagesThisMonth: msgCount?.count ?? 0,
-          },
         };
-      }),
+      },
     );
     return c.json({ success: true, data: results });
   } catch (err) {
