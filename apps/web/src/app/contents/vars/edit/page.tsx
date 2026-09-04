@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type {
   CommonVar,
+  CommonVarChangeImpact,
   CommonVarDeleteImpact,
   CommonVarSchedule,
   Folder,
@@ -17,7 +18,10 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText } from '../delete-impact'
 import {
-  changePreviewNotConnected,
+  blockingErrors,
+  isChangeItem,
+  characterCountText,
+  reviewWarnings,
   changeSummaryText,
   hiddenText,
   historicalText,
@@ -71,13 +75,21 @@ function EditCommonVarInner() {
    * 本体の読み込みとは別に持つ。使用先が読めなくても、名前や値の編集は
    * 続けられるべきだからである。**読めなかったことを0か所として描かない。**
    */
-  const [impact, setImpact] = useState<CommonVarDeleteImpact | null>(null)
+  const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
 
-  const loadImpact = useCallback(async (varId: string, accountId: string) => {
+  /*
+    値を変えていないあいだは使用先台帳（`delete-impact`）だけを読む。
+    **変えた時点で変更前確認（`impact-preview`）へ切り替える。**
+    変えていないのに保存後の文を問い合わせても、いまの文と同じものが
+    返るだけで、読む人には差が見えない。
+  */
+  const loadImpact = useCallback(async (varId: string, accountId: string, nextValue?: string) => {
     setImpactState('loading')
     try {
-      const res = await api.commonVars.deleteImpact(varId, accountId)
+      const res = nextValue === undefined
+        ? await api.commonVars.deleteImpact(varId, accountId)
+        : await api.commonVars.impactPreview(varId, accountId, nextValue)
       if (accountId !== latestAccountRef.current) return
       if (!res.success) {
         setImpact(null)
@@ -92,6 +104,29 @@ function EditCommonVarInner() {
       setImpactState(impactStateFromError(e))
     }
   }, [])
+
+  /**
+   * 入力のたびに問い合わせない。**打っている途中の文で「空になります」と
+   * 出ると、消して打ち直しているだけの人を止めてしまう。** 手が止まって
+   * から引く。
+   */
+  useEffect(() => {
+    if (!item || !selectedAccountId) return
+    const nextValue = value === item.value ? undefined : value
+    const timer = setTimeout(() => {
+      void loadImpact(item.id, selectedAccountId, nextValue)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [item, selectedAccountId, value, loadImpact])
+
+  /*
+    保存を止める理由。**読めていないときは止めない。** 影響を確かめ
+    られなかったことを理由に保存を塞ぐと、口が落ちているあいだ誰も
+    値を直せなくなる。
+  */
+  const blocked = impact && 'canSave' in impact && impactState === 'ready'
+    ? blockingErrors(impact)
+    : []
 
   const load = useCallback(async () => {
     if (!id) {
@@ -433,6 +468,26 @@ function EditCommonVarInner() {
                           <p className="text-ink-secondary mt-1 text-xs break-all">
                             いまの文：{usage.currentPreview}
                           </p>
+                          {isChangeItem(usage) && (
+                            <>
+                              {/*
+                                **変更後の文を作れないときは空文字で埋めない。**
+                                空で出すと「保存すると空になる」と読める。
+                              */}
+                              <p className="text-ink mt-1 text-xs break-all">
+                                保存後の文：
+                                {usage.nextPreview ?? (
+                                  <span className="text-ink-secondary">
+                                    {NOT_AVAILABLE}（差し込みの目印を本文から読み取れませんでした。使用先を開いて確かめてください）
+                                  </span>
+                                )}
+                              </p>
+                              <p className={usage.exceedsCharacterLimit ? 'text-danger mt-1 text-xs font-semibold' : 'text-ink-faint mt-1 text-xs'}>
+                                文字数：{characterCountText(usage)}
+                                {usage.exceedsCharacterLimit && '（上限を超えています。この通は送信のときに落ちます）'}
+                              </p>
+                            </>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -440,12 +495,39 @@ function EditCommonVarInner() {
 
                   <div className="border-hairline border-t p-3">
                     <p className="text-ink-secondary text-xs">変更後の文と文字数の検査</p>
-                    <p className="text-ink mt-1 text-sm">
-                      {NOT_AVAILABLE}
-                      <span className="text-ink-secondary ml-2 text-xs">
-                        {changePreviewNotConnected()}
-                      </span>
-                    </p>
+                    {'canSave' in impact ? (
+                      <>
+                        {blockingErrors(impact).length > 0 ? (
+                          /*
+                            **止める理由があるときは保存させない。**
+                            5,000文字を超える文を保存すると、その通は送信の
+                            ときに落ちる。落ちるのは保存の何日もあとで、
+                            原因がこの操作だと結びつかない。
+                          */
+                          <ul className="text-danger mt-1 list-disc space-y-1 pl-5 text-sm">
+                            {blockingErrors(impact).map((message) => (
+                              <li key={message}>{message}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-ink mt-1 text-sm">
+                            止まる理由は見つかりませんでした。保存できます。
+                          </p>
+                        )}
+                        {reviewWarnings(impact).length > 0 && (
+                          <ul className="text-ink-secondary mt-2 list-disc space-y-1 pl-5 text-xs">
+                            {reviewWarnings(impact).map((message) => (
+                              <li key={message}>{message}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    ) : (
+                      /* まだ値を変えていない。変える前と後で差が無いので出しようがない。 */
+                      <p className="text-ink-secondary mt-1 text-sm">
+                        値を変えると、ここに保存後の文と文字数が出ます。
+                      </p>
+                    )}
                   </div>
 
                   <p className="text-ink-faint border-hairline border-t px-3 py-2 text-xs">
@@ -541,13 +623,28 @@ function EditCommonVarInner() {
                 削除
               </button>
             </div>
-            <button
-              onClick={() => void save()}
-              disabled={saving}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
+            {/*
+              **止める理由があるあいだは保存させない。** 5,000文字を超える
+              文を保存すると、その通は送信のときに落ちる。**落ちるのは保存の
+              何日もあとで、原因がこの操作だと結びつかない。**
+
+              押せない理由は、ボタンの脇に**言葉で**出す。灰色のボタンだけでは
+              「なぜ押せないのか」が分からず、何度も押すことになる。
+            */}
+            <div className="flex items-center gap-3">
+              {blocked.length > 0 && (
+                <span className="text-danger text-xs">
+                  {blocked[0]}。直すまで保存できません。
+                </span>
+              )}
+              <button
+                onClick={() => void save()}
+                disabled={saving || blocked.length > 0}
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-10 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+              >
+                {saving ? '保存中...' : '保存'}
+              </button>
+            </div>
           </div>
         </>
       )}

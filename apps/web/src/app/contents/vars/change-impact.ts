@@ -1,4 +1,4 @@
-import type { CommonVarDeleteImpact } from '@line-crm/shared'
+import type { CommonVarChangeImpact, CommonVarDeleteImpact } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { placeholderText } from './delete-impact'
@@ -14,10 +14,14 @@ import { placeholderText } from './delete-impact'
  * だけである。ここからは「どこで使われているか」「いまどう出ているか」
  * 「送信済みで変わらないもの」が読める。
  *
- * **変更後の文と文字数の検査は読めない。** 設計の
- * `POST /api/common-vars/:id/impact-preview` はまだ無い。取れないものを
- * それらしく作らず、`—` と理由を出す。引き継ぎは
- * `docs/design-qa/v6-common-var-change-impact-handoff.md`。
+ * **2026-09-04：変更後の文と文字数の検査もつながった。**
+ * `POST /api/common-vars/:id/impact-preview`（PR #773）から、保存後の文・
+ * 文字数・上限超えが返る。値を変えていないあいだは使用先台帳だけを読み、
+ * 変えた時点で変更前確認へ切り替える。
+ *
+ * **口が答えられないところは、いまも `—` と理由を出す。** 差し込みの
+ * 目印を本文から読み取れない使用先（`previewAvailable: false`）は変更後の
+ * 文を作れない。そこを空文字で埋めると「変更後は空になる」と読める。
  */
 
 /** 影響確認の読み込み状態。**実値0と、読めなかったを混ぜない。** */
@@ -51,7 +55,7 @@ export function impactStateText(state: ChangeImpactState): string | null {
  * まとめて「15か所が変わります」と言うと、もう送った分まで書き換わると
  * 読めてしまう。分けて数える。
  */
-export function changeCounts(impact: CommonVarDeleteImpact): {
+export function changeCounts(impact: CommonVarDeleteImpact | CommonVarChangeImpact): {
   immediate: number
   historical: number
   hidden: number
@@ -69,7 +73,7 @@ export function changeCounts(impact: CommonVarDeleteImpact): {
  * **0か所は0か所と言う。** 差し込まれていない共通情報なら、保存しても
  * どこも変わらない。それが分かれば運用者はそのまま保存できる。
  */
-export function changeSummaryText(impact: CommonVarDeleteImpact): string {
+export function changeSummaryText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string {
   const { immediate } = changeCounts(impact)
   if (immediate === 0) {
     return `${placeholderText(impact.variable.varKey)} はどこにも差し込まれていません。`
@@ -80,7 +84,7 @@ export function changeSummaryText(impact: CommonVarDeleteImpact): string {
 }
 
 /** 送信済みの分。**「変わりません」を書かないと、遡って直ると誤解される。** */
-export function historicalText(impact: CommonVarDeleteImpact): string | null {
+export function historicalText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string | null {
   const { historical } = changeCounts(impact)
   if (historical === 0) return null
   return `送信済みの${historical.toLocaleString('ja-JP')}か所は変わりません。`
@@ -88,7 +92,7 @@ export function historicalText(impact: CommonVarDeleteImpact): string | null {
 }
 
 /** 名前を出せない使用先。**件数は隠さない。** */
-export function hiddenText(impact: CommonVarDeleteImpact): string | null {
+export function hiddenText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string | null {
   if (impact.unavailableReferences.length === 0) return null
   return impact.unavailableReferences
     .map((ref) => `${ref.kindLabel}${ref.count.toLocaleString('ja-JP')}件（${ref.reason}）`)
@@ -96,7 +100,7 @@ export function hiddenText(impact: CommonVarDeleteImpact): string | null {
 }
 
 /** すぐ変わる使用先だけを、表に出す順で返す。送信済みは混ぜない。 */
-export function immediateItems(impact: CommonVarDeleteImpact) {
+export function immediateItems(impact: CommonVarDeleteImpact | CommonVarChangeImpact) {
   return impact.items.filter((item) => item.blocksDeletion)
 }
 
@@ -142,4 +146,56 @@ export function saveErrorText(err: unknown): string {
           + '続く場合は管理者へ連絡してください。'
         : '保存できませんでした。もう一度お試しください。'
   }
+}
+
+
+/*
+  ここから下は、変更後の文が読めるようになってから足したもの。
+  上の関数は `CommonVarDeleteImpact` を受けるので、`CommonVarChangeImpact`
+  もそのまま渡せる（項目が増えただけで、形は同じ）。
+*/
+
+/**
+ * 保存を止めるかどうか。
+ *
+ * **止める理由が1つでもあれば保存させない。** 5,000文字を超える文を
+ * 保存すると、その通は送信のときに落ちる。**落ちるのは保存の何日も
+ * あとで、原因がこの操作だと結びつかない。**
+ */
+export function blockingErrors(impact: CommonVarChangeImpact): string[] {
+  const seen = new Set<string>()
+  for (const item of impact.items) for (const message of item.errors) seen.add(message)
+  return [...seen]
+}
+
+/** 保存はできるが、目で確かめてほしいこと。 */
+export function reviewWarnings(impact: CommonVarChangeImpact): string[] {
+  const seen = new Set<string>()
+  for (const item of impact.items) for (const message of item.warnings) seen.add(message)
+  return [...seen]
+}
+
+/**
+ * 1件ぶんの文字数の言い方。
+ *
+ * **上限が無い使用先で「/ 5,000」と書かない。** 上限があるのは LINE の
+ * 本文になるものだけで、それ以外に上限を書くと、無い決まりを作ってしまう。
+ */
+export function characterCountText(item: CommonVarChangeImpact['items'][number]): string {
+  if (item.nextCharacterCount === null) return '—'
+  const next = item.nextCharacterCount.toLocaleString('ja-JP')
+  if (item.characterLimit === null) return `${next}文字`
+  return `${next} / ${item.characterLimit.toLocaleString('ja-JP')}文字`
+}
+
+/**
+ * この1件が変更前確認のものか。
+ *
+ * `in` だけだと型が絞れず、`nextPreview` を読むところで落ちる。
+ * 見分けを1か所に置いて、画面側は使うだけにする。
+ */
+export function isChangeItem(
+  item: CommonVarDeleteImpact['items'][number] | CommonVarChangeImpact['items'][number],
+): item is CommonVarChangeImpact['items'][number] {
+  return 'changesOnSave' in item
 }
