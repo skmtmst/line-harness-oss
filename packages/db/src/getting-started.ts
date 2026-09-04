@@ -1,5 +1,3 @@
-
-
 /**
  * はじめの設定の順路。設計 ★V6 34-1（`RAW35`）。台帳 #134。
  *
@@ -78,5 +76,3 @@ export async function countUsableAccounts(db: D1Database): Promise<{ usable: num
     .first<{ c: number }>();
   return { usable: usable?.c ?? 0, total: total?.c ?? 0 };
 }
-
-
