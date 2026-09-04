@@ -9,7 +9,8 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError, webinarApi, type Webinar } from '@/lib/api'
+import { ApiError, webinarApi, type Webinar, type WebinarOverview } from '@/lib/api'
+import { overviewCards } from './overview-view'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -56,8 +57,12 @@ type SavedFilter = '' | 'active' | 'draft'
 export default function WebinarsPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const requestGeneration = useRef(0)
+  const overviewRequestGeneration = useRef(0)
   const [items, setItems] = useState<Webinar[]>([])
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
+  const [overview, setOverview] = useState<WebinarOverview | null>(null)
+  const [loadedOverviewAccountId, setLoadedOverviewAccountId] = useState<string | null>(null)
+  const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [pageSize, setPageSize] = useState(20)
@@ -67,6 +72,8 @@ export default function WebinarsPage() {
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
 
   const visibleItems = loadedAccountId === selectedAccountId ? items : []
+  const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
+  const visibleOverviewFailure = loadedOverviewAccountId === selectedAccountId ? overviewFailure : null
 
   const refresh = useCallback(async () => {
     const generation = ++requestGeneration.current
@@ -103,9 +110,34 @@ export default function WebinarsPage() {
     }
   }, [selectedAccountId])
 
+  const refreshOverview = useCallback(async () => {
+    const generation = ++overviewRequestGeneration.current
+    setOverview(null)
+    setLoadedOverviewAccountId(null)
+    setOverviewFailure(null)
+
+    if (!selectedAccountId) return
+
+    const accountId = selectedAccountId
+    try {
+      const res = await webinarApi.overview(accountId)
+      if (overviewRequestGeneration.current !== generation) return
+      setOverview(res.data)
+      setLoadedOverviewAccountId(accountId)
+    } catch (err) {
+      if (overviewRequestGeneration.current !== generation) return
+      setOverviewFailure(webinarLoadFailure(err))
+      setLoadedOverviewAccountId(accountId)
+    }
+  }, [selectedAccountId])
+
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    void refreshOverview()
+  }, [refreshOverview])
 
   /** 数を出してよいのは、読めたときだけ。 */
   const hasListData = !accountLoading && !loading && loadFailure === null && Boolean(selectedAccountId)
@@ -161,40 +193,38 @@ export default function WebinarsPage() {
         />
       </div>
 
-      <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ウェビナー</p>
-          {/*
-            **読めていないときに 0 件と書かない。** 「1つも無い」と
-            「読めなかった」は別のことで、0 と出すと消えたように見える。
-            数が無いときは `—`（単位も付けない。`—件` は数に見える）。
-          */}
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {hasListData ? visibleItems.length : '—'}
-            {hasListData && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {hasListData ? visibleItems.filter((w) => w.status === 'active').length : '—（未取得）'}
-          </p>
+      {visibleOverviewFailure ? (
+        <div className="mx-auto mb-4 max-w-6xl px-6">
+          <ListState
+            kind={visibleOverviewFailure.kind}
+            title={visibleOverviewFailure.title}
+            description={visibleOverviewFailure.description}
+            action={
+              visibleOverviewFailure.retryable
+                ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button>
+                : undefined
+            }
+          />
         </div>
-        {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
-            一覧でまとめて数える経路を持っていない。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">申込</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">一覧では数えられません</p>
+      ) : (
+        <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
+          {overviewCards(visibleOverview).map((card) => (
+            <div key={card.key} className="bg-canvas rounded-card border-hairline border p-4">
+              <p className="text-ink-faint text-xs">{card.title}</p>
+              <p
+                className={`mt-1 text-2xl font-bold tabular-nums ${
+                  card.view.available ? 'text-ink' : 'text-ink-faint'
+                }`}
+              >
+                {card.view.text}
+              </p>
+              <p className="text-ink-faint mt-0.5 text-xs">
+                {card.view.note ?? card.detail ?? ''}
+              </p>
+            </div>
+          ))}
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">平均視聴率</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">申込者のうち</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">平均視聴時間</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">視聴ログの集計は未対応</p>
-        </div>
-      </div>
+      )}
       <div className="p-6 max-w-6xl mx-auto">
         <div
           data-design="Bar"
