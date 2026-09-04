@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import PageHeader from '@/components/shared/page-header'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
@@ -469,6 +470,18 @@ export default function SettingsPage() {
                 ))}
               </div>
               <SidebarPreview groups={groups} features={features} />
+              {/*
+                運営だけが触る表への入口。要件 v6-34 §5-2「呼び出し元: 31 機能設定の
+                『運営』区分」。**入口をここに 1 つだけ置く。**
+                画面の中身は開いた先で権限を確かめる（運営以外には出さない）。
+              */}
+              <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
+                <p className="text-ink text-sm font-bold">運営</p>
+                <p className="text-ink-secondary mt-1 text-xs leading-5">お客さまの組織からは見えません。</p>
+                <Link href="/settings/manual-links" className="text-accent-deep mt-3 inline-block text-sm font-bold">
+                  マニュアルの正本表
+                </Link>
+              </div>
             </div>
           )}
         </>
