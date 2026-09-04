@@ -18,7 +18,7 @@
   align-items: center; /* alignItems: center */
   justify-content: center; /* justifyContent: center */
   border: none;
-  border-radius: var(--radius-tiny); /* cornerRadius: $radius-xxs */
+  border-radius: var(--radius-icon); /* cornerRadius: $radius-xxs */
   background: none;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   cursor: pointer;

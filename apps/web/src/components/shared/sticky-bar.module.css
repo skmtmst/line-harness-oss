@@ -18,7 +18,7 @@
   min-height: 72px; /* height: 72 */
   padding: 12px 20px; /* padding: [0, 20]。折り返したときのために上下を持つ */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
   background: var(--color-canvas); /* fill: $canvas */
 }
 

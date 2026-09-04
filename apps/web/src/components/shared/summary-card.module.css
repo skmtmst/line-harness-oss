@@ -5,7 +5,7 @@
   min-height: 100px;
   padding: 14px 16px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   box-shadow: var(--shadow-card);
 }
@@ -61,7 +61,7 @@
 .badge {
   flex-shrink: 0;
   padding: 3px 8px;
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-card);
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-size: var(--text-nano);

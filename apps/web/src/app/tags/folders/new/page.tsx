@@ -183,7 +183,7 @@ function FolderEditor() {
                       aria-pressed={selected}
                       disabled={loadState !== 'ready'}
                       onClick={() => setColor(item)}
-                      className={`rounded-tile bg-canvas flex h-[38px] w-[38px] items-center justify-center disabled:opacity-40 ${
+                      className={`rounded-card bg-canvas flex h-[38px] w-[38px] items-center justify-center disabled:opacity-40 ${
                         selected ? 'ring-accent ring-2' : 'ring-hairline ring-1'
                       }`}
                     >
@@ -201,7 +201,7 @@ function FolderEditor() {
               設計 `byqIW` の「一覧での表示」。色だけ選んでも、一覧で
               どう出るかは分からない。**選んだ色のまま名前を並べて見せる。**
             */}
-            <div className="rounded-tile border-hairline bg-canvas-sunken mt-6 flex flex-col gap-[7px] border p-[14px]">
+            <div className="rounded-card border-hairline bg-canvas-sunken mt-6 flex flex-col gap-[7px] border p-[14px]">
               <p className="text-nano text-ink-faint font-semibold">一覧での表示</p>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />

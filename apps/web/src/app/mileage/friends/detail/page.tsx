@@ -138,15 +138,15 @@ function FriendMileageInner() {
         <div className="flex flex-wrap items-center gap-4 p-4">
           {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent">{displayName.slice(0, 1)}</div>}
           <div className="min-w-44">
-            <p className="font-bold text-v6-ink">{displayName}</p>
-            <p className="mt-1 text-xs text-v6-ink-faint">本人確認済みの接続先だけを表示します</p>
+            <p className="font-bold text-ink">{displayName}</p>
+            <p className="mt-1 text-xs text-ink-faint">本人確認済みの接続先だけを表示します</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {connectedAccounts === null ? (
-              <span className="text-sm text-v6-ink-faint">接続先を確認できませんでした</span>
+              <span className="text-sm text-ink-faint">接続先を確認できませんでした</span>
             ) : connectedAccounts.length > 0 ? connectedAccounts.map((connection) => (
-              <span key={connection.accountId} className="rounded-full border border-hairline bg-v6-surface px-3 py-1 text-xs font-semibold text-v6-ink-secondary">{connection.accountName}</span>
-            )) : <span className="text-sm text-v6-ink-faint">接続先はありません</span>}
+              <span key={connection.accountId} className="rounded-full border border-hairline bg-surface-pearl px-3 py-1 text-xs font-semibold text-ink-secondary">{connection.accountName}</span>
+            )) : <span className="text-sm text-ink-faint">接続先はありません</span>}
           </div>
         </div>
       </Card>
@@ -162,16 +162,16 @@ function FriendMileageInner() {
               {mileage.history.map((item) => (
                 <Tr key={item.id}>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
-                  <Td><p className="font-semibold text-v6-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-v6-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
-                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-v6-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
-                  <Td><p className="max-w-56 truncate font-medium text-v6-ink" title={item.reason}>{item.reason}</p></Td>
+                  <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
+                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
+                  <Td><p className="max-w-56 truncate font-medium text-ink" title={item.reason}>{item.reason}</p></Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
-                    <p className="mt-1 text-xs text-v6-ink-faint">
+                    <p className="mt-1 text-xs text-ink-faint">
                       {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.sourceEventId != null })}
                     </p>
                   </Td>
-                  <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>
+                  <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>
                 </Tr>
               ))}
             </tbody>
