@@ -20,6 +20,7 @@ import {
 import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import {
   assertMessagePartsResolved,
@@ -356,6 +357,79 @@ export async function processBroadcastSend(
   return (await getBroadcastById(db, broadcastId))!;
 }
 
+/**
+ * 予約配信を送る直前に、残りの送信枠を確かめる（設計 `Bw0zt`、台帳 #120）。
+ *
+ * **止めるのは「足りないと分かったとき」だけ。** 枠が読めないときは通す
+ * ——LINE の口が落ちているだけで予約を潰すと、送れるはずの配信が届かない。
+ *
+ * 止めたときは通知センターへ理由を残す。**運用者が結果画面で読める**
+ * ようにするため（何通足りないか、次に何をすればよいか）。
+ */
+async function guardScheduledBroadcastQuota(
+  db: D1Database,
+  broadcast: Broadcast,
+  accountId: string | null,
+): Promise<{ blocked: boolean }> {
+  if (!accountId) return { blocked: false };
+
+  const { getLineAccountById } = await import('@line-crm/db');
+  const account = await getLineAccountById(db, accountId);
+  if (!account) return { blocked: false };
+
+  /*
+    これから送る通数。**下書きに数えた `total_count` ではなく、いま数え直す。**
+    予約してから友だちが増減するので、古い数で枠を見ても意味がない。
+  */
+  const planned = await countScheduledRecipients(db, broadcast, accountId);
+  if (planned === null || planned === 0) return { blocked: false };
+
+  const check = evaluateQuota(await fetchQuota(account.channel_access_token), planned);
+  if (check.state !== 'short') return { blocked: false };
+
+  const { createNotification } = await import('@line-crm/db');
+  await createNotification(db, {
+    eventType: 'broadcast.quota_short',
+    title: `「${broadcast.title}」を送れませんでした`,
+    body: shortfallMessage(check, planned),
+    channel: 'center',
+    category: 'error',
+    lineAccountId: accountId,
+    metadata: JSON.stringify({
+      broadcastId: broadcast.id,
+      planned,
+      remaining: check.remaining,
+      shortfall: check.shortfall,
+    }),
+  });
+  return { blocked: true };
+}
+
+/** いま同じ条件で数え直した宛先の数。数えられなければ `null`（止めない）。 */
+async function countScheduledRecipients(
+  db: D1Database,
+  broadcast: Broadcast,
+  accountId: string,
+): Promise<number | null> {
+  try {
+    const where: string[] = ['f.is_following = 1', 'f.line_account_id = ?'];
+    const binds: unknown[] = [accountId];
+    if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
+      where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
+      binds.push(broadcast.target_tag_id);
+    }
+    const row = await db
+      .prepare(`SELECT COUNT(*) AS total FROM friends f WHERE ${where.join(' AND ')}`)
+      .bind(...binds)
+      .first<{ total: number }>();
+    const total = Number(row?.total ?? 0);
+    return Number.isFinite(total) ? total : null;
+  } catch {
+    // 数えられないことを 0 と読まない。**分からないものは止める理由にしない。**
+    return null;
+  }
+}
+
 export async function processScheduledBroadcasts(
   db: D1Database,
   lineClient: LineClient,
@@ -394,6 +468,23 @@ export async function processScheduledBroadcasts(
         }
       } else {
         recordLineTokenDefaultFallback({ accountId: null, context: 'broadcast.scheduled' });
+      }
+
+      /*
+        **送る直前に、残りの送信枠を確かめる**（設計 `Bw0zt`、台帳 #120）。
+        予約したあとに枠を使い切ると、**予約は実行されるが途中で失敗する**。
+        送った人と送れなかった人が混ざり、運用者は結果を見るまで気づけない。
+
+        **取れないときは止めない。** LINE の口が落ちているだけで予約を潰すと、
+        送れるはずの配信が届かなくなる。
+      */
+      const guard = await guardScheduledBroadcastQuota(db, broadcast, accountId);
+      if (guard.blocked) {
+        // 下書きへ戻す。**内容は消さない**ので、相手を減らして予約し直せる。
+        await db.prepare(
+          `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
+        ).bind(broadcast.id).run();
+        continue;
       }
 
       await processBroadcastSend(db, deliveryClient, broadcast.id, workerUrl);
