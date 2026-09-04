@@ -330,7 +330,7 @@ function FriendDetailInner() {
               </button>
               <Link
                 href={`/chats?friendId=${friendId}`}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
               >
                 個別トークを開く
               </Link>
@@ -637,7 +637,7 @@ function FriendDetailInner() {
                       <button
                         onClick={save}
                         disabled={saving}
-                        className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+                        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
                       >
                         {saving ? '保存中...' : '保存'}
                       </button>

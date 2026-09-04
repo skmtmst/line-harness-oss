@@ -9,6 +9,8 @@
  * どちらが効いているのか読めなくなる。
  */
 
+import { enrollFriendInReminder } from '@line-crm/db';
+
 export type ReminderTriggerType = 'manual' | 'booking' | 'event';
 
 export interface ReminderTriggerRow {
@@ -17,6 +19,7 @@ export interface ReminderTriggerRow {
   trigger_offset_minutes: number | null;
   send_at_time: string | null;
   target_tag_id: string | null;
+  current_published_version_id: string | null;
 }
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -66,13 +69,17 @@ export async function enrollByTrigger(
     triggerType: Exclude<ReminderTriggerType, 'manual'>;
     friendId: string;
     startsAtIso: string;
+    sourceId?: string | null;
+    sourceEventId?: string | null;
   },
 ): Promise<number> {
   const rules = await db
     .prepare(
-      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id
+      `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
+              current_published_version_id
          FROM reminders
-        WHERE is_active = 1 AND deleted_at IS NULL AND trigger_type = ?`,
+        WHERE is_active = 1 AND lifecycle_status = 'published'
+          AND deleted_at IS NULL AND trigger_type = ?`,
     )
     .bind(input.triggerType)
     .all<ReminderTriggerRow>();
@@ -101,14 +108,14 @@ export async function enrollByTrigger(
       .first<{ 1: number }>();
     if (existing) continue;
 
-    const now = new Date().toISOString();
-    await db
-      .prepare(
-        `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(crypto.randomUUID(), input.friendId, rule.id, anchor, now, now)
-      .run();
+    await enrollFriendInReminder(db, {
+      friendId: input.friendId,
+      reminderId: rule.id,
+      targetDate: anchor,
+      sourceKind: input.triggerType,
+      sourceId: input.sourceId ?? null,
+      sourceEventId: input.sourceEventId ?? null,
+    });
     enrolled++;
   }
   return enrolled;

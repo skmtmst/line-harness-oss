@@ -312,6 +312,93 @@ export async function getLineAccounts(
   );
 }
 
+export interface LineAccountListStats {
+  friendCount: number;
+  activeScenarios: number;
+  messagesThisMonth: number;
+}
+
+/**
+ * Returns the three counters used by the account list in one D1 query.
+ *
+ * The JSON input keeps the bind count constant even when an operator has many
+ * accounts. Each source is aggregated before UNION ALL so joins cannot
+ * multiply another source's count.
+ */
+export async function getLineAccountListStats(
+  db: D1Database,
+  lineAccountIds: string[],
+): Promise<Record<string, LineAccountListStats>> {
+  if (lineAccountIds.length === 0) return {};
+
+  const result = await db
+    .prepare(
+      `WITH requested_accounts(line_account_id) AS (
+         SELECT CAST(value AS TEXT) FROM json_each(?)
+       ), source_counts AS (
+         SELECT f.line_account_id,
+                COUNT(*) AS friend_count,
+                0 AS active_scenarios,
+                0 AS messages_this_month
+           FROM friends f
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = f.line_account_id
+          WHERE f.is_following = 1
+          GROUP BY f.line_account_id
+         UNION ALL
+         SELECT f.line_account_id,
+                0 AS friend_count,
+                COUNT(*) AS active_scenarios,
+                0 AS messages_this_month
+           FROM friend_scenarios fs
+           INNER JOIN friends f ON f.id = fs.friend_id
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = f.line_account_id
+          WHERE fs.status = 'active'
+          GROUP BY f.line_account_id
+         UNION ALL
+         SELECT f.line_account_id,
+                0 AS friend_count,
+                0 AS active_scenarios,
+                COUNT(*) AS messages_this_month
+           FROM messages_log ml
+           INNER JOIN friends f ON f.id = ml.friend_id
+           INNER JOIN requested_accounts requested
+             ON requested.line_account_id = f.line_account_id
+          WHERE ml.direction = 'outgoing'
+            AND (ml.delivery_type IS NULL OR ml.delivery_type = 'push')
+            AND ml.created_at >= date('now', 'start of month')
+          GROUP BY f.line_account_id
+       )
+       SELECT requested.line_account_id,
+              COALESCE(SUM(source.friend_count), 0) AS friend_count,
+              COALESCE(SUM(source.active_scenarios), 0) AS active_scenarios,
+              COALESCE(SUM(source.messages_this_month), 0) AS messages_this_month
+         FROM requested_accounts requested
+         LEFT JOIN source_counts source
+           ON source.line_account_id = requested.line_account_id
+        GROUP BY requested.line_account_id`,
+    )
+    .bind(JSON.stringify(lineAccountIds))
+    .all<{
+      line_account_id: string;
+      friend_count: number;
+      active_scenarios: number;
+      messages_this_month: number;
+    }>();
+
+  return Object.fromEntries(
+    result.results.map((row) => [
+      row.line_account_id,
+      {
+        friendCount: Number(row.friend_count),
+        activeScenarios: Number(row.active_scenarios),
+        messagesThisMonth: Number(row.messages_this_month),
+      },
+    ]),
+  );
+}
+
 export async function getLineAccountByChannelId(
   db: D1Database,
   channelId: string,

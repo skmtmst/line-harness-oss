@@ -4,6 +4,17 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
+import { NotConnected } from '@/components/shared/not-connected'
+import WebinarLinePreview from '@/components/webinars/webinar-line-preview'
+import { ctaPreview, notificationPreview, videoPreview } from './preview-body'
+import {
+  STEPS,
+  nextLabelOf,
+  nextStepOf,
+  publishBlockers,
+  stepStateOf,
+  type StepKey,
+} from './edit-steps'
 import WebinarForm from '@/components/webinars/webinar-form'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -668,16 +679,25 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
     webinarApi
       .ctas(webinarId)
       .then((res) => {
+        /*
+          **配列で来なかったら、読めなかったこととして扱う。**
+          口の契約は配列（`apps/worker/src/routes/webinars.ts:904` が
+          `data: ctas.map(...)` を返す）だが、器だけ違う返事が来ると
+          `ctas.map is not a function` で**この面が白い画面になる**。
+          そのまま保存に進むと、置き換えで既存のCTAを消してしまう。
+        */
+        if (!Array.isArray(res.data)) throw new Error('cta_list_not_array')
         setCtas(res.data)
         setTimes(res.data.map((c) => fmtMinSec(c.atSeconds)))
         setLoaded(true)
       })
-      .catch(() => setMessage('CTAカードの読み込みに失敗しました。リロードしてください。'))
+      .catch(() => setMessage('CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。'))
     if (accountId) {
       fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
       )
-        .then((res) => setForms(res.data.map((f) => ({ id: f.id, name: f.name }))))
+        /* 同上。フォームの一覧も配列で来るとは限らない。 */
+        .then((res) => setForms(Array.isArray(res.data) ? res.data.map((f) => ({ id: f.id, name: f.name })) : []))
         .catch(() => undefined)
     } else {
       setForms([])
@@ -830,14 +850,64 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
  * 見ている途中に出すもの → 見終わったあとの動き」の順に並べている。
  * 実装は分析タブを先頭に置いていたが、編集画面なので設定を先にする。
  */
-const TABS = [
-  ['settings', 'いつ見られるようにするか'],
-  ['ctas', '見ている途中に出すもの'],
+/**
+ * 段の外にあるもの。**設計の5段には無いが、実装が持っている。**
+ * 段に混ぜると「作り終えるのに必要な手順」に見えてしまうので、分けて置く。
+ */
+const EXTRAS = [
   ['comments', 'コメント演出'],
   ['analytics', '概要・分析'],
 ] as const
 
-type TabKey = (typeof TABS)[number][0]
+type ExtraKey = (typeof EXTRAS)[number][0]
+type PaneKey = StepKey | ExtraKey
+
+/**
+ * STEP 5 確認（設計 `D6yO7e`）。**公開の前に、足りないものを1つずつ言う。**
+ * ここで言えないと、公開してから友だちの画面で気づくことになる。
+ */
+function ReviewStep({ webinar, onBack }: { webinar: Webinar; onBack: (key: StepKey) => void }) {
+  const blockers = publishBlockers(webinar)
+  return (
+    <section className="border-hairline bg-canvas space-y-4 rounded-2xl border p-5 shadow-sm sm:p-6" data-design-node="D6yO7e">
+      <div>
+        <h2 className="text-ink font-bold">公開の前に確認</h2>
+        <p className="text-ink-faint mt-1 text-xs">公開すると、友だちが申込・視聴できるようになります。</p>
+      </div>
+      {blockers.length > 0 ? (
+        <div className="text-warning bg-warning-bg rounded-card p-4 text-sm">
+          <p className="font-bold">このままでは公開できません。</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+            {blockers.map((text) => <li key={text}>{text}</li>)}
+          </ul>
+        </div>
+      ) : (
+        <p className="bg-success-bg text-success rounded-card p-4 text-sm font-bold">
+          必要なものは揃っています。
+        </p>
+      )}
+      <dl className="divide-hairline border-hairline divide-y rounded-xl border">
+        {[
+          ['タイトル', webinar.title || '未設定'],
+          ['公開ページ', `/webinar/${webinar.slug || '未設定'}`],
+          ['動画の長さ', `${Math.round(webinar.durationSeconds / 60)}分`],
+          ['配信枠', `${webinar.schedule.length}件`],
+        ].map(([label, value]) => (
+          <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+            <dt className="text-ink-faint text-xs font-semibold">{label}</dt>
+            <dd className="text-ink text-sm">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
+        <Button onClick={() => onBack('video')}>動画へ戻る</Button>
+      </div>
+      {/* 公開そのものは「基本設定」の公開状態を変えて保存する。ここに2つ目の公開口を作らない。 */}
+      <p className="text-ink-faint text-xs">公開するときは、基本設定の「公開状態」を公開中にして保存してください。</p>
+    </section>
+  )
+}
 
 function EditWebinarInner() {
   const id = useSearchParams().get('id')
@@ -845,7 +915,11 @@ function EditWebinarInner() {
   const [webinar, setWebinar] = useState<Webinar | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabKey>('analytics')
+  /*
+    **編集画面なので、開いた直後は設定の1段目**。前は「概要・分析」を先頭に
+    置いていたので、直しに来た人が結果の画面から始めることになっていた。
+  */
+  const [pane, setPane] = useState<PaneKey>('basic')
 
   useEffect(() => {
     if (!id) return
@@ -951,28 +1025,117 @@ function EditWebinarInner() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid grid-cols-2 gap-1 border-b border-slate-200 bg-slate-50/70 p-2 sm:flex sm:gap-0 sm:overflow-x-auto sm:px-4 sm:pb-0 sm:pt-2">
-            {TABS.map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`shrink-0 rounded-lg border px-2 py-2.5 text-xs font-semibold transition-colors sm:rounded-b-none sm:rounded-t-xl sm:border-x-0 sm:border-t-0 sm:border-b-2 sm:px-5 sm:py-3 sm:text-sm ${
-                  tab === key
-                    ? 'border-blue-200 bg-blue-50 text-blue-700 sm:border-b-blue-600 sm:bg-white sm:shadow-[0_-1px_0_0_rgba(226,232,240,1)]'
-                    : 'border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-800'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {/*
+          段の進み表示（設計 4-8 の STEP 1〜5）。**いま何段目で、あと何が
+          残っているか**を出す。前は横並びのタブで、押した先が設定なのか
+          結果なのかも、まだ足りない段があるのかも言えていなかった。
+
+          印は**通り過ぎたかではなく、その段の入力が入っているか**で決める。
+          通り過ぎただけで済みにすると、空のまま公開へ進める。
+        */}
+        <ol className="border-hairline bg-canvas mb-4 flex flex-wrap items-center gap-1 rounded-2xl border p-3 shadow-sm">
+          {STEPS.map((step) => {
+            const state = stepStateOf(step.key, pane as StepKey, webinar)
+            return (
+              <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  data-qa-open={step.mark}
+                  data-design-node={step.node}
+                  onClick={() => setPane(step.key)}
+                  aria-current={pane === step.key ? 'step' : undefined}
+                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                    state === 'current'
+                      ? 'bg-accent-soft text-ink'
+                      : 'text-ink-secondary hover:bg-canvas-sunken'
+                  }`}
+                >
+                  {/* 印の描き方は共通の `StepRail`（設計 `LMiL2`）にそろえる。 */}
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      state === 'done'
+                        ? 'bg-accent-deep text-on-accent'
+                        : state === 'current'
+                          ? 'border-accent text-accent border-2'
+                          : 'border-hairline text-ink-faint border'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {state === 'done' ? '✓' : step.no}
+                  </span>
+                  <span className="min-w-0 truncate">
+                    STEP {step.no} {step.title}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+
+        {/* 段の外にあるもの。作り終えるのに必要な手順と混ぜない。 */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {EXTRAS.map(([key, label]) => (
+            <Button
+              key={key}
+              variant={pane === key ? 'primary' : 'secondary'}
+              onClick={() => setPane(key)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="border-hairline bg-canvas overflow-hidden rounded-2xl border shadow-sm">
+          <div className="p-4 sm:p-6 xl:p-8">
+            {/*
+              基本設定と動画は同じ入力面（`WebinarForm`）が受け持つ。
+              **段を分けるために面を割らない**——割ると、いま在る1枚の
+              保存の口が2つに増え、片方だけ保存する事故が起きる。
+            */}
+            {(pane === 'basic' || pane === 'video') && (
+              /*
+                設計は段の右にLINEプレビューを置く（`PV1Vh` `d3rFGD` `Ho8z4`）。
+                **中身は各段の入力から組み立てる。新しい口は使わない。**
+                入力がまだ無いときは、それらしい文を作らずに何を入れれば
+                埋まるかを書く——見本の文を置くと、保存すればそれが届くと
+                読めてしまう。
+              */
+              <div className="flex flex-col gap-6 xl:flex-row">
+                <div className="min-w-0 flex-1"><WebinarForm initial={webinar} /></div>
+                {pane === 'video' && (
+                  <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...videoPreview(webinar)} /></div>
+                )}
+              </div>
+            )}
+            {pane === 'cta' && (
+              <div className="flex flex-col gap-6 xl:flex-row">
+                <div className="min-w-0 flex-1"><CtasTab webinarId={webinar.id} accountId={webinar.accountId} /></div>
+                <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...ctaPreview(webinar)} /></div>
+              </div>
+            )}
+            {pane === 'notifications' && (
+              <div className="flex flex-col gap-6 xl:flex-row">
+                {/*
+                  **口がまだ無い段**（台帳 Issue #93）。押せる形で置かず、
+                  理由を見える文字で出す。
+                */}
+                <div className="min-w-0 flex-1"><NotConnected source="通知・リマインドの設定" /></div>
+                {/* 送る文がまだ無いので、プレビューも「何を入れれば埋まるか」だけ。 */}
+                <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...notificationPreview(null)} /></div>
+              </div>
+            )}
+            {pane === 'review' && <ReviewStep webinar={webinar} onBack={setPane} />}
+            {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
+            {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
           </div>
-          <div className="bg-slate-50/40 p-4 sm:p-6 xl:p-8">
-            {tab === 'settings' && <WebinarForm initial={webinar} />}
-            {tab === 'comments' && <CommentsTab webinarId={webinar.id} />}
-            {tab === 'ctas' && <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />}
-            {tab === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
-          </div>
+          {/* 次の段へ。設計は行き先の名前で書く（「動画へ」「確認へ」）。 */}
+          {nextStepOf(pane as StepKey) && (
+            <div className="border-hairline flex justify-end border-t px-4 py-3 sm:px-6">
+              <Button variant="primary" onClick={() => setPane(nextStepOf(pane as StepKey) as StepKey)}>
+                {nextLabelOf(pane as StepKey)}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </>

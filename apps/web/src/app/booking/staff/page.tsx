@@ -85,7 +85,7 @@ export default function BookingStaffPage() {
           <button
             onClick={() => setEditing(EMPTY)}
             disabled={!selectedAccountId || loadStatus !== 'ready'}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
           >
             + 新規スタッフ
           </button>
@@ -296,7 +296,7 @@ function Modal({
           <button
             onClick={submit}
             disabled={saving}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
           >
             {saving ? '保存中…' : '保存'}
           </button>

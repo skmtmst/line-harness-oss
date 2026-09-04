@@ -607,7 +607,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                       }
                       className={`rounded-pill px-2.5 py-1 text-xs transition-colors ${
                         on
-                          ? 'bg-accent text-on-accent'
+                          ? 'bg-accent-deep text-on-accent'
                           : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
                       }`}
                     >
@@ -838,7 +838,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
           >
             {saving ? '保存中...' : '保存'}
           </button>
