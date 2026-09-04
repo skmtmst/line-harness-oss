@@ -14,7 +14,7 @@ describe('V6 友だち一覧の読込状態', () => {
   it('読込失敗を0件の友だち一覧として表示しない', () => {
     expect(PAGE).toContain("loadStatus === 'error'")
     expect(PAGE).toContain('登録した友だちは消えていません。')
-    expect(PAGE).toContain('友だちを再読み込み')
+    expect(PAGE).toContain('onRetry={() => void loadFriends()}')
     expect(PAGE).not.toContain('setError(response.error)')
   })
 
