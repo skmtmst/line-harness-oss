@@ -3,6 +3,7 @@ import {
   recordMediaUsage,
   recordMediaUsages,
   pruneStaleMediaUsages,
+  pruneStaleMediaUsagesBatch,
   saveMediaUsageScanState,
   type MediaRefKind,
 } from '@line-crm/db';
@@ -49,6 +50,10 @@ export interface ScanResult {
 }
 
 type MediaToScan = { id: string; r2_key: string };
+
+const MAX_SOURCE_ROWS = 4_000;
+const MAX_USAGE_WRITES = 4_000;
+const MAX_PRUNE_ROWS = 1_000;
 
 function isMissingSourceTable(error: unknown, table: string): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -119,12 +124,42 @@ export async function scanMediaUsage(
     .all<{ id: string; r2_key: string }>();
   if (media.results.length === 0) return { scanned: 0, matched: 0, pruned: 0 };
 
-  const stateIsValid = state.sourceIndex >= 0 && state.sourceIndex < SOURCES.length;
+  const stateIsValid = state.sourceIndex >= 0 && state.sourceIndex <= SOURCES.length;
   const sourceIndex = stateIsValid ? state.sourceIndex : 0;
   const lastRefId = stateIsValid ? state.lastRefId : '';
+
+  // 参照走査と古い記録の整理を同じcronへ載せると、整理件数分だけ上限を超える。
+  // 7種類を読み終えた次のcronから、整理だけを上限付きで続ける。
+  if (sourceIndex === SOURCES.length) {
+    const pruned = await pruneStaleMediaUsagesBatch(
+      db,
+      state.cycleStartedAt,
+      media.results.map((item) => item.id),
+      MAX_PRUNE_ROWS,
+    );
+    const cycleCompleted = pruned < MAX_PRUNE_ROWS;
+    await saveMediaUsageScanState(db, cycleCompleted ? {
+      sourceIndex: 0,
+      lastRefId: '',
+      cycleStartedAt: now,
+    } : {
+      ...state,
+      sourceIndex: SOURCES.length,
+      lastRefId: '',
+    }, now);
+    return {
+      scanned: media.results.length,
+      matched: 0,
+      pruned,
+      sourceRows: 0,
+      cycleCompleted,
+    };
+  }
+
   const source = SOURCES[sourceIndex];
-  // media 500件と合わせても、1回のcronで読むDB行を1万件未満に固定する。
-  const rowLimit = Math.min(Math.max(opts.sourceRowLimit ?? 1_000, 1), 9_000);
+  // 参照行と使用先の既存行確認を各4,000件までにし、media 500件・state 1件を
+  // 足しても1回のcronで読むDB行を1万件未満に固定する。
+  const rowLimit = Math.min(Math.max(opts.sourceRowLimit ?? 1_000, 1), MAX_SOURCE_ROWS);
   const selectedColumns = source.columns.map((column) => `, ${column}`).join('');
   let rows: Array<Record<string, unknown> & { ref_id: string }> = [];
   let sourceMissing = false;
@@ -146,35 +181,37 @@ export async function scanMediaUsage(
   }
 
   const usages: Array<{ mediaId: string; refKind: MediaRefKind; refId: string }> = [];
+  let processedRows = 0;
+  let writeBudgetExhausted = false;
   for (const row of rows) {
     const searchable = source.columns
       .map((column) => row[column])
       .filter((value): value is string => typeof value === 'string')
       .join('\n');
-    if (!searchable) continue;
+    const rowUsages: typeof usages = [];
     for (const item of media.results) {
       if (item.r2_key && searchable.includes(item.r2_key)) {
-        usages.push({ mediaId: item.id, refKind: source.refKind, refId: String(row.ref_id) });
+        rowUsages.push({ mediaId: item.id, refKind: source.refKind, refId: String(row.ref_id) });
       }
     }
+    if (usages.length + rowUsages.length > MAX_USAGE_WRITES) {
+      writeBudgetExhausted = true;
+      break;
+    }
+    usages.push(...rowUsages);
+    processedRows += 1;
   }
   await recordMediaUsages(db, usages, now);
 
-  const sourceCompleted = sourceMissing || rows.length < rowLimit;
+  const sourceCompleted = sourceMissing || (!writeBudgetExhausted && rows.length < rowLimit);
   let cycleCompleted = false;
   let pruned = 0;
   if (sourceCompleted && sourceIndex === SOURCES.length - 1) {
-    // 7種類をすべて走査した時だけ、1周の開始前から更新されていない記録を落とす。
-    pruned = await pruneStaleMediaUsages(
-      db,
-      state.cycleStartedAt,
-      media.results.map((item) => item.id),
-    );
-    cycleCompleted = true;
+    // 整理は読込予算を分けるため、次のcronへ送る。
     await saveMediaUsageScanState(db, {
-      sourceIndex: 0,
+      sourceIndex: SOURCES.length,
       lastRefId: '',
-      cycleStartedAt: now,
+      cycleStartedAt: state.cycleStartedAt,
     }, now);
   } else if (sourceCompleted) {
     await saveMediaUsageScanState(db, {
@@ -186,7 +223,7 @@ export async function scanMediaUsage(
     await saveMediaUsageScanState(db, {
       ...state,
       sourceIndex,
-      lastRefId: String(rows.at(-1)?.ref_id ?? lastRefId),
+      lastRefId: String(rows[processedRows - 1]?.ref_id ?? lastRefId),
     }, now);
   }
 
