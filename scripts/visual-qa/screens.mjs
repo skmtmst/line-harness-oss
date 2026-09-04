@@ -1749,11 +1749,7 @@ export const SCREENS = [
       `publishedVersion` の2つしか持たない。
     */
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/score-rules',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/mileage/score-rules` が development に無い。判定は未マージ枝 `642b8222` で書かれたもの',
-    why: '`/mileage/score-rules` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    verdict: 'needs_fix', verdictNote: 'P2（つながる先・パンくず・読む場面と直す場面の分離） **ルート**：`/mileage/score-rules`。**取得元**：`mileage-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：読む場面と直す場面を分け、パンくずとつながる先を足す。**残作業**：この画面の本文を撮って差を数え直す。いまの判定は括弧書きだけで、具体的な差を出せていない。', verdictSource: 'mileage-v6/design-qa-score-rules-496.md', verdictHead: '642b8222',
+    verdict: 'needs_fix', verdictNote: '**2026-09-04 画面を載せ直した（board#75）。** それまで development に `page.tsx` が無かった——PR #496 が閉じられ、#770 は**口だけ**を入れ直したので、画面の半分が落ちたままだった。行動スコアのタブから決めごとへ行く先が無く、**点数の付け方を画面から変えられなかった。** 旧 PR #499 の直し（失敗の言い方・表の幅）を載せ、あわせて2つそろえた：(1) 呼び方を「層」→**「帯」**（タブ側は統一済みで、この面だけ戻ると同じ機能の中で名前が2つになる。§7 #48）。(2) 断り文をタブ側と同じ「スコアはマイルではありません。お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。」に（前は「顧客には表示しません…顧客の価値を表す点数ではありません」で、**「マイルが減るのでは」に答えられなかった**）。 **失敗の言い方**：`ApiError` の `message` は 400 以外だと `API error: <番号>` に落ちるので、素通しすると **`API error: 405` が利用者に見える**。403/404/405/409 と通信断を言葉にした。 **表の幅**：`table-layout: fixed` の6列が等分され「こちらに返信した」が切れていた。列ごとに幅を決め、右の柱は 1536px から戻す。 **見るだけの人にスイッチを出さない**：共通 `Toggle` に「押せないが状態は見せる」入口が無く、`locked` は**オンに固定して描く**印なので、止めているルールが動いて見える。動かせない相手には文字だけで状態を伝える。 撮影用の固定データ `ACTION_SCORE_RULES` を足し、**帯の境目を 30 / 70 にそろえた**（`/api/action-scores/friends` が `normalMin: 40` を返していて、一覧と決めごとで同じ人が別の帯に入って見えた。40 に根拠は無い）。 残る差（P2）：つながる先・パンくず・読む場面と直す場面の分離。**設計画像との突き合わせはこれから**——この画面の `.txt` はまだ取れていない。', verdictSource: '実装（board#75 で載せ直した枝）', verdictHead: '2f016fcd5',
     states: {
       apis: ['**/api/action-scores/rules?*'],
       kinds: ['normal', 'loading', 'empty', 'error'],

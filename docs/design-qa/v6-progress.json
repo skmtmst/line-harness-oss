@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 236,
-  "unimplemented": 22,
+  "compared": 239,
+  "unimplemented": 19,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 4,
   "match": 0,
   "structureMatchDataPending": 1,
-  "needsFix": 4,
-  "unjudged": 231,
+  "needsFix": 5,
+  "unjudged": 233,
   "remaining": 258,
   "features": [
     {
@@ -871,15 +871,15 @@
       "feature": 8,
       "name": "自動応答",
       "total": 11,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 10,
+      "unjudged": 11,
       "remaining": 11,
       "capturedAt": [
         {
@@ -988,15 +988,15 @@
       "feature": 10,
       "name": "ウェビナー",
       "total": 13,
-      "compared": 11,
-      "unimplemented": 2,
+      "compared": 12,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 11,
+      "unjudged": 12,
       "remaining": 13,
       "capturedAt": [
         {
@@ -1559,14 +1559,14 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 9,
-      "unimplemented": 2,
+      "compared": 10,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
+      "needsFix": 2,
       "unjudged": 8,
       "remaining": 11,
       "capturedAt": [
@@ -2473,13 +2473,6 @@
       "gapNote": "画面 `/reminders/detail` が development に無い。判定は未マージ枝 `4bc71249` で書かれたもの"
     },
     {
-      "feature": 8,
-      "node": "t7UtYQ",
-      "name": "8-1-H 実行結果",
-      "gap": "pending",
-      "gapNote": "画面 `/auto-replies/runs` が development に無い。判定は未マージ枝 `93edbe17` で書かれたもの"
-    },
-    {
       "feature": 9,
       "node": "s9gAx",
       "name": "9-1-A 基本設定",
@@ -2513,13 +2506,6 @@
       "name": "9-1-I 削除確認",
       "gap": "drop",
       "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
-    },
-    {
-      "feature": 10,
-      "node": "TimXl",
-      "name": "10-1-H 公開完了",
-      "gap": "pending",
-      "gapNote": "画面 `/webinars/published` が development に無い。判定は未マージ枝 `61eeb3c7` で書かれたもの"
     },
     {
       "feature": 10,
@@ -2562,13 +2548,6 @@
       "name": "17-1-G マイルの使い道をつくる",
       "gap": "pending",
       "gapNote": "画面 `/mileage/rewards/edit` が development に無い。判定は未マージ枝 `5e8f32d3` で書かれたもの"
-    },
-    {
-      "feature": 17,
-      "node": "s6MBc",
-      "name": "17-2-A スコアのルール",
-      "gap": "pending",
-      "gapNote": "画面 `/mileage/score-rules` が development に無い。判定は未マージ枝 `642b8222` で書かれたもの"
     },
     {
       "feature": 20,
