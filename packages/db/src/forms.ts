@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow } from './utils.js';
 // =============================================================================
 // Forms — Survey / questionnaire system (L社 回答フォーム equivalent)
 // =============================================================================
@@ -531,9 +531,9 @@ export async function getFormSubmissions(
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ? ORDER BY fs.created_at DESC`,
+       WHERE fs.form_id = ? ORDER BY fs.created_at DESC LIMIT ?`,
     )
-    .bind(formId)
+    .bind(formId, 200)
     .all<FormSubmission & { friend_name: string | null }>();
   return result.results;
 }
@@ -551,8 +551,11 @@ export async function getFormSubmissionsPage(
   formId: string,
   options: { page?: number; limit?: number } = {},
 ): Promise<FormSubmissionPage> {
-  const page = Math.max(1, Math.floor(options.page ?? 1));
-  const limit = Math.max(1, Math.min(Math.floor(options.limit ?? 20), 50));
+  const requestedPage = options.page;
+  const page = Number.isSafeInteger(requestedPage) && (requestedPage ?? 0) >= 1
+    ? requestedPage!
+    : 1;
+  const limit = boundedListLimit(options.limit, 20);
   const offset = (page - 1) * limit;
   const count = await db
     .prepare(`SELECT COUNT(*) AS total FROM form_submissions WHERE form_id = ?`)
@@ -577,7 +580,7 @@ export async function getFormSubmissionsByFriend(
   friendId: string,
   limit = 10,
 ): Promise<FriendFormSubmission[]> {
-  const safeLimit = Math.max(1, Math.min(Math.floor(limit), 50));
+  const safeLimit = boundedListLimit(limit, 10);
   const result = await db
     .prepare(
       `SELECT fs.*, f.name AS form_name, f.fields AS form_fields

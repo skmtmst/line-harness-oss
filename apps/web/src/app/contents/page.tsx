@@ -516,7 +516,7 @@ export default function MediaLibraryPage() {
           {/* 設計 `g89Tc` の「アップロード」: 高さ40・角丸8・左右14・13px/700。 */}
           <label
             htmlFor="media-upload"
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold transition-colors"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold transition-colors"
           >
             {uploading ? 'アップロード中...' : 'ファイルを選択する'}
           </label>
@@ -728,7 +728,7 @@ export default function MediaLibraryPage() {
                       </button>
                       <button
                         onClick={() => void rename()}
-                        className="bg-accent text-on-accent rounded px-2 py-1 text-[11px]"
+                        className="bg-accent-deep text-on-accent rounded px-2 py-1 text-[11px]"
                       >
                         保存
                       </button>
