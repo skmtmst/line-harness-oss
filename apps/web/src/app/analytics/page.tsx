@@ -418,18 +418,17 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-xs font-medium">
               よこの軸
             </label>
-            <select
+            <SelectField
               id="cross-field"
               value={fieldId}
               onChange={(e) => setFieldId(e.target.value)}
+              aria-label="よこの軸"
               className="v6-select w-full"
-            >
-              {fields.map((f) => (
-                <option key={f.id} value={f.id}>
-                  友だち情報 / {f.name}
-                </option>
-              ))}
-            </select>
+              options={fields.map((field) => ({
+                value: field.id,
+                label: `友だち情報 / ${field.name}`,
+              }))}
+            />
           </div>
           <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
             {loading ? '集計中' : 'この30日を集計'}
@@ -838,18 +837,14 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
                 ファネル
               </label>
-              <select
+              <SelectField
                 id="funnel-select"
                 value={selected}
                 onChange={(e) => setSelected(e.target.value)}
+                aria-label="ファネル"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
-              >
-                {funnels.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+                options={funnels.map((funnel) => ({ value: funnel.id, label: funnel.name }))}
+              />
               {selectedFunnel && (
                 <p className="text-ink-faint mt-1 text-xs">
                   {selectedFunnel.windowDays}日以内に通った人を数えます。
@@ -884,9 +879,17 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
                 <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
-                <select id="funnel-group" value={groupKey} onChange={(event) => setGroupKey(event.target.value)} className="v6-select w-full">
-                  {run.groups.map((group) => <option key={group.key} value={group.key}>{group.label}（入口 {group.entrants}人）</option>)}
-                </select>
+                <SelectField
+                  id="funnel-group"
+                  value={groupKey}
+                  onChange={(event) => setGroupKey(event.target.value)}
+                  aria-label="比較する条件"
+                  className="v6-select w-full"
+                  options={run.groups.map((group) => ({
+                    value: group.key,
+                    label: `${group.label}（入口 ${group.entrants}人）`,
+                  }))}
+                />
               </div>
             )}
           </section>
@@ -1157,21 +1160,17 @@ function FunnelForm({
             </div>
             <div>
               <label className="text-ink-faint mb-1 block text-xs">何をしたら</label>
-              <select
+              <SelectField
                 value={step.kind}
                 onChange={(e) =>
                   setSteps((prev) =>
                     prev.map((s, j) => (i === j ? { ...s, kind: e.target.value } : s)),
                   )
                 }
+                aria-label={`${i + 1}段目で何をしたら進むか`}
                 className="border-hairline rounded-control border px-2 py-1.5 text-sm"
-              >
-                {KINDS.map((k) => (
-                  <option key={k.key} value={k.key}>
-                    {k.label}
-                  </option>
-                ))}
-              </select>
+                options={KINDS.map((kind) => ({ value: kind.key, label: kind.label }))}
+              />
             </div>
             <div className="min-w-[10rem] flex-1">
               <label className="text-ink-faint mb-1 block text-xs">
