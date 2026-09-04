@@ -50,6 +50,8 @@ import {
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   TAGS, TAG_GROUPS,
+  SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
+  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -865,6 +867,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  /* 自動変更ルール（設計 `GMvBd` 4-3-A）。マークごとに返す。 */
+  if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
+    return { success: true, data: SUPPORT_MARK_AUTOMATION_RULES }
+  }
   const formDeleteImpact = /^\/api\/forms\/([^/]+)\/delete-impact$/.exec(pathname)
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'
@@ -886,6 +893,25 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     if (!tag) return { success: false, error: 'Not found' }
     return { success: true, data: tagDeleteImpact(tag) }
   }
+  /*
+    外部連携・流入経路・ログインユーザー。**空だと一覧の中身を設計と比べられない。**
+    `readArrayGetPaths()` はこれらを配列の口として拾うが、返す中身が無かったので
+    どの画面も「まだありません」の絵しか撮れず、34画面が空のままだった。
+  */
+  /*
+    いま入っている人。**これが無いと「管理者かどうか」が false になる。**
+    `staff/page.tsx` の `canEdit` は `administrator` を見ていて、
+    行の「範囲を編集」も「ユーザーを追加」も出なくなる。
+    既定の器が返っていたので、固定データを足しても押し口が出なかった。
+  */
+  if (pathname === '/api/staff/me') {
+    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null } }
+  }
+  if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
+  if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
+  if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {

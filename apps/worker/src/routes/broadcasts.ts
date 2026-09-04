@@ -809,6 +809,41 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
   }
 });
 
+// POST /api/broadcasts/:id/cancel - cancel a scheduled broadcast without deleting its content
+//
+// 読み取りの直後に予約実行が始まっても sending を draft に戻さないよう、
+// scheduled のままであることを UPDATE 側でも確認する。
+broadcasts.post('/api/broadcasts/:id/cancel', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const existing = await getBroadcastById(c.env.DB, id);
+    if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    if (existing.status !== 'scheduled' || !existing.scheduled_at) {
+      return c.json({ success: false, error: 'Only scheduled broadcasts can be cancelled' }, 409);
+    }
+
+    const result = await c.env.DB.prepare(
+      `UPDATE broadcasts
+       SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL
+       WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL`,
+    ).bind(id).run();
+    if ((result.meta.changes ?? 0) !== 1) {
+      return c.json({ success: false, error: 'Broadcast is no longer scheduled' }, 409);
+    }
+
+    const updated = await getBroadcastById(c.env.DB, id);
+    if (!updated) {
+      return c.json({ success: false, error: 'Broadcast not found after cancellation' }, 500);
+    }
+    return c.json({ success: true, data: serializeBroadcast(updated) });
+  } catch (err) {
+    console.error('POST /api/broadcasts/:id/cancel error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // DELETE /api/broadcasts/:id - delete
 broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
   try {
