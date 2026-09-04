@@ -1,13 +1,13 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 239,
-  "unimplemented": 19,
+  "compared": 240,
+  "unimplemented": 18,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 4,
   "match": 0,
-  "structureMatchDataPending": 1,
+  "structureMatchDataPending": 2,
   "needsFix": 5,
   "unjudged": 233,
   "remaining": 258,
@@ -52,9 +52,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 2,
-      "unjudged": 14,
+      "unjudged": 13,
       "remaining": 17,
       "capturedAt": [
         {
@@ -941,15 +941,15 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 10,
-      "compared": 5,
-      "unimplemented": 5,
+      "compared": 6,
+      "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 0,
-      "unjudged": 5,
+      "unjudged": 6,
       "remaining": 10,
       "capturedAt": [
         {
@@ -2492,13 +2492,6 @@
       "name": "9-1-C 初回案内",
       "gap": "drop",
       "gapNote": "最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**"
-    },
-    {
-      "feature": 9,
-      "node": "P2J0Te",
-      "name": "9-1-H 実行結果",
-      "gap": "pending",
-      "gapNote": "画面 `/friend-add-settings/runs` が development に無い。判定は未マージ枝 `5dc99107` で書かれたもの"
     },
     {
       "feature": 9,

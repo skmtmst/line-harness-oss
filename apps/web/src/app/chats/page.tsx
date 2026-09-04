@@ -1817,9 +1817,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <OperatorDropdown
                     value={chatDetail.operatorId ?? 'unassigned'}
                     operators={operators}
-                    onChange={(next) => void handleOperatorUpdate(next === 'unassigned' ? null : next)}
+                    onChange={(next) => {
+                      if (next === 'all') return
+                      void handleOperatorUpdate(next === 'unassigned' ? null : next)
+                    }}
                     label="担当"
                     ariaLabel="担当者を変える"
+                    allowAll={false}
                   />
                   <StatusDropdown
                     value={chatDetail.status as ChatStatus}
