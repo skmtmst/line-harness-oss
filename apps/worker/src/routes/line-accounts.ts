@@ -105,8 +105,14 @@ function serializeLineAccount(row: DbLineAccount) {
     channelAccessTokenConfigured: Boolean(
       row.channel_access_token_encrypted || row.channel_access_token,
     ),
+    channelAccessTokenLast4: row.channel_access_token_last4 ?? null,
+    channelAccessTokenUpdatedAt: row.channel_access_token_updated_at ?? null,
     channelSecretConfigured: Boolean(row.channel_secret_encrypted || row.channel_secret),
+    channelSecretLast4: row.channel_secret_last4 ?? null,
+    channelSecretUpdatedAt: row.channel_secret_updated_at ?? null,
     loginChannelSecretConfigured: Boolean(row.login_channel_secret),
+    loginChannelSecretLast4: row.login_channel_secret_last4 ?? null,
+    loginChannelSecretUpdatedAt: row.login_channel_secret_updated_at ?? null,
   };
 }
 

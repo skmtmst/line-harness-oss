@@ -74,6 +74,9 @@ const fakeAccount = {
   name: 'メイン',
   channel_access_token: 'token',
   channel_secret: 'secret',
+  channel_access_token_updated_at: null,
+  channel_secret_updated_at: null,
+  login_channel_secret_updated_at: null,
   login_channel_id: null,
   login_channel_secret: null,
   liff_id: null,
@@ -385,6 +388,38 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
 });
 
 describe('GET /api/line-accounts', () => {
+  test('資格情報は末尾4文字と更新日だけを返す', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([{
+      ...fakeAccount,
+      channel_access_token: 'full-access-token',
+      channel_secret: 'full-channel-secret',
+      login_channel_secret: 'full-login-secret',
+      channel_access_token_last4: 'oken',
+      channel_secret_last4: 'cret',
+      login_channel_secret_last4: 'cret',
+      channel_access_token_updated_at: '2026-09-01T10:00:00.000+09:00',
+      channel_secret_updated_at: '2026-09-02T10:00:00.000+09:00',
+      login_channel_secret_updated_at: '2026-09-03T10:00:00.000+09:00',
+    }]);
+
+    const res = await setupApp('owner').request('/api/line-accounts');
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).toMatchObject({
+      channelAccessTokenLast4: 'oken',
+      channelAccessTokenUpdatedAt: '2026-09-01T10:00:00.000+09:00',
+      channelSecretLast4: 'cret',
+      channelSecretUpdatedAt: '2026-09-02T10:00:00.000+09:00',
+      loginChannelSecretLast4: 'cret',
+      loginChannelSecretUpdatedAt: '2026-09-03T10:00:00.000+09:00',
+    });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('full-access-token');
+    expect(serialized).not.toContain('full-channel-secret');
+    expect(serialized).not.toContain('full-login-secret');
+  });
+
   test('担当店舗だけを返し、担当外店舗を一覧から除外する', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([
       fakeAccount,

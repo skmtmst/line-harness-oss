@@ -30,6 +30,13 @@ export interface LineAccount {
   channel_secret: string;
   channel_access_token_encrypted?: string | null;
   channel_secret_encrypted?: string | null;
+  channel_access_token_updated_at: string | null;
+  channel_secret_updated_at: string | null;
+  login_channel_secret_updated_at: string | null;
+  /** API直列化専用。秘密値そのものは返さない。 */
+  channel_access_token_last4?: string | null;
+  channel_secret_last4?: string | null;
+  login_channel_secret_last4?: string | null;
   login_channel_id: string | null;
   login_channel_secret: string | null;
   liff_id: string | null;
@@ -138,12 +145,14 @@ export async function createLineAccount(
       `INSERT INTO line_accounts
          (id, channel_id, name, channel_access_token, channel_secret,
           channel_access_token_encrypted, channel_secret_encrypted,
+          channel_access_token_updated_at, channel_secret_updated_at,
+          login_channel_secret_updated_at,
           login_channel_id, login_channel_secret, liff_id,
           is_active, display_order,
           og_site_name, og_default_image_url, og_default_description,
           parent_line_account_id, tenant_id,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -153,6 +162,9 @@ export async function createLineAccount(
       input.channelSecret,
       encryptedAccessToken,
       encryptedChannelSecret,
+      now,
+      now,
+      input.loginChannelSecret ? now : null,
       input.loginChannelId ?? null,
       input.loginChannelSecret ?? null,
       input.liffId ?? null,
@@ -178,17 +190,27 @@ export async function decryptLineAccountCredentials(
   row: LineAccount,
   credentialEncryptionKey?: string,
 ): Promise<LineAccount> {
-  const next = { ...row };
+  const last4 = (value: string | null | undefined): string | null =>
+    value ? value.slice(-4) : null;
+  const next: LineAccount = {
+    ...row,
+    channel_access_token_last4: last4(row.channel_access_token),
+    channel_secret_last4: last4(row.channel_secret),
+    login_channel_secret_last4: last4(row.login_channel_secret),
+  };
   for (const field of [
-    ['channel_access_token', 'channel_access_token_encrypted'],
-    ['channel_secret', 'channel_secret_encrypted'],
+    ['channel_access_token', 'channel_access_token_encrypted', 'channel_access_token_last4'],
+    ['channel_secret', 'channel_secret_encrypted', 'channel_secret_last4'],
   ] as const) {
-    const [plainField, encryptedField] = field;
+    const [plainField, encryptedField, last4Field] = field;
     const encrypted = row[encryptedField];
     if (!encrypted) continue;
     try {
       next[plainField] = await decryptCredential(encrypted, credentialEncryptionKey);
+      next[last4Field] = last4(next[plainField]);
     } catch (error) {
+      // 暗号文があるのに復号できない場合、平文フォールバックで末尾を推測しない。
+      next[last4Field] = null;
       if (!row[plainField]) {
         throw new Error(`Unable to decrypt ${plainField}; no legacy fallback is available`);
       }
@@ -452,12 +474,16 @@ export async function updateLineAccount(
     values.push(updates.channel_access_token);
     fields.push('channel_access_token_encrypted = ?');
     values.push(await encryptCredential(updates.channel_access_token, encryptionKey));
+    fields.push('channel_access_token_updated_at = ?');
+    values.push(jstNow());
   }
   if (updates.channel_secret !== undefined) {
     fields.push('channel_secret = ?');
     values.push(updates.channel_secret);
     fields.push('channel_secret_encrypted = ?');
     values.push(await encryptCredential(updates.channel_secret, encryptionKey));
+    fields.push('channel_secret_updated_at = ?');
+    values.push(jstNow());
   }
   if (updates.login_channel_id !== undefined) {
     fields.push('login_channel_id = ?');
@@ -466,6 +492,8 @@ export async function updateLineAccount(
   if (updates.login_channel_secret !== undefined) {
     fields.push('login_channel_secret = ?');
     values.push(updates.login_channel_secret);
+    fields.push('login_channel_secret_updated_at = ?');
+    values.push(jstNow());
   }
   if (updates.liff_id !== undefined) {
     fields.push('liff_id = ?');
@@ -574,6 +602,8 @@ export async function updateLineAccountFields(
   if (input.loginChannelSecret !== undefined) {
     sets.push('login_channel_secret = ?');
     binds.push(input.loginChannelSecret);
+    sets.push('login_channel_secret_updated_at = ?');
+    binds.push(jstNow());
   }
   if (input.liffId !== undefined) {
     sets.push('liff_id = ?');

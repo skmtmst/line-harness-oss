@@ -961,6 +961,12 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  channelAccessTokenLast4: string | null;
+  channelAccessTokenUpdatedAt: string | null;
+  channelSecretLast4: string | null;
+  channelSecretUpdatedAt: string | null;
+  loginChannelSecretLast4: string | null;
+  loginChannelSecretUpdatedAt: string | null;
   /** 友だち数の上限。null なら上限を管理しない */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null なら警告しない */

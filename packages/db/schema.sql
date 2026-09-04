@@ -342,6 +342,9 @@ CREATE TABLE IF NOT EXISTS line_accounts (
   -- 172: AES-GCM encrypted values. Legacy plaintext columns remain during migration.
   channel_access_token_encrypted TEXT,
   channel_secret_encrypted       TEXT,
+  channel_access_token_updated_at TEXT,
+  channel_secret_updated_at       TEXT,
+  login_channel_secret_updated_at TEXT,
   is_active              INTEGER NOT NULL DEFAULT 1,
   country                TEXT,
   role                   TEXT,
