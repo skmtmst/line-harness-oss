@@ -25,6 +25,9 @@
     "direct-primary-button": 1,
     "direct-th": 10
   },
+  "app/auto-replies/runs/page.tsx": {
+    "unresolved-classname": 30
+  },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 60
   },

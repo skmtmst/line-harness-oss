@@ -1032,10 +1032,6 @@ export const SCREENS = [
       固定データに2行入れてある。
     */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/auto-replies/runs` が development に無い。判定は未マージ枝 `93edbe17` で書かれたもの',
-    why: '`/auto-replies/runs` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 一致', verdictSource: 'auto-replies-v6/design-qa-execution-results-501.md', verdictHead: '93edbe17',
     route: '/auto-replies/runs?id=rule-a',
     states: {

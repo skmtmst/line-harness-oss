@@ -6,6 +6,7 @@ import type {
   ReminderPreviewResult,
   ReminderPublishResult,
   ReminderValidationResult,
+  AutoReplyRunsResponse,
   AutoReplyConflict,
   AutoReplyDraftInput,
   AutoReplyDraftVersion,
@@ -3547,6 +3548,19 @@ export const api = {
       }>>(`/api/templates/${id}/usages`),
   },
   autoReplies: {
+    /**
+     * 実行の記録（設計 `t7UtYQ` 8-1-H）。
+     * **どのルールが、いつ、誰へ、どう返したか。** 設定だけ見ても、
+     * 実際に返したのかは分からない。
+     */
+    runs: (params?: { ruleId?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.ruleId) query.set('rule_id', params.ruleId)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query}` : ''
+      return fetchApi<ApiResponse<AutoReplyRunsResponse>>(`/api/auto-reply-runs${suffix}`)
+    },
     /*
       公開までの4段（下書き→検査→競合→試験→公開）。**口はすべて
       `apps/worker/src/routes/auto-replies.ts` に在るものを読むだけ。**
