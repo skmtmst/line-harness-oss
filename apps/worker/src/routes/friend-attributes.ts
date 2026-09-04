@@ -46,6 +46,15 @@ import {
   getSavedSearchMatchInsights,
   type SavedSearchMatchInsight,
 } from '../services/saved-search-insights.js';
+import {
+  archiveSupportMarkAutomationRule,
+  createSupportMarkAutomationRule,
+  listSupportMarkAutomationRules,
+  SUPPORT_MARK_RULE_EVENTS,
+  updateSupportMarkAutomationRule,
+  type SaveSupportMarkAutomationRule,
+  type SupportMarkRuleEvent,
+} from '../services/support-mark-automation.js';
 import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
 
 /**
@@ -212,6 +221,26 @@ function serializeFolder(row: Folder) {
 /** 色は #RRGGBB だけ許す。名前付きの色を混ぜると、画面での見た目が揃わない。 */
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
+function supportMarkRuleInput(body: Record<string, unknown>): SaveSupportMarkAutomationRule | null {
+  const event = body.event;
+  const priority = Number(body.priority ?? 0);
+  const manualProtectionMinutes = Number(body.manualProtectionMinutes ?? 0);
+  if (typeof body.name !== 'string'
+    || !SUPPORT_MARK_RULE_EVENTS.includes(event as SupportMarkRuleEvent)
+    || !Number.isInteger(priority)
+    || !Number.isInteger(manualProtectionMinutes)) return null;
+  return {
+    name: body.name,
+    event: event as SupportMarkRuleEvent,
+    condition: body.condition === null || body.condition === undefined
+      ? null
+      : body.condition as SegmentCondition,
+    priority,
+    manualProtectionMinutes,
+    isActive: body.isActive !== false,
+  };
+}
+
 /**
  * IPの末尾を伏せる。
  *
@@ -329,6 +358,116 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+friendAttributes.get(
+  '/api/support-marks/:id/automation-rules',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      const rules = await listSupportMarkAutomationRules(c.env.DB, scope, c.req.param('id'));
+      if (!rules) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
+      return c.json({ success: true, data: rules });
+    } catch (err) {
+      console.error('GET /api/support-marks/:id/automation-rules error:', err);
+      return c.json({ success: false, error: '自動変更ルールを読み込めませんでした' }, 500);
+    }
+  },
+);
+
+friendAttributes.post(
+  '/api/support-marks/:id/automation-rules',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      const input = supportMarkRuleInput(await c.req.json<Record<string, unknown>>());
+      if (!input) return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 400);
+      const rule = await createSupportMarkAutomationRule(
+        c.env.DB, scope, c.req.param('id'), c.get('staff').id, input,
+      );
+      if (!rule) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
+      return c.json({ success: true, data: rule }, 201);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : '';
+      if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
+        return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
+      }
+      console.error('POST /api/support-marks/:id/automation-rules error:', err);
+      return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
+    }
+  },
+);
+
+friendAttributes.patch(
+  '/api/support-mark-rules/:ruleId',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      const body = await c.req.json<Record<string, unknown>>();
+      const input = supportMarkRuleInput(body);
+      const expectedVersion = Number(body.expectedVersion);
+      if (!input || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+      }
+      const result = await updateSupportMarkAutomationRule(
+        c.env.DB, scope, c.req.param('ruleId'), c.get('staff').id, expectedVersion, input,
+      );
+      if (result === 'not_found') return c.json({ success: false, error: '自動変更ルールが見つかりません' }, 404);
+      if (result === 'conflict') return c.json({
+        success: false,
+        error: 'ほかの担当者が先に変更しました。最新の内容を読み直してください',
+        code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT',
+      }, 409);
+      return c.json({ success: true, data: result });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : '';
+      if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
+        return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
+      }
+      console.error('PATCH /api/support-mark-rules/:ruleId error:', err);
+      return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
+    }
+  },
+);
+
+friendAttributes.delete(
+  '/api/support-mark-rules/:ruleId',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      let body: { expectedVersion?: unknown } = {};
+      try {
+        body = await c.req.json<{ expectedVersion?: unknown }>();
+      } catch {
+        // 本文なしは版未指定として、下の安定した400へ揃える。
+      }
+      const expectedVersion = Number(body.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+      }
+      const result = await archiveSupportMarkAutomationRule(
+        c.env.DB, scope, c.req.param('ruleId'), expectedVersion,
+      );
+      if (result === 'not_found') return c.json({ success: false, error: '自動変更ルールが見つかりません' }, 404);
+      if (result === 'conflict') return c.json({
+        success: false,
+        error: 'ほかの担当者が先に変更しました。最新の内容を読み直してください',
+        code: 'SUPPORT_MARK_RULE_VERSION_CONFLICT',
+      }, 409);
+      return c.json({ success: true, data: null });
+    } catch (err) {
+      console.error('DELETE /api/support-mark-rules/:ruleId error:', err);
+      return c.json({ success: false, error: '自動変更ルールを停止できませんでした' }, 500);
+    }
+  },
+);
 
 friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'), async (c) => {
   try {

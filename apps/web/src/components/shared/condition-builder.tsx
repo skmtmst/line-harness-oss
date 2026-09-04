@@ -370,7 +370,7 @@ function TagPicker({
       type="button"
       onClick={() => onToggle(tag.id)}
       className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-        on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
+        on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
       }`}
     >
       {tag.name}
@@ -585,7 +585,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
                     })
                   }
                   className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
+                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
                   }`}
                 >
                   {mark.name}

@@ -1177,7 +1177,7 @@ export default function ScenarioDetailClient({
           <button
             onClick={handleSaveStep}
             disabled={stepSaving}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
           >
             {stepSaving ? '保存中...' : editingStepId ? '更新' : '追加'}
           </button>
@@ -1372,7 +1372,7 @@ export default function ScenarioDetailClient({
                 onClick={handleSaveScenario}
                 disabled={!editing || saving}
                 title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
+                className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
               >
                 {saving ? '保存中…' : '保存'}
               </button>
@@ -1540,7 +1540,7 @@ export default function ScenarioDetailClient({
               <button
                 onClick={handleSaveScenario}
                 disabled={saving}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
+ className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 min-h-[44px] text-sm font-medium rounded-control disabled:opacity-50"
               >
                 {saving ? '保存中...' : '保存'}
               </button>

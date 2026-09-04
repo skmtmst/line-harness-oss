@@ -1,4 +1,5 @@
 import { ATTRIBUTION_WINDOW_DAYS } from './affiliate-attribution.js';
+import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 
 // =============================================================================
 // Affiliate Report v2 + Journey aggregation (ASP)
@@ -719,8 +720,8 @@ export async function getConversionApprovalQueue(
   },
 ): Promise<ConversionApprovalRow[]> {
   const { status, identityKeySql } = opts;
-  const limit = opts.limit ?? 200;
-  const offset = opts.offset ?? 0;
+  const limit = boundedListLimit(opts.limit, 200);
+  const offset = nonNegativeListOffset(opts.offset);
   const scopeCondition = opts.scope.allowedAccountIds.length > 0
     ? `(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
     : opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0';
