@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import Button from '@/components/shared/button'
 
 export type DashboardCardId =
   | 'today-inbox'
@@ -292,8 +293,8 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
             <button type="button" onClick={() => onReset ? onReset() : setDraft(defaultDashboardPreferences())} className="text-action shrink-0 text-xs font-medium hover:underline">初期状態に戻す</button>
           </div>
           <div className="mt-3 flex gap-2" role="tablist" aria-label="ダッシュボード編集モード">
-            <button type="button" role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')} className={`rounded-control px-3 py-2 text-sm font-semibold ${mode === 'cards' ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border hover:bg-canvas-sunken'}`}>カードと配置</button>
-            <button type="button" role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} className={`rounded-control px-3 py-2 text-sm font-semibold ${mode === 'preview' ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border hover:bg-canvas-sunken'}`}>プレビュー</button>
+            <Button role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')} variant={mode === 'cards' ? 'primary' : 'secondary'}>カードと配置</Button>
+            <Button role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} variant={mode === 'preview' ? 'primary' : 'secondary'}>プレビュー</Button>
           </div>
         </header>
 
@@ -335,8 +336,8 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
         </div>
 
         <footer className="border-hairline flex items-center justify-center gap-2 border-t px-[22px] py-4">
-          <button type="button" onClick={onCancel} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium">キャンセル</button>
-          <button type="button" onClick={() => onApply(draft)} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium">ダッシュボードに反映</button>
+          <Button onClick={onCancel}>キャンセル</Button>
+          <Button onClick={() => onApply(draft)} variant="primary">ダッシュボードに反映</Button>
         </footer>
       </aside>
     </div>

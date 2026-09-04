@@ -48,7 +48,7 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(editor).toContain('表示するカードと位置を変更します')
     expect(editor).toContain('ダッシュボードに反映')
     expect(editor).toContain('5つ目をONにすると、いちばん下のカードが自動でOFFになります。')
-    expect(qrDialog).toContain('max-w-[820px]')
+    expect(qrDialog).toContain('style={{ maxWidth: 820 }}')
     expect(qrDialog).toContain("{ value: '300x300', label: '小（300px）'")
     expect(qrDialog).toContain('ダウンロード形式')
     expect(qrDialog).toContain('画像をダウンロード')

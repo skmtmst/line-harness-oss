@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 
 /**
@@ -153,7 +154,8 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full max-w-[820px] overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -280,12 +282,12 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <a
+              <Button
                 href={saveHref}
-                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
+                variant="primary"
               >
                 <DownloadIcon />画像をダウンロード
-              </a>
+              </Button>
               <button
                 type="button"
                 onClick={printQr}
