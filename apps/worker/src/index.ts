@@ -13,6 +13,7 @@ import {
   incrementAffiliateLinkClick,
   enqueueFollowingMileageMilestones,
   processPendingMileageEvents,
+  processActionScoreInactivity,
 } from '@line-crm/db';
 import { processStepDeliveries } from './services/step-delivery.js';
 import { processScheduledBroadcasts, processQueuedBroadcasts } from './services/broadcast.js';
@@ -33,6 +34,7 @@ import {
   processOverdueSupportMarkTriggers,
   processScheduledAutomationTriggers,
 } from './services/automation-triggers.js';
+import { dispatchActionScoreApplications } from './services/action-score-events.js';
 import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
@@ -67,6 +69,7 @@ import { calendar } from './routes/calendar.js';
 import { meetConsultations } from './routes/meet-consultations.js';
 import { reminders } from './routes/reminders.js';
 import { scoring } from './routes/scoring.js';
+import { actionScoreRules } from './routes/action-score-rules.js';
 import { templates } from './routes/templates.js';
 import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
@@ -331,6 +334,7 @@ app.route('/', calendar);
 app.route('/', meetConsultations);
 app.route('/', reminders);
 app.route('/', scoring);
+app.route('/', actionScoreRules);
 app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
@@ -1212,8 +1216,10 @@ async function runFrequentHeavyJobs(
     });
   }
 
-  // 日本時間の0:01だけ、友だち情報欄の日付から当日分のリマインダを立てる。
-  if (toJstParts(new Date(event.scheduledTime)).minutes === 1) {
+  const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
+
+  // 日本時間の各時01分に、友だち情報欄の日付から当日分のリマインダを立てる。
+  if (jstMinutes === 1) {
     jobs.push({
       name: 'friend field reminders',
       run: async () => {
@@ -1222,6 +1228,33 @@ async function runFrequentHeavyJobs(
           console.log(
             `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
           );
+        }
+      },
+    });
+  }
+
+  // 通知cronから外した重い処理側で、各時11分に無反応スコアを再評価する。
+  if (jstMinutes === 11) {
+    jobs.push({
+      name: 'action score inactivity',
+      run: async () => {
+        const result = await processActionScoreInactivity(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          limit: 200,
+        });
+        for (const transition of result.transitions) {
+          const account = dbAccounts.find((item) => item.id === transition.lineAccountId);
+          await dispatchActionScoreApplications(env.DB, {
+            ...transition,
+            lineAccessToken: account?.channel_access_token,
+          });
+        }
+        if (result.candidates > 0) {
+          console.log(JSON.stringify({
+            event: 'action_score_inactivity_tick',
+            candidates: result.candidates,
+            applied: result.applied,
+          }));
         }
       },
     });
