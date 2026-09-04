@@ -131,6 +131,52 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+/*
+ * 緊急停止の「止める前に何が止まるか」。
+ *
+ * ここに置いてあるのは**影響を見るぶんだけ**。止める・戻す口は
+ * 段階的な本人確認のヘッダを送るが、worker 側の許可一覧にまだ無い
+ * （`apps/worker/src/cors-headers.test.ts` が落ちる）。口が入ってから足す。
+ */
+export type OperationCapability =
+  | 'broadcast_dispatch'
+  | 'scenario_dispatch'
+  | 'reminder_dispatch'
+  | 'automation_actions'
+  | 'auto_reply_dispatch'
+  | 'webhook_outgoing'
+  | 'ad_postback'
+
+export type OperationImpactMetric = {
+  itemCount: number
+  /** 数える経路が無いときは null。**0人と読み替えない。** */
+  friendCount: number | null
+  pendingCount?: number
+  nearestScheduledAt?: string | null
+}
+
+export type OperationImpactPreview = Record<
+  Extract<OperationCapability,
+    | 'broadcast_dispatch'
+    | 'scenario_dispatch'
+    | 'reminder_dispatch'
+    | 'automation_actions'
+    | 'auto_reply_dispatch'>,
+  OperationImpactMetric
+>
+
+export type OperationControl = {
+  scopeKey: string
+  lineAccountId: string | null
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  updatedAt: string | null
+}
+
 export type FormDeleteImpact = {
   form: {
     id: string
@@ -5129,6 +5175,19 @@ export const api = {
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
+  /** 緊急停止の影響（見るだけ）。止める・戻す口はまだ足していない。 */
+  operations: {
+    preview: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<{
+        control: OperationControl
+        counts: Partial<Record<OperationCapability, number>>
+        impact: OperationImpactPreview
+        permissions: { canControl: boolean }
+        calculatedAt: string
+      }>>(`/api/operations/control/preview${query}`)
+    },
+  },
   adPlatforms: {
     list: () =>
       fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
