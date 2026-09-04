@@ -15,6 +15,8 @@ const EVENT_TRIGGER_TYPES = new Set([
   'form_submitted',
   'link_clicked',
   'calendar_booked',
+  'score_threshold_crossed',
+  'score_band_changed',
   'manual_reply_sent',
   'staff_assigned',
   'response_overdue',
@@ -34,6 +36,14 @@ const EVENT_FILTER_KEYS: Record<string, ReadonlySet<string>> = {
   form_submitted: new Set(['formId']),
   link_clicked: new Set(['trackedLinkId']),
   calendar_booked: new Set(['bookingType', 'menuId', 'eventId']),
+  score_threshold_crossed: new Set([
+    'ruleId', 'ruleVersionId', 'scoreBefore', 'currentScore',
+    'previousBand', 'currentBand', 'thresholdBand',
+  ]),
+  score_band_changed: new Set([
+    'ruleId', 'ruleVersionId', 'scoreBefore', 'currentScore',
+    'previousBand', 'currentBand',
+  ]),
   manual_reply_sent: new Set(['staffId']),
   staff_assigned: new Set(['staffId']),
   response_overdue: new Set(['dueAt']),
