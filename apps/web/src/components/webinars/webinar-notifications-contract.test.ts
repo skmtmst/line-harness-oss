@@ -66,6 +66,13 @@ describe('送った結果の数', () => {
     expect(PART).toContain('件を予定に入れ、')
     expect(PART).toContain('件を取り消しました。')
   })
+
+  it('通知対象は実人数と延べ予約を分けて表示する', () => {
+    expect(PART).toContain('audienceText(overview?.audience)')
+    expect(PART).toContain('通知の対象')
+    expect(PART).toContain('{audience.people}')
+    expect(PART).toContain('{audience.note}')
+  })
 })
 
 describe('読めなかったとき', () => {
