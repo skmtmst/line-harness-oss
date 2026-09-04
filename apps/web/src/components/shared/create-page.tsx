@@ -178,7 +178,7 @@ export default function CreatePage({
         <div
           data-design="Left"
           className={`bg-canvas border-hairline border ${
-            v6 ? 'rounded-tile space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
+            v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
           {children}

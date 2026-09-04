@@ -64,7 +64,8 @@
   },
   "required": {
     "$説明": "この数を下回るとCIを落とす。B3では入力・検索・選択まで契約へ追加した。減らす方向の変更は承認が要る。",
-    "tokens": 24,
+    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は docs/v6-directives.md §4「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。",
+    "tokens": 21,
     "parts": 20,
     "componentInventory": 85,
     "v6RepresentativeNodes": 10,
@@ -169,14 +170,6 @@
       "note": "追加。表の見出し行の地",
       "lastCheckedAt": "2026-08-24"
     },
-    "--radius-tile": {
-      "pencil": "$radius-md",
-      "source": "10px",
-      "resolved": "10px",
-      "status": "active",
-      "note": "追加。--radius-md にするとTailwind標準の rounded-md(6px) を83か所で上書きするため別名",
-      "lastCheckedAt": "2026-08-24"
-    },
     "--text-caption": {
       "pencil": "$size-caption",
       "source": "12px",
@@ -247,22 +240,6 @@
       "resolved": "#e9f1ff",
       "status": "active",
       "note": "状態バッジの情報背景",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--color-status-warning": {
-      "pencil": "$status-warn-deep",
-      "source": "#a15c00",
-      "resolved": "#a15c00",
-      "status": "active",
-      "note": "状態バッジの注意色",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--color-status-warning-soft": {
-      "pencil": "$status-warn-soft",
-      "source": "#fff7e6",
-      "resolved": "#fff7e6",
-      "status": "active",
-      "note": "状態バッジの注意背景",
       "lastCheckedAt": "2026-08-24"
     },
     "--color-status-danger": {
@@ -398,7 +375,7 @@
           "pencil": "XywGr cornerRadius: $radius-md",
           "class": "card",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -482,7 +459,7 @@
           "pencil": "バッジ cornerRadius: $radius-md",
           "class": "badge",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -682,7 +659,7 @@
           "class": "button",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "nBRKk/uzNEC fontSize: $size-label",
@@ -834,7 +811,7 @@
           "class": "item",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "Blot6 item fill: $canvas",
@@ -1088,7 +1065,7 @@
           "pencil": "J33xq menu item cornerRadius: $radius-md",
           "class": "item",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -1455,7 +1432,7 @@
           "pencil": "z9TQJ cornerRadius: $radius-md",
           "class": "segmented",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -1470,7 +1447,7 @@
           "class": "segmentedTab",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         }
       ]
     },
@@ -1519,7 +1496,7 @@
           "pencil": "X34VF cornerRadius: $radius-md",
           "class": "card",
           "prop": "border-radius",
-          "source": "var(--radius-tile)",
+          "source": "var(--radius-card)",
           "resolved": "10px"
         },
         {
@@ -1839,14 +1816,14 @@
           "pencil": "warning fill: $status-warn-soft",
           "class": "warning",
           "prop": "background",
-          "source": "var(--color-status-warning-soft)",
+          "source": "var(--color-status-warn-soft)",
           "resolved": "#fff7e6"
         },
         {
           "pencil": "warning label: $status-warn-deep",
           "class": "warning",
           "prop": "color",
-          "source": "var(--color-status-warning)",
+          "source": "var(--color-status-warn-deep)",
           "resolved": "#a15c00"
         },
         {
@@ -1935,7 +1912,7 @@
           "class": "control",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "ytG7l/keKe3 fill: $canvas",
@@ -2084,7 +2061,7 @@
           "class": "search",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "phlR1 fill: $canvas",
@@ -2209,7 +2186,7 @@
           "class": "closedTrigger",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "rpot9 fill: $canvas",
@@ -2635,7 +2612,7 @@
           "class": "button",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "J6x4Q button fontSize: $size-caption",
@@ -2854,7 +2831,7 @@
           "class": "notice",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "notice fontSize: $size-label",
@@ -2881,7 +2858,7 @@
           "pencil": "zPRvi fill: $status-warn-soft",
           "class": "validation",
           "prop": "background",
-          "source": "var(--color-status-warning-soft)",
+          "source": "var(--color-status-warn-soft)",
           "resolved": "#fff7e6"
         },
         {
@@ -2951,7 +2928,7 @@
           "class": "menu",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "0.5rem"
+          "resolved": "8px"
         },
         {
           "pencil": "hGpFq fill: $canvas",

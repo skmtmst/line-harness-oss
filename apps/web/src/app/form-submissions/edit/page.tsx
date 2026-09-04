@@ -34,6 +34,7 @@ import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import OptionsDialog from '@/components/forms/options-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -439,13 +440,6 @@ function FormEditInner() {
               >
                 オプション設定
               </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-              >
-                {saving ? '保存中...' : 'フォームを保存'}
-              </button>
             </div>
           }
         />
@@ -732,6 +726,18 @@ function FormEditInner() {
           </div>
         </>
       )}
+
+      <StickyBar
+        actions={(
+          <button
+            onClick={save}
+            disabled={saving}
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          >
+            {saving ? '保存中...' : 'フォームを保存'}
+          </button>
+        )}
+      />
 
       {/*
         ページを消す前の確認。**「元に戻す」で戻せるので `destructive` は付けない。**

@@ -18,7 +18,7 @@
 .frame {
   overflow: hidden; /* clip: true */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
 }
 
 .row {
