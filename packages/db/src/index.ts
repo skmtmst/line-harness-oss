@@ -21,6 +21,7 @@ export * from './friend-add-routing-versions';
 export * from './calendar';
 export * from './reminders';
 export * from './scoring';
+export * from './action-score-rules';
 export * from './templates';
 export * from './chats';
 export * from './inbox-reads';

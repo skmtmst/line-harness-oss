@@ -21,6 +21,7 @@ import {
   postMileageAdjustment,
   MileageAdjustmentError,
   getActionScoreOverview,
+  getActionScoreBands,
   createMileageRewardDraft,
   createMileageRewardDraftFromPublished,
   getMileageReward,
@@ -842,8 +843,11 @@ scoring.get('/api/action-scores/friends', requireRole('owner', 'admin', 'staff')
     }
     const requestedLimit = Number(c.req.query('limit') || 20);
     const requestedOffset = Number(c.req.query('offset') || 0);
+    const bands = await getActionScoreBands(c.env.DB, accountId);
     const data = await getActionScoreOverview(c.env.DB, {
       accountId,
+      highMin: bands.highMin,
+      normalMin: bands.normalMin,
       search: c.req.query('search') || '',
       filter: filterValue as ActionScoreFilter,
       sort: sortValue as ActionScoreSort,
