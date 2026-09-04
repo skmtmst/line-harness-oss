@@ -715,6 +715,28 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
+  if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
+    /*
+      1件を返す口。**詳細（★V6 33-3）が読む。**
+      資格情報は「入っているか」だけを返す（値そのものは返さない）。
+      これが無いと、詳細の資格情報タブが全部「入っていません」になり、
+      **実装の不具合に見えてしまう。**
+    */
+    return {
+      success: true,
+      data: {
+        ...ACCOUNT,
+        webhook: { status: 'matched', expectedUrl: `${'https://api.example'}/webhook`, actualUrl: `${'https://api.example'}/webhook`, active: true, checkedAt: `${FIXED_TO}T00:00:00.000Z` },
+        channelAccessTokenConfigured: true,
+        channelSecretConfigured: true,
+        loginChannelSecretConfigured: true,
+        friendCapacity: 50000,
+        capacityWarnAt: 45000,
+        country: '日本',
+        role: '検証用。本番の配信には使わない',
+      },
+    }
+  }
   if (pathname === '/api/line-accounts') {
     /*
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、

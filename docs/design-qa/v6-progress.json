@@ -1,15 +1,15 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 227,
-  "unimplemented": 18,
+  "compared": 211,
+  "unimplemented": 23,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 17,
+  "missing": 28,
   "match": 0,
-  "structureMatchDataPending": 5,
-  "needsFix": 52,
-  "unjudged": 183,
+  "structureMatchDataPending": 27,
+  "needsFix": 111,
+  "unjudged": 97,
   "remaining": 258,
   "features": [
     {
@@ -52,8 +52,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 2,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
       "unjudged": 13,
       "remaining": 17,
       "capturedAt": [
@@ -586,11 +586,11 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 14,
+      "compared": 13,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 2,
       "match": 0,
       "structureMatchDataPending": 1,
       "needsFix": 12,
@@ -871,15 +871,15 @@
       "feature": 8,
       "name": "自動応答",
       "total": 11,
-      "compared": 8,
-      "unimplemented": 0,
+      "compared": 7,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 3,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 7,
-      "unjudged": 4,
+      "unjudged": 3,
       "remaining": 11,
       "capturedAt": [
         {
@@ -941,11 +941,11 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 10,
-      "compared": 5,
+      "compared": 3,
       "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 3,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 2,
@@ -988,15 +988,15 @@
       "feature": 10,
       "name": "ウェビナー",
       "total": 13,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 2,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 9,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 1,
-      "unjudged": 11,
+      "unjudged": 10,
       "remaining": 13,
       "capturedAt": [
         {
@@ -1177,11 +1177,11 @@
       "feature": 12,
       "name": "リッチメニュー",
       "total": 9,
-      "compared": 5,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 4,
+      "missing": 5,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 4,
@@ -1362,8 +1362,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1418,9 +1418,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 5,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
         {
@@ -1477,15 +1477,15 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 7,
-      "unimplemented": 2,
+      "compared": 6,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "structureMatchDataPending": 2,
+      "needsFix": 3,
+      "unjudged": 1,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1559,15 +1559,15 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 10,
-      "unimplemented": 1,
+      "compared": 8,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 8,
+      "structureMatchDataPending": 3,
+      "needsFix": 4,
+      "unjudged": 1,
       "remaining": 11,
       "capturedAt": [
         {
@@ -1702,8 +1702,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 9,
+      "needsFix": 9,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1791,9 +1791,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 2,
+      "unjudged": 1,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1824,9 +1824,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 8,
+      "structureMatchDataPending": 1,
+      "needsFix": 7,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1887,9 +1887,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "structureMatchDataPending": 3,
+      "needsFix": 3,
+      "unjudged": 1,
       "remaining": 7,
       "capturedAt": [
         {
@@ -1958,9 +1958,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
-      "unjudged": 2,
+      "unjudged": 1,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1991,8 +1991,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 2,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2025,9 +2025,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 6,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
+      "unjudged": 1,
       "remaining": 6,
       "capturedAt": [
         {
@@ -2082,9 +2082,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "structureMatchDataPending": 5,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 8,
       "capturedAt": [
         {
@@ -2151,9 +2151,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2206,8 +2206,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "needsFix": 3,
+      "unjudged": 4,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2264,9 +2264,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 2,
+      "needsFix": 1,
+      "unjudged": 1,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2318,9 +2318,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2374,9 +2374,9 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 1,
+      "unjudged": 2,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2404,8 +2404,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 1,
+      "needsFix": 1,
+      "unjudged": 0,
       "remaining": 1,
       "capturedAt": [
         {
@@ -2430,8 +2430,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 4,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2473,6 +2473,13 @@
       "gapNote": "画面 `/reminders/detail` が development に無い。判定は未マージ枝 `4bc71249` で書かれたもの"
     },
     {
+      "feature": 8,
+      "node": "t7UtYQ",
+      "name": "8-1-H 実行結果",
+      "gap": "pending",
+      "gapNote": "画面 `/auto-replies/runs` が development に無い。判定は未マージ枝 `93edbe17` で書かれたもの"
+    },
+    {
       "feature": 9,
       "node": "s9gAx",
       "name": "9-1-A 基本設定",
@@ -2502,6 +2509,13 @@
     },
     {
       "feature": 10,
+      "node": "TimXl",
+      "name": "10-1-H 公開完了",
+      "gap": "pending",
+      "gapNote": "画面 `/webinars/published` が development に無い。判定は未マージ枝 `61eeb3c7` で書かれたもの"
+    },
+    {
+      "feature": 10,
       "node": "LKuAQ",
       "name": "10-1-K 削除確認",
       "gap": "drop",
@@ -2523,6 +2537,13 @@
     },
     {
       "feature": 16,
+      "node": "njLGA",
+      "name": "16-1-C 支払い",
+      "gap": "build",
+      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
+    },
+    {
+      "feature": 16,
       "node": "QX70l",
       "name": "16-1-G アフィリエイターを削除する確認",
       "gap": "drop",
@@ -2537,10 +2558,24 @@
     },
     {
       "feature": 17,
+      "node": "qlVLJ",
+      "name": "17-1-B マイルの使い道",
+      "gap": "build",
+      "gapNote": "交換できるもの（送料無料クーポン・先行のお知らせ・数量に限りがあるもの）の一覧と、申し込みの受付。`p9CcEB`（使い道をつくる）と対で要る"
+    },
+    {
+      "feature": 17,
       "node": "p9CcEB",
       "name": "17-1-G マイルの使い道をつくる",
       "gap": "pending",
       "gapNote": "画面 `/mileage/rewards/edit` が development に無い。判定は未マージ枝 `5e8f32d3` で書かれたもの"
+    },
+    {
+      "feature": 17,
+      "node": "s6MBc",
+      "name": "17-2-A スコアのルール",
+      "gap": "pending",
+      "gapNote": "画面 `/mileage/score-rules` が development に無い。判定は未マージ枝 `642b8222` で書かれたもの"
     },
     {
       "feature": 20,
