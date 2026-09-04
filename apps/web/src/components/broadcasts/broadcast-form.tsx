@@ -12,6 +12,12 @@ import {
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import {
+  MAX_BUBBLES,
+  MAX_TEXT_LENGTH,
+  messageLengthLabel,
+  messageLengthNotice,
+} from './message-limits'
+import {
   bubbleLegacyMessage,
   bubblesForSave,
   contentTemplateToBubble,
@@ -64,10 +70,22 @@ const LINE_MOCK = {
   onDark: 'text-white',        // 上のバーと日付の文字
 } as const
 
+/**
+ * 種類の名前。**内部の語をそのまま画面へ出さない。**
+ *
+ * ここに無い種類が来たときに元の値へ落とすと、テンプレートの札に
+ * `text` や `carousel` が出る（設計 `p97Tf` で見つかった）。
+ * 知らない種類は「その他」にして、内部の語は出さない。
+ */
 const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
   text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', location: '位置情報',
   audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
   rich_video: 'リッチビデオ', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
+}
+
+/** 知らない種類でも内部の語を出さない。 */
+export function typeLabel(type: string): string {
+  return TYPE_LABELS[type as BroadcastBubbleType] ?? 'その他'
 }
 
 /*
@@ -220,11 +238,11 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
           <InsertToolbar
             targetRef={textRef}
             value={String(bubble.content.text ?? '')}
-            onChange={(next) => onChange({ ...bubble, content: { text: next.slice(0, 500) } })}
+            onChange={(next) => onChange({ ...bubble, content: { text: next.slice(0, MAX_TEXT_LENGTH) } })}
           />
         </div>
-        <textarea ref={textRef} rows={6} maxLength={500} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
-        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, 500) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{String(bubble.content.text ?? '').length}/500</span></div>
+        <textarea ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
+        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
         <label className="mb-1 block text-xs font-bold text-ink-secondary">Flex JSON</label>
@@ -516,9 +534,19 @@ export default function BroadcastForm({
     }
   }
 
-  // 1つ目の吹き出しの文字数。設計は「238 / 22,500 ・ 分割なし」と出すが、
-  // 実装の上限は1吹き出し500文字なので、そちらに合わせる。
-  const textLength = bubbles[0]?.type === 'text' ? String(bubbles[0].content.text ?? '').length : 0
+  /*
+   * 文字数は**いちばん長い通**と**合計**の両方を見る。
+   * 1つ目だけを見ていたころは、2通目に長い本文を書いても
+   * 「分割なし」と出たままだった。
+   */
+  const bubbleLengths = bubbles.map((b) => (b.type === 'text' ? String(b.content.text ?? '').length : 0))
+  const textLength = Math.max(0, ...bubbleLengths)
+  const totalTextLength = bubbleLengths.reduce((sum, n) => sum + n, 0)
+  const lengthNotice = messageLengthNotice({
+    longest: textLength,
+    total: totalTextLength,
+    bubbles: bubbles.length,
+  })
   // 本文に入っているURLの数。trackLinks: true で送るので、この数だけ
   // 短縮されてクリックが記録される。
   const urlCount = bubbles.reduce((sum, b) => {
@@ -671,7 +699,7 @@ export default function BroadcastForm({
       <div>
         <h2 className="text-ink text-2xl font-bold">一斉配信の作成</h2>
         <p className="text-ink-faint mt-1 text-sm leading-relaxed">
-          送る相手・送る時間・送る内容を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
+          送る相手・送る内容・送る時間を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
         </p>
       </div>
       <button onClick={onCancel} className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm">
@@ -719,7 +747,7 @@ export default function BroadcastForm({
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-bold text-accent">送信対象</p>
               <p className="text-2xl font-black text-accent">
-                {counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '-'}
+                {counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '—'}
                 <span className="ml-1 text-sm">人</span>
               </p>
             </div>
@@ -819,6 +847,12 @@ export default function BroadcastForm({
         </section>
         <section id="broadcast-step-message" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
+            {/*
+              番号は**画面に出てくる順**。前は 1 → 3 → 2 と並んでいて、
+              飛ばした節があるように読めた。設計（`zZ9fA`）の段も
+              基本設定 → 対象者 → メッセージ → 送信設定 の順なので、
+              並べ替えではなく番号のほうを直す。
+            */}
             <p className="text-ink text-sm font-bold">3. 送る内容</p>
             <button
               type="button"
@@ -829,7 +863,10 @@ export default function BroadcastForm({
             </button>
           </div>
           <p className="text-ink-faint mt-1 text-xs">
-            {textLength} / 500{textLength > 500 ? '（上限を超えています）' : ' ・ 分割なし'}
+            {messageLengthLabel(textLength)}
+            {lengthNotice.tone === 'ok'
+              ? ` ・ 合計${totalTextLength.toLocaleString('ja-JP')}文字`
+              : `（${lengthNotice.title}）`}
             {urlCount > 0 && (trackLinks
               ? ` ・ URL ${urlCount}件を短縮してクリックを計測します`
               : ` ・ URL ${urlCount}件はそのまま送ります（クリックは数えません）`)}
@@ -893,7 +930,7 @@ export default function BroadcastForm({
                   setBubbles((items) => items.length === 1 && !String(items[0]?.content.text ?? '').trim() ? [bubble] : [...items.slice(0, 2), bubble])
                   setShowTemplatePicker(false)
                 }} className="rounded-card border border-hairline bg-canvas p-4 text-left hover:border-accent">
-                  <span className="text-[11px] font-bold text-accent">{TYPE_LABELS[template.messageType as BroadcastBubbleType] ?? template.messageType}</span>
+                  <span className="text-[11px] font-bold text-accent">{typeLabel(template.messageType)}</span>
                   <p className="mt-1 truncate text-sm font-bold text-ink">{template.name}</p>
                   <p className="mt-1 truncate text-xs text-ink-faint">{template.category}</p>
                 </button>
@@ -918,7 +955,7 @@ export default function BroadcastForm({
           </section>
         )}
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
-        <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-card border-2 border-dashed border-accent py-4 text-sm font-bold text-accent disabled:cursor-not-allowed disabled:border-hairline disabled:text-ink-faint">＋ 吹き出しを追加（{bubbles.length}/3）</button>
+        <button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-card border-2 border-dashed border-accent py-4 text-sm font-bold text-accent disabled:cursor-not-allowed disabled:border-hairline disabled:text-ink-faint">＋ 吹き出しを追加（{bubbles.length}/{MAX_BUBBLES}）</button>
         {/*
           2通目以降はまだ実際には送れない（送信が「複数吹き出しの実配信は
           次フェーズです」で断る）。押した時点で分かるようにする。保存して
@@ -1063,12 +1100,8 @@ export default function BroadcastForm({
           </p>
           <ul className="mt-2 space-y-2">
             <li className="border-hairline rounded-control border p-2">
-              <p className="text-ink text-xs font-medium">
-                本文の文字数は{textLength > 500 ? '上限を超えています' : '問題ありません'}
-              </p>
-              <p className="text-ink-faint text-xs">
-                {textLength}文字。{textLength > 500 ? '500文字までに収めてください。' : '分割されずに1通で届きます。'}
-              </p>
+              <p className="text-ink text-xs font-medium">{lengthNotice.title}</p>
+              <p className="text-ink-faint text-xs">{lengthNotice.description}</p>
             </li>
             {preflight.warnings.map((w) => (
               <li
@@ -1126,6 +1159,23 @@ export default function BroadcastForm({
         </>
       )}
     </section>
+    {/*
+      **上限を超えたまま保存・送信させない。**
+
+      本文の欄は `maxLength` で止まるが、下書きやテンプレートから読み込むと
+      上限を超えた本文がそのまま入ることがある。**そのとき保存の口だけが
+      静かに 400 で失敗する**——押した人には「保存中…」が戻るだけで、
+      どの通のどこが長いのか分からない。押す前に、押せない理由を出す。
+
+      右の点検欄（`preflight`）は宛先と本文が決まるまで出ないので、
+      **こちらは常に出す。**
+    */}
+    {lengthNotice.tone === 'error' && (
+      <div className="border-danger-bg bg-danger-bg rounded-card mb-3 border p-3">
+        <p className="text-danger text-sm font-bold">{lengthNotice.title}</p>
+        <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
+      </div>
+    )}
     <div className="flex flex-wrap justify-end gap-3">
       <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">
         キャンセル
@@ -1138,7 +1188,8 @@ export default function BroadcastForm({
         別に用意すると、同じ組み立てが2か所に増える。
       */}
       <button
-        disabled={testSending || saving}
+        disabled={testSending || saving || lengthNotice.tone === 'error'}
+        title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
         onClick={() => void handleTestSend()}
         className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50"
       >
@@ -1149,7 +1200,8 @@ export default function BroadcastForm({
         段を増やすと手間が増えるだけになる。
       */}
       <button
-        disabled={saving}
+        disabled={saving || lengthNotice.tone === 'error'}
+        title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
         onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}
         className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
       >
