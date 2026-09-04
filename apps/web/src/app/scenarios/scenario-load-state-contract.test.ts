@@ -14,7 +14,7 @@ describe('V6 シナリオ一覧の読込状態', () => {
   it('読込失敗を空のシナリオ一覧として表示しない', () => {
     expect(PAGE).toContain("loadStatus === 'error'")
     expect(PAGE).toContain('登録したシナリオは消えていません。')
-    expect(PAGE).toContain('シナリオを再読み込み')
+    expect(PAGE).toContain('onRetry={() => void loadScenarios()}')
     expect(PAGE).not.toContain("setError(res.error)")
   })
 
