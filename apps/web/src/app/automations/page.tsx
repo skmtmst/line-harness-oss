@@ -7,6 +7,9 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
+import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import ListState from '@/components/shared/list-state'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -110,8 +113,20 @@ const initialForm: CreateFormState = {
   priority: 0,
 }
 
+/*
+  設計 `gief7` のタブ帯。**「見本」は別の画面ではなく、同じ帯の中の1本。**
+  台帳の `WjYAC`（25-1-C 見本から作る）は `/automations?tab=templates` を指しているが、
+  これまで画面にタブが無く、`?tab=` を付けても一覧が出るだけだった。
+*/
+const MERGED_TABS = [
+  { key: 'rules', label: 'オートメーション' },
+  { key: 'templates', label: '見本' },
+]
+
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const tab = useMergedTab(MERGED_TABS)
+  const canManageAutomations = useCanManageAutomations()
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
@@ -271,8 +286,22 @@ export default function AutomationsPage() {
     }
   }
 
+  if (tab === 'templates') {
+    return (
+      <div>
+        <div className="mb-4">
+          <MergedTabs basePath="/automations" paramName="tab" tabs={MERGED_TABS} active={tab} />
+        </div>
+        <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
+      </div>
+    )
+  }
+
   return (
     <div>
+      <div className="mb-4">
+        <MergedTabs basePath="/automations" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      </div>
       <div data-design="Head">
         <Header
           title="オートメーション"

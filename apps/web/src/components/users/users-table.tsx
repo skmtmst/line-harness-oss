@@ -57,7 +57,7 @@ export default function UsersTable({
   const countAvailable = !loading && !error
 
   return (
-    <div className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
+    <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
       <table className="w-full table-fixed">
         <colgroup>
           <col className="w-[18%]" />
@@ -68,7 +68,7 @@ export default function UsersTable({
           <col className="w-[10%]" />
           <col className="w-[9%]" />
         </colgroup>
-        <thead className="border-b border-hairline bg-v6-surface-strong text-left text-micro font-semibold text-v6-ink-secondary">
+        <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary">
           <TableHeadRow>
             <Th>統合ユーザー</Th>
             <Th>連絡先</Th>
@@ -113,7 +113,7 @@ export default function UsersTable({
           )}
         </tbody>
       </table>
-      <div className="flex items-center justify-between border-t border-v6-divider px-4 py-3 text-sm text-v6-ink-secondary">
+      <div className="flex items-center justify-between border-t border-divider-soft px-4 py-3 text-sm text-ink-secondary">
         <span>
           {countAvailable
             ? `${fmt.format(total)}人中 ${fmt.format(start)}〜${fmt.format(end)}人`

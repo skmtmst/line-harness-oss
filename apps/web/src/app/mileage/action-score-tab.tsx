@@ -40,16 +40,16 @@ function formatNumber(value: number | null | undefined) {
 }
 
 function ScoreBand({ band }: { band: ActionScoreBand }) {
-  if (band === 'high') return <span className="rounded-full bg-v6-accent-soft px-2.5 py-1 text-xs font-semibold text-v6-accent-hover">{BAND_LABELS[band]}</span>
-  if (band === 'normal') return <span className="rounded-full bg-v6-warning-bg px-2.5 py-1 text-xs font-semibold text-v6-warning">{BAND_LABELS[band]}</span>
-  return <span className="rounded-full bg-v6-surface-strong px-2.5 py-1 text-xs font-semibold text-v6-ink-secondary">{BAND_LABELS[band]}</span>
+  if (band === 'high') return <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-hover">{BAND_LABELS[band]}</span>
+  if (band === 'normal') return <span className="rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
+  return <span className="rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
 }
 
 function ScoreChange({ value }: { value: number }) {
   const label = `${value > 0 ? '+' : ''}${formatNumber(value)}`
-  if (value > 0) return <span className="font-semibold text-v6-accent-hover">{label}</span>
-  if (value < 0) return <span className="font-semibold text-v6-danger">{label}</span>
-  return <span className="font-semibold text-v6-ink-faint">{label}</span>
+  if (value > 0) return <span className="font-semibold text-accent-hover">{label}</span>
+  if (value < 0) return <span className="font-semibold text-danger">{label}</span>
+  return <span className="font-semibold text-ink-faint">{label}</span>
 }
 
 function scoreRange(filter: ActionScoreFilter, summary: ActionScoreOverview['summary'] | undefined) {
@@ -167,13 +167,13 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
   return (
     <section data-design-node="z3PB2" className="space-y-3.5">
-      <div className="rounded-v6-control border border-v6-warning/25 bg-v6-warning-bg px-4 py-3 text-xs text-v6-ink-secondary">
+      <div className="rounded-control border border-status-warn-deep/25 bg-status-warn-soft px-4 py-3 text-xs text-ink-secondary">
         {/*
           設計 `z3PB2` の文そのまま。**「顧客には表示されず」だけでは足りない。**
           「マイルが減るのでは」と聞かれたときに答えられる形にする——
           交換できないこと、残高が動かないことを先に言う。
         */}
-        <strong className="text-v6-ink">スコアはマイルではありません。</strong>
+        <strong className="text-ink">スコアはマイルではありません。</strong>
         お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
         反応の目安として、配信や対応の順番を決めるために使います。
       </div>
@@ -189,15 +189,15 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
         <div className="flex flex-wrap items-center gap-2">
           {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この帯の人を見る</Button> : null}
           {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この帯に配信する</Button> : null}
-          {filter === 'all' ? <span className="text-xs text-v6-ink-faint">高い・ふつう・低いの帯を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
-          {filter === 'decreased' ? <span className="text-xs text-v6-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
+          {filter === 'all' ? <span className="text-xs text-ink-faint">高い・ふつう・低いの帯を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
+          {filter === 'decreased' ? <span className="text-xs text-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
         <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
           <Download className="h-4 w-4" aria-hidden="true" />行動スコアをCSVで書き出す
         </Button>
       </div>
 
-      <div className="rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
+      <div className="rounded-card border border-hairline bg-canvas shadow-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
           <SearchField
             aria-label="友だち名で検索"
@@ -259,7 +259,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
           <ListState kind="empty" title="条件に合う友だちがいません" description="帯または検索条件を変えてください。" />
         ) : (
           <DataTable>
-              <thead className="bg-v6-surface text-left text-xs text-v6-ink-faint">
+              <thead className="bg-surface-pearl text-left text-xs text-ink-faint">
                 <TableHeadRow>
                   <Th className="w-1/4">友だち</Th>
                   <Th className="w-1/12" align="right">いまの点数</Th>
@@ -274,16 +274,16 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                   <Tr key={item.friendId}>
                     <Td>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-v6-accent-soft text-xs font-bold text-v6-accent">{item.displayName.slice(0, 1)}</div>}
-                        <span className="truncate text-sm font-semibold text-v6-ink" title={item.displayName}>{item.displayName}</span>
+                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{item.displayName.slice(0, 1)}</div>}
+                        <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>
                     <Td align="right"><strong>{formatNumber(item.currentScore)}</strong></Td>
                     <Td><ScoreBand band={item.band} /></Td>
                     <Td align="right"><ScoreChange value={item.change30d} /></Td>
                     <Td>
-                      <p className="truncate text-xs text-v6-ink-secondary" title={safeReason(item.lastReason)}>{safeReason(item.lastReason)}</p>
-                      <p className="mt-0.5 text-xs text-v6-ink-faint">{formatMileageDate(item.lastChangedAt)}</p>
+                      <p className="truncate text-xs text-ink-secondary" title={safeReason(item.lastReason)}>{safeReason(item.lastReason)}</p>
+                      <p className="mt-0.5 text-xs text-ink-faint">{formatMileageDate(item.lastChangedAt)}</p>
                     </Td>
                     <ActionCell><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>友だちの詳細を見る</Button></ActionCell>
                   </Tr>
@@ -294,7 +294,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
         {!loading && !error && total > 0 ? (
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <span className="text-xs text-v6-ink-faint">{formatNumber((page - 1) * pageSize + 1)}〜{formatNumber(Math.min(page * pageSize, total))}件 / 全{formatNumber(total)}件</span>
+            <span className="text-xs text-ink-faint">{formatNumber((page - 1) * pageSize + 1)}〜{formatNumber(Math.min(page * pageSize, total))}件 / 全{formatNumber(total)}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>
         ) : null}

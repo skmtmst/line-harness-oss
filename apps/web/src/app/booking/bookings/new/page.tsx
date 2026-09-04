@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import StickyBar from '@/components/shared/sticky-bar'
 import {
   api,
   ApiError,
@@ -420,28 +421,22 @@ export default function NewProxyBookingPage() {
       )}
 
       {(step === 'input' || step === 'confirm') && (
-        <div className="border-hairline bg-canvas fixed right-0 bottom-0 left-0 z-30 flex items-center justify-center gap-2 border-t px-6 py-3">
-          {step === 'confirm' && <Button onClick={() => setStep('input')}>予約入力に戻る</Button>}
-          {step === 'input' ? (
-            <Button
-              variant="primary"
-              disabled={loading}
-              data-qa-open="GFDqW"
-              onClick={() => void review()}
-            >
-              {loading ? '空きを再確認しています' : '予約内容を確認する'}
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              disabled={loading}
-              data-qa-open="GfceK"
-              onClick={() => void createBooking()}
-            >
-              {loading ? '登録中です' : 'この内容で予約を入れる'}
-            </Button>
+        <StickyBar
+          actions={(
+            <>
+              {step === 'confirm' && <Button onClick={() => setStep('input')}>予約入力に戻る</Button>}
+              {step === 'input' ? (
+                <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()}>
+                  {loading ? '空きを再確認しています' : '予約内容を確認する'}
+                </Button>
+              ) : (
+                <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()}>
+                  {loading ? '登録中です' : 'この内容で予約を入れる'}
+                </Button>
+              )}
+            </>
           )}
-        </div>
+        />
       )}
     </div>
   )

@@ -31,7 +31,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
   （共通Buttonは設計と一致済みで、こちらへ寄せると他画面が動く）。
   幅は設計の実寸：詳細条件110 / 保存した検索130 / 検索70。
 */
-const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-v6-control border border-hairline bg-canvas text-label font-semibold text-v6-ink hover:bg-v6-surface-strong'
+const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -248,17 +248,17 @@ function FriendsPageInner({
       <FriendKpis />
 
       {hasScoreRange ? (
-        <div className="flex items-center justify-between rounded-v6-control border border-v6-accent-border bg-v6-accent-soft px-4 py-2.5 text-xs text-v6-ink-secondary">
+        <div className="flex items-center justify-between rounded-control border border-accent-border bg-accent-soft px-4 py-2.5 text-xs text-ink-secondary">
           <span>
             行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
             {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
             {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
           </span>
-          <Link href="/friends" className="font-semibold text-v6-action hover:underline">この条件を外す</Link>
+          <Link href="/friends" className="font-semibold text-action hover:underline">この条件を外す</Link>
         </div>
       ) : null}
 
-      <section className={`rounded-v6-card border border-hairline bg-canvas px-4 py-3.5 shadow-v6-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
+      <section className={`rounded-card border border-hairline bg-canvas px-4 py-3.5 shadow-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
         <form
           onSubmit={(event) => {
             event.preventDefault()
@@ -287,7 +287,7 @@ function FriendsPageInner({
             type="button"
             aria-pressed={advanced !== null}
             onClick={() => setAdvancedOpen(true)}
-            className={`${SEARCH_ROW_SECONDARY} w-27.5 ${advanced ? 'border-v6-accent text-v6-accent-hover' : ''}`}
+            className={`${SEARCH_ROW_SECONDARY} w-27.5 ${advanced ? 'border-accent text-accent-hover' : ''}`}
           >
             <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
             詳細条件
@@ -295,7 +295,7 @@ function FriendsPageInner({
           <button
             type="button"
             onClick={() => setSavedOpen(true)}
-            className={`${SEARCH_ROW_SECONDARY} w-32.5 text-v6-action`}
+            className={`${SEARCH_ROW_SECONDARY} w-32.5 text-action`}
           >
             <Bookmark aria-hidden="true" className="h-4 w-4" />
             保存した検索
@@ -313,20 +313,20 @@ function FriendsPageInner({
               ]}
             />
           </div>
-          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-v6-control bg-accent-deep text-label font-bold text-on-accent hover:brightness-92">検索</button>
+          <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-bold text-on-accent hover:brightness-92">検索</button>
         </form>
 
         {advanced?.summary.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-v6-control bg-v6-accent-soft px-3 py-2">
-            <span className="text-xs font-bold text-v6-accent-hover">絞り込み中</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-3 py-2">
+            <span className="text-xs font-bold text-accent-hover">絞り込み中</span>
             {/* 保存条件の札は共通 Chip（設計の印：高さ17 / 文字10・700 / 丸）。 */}
             {advanced.summary.map((summary) => <Chip key={summary} tone="neutral">{summary}</Chip>)}
-            <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-v6-action hover:underline">条件を外す</button>
+            <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-action hover:underline">条件を外す</button>
           </div>
         ) : null}
 
         <div className="mt-2.5 flex min-w-0 items-center gap-2.5">
-          <span className="shrink-0 text-sm font-semibold text-v6-ink-secondary">絞り込み</span>
+          <span className="shrink-0 text-sm font-semibold text-ink-secondary">絞り込み</span>
           {/*
             絞り込み4つは共通 Select（設計 h42 / r8 / 文字13・600）。
             幅は設計の実寸：タグ156 / 対応156 / 担当者176 / シナリオ184。
@@ -375,21 +375,21 @@ function FriendsPageInner({
               options={[{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
             />
           </div>
-          <button type="button" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold text-v6-danger ${responseFilter === 'unhandled' ? 'bg-v6-danger-selected ring-2 ring-v6-danger/30' : 'bg-v6-danger-bg'}`}>
+          <button type="button" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold text-danger ${responseFilter === 'unhandled' ? 'bg-status-danger-selected ring-2 ring-status-danger/30' : 'bg-status-danger-soft'}`}>
             <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />未対応
           </button>
-          <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-v6-warning-bg px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-v6-warning-strong/30' : ''} text-v6-warning`}>
+          <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-status-warn-soft px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-status-warn-deep/30' : ''} text-status-warn-deep`}>
             <Star aria-hidden="true" className="h-3.5 w-3.5" />注目のみ
           </button>
-          <span className="shrink-0 whitespace-nowrap text-xs text-v6-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
+          <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </div>
       </section>
 
       {selectedIds.size > 0 ? (
-        <section className={`rounded-v6-card border border-v6-accent-border bg-v6-accent-soft p-3 shadow-v6-card`} data-design="V4BulkBar">
+        <section className={`rounded-card border border-accent-border bg-accent-soft p-3 shadow-card`} data-design="V4BulkBar">
           <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-sm text-v6-ink">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-v6-ink-secondary">対象を確認してから操作を選んでください</span>
+            <strong className="text-sm text-ink">{selectedIds.size}人を選択中</strong>
+            <span className="text-xs text-ink-secondary">対象を確認してから操作を選んでください</span>
             {selectedIds.size > 1 && canRunBulk(selectedAccount?.role) ? (
               <Button
                 variant="primary"
@@ -402,7 +402,7 @@ function FriendsPageInner({
             ) : null}
             {selectedIds.size > 1 && !canRunBulk(selectedAccount?.role) ? (
               /* 権限が無いときは押し口を出さない。理由だけ書く。 */
-              <span className="text-v6-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
+              <span className="text-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
             ) : null}
           </div>
           {selectedIds.size === 1 ? (
@@ -486,11 +486,11 @@ function FriendsPageInner({
 function NoticeDialog({ notice, onClose }: { notice: Exclude<Notice, null>; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="friends-notice-title" className={`w-full max-w-md rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card`} onMouseDown={(event) => event.stopPropagation()}>
-        <h2 id="friends-notice-title" className="text-lg font-bold text-v6-ink">{notice.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-v6-ink-secondary">{notice.message}</p>
+      <section role="dialog" aria-modal="true" aria-labelledby="friends-notice-title" className={`w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card`} onMouseDown={(event) => event.stopPropagation()}>
+        <h2 id="friends-notice-title" className="text-lg font-bold text-ink">{notice.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">{notice.message}</p>
         <div className="mt-5 flex justify-end">
-          <button type="button" onClick={onClose} className="rounded-v6-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">確認</button>
+          <button type="button" onClick={onClose} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">確認</button>
         </div>
       </section>
     </div>
@@ -535,10 +535,10 @@ function SavedSearchDialog({
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="saved-search-title" className={`w-full max-w-lg rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card`} onMouseDown={(event) => event.stopPropagation()}>
-        <h2 id="saved-search-title" className="text-lg font-bold text-v6-ink">保存した検索</h2>
-        {loading ? <p className="mt-4 text-sm text-v6-ink-faint">読み込み中…</p> : null}
-        {error ? <p className="mt-4 rounded-v6-control bg-v6-danger-bg p-3 text-sm text-v6-danger">{error}</p> : null}
+      <section role="dialog" aria-modal="true" aria-labelledby="saved-search-title" className={`w-full max-w-lg rounded-panel border border-hairline bg-canvas p-5 shadow-card`} onMouseDown={(event) => event.stopPropagation()}>
+        <h2 id="saved-search-title" className="text-lg font-bold text-ink">保存した検索</h2>
+        {loading ? <p className="mt-4 text-sm text-ink-faint">読み込み中…</p> : null}
+        {error ? <p className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-danger">{error}</p> : null}
         {!loading && saved.length > 0 ? (
           <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
             {saved.map((search) => {
@@ -548,27 +548,27 @@ function SavedSearchDialog({
                   key={search.id}
                   type="button"
                   onClick={() => onApply({ params: savedSearchParams(search.id, search.conditions), summary })}
-                  className="w-full rounded-tile border border-v6-divider bg-v6-surface p-4 text-left hover:border-v6-accent"
+                  className="w-full rounded-card border border-divider-soft bg-surface-pearl p-4 text-left hover:border-accent"
                 >
-                  <span className="flex items-center gap-2 text-sm font-bold text-v6-ink">
+                  <span className="flex items-center gap-2 text-sm font-bold text-ink">
                     {search.name}
-                    <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-v6-ink-faint">{search.isShared ? '全員' : '自分だけ'}</span>
+                    <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-ink-faint">{search.isShared ? '全員' : '自分だけ'}</span>
                   </span>
-                  <span className="mt-2 block text-xs leading-5 text-v6-ink-secondary">{summary.slice(0, 3).join(' ／ ') || '条件を確認してください'}</span>
+                  <span className="mt-2 block text-xs leading-5 text-ink-secondary">{summary.slice(0, 3).join(' ／ ') || '条件を確認してください'}</span>
                 </button>
               )
             })}
           </div>
         ) : !loading ? (
-          <div className="mt-4 rounded-tile border border-hairline bg-v6-surface p-4">
-            <p className="text-sm font-semibold text-v6-ink-secondary">保存した条件はまだありません。</p>
-            <p className="mt-1 text-xs leading-5 text-v6-ink-faint">「詳細条件」で絞り込みを組み、条件を保存すると次回からここで呼び出せます。</p>
+          <div className="mt-4 rounded-card border border-hairline bg-surface-pearl p-4">
+            <p className="text-sm font-semibold text-ink-secondary">保存した条件はまだありません。</p>
+            <p className="mt-1 text-xs leading-5 text-ink-faint">「詳細条件」で絞り込みを組み、条件を保存すると次回からここで呼び出せます。</p>
           </div>
         ) : null}
         <div className="mt-5 flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-v6-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-v6-ink-secondary hover:bg-v6-surface-strong">閉じる</button>
+          <button type="button" onClick={onClose} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken">閉じる</button>
           {saved.length === 0 ? (
-            <button type="button" onClick={onOpenAdvanced} className="rounded-v6-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">詳細条件を設定</button>
+            <button type="button" onClick={onOpenAdvanced} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">詳細条件を設定</button>
           ) : null}
         </div>
       </section>
@@ -600,8 +600,8 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-semibold text-v6-ink-secondary hover:bg-v6-surface-strong disabled:text-v6-ink-disabled">CSVで書き出す</button> : null}
-              <Link href="/accounts?tab=migration" className="flex h-9.5 items-center rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-semibold text-v6-action hover:bg-v6-action-soft">UID移行</Link>
+              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">CSVで書き出す</button> : null}
+              <Link href="/accounts?tab=migration" className="flex h-9.5 items-center rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-action hover:bg-action-soft">UID移行</Link>
             </div>
           )}
         />
@@ -616,7 +616,7 @@ function FriendsPageHost() {
 
 export default function FriendsPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-v6-ink-faint">読み込み中…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
       <FriendsPageHost />
     </Suspense>
   )
