@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import type { Area } from './canvas-editor'
 import type { RichMenuAreaIntent } from '@/lib/api'
 
@@ -236,17 +237,12 @@ export function AreaProperties({
       </div>
 
       <Field label="押したときの動き" hint="タップしたときに何が起きるかを決めます。">
-        <select
+        <SelectField
           value={intent}
           onChange={(e) => changeIntent(e.target.value as RichMenuAreaIntent)}
+          options={INTENT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           className={inputClass}
-        >
-          {INTENT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        />
         <p className="text-ink-faint mt-1 text-[11px]">
           {INTENT_OPTIONS.find((o) => o.value === intent)?.hint}
         </p>

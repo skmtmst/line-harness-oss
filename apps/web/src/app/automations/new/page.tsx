@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -247,18 +248,13 @@ export default function NewAutomationPage() {
               きっかけ<span className={styles.required}>必須</span>
             </label>
             <div className={styles.field}>
-              <select
+              <SelectField
                 id="au-event"
                 value={eventType}
                 onChange={(event) => setEventType(event.target.value)}
+                options={EVENTS.map((event) => ({ value: event.value, label: event.label }))}
                 className={styles.select}
-              >
-                {EVENTS.map((event) => (
-                  <option key={event.value} value={event.value}>
-                    {event.label}
-                  </option>
-                ))}
-              </select>
+              />
               <p className={styles.note}>{selectedEvent.note}</p>
             </div>
 
@@ -304,20 +300,15 @@ export default function NewAutomationPage() {
                       すること<span className={styles.required}>必須</span>
                     </label>
                     <div className={styles.field}>
-                      <select
+                      <SelectField
                         id={`au-action-${row.key}`}
                         value={row.type}
                         onChange={(event) =>
                           updateAction(row.key, { type: event.target.value as ActionType })
                         }
+                        options={ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
                         className={styles.select}
-                      >
-                        {ACTIONS.map((action) => (
-                          <option key={action.value} value={action.value}>
-                            {action.label}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
 

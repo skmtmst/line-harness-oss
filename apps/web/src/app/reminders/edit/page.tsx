@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -296,18 +297,11 @@ function ReminderEditInner() {
                 タグを選ぶと、そのタグを持つ人だけに送ります。
               </p>
             </div>
-            <select
+            <SelectField
               value={targetTagId}
               onChange={(e) => setTargetTagId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">対象になった友だち全員</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              options={[{ value: '', label: '対象になった友だち全員' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            />
           </section>
 
           <section className="bg-canvas border-hairline rounded-card space-y-4 border p-5">
@@ -415,18 +409,11 @@ function ReminderEditInner() {
                 <span className="text-ink-faint block text-[11px]">
                   選ぶと、下の本文の代わりにテンプレートの中身が届きます。
                 </span>
-                <select
+                <SelectField
                   value={newStep.templateId}
                   onChange={(e) => setNewStep({ ...newStep, templateId: e.target.value })}
-                  className={`mt-1 ${inputClass}`}
-                >
-                  <option value="">使わない（下に直接書く）</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: '', label: '使わない（下に直接書く）' }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+                />
               </label>
 
               <label className="block">

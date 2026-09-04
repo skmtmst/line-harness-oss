@@ -22,7 +22,8 @@ describe('種類の呼び方', () => {
   it('絞り込みの札にも内部の名前を出さない', () => {
     /* 一覧の上の札と、作る画面の選び口。どちらも運用の言葉にする。 */
     expect(PAGE).toContain("{ key: 'flex', label: 'カード型' },")
-    expect(PAGE).toContain('<option value="flex">カード型</option>')
+    /* 選び口は共通の `SelectField` へ寄せたので、options で並ぶ。 */
+    expect(PAGE).toContain("{ value: \"flex\", label: \"カード型\" }")
     expect(PAGE, '失敗の文に内部の語が出ている').not.toContain('Flex JSON parse 失敗')
   })
 

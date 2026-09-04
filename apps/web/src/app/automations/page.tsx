@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -351,15 +352,12 @@ export default function AutomationsPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">イベントタイプ</label>
-              <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              <SelectField
                 value={form.eventType}
                 onChange={(e) => setForm({ ...form, eventType: e.target.value as AutomationEventType })}
-              >
-                {eventTypeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                options={eventTypeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">アクション (JSON)</label>

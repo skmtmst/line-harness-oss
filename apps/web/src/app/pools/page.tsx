@@ -1,5 +1,6 @@
 'use client'
 
+import SelectField from '@/components/shared/select-field'
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
@@ -270,7 +271,7 @@ function PoolAccountList({
       </ul>
       {candidates.length > 0 && (
         <div className="mt-2">
-          <select
+          <SelectField
             defaultValue=""
             onChange={(e) => {
               if (e.target.value) {
@@ -278,15 +279,8 @@ function PoolAccountList({
                 e.target.value = ''
               }
             }}
-            className="text-xs border border-gray-200 rounded px-2 py-1"
-          >
-            <option value="">＋ アカウントを追加</option>
-            {candidates.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: '＋ アカウントを追加' }, ...candidates.map((a) => ({ value: a.id, label: a.name }))]}
+          />
         </div>
       )}
 
@@ -354,18 +348,11 @@ function CreatePoolModal({
           placeholder="表示名 (例: ブランドA)"
           className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
         />
-        <select
+        <SelectField
           value={activeAccountId}
           onChange={(e) => setActiveAccountId(e.target.value)}
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
-        >
-          <option value="">最初の所属アカウントを選択</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+          options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+        />
         <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
           <button onClick={onClose} className="text-sm px-3 py-1.5 text-gray-600">
             キャンセル
