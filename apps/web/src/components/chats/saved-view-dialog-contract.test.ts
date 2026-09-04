@@ -27,4 +27,18 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(PAGE).toContain('return { success: true }')
     expect(PAGE).toContain('return { success: false, error: message }')
   })
+
+  it('検索名が空のあいだは最初から保存ボタンを押せない', () => {
+    /*
+      押してはじめて断るのではなく、**押せない形にしてから、何をすれば
+      進めるかを書く。** 押せる形で置いてあるものは、押せば進むと読む。
+    */
+    expect(DIALOG).toContain("const nameMissing = name.trim() === ''")
+    expect(DIALOG).toContain('disabled={saving || nameMissing}')
+    // 文言は設計 `AuSDY`（2-16）そのまま。実装で言い換えない。
+    expect(DIALOG).toContain("title={nameMissing ? '検索名を入力してください' : undefined}")
+    expect(DIALOG).toContain('検索名を入力してください。')
+    // 空を押させてから赤字を出す形へ戻さない。
+    expect(DIALOG).not.toContain('disabled={saving}')
+  })
 })
