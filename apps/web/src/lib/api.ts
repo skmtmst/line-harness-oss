@@ -1,6 +1,12 @@
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
+  AutoReplyConflict,
+  AutoReplyDraftInput,
+  AutoReplyDraftVersion,
+  AutoReplyDryRunResult,
+  AutoReplyPublishResult,
+  AutoReplyValidationResult,
   Friend,
   FriendAddRouting,
   FriendAddRoutingDraftTestResult,
@@ -3490,6 +3496,48 @@ export const api = {
       }>>(`/api/templates/${id}/usages`),
   },
   autoReplies: {
+    /*
+      公開までの4段（下書き→検査→競合→試験→公開）。**口はすべて
+      `apps/worker/src/routes/auto-replies.ts` に在るものを読むだけ。**
+      公開は `Idempotency-Key` を付ける——二度押しで2回公開すると、
+      同じ変更が2つの版として台帳に残る。
+    */
+    createDraft: (body: AutoReplyDraftInput) =>
+      fetchApi<ApiResponse<AutoReplyDraftVersion>>('/api/auto-replies/drafts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getDraft: (id: string) =>
+      fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`),
+    saveDraft: (id: string, body: AutoReplyDraftInput) =>
+      fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    validateDraft: (id: string) =>
+      fetchApi<ApiResponse<AutoReplyValidationResult>>(`/api/auto-replies/${id}/validate`, {
+        method: 'POST',
+      }),
+    conflicts: (id: string) =>
+      fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
+    testDraft: (id: string, body: {
+      friendId: string;
+      incomingText: string;
+      messageKind?: string;
+      occurredAt?: string;
+    }) => fetchApi<ApiResponse<AutoReplyDryRunResult>>(`/api/auto-replies/${id}/test`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    publishDraft: (
+      id: string,
+      body: { acknowledgedConflictIds: string[] },
+      idempotencyKey: string,
+    ) => fetchApi<ApiResponse<AutoReplyPublishResult>>(`/api/auto-replies/${id}/publish`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(body),
+    }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{

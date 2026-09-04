@@ -8,6 +8,7 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('テンプレート一覧のV6画面構造', () => {
   const page = read('page.tsx')
+  const panel = read('../../components/shared/folder-panel.tsx')
   const detail = read('detail/page.tsx')
   const assetManager = read('../../components/broadcasts/broadcast-asset-manager.tsx')
   const styles = read('templates-v6.module.css')
@@ -43,7 +44,10 @@ describe('テンプレート一覧のV6画面構造', () => {
     expect(page).not.toContain('<ListKpis')
     expect(styles).toContain('width: 252px')
     expect(styles).toContain('flex: 0 0 252px')
-    expect(page).toContain('aria-label="テンプレートのフォルダ"')
+    // 2026-09-04: 自前で描いていた帯を共通 `FolderPanel` へ寄せた。
+    // 読み上げ名は部品が持つ（`aria-label="フォルダ"`）。
+    expect(page).toContain('<FolderPanel')
+    expect(panel).toContain('aria-label="フォルダ"')
     expect(page).toContain('className="min-w-0 flex-1"')
   })
 
