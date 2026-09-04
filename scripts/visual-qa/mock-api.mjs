@@ -49,7 +49,7 @@ import {
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
-  TAGS, TAG_GROUPS,
+  TAGS, TAG_GROUPS, REMINDER_RUNS,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
 } from './fixtures.mjs'
@@ -886,6 +886,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
         items: SUPPORT_INBOX_ITEMS,
         summary: { total: 5, line: 1, email: 4, emailUnread: 4, oldestWaitMinutes: 9110 },
       },
+    }
+  }
+  /* リマインダの実行結果（設計 `GC4St` 7-1-H）。絞り込みと検索もここで効かせる。 */
+  if (/^\/api\/reminders\/[^/]+\/runs$/.test(pathname)) {
+    const status = query.get('status')
+    const search = (query.get('search') ?? '').trim()
+    let items = REMINDER_RUNS.items
+    if (status) items = items.filter((run) => run.domainStatus === status)
+    if (search) items = items.filter((run) => (run.friendName ?? '').includes(search))
+    return {
+      success: true,
+      data: { ...REMINDER_RUNS, items, pagination: { ...REMINDER_RUNS.pagination, total: items.length } },
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }

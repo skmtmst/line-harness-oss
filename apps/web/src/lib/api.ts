@@ -1245,6 +1245,102 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+/**
+ * リマインダの実行結果（設計 `GC4St` 7-1-H、要件 §3-7）。
+ *
+ * **状態の名前は Worker と同じにする。** 画面で言い換えると、
+ * 絞り込みに送る値が合わなくなる（`packages/db` の
+ * `ReminderDeliveryRunStatus` が正）。見せる言葉は画面側で当てる。
+ */
+export type ReminderDeliveryRunStatus =
+  | 'queued'
+  | 'claimed'
+  | 'succeeded'
+  | 'skipped'
+  | 'retry_wait'
+  | 'permanent_failed'
+  | 'cancelled'
+
+/**
+ * 7機能で共有する実行台帳の状態。**機能ごとの状態名とは別。**
+ * リマインダの `queued` `claimed` `retry_wait` は、共通では `pending` に寄せる。
+ */
+export type RunRecordStatus =
+  | 'succeeded'
+  | 'failed'
+  | 'partial'
+  | 'skipped'
+  | 'pending'
+  | 'cancelled'
+
+/**
+ * 実行台帳の共通9項目。**7機能で同じ形にする。**
+ * 機能ごとの細かい値（`domainStatus` など）は各機能の型が足す。
+ */
+export type RunRecord = {
+  occurredAt: string
+  /** 誰に対しての実行か。リマインダなら友だち名。 */
+  subject: string | null
+  /** どのLINEアカウントから送ったか。 */
+  accountLabel: string | null
+  /** 何がきっかけか。リマインダならリマインダ名。 */
+  triggerLabel: string | null
+  /** 送った先の記録などへの参照。無ければ null。 */
+  reference: string | null
+  status: RunRecordStatus
+  /** 1行で言う結果。失敗なら理由。 */
+  detail: string | null
+  /** かかった時間。始まりか終わりが無ければ null（0にしない）。 */
+  durationMs: number | null
+  /** 再試行できるか。**画面で条件を作らない**——Worker が決める。 */
+  canRetry: boolean
+}
+
+export type ReminderDeliveryRun = RunRecord & {
+  id: string
+  friendId: string
+  friendName: string | null
+  stepNumber: number
+  scheduledAt: string
+  startedAt: string | null
+  completedAt: string | null
+  domainStatus: ReminderDeliveryRunStatus
+  attemptCount: number
+  nextRetryAt: string | null
+  lastErrorCode: string | null
+  lastErrorMessage: string | null
+  lineRequestId: string | null
+  /** どの通か。通ごとに絞るときに使う。 */
+  reminderStepId: string
+  /** どのLINEアカウントから送ったか。複数アカウントを見る人には要る。 */
+  accountLabel: string | null
+}
+
+export type ReminderDeliveryRunsResponse = {
+  reminder: { id: string; name: string; isActive: boolean }
+  summary: {
+    sent: number
+    scheduled: number
+    stopped: number
+    errors: number
+    targetCount: number
+    nextScheduledAt: string | null
+  }
+  steps: Array<{
+    id: string
+    stepNumber: number
+    offsetMinutes: number
+    messageType: string
+    messageContent: string
+    sent: number
+    /** LINEは友だち単位の開封を返さない。**0%を作らない。** */
+    openRate: null
+    errors: number
+  }>
+  items: ReminderDeliveryRun[]
+  pagination: { total: number; limit: number; offset: number }
+}
+
 /** 質問テンプレート。シナリオの質問と同じ契約を使う。 */
 export type TemplateQuestion = {
   intro?: string
@@ -4199,6 +4295,28 @@ export const api = {
     },
   },
   reminders: {
+    /** 実行結果（設計 `GC4St`）。状態・検索・ページ送りは Worker が受ける。 */
+    runs: (
+      reminderId: string,
+      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number },
+    ) => {
+      const query = new URLSearchParams()
+      if (params?.status) query.set('status', params.status)
+      if (params?.search) query.set('search', params.search)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query}` : ''
+      return fetchApi<ApiResponse<ReminderDeliveryRunsResponse>>(`/api/reminders/${reminderId}/runs${suffix}`)
+    },
+    /**
+     * 1件を手で再試行する。**冪等キーが要る。**
+     * 二度押しで二重に送らないよう、同じ実行には同じ鍵を使う。
+     */
+    retryRun: (runId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; status: ReminderDeliveryRunStatus; replayed: boolean }>>(
+        `/api/reminder-runs/${runId}/retry`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
     /** 161: 渡した順に並べ替える。見えているものだけ送る。 */
     reorder: (ids: string[]) =>
       fetchApi<ApiResponse<{ updated: number }>>('/api/reminders/reorder', {

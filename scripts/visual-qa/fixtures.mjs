@@ -1080,6 +1080,109 @@ export const INBOX_SAVED_VIEWS = [
 }))
 
 /*
+  リマインダの実行結果（設計 `GC4St` 7-1-H、要件 §3-7）。
+
+  **成功だけを並べない。** 送信済み・配信予定・再試行待ち・送信失敗・
+  送らなかったもの を1件ずつ入れて、状態の描き分けと「失敗した1通だけ
+  再試行できる」を確かめられるようにする。
+
+  **かかった時間が出せない行を混ぜる**（まだ始まっていない予定）。
+  `durationMs` を0で埋めると「一瞬で終わった」と読めてしまう。
+*/
+const RUN_BASE = {
+  ownerKind: 'reminder',
+  ownerId: 'reminder-1',
+  lineAccountId: 'visual-qa-account',
+  accountLabel: '然-NEN-TEST',
+  triggerLabel: '予約前日のお知らせ',
+  reference: null,
+  reminderId: 'reminder-1',
+  friendReminderId: 'fr-1',
+  reminderStepId: 'step-1',
+}
+
+export const REMINDER_RUNS = {
+  reminder: { id: 'reminder-1', name: '予約前日のお知らせ', isActive: true },
+  summary: {
+    sent: 128, scheduled: 42, stopped: 6, errors: 3,
+    targetCount: 179, nextScheduledAt: '2026-08-20T09:00:00+09:00',
+  },
+  steps: [
+    {
+      id: 'step-1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text',
+      messageContent: '明日のご予約のお知らせです。お待ちしております。',
+      /** LINEは友だち単位の既読を返さない。**0%を作らない。** */
+      sent: 128, openRate: null, errors: 3,
+    },
+    {
+      id: 'step-2', stepNumber: 2, offsetMinutes: -60, messageType: 'text',
+      messageContent: '1時間後にお会いできるのを楽しみにしています。',
+      sent: 96, openRate: null, errors: 0,
+    },
+  ],
+  items: [
+    {
+      ...RUN_BASE, id: 'run-1', friendId: 'friend-kyohei', friendName: 'Kyohei Yamamoto',
+      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
+      startedAt: '2026-08-19T09:00:02+09:00', completedAt: '2026-08-19T09:00:03+09:00',
+      occurredAt: '2026-08-19T09:00:03+09:00', subject: 'Kyohei Yamamoto',
+      status: 'succeeded', domainStatus: 'succeeded', detail: '1通目',
+      durationMs: 1200, attemptCount: 1, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: null,
+      lineRequestId: '0f3c2a8e-1b44-4f0a-9d21-77c0a1b2c3d4', messageLogId: 'log-1',
+      canRetry: false,
+    },
+    {
+      ...RUN_BASE, id: 'run-2', friendId: 'friend-masato', friendName: 'Masato.S',
+      stepNumber: 1, scheduledAt: '2026-08-20T09:00:00+09:00',
+      startedAt: null, completedAt: null,
+      occurredAt: '2026-08-20T09:00:00+09:00', subject: 'Masato.S',
+      status: 'pending', domainStatus: 'queued', detail: '1通目',
+      /** まだ始まっていないので出せない。**0にしない。** */
+      durationMs: null, attemptCount: 0, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: null,
+      lineRequestId: null, messageLogId: null,
+      canRetry: false,
+    },
+    {
+      ...RUN_BASE, id: 'run-3', friendId: 'friend-kenta', friendName: 'Kenta Kawano(Obama)',
+      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
+      startedAt: '2026-08-19T09:00:02+09:00', completedAt: null,
+      occurredAt: '2026-08-19T09:00:02+09:00', subject: 'Kenta Kawano(Obama)',
+      status: 'pending', domainStatus: 'retry_wait', detail: '一時的にLINEへ届きませんでした',
+      durationMs: null, attemptCount: 2, nextRetryAt: '2026-08-19T09:30:00+09:00',
+      lastErrorCode: '429', lastErrorMessage: '一時的にLINEへ届きませんでした',
+      lineRequestId: null, messageLogId: null,
+      canRetry: true,
+    },
+    {
+      ...RUN_BASE, id: 'run-4', friendId: 'friend-taro', friendName: 'テスト 太郎',
+      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
+      startedAt: '2026-08-19T09:00:02+09:00', completedAt: '2026-08-19T09:00:05+09:00',
+      occurredAt: '2026-08-19T09:00:05+09:00', subject: 'テスト 太郎',
+      status: 'failed', domainStatus: 'permanent_failed',
+      detail: '友だちがブロックしているため送れません',
+      durationMs: 3100, attemptCount: 3, nextRetryAt: null,
+      lastErrorCode: '403', lastErrorMessage: '友だちがブロックしているため送れません',
+      lineRequestId: null, messageLogId: null,
+      canRetry: true,
+    },
+    {
+      ...RUN_BASE, id: 'run-5', friendId: 'friend-hanako', friendName: null,
+      stepNumber: 2, scheduledAt: '2026-08-19T17:00:00+09:00',
+      startedAt: '2026-08-19T17:00:01+09:00', completedAt: '2026-08-19T17:00:01+09:00',
+      occurredAt: '2026-08-19T17:00:01+09:00', subject: null,
+      status: 'skipped', domainStatus: 'skipped', detail: '予約が取り消されたため送りませんでした',
+      durationMs: 400, attemptCount: 1, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: '予約が取り消されたため送りませんでした',
+      lineRequestId: null, messageLogId: null,
+      canRetry: false,
+    },
+  ],
+  pagination: { total: 5, limit: 20, offset: 0 },
+}
+
+/*
   対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
 
   **「保留」を必ず入れる。** 撮影の手順が「保留」を押して編集画面へ進む。

@@ -10,10 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする93ファイルを利用先に数える', () => {
+  it('共通Buttonを直接importする94ファイルを利用先に数える', () => {
     // 2026-09-04: LINEアカウントの一覧・登録・詳細・乗り換え（★V6 33-1〜33-4）の
     // 4画面が共通 Button を使う。統合 PR #834 #845 のぶんと合わせて実測し直す。
-    expect(directImporters(files, button)).toHaveLength(93)
+    expect(directImporters(files, button)).toHaveLength(94)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -21,7 +21,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする20ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする21ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -40,6 +40,8 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/action-score-tab.tsx',
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',
+      // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
+      'app/reminders/detail/page.tsx',
       'app/reminders/page.tsx',
       'app/rich-menus/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
