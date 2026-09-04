@@ -111,7 +111,7 @@ function BookingsInner() {
       setItems([])
       setLoadStatus('error')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 控えの `event` を読まなくなったので、依存の除外は要らない。
   }, [selectedAccountId, eventId, tab])
 
   useEffect(() => {
