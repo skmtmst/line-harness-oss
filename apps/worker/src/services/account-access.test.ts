@@ -27,6 +27,8 @@ function account(
     channel_access_token: 'token', channel_secret: 'secret', login_channel_id: '1',
     login_channel_secret: 'secret', liff_id: '1-X', is_active: 1, is_default: 0,
     archived_at: null, archived_by: null, archived_reason: null, country: null,
+    channel_access_token_updated_at: null, channel_secret_updated_at: null,
+    login_channel_secret_updated_at: null,
     role: null, display_order: 0, token_expires_at: null, og_site_name: null,
     og_default_image_url: null, og_default_description: null, friend_capacity: null,
     capacity_warn_at: null, icon_url: null,
