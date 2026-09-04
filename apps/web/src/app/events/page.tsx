@@ -7,6 +7,8 @@ import { eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import { daysUntilEvent, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -28,6 +30,22 @@ function formatJpDate(iso: string | null): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
+function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
+  if (!hasAccount) return 'アカウントを選択'
+  if (status === 'loading') return '読み込み中'
+  if (status === 'error') return '取得できませんでした'
+  return readyDetail
+}
+
+function formatShortJpDate(iso: string | null): string {
+  if (!iso) return '日時未設定'
+  return new Date(iso).toLocaleDateString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
     timeZone: 'Asia/Tokyo',
   })
 }
@@ -77,20 +95,9 @@ export default function EventsListPage() {
     return e.total_capacity != null && e.total_active >= e.total_capacity
   }
 
-  const kpi = useMemo(() => {
-    const open = items.filter((e) => e.is_published === 1)
-    const applied = items.reduce((sum, e) => sum + e.total_active, 0)
-    const capacity = open.reduce((sum, e) => sum + (e.total_capacity ?? 0), 0)
-    const filled = open.reduce((sum, e) => sum + e.total_active, 0)
-    return {
-      open: open.length,
-      applied,
-      // 受付中のイベントで、定員のうちどれだけ埋まったか。
-      // 定員なしのイベントは分母に入れられないので、混ぜずに省く。
-      rate: capacity > 0 ? Math.round((filled / capacity) * 100) : null,
-      pending: items.reduce((sum, e) => sum + e.pending_count, 0),
-    }
-  }, [items])
+  const attention = useMemo(() => summarizeEventAttention(items), [items])
+  const nearest = attention.upcoming[0]
+  const nearestLow = attention.lowApplications[0]
 
   const filtered = useMemo(() => {
     const q = query.trim()
@@ -106,7 +113,11 @@ export default function EventsListPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
-  const dataReady = loadStatus === 'ready'
+  /*
+    **アカウントを選んでいないときも「取れた」にしない。** 選ぶ前は
+    そもそも数える対象が無い。`ready` だけを見ると 0件と出る。
+  */
+  const dataReady = Boolean(selectedAccountId) && loadStatus === 'ready'
 
   return (
     <div>
@@ -148,19 +159,49 @@ export default function EventsListPage() {
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
-          title="イベント"
-          value={dataReady ? String(items.length) : '—'}
-          unit={dataReady ? '件' : ''}
-          detail={dataReady ? `受付中 ${kpi.open}` : '取得できませんでした'}
+          title="これからの回"
+          value={dataReady ? String(attention.upcoming.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            nearest ? `いちばん近いのは ${formatShortJpDate(nearest.next_slot_starts_at)}` : '予定されている回はありません',
+          )}
         />
-        <Kpi title="申込" value={dataReady ? String(kpi.applied) : '—'} unit={dataReady ? '人' : ''} detail={dataReady ? '累計' : '取得できませんでした'} />
         <Kpi
-          title="定員の充足"
-          value={dataReady && kpi.rate !== null ? String(kpi.rate) : '—'}
-          unit={dataReady && kpi.rate !== null ? '%' : ''}
-          detail={dataReady ? '受付中のもの' : '取得できませんでした'}
+          title="申込"
+          value={dataReady ? String(attention.applied) : '—'}
+          unit={dataReady ? '人' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            attention.fillRate === null
+              ? '定員を確認できません'
+              : `定員${attention.capacity}人に対して ${attention.fillRate}%`,
+          )}
         />
-        <Kpi title="承認待ち" value={dataReady ? String(kpi.pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '要対応' : '取得できませんでした'} />
+        <Kpi
+          title="あと少しで満席"
+          value={dataReady ? String(attention.nearlyFull.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            attention.nearlyFull.length > 0 ? '声をかけると埋まります' : '該当する回はありません',
+          )}
+        />
+        <Kpi
+          title="申し込みが少ない"
+          value={dataReady ? String(attention.lowApplications.length) : '—'}
+          unit={dataReady ? '回' : ''}
+          detail={loadDetail(
+            Boolean(selectedAccountId),
+            loadStatus,
+            nearestLow
+              ? `${formatShortJpDate(nearestLow.next_slot_starts_at)}の回。あと${daysUntilEvent(nearestLow) ?? '—'}日です`
+              : '該当する回はありません',
+          )}
+        />
       </div>
 
       <div
@@ -333,26 +374,25 @@ export default function EventsListPage() {
       )}
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-ink-faint text-xs">全 {filtered.length} 件</span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={current <= 1}
-            className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-          >
-            前へ
-          </button>
-          <span className="text-ink-secondary px-2 text-xs tabular-nums">
-            {current} / {pageCount}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            disabled={current >= pageCount}
-            className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-          >
-            次へ
-          </button>
-        </div>
+        {/*
+          **「全 0 件」と言い切らない。** 取れていないときの 0件は
+          「イベントが無い」に読める。`—` と読み込み中を分ける。
+        */}
+        <span className="text-ink-faint text-xs">
+          {!selectedAccountId || loadStatus === 'error'
+            ? '—'
+            : loadStatus === 'loading'
+              ? '読み込み中'
+              : filtered.length === 0
+                ? '0件'
+                : `${(current - 1) * PAGE_SIZE + 1}〜${Math.min(current * PAGE_SIZE, filtered.length)}件 / 全${filtered.length}件`}
+        </span>
+        {/*
+          **送る先が無いページ送りを出さない。** 取れていないときに
+          「1 / 1」と出ると、1ページぶんは取れたように見える。
+          共通の `Pagination` に寄せる。
+        */}
+        {dataReady ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     </div>
   )

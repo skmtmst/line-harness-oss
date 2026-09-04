@@ -43,14 +43,15 @@ describe('V6 イベント・申込者一覧の状態', () => {
 
   it('イベント一覧は未取得の帯を0件にしない', () => {
     const body = code(EVENTS)
-    expect(body).toContain("value={dataReady ? String(items.length) : '—'}")
-    expect(body).toContain("value={dataReady ? String(kpi.applied) : '—'}")
+    // 帯は「数」ではなく「次にすること」を出す（`event-attention.ts`）。
+    expect(body).toContain("value={dataReady ? String(attention.upcoming.length) : '—'}")
+    expect(body).toContain("value={dataReady ? String(attention.applied) : '—'}")
     expect(body).toContain('登録したイベントは消えていません。')
   })
 
   it('申込者一覧は未取得の帯を0件にしない', () => {
     const body = code(BOOKINGS)
-    expect(body).toContain("value={dataReady ? String(confirmed + pending) : '—'}")
+    expect(body).toContain("value={dataReady ? String(applied) : '—'}")
     expect(body).toContain("value={dataReady ? String(pending) : '—'}")
     expect(body).toContain("value={dataReady ? String(cancelled) : '—'}")
     expect(body).toContain('受け付けた予約は消えていません。')
@@ -61,7 +62,9 @@ describe('V6 イベント・申込者一覧の状態', () => {
     // 上限が無いのか読めなかったのかで、締め切りの判断が変わる。
     expect(body).toContain('capacityStatus')
     expect(body).toContain("'定員は取得できませんでした'")
-    expect(body).toContain("'定員なし'")
+    // 「定員なし」の言い分けは `event-attention.ts` の
+    // `describeBookingCapacity` に寄せた（帯と窓で同じ言い方にするため）。
+    expect(body).toContain('describeBookingCapacity(applied, capacity)')
   })
 
   it('申込者一覧は切替後に前のイベント名と定員を残さない', () => {
@@ -76,7 +79,9 @@ describe('V6 イベント・申込者一覧の状態', () => {
     const body = code(BOOKINGS)
     expect(body).not.toContain('setError(e instanceof Error ? e.message : String(e))')
     expect(body).toContain('const [actionError, setActionError]')
-    expect(body).toContain('予約を確定・拒否できませんでした。')
+    // 確定と拒否は出す場所が違う（拒否は窓の中）ので、文も分けた。
+    expect(body).toContain('予約を確定できませんでした。')
+    expect(body).toContain('予約を拒否できませんでした。')
     expect(body).toContain('{actionError}')
   })
 })
