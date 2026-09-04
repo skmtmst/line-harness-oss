@@ -318,20 +318,18 @@ export default function NewAutomationPage() {
                         付けるタグ<span className={styles.required}>必須</span>
                       </label>
                       <div className={styles.field}>
-                        <select
+                        <SelectField
                           id={`au-tag-${row.key}`}
                           value={row.tagId}
                           disabled={tagsLoading || tagsFailed}
                           onChange={(event) => updateAction(row.key, { tagId: event.target.value })}
+                          aria-label="自動化で付けるタグ"
                           className={styles.select}
-                        >
-                          <option value="">— 選んでください —</option>
-                          {tags.map((tag) => (
-                            <option key={tag.id} value={tag.id}>
-                              {tag.name}
-                            </option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: '', label: '— 選んでください —' },
+                            ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+                          ]}
+                        />
                         {tagsLoading ? <p className={styles.note}>読み込んでいます</p> : null}
                         {tagsFailed ? (
                           <p className={styles.note}>

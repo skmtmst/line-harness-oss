@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Folder, ReminderTriggerType, Tag } from '@line-crm/shared'
+import type { Folder, ReminderDraftSettings, ReminderTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import CreatePage, {
@@ -12,6 +12,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { TextArea } from '@/components/shared/form-controls'
+import SelectField from '@/components/shared/select-field'
 import { useAccount } from '@/contexts/account-context'
 
 const TRIGGERS: Array<{ key: ReminderTriggerType; label: string }> = [
@@ -39,7 +40,6 @@ export default function NewReminderPage() {
   const [offsetMinutes, setOffsetMinutes] = useState(1440)
   const [targetTagId, setTargetTagId] = useState('')
   const [messageContent, setMessageContent] = useState('')
-  const [activateNow, setActivateNow] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [foldersLoadState, setFoldersLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -103,7 +103,8 @@ export default function NewReminderPage() {
       title="リマインダを作る"
       description="予約やイベントの前に、忘れないようLINEで自動でお知らせします。"
       parent={['リマインダ', '/reminders']}
-      saveLabel="リマインダを作成"
+      saveLabel="次へ：対象と停止条件"
+      successHref={(id) => `/reminders/edit?id=${encodeURIComponent(String(id))}&stage=target`}
       validate={() => {
         if (accountLoading) return 'LINEアカウントを確認しています'
         if (!selectedAccountId) return 'LINEアカウントを選んでください'
@@ -124,7 +125,7 @@ export default function NewReminderPage() {
         setMessageContent('')
       }}
       onSave={async () => {
-        const res = await api.reminders.create({
+        const settings: ReminderDraftSettings = {
           name: name.trim(),
           description: description.trim() || null,
           lineAccountId: selectedAccountId!,
@@ -135,26 +136,26 @@ export default function NewReminderPage() {
           deliveryMode,
           triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
           repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
-        })
-        if (!res.success) throw new Error(res.error)
-        // 下書きとして作りたい場合は、作ったあとに止める。作成の受け口が
-        // is_active を受け取らないので、ここで1回だけ更新する。
-        if (!activateNow) {
-          await api.reminders.update(res.data.id, { isActive: false })
+          triggerOffsetMinutes: null,
+          stopConditions: {
+            bookingCancelled: true,
+            supportMarkCompleted: false,
+            daysAfterTarget: 7,
+            friendBlocked: true,
+          },
+          steps: [{
+            stableStepId: crypto.randomUUID(),
+            offsetMinutes: deliveryMode === 'time' ? 0 : -Math.abs(offsetMinutes),
+            messageType: 'text',
+            messageContent: messageContent.trim() || '（テンプレートから送ります）',
+            templateId: templateId || null,
+            offsetDays: deliveryMode === 'time' ? offsetDays : null,
+            sendAtTime: deliveryMode === 'time' ? stepSendAtTime : null,
+          }],
         }
-        // 通が1つも無いと、対象に加わっても何も届かない。作るときに1通目まで入れる。
-        await api.reminders.addStep(res.data.id, {
-          offsetMinutes,
-          messageType: 'text',
-          // テンプレートを選んでいても本文は残す。テンプレートを消したときに
-          // ここが送られる（参照が切れて何も届かなくなるのを防ぐ）。
-          messageContent: messageContent.trim() || '（テンプレートから送ります）',
-          templateId: templateId || null,
-          // 「○日前の●時」で決めるときは、日数と時刻を持たせる。
-          offsetDays: deliveryMode === 'time' ? offsetDays : null,
-          sendAtTime: deliveryMode === 'time' ? stepSendAtTime : null,
-        })
-        return res.data.id
+        const res = await api.reminders.createDraft(settings)
+        if (!res.success) throw new Error(res.error)
+        return res.data.reminderId
       }}
       aside={
         <>
@@ -205,25 +206,24 @@ export default function NewReminderPage() {
               : '一覧で作ったリマインダ用フォルダから選べます。'}
         >
           <div className="flex items-center gap-2">
-            <select
+            <SelectField
               value={folderId}
               onChange={(event) => setFolderId(event.target.value)}
               disabled={foldersLoadState !== 'ready'}
+              aria-label="リマインダのフォルダ"
               className={inputClass}
-            >
-              <option value="">
-                {foldersLoadState === 'loading'
+              options={[
+                {
+                  value: '',
+                  label: foldersLoadState === 'loading'
                   ? 'フォルダを読み込み中'
                   : foldersLoadState === 'error'
                     ? 'フォルダを読み込めませんでした'
-                    : '未分類'}
-              </option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
+                    : '未分類',
+                },
+                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+              ]}
+            />
             {foldersLoadState === 'error' && (
               <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>
                 フォルダを再読み込み
@@ -283,20 +283,17 @@ export default function NewReminderPage() {
               htmlFor="rm-field"
               note="友だち情報の「日付」の欄だけが並びます。"
             >
-              <select
+              <SelectField
                 id="rm-field"
                 value={triggerFieldId}
                 onChange={(e) => setTriggerFieldId(e.target.value)}
+                aria-label="リマインダの起点にする日付"
                 className={inputClass}
-              >
-                <option value="">選んでください</option>
-                {dateFields.length === 0 && <option value="">（日付の欄がありません）</option>}
-                {dateFields.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: dateFields.length === 0 ? '（日付の欄がありません）' : '選んでください' },
+                  ...dateFields.map((field) => ({ value: field.id, label: field.name })),
+                ]}
+              />
             </Field>
 
             <Field label="くり返し">
@@ -368,18 +365,14 @@ export default function NewReminderPage() {
 
         <div className={`grid gap-3 sm:grid-cols-2 ${deliveryMode === 'time' ? 'hidden' : ''}`}>
           <Field label="どれだけ前に送るか" htmlFor="rm-offset">
-            <select
+            <SelectField
               id="rm-offset"
               value={offsetMinutes}
               onChange={(e) => setOffsetMinutes(Number(e.target.value))}
+              aria-label="リマインダを送るまでの時間"
               className={inputClass}
-            >
-              {OFFSETS.map((o) => (
-                <option key={o.minutes} value={o.minutes}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              options={OFFSETS.map((offset) => ({ value: String(offset.minutes), label: offset.label }))}
+            />
           </Field>
 
           {triggerType !== 'manual' && (
@@ -417,19 +410,16 @@ export default function NewReminderPage() {
         </div>
         {targetTagId && (
           <Field label="対象のタグ" htmlFor="rm-tag">
-            <select
+            <SelectField
               id="rm-tag"
               value={targetTagId}
               onChange={(e) => setTargetTagId(e.target.value)}
+              aria-label="リマインダ対象を絞り込むタグ"
               className={inputClass}
-            >
-              {tags.length === 0 && <option value="">（タグがありません）</option>}
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              options={tags.length === 0
+                ? [{ value: '', label: '（タグがありません）' }]
+                : tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            />
           </Field>
         )}
       </FormSection>
@@ -444,19 +434,17 @@ export default function NewReminderPage() {
           htmlFor="rm-template"
           note="選ぶと、下の本文の代わりにテンプレートの中身が届きます。"
         >
-          <select
+          <SelectField
             id="rm-template"
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
+            aria-label="リマインダに使うテンプレート"
             className={inputClass}
-          >
-            <option value="">使わない（下に直接書く）</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: '使わない（下に直接書く）' },
+              ...templates.map((template) => ({ value: template.id, label: template.name })),
+            ]}
+          />
         </Field>
 
         <Field
@@ -474,21 +462,9 @@ export default function NewReminderPage() {
           />
         </Field>
 
-        <label className="text-ink-secondary flex cursor-pointer items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={activateNow}
-            onChange={(e) => setActivateNow(e.target.checked)}
-          />
-          <span>
-            作成したらすぐ動かす
-            <span className="text-ink-faint block text-xs">
-              オフにすると下書きとして保存され、条件に合っても送られません。あとから編集画面で
-              動かせます。
-            </span>
-          </span>
-        </label>
+        <p className="bg-info-bg text-info rounded-control px-3 py-2 text-xs leading-relaxed">
+          この段階では下書きです。対象・停止条件・届く予定を確認し、テスト送信が成功したあとに公開します。
+        </p>
       </FormSection>
     </CreatePage>
   )

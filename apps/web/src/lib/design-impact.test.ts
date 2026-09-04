@@ -10,11 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  // 最新 development の基準 95 に、この枝が足す2面（下書き編集・マイルの使い道）で 2 増える。
-  it('共通Buttonを直接importする97ファイルを利用先に数える', () => {
-    // 2026-09-04: LINEアカウントの4画面と、下部追従バーへ寄せた共通情報の2画面は
-    // development 側。この枝ではオートメーション下書き編集とマイルの使い道が増える。
-    expect(directImporters(files, button)).toHaveLength(97)
+  it('共通Buttonを直接importする102ファイルを利用先に数える', () => {
+    // 2026-09-04: 最新 development の100ファイルに、この枝の下書き編集と
+    // マイルの使い道の2画面を加えた実測値。
+    expect(directImporters(files, button)).toHaveLength(102)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -30,6 +29,8 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
+      // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
+      'app/auto-replies/runs/page.tsx',
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',

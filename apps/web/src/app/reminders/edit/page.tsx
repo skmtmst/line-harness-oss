@@ -1,5 +1,8 @@
 'use client'
 
+import ReminderPublishFlow, {
+  type ReminderPublishStage,
+} from '@/components/reminders/reminder-publish-flow'
 import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -43,7 +46,28 @@ function emptyStep(mode: 'time' | 'countdown'): StepDraft {
   }
 }
 
+/**
+ * 公開までの段（設計 7-1-C〜G）。`?stage=` が付いていたらそちらへ渡す。
+ *
+ * **同じ `/reminders/edit` のまま段を切り替える。** 別のルートにすると、
+ * 直しに戻るたびに URL が変わり、どこまで進んだのか分からなくなる。
+ */
+const PUBLISH_STAGES = new Set<ReminderPublishStage>(['target', 'preview', 'test', 'confirm', 'done'])
+
 function ReminderEditInner() {
+  const params = useSearchParams()
+  const id = params.get('id') ?? ''
+  const rawStage = params.get('stage')
+  if (rawStage && PUBLISH_STAGES.has(rawStage as ReminderPublishStage)) {
+    if (!id) {
+      return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
+    }
+    return <ReminderPublishFlow reminderId={id} stage={rawStage as ReminderPublishStage} />
+  }
+  return <LegacyReminderEditInner />
+}
+
+function LegacyReminderEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 

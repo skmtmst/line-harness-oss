@@ -110,7 +110,6 @@ const NOT_YET = [
   'form-submissions/edit/page.tsx',
   'nen-campaigns/columns/new/page.tsx',
   'nen-campaigns/edit/page.tsx',
-  'reminders/edit/page.tsx',
   'restaurant-test/stores/new/page.tsx',
   'rich-menus/edit/page.tsx',
   'rich-menus/new/page.tsx',

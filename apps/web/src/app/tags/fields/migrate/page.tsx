@@ -8,6 +8,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
+import SelectField from '@/components/shared/select-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api } from '@/lib/api'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
@@ -118,9 +119,13 @@ function MigrateFriendField() {
             <input value={targetName} onChange={(event) => { setTargetName(event.target.value); setPreview(null) }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal outline-none focus:border-accent" />
           </label>
           <label className="mt-3 block text-sm font-semibold text-ink">種類
-            <select value={targetType} onChange={(event) => { setTargetType(event.target.value as FriendFieldType); setPreview(null) }} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal">
-              {TYPES.map((type) => <option key={type} value={type}>{FIELD_TYPE_LABELS[type]} — {FIELD_TYPE_HINTS[type]}</option>)}
-            </select>
+            <SelectField
+              value={targetType}
+              onChange={(event) => { setTargetType(event.target.value as FriendFieldType); setPreview(null) }}
+              aria-label="移行後の友だち情報欄の種類"
+              className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"
+              options={TYPES.map((type) => ({ value: type, label: `${FIELD_TYPE_LABELS[type]} — ${FIELD_TYPE_HINTS[type]}` }))}
+            />
           </label>
         </section>
       </div>

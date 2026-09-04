@@ -127,7 +127,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(139)  // 2026-09-04: 最新 development の 138 枚に、この枝の下書き編集 1 枚を足して 139。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(142)  // 2026-09-04: 最新 development の141枚に、この枝の下書き編集1枚を足した実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
