@@ -1333,10 +1333,6 @@ export interface Reminder {
   triggerFieldId?: string | null;
   /** 154: 毎年くり返すか（誕生日なら true）。 */
   repeatYearly?: boolean;
-  /** 下書き・公開・停止のどれか。**公開しているものと編集中のものを分けるため。** */
-  lifecycleStatus?: ReminderLifecycleStatus;
-  currentDraftVersionId?: string | null;
-  currentPublishedVersionId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1853,6 +1849,102 @@ export type FriendAddEventViewState =
   | { status: "empty"; summary: FriendAddEventSummary }
   | { status: "ready"; data: FriendAddEventList }
   | { status: "error"; message: string };
+
+/** 自動応答の公開前に固定する編集内容。保存しても本番ルールは変わらない。 */
+export interface AutoReplyDraftInput {
+  keyword: string;
+  matchType: "exact" | "contains";
+  responseType: string;
+  responseContent: string;
+  templateId: string | null;
+  lineAccountId: string;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  cooldownMinutes: number | null;
+  skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string[] | null;
+  friendConditions: Record<string, unknown> | null;
+  actions: unknown[] | null;
+  responseWeekdays: number[] | null;
+  responseHolidayRule: "ignore" | "include" | "exclude" | null;
+  oncePerFriend: boolean;
+  keywords: Array<{
+    keyword: string;
+    matchType?: "exact" | "contains";
+    minLength?: number;
+    caseSensitive?: boolean;
+  }> | null;
+  respondToAll: boolean;
+  name: string | null;
+  keywordMatchMode: "any" | "all";
+  folderId: string | null;
+}
+
+export interface AutoReplyDraftVersion {
+  autoReplyId: string;
+  versionId: string;
+  versionNumber: number;
+  status: "draft" | "published" | "retired";
+  settings: AutoReplyDraftInput;
+  lastTestStatus: "succeeded" | "failed" | null;
+  lastTestedAt: string | null;
+  publishedAt: string | null;
+}
+
+export type AutoReplyTestReasonCode =
+  | "message_kind_not_matched"
+  | "keyword_not_matched"
+  | "outside_active_window"
+  | "weekday_not_allowed"
+  | "operator_handling"
+  | "already_replied_once"
+  | "cooldown_active"
+  | "friend_conditions_not_met";
+
+export interface AutoReplyConflict {
+  autoReplyId: string;
+  name: string;
+  certainty: "certain" | "possible";
+  winnerAutoReplyId: string;
+  reason: string;
+}
+
+export interface AutoReplyValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  conflicts: AutoReplyConflict[];
+  lastTestStatus: "succeeded" | "failed" | null;
+}
+
+export interface AutoReplyDryRunResult {
+  matched: boolean;
+  draftWon: boolean;
+  winner: {
+    autoReplyId: string;
+    name: string;
+    responseType: string;
+    responseContent: string;
+  } | null;
+  candidates: Array<{
+    autoReplyId: string;
+    name: string;
+    priority: number;
+    result: "not_matched" | "skipped" | "won";
+    reasonCodes: AutoReplyTestReasonCode[];
+  }>;
+  actions: Array<{ kind: string }>;
+  stateChanged: false;
+}
+
+export interface AutoReplyPublishResult {
+  autoReplyId: string;
+  versionId: string;
+  versionNumber: number;
+  publishedAt: string;
+  acknowledgedConflictIds: string[];
+}
 
 export type ReminderLifecycleStatus = "draft" | "published" | "stopped";
 

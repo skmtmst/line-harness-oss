@@ -40,7 +40,6 @@ import {
   getFriendByLineUserIdForAccount,
   getFormById,
   type Webinar,
-  upsertWebinarRegistration,
   getUpcomingWebinarRegistration,
   getWebinarRegistration,
   recordWebinarPickerOpen,
@@ -49,6 +48,15 @@ import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { resolveSession, parseScheduleRules, upcomingSessions } from '../services/webinar-schedule.js';
 import { sendWebinarRegistrationConfirmation } from '../services/webinar-reminders.js';
+import {
+  enqueueWebinarCompletedNotification,
+  getWebinarNotificationOverview,
+  getWebinarNotificationSettings,
+  registerWebinarSession,
+  saveWebinarNotificationSettings,
+  sendWebinarNotificationTest,
+  type WebinarNotificationSettingsInput,
+} from '../services/webinar-notifications.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { signWebinarToken, verifyWebinarToken } from '../lib/webinar-token.js';
 import {
@@ -346,6 +354,14 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
       positionSeconds,
       durationSeconds: loaded.webinar.duration_seconds,
     }));
+    if (positionSeconds >= Math.floor(loaded.webinar.duration_seconds * 0.9)) {
+      c.executionCtx.waitUntil(enqueueWebinarCompletedNotification(
+        c.env.DB,
+        loaded.webinar.id,
+        auth.friendId,
+        sessionStartAt,
+      ));
+    }
     return c.json({ ok: true });
   } catch (err) {
     console.error('POST heartbeat error:', err);
@@ -437,9 +453,15 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
     ) {
       return c.json({ error: 'invalid_session' }, 400);
     }
-    await upsertWebinarRegistration(c.env.DB, webinar.id, auth.friendId, sessionStartAt);
+    const registered = await registerWebinarSession(
+      c.env.DB,
+      webinar.id,
+      auth.friendId,
+      sessionStartAt,
+    );
+    const notificationSettings = await getWebinarNotificationSettings(c.env.DB, webinar.id);
     const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(c.env.LIFF_URL ?? '');
-    c.executionCtx.waitUntil(
+    if (registered.created && (notificationSettings?.registrationEnabled ?? true)) c.executionCtx.waitUntil(
       sendWebinarRegistrationConfirmation(
         c.env.DB,
         webinar,
@@ -452,9 +474,22 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
           proxyDispatch: (request) =>
             dispatchLineProxyLocally(request, c.env, c.executionCtx),
         },
+        registered.registration.id,
+        notificationSettings
+          ? [
+              notificationSettings.dayBeforeEnabled ? `前日${notificationSettings.dayBeforeTime}` : '',
+              notificationSettings.hourBeforeEnabled ? `${notificationSettings.hourBeforeMinutes}分前` : '',
+              notificationSettings.startEnabled ? '開始時' : '',
+            ].filter(Boolean).join('・') || '設定した時刻'
+          : '開始5分前',
       ),
     );
-    return c.json({ ok: true, sessionStartAt });
+    return c.json({
+      ok: true,
+      sessionStartAt,
+      rescheduled: registered.rescheduled,
+      confirmationQueued: registered.created && (notificationSettings?.registrationEnabled ?? true),
+    });
   } catch (err) {
     console.error('POST webinar register error:', err);
     return c.json({ error: 'internal_error' }, 500);
@@ -804,6 +839,123 @@ webinarRoutes.get('/api/webinars/:id', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+webinarRoutes.get('/api/webinars/:id/notifications', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const [settings, overview] = await Promise.all([
+      getWebinarNotificationSettings(c.env.DB, id),
+      getWebinarNotificationOverview(c.env.DB, id),
+    ]);
+    return c.json({ success: true, data: { settings, overview } });
+  } catch (err) {
+    console.error('GET /api/webinars/:id/notifications error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.put(
+  '/api/webinars/:id/notifications',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<Partial<WebinarNotificationSettingsInput>>();
+      const required = [
+        'registrationEnabled',
+        'dayBeforeEnabled',
+        'dayBeforeTime',
+        'hourBeforeEnabled',
+        'hourBeforeMinutes',
+        'startEnabled',
+        'missedEnabled',
+        'missedTime',
+        'completedEnabled',
+      ] as const;
+      if (required.some((key) => body[key] === undefined)) {
+        return c.json({ success: false, error: 'invalid_settings' }, 400);
+      }
+      const booleans = [
+        body.registrationEnabled,
+        body.dayBeforeEnabled,
+        body.hourBeforeEnabled,
+        body.startEnabled,
+        body.missedEnabled,
+        body.completedEnabled,
+      ];
+      if (
+        booleans.some((value) => typeof value !== 'boolean') ||
+        typeof body.dayBeforeTime !== 'string' ||
+        typeof body.missedTime !== 'string' ||
+        typeof body.hourBeforeMinutes !== 'number'
+      ) {
+        return c.json({ success: false, error: 'invalid_settings' }, 400);
+      }
+      const result = await saveWebinarNotificationSettings(
+        c.env.DB,
+        c.req.param('id'),
+        body as WebinarNotificationSettingsInput,
+      );
+      return c.json({ success: true, data: result });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'invalid_settings';
+      if (code === 'invalid_time' || code === 'invalid_hour_before') {
+        return c.json({ success: false, error: code }, 400);
+      }
+      console.error('PUT /api/webinars/:id/notifications error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+webinarRoutes.post(
+  '/api/webinars/:id/notifications/test',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
+      if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
+      const nextSession = upcomingSessions(
+        parseScheduleRules(webinar.schedule_json),
+        webinar.duration_seconds,
+        nowEpoch(),
+        1,
+      )[0];
+      if (!nextSession) return c.json({ success: false, error: 'no_upcoming_session' }, 400);
+      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(c.env.LIFF_URL ?? '');
+      const result = await sendWebinarNotificationTest(
+        c.env.DB,
+        {
+          id: webinar.id,
+          accountId: webinar.account_id,
+          title: webinar.title,
+          slug: webinar.slug,
+        },
+        nextSession,
+        {
+          proxyBaseUrl: c.env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+          defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+          defaultLiffId: liffMatch?.[1] ?? null,
+          proxyDispatch: (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
+        },
+      );
+      return c.json({ success: true, data: result });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'test_send_failed';
+      if ([
+        'missing_line_account',
+        'invalid_test_recipients',
+        'no_test_recipients',
+        'inactive_line_account',
+        'missing_liff_id',
+        'no_active_test_recipients',
+      ].includes(code)) {
+        return c.json({ success: false, error: code }, 400);
+      }
+      console.error('POST /api/webinars/:id/notifications/test error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) => {
   try {

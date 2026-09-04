@@ -10,6 +10,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
+import SupportMarkRulesPanel from './support-mark-rules-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 
@@ -144,6 +145,19 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは初期値へ移り、変更履歴は残ります。</p>
         </Card>
       </div>
+
+      {/*
+        自動変更ルール。設計 `GMvBd` は「基本情報」と同じ面に置いている。
+        **別画面にすると「このマークがいつ付くのか」を見るのに行き来する。**
+
+        **作る前は出さない。** まだ id が無いルールは保存先が無く、
+        押しても何も起きない口を並べることになる（`v6-common-rules` §5-5）。
+      */}
+      {editing ? (
+        <Card padding="default" className="mt-4">
+          <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} />
+        </Card>
+      ) : null}
 
       <StickyBar
         className="mt-4"
