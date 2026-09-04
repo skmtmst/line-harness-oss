@@ -385,6 +385,8 @@ export interface CommonVar {
     value: string;
   } | null;
   pendingScheduleCount?: number;
+  /** 一覧で確認する、差し込まれている場所の合計。 */
+  usageCount?: number;
 }
 
 /** 共通情報の日付での切り替え予約 */
@@ -1160,6 +1162,10 @@ export interface ConversionEvent {
 export interface Affiliate {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 所属テナント */
+  tenantId: string;
+  /** 所属LINE公式アカウント */
+  lineAccountId: string | null;
   /** アフィリエイト名 */
   name: string;
   /** トラッキングコード (ユニーク) */

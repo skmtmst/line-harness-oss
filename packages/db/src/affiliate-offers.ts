@@ -85,11 +85,28 @@ export async function getAffiliateOfferById(
 
 export async function listAffiliateOffers(
   db: D1Database,
-  opts: { activeOnly?: boolean } = {},
+  opts: {
+    activeOnly?: boolean;
+    lineAccountIds?: string[];
+    includeUnassigned?: boolean;
+  } = {},
 ): Promise<AffiliateOffer[]> {
-  const where = opts.activeOnly ? `WHERE is_active = 1` : '';
+  const conditions: string[] = [];
+  const binds: unknown[] = [];
+  if (opts.activeOnly) conditions.push('is_active = 1');
+  if (opts.lineAccountIds) {
+    const accountParts: string[] = [];
+    if (opts.lineAccountIds.length > 0) {
+      accountParts.push(`line_account_id IN (${opts.lineAccountIds.map(() => '?').join(', ')})`);
+      binds.push(...opts.lineAccountIds);
+    }
+    if (opts.includeUnassigned) accountParts.push('line_account_id IS NULL');
+    conditions.push(`(${accountParts.join(' OR ') || '0 = 1'})`);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const result = await db
     .prepare(`SELECT * FROM affiliate_offers ${where} ORDER BY created_at DESC`)
+    .bind(...binds)
     .all<AffiliateOffer>();
   return result.results;
 }
@@ -168,11 +185,21 @@ export async function enrollAffiliateInOffer(
   db: D1Database,
   input: EnrollAffiliateInOfferInput,
 ): Promise<{ link: AffiliateLink; existing: boolean }> {
-  const existing = await findOfferLink(db, input.affiliateId, input.offerId);
-  if (existing) return { link: existing, existing: true };
-
   const offer = await getAffiliateOfferById(db, input.offerId);
   if (!offer) throw new Error('offer not found');
+  const affiliate = await db.prepare(`SELECT line_account_id FROM affiliates WHERE id = ?`)
+    .bind(input.affiliateId)
+    .first<{ line_account_id: string | null }>();
+  if (!affiliate || affiliate.line_account_id !== offer.line_account_id) {
+    throw new Error('affiliate offer account mismatch');
+  }
+  const existing = await findOfferLink(
+    db,
+    input.affiliateId,
+    input.offerId,
+    affiliate.line_account_id,
+  );
+  if (existing) return { link: existing, existing: true };
 
   const created = await createAffiliateLink(db, {
     affiliateId: input.affiliateId,
@@ -182,7 +209,12 @@ export async function enrollAffiliateInOffer(
   });
 
   // Re-check for the earliest link in case a concurrent enroll created one first.
-  const winner = await findOfferLink(db, input.affiliateId, input.offerId);
+  const winner = await findOfferLink(
+    db,
+    input.affiliateId,
+    input.offerId,
+    affiliate.line_account_id,
+  );
   if (winner && winner.id !== created.id) {
     return { link: winner, existing: true };
   }
@@ -193,15 +225,16 @@ async function findOfferLink(
   db: D1Database,
   affiliateId: string,
   offerId: string,
+  lineAccountId: string | null,
 ): Promise<AffiliateLink | null> {
   return db
     .prepare(
       `SELECT * FROM affiliate_links
-        WHERE affiliate_id = ? AND offer_id = ?
+        WHERE affiliate_id = ? AND offer_id = ? AND line_account_id IS ?
         ORDER BY created_at ASC, id ASC
         LIMIT 1`,
     )
-    .bind(affiliateId, offerId)
+    .bind(affiliateId, offerId, lineAccountId)
     .first<AffiliateLink>();
 }
 
