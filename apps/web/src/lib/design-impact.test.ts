@@ -10,10 +10,10 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする98ファイルを利用先に数える', () => {
-    // 2026-09-04: LINEアカウントの一覧・登録・詳細・乗り換え（★V6 33-1〜33-4）と、
-    // 合流ブランチの4画面が**どちらも共通 Button を使う**。合わせて実測し直す。
-    expect(directImporters(files, button)).toHaveLength(98)
+  it('共通Buttonを直接importする100ファイルを利用先に数える', () => {
+    // 2026-09-04: 合流ブランチの追加画面と、development 側で下部追従バーへ
+    // 寄せた画面を合わせた実測値。
+    expect(directImporters(files, button)).toHaveLength(100)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
