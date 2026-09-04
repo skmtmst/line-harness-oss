@@ -11,6 +11,7 @@ import {
   applyMediaReplacementPlan,
   jstNow,
   getCommonVars,
+  getCommonVarUsageCounts,
   getCommonVarById,
   createCommonVar,
   updateCommonVar,
@@ -582,6 +583,7 @@ function serializeVar(row: CommonVar) {
       ? { effectiveFrom: row.next_effective_from, value: row.next_value ?? '' }
       : null,
     pendingScheduleCount: Number(row.pending_schedule_count ?? 0),
+    usageCount: Number(row.usage_count ?? 0),
   };
 }
 
@@ -786,6 +788,12 @@ contents.get('/api/common-vars', async (c) => {
       lineAccountId: accountId,
       folderId: c.req.query('folderId') || undefined,
     });
+    const usageCounts = await getCommonVarUsageCounts(
+      c.env.DB,
+      items.map((item) => item.var_key),
+      accountId,
+    );
+    for (const item of items) item.usage_count = usageCounts.get(item.var_key) ?? 0;
     return c.json({ success: true, data: items.map(serializeVar) });
   } catch (err) {
     console.error('GET /api/common-vars error:', err);

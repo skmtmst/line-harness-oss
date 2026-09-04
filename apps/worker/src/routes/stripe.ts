@@ -11,6 +11,10 @@ import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { listLimit } from './list-pagination.js';
 
 const stripe = new Hono<Env>();
+const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
+const MAX_STRIPE_SIGNATURE_HEADER_BYTES = 4 * 1024;
+const MAX_STRIPE_V1_SIGNATURES = 8;
+const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
 interface StripeWebhookBody {
   id: string;
@@ -56,54 +60,113 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
 
 // ========== Stripe Webhookレシーバー ==========
 
-/** Stripe署名検証 */
-async function verifyStripeSignature(secret: string, rawBody: string, sigHeader: string): Promise<boolean> {
-  // Stripe署名形式: t=timestamp,v1=signature
-  const parts = Object.fromEntries(
-    sigHeader.split(',').map((p) => {
-      const [k, ...v] = p.split('=');
-      return [k, v.join('=')];
-    }),
-  );
-  const timestamp = parts.t;
-  const expectedSig = parts.v1;
-  if (!timestamp || !expectedSig) return false;
+function hexToBytes(value: string): Uint8Array | null {
+  if (!/^[0-9a-f]{64}$/i.test(value)) return null;
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < value.length; index += 2) {
+    bytes[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
+  }
+  return bytes;
+}
+
+async function readBodyWithinLimit(request: Request): Promise<string | null> {
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > MAX_STRIPE_WEBHOOK_BODY_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/** Stripe署名検証。秘密鍵ローテーション中の複数 v1 署名も検証する。 */
+async function verifyStripeSignature(
+  secret: string,
+  rawBody: string,
+  sigHeader: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): Promise<boolean> {
+  if (new TextEncoder().encode(sigHeader).byteLength > MAX_STRIPE_SIGNATURE_HEADER_BYTES) return false;
+  let timestamp: string | undefined;
+  const signatures: string[] = [];
+  for (const item of sigHeader.split(',')) {
+    const separator = item.indexOf('=');
+    if (separator < 0) continue;
+    const key = item.slice(0, separator).trim();
+    const value = item.slice(separator + 1).trim();
+    if (key === 't' && timestamp === undefined) timestamp = value;
+    if (key === 'v1' && value) {
+      if (signatures.length >= MAX_STRIPE_V1_SIGNATURES) return false;
+      signatures.push(value);
+    }
+  }
+  if (!timestamp || !/^\d+$/.test(timestamp) || signatures.length === 0) return false;
+
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isSafeInteger(timestampSeconds)
+    || Math.abs(nowSeconds - timestampSeconds) > STRIPE_SIGNATURE_TOLERANCE_SECONDS) return false;
+
+  const signatureBytes = signatures.map(hexToBytes).filter((value): value is Uint8Array => value !== null);
+  if (signatureBytes.length === 0) return false;
 
   const encoder = new TextEncoder();
-  const signedPayload = `${timestamp}.${rawBody}`;
   const key = await crypto.subtle.importKey(
     'raw',
     encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign'],
+    ['verify'],
   );
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload));
-  const computedSig = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return computedSig === expectedSig;
+  const signedPayload = encoder.encode(`${timestamp}.${rawBody}`);
+  const results = await Promise.all(
+    signatureBytes.map((signature) => crypto.subtle.verify('HMAC', key, signature, signedPayload)),
+  );
+  return results.some(Boolean);
 }
 
 stripe.post('/api/integrations/stripe/webhook', async (c) => {
   try {
-    const stripeSecret = (c.env as unknown as Record<string, string | undefined>).STRIPE_WEBHOOK_SECRET;
-    let body: StripeWebhookBody;
-
-    if (stripeSecret) {
-      // 署名検証モード（本番環境）
-      const sigHeader = c.req.header('Stripe-Signature') ?? '';
-      const rawBody = await c.req.text();
-
-      const valid = await verifyStripeSignature(stripeSecret, rawBody, sigHeader);
-      if (!valid) {
-        return c.json({ success: false, error: 'Stripe signature verification failed' }, 401);
-      }
-      body = JSON.parse(rawBody) as StripeWebhookBody;
-    } else {
-      // シークレット未設定（開発環境向け）
-      body = await c.req.json<StripeWebhookBody>();
+    const stripeSecret = c.env.STRIPE_WEBHOOK_SECRET?.trim();
+    if (!stripeSecret) {
+      console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET is not configured');
+      return c.json({ success: false, error: 'Stripe webhook is not configured' }, 503);
     }
+
+    const declaredLength = Number(c.req.header('Content-Length') ?? '0');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_STRIPE_WEBHOOK_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+
+    const rawBody = await readBodyWithinLimit(c.req.raw);
+    if (rawBody === null) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+
+    const sigHeader = c.req.header('Stripe-Signature') ?? '';
+    const valid = await verifyStripeSignature(stripeSecret, rawBody, sigHeader);
+    if (!valid) {
+      return c.json({ success: false, error: 'Stripe signature verification failed' }, 401);
+    }
+    const body = JSON.parse(rawBody) as StripeWebhookBody;
 
     // 冪等性チェック
     const existing = await getStripeEventByStripeId(c.env.DB, body.id);

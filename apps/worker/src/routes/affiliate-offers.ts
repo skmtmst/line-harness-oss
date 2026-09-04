@@ -10,7 +10,10 @@ import {
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import {
+  canAccessAllLineAccounts,
+  getVisibleLineAccountScope,
+} from '../services/account-access.js';
 
 /**
  * Admin-side affiliate offer (案件) CRUD. Mounted under `/api/affiliate-offers`,
@@ -58,7 +61,12 @@ function isValidReward(v: unknown): v is number {
 affiliateOffers.get('/api/affiliate-offers', async (c) => {
   try {
     const activeOnly = c.req.query('activeOnly') === 'true';
-    const items = await listAffiliateOffers(c.env.DB, { activeOnly });
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const items = await listAffiliateOffers(c.env.DB, {
+      activeOnly,
+      lineAccountIds: scope.allowedAccountIds,
+      includeUnassigned: scope.canSeeUnassigned,
+    });
     return c.json({ success: true, data: items.map(serializeOffer) });
   } catch (err) {
     console.error('GET /api/affiliate-offers error:', err);
@@ -114,9 +122,13 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
         400,
       );
     }
-    if (body.lineAccountId !== null && body.lineAccountId !== undefined
-      && (!body.lineAccountId
-        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const lineAccountId = body.lineAccountId
+      ?? (scope.allowedAccountIds.length === 1 ? scope.allowedAccountIds[0] : null);
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
+    if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
@@ -125,7 +137,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       description: body.description ?? null,
       rewardAmount: body.rewardAmount,
       rewardMiles: body.rewardMiles,
-      lineAccountId: body.lineAccountId ?? null,
+      lineAccountId,
       tagId: body.tagId ?? null,
       scenarioId: body.scenarioId ?? null,
     });
@@ -169,7 +181,10 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
         400,
       );
     }
-    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+    if (body.lineAccountId === null) {
+      return c.json({ success: false, error: 'lineAccountId cannot be empty' }, 400);
+    }
+    if (body.lineAccountId !== undefined
       && (!body.lineAccountId
         || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
