@@ -12,7 +12,7 @@ describe('共通部品の影響範囲', () => {
 
   it('共通Buttonを直接importする91ファイルを利用先に数える', () => {
     // 2026-09-04: LINEアカウントの一覧・登録・詳細・乗り換え（★V6 33-1〜33-4）の
-    // 4画面が共通 Button を使う。統合 PR #834 のぶんと合わせて 91。
+    // 4画面が共通 Button を使う。統合 PR #834 #845 のぶんと合わせて実測し直す。
     expect(directImporters(files, button)).toHaveLength(91)
   })
 
