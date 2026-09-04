@@ -6,6 +6,18 @@ import { useSearchParams } from 'next/navigation'
 import { bookingApi, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+
+type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
+
+/** 運用者に見せる言葉。内部の値をそのまま出さない。 */
+const ACTION_LABELS: Record<BookingAction, string> = {
+  approve: '承認',
+  reject: 'お断り',
+  cancel: 'キャンセル',
+  complete: '完了',
+  no_show: '来店なし',
+}
 
 /**
  * 予約の詳細（設計 V2 8-1-1 / node IHRKE）。
@@ -100,6 +112,7 @@ function BookingDetailInner() {
   const [history, setHistory] = useState<BookingRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
+  const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -126,16 +139,14 @@ function BookingDetailInner() {
     void load()
   }, [load])
 
-  const decide = async (action: 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show') => {
+  /**
+   * 予約の状態を変える。**押す前に確認を出す。**
+   *
+   * ブラウザの `confirm()` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
+   * **画像比較に写らない**（確認の絵をそもそも撮れない）。
+   */
+  const decide = async (action: BookingAction) => {
     if (!selectedAccountId) return
-    const labels: Record<typeof action, string> = {
-      approve: '承認',
-      reject: 'お断り',
-      cancel: 'キャンセル',
-      complete: '完了',
-      no_show: '来店なし',
-    }
-    if (!confirm(`この予約を「${labels[action]}」にしますか？`)) return
     setActing(true)
     setError('')
     try {
@@ -302,7 +313,7 @@ function BookingDetailInner() {
                 {status === 'requested' && (
                   <>
                     <button
-                      onClick={() => decide('approve')}
+                      onClick={() => setDecideTarget('approve')}
                       disabled={acting}
                       className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
@@ -316,7 +327,7 @@ function BookingDetailInner() {
                       日時を変更する
                     </button>
                     <button
-                      onClick={() => decide('reject')}
+                      onClick={() => setDecideTarget('reject')}
                       disabled={acting}
                       className="text-danger hover:bg-danger-bg rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
@@ -327,21 +338,21 @@ function BookingDetailInner() {
                 {status === 'confirmed' && (
                   <>
                     <button
-                      onClick={() => decide('complete')}
+                      onClick={() => setDecideTarget('complete')}
                       disabled={acting}
                       className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       完了にする
                     </button>
                     <button
-                      onClick={() => decide('no_show')}
+                      onClick={() => setDecideTarget('no_show')}
                       disabled={acting}
                       className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       来店なし
                     </button>
                     <button
-                      onClick={() => decide('cancel')}
+                      onClick={() => setDecideTarget('cancel')}
                       disabled={acting}
                       className="text-danger hover:bg-danger-bg rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
@@ -399,6 +410,17 @@ function BookingDetailInner() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={decideTarget !== null}
+        title={`この予約を「${decideTarget ? ACTION_LABELS[decideTarget] : ''}」にしますか？`}
+        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
+        confirmLabel={decideTarget ? ACTION_LABELS[decideTarget] : '実行する'}
+        destructive={decideTarget === 'reject' || decideTarget === 'cancel' || decideTarget === 'no_show'}
+        busy={acting}
+        onCancel={() => setDecideTarget(null)}
+        onConfirm={() => { const a = decideTarget; setDecideTarget(null); if (a) void decide(a) }}
+      />
     </div>
   )
 }

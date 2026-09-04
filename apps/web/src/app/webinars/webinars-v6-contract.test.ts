@@ -13,7 +13,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('更新が新しい順')
     expect(PAGE).toContain('作成が新しい順')
     expect(PAGE).toContain('名前順')
-    expect(PAGE).toContain('[20, 50, 100]')
+    /* 共通の `SelectField` へ寄せたので、配列ではなく options で並ぶ。 */
+    for (const n of ['20件表示', '50件表示', '100件表示']) expect(PAGE).toContain(n)
     expect(PAGE).toContain('setPageSize(Number(event.target.value))')
     expect(PAGE).not.toContain('申込が多い順')
     expect(PAGE).not.toContain('表示件数の切り替えは準備中です')
