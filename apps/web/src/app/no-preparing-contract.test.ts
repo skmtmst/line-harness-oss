@@ -127,7 +127,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(131)  // 2026-09-04: 自動応答の公開（`auto-replies/publish`）が入って 131。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(132)  // 2026-09-04: 自動応答の公開と友だち追加時配信の実行結果が入って 132。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
