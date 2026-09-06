@@ -31,6 +31,7 @@ import {
   duplicateFriendNameText,
   personNameText,
 } from './affiliate-display'
+import { AffiliateArchiveDialog } from './action-dialogs'
 import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
@@ -235,6 +236,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
 
   // ── create modal ────────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = useState(false)
+  const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
 
   // ── journeys (cursor-paginated) ────────────────────────────────────────────
   const [journeys, setJourneys] = useState<JourneySummary[]>([])
@@ -591,6 +593,12 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         />
       )}
 
+      <AffiliateArchiveDialog
+        target={archiveTarget}
+        onClose={() => setArchiveTarget(null)}
+        onChanged={() => { void loadList() }}
+      />
+
       {error ? (
         <ListState
           kind="error"
@@ -652,8 +660,19 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                         {formatYen(row.rewardAmount)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-action text-xs font-medium">{isExpanded ? '閉じる' : '成果を見る'}</span>
-                        <span className="text-ink-faint ml-2 text-xs">{row.isActive ? '計測中' : '停止中'}</span>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <span className="text-action text-xs font-medium">{isExpanded ? '閉じる' : '成果を見る'}</span>
+                          <span className="text-ink-faint text-xs">{row.isActive ? '計測中' : '停止中'}</span>
+                          <AffiliateButton
+                            aria-label={`${row.name}の紹介停止を確認`}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setArchiveTarget({ id: row.id, name: row.name })
+                            }}
+                          >
+                            紹介を止める
+                          </AffiliateButton>
+                        </div>
                       </td>
                     </tr>
 
