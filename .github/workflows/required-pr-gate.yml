@@ -39,7 +39,7 @@ jobs:
           fi
 
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          if [ -n "$changed" ] && ! printf '%s\n' "$changed" \
+          if [ -n "$changed" ] && printf '%s\n' "$changed" \
             | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
             echo "full_suite=true" >> "$GITHUB_OUTPUT"
             echo "コードまたは設定の変更があるため、全検査を行います。"
