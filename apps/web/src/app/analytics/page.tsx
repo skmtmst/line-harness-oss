@@ -21,6 +21,7 @@ import {
 import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import type { ButtonProps } from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -65,7 +66,8 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
 function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
   return createElement(
     Button,
-    { onClick, disabled, variant: 'secondary', children: ['CSV', 'で書き出す'].join('') },
+    { onClick, disabled, variant: 'secondary' } as unknown as ButtonProps,
+    ['CSV', 'で書き出す'].join(''),
   )
 }
 
