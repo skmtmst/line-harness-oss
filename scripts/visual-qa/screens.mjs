@@ -531,10 +531,17 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
-    gap: 'api',
-    gapNote: '異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る',
-    status: 'unimplemented',
-    why: '`/accounts` の権限を通すだけでは、設計のdry-run・全競合判断・影響確認・切り戻しを実行できない。正式要件 §12・§14 が専用run/itemと実行APIを要求し、LINE APIだけでは対応表を作れないと明記している',
+    status: 'implemented',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #246 で実装。** `uid_migration_runs/items` を使う事前確認・競合判断・owner二者確認・本移行・切り戻しAPIへ接続した。1920px設計画像と実装の1440・1920pxは撮影後に比較する。異なるLINEプロバイダーのUIDは自動変換できないことを画面とAPIの両方で守る。',
+    verdictSource: 'friends-v6/vtBCu.txt + apps/web/src/app/accounts/migration.tsx + apps/worker/src/routes/friend-migrations.ts',
+  },
+  {
+    ...FRIENDS, node: 'ux7of', name: '3-4-A UID・顧客データ移行／CSV', route: '/friends/migrations',
+    status: 'implemented',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #246 で実装。設計画像なし。** `docs/design-reference/friends-v6/ux7of.txt` の文言・節・状態と照合し、全件書き出し、CSV数式の無害化、7日期限、追加・更新・変更なし・競合・エラーの事前確認、同一ファイルの二重反映防止、履歴を本物のAPIへ接続した。実装の1440・1920pxは撮影後に横はみ出しと壊れ値を確認する。',
+    verdictSource: 'friends-v6/ux7of.txt + apps/web/src/app/friends/migrations/page.tsx + apps/worker/src/routes/friend-migrations.ts',
   },
 
   // ── 機能5 シナリオ配信 ──────────────────────────────────
