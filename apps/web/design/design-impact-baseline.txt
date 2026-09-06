@@ -72,6 +72,8 @@ shared-button-importer app/reminders/new/page.tsx
 shared-button-importer app/reminders/page.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
+shared-button-importer app/rich-menus/new/page.tsx
+shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
@@ -107,6 +109,7 @@ shared-button-importer components/friend-fields/support-mark-rules-panel.tsx
 shared-button-importer components/friend-fields/tag-csv-import-dialog.tsx
 shared-button-importer components/friend-fields/tag-editor-v4.tsx
 shared-button-importer components/friend-fields/tags-page-v4.tsx
+shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friends/advanced-search-dialog.tsx
 shared-button-importer components/friends/bulk-run-dialog.tsx
 shared-button-importer components/hq/account-list.tsx
@@ -132,6 +135,7 @@ button-migration-target app/conversions/page.tsx
 button-migration-target app/inflow-links/page.tsx
 button-migration-target app/reminders/page.tsx
 button-migration-target app/templates/page.tsx
+button-migration-target app/webhooks/webhook-interactions.tsx
 button-migration-target components/friend-fields/tags-page-v4.tsx
 
 # 標準の表見出しへ移行済みとして監視する画面本体。
@@ -140,6 +144,7 @@ table-header-migration-target app/conversions/page.tsx
 table-header-migration-target app/inflow-links/page.tsx
 table-header-migration-target app/reminders/page.tsx
 table-header-migration-target app/templates/page.tsx
+table-header-migration-target app/webhooks/webhook-interactions.tsx
 
 # 詳細内テーブルのため、直書きthを残す既知の例外。
 native-table-header-exception app/affiliates/tabs.tsx

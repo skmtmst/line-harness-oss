@@ -1,5 +1,5 @@
 # 26-1 外部連携
-# /webhooks
+# /webhooks?tab=outgoing
 
 画
 画面確認アカウント
@@ -47,6 +47,8 @@ Ver. 0.0.0-dev
 
 設定
 
+はじめの設定
+LINEアカウント
 ログインユーザー
 機能設定
 運用状態
@@ -58,16 +60,17 @@ LINEアカウント
 統括
 画面確認
 ログアウト
-Webhook
+こちらで受け取る 3
+こちらから送る 6
 やり取りの記録
-未対応の通知
+見本 14
 外部連携
 
 外部サービスから受け取る情報と、外部サービスへ送る通知を設定します。
 
+未対応の通知
 Webhookを追加
-こちらで受け取る
-こちらから送る
+送り先を追加
 名前	URL	イベントタイプ	シークレット	ステータス	送信状況	作成日
 Slack ／ #注文チャンネル	https://hooks.slack.com/services/T0XXXXXXXXX/BXXXXXXXXX/visual-qa
 conversion.confirmed
