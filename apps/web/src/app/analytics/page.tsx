@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import {
@@ -21,6 +21,7 @@ import {
 import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
@@ -38,12 +39,35 @@ const TABS = [
   { key: 'saved', label: '保存した分析' },
 ]
 
-/** 期間の選択肢。日数で持つ。 */
-const RANGES = [
-  { days: 7, label: '7日' },
-  { days: 28, label: '28日' },
-  { days: 90, label: '90日' },
-]
+function csvCell(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return ''
+  return `"${String(value).replaceAll('"', '""')}"`
+}
+
+function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function AnalyticsNotice({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm leading-relaxed text-ink-secondary">
+      {children}
+    </div>
+  )
+}
+
+function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
+  const values = metrics.map(shownValue)
+  return values.some((value) => value === null)
+    ? null
+    : values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+}
 
 function rangeFor(days: number): { from: string; to: string } {
   const jstNow = new Date(Date.now() + 9 * 3600_000)
@@ -51,26 +75,6 @@ function rangeFor(days: number): { from: string; to: string } {
     from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
     to: jstNow.toISOString().slice(0, 10),
   }
-}
-
-function RangePicker({ days, onChange }: { days: number; onChange: (d: number) => void }) {
-  return (
-    <div className="mb-4 flex gap-1">
-      {RANGES.map((r) => (
-        <button
-          key={r.days}
-          onClick={() => onChange(r.days)}
-          className={`rounded-pill px-3 py-1 text-sm transition-colors ${
-            days === r.days
-              ? 'bg-accent-deep text-on-accent'
-              : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-          }`}
-        >
-          {r.label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function SaveAnalysisAction({
@@ -157,40 +161,6 @@ function SaveAnalysisAction({
       <p className="text-ink-faint text-xs">条件の定義と、いま表示している結果を別々に固定して残します。</p>
     </div>
   )
-}
-
-/**
- * 棒グラフ。
- *
- * ライブラリを入れず、divの高さで描く。目盛りが要るほど細かく見るなら
- * 数字の表を見た方が速い、という判断。書き出したページも軽く済む。
- */
-function Bars({ items }: { items: Array<{ label: string; value: number }> }) {
-  const max = Math.max(1, ...items.map((i) => i.value))
-  return (
-    <div className="flex h-40 items-end gap-1 overflow-x-auto">
-      {items.map((item) => (
-        <div key={item.label} className="flex min-w-[1.5rem] flex-1 flex-col items-center gap-1">
-          <div
-            className="bg-accent w-full rounded-t"
-            style={{ height: `${Math.round((item.value / max) * 100)}%` }}
-            title={`${item.label}: ${item.value}`}
-          />
-          <span className="text-ink-faint text-[10px] whitespace-nowrap">
-            {item.label.slice(5)}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
-
-/** 「2026-08-12」→「水」。JST の日付文字列をそのまま曜日にする。 */
-function weekdayOf(date: string): string {
-  const [y, m, d] = date.split('-').map(Number)
-  return WEEKDAY_JP[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
 }
 
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
@@ -390,6 +360,19 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     return out
   }, [summary, cells.length, rowTotals, rows, lookup])
 
+  const exportCross = () => {
+    if (!crossResult) return
+    downloadCsv('analytics-cross.csv', [
+      [`${rowLabel} ＼ ${fieldName}`, ...cols.map((column) => column.label), '合計'],
+      ...rows.map((row) => [
+        row.label,
+        ...cols.map((column) => lookup.get(`${row.key}\u0000${column.key}`) ?? 0),
+        rowTotals.get(row.key) ?? 0,
+      ]),
+      ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],
+    ])
+  }
+
   if (fields.length === 0) {
     return (
       <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
@@ -402,13 +385,12 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   }
 
   return (
-    <div data-design-node="f5HsX">
-      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-        タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。
-      </p>
+    <div data-design-node="f5HsX" className="space-y-4">
+      <div className="flex justify-end"><Button onClick={exportCross} disabled={!crossResult} variant="secondary">CSVで書き出す</Button></div>
+      <AnalyticsNotice>数えているのは、こちらで観測できたことだけです。LINEで開かれたかどうかは取れないため、この画面には出しません。</AnalyticsNotice>
 
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
-        <h3 className="text-ink mb-3 text-sm font-semibold">何を掛け合わせるか</h3>
+      <section className="bg-canvas rounded-card border-hairline border p-4">
+        <h3 className="text-ink mb-3 text-sm font-semibold">かけ合わせる軸</h3>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
@@ -434,9 +416,14 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             {loading ? '集計中' : 'この30日を集計'}
           </Button>
         </div>
+        <dl className="mt-3 grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
+          <div><dt className="text-xs font-medium text-ink-secondary">数えるもの</dt><dd className="mt-1 text-sm text-ink">友だちの人数（重複なし）</dd></div>
+          <div><dt className="text-xs font-medium text-ink-secondary">期間</dt><dd className="mt-1 text-sm text-ink">この30日</dd></div>
+        </dl>
         <p className="text-ink-faint mt-2 text-xs">
           集計結果はその時点のデータで固定します。期間や軸を変えた場合は、新しい結果として集計します。
         </p>
+        <p className="mt-1 text-xs text-ink-faint">追加条件を最大15個指定するには、クロス分析APIの追加条件の接続が必要です。</p>
         {error && <p className="text-danger mt-2 text-xs">{error}</p>}
         {crossResult?.stateReason && <p className="text-warning mt-2 text-xs">{crossResult.stateReason}</p>}
       </section>
@@ -478,8 +465,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         </div>
       ) : (
         <>
-          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-            <table className="w-full min-w-[600px]">
+          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-hidden border">
+            <table className="w-full table-fixed">
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
                   <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
@@ -775,12 +762,24 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
 
   const top = result?.[0]?.reached ?? 0
   const selectedFunnel = funnels.find((f) => f.id === selected) ?? null
+  const exportFunnel = () => {
+    if (!result) return
+    downloadCsv('analytics-funnel.csv', [
+      ['段', '到達した人', '前の段からの通過率', 'ここで止まった人', 'まだ途中の人'],
+      ...result.map((step) => [
+        step.label,
+        step.reached,
+        step.conversionFromPrevious === null ? null : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`,
+        step.droppedAfter,
+        step.inProgressAfter,
+      ]),
+    ])
+  }
 
   return (
-    <div data-design-node="C2I7ry">
-      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-        友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。
-      </p>
+    <div data-design-node="C2I7ry" className="space-y-4">
+      <div className="flex justify-end"><Button onClick={exportFunnel} disabled={!result} variant="secondary">CSVで書き出す</Button></div>
+      <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
 
       {creating ? (
         <FunnelForm
@@ -810,7 +809,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
         </p>
       ) : (
         <>
-          <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+          <section className="bg-canvas rounded-card border-hairline border p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="text-ink text-sm font-semibold">段の並び</h3>
@@ -1319,9 +1318,14 @@ function OverviewState({ loading, error }: { loading: boolean; error: string }) 
 
 function FriendsOverviewTab({ accountId }: { accountId: string }) {
   const range = useMemo(() => rangeFor(29), [])
+  const [selectedDate, setSelectedDate] = useState('')
   const state = useOverview<AnalyticsFriendsOverview>(
     () => api.analytics.friendsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:friends`,
+  )
+  const routeState = useOverview<AnalyticsRoutesOverview>(
+    () => api.analytics.routesOverview(accountId, range),
+    `${accountId}:${range.from}:${range.to}:friends-routes`,
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
@@ -1330,29 +1334,50 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   // 差し引きは増加と減少から導いた値。元の2つが出せないなら、差し引きも出せない。
   // ここを道連れにしないと「増えた —／減った —／差し引き 0人」という読めない並びになる。
   const netValue = addedValue === null || removedValue === null ? null : shownValue(overview.metrics.net)
+  const remainingRate = addedValue && removedValue !== null
+    ? Math.max(0, ((addedValue - removedValue) / addedValue) * 100)
+    : null
   const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
   // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
   // 0 が並んだ30行を出さずに理由を1行で出す。
   const daysShown = overview.state === 'available' || overview.state === 'partial'
+  const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? overview.days.at(-1) ?? null
+  const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
   return <div data-design-node="Zxezb" className="space-y-4">
     {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `初回 ${metricText(overview.metrics.firstTime)}人`)} />
-      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : 'ブロック・解除')} />
-      <KpiCard title="差し引き" value={netValue} unit="人" detail={overview.metrics.net.reason ?? (netValue === null ? pendingReason : '増加 − 減少')} />
-      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? `再追加 ${metricText(overview.metrics.returning)}人`} />
+      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? (netValue === null ? pendingReason : `この30日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人`)} />
+      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `この30日。初回 ${metricText(overview.metrics.firstTime)}人`)} />
+      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : 'この30日。ブロック・友だち解除')} />
+      <KpiCard title="差し引き" value={netValue} unit="人" detail={remainingRate === null ? pendingReason : `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%`} />
     </div>
-    <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-      <div className="border-hairline flex items-center justify-between border-b px-4 py-3"><h2 className="text-sm font-semibold">日ごとの増減</h2><span className="text-ink-faint text-xs">{state.data.period.from}〜{state.data.period.to}</span></div>
-      <table className="w-full table-fixed">
-        <thead><TableHeadRow><Th>日付</Th><Th align="right">増加</Th><Th align="right">減少</Th><Th align="right">差し引き</Th><Th>同日の施策</Th></TableHeadRow></thead>
-        <tbody className="divide-hairline divide-y">{!daysShown ? <tr><td colSpan={5} className="text-ink-faint p-8 text-center text-sm">{pendingReason}</td></tr> : [...overview.days].reverse().map((day) => {
-          const campaigns = overview.campaigns.filter((item) => item.date === day.date)
-          const names = campaigns.map((item) => item.name).join('、')
-          return <tr key={day.date} className="text-sm"><td className="px-4 py-2 tabular-nums">{day.date}</td><td className="px-4 py-2 text-right tabular-nums">{day.added}</td><td className="px-4 py-2 text-right tabular-nums">{day.removed}</td><td className="px-4 py-2 text-right font-medium tabular-nums">{day.net > 0 ? '+' : ''}{day.net}</td><td className="text-ink-secondary truncate px-4 py-2" title={names || undefined}>{names || '—'}</td></tr>
-        })}</tbody>
-      </table>
-    </div>
+    <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
+    <section className="bg-canvas rounded-card border-hairline border p-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div><h2 className="font-semibold text-ink">日ごとの増減（この30日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
+        <span className="text-xs tabular-nums text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+      </div>
+      {!daysShown ? <p className="p-8 text-center text-sm text-ink-faint">{pendingReason}</p> : (
+        <div className="grid h-44 grid-cols-[repeat(30,minmax(0,1fr))] items-center gap-1 border-y border-hairline py-3">
+          {overview.days.map((day, index) => {
+            const max = Math.max(1, ...overview.days.flatMap((item) => [item.added, item.removed]))
+            const campaigns = overview.campaigns.filter((item) => item.date === day.date)
+            return <button type="button" key={day.date} onClick={() => setSelectedDate(day.date)} className={`relative flex h-full flex-col justify-center ${selectedDate === day.date ? 'ring-2 ring-accent ring-offset-1' : ''}`} title={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`}>
+              <div className="flex h-1/2 items-end"><span className="block w-full rounded-t bg-accent" style={{ height: `${Math.max(3, day.added / max * 100)}%` }} /></div>
+              <div className="border-t border-hairline" />
+              <div className="flex h-1/2 items-start"><span className="block w-full rounded-b bg-danger" style={{ height: `${Math.max(3, day.removed / max * 100)}%` }} /></div>
+              {(index === 0 || index === overview.days.length - 1 || campaigns.length > 0) && <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-ink-faint">{day.date.slice(5).replace('-', '/')}</span>}
+            </button>
+          })}
+        </div>
+      )}
+      <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
+      {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
+    </section>
+    <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+      <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この30日の実測です。</p></div>
+      {routeState.data ? <table className="w-full table-fixed"><thead><TableHeadRow><Th>経路</Th><Th align="right">増えた友だち</Th><Th align="right">現在つながっている</Th><Th align="right">1人追加あたり費用</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{routeState.data.data.routes.map((route) => <tr key={route.id} className="text-sm"><td className="px-4 py-3"><p className="truncate font-medium" title={route.name}>{route.name}</p><p className="mt-1 truncate text-xs text-ink-faint">{route.refCode ? `ref=${route.refCode}` : '参照コードなし'}</p></td><td className="px-4 py-3 text-right"><MetricCell metric={route.friendAdds} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.currentFriends} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.costPerFriend} currency /></td></tr>)}</tbody></table> : <OverviewState loading={routeState.loading} error={routeState.error} />}
+    </section>
   </div>
 }
 
@@ -1364,13 +1389,28 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const delivered = shownValue(overview.metrics.delivered)
+  const clicked = shownValue(overview.metrics.lineClicked)
+  const clickRate = delivered && clicked !== null ? clicked / delivered * 100 : null
+  const maxHourly = Math.max(1, ...overview.trackedClickHours.map((item) => item.clicks))
   return <div data-design-node="J6Inc" className="space-y-4">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="送信対象" value={overview.metrics.sent.value} unit="人" detail={overview.metrics.sent.reason ?? '配信ごとの対象'} />
-      <KpiCard title="到達" value={overview.metrics.delivered.value} unit="人" detail={overview.metrics.delivered.reason ?? 'LINE取得値'} />
-      <KpiCard title="開封" value={overview.metrics.opened.value} unit="人" detail={overview.metrics.opened.reason ?? '20人未満は取得対象外'} />
-      <KpiCard title="自社URLクリック" value={overview.metrics.trackedClicks.value} unit="回" detail={overview.clickDefinition} />
+      <KpiCard title="この30日に送った" value={overview.campaigns.length} unit="回" detail="一覧に取得できた配信" />
+      <KpiCard title="届いた人" value={delivered} unit="人" detail={overview.metrics.delivered.reason ?? '配信ごとの到達数の合計'} />
+      <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
+      <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" detail={overview.metrics.unavailableCampaigns.reason ?? '開封などを取得できない配信'} />
     </div>
+    <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
+    <section className="bg-canvas rounded-card border-hairline border p-4">
+      <h2 className="font-semibold text-ink">送った時間ごとの「押された回数」</h2>
+      <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLのクリックを、時間帯ごとに並べています。</p>
+      <div className="mt-4 flex h-28 items-end gap-2">
+        {Array.from({ length: 24 }, (_, hour) => {
+          const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
+          return <div key={hour} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
+        })}
+      </div>
+    </section>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
@@ -1386,11 +1426,35 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const clicks = metricSum(overview.routes.map((item) => item.clicks))
+  const friends = metricSum(overview.routes.map((item) => item.friendAdds))
+  const reactions = metricSum(overview.routes.map((item) => item.reactionPeople))
+  const conversions = metricSum(overview.routes.map((item) => item.conversions.approved))
+  const revenue = metricSum(overview.routes.map((item) => item.conversions.revenue))
+  const adCost = metricSum(overview.routes.map((item) => item.adCost))
+  const profit = metricSum(overview.routes.map((item) => item.profitAfterAdCost))
+  const stages = [
+    { label: 'リンクを見た', value: clicks },
+    { label: '友だちになった', value: friends },
+    { label: '1回でも反応した', value: reactions },
+    { label: '成果になった', value: conversions },
+  ]
   return <div data-design-node="YBGtm" className="space-y-4">
-    <div className="bg-info-bg border-info rounded-card flex items-center justify-between border px-4 py-3 text-sm"><span>帰属方式: {overview.attributionLabel}</span><Link href={overview.searchConsoleHref} className="text-accent font-medium hover:underline">Search Consoleを見る</Link></div>
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <KpiCard title="この30日の成果" value={conversions} unit="件" detail={revenue === null ? '売上は取得できません' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
+      <KpiCard title="かかった広告費" value={adCost} unit="円" detail="接続済みの経路を合計" />
+      <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
+      <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
+    </div>
+    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link></AnalyticsNotice>
+    <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
+      const previous = index > 0 ? stages[index - 1].value : null
+      const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
+      return <div key={stage.label} className="border-r border-hairline px-4 py-3 last:border-r-0"><p className="text-xs text-ink-faint">{stage.label}</p><p className="mt-1 text-lg font-bold text-ink">{stage.value === null ? '—' : stage.value.toLocaleString('ja-JP')}<span className="ml-1 text-xs font-normal">{index === 0 ? '回' : index === 3 ? '件' : '人'}</span></p>{index > 0 && <p className="text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
+    })}</div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>経路</Th><Th align="right">クリック</Th><Th align="right">友だち追加</Th><Th align="right">現在</Th><Th align="right">反応</Th><Th align="right">承認成果</Th><Th align="right">成果金額</Th><Th align="right">広告費</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={9} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="truncate px-3 py-3 font-medium" title={item.name}>{item.name}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.currentFriends} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
+      <thead><TableHeadRow><Th>経路</Th><Th align="right">友だち</Th><Th align="right">反応</Th><Th align="right">成果</Th><Th align="right">売上</Th><Th align="right">かかった費用</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="px-3 py-3 font-medium"><p className="truncate" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs font-normal text-ink-faint">{item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック <MetricCell metric={item.clicks} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /><p className="mt-1 text-xs text-ink-faint">現在 <MetricCell metric={item.currentFriends} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /><p className="mt-1 text-xs text-ink-faint">保留 <MetricCell metric={item.conversions.pending} />・却下 <MetricCell metric={item.conversions.rejected} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /><p className="mt-1 text-xs text-ink-faint">友だち1人 <MetricCell metric={item.costPerFriend} currency />・成果1件 <MetricCell metric={item.costPerConversion} currency /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
     </table></div>
   </div>
 }
@@ -1421,6 +1485,10 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
   }, [accountId])
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const estimatedHoursSavedValue = overview.summary.estimatedHoursSaved.state === 'available'
+    || overview.summary.estimatedHoursSaved.state === 'partial'
+    ? overview.summary.estimatedHoursSaved.value
+    : null
   return <div data-design-node="QQ1SR" className="space-y-4">
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
@@ -1431,25 +1499,25 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       />
       <KpiCard
         title="作ったのに使っていない"
-        value={overview.summary.unusedItems.value}
+        value={shownValue(overview.summary.unusedItems)}
         unit="個"
         detail={overview.summary.unusedItems.reason ?? '8分類の利用状況から集計'}
-        action={{ label: '片づける', href: '#usage-items' }}
+        action={(shownValue(overview.summary.unusedItems) ?? 0) > 0 ? { label: '片づける', href: '#usage-items' } : undefined}
       />
       <KpiCard
         title="自動で動いた回数"
-        value={overview.summary.automaticRuns.value}
+        value={shownValue(overview.summary.automaticRuns)}
         unit="回"
         detail={`この30日。${overview.summary.automaticRuns.reason ?? '実行記録から集計'}。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回`}
       />
       <KpiCard
         title="手作業が減った時間"
-        value={overview.summary.estimatedHoursSaved.value}
+        value={estimatedHoursSavedValue}
         unit="時間"
         detail={overview.summary.estimatedHoursSaved.reason ?? '1件30秒として試算'}
       />
     </div>
-    {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {overview.stateReason ? <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
     <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
@@ -1466,17 +1534,39 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
 
 function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
   const range = useMemo(() => rangeFor(29), [])
+  const [query, setQuery] = useState('')
   const state = useOverview<AnalyticsUrlClicksOverview>(
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
     `${accountId}:${range.from}:${range.to}:url-clicks`,
   )
   if (!state.data) return <OverviewState loading={state.loading} error={state.error} />
   const overview = state.data.data
+  const visibleLinks = overview.links.filter((item) => `${item.name} ${item.originalUrl} ${item.usageLocations.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const clicks = metricSum(overview.links.map((item) => item.clicks))
+  const people = metricSum(overview.links.map((item) => item.knownClickPeople))
+  const zeroLinks = overview.links.filter((item) => shownValue(item.clicks) === 0).length
+  const exportRows = () => downloadCsv('analytics-url-clicks.csv', [
+    ['リンク名', 'URL', '押された回数', '押した人', '使われた場所'],
+    ...visibleLinks.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
+  ])
   return <div data-design-node="Fh2Qj" className="space-y-4">
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <KpiCard title="押された回数" value={clicks} unit="回" detail="この30日の中継URL" />
+      <KpiCard title="押した人（URLごとの合計）" value={people} unit="人" detail="URLをまたぐ重複は除けません" />
+      <KpiCard title="計測中のURL" value={overview.links.filter((item) => item.isActive).length} unit="件" detail="この画面に取得できたもの" />
+      <KpiCard title="押されていないURL" value={zeroLinks} unit="件" detail="実測できたURLのうち" />
+    </div>
+    <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
     {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    <div className="flex flex-wrap items-center gap-2">
+      <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
+      <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
+      <span className="text-xs text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+      <Button onClick={exportRows} disabled={visibleLinks.length === 0} variant="secondary">CSVで書き出す</Button>
+    </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>URL名</Th><Th>リンク先</Th><Th align="right">クリック</Th><Th align="right">実人数</Th><Th align="right">届いた人数</Th><Th align="right">クリック率</Th><Th>使われた場所</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.links.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できるURLはありません</td></tr> : overview.links.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="truncate px-3 py-3 font-medium" title={item.name}>{item.name}{!item.isActive && <span className="text-ink-faint ml-1 text-xs">停止</span>}</td><td className="text-ink-secondary truncate px-3 py-3" title={item.originalUrl}>{item.originalUrl}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.deliveredPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.clickRate} percent /></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td></tr>)}</tbody>
+      <thead><TableHeadRow><Th>リンク名・URL</Th><Th>どこから</Th><Th align="right">押された回数</Th><Th align="right">押した人</Th><Th align="right">クリック率</Th><Th>状態</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{visibleLinks.length === 0 ? <tr><td colSpan={6} className="text-ink-faint p-8 text-center text-sm">条件に合うURLはありません</td></tr> : visibleLinks.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="px-3 py-3"><p className="truncate font-medium" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs text-ink-faint" title={item.originalUrl}>{item.originalUrl}</p><p className="mt-1 truncate text-[11px] text-ink-faint">最初 {item.firstClickedAt ? <DateTimeMetricCell metric={item.firstClickedAt} /> : '—'} ／ 最後 {item.lastClickedAt ? <DateTimeMetricCell metric={item.lastClickedAt} /> : '—'}</p></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /><p className="mt-1 text-xs text-ink-faint">届いた人数 <MetricCell metric={item.deliveredPeople} /></p></td><td className="px-2 py-3 text-right">{shownValue(item.clickRate) === null ? <span className="text-ink-faint" title={item.clickRate.reason ?? undefined}>—</span> : <span>{shownValue(item.clickRate)}%</span>}</td><td className="px-3 py-3"><Chip tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? '計測中' : '停止中'}</Chip>{(item.actions?.tagName || item.actions?.scenarioName) && <p className="mt-1 truncate text-xs text-ink-faint" title={[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('、')}>{[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('・')}</p>}</td></tr>)}</tbody>
     </table></div>
     <p className="text-ink-faint text-xs">{overview.clickRateDefinition}</p>
   </div>
@@ -1498,6 +1588,7 @@ const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
 
 function SavedAnalyticsTab({ accountId }: { accountId: string }) {
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
+  const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [snapshots, setSnapshots] = useState<SavedAnalyticsSnapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -1557,14 +1648,40 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
   }, [accountId, selectedId])
 
   const selected = items.find((item) => item.id === selectedId) ?? null
+  const visibleItems = items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const staleCount = items.filter((item) => item.latestSnapshot && ['unavailable', 'failed'].includes(item.latestSnapshot.state)).length
+  const exportSaved = () => downloadCsv('analytics-saved.csv', [
+    ['分析名', '種類', '作った人', '定義版', '更新日時', '集計状態', '保存結果数'],
+    ...visibleItems.map((item) => [
+      item.name,
+      item.kind === 'cross' ? 'クロス分析' : 'ファネル',
+      item.createdByName,
+      item.currentVersionNumber,
+      item.updatedAt,
+      item.latestSnapshot ? SAVED_STATE_LABELS[item.latestSnapshot.state] : null,
+      item.snapshotCount,
+    ]),
+  ])
 
   return (
     <div data-design-node="dfwD4" className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <KpiCard title="保存した分析" value={items.length} unit="件" detail="クロス分析とファネル" loading={loading} />
+        <KpiCard title="保存した結果" value={items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail="時点ごとに固定した結果" loading={loading} />
+        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="取得不可・失敗の最新結果" loading={loading} />
+        <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? '分析を選んでください'} loading={loading} />
+      </div>
       <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
         <p className="text-ink font-medium">条件の定義と集計結果を分けて保存しています</p>
         <p className="text-ink-secondary mt-1 text-xs">
           あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートは現在「なし」です。
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="saved-analysis-search" className="sr-only">分析名・作った人で探す</label>
+        <input id="saved-analysis-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="分析名・作った人で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
+        <Button onClick={exportSaved} disabled={visibleItems.length === 0} variant="secondary">CSVで書き出す</Button>
       </div>
 
       {loading ? (
@@ -1585,8 +1702,8 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
               <h2 className="text-sm font-semibold">保存した分析</h2>
               <span className="text-ink-faint text-xs">{items.length}件</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] table-fixed">
+            <div className="overflow-hidden">
+              <table className="w-full table-fixed">
                 <thead>
                   <TableHeadRow>
                     <Th>分析名</Th>
@@ -1599,7 +1716,7 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-hairline divide-y">
-                  {items.map((item) => {
+                  {visibleItems.map((item) => {
                     const active = selectedId === item.id
                     return (
                       <tr key={item.id} className={active ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}>
@@ -1681,6 +1798,7 @@ function AnalyticsInner() {
   const tab = useMergedTab(TABS)
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [canManage, setCanManage] = useState(false)
+  const [savedCount, setSavedCount] = useState<number | null>(null)
 
   useEffect(() => {
     let active = true
@@ -1692,15 +1810,34 @@ function AnalyticsInner() {
       active = false
     }
   }, [])
+  useEffect(() => {
+    let active = true
+    setSavedCount(null)
+    if (!selectedAccountId) return () => { active = false }
+    void api.analytics.saved.list(selectedAccountId).then((response) => {
+      if (active && response.success) setSavedCount(response.data.length)
+    })
+    return () => { active = false }
+  }, [selectedAccountId])
   if (accountLoading) {
     return <div className="text-ink-faint p-8 text-center text-sm">分析を読み込んでいます</div>
   }
   if (!selectedAccountId) {
     return <div className="text-ink-faint p-8 text-center text-sm">LINE公式アカウントを選んでください</div>
   }
+  const currentLabel = TABS.find((item) => item.key === tab)?.label ?? '分析'
+  const displayTabs = TABS.map((item) => item.key === 'saved' && savedCount !== null
+    ? { ...item, label: `${item.label} ${savedCount}` }
+    : item)
   return (
     <div data-analytics-design="v6">
-      <MergedTabs basePath="/analytics" tabs={TABS} active={tab} />
+      <Breadcrumb
+        items={tab === 'friends'
+          ? [{ label: '成果と分析' }, { label: '分析' }]
+          : [{ label: '分析', href: '/analytics?tab=friends' }, { label: currentLabel }]}
+        className="mb-3"
+      />
+      <MergedTabs basePath="/analytics" tabs={displayTabs} active={tab} />
       {tab === 'friends' && <FriendsOverviewTab accountId={selectedAccountId} />}
       {tab === 'reactions' && <ReactionsOverviewTab accountId={selectedAccountId} />}
       {tab === 'routes' && <RoutesOverviewTab accountId={selectedAccountId} />}
