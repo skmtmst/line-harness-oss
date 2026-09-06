@@ -40,7 +40,9 @@ export type AuditAction =
   | 'dashboard.preference.update'
   | 'dashboard.preference.reset'
   | 'dashboard.preference.default.update'
-  | 'conversion.approval.update';
+  | 'conversion.approval.update'
+  | 'webinar.archive'
+  | 'webinar.participant.export';
 
 export function auditLog(
   c: Context<Env>,

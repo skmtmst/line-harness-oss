@@ -6457,6 +6457,15 @@ export type WebinarCtaCard = {
   url: string | null
 }
 
+export type WebinarAction = {
+  id?: string
+  trigger: 'completed' | 'cta_clicked' | 'unviewed'
+  actionType: 'add_tag' | 'remove_tag' | 'start_scenario' | 'stop_scenario' | 'resume_scenario' | 'send_message' | 'send_webhook' | 'switch_rich_menu' | 'remove_rich_menu'
+  config: Record<string, unknown>
+  position?: number
+  version?: number
+}
+
 export const webinarApi = {
   list: (accountId?: string) => fetchApi<{ data: Webinar[] }>(
     `/api/webinars${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
@@ -6469,7 +6478,13 @@ export const webinarApi = {
     fetchApi<{ data: Webinar }>('/api/webinars', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: string, input: WebinarInput) =>
     fetchApi<{ data: Webinar }>(`/api/webinars/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
-  remove: (id: string) => fetchApi<{ data: null }>(`/api/webinars/${id}`, { method: 'DELETE' }),
+  archive: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}/archive`, { method: 'POST' }),
+  actions: (id: string) => fetchApi<{ data: WebinarAction[] }>(`/api/webinars/${id}/actions`),
+  saveActions: (id: string, actions: WebinarAction[]) => fetchApi<{ data: WebinarAction[] }>(
+    `/api/webinars/${id}/actions`,
+    { method: 'PUT', body: JSON.stringify({ actions }) },
+  ),
+  participantsCsvUrl: (id: string) => `/api/webinars/${encodeURIComponent(id)}/participants.csv`,
   notifications: (id: string) => fetchApi<{
     data: {
       settings: WebinarNotificationSettings | null
