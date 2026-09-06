@@ -142,7 +142,7 @@ describe('profile refresh operation limits', () => {
 
     expect(response.status).toBe(200);
     const query = records.find((record) => record.sql.includes('FROM messages_log ml'));
-    expect(query?.bindings).toEqual([expected]);
+    expect(query?.bindings).toEqual(['["account-a"]', expected]);
     expect(query?.bindings).not.toContain(-1);
   });
 });
