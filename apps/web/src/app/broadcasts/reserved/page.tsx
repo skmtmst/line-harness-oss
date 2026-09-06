@@ -279,16 +279,16 @@ function ReservedBroadcastContent() {
             <Button href={`/broadcasts?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
-            <button type="button" onClick={() => void testSend()} disabled={actionBusy !== null} className="border-hairline bg-canvas text-ink hover:bg-canvas-sunken rounded-control flex h-9 w-full items-center justify-center gap-2 border px-3 text-sm font-semibold disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info">
+            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
               <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
-            </button>
-            <button type="button" onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="border-hairline bg-canvas text-ink hover:bg-canvas-sunken rounded-control flex h-9 w-full items-center justify-center gap-2 border px-3 text-sm font-semibold disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info">
+            </Button>
+            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
               <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}
-            </button>
+            </Button>
             {broadcast.status === 'scheduled' && !cancelled && (
-              <button type="button" onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="border-hairline bg-canvas text-ink hover:bg-canvas-sunken rounded-control h-9 w-full border px-3 text-sm font-semibold disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info">
+              <Button onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="w-full">
                 予約を取り消す
-              </button>
+              </Button>
             )}
           </div>
           <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>

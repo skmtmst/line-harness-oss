@@ -14,7 +14,6 @@ import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Button from '@/components/shared/button'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -78,6 +77,7 @@ function BroadcastList() {
   /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
   const [scheduledOnly, setScheduledOnly] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
   // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
   const [titleQuery, setTitleQuery] = useState('')
@@ -292,11 +292,33 @@ function BroadcastList() {
       <BroadcastKpis />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button>
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setShowCreate(true)}
+          disabled
+          title="マニュアルは準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+        >
+          マニュアル
+        </button>
+        <button
+          type="button"
+          onClick={() => setFolderDialogOpen(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          フォルダを追加
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          テンプレートから配信
+        </button>
+        <button
+          type="button"
+          aria-label="新規配信を作成"
+          onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
           className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
         >
           配信を作成
@@ -433,6 +455,7 @@ function BroadcastList() {
           tags={tags}
           onSuccess={() => { setShowCreate(false); load() }}
           onCancel={() => setShowCreate(false)}
+          openTemplatePickerInitially={openTemplatePicker}
         />
       )}
 

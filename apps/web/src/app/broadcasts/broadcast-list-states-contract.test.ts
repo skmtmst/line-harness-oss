@@ -69,9 +69,10 @@ describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
   })
 
   it('追加と配信作成は実際の処理へつなぐ', () => {
-    expect(PAGE).toContain("import Button from '@/components/shared/button'")
-    expect(PAGE).toContain('<Button onClick={() => setFolderDialogOpen(true)}>フォルダを追加</Button>')
-    expect(PAGE).toContain('onClick={() => setShowCreate(true)}')
+    expect(PAGE).toContain('onClick={() => setFolderDialogOpen(true)}')
+    expect(PAGE).toContain('onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}')
+    expect(PAGE).toContain('onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}')
+    expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
     expect(PAGE).toContain('配信を作成')
   })
 })
