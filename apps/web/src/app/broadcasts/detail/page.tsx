@@ -9,7 +9,8 @@ import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
-import { clickInsightDetail, openInsightDetail } from './broadcast-insight-display'
+import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
+import { broadcastDetailCsv } from './broadcast-detail-export'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -36,6 +37,27 @@ function BroadcastDetailInner() {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
   const contentRef = useRef<HTMLElement>(null)
+
+  const exportCsv = () => {
+    if (!broadcast) return
+    const csv = broadcastDetailCsv({
+      title: broadcast.title,
+      status: broadcast.status,
+      sentAt: broadcast.sentAt,
+      scheduledAt: broadcast.scheduledAt,
+      totalCount: broadcast.totalCount,
+      successCount: broadcast.successCount,
+      delivered: insight?.delivered ?? null,
+      uniqueImpression: insight?.uniqueImpression ?? null,
+      uniqueClick: insight?.uniqueClick ?? null,
+    }, formatBroadcastDateTime)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `broadcast-${broadcast.id}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   useEffect(() => {
     let active = true
@@ -132,9 +154,9 @@ function BroadcastDetailInner() {
           title={broadcast?.title ?? '配信の詳細'}
           description={
             broadcast?.sentAt
-              ? `${new Date(broadcast.sentAt).toLocaleString('ja-JP')} に送信`
+              ? `${formatBroadcastDateTime(broadcast.sentAt)} に送信`
               : broadcast?.scheduledAt
-                ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
+                ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に予約`
                 : undefined
           }
           action={
@@ -144,6 +166,9 @@ function BroadcastDetailInner() {
                 disabled={!broadcast}
               >
                 配信内容を見る
+              </Button>
+              <Button onClick={exportCsv} disabled={!broadcast}>
+                CSVで書き出す
               </Button>
               {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
               <button
@@ -204,7 +229,7 @@ function BroadcastDetailInner() {
             {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
             <p className="text-ink-faint mt-2 text-xs">
               {broadcast.sentAt
-                ? `完了 ${new Date(broadcast.sentAt).toLocaleTimeString('ja-JP')}`
+                ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
                 : '開始・完了の時刻は記録していません'}
             </p>
           </section>
@@ -317,12 +342,17 @@ function BroadcastDetailInner() {
                 label="送信タイミング"
                 value={
                   broadcast.scheduledAt
-                    ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
+                    ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に予約`
                     : '即時配信'
                 }
               />
               {/* 誰が作ったかを記録していない。 */}
-              <Row label="作成者" value={`記録していません ・ ${new Date(broadcast.createdAt).toLocaleString('ja-JP')} 作成`} />
+              <Row
+                label="作成者"
+                value={broadcast.createdAt
+                  ? `記録していません ・ ${formatBroadcastDateTime(broadcast.createdAt)} 作成`
+                  : '記録していません ・ 作成日時 —'}
+              />
             </dl>
           </section>
 

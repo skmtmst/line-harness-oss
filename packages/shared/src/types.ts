@@ -444,6 +444,41 @@ export interface CommonVarDeleteImpact {
   recommendedAction: "delete" | "review_references";
 }
 
+/**
+ * 共通情報を**変える前**の1件（POST /api/common-vars/:id/impact-preview）。
+ *
+ * 削除前の1件に、保存すると何がどう変わるかを足したもの。
+ */
+export interface CommonVarChangeImpactItem extends CommonVarDeleteImpactItem {
+  /** 保存すると変わるか。**送信済みの記録は変わらない。** */
+  changesOnSave: boolean;
+  /** 差し込みの目印を本文から読み取れたか。読めないと変更後の文を作れない。 */
+  previewAvailable: boolean;
+  /** 変更後の文。作れないときは `null`。**空文字と混ぜない。** */
+  nextPreview: string | null;
+  currentCharacterCount: number;
+  /** 変更後の文字数。変更後の文を作れないときは `null`。**0と混ぜない。** */
+  nextCharacterCount: number | null;
+  /** LINEの本文になる使用先だけ上限がある。無いものは `null`。 */
+  characterLimit: number | null;
+  exceedsCharacterLimit: boolean;
+  /** 保存を止める理由。空なら止めない。 */
+  errors: string[];
+  /** 保存はできるが、目で確かめてほしいこと。 */
+  warnings: string[];
+}
+
+/** 共通情報の変更前確認（POST /api/common-vars/:id/impact-preview）。 */
+export interface CommonVarChangeImpact extends Omit<CommonVarDeleteImpact, "items" | "variable" | "recommendedAction"> {
+  variable: { id: string; name: string; varKey: string; currentValue: string; nextValue: string };
+  items: CommonVarChangeImpactItem[];
+  errorTotal: number;
+  warningTotal: number;
+  /** 1件でも `errors` があれば保存させない。 */
+  canSave: boolean;
+  recommendedAction: "fix_errors" | "confirm_changes" | "save";
+}
+
 export type SavedSearchConditionKind =
   | "name"
   | "tag"
