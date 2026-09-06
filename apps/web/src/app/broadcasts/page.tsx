@@ -326,7 +326,7 @@ function BroadcastList() {
       )}
 
       <div data-design="KPIs">
-      <BroadcastKpis />
+      <BroadcastKpis unavailable={loading || Boolean(error) || forbidden || (!loading && broadcasts.length === 0)} />
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}

@@ -1217,6 +1217,7 @@ export default function BroadcastForm({
               <label className="flex cursor-pointer items-start gap-2">
                 <input
                   type="checkbox"
+                  aria-label="LINEプレビュー確認済み"
                   checked={previewConfirmed}
                   onChange={(event) => setPreviewConfirmed(event.target.checked)}
                   className="mt-0.5"
