@@ -46,6 +46,36 @@ function validationResponse(c: Context<Env>, error: CommonActionValidationError)
   }, status);
 }
 
+function nonNegativeInteger(value: string | undefined, field: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new CommonActionValidationError('pagination_invalid', 'ページ指定を確認してください', field);
+  }
+  return parsed;
+}
+
+function csvCell(value: string | number | null): string {
+  let text = value === null ? '' : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function commonActionsCsv(items: Awaited<ReturnType<typeof listCommonActions>>['items']): string {
+  const header = ['名前', '状態', '公開版', '中の処理', '呼び出し場所', '今月の実行', '今月の失敗', '最終実行'];
+  const rows = items.map((item) => [
+    item.name,
+    item.status,
+    item.publishedVersion,
+    item.actionCount,
+    item.bindingCount,
+    item.executionCountThisMonth,
+    item.failureCountThisMonth,
+    item.lastRunAt,
+  ]);
+  return `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+}
+
 async function endpoint<T>(
   c: Context<Env>,
   run: () => Promise<T>,
@@ -68,11 +98,46 @@ async function endpoint<T>(
 commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
-  return endpoint(c, () => listCommonActions(c.env.DB, {
-    lineAccountId: id,
-    status: c.req.query('status'),
-    query: c.req.query('query'),
-  }));
+  try {
+    const format = c.req.query('format');
+    if (format && format !== 'csv') {
+      throw new CommonActionValidationError('format_invalid', '書き出し形式を確認してください', 'format');
+    }
+    if (format === 'csv') {
+      const staff = c.get('staff');
+      if (staff?.role === 'staff' && !staff.permissionKeys?.includes('automation.run.export')) {
+        return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+      }
+    }
+    const requestedLimit = nonNegativeInteger(c.req.query('limit'), 'limit');
+    const limit = requestedLimit === undefined ? undefined : Math.max(1, Math.min(requestedLimit, 500));
+    const offset = nonNegativeInteger(c.req.query('offset'), 'offset') ?? 0;
+    const result = await listCommonActions(c.env.DB, {
+      lineAccountId: id,
+      status: c.req.query('status'),
+      query: c.req.query('query'),
+      ...(format === 'csv' ? {} : { limit, offset }),
+    });
+    if (format === 'csv') {
+      return c.body(commonActionsCsv(result.items), 200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="common-actions.csv"',
+      });
+    }
+    return c.json({
+      success: true,
+      data: result.items,
+      pagination: { total: result.total, limit: limit ?? null, offset },
+      freshness: 'available',
+    });
+  } catch (error) {
+    if (error instanceof CommonActionValidationError) return validationResponse(c, error);
+    console.error(JSON.stringify({
+      event: 'common_action_api_failed', path: c.req.path,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
+    return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
+  }
 });
 
 commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (c) => {
@@ -193,14 +258,16 @@ commonActions.post(
   async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
-    const body = await c.req.json<{ versionId?: unknown }>()
-      .catch(() => ({} as { versionId?: unknown }));
+    const body = await c.req.json<{ versionId?: unknown; expectedVersionId?: unknown }>()
+      .catch(() => ({} as { versionId?: unknown; expectedVersionId?: unknown }));
     return endpoint(c, async () => {
       await updateCommonActionBindingVersion(c.env.DB, {
         id: c.req.param('id'),
         bindingId: c.req.param('bindingId'),
         lineAccountId: id,
         versionId: body.versionId,
+        expectedVersionId: body.expectedVersionId,
+        actorId: c.get('staff')?.id,
       });
       return { updated: true };
     });

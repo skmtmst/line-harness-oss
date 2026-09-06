@@ -68,6 +68,7 @@ type DeliveryJob = {
   source_key: string;
   payload: string;
   campaign_snapshot: string | null;
+  retry_generation?: number;
 };
 
 export type NenDeliveryOptions = {
@@ -524,7 +525,8 @@ export async function processNenDeliveries(
   options: NenDeliveryOptions,
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   const jobs = await db.prepare(
-    `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot
+    `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+            retry_generation
        FROM nen_delivery_jobs
       WHERE status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
         AND attempts < ?
@@ -571,8 +573,12 @@ export async function processNenDeliveries(
       const accessToken = account.channel_access_token;
       const payload = JSON.parse(job.payload) as Record<string, unknown>;
       const messages = buildNenDeliveryMessages(campaign, payload);
+      const retryGeneration = Number(job.retry_generation ?? 0);
+      const idempotencyKey = retryGeneration > 0
+        ? `${job.id}:manual:${retryGeneration}`
+        : job.id;
       await pushViaHarnessProxy(
-        options.proxyBaseUrl, accessToken, friend.line_user_id, messages, job.id, options.proxyDispatch,
+        options.proxyBaseUrl, accessToken, friend.line_user_id, messages, idempotencyKey, options.proxyDispatch,
       );
       for (const message of messages) {
         await logOutgoingMessage(db, {

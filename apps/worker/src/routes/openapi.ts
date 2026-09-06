@@ -664,6 +664,92 @@ const spec = {
         responses: { '200': { description: 'Preview computed (totalSelected, uniqueRecipients, reduction, perAccount)' } },
       },
     },
+    // ── NEN delivery ────────────────────────────────────────────────────────
+    '/api/nen-campaigns/metrics/flows': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NEN配信フローの実績を取得',
+        description: '開封率は取得できないためnull、関連成果は送信後7日以内の相関として返します。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+        ],
+        responses: { '200': { description: 'Flow metrics' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/metrics/columns': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NENコラムの配信・記事閲覧実績を取得',
+        description: '計測台帳がない記事閲覧と、未収集の読了率はnullで返します。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+        ],
+        responses: { '200': { description: 'Column metrics' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/metrics/pets': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'ペット登録・誕生日クーポン実績を取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+        ],
+        responses: { '200': { description: 'Pet and birthday coupon metrics' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/deliveries': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NEN配信履歴を取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'from', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'processing', 'sent', 'skipped', 'failed', 'cancelled'] } },
+          { name: 'cursor', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'Scoped delivery history' }, '403': { description: 'Account access denied' } },
+      },
+    },
+    '/api/nen-campaigns/deliveries/{id}': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'NEN配信履歴の安全な詳細を取得',
+        description: '注文情報やクーポンコードを含むraw payloadは返しません。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Delivery detail' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/nen-campaigns/deliveries/{id}/retry': {
+      post: {
+        tags: ['NEN delivery'],
+        summary: '恒久失敗したNEN配信を手動再送',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['lineAccountId', 'expectedVersion', 'reason'],
+          properties: {
+            lineAccountId: { type: 'string' },
+            expectedVersion: { type: 'integer', minimum: 1 },
+            reason: { type: 'string', minLength: 1, maxLength: 500 },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Retry queued with a new idempotency generation' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in account scope' },
+          '409': { description: 'Retry unavailable or version conflict' },
+        },
+      },
+    },
     // ── Users (UUID Cross-Account) ──────────────────────────────────────────
     '/api/users': {
       get: { tags: ['Users'], summary: '内部ユーザー一覧取得', responses: { '200': { description: 'All users' } } },
@@ -872,6 +958,7 @@ const spec = {
     { name: 'Tags', description: 'タグ管理' },
     { name: 'Scenarios', description: 'ステップ配信シナリオ' },
     { name: 'Broadcasts', description: '一斉配信' },
+    { name: 'NEN delivery', description: 'NEN専用配信・コラム・ペット実績' },
     { name: 'Users', description: 'UUID Cross-Account ユーザー管理' },
     { name: 'LINE Accounts', description: 'マルチLINEアカウント管理' },
     { name: 'Conversions', description: 'コンバージョン計測' },

@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
-  getAutomations,
   getAutomationById,
   createAutomation,
   updateAutomation,
@@ -21,6 +20,12 @@ import {
   listAutomationTemplates,
   updateAutomationDraft,
 } from '../services/automation-drafts.js';
+import {
+  AutomationDefinitionError,
+  listAutomationDefinitions,
+  previewAutomationAudience,
+  runAutomationTest,
+} from '../services/automation-definitions.js';
 import { listLimit } from './list-pagination.js';
 
 const automations = new Hono<Env>();
@@ -29,6 +34,15 @@ async function requireAutomationPermission(c: Context<Env>, next: () => Promise<
   const staff = c.get('staff');
   if (!staff || (staff.role === 'staff' && !staff.permissionKeys?.includes('/automations'))) {
     return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+  }
+  await next();
+}
+
+async function requireAutomationTestPermission(c: Context<Env>, next: () => Promise<void>) {
+  const staff = c.get('staff');
+  if (!staff || (staff.role === 'staff'
+    && !staff.permissionKeys?.includes('automation.definition.test'))) {
+    return c.json({ success: false, error: '1人テストを実行する権限がありません' }, 403);
   }
   await next();
 }
@@ -53,6 +67,32 @@ function draftErrorResponse(c: Context<Env>, error: AutomationDraftError): Respo
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
   }, status);
+}
+
+function definitionErrorResponse(c: Context<Env>, error: AutomationDefinitionError): Response {
+  const status = error.code === 'version_conflict' ? 409
+    : error.code === 'not_found' ? 404
+      : 422;
+  return c.json({
+    success: false,
+    error: error.message,
+    code: error.code,
+    ...(error.field ? { field: error.field } : {}),
+  }, status);
+}
+
+async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Promise<Response> {
+  try {
+    return c.json({ success: true, data: await run() });
+  } catch (error) {
+    if (error instanceof AutomationDefinitionError) return definitionErrorResponse(c, error);
+    console.error(JSON.stringify({
+      event: 'automation_definition_api_failed',
+      path: c.req.path,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
+    return c.json({ success: false, error: 'オートメーションを処理できませんでした' }, 500);
+  }
 }
 
 async function draftEndpoint<T>(
@@ -275,6 +315,7 @@ automations.put(
       name?: unknown;
       eventType?: unknown;
       triggerConfig?: unknown;
+      conditions?: unknown;
       actions?: unknown;
     };
     const body = await c.req.json<DraftBody>().catch((): DraftBody => ({}));
@@ -286,6 +327,7 @@ automations.put(
         name: body.name,
         eventType: body.eventType,
         triggerConfig: body.triggerConfig,
+        conditions: body.conditions,
         actions: body.actions,
       });
       return { updated: true };
@@ -293,45 +335,71 @@ automations.put(
   },
 );
 
-automations.get('/api/automations', async (c) => {
+automations.get(
+  '/api/automations',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
   try {
-    const lineAccountId = c.req.query('lineAccountId');
-    let items;
-    if (lineAccountId) {
-      // NULL line_account_id = global automation (event-bus.ts:149 fires it for every account).
-      // Include both account-bound and global rows so the UI mirrors the engine's match semantic.
-      const result = await c.env.DB
-        .prepare(`SELECT * FROM automations WHERE line_account_id IS NULL OR line_account_id = ? ORDER BY priority DESC, created_at DESC`)
-        .bind(lineAccountId)
-        .all();
-      items = result.results as unknown as Awaited<ReturnType<typeof getAutomations>>;
-    } else {
-      items = await getAutomations(c.env.DB);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const requestedAccountId = (
+      c.req.query('lineAccountId') ?? c.req.query('account_id')
+    )?.trim();
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
+    const result = await listAutomationDefinitions(
+      c.env.DB,
+      requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+    );
     return c.json({
       success: true,
-      data: items.map((a) => ({
-        id: a.id,
-        name: a.name,
-        description: a.description,
-        eventType: a.event_type,
-        conditions: JSON.parse(a.conditions),
-        actions: JSON.parse(a.actions),
-        isActive: Boolean(a.is_active),
-        priority: a.priority,
-        // null line_account_id = global automation. Surfacing this lets callers
-        // distinguish globals from account-bound rows in the mixed result and
-        // avoid unintentionally editing a rule that affects every account.
-        lineAccountId: a.line_account_id ?? null,
-        createdAt: a.created_at,
-        updatedAt: a.updated_at,
-      })),
+      data: result.items,
+      summary: result.summary,
+      freshness: result.freshness,
     });
   } catch (err) {
     console.error('GET /api/automations error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json({ success: false, error: 'オートメーションを表示できませんでした' }, 500);
   }
 });
+
+automations.post(
+  '/api/automations/:id/audience-preview',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    const body = await c.req.json<{ versionId?: unknown }>()
+      .catch((): { versionId?: unknown } => ({}));
+    return definitionEndpoint(c, () => previewAutomationAudience(c.env.DB, {
+      automationId: c.req.param('id'),
+      versionId: body.versionId,
+      lineAccountId: accountId,
+    }));
+  },
+);
+
+automations.post(
+  '/api/automations/:id/test',
+  requireAutomationPermission,
+  requireAutomationTestPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await requireDraftAccount(c);
+    if (typeof accountId !== 'string') return accountId;
+    const body = await c.req.json<{ versionId?: unknown; friendId?: unknown }>()
+      .catch((): { versionId?: unknown; friendId?: unknown } => ({}));
+    return definitionEndpoint(c, () => runAutomationTest(c.env.DB, {
+      automationId: c.req.param('id'),
+      versionId: body.versionId,
+      friendId: body.friendId,
+      lineAccountId: accountId,
+      credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    }));
+  },
+);
 
 /** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
 automations.get('/api/automation-runs', async (c) => {
