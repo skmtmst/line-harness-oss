@@ -72,6 +72,7 @@ function StaffShiftsPageContent() {
   const [serviceAccountEmail, setServiceAccountEmail] = useState<string | null>(null)
   const [serviceAccountConfigured, setServiceAccountConfigured] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [loadError, setLoadError] = useState(false)
   const [savingRules, setSavingRules] = useState(false)
   const [savingCalendar, setSavingCalendar] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,6 +122,7 @@ function StaffShiftsPageContent() {
       return
     }
     setLoadStatus('loading')
+    setLoadError(false)
     setError(null)
     try {
       const [staff, dated, rules, calendar] = await Promise.all([
@@ -148,6 +150,7 @@ function StaffShiftsPageContent() {
       setStaffMember(null)
       setShifts([])
       setTemplate({ ...EMPTY_TEMPLATE })
+      setLoadError(true)
       setLoadStatus('error')
     }
   }, [selectedAccountId, staffId])
@@ -271,7 +274,7 @@ function StaffShiftsPageContent() {
         <ListState kind="empty" title="予約スタッフを選んでください" description="受付時間を設定する担当者を選んでください。" />
       ) : loadStatus === 'loading' ? (
         <ListState kind="loading" title="受付時間と休業日を読み込んでいます" />
-      ) : loadStatus === 'error' ? (
+      ) : loadStatus === 'error' && loadError ? (
         <ListState
           kind="error"
           title="受付時間と休業日を表示できませんでした"
@@ -279,8 +282,9 @@ function StaffShiftsPageContent() {
           action={<Button onClick={() => void load()}>受付時間と休業日を再読み込み</Button>}
         />
       ) : (
-        <div data-design="Body" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <div className="min-w-0 space-y-4">
+        <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
+          <div className="min-w-0 flex-1">
+            <div className="space-y-4">
             <section data-design="Week" className="bg-canvas border-hairline overflow-hidden rounded-card border">
               <div className="border-hairline border-b px-4 py-4">
                 <h2 className="text-ink font-semibold">曜日ごとの受付時間</h2>
@@ -385,9 +389,10 @@ function StaffShiftsPageContent() {
                 ))}
               </div>
             </section>
+            </div>
           </div>
 
-          <aside className="space-y-4">
+          <aside className="space-y-4 xl:w-96 xl:flex-none">
             <section data-design="Preview" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink-secondary text-sm font-semibold">お客様のLINEではこう見えます</h2>
               <div className="bg-info mt-3 rounded-card p-3">
