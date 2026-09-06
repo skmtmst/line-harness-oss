@@ -9,6 +9,7 @@ import type { LineAccount } from '@line-crm/shared'
 
 /** 接続状態。**色だけに頼らず、必ず文字で言う。** */
 export function connectionLabel(account: LineAccount): { label: string; tone: 'success' | 'neutral' } {
+  if (account.archivedAt) return { label: 'アーカイブ', tone: 'neutral' }
   return account.isActive
     ? { label: '稼働中', tone: 'success' }
     : { label: '停止中', tone: 'neutral' }
