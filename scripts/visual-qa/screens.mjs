@@ -1632,13 +1632,13 @@ export const SCREENS = [
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
     ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `23f6d6f2e`。構造一致・データ未接続。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込み、6列一覧、ページ送りの骨格を確認した。1440・1920とも横はみ出し0。**データ未接続**：現行APIは設計の説明文と種類別使用数を返さず、固定データも設計の3フォルダ・6行・空のまま使用中の警告状態を持たないため、内容と件数の一致は未確認。取得できない使用数は偽の0件にせず `—（未取得）` と表示する。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-{1440,1920}.png + list-model.test.ts', verdictHead: '23f6d6f2e',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込み、6列一覧、ページ送りの骨格を確認した。1440・1920とも横はみ出し0。**データ未接続**：現行APIは設計の説明文と種類別使用数を返さず、固定データも設計の3フォルダ・6行・空のまま使用中の警告状態を持たないため、内容と件数の一致は未確認。取得できない使用数は偽の0件にせず `—（未取得）` と表示する。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-{1440,1920}.png + list-model.test.ts', verdictHead: '24313778e',
   },
   {
     ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `23f6d6f2e`。構造一致・データ未接続。** 設計画像と、値を変更して保存前の影響が出た実装画像を同じ比較入力で見比べた。入力欄を左、使用先と保存後プレビューを右に置く2カラム構成、期限、履歴、固定保存欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：社内メモと追記型履歴のAPIが無く、固定データも設計と同じ会社名・15使用先を持たないため内容一致は未確認。無い値は偽データで埋めず、未接続理由を表示する。',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-{1440,1920}.png + change-impact.test.ts', verdictHead: '23f6d6f2e',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と、値を変更して保存前の影響が出た実装画像を同じ比較入力で見比べた。入力欄を左、使用先と保存後プレビューを右に置く2カラム構成、期限、履歴、固定保存欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：社内メモと追記型履歴のAPIが無く、固定データも設計と同じ会社名・15使用先を持たないため内容一致は未確認。無い値は偽データで埋めず、未接続理由を表示する。',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-{1440,1920}.png + change-impact.test.ts', verdictHead: '24313778e',
   },
   {
     /*
@@ -1682,9 +1682,9 @@ export const SCREENS = [
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `23f6d6f2e`。構造一致・データ未接続。** 設計画像と、使用中・未使用の実装画像を同じ比較入力で見比べた。対象、影響、差し替え案、このまま削除する案、使用先一覧、固定操作欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：設計の差し替え候補を取得して一括置換するAPIが無いため、候補は偽造せず未接続として選べない状態にした。使用中は削除を止め、未使用だけ確認キー入力後に削除できる。',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `24313778e`。構造一致・データ未接続。** 設計画像と、使用中・未使用の実装画像を同じ比較入力で見比べた。対象、影響、差し替え案、このまま削除する案、使用先一覧、固定操作欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：設計の差し替え候補を取得して一括置換するAPIが無いため、候補は偽造せず未接続として選べない状態にした。使用中は削除を止め、未使用だけ確認キー入力後に削除できる。',
     verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + delete-impact.test.ts',
-    verdictHead: '23f6d6f2e',
+    verdictHead: '24313778e',
 
   },
 
