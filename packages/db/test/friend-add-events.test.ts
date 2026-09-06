@@ -42,6 +42,16 @@ function setup(): Database.Database {
   sqlite.prepare(
     `INSERT INTO entry_routes (id, ref_code, name) VALUES ('route-1', 'current-link', '夏の広告')`,
   ).run();
+  sqlite.prepare(
+    `INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+     VALUES ('scenario-1', '初回案内', 'friend_add', 1, 'account-1')`,
+  ).run();
+  sqlite.prepare(
+    `INSERT INTO friend_scenarios
+      (id, friend_id, scenario_id, status, started_at, updated_at)
+     VALUES ('enrollment-1', 'friend-1', 'scenario-1', 'active',
+             '2026-08-24T10:00:00.000+09:00', '2026-08-24T10:00:00.000+09:00')`,
+  ).run();
   return sqlite;
 }
 
