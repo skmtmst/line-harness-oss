@@ -518,14 +518,19 @@ export async function deleteCommonVarSchedule(
 export async function applyDueCommonVarSchedules(
   db: D1Database,
   now: string,
+  limit = 1_000,
 ): Promise<number> {
+  const batchLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+    : 1_000;
   const due = await db
     .prepare(
       `SELECT * FROM common_var_schedules
         WHERE applied_at IS NULL AND effective_from <= ?
-        ORDER BY effective_from ASC`,
+        ORDER BY effective_from ASC, id ASC
+        LIMIT ?`,
     )
-    .bind(now)
+    .bind(now, batchLimit)
     .all<CommonVarSchedule>();
   let applied = 0;
   for (const row of due.results) {
