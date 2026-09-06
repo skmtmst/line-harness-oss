@@ -222,7 +222,9 @@ beforeEach(() => {
     replacement: { ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', version: 1 },
     targets: [{
       table: 'templates', id: 'template-1', kind: 'template',
-      columns: { message_content: '{{var.new_hours}}' }, fingerprint: '{{var.shop_hours}}',
+      columns: { message_content: '{{var.new_hours}}' },
+      originalColumns: { message_content: '{{var.shop_hours}}' },
+      fingerprint: '{{var.shop_hours}}',
     }],
     usageTotal: 1,
     replaceableTotal: 1,

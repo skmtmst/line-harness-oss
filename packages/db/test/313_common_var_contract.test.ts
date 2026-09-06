@@ -136,4 +136,20 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
     expect(sqlite.prepare(`SELECT replaced_usage_count, status FROM common_var_replacement_runs`).get())
       .toEqual({ replaced_usage_count: 2, status: 'completed' });
   });
+
+  it('プレビュー後に本文が変わったら、一部だけ置換せず全体をロールバックする', async () => {
+    const source = (await getCommonVarById(db, 'source', 'account-1'))!;
+    const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;
+    const plan = await getCommonVarReplacementPlan(db, source, replacement);
+    sqlite.prepare(`UPDATE templates SET message_content = ? WHERE id = 'template-1'`)
+      .run('別の担当者が編集中 {{var.old_hours}}');
+
+    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1')).rejects.toThrow();
+    expect(sqlite.prepare(`SELECT archived_at FROM common_vars WHERE id = 'source'`).get())
+      .toEqual({ archived_at: null });
+    expect(JSON.parse((sqlite.prepare(`SELECT config_json FROM scenario_actions WHERE id = 'action-1'`).get() as { config_json: string }).config_json))
+      .toMatchObject({ varKey: 'old_hours' });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM common_var_replacement_runs`).get())
+      .toEqual({ count: 0 });
+  });
 });

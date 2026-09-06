@@ -567,6 +567,7 @@ export interface CommonVarReplacementTarget {
   id: string;
   kind: CommonVarUsageKind;
   columns: Record<string, string>;
+  originalColumns: Record<string, string>;
   fingerprint: string;
 }
 
@@ -667,6 +668,7 @@ export async function getCommonVarReplacementPlan(
       .all<Record<string, string | null>>();
     for (const row of result.results) {
       const columns: Record<string, string> = {};
+      const originalColumns: Record<string, string> = {};
       const before: string[] = [];
       for (const column of descriptor.columns) {
         const current = row[column];
@@ -674,6 +676,7 @@ export async function getCommonVarReplacementPlan(
         const next = replaceCommonVarText(current, source.var_key, replacement.var_key);
         if (next !== null) {
           columns[column] = next;
+          originalColumns[column] = current;
           before.push(`${column}:${current}`);
         }
       }
@@ -683,6 +686,7 @@ export async function getCommonVarReplacementPlan(
           id: String(row.id),
           kind: descriptor.kind,
           columns,
+          originalColumns,
           fingerprint: before.join('\n'),
         });
       }
@@ -713,21 +717,34 @@ export async function applyCommonVarReplacementPlan(
   const now = jstNow();
   const runId = crypto.randomUUID();
   const archivedVersion = plan.source.version + 1;
+  const assertions = plan.targets.map((target) => {
+    const originals = Object.entries(target.originalColumns);
+    return db.prepare(
+      `SELECT CASE WHEN EXISTS (
+         SELECT 1 FROM ${target.table}
+          WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
+       ) THEN 1 ELSE json('') END AS unchanged`,
+    ).bind(target.id, ...originals.map(([, value]) => value));
+  });
   const updates = plan.targets.map((target) => {
     const entries = Object.entries(target.columns);
+    const originals = Object.entries(target.originalColumns);
     return db.prepare(
       `UPDATE ${target.table}
           SET ${entries.map(([column]) => `${column} = ?`).join(', ')}
-        WHERE id = ? AND EXISTS (
+        WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
+          AND EXISTS (
           SELECT 1 FROM common_vars
            WHERE id = ? AND replacement_run_id = ? AND version = ?
         )`,
     ).bind(
       ...entries.map(([, value]) => value), target.id,
+      ...originals.map(([, value]) => value),
       plan.source.id, runId, archivedVersion,
     );
   });
   const results = await db.batch([
+    ...assertions,
     db.prepare(
       `UPDATE common_vars
           SET archived_at = ?, replacement_run_id = ?, version = ?, updated_by = ?, updated_at = ?
@@ -765,7 +782,7 @@ export async function applyCommonVarReplacementPlan(
       plan.source.id, runId, archivedVersion,
     ),
   ]);
-  const archiveResult = results[0];
+  const archiveResult = results[assertions.length];
   if (Number(archiveResult?.meta.changes ?? 0) === 0) {
     throw new CommonVarVersionConflictError(plan.source.version);
   }
