@@ -1582,7 +1582,7 @@ export const SCREENS = [
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
-    verdictSource: 'forms-v6/v9tYhl.png + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
+    verdictSource: 'forms-v6/v9tYhl.txt + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
     verdictHead: '19422a3b7',
     route: '/form-submissions/responses?id=form-visit',
     states: {
