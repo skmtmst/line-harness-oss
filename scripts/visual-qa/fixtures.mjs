@@ -621,42 +621,94 @@ export const COMMON_VAR_DELETE_IMPACT_ERROR = {
  * 使用先の名前はすべて作り物。内部IDは画面に出さず、hrefの中だけで使う。
  * 通常・0件・失敗を同じ契約から撮れるよう、形を分けて固定してある。
  */
+export const MEDIA_FOLDERS = [
+  { id: 'media-product', name: '01_商品写真', kind: 'media', sortOrder: 0, color: '#2563EB', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'media-banner', name: '02_バナー', kind: 'media', sortOrder: 1, color: '#F3C66B', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'media-video', name: '03_動画', kind: 'media', sortOrder: 2, color: '#7C6BC4', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+]
+
+const mediaPreview = (color) => `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="678"><rect width="1040" height="678" fill="${color.replace('#', '%23')}"/></svg>`
+
 export const MEDIA_ITEMS = [
   {
-    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'image', filename: '来店後のご案内.png', mimeType: 'image/png',
-    sizeBytes: 245760, width: 1040, height: 1040, durationMs: null,
-    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23e7f7ef"/></svg>',
-    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-31T09:00:00.000Z', usageCount: 2,
+    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: '夏の定番セット.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
+  },
+  {
+    id: 'media-banner', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '会員証バナー.png', mimeType: 'image/png',
+    sizeBytes: 839680, width: 2500, height: 1686, durationMs: null,
+    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', createdAt: '2026-08-17T09:00:00.000Z', usageCount: 2,
+  },
+  {
+    id: 'media-store-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
+    kind: 'video', filename: '店内のようす.mp4', mimeType: 'video/mp4',
+    sizeBytes: 88080384, width: null, height: null, durationMs: 164000,
+    url: mediaPreview('#eef0f2'), uploadedBy: '佐々木', createdAt: '2026-08-16T09:00:00.000Z', usageCount: 1,
+  },
+  {
+    id: 'media-coupon', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '誕生月クーポン.png', mimeType: 'image/png',
+    sizeBytes: 215040, width: 1029, height: 1029, durationMs: null,
+    url: mediaPreview('#f3ece1'), uploadedBy: '田中', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'image', filename: '未使用の案内.png', mimeType: 'image/png',
-    sizeBytes: 102400, width: 1040, height: 1040, durationMs: null,
-    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23f4f5f4"/></svg>',
-    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-30T09:00:00.000Z', usageCount: 0,
+    kind: 'file', filename: 'メニュー表.pdf', mimeType: 'application/pdf',
+    sizeBytes: 1258291, width: null, height: null, durationMs: null,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
   },
   {
-    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'image', filename: '新しい来店案内.png', mimeType: 'image/png',
-    sizeBytes: 204800, width: 1040, height: 1040, durationMs: null,
-    url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1040"><rect width="1040" height="1040" fill="%23d9efe3"/></svg>',
-    uploadedBy: 'visual-qa-owner', createdAt: '2026-08-31T08:00:00.000Z', usageCount: 0,
+    id: 'media-pamphlet', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: '定期便パンフ.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 491520, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#e4eee8'), uploadedBy: '佐々木', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 5,
+  },
+  {
+    id: 'media-staff', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: 'スタッフ紹介.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 399360, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', createdAt: '2026-08-12T09:00:00.000Z', usageCount: 0,
+  },
+  {
+    id: 'media-guide-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
+    kind: 'video', filename: '使い方ガイド.mp4', mimeType: 'video/mp4',
+    sizeBytes: 20761804, width: null, height: null, durationMs: 215000,
+    url: mediaPreview('#e8ebef'), uploadedBy: '川野 健太', createdAt: '2026-08-11T09:00:00.000Z', usageCount: 2,
+  },
+  {
+    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '休業のお知らせ.png', mimeType: 'image/png',
+    sizeBytes: 122880, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', createdAt: '2026-08-10T09:00:00.000Z', usageCount: 0,
+  },
+  {
+    id: 'media-price-list', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'file', filename: '価格表_2026.pdf', mimeType: 'application/pdf',
+    sizeBytes: 655360, width: null, height: null, durationMs: null,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
   },
 ]
 
 export const MEDIA_DELETE_IMPACT = {
-  media: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
-  usageCount: 2,
+  media: { id: 'media-delete-target', filename: '夏の定番セット.jpg', kind: 'image' },
+  usageCount: 3,
   references: [
     {
-      kind: 'broadcast', name: '8月のお知らせ',
+      kind: 'template', name: '夏の定番5点',
+      href: '/templates', state: 'available',
+      scannedAt: '2026-08-31T10:00:00.000Z',
+    },
+    {
+      kind: 'broadcast', name: '夏のご案内',
       href: '/broadcasts/detail?id=broadcast-visual', state: 'available',
       scannedAt: '2026-08-31T10:00:00.000Z',
     },
     {
-      kind: 'scenario_step', name: '来店後シナリオ・1通目',
-      href: '/scenarios/detail?id=scenario-visual', state: 'available',
+      kind: 'rich_menu', name: '夏キャンペーン',
+      href: '/rich-menus', state: 'available',
       scannedAt: '2026-08-31T10:00:00.000Z',
     },
   ],
@@ -667,7 +719,7 @@ export const MEDIA_DELETE_IMPACT = {
 }
 
 export const MEDIA_DELETE_IMPACT_EMPTY = {
-  media: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  media: { id: 'media-delete-safe', filename: 'メニュー表.pdf', kind: 'file' },
   usageCount: 0,
   references: [],
   checkedAt: '2026-08-31T10:00:00.000Z',
@@ -682,10 +734,10 @@ export const MEDIA_DELETE_IMPACT_ERROR = {
 }
 
 export const MEDIA_REPLACEMENT_IMPACT = {
-  source: { id: 'media-delete-target', filename: '来店後のご案内.png', kind: 'image' },
-  replacement: { id: 'media-replacement', filename: '新しい来店案内.png', kind: 'image' },
-  usageCount: 2,
-  replaceableCount: 2,
+  source: { id: 'media-delete-target', filename: '夏の定番セット.jpg', kind: 'image' },
+  replacement: { id: 'media-replacement', filename: '休業のお知らせ.png', kind: 'image' },
+  usageCount: 3,
+  replaceableCount: 3,
   references: MEDIA_DELETE_IMPACT.references.map((reference) => ({
     ...reference, replaceable: true, blocker: null, reason: null,
   })),
@@ -697,7 +749,7 @@ export const MEDIA_REPLACEMENT_IMPACT = {
 
 export const MEDIA_REPLACEMENT_IMPACT_EMPTY = {
   ...MEDIA_REPLACEMENT_IMPACT,
-  source: { id: 'media-delete-safe', filename: '未使用の案内.png', kind: 'image' },
+  source: { id: 'media-delete-safe', filename: 'メニュー表.pdf', kind: 'file' },
   usageCount: 0,
   replaceableCount: 0,
   references: [],

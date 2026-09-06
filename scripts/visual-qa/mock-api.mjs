@@ -37,6 +37,7 @@ import {
   MEDIA_REPLACEMENT_IMPACT,
   MEDIA_REPLACEMENT_IMPACT_BLOCKED,
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
+  MEDIA_FOLDERS,
   MEDIA_ITEMS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
@@ -1154,6 +1155,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'media') {
+    return { success: true, data: MEDIA_FOLDERS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
