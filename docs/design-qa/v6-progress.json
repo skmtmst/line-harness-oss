@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 24,
-  "match": 69,
-  "structureMatchDataPending": 60,
-  "needsFix": 132,
+  "match": 72,
+  "structureMatchDataPending": 62,
+  "needsFix": 127,
   "unjudged": 5,
-  "remaining": 199,
+  "remaining": 196,
   "features": [
     {
       "feature": 1,
@@ -860,11 +860,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 10,
+      "match": 11,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 429,
@@ -1142,11 +1142,20 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 13,
+      "structureMatchDataPending": 1,
+      "needsFix": 12,
       "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 1011,
+          "head": "98e104b7c",
+          "on": "2026-09-06",
+          "screens": [
+            "lvaY5"
+          ],
+          "note": "Issue #223。3102/8789で1440・1920を撮影し、両方とも横スクロール0。5段・設定サマリー・LINEプレビューへ整え、構造一致／保存API待ちへ更新した。"
+        },
         {
           "pr": 962,
           "head": "9b8f7451",
@@ -2620,11 +2629,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 3,
+      "match": 2,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 2,
       "capturedAt": [
         {
           "pr": 533,

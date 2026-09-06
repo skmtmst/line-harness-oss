@@ -20,6 +20,48 @@ export interface DashboardSectionStatus {
   period: DashboardPeriod | 'latest' | 'last7-fixed' | 'this-month';
 }
 
+export type DashboardMetricState =
+  | 'available'
+  | 'empty'
+  | 'unavailable'
+  | 'estimated'
+  | 'partial'
+  | 'stale';
+
+export type DashboardMetricReason =
+  | 'source_failed'
+  | 'fetch_failed'
+  | 'not_connected'
+  | 'not_loaded'
+  | 'not_applicable'
+  | null;
+
+export interface DashboardMetric<T> {
+  /** 未取得・取得失敗時は0や空配列にせずnull。 */
+  value: T | null;
+  state: DashboardMetricState;
+  reason: DashboardMetricReason;
+  asOf: string | null;
+  period: DashboardSectionStatus['period'];
+}
+
+export interface DashboardFriendTrendPoint {
+  date: string;
+  added: number;
+  blocked: number;
+  /** その日の終わりの有効友だち数。 */
+  active: number;
+  /**
+   * 日次記録が無く、いまの友だちから逆算した日。
+   *
+   * 退会して行ごと消えた友だちは数に出ないので、実態より少なく見える。
+   * 画面はこの日を実線で結ばない。正しい記録と同じ見た目にすると、
+   * 見た人が違いに気づけない。
+   */
+  estimated: boolean;
+  sources: Array<{ name: string; count: number }>;
+}
+
 export interface DashboardOverview {
   period: DashboardPeriod;
   /** 集計した時刻（JST）。カードごとの基準日がずれていないことの証拠になる。 */
@@ -66,22 +108,7 @@ export interface DashboardOverview {
     quotaUsed: number | null;
   };
   /** 友だち数の推移。古い順。 */
-  trend: Array<{
-    date: string;
-    added: number;
-    blocked: number;
-    /** その日の終わりの有効友だち数。 */
-    active: number;
-    /**
-     * 日次記録が無く、いまの友だちから逆算した日。
-     *
-     * 退会して行ごと消えた友だちは数に出ないので、実態より少なく見える。
-     * 画面はこの日を実線で結ばない。正しい記録と同じ見た目にすると、
-     * 見た人が違いに気づけない。
-     */
-    estimated: boolean;
-    sources: Array<{ name: string; count: number }>;
-  }>;
+  trend: DashboardFriendTrendPoint[];
   conversions: {
     /** 期間内の成果の件数。 */
     total: number;
@@ -110,6 +137,20 @@ export interface DashboardOverview {
     trend: DashboardSectionStatus;
     conversions: DashboardSectionStatus;
     operations: DashboardSectionStatus;
+  };
+  /**
+   * V6画面が使う、未取得をnullで区別できる指標契約。
+   * 上の既存フィールドは段階配備中の互換用に残す。
+   */
+  metrics: {
+    activeFriends: DashboardMetric<number>;
+    monthlyQuota: DashboardMetric<{
+      used: number | null;
+      limit: number | null;
+      remaining: number | null;
+    }>;
+    friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>;
+    officialProfileUrl: DashboardMetric<string>;
   };
 }
 
@@ -621,6 +662,27 @@ export async function getDashboardOverview(
   if (trendStatus.status === 'ok' && trend.some((point) => point.estimated)) {
     trendStatus.status = 'estimated';
   }
+  const sections: DashboardOverview['sections'] = {
+    friends: status('friends', friends.total === 0, 'latest'),
+    inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
+    delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, period),
+    quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
+    trend: trendStatus,
+    conversions: status('conversions', conversions.total === 0, period),
+    operations: status(
+      'operations',
+      operations.scenarios.active + operations.scenarios.paused
+        + operations.migrations.active + operations.migrations.completed
+        + operations.bookings.pending + operations.bookings.upcoming
+        + operations.funnelAlerts + operations.automationFailures === 0
+        && operations.inflowTop.length === 0,
+      period,
+    ),
+  };
+  const metricState = (section: DashboardSectionStatus): DashboardMetricState =>
+    section.status === 'ok' ? 'available' : section.status;
+  const metricReason = (section: DashboardSectionStatus): DashboardMetricReason =>
+    section.status === 'unavailable' ? 'source_failed' : null;
 
   return {
     period,
@@ -641,22 +703,36 @@ export async function getDashboardOverview(
     conversions,
     partialFailures,
     operations,
-    sections: {
-      friends: status('friends', friends.total === 0, 'latest'),
-      inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
-      delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, period),
-      quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
-      trend: trendStatus,
-      conversions: status('conversions', conversions.total === 0, period),
-      operations: status(
-        'operations',
-        operations.scenarios.active + operations.scenarios.paused
-          + operations.migrations.active + operations.migrations.completed
-          + operations.bookings.pending + operations.bookings.upcoming
-          + operations.funnelAlerts + operations.automationFailures === 0
-          && operations.inflowTop.length === 0,
-        period,
-      ),
+    sections,
+    metrics: {
+      activeFriends: {
+        value: sections.friends.status === 'unavailable' ? null : friends.active,
+        state: metricState(sections.friends),
+        reason: metricReason(sections.friends),
+        asOf: sections.friends.status === 'unavailable' ? null : sections.friends.asOf,
+        period: sections.friends.period,
+      },
+      monthlyQuota: {
+        value: null,
+        state: 'unavailable',
+        reason: 'not_loaded',
+        asOf: null,
+        period: 'this-month',
+      },
+      friendTrend: {
+        value: sections.trend.status === 'unavailable' ? null : trend,
+        state: metricState(sections.trend),
+        reason: metricReason(sections.trend),
+        asOf: sections.trend.status === 'unavailable' ? null : sections.trend.asOf,
+        period: sections.trend.period,
+      },
+      officialProfileUrl: {
+        value: null,
+        state: 'unavailable',
+        reason: 'not_loaded',
+        asOf: null,
+        period: 'latest',
+      },
     },
   };
 }
