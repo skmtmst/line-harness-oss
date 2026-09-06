@@ -676,7 +676,20 @@ export type CommonActionSummary = {
   actionCount: number;
   bindingCount: number;
   oldVersionBindingCount: number;
+  executionCountThisMonth: number;
+  failureCountThisMonth: number;
+  lastRunAt: string | null;
   updatedAt: string;
+};
+
+export type AutomationListItem = Automation & {
+  triggerConfig: Record<string, unknown>;
+  status: 'draft' | 'active' | 'stopped';
+  versionId: string;
+  version: number;
+  executionCount30d: number;
+  failureCount30d: number;
+  lastRunAt: string | null;
 };
 
 export type AnalyticsMetricState =
@@ -2580,6 +2593,77 @@ export type NenPetProfile = {
   birthday: string | null
   ownerName: string | null
   lineUserId: string
+}
+
+export type NenUnavailableMetric = {
+  value: null
+  state: 'unavailable'
+  reason: string
+}
+
+export type NenMetricsRange = { days: number; from: string; to: string }
+
+export type NenFlowMetrics = {
+  range: NenMetricsRange
+  summary: { active: number; paused: number; planned: number; sent: number; associatedConversions: number }
+  flows: Array<{
+    campaignKey: string; label: string; category: string; isEnabled: boolean
+    planned: number; sent: number; failed: number; skipped: number
+    openRate: NenUnavailableMetric; associatedConversions: number; attribution: string
+  }>
+}
+
+export type NenColumnMetrics = {
+  range: NenMetricsRange
+  summary: { total: number; sent: number; drafts: number; scheduled: number; unread: number | null; associatedConversions: number }
+  columns: Array<{
+    id: string; title: string; category: string | null; deliveryStatus: string
+    publishedAt: string | null; deliveryAt: string | null
+    period: { from: string | null; to: string | null }
+    targeted: number; sent: number; pending: number; failed: number
+    articleOpened: { value: number | null; rate: number | null; state: 'available' | 'unavailable'; reason: string | null }
+    unread: number | null; completionRate: NenUnavailableMetric
+    associatedConversions: number; attribution: string
+  }>
+}
+
+export type NenPetMetrics = {
+  range: NenMetricsRange
+  summary: {
+    pets: number; birthdayRegistered: number; birthdayMissing: number; birthdayThisMonth: number
+    friends: number; friendsWithoutPet: number; birthdayOpenRate: NenUnavailableMetric
+    coupons: { issued: number; used: number; usageRate: number }
+  }
+  breeds: Array<{ name: string; count: number }>
+  pets: Array<{
+    id: string; name: string; animalType: string; breed: string | null; birthday: string | null
+    friendId: string; ownerName: string
+    ownerDeliveryHistory: { count: number; lastSentAt: string | null }
+    coupons: { issued: number; used: number }
+  }>
+}
+
+export type NenDelivery = {
+  id: string; campaignKey: string; label: string; friendId: string; friendName: string
+  lineAccountName: string; scheduledAt: string; sentAt: string | null; status: string
+  attempts: number; unmetReason: string | null; reaction: NenUnavailableMetric
+  version: number; updatedAt: string
+}
+
+export type NenDeliveryList = {
+  range: NenMetricsRange
+  summary: { pending: number; processing: number; sent: number; skipped: number; failed: number; cancelled: number; retryRequired: number }
+  deliveries: NenDelivery[]
+  pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
+}
+
+export type NenDeliveryDetail = Omit<NenDelivery, 'reaction'> & {
+  trigger: string
+  content: {
+    title: string | null; bodyText: string | null; buttonLabel: string | null
+    buttonUrl: string | null; imageUrl: string | null
+    state: 'available' | 'unavailable'; reason: string | null
+  }
 }
 
 export type NenFriendOverview = {
@@ -5337,7 +5421,10 @@ export const api = {
   automations: {
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
-      return fetchApi<ApiResponse<Automation[]>>('/api/automations' + query)
+      return fetchApi<ApiResponse<AutomationListItem[]> & {
+        summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
+        freshness?: 'available'
+      }>('/api/automations' + query)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Automation & { logs?: AutomationLog[] }>>(`/api/automations/${id}`),
@@ -5404,12 +5491,21 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      limit?: number;
+      offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
-      return fetchApi<ApiResponse<CommonActionSummary[]>>(`/api/common-actions?${query}`);
+      if (params.limit !== undefined) query.set('limit', String(params.limit));
+      if (params.offset !== undefined) query.set('offset', String(params.offset));
+      return fetchApi<ApiResponse<CommonActionSummary[]> & {
+        pagination?: { total: number; limit: number | null; offset: number }
+        freshness?: 'available'
+      }>(`/api/common-actions?${query}`);
     },
+    csvUrl: (accountId: string) =>
+      `${API_URL}/api/common-actions?account_id=${encodeURIComponent(accountId)}&format=csv`,
     get: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonActionDetail>>(
         `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,
@@ -5795,6 +5891,29 @@ export const api = {
       ),
   },
   nenCampaigns: {
+    flowMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
+      `/api/nen-campaigns/metrics/flows?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    ),
+    columnMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenColumnMetrics>>(
+      `/api/nen-campaigns/metrics/columns?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    ),
+    petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
+      `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    ),
+    deliveries: (accountId: string, options: { days?: number; status?: string; cursor?: string; limit?: number } = {}) => {
+      const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
+      if (options.status) query.set('status', options.status)
+      if (options.cursor) query.set('cursor', options.cursor)
+      return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
+    },
+    delivery: (id: string, accountId: string) => fetchApi<ApiResponse<NenDeliveryDetail>>(
+      `/api/nen-campaigns/deliveries/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
+    retryDelivery: (id: string, data: { lineAccountId: string; expectedVersion: number; reason: string }) =>
+      fetchApi<ApiResponse<{ id: string; status: string; version: number; attempts: number }>>(
+        `/api/nen-campaigns/deliveries/${encodeURIComponent(id)}/retry`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
     overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
       jobs: { total: number; pending: number; sent: number; failed: number }
