@@ -43,7 +43,7 @@ import {
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS,
-  BROADCASTS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -58,6 +58,7 @@ import {
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
+  WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -613,6 +614,13 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/broadcasts/preflight') {
+    return {
+      audienceCount: 624,
+      hiddenExcluded: 12,
+      warnings: [],
+    }
+  }
   if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
     return FRIEND_ADD_LIFECYCLE_VALIDATION
   }
@@ -829,6 +837,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
+    return { success: true, data: BROADCAST_FOLDERS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
     return { success: true, data: REMINDER_FOLDERS }
   }
@@ -870,6 +881,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
     const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
     return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
+  }
+  const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
+  if (broadcastOne) {
+    const found = BROADCASTS.find((item) => item.id === broadcastOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') return { success: true, data: BROADCASTS }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
@@ -1266,20 +1282,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       空だと「この条件を使う」の行が描かれず、設計 `sqFXf`（対象条件を編集）が
       撮れなかった。設計と同じ2件を返す。
     */
-    const rule = (field, op, value) => ({ field, operator: op, value })
     return {
       success: true,
       data: [
         {
           id: 'sp-1', name: 'VIPかつ未契約', scope: 'friends', conditionFormat: 'segment_v1',
-          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('tag', 'includes', 'VIP'), rule('tag', 'excludes', '契約中')] } },
+          conditions: { version: 1, condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-vip' }, { type: 'tag_not_exists', value: 'tag-trial' }], groups: [] } },
           createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: true,
           displayOrder: 1, createdAt: '2026-08-10T00:00:00.000Z',
           usedIn: [{ kind: 'broadcast', count: 2 }, { kind: 'automation', count: 1 }],
         },
         {
           id: 'sp-2', name: '誕生日30日前', scope: 'friends', conditionFormat: 'segment_v1',
-          conditions: { version: 1, condition: { operator: 'AND', rules: [rule('field', 'within_days', 30)] } },
+          conditions: { version: 1, condition: { operator: 'AND', rules: [{ type: 'registered_at', value: { from: '2026-07-25', to: '' } }], groups: [] } },
           createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: false,
           displayOrder: 2, createdAt: '2026-08-18T00:00:00.000Z',
           usedIn: [{ kind: 'other', count: 1 }],
@@ -1287,6 +1302,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       ],
     }
   }
+  if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
+  if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
+  if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
+  if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
+  if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
+  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -1295,28 +1317,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     */
     return {
       data: {
-        id: pathname.split('/').pop(), accountId: 'visual-qa-account',
-        title: '定期便のはじめ方', slug: 'subscription-start', status: 'active',
-        videoPrefix: 'nen/subscription-start', durationSeconds: 2_580,
-        schedule: [], cta: { label: '詳しく見る', url: 'https://example.com/subscription', showAtSeconds: 900 },
-        tagOnAttend: null, tagOnCtaClick: null,
-        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
-      },
-    }
-  }
-  if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) {
-    // 一覧の器だと `participants` `daily` `formFunnel` が無く、画面が落ちる。
-    return {
-      data: {
-        summary: {
-          reservations: 128, viewers: 96, registeredAndJoined: 74, watched5m: 88,
-          watched15m: 61, completed: 34, avgWatchedSeconds: 1_140, ctaClicks: 41, formSubmissions: 18,
-        },
-        daily: [], participants: [], sessions: [], dropoff: [],
-        formFunnel: {
-          ctaImpressions: 96, ctaClicks: 41, formOpens: 33, formStarts: 27,
-          submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
-        },
+        ...WEBINARS[0], id: pathname.split('/').pop(),
       },
     }
   }

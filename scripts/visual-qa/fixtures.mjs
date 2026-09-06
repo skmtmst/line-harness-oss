@@ -1534,8 +1534,25 @@ export const BROADCASTS = [
   sentAt: status === 'sent' ? scheduledAt : null,
   totalCount: Number(totalCount),
   successCount: Number(successCount),
-  folderId: null,
+  lineAccountId: 'visual-qa-account',
+  folderId: ['bf-campaign', 'bf-ec', 'bf-campaign', 'bf-ec', null][index] ?? null,
   createdAt: '2026-08-16T00:00:00.000Z',
+}))
+
+/** 一斉配信のフォルダ操作 `xkRDb` を開くための固定データ。 */
+export const BROADCAST_FOLDERS = [
+  ['bf-reserved', '予約配信', '#3B82F6'],
+  ['bf-campaign', 'キャンペーン', '#10B981'],
+  ['bf-ec', 'EC・フォロー', '#F59E0B'],
+].map(([id, name, color], index) => ({
+  id: String(id),
+  kind: 'broadcast',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  color: String(color),
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
 }))
 
 /**
@@ -2318,6 +2335,86 @@ export const ACTION_SCORE_RULES = {
     ...ACTION_SCORE_BUNDLE,
     id: 'asrv-2', versionNumber: 2, status: 'published',
     createdAt: '2026-08-20T10:00:00.000Z', publishedAt: '2026-08-21T02:00:00.000Z',
+  },
+}
+
+/** 機能10 ウェビナー。Pencil V6の文言と数を固定し、通常状態を再現する。 */
+export const WEBINARS = [
+  ['webinar-1', 'NEN活用スタートセミナー', 'nen-start', 'active', 2_538, 184],
+  ['webinar-2', '予約機能の使い方', 'booking-guide', 'active', 1_920, 96],
+  ['webinar-3', 'EC連携 実践講座', 'ec-guide', 'draft', 2_160, 63],
+  ['webinar-4', '顧客対応の自動化', 'support-automation', 'draft', 1_800, 0],
+  ['webinar-5', '旧機能説明会', 'legacy-guide', 'draft', 1_500, 85],
+].map(([id, title, slug, status, durationSeconds, registrations]) => ({
+  id, accountId: 'visual-qa-account', title, slug, status,
+  videoPrefix: `webinars/${slug}`, durationSeconds,
+  schedule: [{ type: 'daily', time: '20:00' }],
+  cta: { label: '個別相談を予約する', url: 'https://example.com/consultation', showAtSeconds: 1_920 },
+  tagOnAttend: '配信済み', tagOnCtaClick: '相談希望', registrations,
+  createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+}))
+
+export const WEBINAR_OVERVIEW = {
+  state: 'partial', registrationMode: 'people',
+  metrics: {
+    webinars: { value: 6, state: 'available', reason: null },
+    activeWebinars: { value: 3, state: 'available', reason: null },
+    registrations: { value: 428, state: 'available', reason: null },
+    registrationBookings: { value: 428, state: 'available', reason: null },
+    viewers: { value: 312, state: 'available', reason: null },
+    viewRate: { value: 0.729, state: 'available', reason: null },
+    averageWatchSeconds: { value: null, state: 'unavailable', reason: '一覧では未取得' },
+    ctaUniquePeople: { value: 86, state: 'available', reason: null },
+    ctaTotalClicks: { value: 86, state: 'available', reason: null },
+  },
+}
+
+export const WEBINAR_NOTIFICATIONS = {
+  settings: {
+    webinarId: 'webinar-1', version: 3,
+    registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '20:00',
+    hourBeforeEnabled: true, hourBeforeMinutes: 60, startEnabled: true,
+    missedEnabled: true, missedTime: '10:00', completedEnabled: true,
+    updatedAt: '2026-08-25T02:00:00.000Z',
+  },
+  overview: {
+    total: 184, pending: 32, sent: 149, failed: 3, skipped: 0, cancelled: 0,
+    audience: { people: 184, bookings: 184, definition: 'active_registrations' },
+  },
+}
+
+export const WEBINAR_CTAS = [{
+  id: 'webinar-cta-1', atSeconds: 1_920, kind: 'form',
+  title: '個別相談を予約する', body: '資料の確認や個別相談をご案内します。',
+  buttonLabel: '個別相談を予約する', autoOpen: false, formId: 'form-1', url: null,
+}]
+
+export const WEBINAR_ACTIONS = [
+  { id: 'webinar-action-1', trigger: 'completed', actionType: 'add_tag', config: { tagId: '配信済み' }, position: 0, version: 2 },
+  { id: 'webinar-action-2', trigger: 'completed', actionType: 'start_scenario', config: { scenarioId: '相談シナリオ' }, position: 1, version: 2 },
+]
+
+export const WEBINAR_ANALYTICS = {
+  summary: {
+    reservations: 184, viewers: 142, registeredAndJoined: 128, watched5m: 128,
+    watched15m: 112, completed: 96, avgWatchedSeconds: 1_722, ctaClicks: 52, formSubmissions: 18,
+  },
+  daily: [],
+  participants: [
+    ['friend-1', 'Kenta Kawano', 2_538, '2026-08-25T10:32:00+09:00', true, true],
+    ['friend-2', 'Masato S.', 1_980, '2026-08-25T10:28:00+09:00', true, false],
+    ['friend-3', '菅野 亮', 1_240, '2026-08-25T10:21:00+09:00', false, false],
+    ['friend-4', '山田 太郎', 0, '2026-08-25T10:14:00+09:00', false, false],
+  ].map(([friendId, friendName, maxWatchedSeconds, latestJoinedAt, cta, form]) => ({
+    friendId, friendName, pictureUrl: null, sessions: 1,
+    firstJoinedAt: latestJoinedAt, latestJoinedAt, maxWatchedSeconds,
+    ctaClickedAt: cta ? latestJoinedAt : null, registered: true,
+    formSubmittedAt: form ? latestJoinedAt : null,
+  })),
+  sessions: [], dropoff: [],
+  formFunnel: {
+    ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,
+    submitAttempts: 21, submitSuccesses: 18, submitErrors: 3, fieldCompletions: [],
   },
 }
 
