@@ -39,12 +39,12 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(wizardSource).toContain('type="password"')
   })
 
-  it('旧画面から外した階層編集部品はデータ削除をせず残す', () => {
+  it('階層編集部品を一覧の操作から開き、保存APIへつなぐ', () => {
     for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層をドラッグ＆ドロップで編集', '未保存の変更', '構成を保存']) {
       expect(orderingSource).toContain(label)
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
-    expect(accountsSource).not.toContain('<AccountOrdering />')
+    expect(accountsSource).toContain('{orderingOpen && <AccountOrdering />}')
   })
 
   it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {
