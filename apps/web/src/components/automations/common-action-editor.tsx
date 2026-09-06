@@ -169,7 +169,14 @@ function ActionParams({
     return <ResourceSelect label="リッチメニュー" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
   }
   if (step.type === 'common_action') {
-    return <ResourceSelect label="共通アクション" value={String(step.params.commonActionId ?? '')} options={resources.commonActions} onChange={(commonActionId) => onChange({ commonActionId })} />
+    const commonActionId = String(step.params.commonActionId ?? '')
+    const selected = resources.commonActions.find((item) => item.id === commonActionId)
+    return (
+      <div>
+        <ResourceSelect label="共通アクション" value={commonActionId} options={resources.commonActions} onChange={(nextId) => onChange({ commonActionId: nextId })} />
+        {selected ? <p className="text-ink-secondary mt-2 text-xs">共通アクション「{selected.name}」 v{selected.version}</p> : null}
+      </div>
+    )
   }
   if (step.type === 'wait') {
     return (
@@ -181,9 +188,15 @@ function ActionParams({
   }
   if (step.type === 'send_message') {
     const templateId = String(step.params.templateId ?? '')
+    const selected = resources.templates.find((item) => item.id === templateId)
     return (
       <div className="space-y-3">
         <ResourceSelect label="テンプレート" value={templateId} options={resources.templates} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
+        {selected ? (
+          <p className="text-ink-secondary text-xs">
+            テンプレート「{selected.name}」　版: —（未取得。テンプレートの版を返す口が接続されると表示します）
+          </p>
+        ) : null}
         {!templateId ? (
           <label className="text-ink-secondary block text-sm">
             送る本文
