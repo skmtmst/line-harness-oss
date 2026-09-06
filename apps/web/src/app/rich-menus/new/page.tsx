@@ -190,7 +190,7 @@ export default function NewRichMenuPage() {
       </nav>
 
       <section data-design="Head" hidden>
-        <h1>リッチメニューを作る</h1>
+        <p>リッチメニューを作る</p>
         <p>名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。</p>
         <p>トーク画面下の文言</p>
         <p>14文字以内。メニューを開く前にトーク画面下に表示されます。</p>

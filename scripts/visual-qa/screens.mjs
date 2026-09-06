@@ -1488,7 +1488,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・ユニーク人数の集計口待ち。設計画像と実装画像を同じ比較入力で見比べ、フォルダ、作成・並べ替え・検索・表示件数、保存した検索、優先順位の説明、一覧6列と操作を確認した。今月のタップ回数は実データだが、のべ人数を返す口が無いため設計の8,140人などを作らず「のべ人数は未取得」と表示する。1440・1920とも横スクロール0。取得元 `rich-menus-v6/GO8RQ.txt` と同Node画像。',
-    verdictHead: 'd28de92b0', },
+    verdictHead: 'f2be359e5', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200,
     steps: [
@@ -1497,7 +1497,7 @@ export const SCREENS = [
     ],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・下書き保存後の編集口待ち。設計画像と実装画像を同じ比較入力で見比べ、3段の進み方、名称・フォルダ・14字までのボタン文字、大小の寸法、切替タブ、A〜Fの7レイアウト、LINEプレビュー、面Fの未設定警告を確認した。画像と開閉状態は新規作成時に存在しないIDへ書かず、下書き保存後の編集画面で登録する旨を表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/XtfO3.txt` と同Node画像。',
-    verdictHead: 'd28de92b0', route: '/rich-menus/new', },
+    verdictHead: 'f2be359e5', route: '/rich-menus/new', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
@@ -1540,7 +1540,7 @@ export const SCREENS = [
     steps: [{ qaOpen: 'TL7tp' }],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・面ごとの動きを読むAPI待ち。設計画像と実装画像を同じ比較入力で見比べ、LINEからの読み直し、管理外メニューの選択、6面プレビュー、取り込み後にできること、表示を変えない説明、削除時の注意、取り込み操作を確認した。LINEから面ごとのURLや送信文を返す口が無いため例示値を作らず、接続後に確認できる内容を本文に明記した。1440・1920とも横スクロール0。取得元 `rich-menus-v6/TL7tp.txt` と同Node画像。',
-    verdictHead: 'd28de92b0', },
+    verdictHead: 'f2be359e5', },
   {
     /*
       **#575 で `ConfirmDialog` につながった。**管理画面のメニューと、
@@ -1559,7 +1559,7 @@ export const SCREENS = [
     mode: 'viewport', height: 1080,
     verdict: 'match',
     verdictNote: '**2026-09-06 #225 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、共通の操作列・優先順位の説明・保存した検索・フォルダを残したまま、読込中「読み込んでいます」、0件「まだリッチメニューがありません」、失敗「表示できませんでした」を別状態で確認した。未取得の集計帯は表示せず、実値0と取得失敗を混ぜていない。通常・読込中・0件・取得失敗を1440・1920で撮影し、全画像で横スクロール0。取得元 `rich-menus-v6/RW5Tb*.txt` と同Node画像。',
-    verdictHead: 'd28de92b0',
+    verdictHead: 'f2be359e5',
     states: { apis: ['**/api/rich-menu-groups*', '**/api/rich-menu-groups/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
 
   },
