@@ -73,7 +73,37 @@ describe('友だち追加時配信の公開画面', () => {
 
   it('最終確認は5段目を現在地にする', () => {
     expect(PAGE).toContain('current={5}')
+    expect(PAGE).toContain('complete')
     expect(PAGE).not.toContain('current={4}')
+  })
+
+  it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
+    expect(PAGE).toContain('登録直後から5分以内')
+    expect(PAGE).toContain('LINEプレビュー')
+    expect(PAGE).toContain('Slack通知（未接続）')
+    expect(PAGE).toContain('初回案内の本文は、選択したシナリオで確認してください。')
+  })
+
+  it('運用者向けの画面に内部の仕組みの名前を出さない', () => {
+    expect(PAGE).not.toContain('value="webhookの記録で防ぎます"')
+    expect(PAGE).not.toContain('value="有効（webhookの記録で判定）"')
+    expect(PAGE).toContain('同じ友だち追加通知は1回だけ処理します。')
+  })
+
+  it('有効化後に次の操作と監視対象を説明する', () => {
+    for (const label of [
+      '配信を一時停止',
+      '内容を編集する',
+      'テストを再送信',
+      '別の経路用に複製',
+      '未送信',
+      '二重送信',
+      '再追加の連続実行',
+      'シナリオ開始失敗',
+    ]) {
+      expect(PAGE).toContain(label)
+    }
+    expect(PAGE).toContain('Slack通知はまだ接続されていません')
   })
 
   it('公開中にアカウントを変えられたら、返事を映さない', () => {
