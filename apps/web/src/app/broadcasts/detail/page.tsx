@@ -415,7 +415,7 @@ function SentResult({
 
   return (
     <div className="space-y-4">
-      <nav aria-label="配信結果の表示" className="bg-canvas-sunken rounded-card grid grid-cols-5 p-1 text-center text-sm font-semibold">
+      <nav aria-label="配信内容を見る" className="bg-canvas-sunken rounded-card grid grid-cols-5 p-1 text-center text-sm font-semibold">
         {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
           <span key={label} className={index === 0 ? 'bg-canvas text-accent rounded-control px-3 py-2' : 'text-ink-secondary px-3 py-2'}>{label}</span>
         ))}

@@ -410,15 +410,15 @@ function BroadcastList() {
               onChange={(e) => setTitleQuery(e.target.value)}
               className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <select
+            <SelectField
               aria-label="保存した検索"
               defaultValue=""
               onChange={(event) => applySavedView(event.target.value)}
-              className="border-hairline rounded-control border px-3 py-2 text-sm font-semibold text-action"
-            >
-              <option value="">保存した検索</option>
-              {savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
-            </select>
+              options={[
+                { value: '', label: '保存した検索' },
+                ...savedViews.map((view) => ({ value: view.id, label: view.name })),
+              ]}
+            />
             <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
             <SelectField aria-label="表示件数" defaultValue="20" size="compact" options={[{ value: '20', label: '20件表示' }]} />
           </div>

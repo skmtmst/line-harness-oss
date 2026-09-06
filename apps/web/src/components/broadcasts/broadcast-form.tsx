@@ -1321,7 +1321,7 @@ export default function BroadcastForm({
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4><p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p></div>
-            <Link href="/automations/actions" className="text-xs font-semibold text-action hover:underline">アクションを管理</Link>
+            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">アクションを管理</Link>
           </div>
           <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
             <select aria-label="配信後のアクション" value={afterActionVersionId} onChange={(event) => setAfterActionVersionId(event.target.value)} className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal text-ink">
