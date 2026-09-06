@@ -800,8 +800,8 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は「選択中のアカウントの配信ではありません」で止まり、設計の5段表示・予約内容・Slack通知・次の操作が出ない。取消ボタンも無く確認状態を撮れない。**推奨修正**：撮影アカウントと予約データを一致させ、設計の完了要約と取消導線を出す。取得元 `broadcasts-v6/bPF0s.txt` と同Node画像。',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。固定配信を `visual-qa-account` に所属させ、詳細APIと人数確認の固定結果を追加した。予約完了と取消確認を1440・1920で撮影でき、別画面・権限不足・横はみ出しは0。**撮影不能は解消。** 残る設計差は、Pencilの5段完了表示・管理名/配信対象/送信予定/状態の要約・Slack通知・右側「次にできること」に対し、実装は完了カード・KPI3枚・予約内容・中央の3操作という構造であること。取得元 `broadcasts-v6/bPF0s.txt`、`bPF0s-cancel.txt` と同Node画像。',
+    verdictHead: 'fc3cb9aede',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -827,8 +827,8 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/broadcasts/new`（対象条件を編集）。**撮影の手順を2つ直した**——ラジオの役割（`text`→`radio`）と、変種が基本手順を二重に持っていた点（`capture-screens.mjs` は `[...steps, ...variant.steps]` で繋ぐ）。設計の「条件 1」の見出し、「標準互換（15軸）」「この画面だけの軸（6軸）」の区別、「複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。」が無い。**`-save`（保存する窓）は撮れていない**——モックに保存済み条件が無く（`/api/segment-presets` が空の器）「この条件を使う」に届かない。取得元 `broadcasts-v6/sqFXf.txt`',
-    verdictHead: '49e1341c', route: NEW_BC,
+    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。現行 `segment_v1` 形式の保存済み条件を2件返し、呼出し後の「この条件を保存」まで1440・1920で撮影できた。別画面・画面エラー・横はみ出しは0。**`-save` の撮影不能は解消。** 残る設計差は、Pencilの対象条件編集が「条件1」と15軸/6軸の区別、AND/OR結合の案内を持つ一方、実装の呼出し窓は未接続KPI3枚を置き、編集本体も軸の区別を持たないこと。取得元 `broadcasts-v6/sqFXf.txt`、`sqFXf-save.txt` と同Node画像。',
+    verdictHead: 'fc3cb9aede', route: NEW_BC,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [
@@ -858,8 +858,8 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも `data-qa-open="xkRDb"` が0件で、設計のフォルダ操作メニューを開けない。「フォルダを追加」だけは表示される。**推奨修正**：各フォルダへ「…」の操作口を戻し、名称変更・移動・削除を設計どおり確認できるようにする。取得元 `broadcasts-v6/xkRDb.txt` と撮影失敗ログ。', route: '/broadcasts',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 S0 再判定（#215）。** 要修正。共通フォルダ行の「…」から、名前変更・色変更・上下移動・削除・削除後の注意をすべて表示できる。`data-qa-open="xkRDb"` で1440・1920を撮影し、メニュー切れ・別画面・横はみ出しは0。**操作メニューの撮影不能は解消。** ただし画面全体は、PencilのKPI値・検索/絞り込み・一覧情報量・ページ送りと実装に既存差が残るため要修正のまま。取得元 `broadcasts-v6/xkRDb.txt` と同Node画像。', route: '/broadcasts',
+    verdictHead: 'fc3cb9aede',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
