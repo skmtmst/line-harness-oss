@@ -204,6 +204,30 @@ describe('identity candidate contract', () => {
     expect(undone.history).toHaveLength(2);
   });
 
+  it('stores the selected friend value and its source in the same link decision', async () => {
+    const { db, raw } = seed();
+    raw.prepare("UPDATE friends SET real_name = '田中 花子' WHERE id = 'friend-a'").run();
+    await upsertIdentityCandidate(db, friendDraft());
+    await decideIdentityCandidate(db, actor, 'candidate-friend', {
+      expectedVersion: 1,
+      decision: 'linked',
+      reason: '本人確認済みのメールが一致しました',
+      profileSelections: [{
+        fieldKey: 'real_name', sourceFriendId: 'friend-a', updateMode: 'fixed',
+      }],
+    });
+    expect(raw.prepare(
+      `SELECT field_key, value_json, source_friend_id, update_mode
+         FROM user_profile_values WHERE is_active = 1`,
+    ).get()).toEqual({
+      field_key: 'real_name', value_json: '"田中 花子"',
+      source_friend_id: 'friend-a', update_mode: 'fixed',
+    });
+    expect(raw.prepare(
+      "SELECT COUNT(*) AS count FROM identity_events WHERE event_type = 'profile'",
+    ).get()).toEqual({ count: 1 });
+  });
+
   it('rejects a stale decision and prevents two existing users from being merged silently', async () => {
     const { db, raw } = seed();
     await upsertIdentityCandidate(db, friendDraft());

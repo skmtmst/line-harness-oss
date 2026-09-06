@@ -14,17 +14,25 @@ const personMocks = vi.hoisted(() => {
   }
   return {
     getMergedPerson: vi.fn(),
+    listMergedPeople: vi.fn(),
     mergedPersonAccountIds: vi.fn(),
+    unlinkMergedPersonFriend: vi.fn(),
     updateMergedPerson: vi.fn(),
     updateMergedPersonDeliveryPriorities: vi.fn(),
     MergedPersonError: TestMergedPersonError,
   };
 });
 
-const accessMocks = vi.hoisted(() => ({ canAccessAllLineAccounts: vi.fn() }));
+const accessMocks = vi.hoisted(() => ({
+  canAccessAllLineAccounts: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(),
+}));
+
+const profileMocks = vi.hoisted(() => ({ getFriendProfileCandidates: vi.fn() }));
 
 vi.mock('../services/merged-people.js', () => personMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
+vi.mock('../services/friend-profile-candidates.js', () => profileMocks);
 
 const { mergedPeople } = await import('./merged-people.js');
 
@@ -61,17 +69,27 @@ function harness(options?: { role?: 'owner' | 'admin' | 'staff'; permissions?: s
 beforeEach(() => {
   vi.clearAllMocks();
   personMocks.getMergedPerson.mockResolvedValue(detail);
+  personMocks.listMergedPeople.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
   personMocks.mergedPersonAccountIds.mockResolvedValue(['account-a']);
   personMocks.updateMergedPerson.mockResolvedValue({ ...detail, revision: 2 });
   personMocks.updateMergedPersonDeliveryPriorities.mockResolvedValue({ ...detail, revision: 2 });
+  personMocks.unlinkMergedPersonFriend.mockResolvedValue({
+    personId: 'user-a', friendId: 'friend-a', revision: 2, unlinkedAt: '2026-08-31',
+  });
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  accessMocks.getVisibleLineAccountScope.mockResolvedValue({ allowedAccountIds: ['account-a'] });
+  profileMocks.getFriendProfileCandidates.mockResolvedValue({
+    profileCandidates: [], tagCandidates: [],
+  });
 });
 
 describe('merged person HTTP contract', () => {
   it('returns the normal detail shape only after every linked account is authorized', async () => {
     const response = await harness({ role: 'staff' }).request('/api/friends/people/user-a');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, data: detail });
+    expect(await response.json()).toEqual({
+      success: true, data: { ...detail, profileCandidates: [], tagCandidates: [] },
+    });
     expect(accessMocks.canAccessAllLineAccounts).toHaveBeenCalledWith(
       expect.anything(), expect.objectContaining({ id: 'staff-a' }), ['account-a'],
     );
@@ -138,6 +156,40 @@ describe('merged person HTTP contract', () => {
     expect(response.status).toBe(200);
     expect(personMocks.updateMergedPersonDeliveryPriorities).toHaveBeenCalledWith(
       expect.anything(), expect.anything(), 'user-a', { expectedRevision: 1, priorities: [] },
+    );
+  });
+
+  it('returns an empty people list and passes the visible account scope', async () => {
+    const response = await harness({ role: 'staff' }).request('/api/friends/people');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true, data: { items: [], total: 0, limit: 20, offset: 0 },
+    });
+    expect(personMocks.listMergedPeople).toHaveBeenCalledWith(
+      expect.anything(), 'tenant-a', ['account-a'], 20, 0,
+    );
+  });
+
+  it('requires admin and a current revision for non-destructive unlink', async () => {
+    const denied = await harness({ role: 'staff' }).request(
+      '/api/friends/people/user-a/links/friend-a',
+      { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: '{}' },
+    );
+    expect(denied.status).toBe(403);
+
+    const accepted = await harness({ role: 'admin' }).request(
+      '/api/friends/people/user-a/links/friend-a',
+      {
+        method: 'DELETE', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: 1, reason: '本人から別人と確認しました' }),
+      },
+    );
+    expect(accepted.status).toBe(200);
+    expect(personMocks.unlinkMergedPersonFriend).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: 'staff-a', name: '担当者', tenantId: 'tenant-a' },
+      'user-a', 'friend-a',
+      { expectedRevision: 1, reason: '本人から別人と確認しました' },
     );
   });
 });
