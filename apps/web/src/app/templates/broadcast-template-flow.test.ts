@@ -28,6 +28,6 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
   it('loads both message and content templates into the broadcast picker', () => {
     expect(formSource).toContain('api.templates.list()')
     expect(formSource).toContain('api.broadcastMessageAssets.list')
-    expect(formSource).toContain('コンテンツのテンプレートを引用')
+    expect(formSource).toContain('テンプレートから選ぶ')
   })
 })
