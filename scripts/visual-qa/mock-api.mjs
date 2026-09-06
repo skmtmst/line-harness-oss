@@ -615,6 +615,15 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
+    return {
+      matched: { value: 1020, state: 'available', reason: null },
+      overlap: { value: 180, state: 'available', reason: null },
+      effective: { value: 840, state: 'available', reason: null },
+      higherMenus: ['夏キャンペーン'],
+      priority: 2,
+    }
+  }
   if (method === 'POST' && pathname === '/api/broadcasts/preflight') {
     return {
       audienceCount: 624,

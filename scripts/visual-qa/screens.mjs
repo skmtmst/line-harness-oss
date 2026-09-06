@@ -1448,12 +1448,8 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/new`。**3段のステッパー（STEP 1〜3）が無い。** 面の分け方の記号（A〜F）、トークの下に出る文字の説明（14字まで）、寸法（大 2500 × 1686px／小 2500 × 843px）、LINEプレビュー、公開前の注意（「面 F のアクションが未設定です。」）が無い。言い方も設計と違う（設計「上下2面」／実装「上下2分割」）。取得元 `rich-menus-v6/XtfO3.txt`',
     verdictHead: '49e1341c', route: '/rich-menus/new', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「画面を表示できませんでした」で停止し、設計の対象条件・優先順位・LINEプレビューを確認できない。**推奨修正**：`rmg-1` を正常に読み、誰に出すかと条件別表示を描画する。取得元 `rich-menus-v6/kQ1bs.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: RM_EDIT, /*
-      **「出す順番」は出し分けを入れたときだけ出る**（`edit/page.tsx:781` の
-      `targetingEnabled && (`）。既定は切れているので、入れた状態も撮る。
-    */
-    variants: [{ suffix: '-targeting', steps: [{ click: '条件で出し分ける', role: 'checkbox' }, { wait: 600 }] }], },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: 'bec0d4c6f', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
   {
     /*
       **#509 で `/rich-menus/connections?id=` が入った。**
@@ -1461,18 +1457,18 @@ export const SCREENS = [
       `NXdDk` は同じ画面の「つながりが無い」状態。
     */
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも表示エラーで停止し、設計の切替元・切替先・循環警告を確認できない。**推奨修正**：グループ詳細を正常取得し、切替関係を設計の図と一覧で表示する。取得元 `rich-menus-v6/DIUbO.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
-    route: '/rich-menus/connections?id=rmg-1', mode: 'page',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #253 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、切替元・切替先を図と表で確認できる構成、トップへ戻るタブが無い警告、LINEプレビュー、固定の保存操作を確認した。グループ詳細の実データから線と戻り道を計算している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/DIUbO.txt` と同Node画像。',
+    verdictHead: 'bec0d4c6f',
+    route: '/rich-menus/connections?id=rmg-1', mode: 'viewport', height: 1080,
 
   },
   {
     ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。読込・空・失敗は1440・1920で撮れたが、通常状態は表示エラーで停止する。設計の「つながりなし」説明とLINEプレビューも出ない。**推奨修正**：通常データの形を直し、つながりが無い理由と次の操作を表示する。取得元 `rich-menus-v6/NXdDk*.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
-    route: '/rich-menus/connections?id=rmg-2', mode: 'page',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #253 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、つながりが無い理由、切替先を追加する次の操作、LINEプレビューを確認した。通常・読込中・0件・取得失敗の4状態を1440・1920で撮影し、取得失敗を0件として扱っていない。全画像で横スクロール0。取得元 `rich-menus-v6/NXdDk*.txt` と同Node画像。',
+    verdictHead: 'bec0d4c6f',
+    route: '/rich-menus/connections?id=rmg-2', mode: 'viewport', height: 1080,
     /*
       **通常・空・失敗を本文まで取る。**読む口は `api.richMenuGroups.get(groupId)`
       （`connections/page.tsx:41`）ひとつだけ。
@@ -1481,8 +1477,13 @@ export const SCREENS = [
 
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも表示エラーで停止し、設計の公開方法・対象・開始時刻・LINEプレビューを確認できない。**推奨修正**：編集データを正常取得し、STEP 3の公開設定を表示する。取得元 `rich-menus-v6/UMiJ9.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: RM_EDIT, },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・一部データ未登録。設計画像と実装画像を同じ比較入力で見比べ、STEP 3、今すぐ・日時指定・期間指定、終了後に戻すメニュー、公開前確認、対象の要約、LINEプレビューを確認した。予約は実行キー付きでDBへ保存し、予約時点の定義を固定する。固定データには画像が無いため、設計の「画像登録済み」を作らず「未設定」と表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/UMiJ9.txt` と同Node画像。', verdictHead: 'bec0d4c6f', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
+    steps: [
+      { click: '期間を決める', role: 'radio' },
+      { fill: '出しはじめ', text: '2026-08-25T10:00' },
+      { fill: '出しおわり', text: '2026-09-30T23:59' },
+    ], },
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む',
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/connections`（管理画面の外のメニューを取り込む）。**「LINEから読み直す」と、面ごとの動きの一覧（設計「A：URLを開く（https://example.co.jp/menu）」など）が無い。** 取り込まずに消したときの注意（「お客さまのメニューがすぐ消えます」）も無い。内部語 `rich menu` が帯に出る。取得元 `rich-menus-v6/TL7tp.txt`',
@@ -1494,24 +1495,11 @@ export const SCREENS = [
       両方を撮る。取り込みの標準 `confirm` は削除ではないので、この行では見ない。
     */
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。基本状態を1440・1920で撮影しPencil画像と横並び比較（はみ出し0）したが、実装は0件の一覧で設計の削除確認窓にならない。管理内・LINE側・失敗の3変種も押し口0件。**推奨修正**：固定データを一覧へ出し、「LINEから取り下げる→管理画面から削除」の順を確認窓に示す。取得元 `rich-menus-v6/szXsT.txt` と同Node画像。',
-    verdictHead: '350f9636a',
-    route: '/rich-menus', mode: 'page',
-    /*
-      **公開中のメニューは窓が出ない**（`handleDelete` が `alert` で止める）。
-      固定データで下書きなのは4つ目の「店舗A限定メニュー」だけなので、
-      `nth: 5` で下書きの行の「削除」を押す（名前は部分一致なので、
-      先に並ぶ「LINE から削除」2つも数に入る）。
-    */
-    variants: [
-      { suffix: '-managed', steps: [{ click: '削除', nth: 5 }] },
-      { suffix: '-external', steps: [{ click: 'LINE から削除' }] },
-      /* 失敗しても窓が閉じないかを見る。撮影用の口は書き込みを405で返す。 */
-      /* 失敗は**消せる下書き**（`rmg-5`）で撮る。塞がれた行には押し口が出ない。 */
-      { suffix: '-managed-fail', steps: [{ click: '削除', nth: 6 }, { click: '削除する' }, { wait: 1200 }] },
-    ],
-
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・割当人数は未接続。設計画像と実装画像を同じ比較入力で見比べ、公開中メニューの影響確認、次に出る候補、切替元、配信などの参照を確認した。現在の表示人数を確定する割当台帳が無いため、設計の8,140人を作らず `—（未取得）` と表示する。公開中は安全のため「LINEから取り下げる」を先に行い、取り下げ完了後だけ管理画面から削除できる。1440・1920とも横スクロール0。取得元 `rich-menus-v6/szXsT.txt` と同Node画像。',
+    verdictHead: 'bec0d4c6f',
+    route: '/rich-menus', mode: 'viewport', height: 1080,
+    steps: [{ qaOpen: 'szXsT' }],
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
