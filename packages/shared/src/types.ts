@@ -1972,6 +1972,12 @@ export interface AutoReplyDraftInput {
   name: string | null;
   keywordMatchMode: "any" | "all";
   folderId: string | null;
+  /** 管理者だけが読む補足。友だちへ送る本文には含めない。 */
+  internalMemo: string | null;
+  /** 受信してから返信するまで待つ秒数。null は即時。 */
+  replyDelaySeconds: number | null;
+  /** 条件に一致しなかったときの後続処理。 */
+  unmatchedAction: Record<string, unknown> | null;
 }
 
 export interface AutoReplyDraftVersion {

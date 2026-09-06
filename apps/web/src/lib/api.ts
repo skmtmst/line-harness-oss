@@ -4672,7 +4672,7 @@ export const api = {
       }),
     getDraft: (id: string) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`),
-    saveDraft: (id: string, body: AutoReplyDraftInput) =>
+    saveDraft: (id: string, body: AutoReplyDraftInput & { expectedVersion: number }) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>(`/api/auto-replies/${id}/draft`, {
         method: 'PUT',
         body: JSON.stringify(body),
@@ -4683,6 +4683,13 @@ export const api = {
       }),
     conflicts: (id: string) =>
       fetchApi<ApiResponse<{ conflicts: AutoReplyConflict[] }>>(`/api/auto-replies/${id}/conflicts`),
+    summary: (accountId: string) =>
+      fetchApi<ApiResponse<{
+        conflicts: AutoReplyConflict[];
+        conflictCount: number;
+        receiveSourceCounts: Array<{ source: string; count: number }> | null;
+        matchedLast28Days: number | null;
+      }>>(`/api/auto-replies/conflicts?accountId=${encodeURIComponent(accountId)}`),
     testDraft: (id: string, body: {
       friendId: string;
       incomingText: string;
@@ -4734,6 +4741,10 @@ export const api = {
         folderId: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
+        /** 実行台帳で成功を確認できた後続処理の累計。 */
+        actionExecutionCount?: number | null;
+        /** 同じ受信に当たり得る、有効な別ルールの数。 */
+        conflictAttentionCount?: number | null;
         createdAt: string;
         effectiveAccounts?: Array<{
           accountId: string;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
@@ -63,6 +64,14 @@ export interface AutoReplyDraft {
   folderId?: string | null
   /** 一覧・詳細APIが返せる実行集計。取れない場合はnull。 */
   hits?: { period?: number; total?: number } | null
+  /** 下書き保存の楽観ロックに使う現在の版。 */
+  versionNumber?: number
+  matchedLast28Days?: number | null
+  conflictAttentionCount?: number | null
+  receiveSourceCounts?: Array<{ source: string; count: number }> | null
+  internalMemo?: string | null
+  replyDelaySeconds?: number | null
+  unmatchedAction?: Record<string, unknown> | null
 }
 
 /**
@@ -102,6 +111,9 @@ export function toDraft(rule: {
   keywordMatchMode?: string
   folderId?: string | null
   hits?: { period?: number; total?: number } | null
+  internalMemo?: string | null
+  replyDelaySeconds?: number | null
+  unmatchedAction?: Record<string, unknown> | null
 }): AutoReplyDraft {
   return {
     id: rule.id,
@@ -129,6 +141,31 @@ export function toDraft(rule: {
     keywordMatchMode: rule.keywordMatchMode === 'all' ? 'all' : 'any',
     folderId: rule.folderId ?? null,
     hits: rule.hits ?? null,
+    internalMemo: rule.internalMemo ?? null,
+    replyDelaySeconds: rule.replyDelaySeconds ?? null,
+    unmatchedAction: rule.unmatchedAction ?? null,
+  }
+}
+
+/** 版管理APIの下書きを、一覧編集と同じ入力モデルへ変換する。 */
+export function toVersionDraft(
+  version: AutoReplyDraftVersion,
+  details: {
+    isActive: boolean
+    conflictAttentionCount: number | null
+    receiveSourceCounts: Array<{ source: string; count: number }> | null
+  },
+): AutoReplyDraft {
+  return {
+    ...toDraft({
+      id: version.autoReplyId,
+      ...version.settings,
+      isActive: details.isActive,
+    }),
+    versionNumber: version.versionNumber,
+    matchedLast28Days: version.matchedLast28Days ?? null,
+    conflictAttentionCount: details.conflictAttentionCount,
+    receiveSourceCounts: details.receiveSourceCounts,
   }
 }
 
@@ -143,6 +180,10 @@ const MESSAGE_KIND_LABELS: Array<{ key: string; label: string }> = [
   { key: 'sticker', label: 'スタンプ' },
   { key: 'postback', label: 'ボタンのタップ' },
 ]
+
+function messageKindLabel(source: string): string {
+  return MESSAGE_KIND_LABELS.find((item) => item.key === source)?.label ?? source
+}
 
 interface Props {
   draft: AutoReplyDraft
@@ -205,6 +246,13 @@ export default function EditDialog({
     draft.keywordMatchMode ?? 'any',
   )
   const [folderId, setFolderId] = useState(draft.folderId ?? '')
+  const [internalMemo, setInternalMemo] = useState(draft.internalMemo ?? '')
+  const [replyDelaySeconds, setReplyDelaySeconds] = useState(
+    draft.replyDelaySeconds == null ? '0' : String(draft.replyDelaySeconds),
+  )
+  const [unmatchedMode, setUnmatchedMode] = useState<'none' | 'notify_operator'>(
+    draft.unmatchedAction?.type === 'notify_operator' ? 'notify_operator' : 'none',
+  )
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
   const [foldersLoadState, setFoldersLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloadToken, setFoldersReloadToken] = useState(0)
@@ -329,7 +377,24 @@ export default function EditDialog({
           body.responseContent = tpl.messageContent
         }
       }
-      if (draft.id) {
+      if (page && draft.id) {
+        if (!draft.lineAccountId || draft.versionNumber == null) {
+          throw new Error('下書きの版情報を確認できません。画面を読み直してください')
+        }
+        await api.autoReplies.saveDraft(draft.id, {
+          ...body,
+          lineAccountId: draft.lineAccountId,
+          friendConditions: friendConditions as Record<string, unknown> | null,
+          keywords: body.keywords as AutoReplyDraftInput['keywords'],
+          responseHolidayRule: body.responseHolidayRule as 'ignore' | 'include' | 'exclude' | null,
+          internalMemo: internalMemo.trim() || null,
+          replyDelaySeconds: Number(replyDelaySeconds) || null,
+          unmatchedAction: unmatchedMode === 'notify_operator'
+            ? { type: 'notify_operator' }
+            : null,
+          expectedVersion: draft.versionNumber,
+        })
+      } else if (draft.id) {
         await api.autoReplies.update(draft.id, body)
       } else {
         await api.autoReplies.create(body)
@@ -363,6 +428,11 @@ export default function EditDialog({
         : mode === 'inline-flex'
           ? 'リッチメッセージ'
           : 'テキスト'
+  const replyDelaySummary = Number(replyDelaySeconds) > 0
+    ? `${Number(replyDelaySeconds)}秒後に返信`
+    : 'すぐに返信'
+  const unmatchedSummary = unmatchedMode === 'notify_operator' ? '担当者へ引き継ぎ' : '何もしない'
+  const receiveCount = draft.receiveSourceCounts?.reduce((sum, item) => sum + item.count, 0) ?? null
   const moveTo = (next: 'basic' | 'trigger' | 'response') => onStepChange?.(next)
 
   return (
@@ -489,13 +559,14 @@ export default function EditDialog({
               <label className="block">
                 <span className="text-ink-secondary text-xs">社内メモ <span className="text-ink-faint">任意</span></span>
                 <textarea
-                  disabled
                   rows={2}
-                  value=""
-                  placeholder="保存APIが接続されたら入力できます"
-                  className="border-hairline rounded-control mt-1 w-full border bg-canvas-sunken px-3 py-2 text-sm text-ink-faint"
+                  value={internalMemo}
+                  onChange={(event) => setInternalMemo(event.target.value)}
+                  maxLength={1000}
+                  placeholder="運用上の補足を入力"
+                  className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
                 />
-                <span className="text-ink-faint mt-1 block text-xs">友だちには表示されません。現在のAPIは社内メモを保存しません。</span>
+                <span className="text-ink-faint mt-1 block text-xs">友だちには表示されません</span>
               </label>
             </div>
           </section>
@@ -809,13 +880,21 @@ export default function EditDialog({
             </div>}
 
             {page && (
-              <label className="block">
-                <span className="text-ink-faint mb-1 block text-xs">受信元</span>
-                <select disabled className="border-hairline rounded-control w-full border bg-canvas-sunken px-3 py-2 text-sm">
-                  <option>LINE</option>
-                </select>
-                <span className="text-ink-faint mt-1 block text-xs">現在のAPIは受信元の選択を保存しません。</span>
-              </label>
+              <div className="block">
+                <span className="text-ink-faint mb-1 block text-xs">過去28日の受信種別</span>
+                <div className="border-hairline rounded-control flex min-h-10 flex-wrap items-center gap-2 border px-3 py-2 text-sm">
+                  {draft.receiveSourceCounts == null
+                    ? <span className="text-ink-faint">—（未取得）</span>
+                    : draft.receiveSourceCounts.length === 0
+                      ? <span className="text-ink-faint">受信なし</span>
+                      : draft.receiveSourceCounts.map((item) => (
+                        <span key={item.source} className="bg-canvas-sunken rounded-pill px-2 py-1 text-xs">
+                          {messageKindLabel(item.source)} {item.count.toLocaleString()}件
+                        </span>
+                      ))}
+                </div>
+                <span className="text-ink-faint mt-1 block text-xs">実際の受信履歴から集計しています。</span>
+              </div>
             )}
 
             {!page && <label className="flex cursor-pointer items-start gap-2">
@@ -1073,8 +1152,17 @@ export default function EditDialog({
             <div className="border-hairline grid gap-3 rounded-card border p-4 md:grid-cols-2">
               <label className="block">
                 <span className="text-ink-secondary text-xs">返信を待つ時間</span>
-                <span className="text-ink-faint mt-1 block text-sm">すぐに返信</span>
-                <span className="text-ink-faint mt-1 block text-xs">現在のAPIは遅延秒数を保存しません。</span>
+                <select
+                  value={replyDelaySeconds}
+                  onChange={(event) => setReplyDelaySeconds(event.target.value)}
+                  className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
+                >
+                  <option value="0">すぐに返信</option>
+                  <option value="10">10秒後</option>
+                  <option value="30">30秒後</option>
+                  <option value="60">1分後</option>
+                  <option value="300">5分後</option>
+                </select>
               </label>
               <label className="block">
                 <span className="text-ink-secondary text-xs">同じ人への連続返信</span>
@@ -1093,8 +1181,14 @@ export default function EditDialog({
               </label>
               <div className="md:col-span-2">
                 <p className="text-ink-secondary text-xs">条件に当たらなかった場合</p>
-                <p className="text-ink-faint mt-1 text-sm">何もしない</p>
-                <p className="text-ink-faint mt-1 text-xs">現在のAPIは未一致時の別返信を保存しません。</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="button" variant={unmatchedMode === 'notify_operator' ? 'primary' : undefined} onClick={() => setUnmatchedMode('notify_operator')}>
+                    担当者へ引き継ぐ
+                  </Button>
+                  <Button type="button" variant={unmatchedMode === 'none' ? 'primary' : undefined} onClick={() => setUnmatchedMode('none')}>
+                    何もしない
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -1149,8 +1243,8 @@ export default function EditDialog({
               {step === 'basic' && (
                 <>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">優先順位</dt><dd className="text-ink font-medium">{priority || '未入力'}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-medium">{draft.hits?.period == null ? '—（未取得）' : `${draft.hits.period}件`}</dd></div>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-medium">競合確認で表示</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-medium">{draft.conflictAttentionCount == null ? '—（未取得）' : draft.conflictAttentionCount === 0 ? 'なし' : `${draft.conflictAttentionCount}件`}</dd></div>
                 </>
               )}
               {step === 'trigger' && (
@@ -1158,6 +1252,7 @@ export default function EditDialog({
                   <div className="py-3"><dt className="text-ink-faint">受信メッセージ</dt><dd className="text-ink mt-1 font-medium">{conditionSummary}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">曜日・時間</dt><dd className="text-ink font-medium">{timeSummary}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">相手</dt><dd className="text-ink font-medium">{friendConditions ? '条件あり' : 'すべての友だち'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">28日間の一致</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
                 </>
               )}
               {step === 'response' && (
@@ -1165,6 +1260,8 @@ export default function EditDialog({
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">返信</dt><dd className="text-ink font-medium">{responseSummary}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">実行すること</dt><dd className="text-ink font-medium">{actions.length}件</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">連続返信</dt><dd className="text-ink font-medium">{cooldown ? `${cooldown}分あける` : '制限なし'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">待ち時間</dt><dd className="text-ink font-medium">{replyDelaySummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">不一致時</dt><dd className="text-ink font-medium">{unmatchedSummary}</dd></div>
                 </>
               )}
             </dl>
@@ -1183,7 +1280,8 @@ export default function EditDialog({
             <p className="text-ink font-semibold">{step === 'trigger' ? '過去28日の受信' : '動作の確認'}</p>
             {step === 'trigger' ? (
               <>
-                <p className="text-ink-faint mt-2 leading-relaxed">条件に当たった受信件数は、現在のAPIでは取得できません。</p>
+                <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{draft.matchedLast28Days == null ? '—' : `${draft.matchedLast28Days.toLocaleString()}件`}</p>
+                <p className="text-ink-faint mt-1 leading-relaxed">{receiveCount == null ? '受信総数は未取得です。' : `受信 ${receiveCount.toLocaleString()}件の実測集計です。`}</p>
                 <p className="text-ink-faint mt-3 leading-relaxed">利用できる条件：タグ・友だち情報・シナリオ・予約・流入経路・対応状況など</p>
               </>
             ) : (
