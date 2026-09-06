@@ -150,6 +150,8 @@ describe('staging operational verification safety', () => {
     expect(script).toContain("DELETE FROM admin_sessions WHERE token_hash = ?");
     expect(script).toContain("DELETE FROM notification_rules WHERE id = ?");
     expect(script).toContain("DELETE FROM admin_sessions WHERE expires_at <= ?");
+    expect(script).toContain("const SYNTHETIC_FRIEND_PATTERN = 'verify-b88-line-%'");
+    expect(script).not.toContain('verify-b88-line-${runId}-%');
     expect(script).toContain("lineMessagesSent: 0");
     expect(script).not.toMatch(/console\.(?:log|error)\([^\n]*(?:sessionToken|apiToken|staff_id|line_account_id)/);
   });

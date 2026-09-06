@@ -15,6 +15,7 @@ const CONFIG_PATH = 'apps/worker/wrangler.staging.toml';
 const SESSION_TTL_MINUTES = 15;
 const D1_MAX_ATTEMPTS = 3;
 const DEFAULT_TENANT_ID = '00000000-0000-4000-8000-000000000001';
+const SYNTHETIC_FRIEND_PATTERN = 'verify-b88-line-%';
 
 type D1Envelope<T> = {
   success: boolean;
@@ -320,7 +321,8 @@ async function main(): Promise<void> {
       `DELETE FROM scenarios WHERE id LIKE 'verify-b88-scenario-%'`,
     );
     await query(
-      `DELETE FROM friends WHERE line_user_id LIKE 'verify-b88-line-%'`,
+      'DELETE FROM friends WHERE line_user_id LIKE ?',
+      [SYNTHETIC_FRIEND_PATTERN],
     );
     await query('DELETE FROM admin_sessions WHERE expires_at <= ?', [new Date().toISOString()]);
 
@@ -453,7 +455,7 @@ async function main(): Promise<void> {
       { name: 'admin-session', run: () => query('DELETE FROM admin_sessions WHERE token_hash = ?', [sessionHash]) },
       { name: 'enrollments', run: () => query('DELETE FROM friend_scenarios WHERE scenario_id = ?', [`verify-b88-scenario-${runId}`]) },
       { name: 'scenario', run: () => query('DELETE FROM scenarios WHERE id = ?', [`verify-b88-scenario-${runId}`]) },
-      { name: 'friends', run: () => query('DELETE FROM friends WHERE line_user_id LIKE ?', [`verify-b88-line-${runId}-%`]) },
+      { name: 'friends', run: () => query('DELETE FROM friends WHERE line_user_id LIKE ?', [SYNTHETIC_FRIEND_PATTERN]) },
     ];
     for (const cleanup of cleanups) {
       try {
@@ -464,7 +466,7 @@ async function main(): Promise<void> {
           try {
             const references = await findSyntheticFriendReferences(
               query,
-              `verify-b88-line-${runId}-%`,
+              SYNTHETIC_FRIEND_PATTERN,
             );
             cleanupFailures.push(
               `friends[references=${references.join(',') || 'none'}; reason=${reason}]`,
@@ -488,7 +490,7 @@ async function main(): Promise<void> {
     const leftovers = await countVerificationLeftovers(query, {
       sessionHash,
       scenarioId: `verify-b88-scenario-${runId}`,
-      lineUserIdPattern: `verify-b88-line-${runId}-%`,
+      lineUserIdPattern: SYNTHETIC_FRIEND_PATTERN,
       notificationRuleId,
     });
     leftoverCount = leftovers.total;
