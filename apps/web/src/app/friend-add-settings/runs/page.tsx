@@ -11,6 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -75,6 +76,7 @@ export default function FriendAddRunsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [stopBusy, setStopBusy] = useState(false)
+  const [stopDialogOpen, setStopDialogOpen] = useState(false)
   const [stopMessage, setStopMessage] = useState('')
   const requestSequence = useRef(0)
   const cursor = cursorStack[cursorStack.length - 1]
@@ -140,7 +142,6 @@ export default function FriendAddRunsPage() {
 
   const stopDelivery = async () => {
     if (!selectedAccountId || !activeRuleId || stopBusy) return
-    if (!window.confirm('この配信を一時停止しますか？')) return
     setStopBusy(true)
     setStopMessage('')
     try {
@@ -148,6 +149,7 @@ export default function FriendAddRunsPage() {
       if (!detail.success) throw new Error('rule detail missing')
       const response = await api.friendAddRules.stop(selectedAccountId, activeRuleId, detail.data.rule.version)
       setStopMessage(response.success ? '配信を一時停止しました。' : '配信を停止できませんでした。')
+      if (response.success) setStopDialogOpen(false)
     } catch {
       setStopMessage('配信を停止できませんでした。状態を読み直してください。')
     } finally {
@@ -365,7 +367,19 @@ export default function FriendAddRunsPage() {
         </aside>
       </div>
 
-      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => void stopDelivery()}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button><Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button></>} />
+      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => setStopDialogOpen(true)}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button><Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button></>} />
+      <ConfirmDialog
+        open={stopDialogOpen}
+        title="友だち追加時の配信を一時停止しますか？"
+        description="停止後は、新しく友だち追加された人へこの案内が送られません。設定は残るため、あとで再開できます。"
+        confirmLabel="一時停止する"
+        busy={stopBusy}
+        error={stopMessage.includes('できませんでした') ? stopMessage : undefined}
+        onCancel={() => {
+          if (!stopBusy) setStopDialogOpen(false)
+        }}
+        onConfirm={() => void stopDelivery()}
+      />
     </div>
   )
 }

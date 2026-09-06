@@ -65,6 +65,8 @@ function FriendAddSettingsList() {
   const [search, setSearch] = useState('')
   const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
   const [folderBusy, setFolderBusy] = useState(false)
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [folderName, setFolderName] = useState('')
   const folderKey = useRef(crypto.randomUUID())
   const cursor = cursorStack[cursorStack.length - 1]
 
@@ -116,7 +118,7 @@ function FriendAddSettingsList() {
 
   const createFolder = async () => {
     if (!selectedAccountId || folderBusy) return
-    const name = window.prompt('追加するフォルダ名を入力してください')?.trim()
+    const name = folderName.trim()
     if (!name) return
     setFolderBusy(true)
     setError('')
@@ -127,6 +129,8 @@ function FriendAddSettingsList() {
         return
       }
       folderKey.current = crypto.randomUUID()
+      setFolderName('')
+      setFolderDialogOpen(false)
       await load()
     } catch {
       setError('フォルダを追加できませんでした。通信を確認して、もう一度お試しください。')
@@ -210,7 +214,7 @@ function FriendAddSettingsList() {
         <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
           <ListToolbar searchPlaceholder="設定名・流入リンクで検索" searchValue={search} onSearchChange={setSearch}>
-            <Button variant="secondary" onClick={() => void createFolder()} disabled={folderBusy}><Plus size={14} />フォルダを追加</Button>
+            <Button variant="secondary" onClick={() => setFolderDialogOpen(true)} disabled={folderBusy}><Plus size={14} />フォルダを追加</Button>
             <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
           </ListToolbar>
           {!data || data.items.length === 0 ? (
@@ -249,6 +253,29 @@ function FriendAddSettingsList() {
       </div>
 
       <ConfirmDialog open={Boolean(deleting)} designNode="Q3qP1r" title={`「${deleting?.name ?? ''}」を削除しますか？`} description="削除すると、このリンクから追加された人には「経路が分からなかった人」の共通あいさつが動きます。過去の実行履歴は監査記録として残り、この操作は取り消せません。" confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError} titleIcon={<Trash2 size={20} />} onCancel={closeDelete} onConfirm={() => void archiveRule()} />
+      <ConfirmDialog
+        open={folderDialogOpen}
+        title="流入の束を追加"
+        description="設定を整理するフォルダ名を入力してください。"
+        confirmLabel="追加する"
+        busy={folderBusy}
+        onCancel={() => {
+          setFolderDialogOpen(false)
+          setFolderName('')
+        }}
+        onConfirm={folderName.trim() ? () => void createFolder() : undefined}
+      >
+        <label className="grid gap-2 text-sm font-bold">
+          フォルダ名
+          <input
+            autoFocus
+            className="rounded-control border-hairline bg-canvas border px-3 py-2 font-normal"
+            value={folderName}
+            onChange={(event) => setFolderName(event.target.value)}
+            maxLength={50}
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   )
 }
