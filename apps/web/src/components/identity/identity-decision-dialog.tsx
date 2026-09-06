@@ -68,7 +68,7 @@ export default function IdentityDecisionDialog({
     const profiles = 'profileCandidates' in candidate ? candidate.profileCandidates : []
     setProfileSelections(Object.fromEntries(profiles.flatMap((field) => field.options[0] ? [[field.fieldKey, field.options[0].sourceFriendId]] : [])))
     setConsents([false, false, false])
-  }, [open, candidate.id])
+  }, [open, candidate])
 
   const ec = candidate.kind === 'ec_member'
   const canReprocess = ec && decision === 'linked'
