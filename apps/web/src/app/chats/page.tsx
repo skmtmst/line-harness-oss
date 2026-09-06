@@ -1324,7 +1324,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 ))}
               </div>
               {savedViews.some((view) => typeof view.matchCount !== 'number') ? (
-                <p className="text-ink-faint mt-2 text-[11px] leading-relaxed">
+                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
                   該当件数は、保存した条件ごとの集計が接続されると表示されます。「—件」は0件ではありません。
                 </p>
               ) : null}

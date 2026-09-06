@@ -104,7 +104,7 @@ function OperatorMark({ option }: { option: OperatorOption }) {
   return (
     <span
       aria-hidden="true"
-      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold"
+      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold"
     >
       {mark}
     </span>
@@ -210,7 +210,7 @@ export function OperatorDropdown({
           {unreadUnavailable ? (
             <div className="border-warning bg-warning-bg border-t px-3 py-3" role="status">
               <p className="text-warning text-xs font-bold">未読の数をいま数えられません</p>
-              <p className="text-ink-secondary mt-1 text-[11px] leading-relaxed">
+              <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
                 担当者は選べます。数だけが取れていないので「—」にしています。0件とは違います。少し待ってからもう一度開いてください。
               </p>
             </div>
