@@ -8,6 +8,12 @@ class MockCommonVarVersionConflictError extends Error {
   }
 }
 
+class MockMediaVersionConflictError extends Error {
+  constructor(readonly currentVersionNo: number) {
+    super('conflict');
+  }
+}
+
 const mocks = {
   getMedia: vi.fn(),
   getMediaById: vi.fn(),
@@ -19,6 +25,14 @@ const mocks = {
   getMediaDeleteImpact: vi.fn(),
   getMediaReplacementPlan: vi.fn(),
   applyMediaReplacementPlan: vi.fn(),
+  getMediaStorageQuota: vi.fn(),
+  createMediaUploadSession: vi.fn(),
+  getMediaUploadSession: vi.fn(),
+  failMediaUploadSession: vi.fn(),
+  verifyMediaUploadSession: vi.fn(),
+  completeNewMediaUpload: vi.fn(),
+  createMediaVersionFromUpload: vi.fn(),
+  MediaVersionConflictError: MockMediaVersionConflictError,
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
   getCommonVarUsageSummaries: vi.fn(),
@@ -46,6 +60,8 @@ const accessMocks = { canAccessAllLineAccounts: vi.fn(async () => true) };
 vi.mock('../services/account-access.js', () => accessMocks);
 const scanMocks = { scanSingleMediaUsage: vi.fn() };
 vi.mock('../services/media-usage-scan.js', () => scanMocks);
+const signingMocks = { createR2PresignedPutUrl: vi.fn() };
+vi.mock('../services/r2-presigned-upload.js', () => signingMocks);
 
 const { contents } = await import('./contents.js');
 
@@ -53,23 +69,34 @@ const { contents } = await import('./contents.js');
 // 実装の .catch() が落ちて本物と違う結果になる。
 const put = vi.fn().mockResolvedValue(undefined);
 const del = vi.fn().mockResolvedValue(undefined);
+const head = vi.fn();
+const get = vi.fn();
 const env = {
   DB: {} as D1Database,
-  IMAGES: { put, delete: del } as unknown as R2Bucket,
+  IMAGES: { put, delete: del, head, get } as unknown as R2Bucket,
   WORKER_URL: 'https://api.example.com',
+  CF_ACCOUNT_ID: 'cf-account',
+  MEDIA_R2_ACCESS_KEY_ID: 'access-key',
+  MEDIA_R2_SECRET_ACCESS_KEY: 'secret-key',
+  MEDIA_R2_BUCKET_NAME: 'media-bucket',
 };
 
-function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
+function makeApp(role: 'owner' | 'admin' | 'staff' | null = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
+    if (role) c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
     return next();
   });
   app.route('/', contents);
   return app;
 }
 
-function req(path: string, method: string, body?: unknown, role: 'owner' | 'admin' | 'staff' = 'owner') {
+function req(
+  path: string,
+  method: string,
+  body?: unknown,
+  role: 'owner' | 'admin' | 'staff' | null = 'owner',
+) {
   return makeApp(role).fetch(
     new Request(`https://example.com${path}`, {
       method,
@@ -96,6 +123,35 @@ const MEDIA = {
   uploaded_by: 'u-1',
   created_at: '2026-08-16',
   usage_count: 3,
+};
+
+const QUOTA = {
+  usageBytes: 100,
+  reservedBytes: 0,
+  limitBytes: 1000,
+  remainingBytes: 900,
+  usageRate: 0.1,
+  state: 'normal',
+};
+
+const UPLOAD_SESSION = {
+  id: 'upload-1',
+  line_account_id: 'account-1',
+  target_media_id: null,
+  result_media_id: null,
+  folder_id: null,
+  filename: 'a.png',
+  kind: 'image',
+  expected_mime: 'image/png',
+  expected_size: 8,
+  r2_key: 'media/account-1/a.png',
+  status: 'pending',
+  failure_code: null,
+  etag: null,
+  expires_at: '2099-01-01T00:00:00.000Z',
+  created_by: 'u-1',
+  created_at: '2026-09-07T00:00:00.000Z',
+  completed_at: null,
 };
 
 const DELETE_IMPACT = {
@@ -186,6 +242,20 @@ beforeEach(() => {
   vi.clearAllMocks();
   put.mockResolvedValue(undefined);
   del.mockResolvedValue(undefined);
+  head.mockResolvedValue({
+    size: 8,
+    etag: 'etag-1',
+    httpMetadata: { contentType: 'image/png' },
+    customMetadata: {
+      'line-account-id': 'account-1',
+      'upload-session-id': 'upload-1',
+    },
+  });
+  get.mockResolvedValue({
+    arrayBuffer: async () => Uint8Array.from(
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+    ).buffer,
+  });
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   scanMocks.scanSingleMediaUsage.mockResolvedValue({ scanned: 1, matched: 0, pruned: 0 });
   mocks.getMedia.mockResolvedValue([MEDIA]);
@@ -197,6 +267,27 @@ beforeEach(() => {
   mocks.getMediaDeleteImpact.mockResolvedValue(DELETE_IMPACT);
   mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
   mocks.applyMediaReplacementPlan.mockResolvedValue(1);
+  mocks.getMediaStorageQuota.mockResolvedValue(QUOTA);
+  mocks.createMediaUploadSession.mockResolvedValue(UPLOAD_SESSION);
+  mocks.getMediaUploadSession.mockResolvedValue(UPLOAD_SESSION);
+  mocks.verifyMediaUploadSession.mockResolvedValue({
+    ...UPLOAD_SESSION, status: 'verified', etag: 'etag-1',
+  });
+  mocks.completeNewMediaUpload.mockResolvedValue(MEDIA);
+  mocks.createMediaVersionFromUpload.mockResolvedValue({
+    id: 'version-2', media_id: 'md-1', version_no: 2,
+    mime_type: 'image/png', size_bytes: 8, change_reason: 'ロゴを更新',
+    created_at: '2026-09-07T00:00:00.000Z',
+  });
+  signingMocks.createR2PresignedPutUrl.mockResolvedValue({
+    url: 'https://r2.example.com/upload?signature=hidden',
+    headers: {
+      'Content-Type': 'image/png',
+      'x-amz-meta-line-account-id': 'account-1',
+      'x-amz-meta-upload-session-id': 'upload-1',
+    },
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
   mocks.getCommonVars.mockResolvedValue([VAR]);
   mocks.getCommonVarUsageSummaries.mockResolvedValue(new Map([['shop_hours', {
     total: 3,
@@ -357,6 +448,129 @@ describe('メディアのアップロード', () => {
     expect(res.status).toBe(500);
     expect(put).toHaveBeenCalled();
     expect(del).toHaveBeenCalledWith(expect.stringMatching(/^media\/.+\.png$/));
+  });
+});
+
+describe('メディアの容量・直接アップロード・版', () => {
+  it.each([
+    ['normal', 0.5],
+    ['notice', 0.8],
+    ['warning', 0.9],
+    ['full', 1],
+  ])('容量の%s状態を固定値にせず返す', async (state, usageRate) => {
+    mocks.getMediaStorageQuota.mockResolvedValueOnce({ ...QUOTA, state, usageRate });
+    const res = await req('/api/media/quota?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { state, usageRate, limitBytes: 1000 } });
+  });
+
+  it('最大20件のR2直接PUT用セッションを作る', async () => {
+    mocks.getMediaStorageQuota.mockResolvedValueOnce({
+      ...QUOTA, limitBytes: 1024 * 1024 * 1024, remainingBytes: 1024 * 1024 * 1024,
+    });
+    const res = await req('/api/media/upload-sessions', 'POST', {
+      accountId: 'account-1',
+      files: [{ filename: 'movie.mp4', mimeType: 'video/mp4', sizeBytes: 200 * 1024 * 1024 }],
+    }, 'staff');
+    expect(res.status).toBe(201);
+    expect(mocks.createMediaUploadSession).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      lineAccountId: 'account-1', kind: 'video', sizeBytes: 200 * 1024 * 1024,
+    }));
+    expect(await res.json()).toMatchObject({
+      data: { sessions: [{ method: 'PUT', uploadUrl: expect.stringContaining('https://') }] },
+    });
+  });
+
+  it('容量超過はR2セッションを作らず409にする', async () => {
+    mocks.getMediaStorageQuota.mockResolvedValueOnce({ ...QUOTA, remainingBytes: 7 });
+    const res = await req('/api/media/upload-sessions', 'POST', {
+      accountId: 'account-1',
+      files: [{ filename: 'a.png', mimeType: 'image/png', sizeBytes: 8 }],
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'media_quota_exceeded' });
+    expect(mocks.createMediaUploadSession).not.toHaveBeenCalled();
+  });
+
+  it('担当者情報がなければアップロードと版追加を403で止める', async () => {
+    expect((await req('/api/media/upload-sessions', 'POST', {
+      accountId: 'account-1',
+      files: [{ filename: 'a.png', mimeType: 'image/png', sizeBytes: 8 }],
+    }, null)).status).toBe(403);
+    expect((await req('/api/media/md-1/versions', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1', expectedVersionNo: 1,
+      changeReason: '更新',
+    }, null)).status).toBe(403);
+  });
+
+  it('R2実体をHEAD・メタデータ・シグネチャで確認して新規登録する', async () => {
+    const res = await req('/api/media/upload-sessions/upload-1/complete', 'POST', {
+      accountId: 'account-1', etag: '"etag-1"',
+    });
+    expect(res.status).toBe(201);
+    expect(head).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key);
+    expect(get).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key, { range: { offset: 0, length: 16 } });
+    expect(mocks.verifyMediaUploadSession).toHaveBeenCalledWith(
+      env.DB, 'upload-1', 'account-1', 'etag-1',
+    );
+    expect(mocks.completeNewMediaUpload).toHaveBeenCalled();
+  });
+
+  it('R2実体がセッションと違えば削除して409にする', async () => {
+    head.mockResolvedValueOnce({
+      size: 9,
+      etag: 'etag-1',
+      httpMetadata: { contentType: 'image/png' },
+      customMetadata: {
+        'line-account-id': 'account-1',
+        'upload-session-id': 'upload-1',
+      },
+    });
+    const res = await req('/api/media/upload-sessions/upload-1/complete', 'POST', {
+      accountId: 'account-1', etag: 'etag-1',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'media_upload_mismatch' });
+    expect(mocks.failMediaUploadSession).toHaveBeenCalledWith(
+      env.DB, 'upload-1', 'account-1', 'object_mismatch',
+    );
+    expect(del).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key);
+  });
+
+  it('既存メディア用は確認済みで止め、版APIで不変の次版を作る', async () => {
+    mocks.getMediaUploadSession.mockResolvedValueOnce({
+      ...UPLOAD_SESSION, target_media_id: 'md-1',
+    });
+    mocks.verifyMediaUploadSession.mockResolvedValueOnce({
+      ...UPLOAD_SESSION, target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+    });
+    const complete = await req('/api/media/upload-sessions/upload-1/complete', 'POST', {
+      accountId: 'account-1', etag: 'etag-1',
+    });
+    expect(complete.status).toBe(200);
+    expect(await complete.json()).toMatchObject({
+      data: { status: 'verified', targetMediaId: 'md-1' },
+    });
+    expect(mocks.completeNewMediaUpload).not.toHaveBeenCalled();
+
+    const version = await req('/api/media/md-1/versions', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1', expectedVersionNo: 1,
+      changeReason: 'ロゴを更新',
+    });
+    expect(version.status).toBe(201);
+    expect(await version.json()).toMatchObject({ data: { mediaId: 'md-1', versionNo: 2 } });
+  });
+
+  it('版が先に進んでいれば現在版を添えて409にする', async () => {
+    mocks.createMediaVersionFromUpload.mockRejectedValueOnce(new MockMediaVersionConflictError(3));
+    const res = await req('/api/media/md-1/versions', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1', expectedVersionNo: 1,
+      changeReason: 'ロゴを更新',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'media_version_conflict', currentVersionNo: 3,
+    });
   });
 });
 
