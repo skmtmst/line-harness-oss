@@ -1,7 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createElement, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import {
@@ -27,7 +27,6 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { formatAnalyticsDateTime } from './analytics-time'
 import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
-import AnalyticsExportButton from './analytics-export-button'
 
 const TABS = [
   { key: 'friends', label: '友だちの増減' },
@@ -60,6 +59,13 @@ function AnalyticsNotice({ children }: { children: ReactNode }) {
     <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm leading-relaxed text-ink-secondary">
       {children}
     </div>
+  )
+}
+
+function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return createElement(
+    Button,
+    { onClick, disabled, variant: 'secondary', children: ['CSV', 'で書き出す'].join('') },
   )
 }
 

@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const EXPORT_BUTTON = readFileSync(new URL('./analytics-export-button.tsx', import.meta.url), 'utf8')
 
 describe('V6 機能20の画面比較で直した契約', () => {
   it('概要4画面に設計の判断材料を残す', () => {
@@ -30,7 +29,7 @@ describe('V6 機能20の画面比較で直した契約', () => {
       'URL・配信名・リンク名で探す',
       '分析名・作った人で探す',
     ]) expect(PAGE).toContain(text)
-    expect(EXPORT_BUTTON).toContain("['CSV', 'で書き出す'].join('')")
+    expect(PAGE).toContain("['CSV', 'で書き出す'].join('')")
   })
 
   it('APIが16.9と返すクリック率を1690%にしない', () => {
