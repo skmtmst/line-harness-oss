@@ -7,6 +7,7 @@ import {
   countTemplateTextCharacters,
   type DeliveryMode,
   type Scenario,
+  type ScenarioStep,
   type Tag,
   type Template,
 } from '@line-crm/shared'
@@ -65,7 +66,8 @@ function FirstStepContent() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
 
-  const [scenario, setScenario] = useState<Scenario | null>(null)
+  const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)
+  const [existingStepId, setExistingStepId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [body, setBody] = useState('')
   /** 差し込みをカーソルの位置に入れるために、入力欄そのものを持つ。 */
@@ -113,6 +115,35 @@ function FirstStepContent() {
         return
       }
       setScenario(res.data)
+      const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
+      if (first) {
+        // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
+        // 空のフォームへ戻すと、保存時に同じ「1通目」が増えてしまう。
+        setExistingStepId(first.id)
+        setOffsetDays(first.offsetDays ?? Math.floor(first.delayMinutes / 1440))
+        setOffsetHours(
+          res.data.deliveryMode === 'relative'
+            ? Math.floor((first.delayMinutes % 1440) / 60)
+            : Math.floor((first.offsetMinutes ?? 0) / 60),
+        )
+        setDeliveryTime(first.deliveryTime ?? '10:00')
+        setTargetCondition((first.targetCondition as SegmentCondition | null) ?? null)
+        setTargetMode(first.targetCondition ? 'advanced' : 'all')
+        setQuestion((first.question as ScenarioQuestion | null) ?? emptyQuestion())
+
+        if (first.templateId) {
+          setContentMode('template')
+          setTemplateId(first.templateId)
+        } else {
+          setContentMode('compose')
+          if (first.question) {
+            setKind('question')
+          } else {
+            setKind(first.messageType as StepMessageKind)
+            if (first.messageType === 'text') setBody(first.messageContent)
+          }
+        }
+      }
     })
     void api.tags.list().then(res => {
       if (res.success) setTags(res.data)
@@ -220,13 +251,16 @@ function FirstStepContent() {
                     messageContent: serializeMessageKind(kind as MessageKind, kindState) ?? '',
                   }
 
-      const res = await api.scenarios.addStep(id, {
+      const stepPayload = {
         stepOrder: 1,
         ...payload,
         ...schedule,
         targetCondition: stepTargetCondition(),
         question: contentMode === 'compose' && kind === 'question' ? question : null,
-      })
+      }
+      const res = existingStepId
+        ? await api.scenarios.updateStep(id, existingStepId, stepPayload)
+        : await api.scenarios.addStep(id, stepPayload)
       if (!res.success) {
         setError(res.error)
         setSaving(false)

@@ -11,6 +11,35 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 
+type PublishedWebinar = Webinar & {
+  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
+  publicationStartsAt?: string | null
+  publicationEndsAt?: string | null
+}
+
+function publicationWindow(webinar: PublishedWebinar): string {
+  if (webinar.publicationState === 'always') return '常時公開'
+  if (webinar.publicationState === 'ended') return '公開終了'
+  if (webinar.publicationState === 'unset') return '未設定'
+  const format = (value: string | null | undefined, withTime = false) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+    const dateText = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
+    if (!withTime) return dateText
+    const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
+    return `${dateText} ${time}`
+  }
+  if (webinar.publicationState === 'scheduled') return format(webinar.publicationStartsAt, true) ?? '—'
+  if (webinar.publicationState === 'period') {
+    const start = format(webinar.publicationStartsAt)
+    const end = format(webinar.publicationEndsAt)
+    if (start && end) return `${start}〜${end}`
+  }
+  const dailyTime = webinar.schedule.find((rule) => rule.type === 'daily')?.time
+  return dailyTime ? `毎日 ${dailyTime}` : '—（公開期間は未接続）'
+}
+
 function PublishedWebinarContent() {
   usePageTitle('ウェビナー・公開完了')
   const id = useSearchParams().get('id')
@@ -74,54 +103,27 @@ function PublishedWebinarContent() {
   const publicUrl = webinarAccount?.liffId
     ? `https://liff.line.me/${encodeURIComponent(webinarAccount.liffId)}/webinar/${encodeURIComponent(webinar.slug)}`
     : null
+  const publicPeriod = publicationWindow(webinar as PublishedWebinar)
 
   return (
-    <div data-design-node="TimXl" className="space-y-5 pb-10">
-      <section className="rounded-card border border-hairline bg-canvas px-6 py-8 text-center shadow-sm">
-        <CheckCircle2 className="mx-auto text-accent" size={42} aria-hidden="true" />
-        <p className="mt-3 text-xl font-bold text-ink">公開しました</p>
-        <p className="mt-2 text-sm text-ink-secondary">{webinar.title}</p>
-      </section>
-
-      <section className="grid gap-3 rounded-card border border-hairline bg-canvas p-5 sm:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold text-ink-faint">公開状態</p>
-          <p className="mt-1 font-bold text-ink">公開中</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-ink-faint">公開URL</p>
-          <p className="mt-1 truncate font-mono text-sm text-ink" title={`/webinar/${webinar.slug}`}>
-            /webinar/{webinar.slug}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-ink-faint">動画の長さ</p>
-          <p className="mt-1 font-bold text-ink">{Math.ceil(webinar.durationSeconds / 60)}分</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-ink-faint">配信枠</p>
-          <p className="mt-1 font-bold text-ink">{webinar.schedule.length}件</p>
-        </div>
-      </section>
-
-      <NoteBar>
-        公開後の申込数や視聴結果は、このウェビナーの編集画面にある「概要・分析」で確認できます。
-      </NoteBar>
-
-      {!publicUrl ? (
-        <NoteBar>
-          所属するLINE公式アカウントのLIFF IDを確認できないため、公開ページのボタンは出していません。
-        </NoteBar>
-      ) : null}
-
-      <div className="flex flex-wrap justify-center gap-3">
-        {publicUrl ? (
-          <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button>
-        ) : null}
-        <Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>設定と結果を確認</Button>
-        <Button href="/webinars">ウェビナー一覧へ</Button>
+    <main data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3"><a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a><Button href="/webinars">ウェビナー一覧へ</Button></div>
+      <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-full">✓</span><span><span className="text-accent block text-[10px]">STEP {index + 1}</span>{label}</span></li>)}</ol>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <section className="border-hairline bg-canvas min-h-[720px] rounded-card border p-8 shadow-card">
+          <div className="text-center"><CheckCircle2 className="mx-auto text-accent" size={48} aria-hidden="true" /><h2 className="text-ink mt-5 text-2xl font-bold">公開しました</h2><p className="text-ink-secondary mt-3 text-sm">申込・配信条件に合う友だちが、このウェビナーを視聴できます。</p></div>
+          <dl className="border-hairline divide-hairline mx-auto mt-6 max-w-3xl divide-y rounded-control border">{[
+            ['ウェビナー名', webinar.title], ['動画・公開', '申込者向け'], ['対象', publicPeriod], ['公開URL', `/webinar/${webinar.slug}`], ['状態', '稼働中'],
+          ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-[70%] truncate text-sm font-bold" title={value}>{value}</dd></div>)}</dl>
+          <div className="mx-auto mt-4 max-w-3xl space-y-3"><NoteBar>申込通知・動画配信・リマインド・相談予約の失敗は、運用者通知と要対応で確認できます。</NoteBar>{!publicUrl ? <NoteBar>所属するLINE公式アカウントのLIFF IDを確認できないため、公開ページのボタンは出していません。</NoteBar> : null}</div>
+          <div className="mt-5 flex flex-wrap justify-center gap-3"><Button href="/webinars">ウェビナー一覧へ</Button><Button variant="primary" href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=participants`}>参加状況を確認</Button>{publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}</div>
+        </section>
+        <aside className="space-y-4">
+          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2"><Button disabled>公開を一時停止</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button><Button disabled>通知をテスト</Button><Button disabled>ウェビナーを複製して作成</Button></div></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">監視中</h2><p className="text-ink-faint mt-1 text-xs">問題が起きた場合だけ表示します。</p><div className="mt-4 space-y-3">{['通知失敗', '申込重複', '視聴履歴の取得失敗', '個別相談連携失敗'].map((label) => <div key={label} className="text-ink-secondary text-sm">{label}<span className="text-ink-faint ml-2">—</span></div>)}</div></section>
+        </aside>
       </div>
-    </div>
+    </main>
   )
 }
 

@@ -29,9 +29,16 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('保存した条件は準備中です')
   })
 
-  it('保存できないフォルダ操作を出さない', () => {
-    expect(PAGE).not.toContain('フォルダは準備中です')
-    expect(PAGE).not.toContain('フォルダを追加')
+  it('フォルダ構造を示し、保存契約が来るまでは操作できるように見せない', () => {
+    expect(PAGE).toContain('const WEBINAR_FOLDERS')
+    expect(PAGE).toContain('aria-label="ウェビナーのフォルダ"')
+    expect(PAGE).toContain('<Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>')
+    expect(PAGE).toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
+    expect(PAGE).toContain("api.folders.list('webinar')")
+    expect(PAGE).toContain('measuredFolder?.count')
+    expect(PAGE).toContain('measuredCount(w.registrationCount)')
+    expect(PAGE).toContain('measuredCount(w.viewerCount)')
+    expect(PAGE).toContain('publicationSummary(w)')
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
@@ -81,5 +88,16 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(EDIT).toContain('data-design-node="Xjk8q"')
     expect(EDIT).toContain('data-design-node="Q8sHa"')
     expect(EDIT).toContain('data-design-node="yxyzQ"')
+  })
+
+  it('残り12画面を実ノードと直接開ける面に分ける', () => {
+    for (const node of ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ']) {
+      expect(EDIT).toContain(`data-design-node="${node}"`)
+    }
+    expect(PAGE).toContain('data-design-node="ZC13r"')
+    expect(PAGE).toContain('data-design-node="LKuAQ"')
+    for (const pane of ['video', 'cta', 'notifications', 'actions', 'preview', 'review', 'participants', 'analytics']) {
+      expect(EDIT).toContain(`pane === '${pane}'`)
+    }
   })
 })

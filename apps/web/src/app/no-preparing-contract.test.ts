@@ -104,7 +104,6 @@ const REMAINING: Record<string, number> = {
   'app/search-console/page.tsx': 3,
   'app/templates/carousel/page.tsx': 2,
   'app/templates/edit/page.tsx': 4,
-  'app/webinars/page.tsx': 1,
   'components/broadcasts/broadcast-form.tsx': 7,
   'components/events/event-wizard.tsx': 2,
   'components/friends/friend-timeline.tsx': 1,

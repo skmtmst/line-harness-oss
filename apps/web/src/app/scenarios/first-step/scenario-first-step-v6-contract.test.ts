@@ -95,6 +95,13 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain('<CharCounter length={bodyLength} />')
   })
 
+  it('作成途中へ戻ったときは既存の1通目を表示し、重複追加せず更新する', () => {
+    expect(PAGE).toContain('setExistingStepId(first.id)')
+    expect(PAGE).toContain('setBody(first.messageContent)')
+    expect(PAGE).toContain('api.scenarios.updateStep(id, existingStepId, stepPayload)')
+    expect(PAGE).toContain('api.scenarios.addStep(id, stepPayload)')
+  })
+
   it('上限を超えた本文では保存を押せなくし、理由を本文に出す', () => {
     expect(PAGE).toContain('const bodyOverLimit =')
     expect(PAGE).toContain('isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)')
