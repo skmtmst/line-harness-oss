@@ -499,6 +499,61 @@ export const FRIEND_ADD_EVENTS = {
 }
 
 /**
+ * 友だち追加時配信の新しい実行結果契約（PR #1111）。
+ * 一覧4行と集計値は設計 `P2J0Te` に置かれた固定値を使う。
+ */
+export const FRIEND_ADD_RUNS = {
+  items: [
+    {
+      id: 'friend-add-run-1', receivedAt: '2026-09-07T01:32:00.000Z', processedAt: '2026-09-07T01:32:00.800Z',
+      friend: { id: 'visual-friend-add-1', displayName: 'Kenta Kawano' }, friendKind: 'first_time',
+      attribution: { status: 'captured', routeId: 'route-shop', routeName: '店頭QR', reason: 'store-qr' },
+      rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'rule-shop-v1', versionNumber: 1 },
+      scenario: { id: 'scenario-welcome', name: '新規登録7日間フォロー', enrollmentId: 'enrollment-1', started: true },
+      actions: { total: 2, failed: 0 }, deliveryCount: 1, status: 'completed', errorCode: null,
+    },
+    {
+      id: 'friend-add-run-2', receivedAt: '2026-09-07T01:28:00.000Z', processedAt: '2026-09-07T01:28:00.700Z',
+      friend: { id: 'visual-friend-add-2', displayName: 'Masato S.' }, friendKind: 'returning',
+      attribution: { status: 'unavailable', routeId: null, routeName: null, reason: '経路不明のテスト' },
+      rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'rule-fallback-v1', versionNumber: 1 },
+      scenario: { id: 'scenario-common', name: '共通のあいさつ', enrollmentId: 'enrollment-2', started: true },
+      actions: { total: 1, failed: 0 }, deliveryCount: 1, status: 'completed', errorCode: null,
+    },
+    {
+      id: 'friend-add-run-3', receivedAt: '2026-09-07T01:21:00.000Z', processedAt: null,
+      friend: { id: 'visual-friend-add-3', displayName: '菅野 亮' }, friendKind: 'first_time',
+      attribution: { status: 'captured', routeId: 'route-referral', routeName: '紹介キャンペーン', reason: 'referral-campaign' },
+      rule: { id: 'rule-referral', name: '紹介キャンペーンの初回案内', versionId: 'rule-referral-v1', versionNumber: 1 },
+      scenario: { id: 'scenario-welcome', name: '新規登録7日間フォロー', enrollmentId: null, started: false },
+      actions: { total: 2, failed: 0 }, deliveryCount: 0, status: 'pending', errorCode: null,
+    },
+    {
+      id: 'friend-add-run-4', receivedAt: '2026-09-07T01:14:00.000Z', processedAt: '2026-09-07T01:14:02.000Z',
+      friend: { id: 'visual-friend-add-4', displayName: '山田 太郎' }, friendKind: 'first_time',
+      attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
+      rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'rule-fallback-v1', versionNumber: 1 },
+      scenario: null,
+      actions: { total: 1, failed: 1 }, deliveryCount: 0, status: 'failed', errorCode: 'delivery_failed',
+    },
+  ],
+  total: 214,
+  nextCursor: null,
+  summary: {
+    totalRuns: 214,
+    cumulativeDeliveries: 1842,
+    scenarioStarts: 198,
+    averageSendTimeMs: 800,
+    failed: 3,
+    staffHandoffs: {
+      value: null,
+      state: 'unavailable',
+      reason: '担当者引き継ぎと実行イベントを結ぶ記録がありません',
+    },
+  },
+}
+
+/**
  * 友だち追加時配信を公開する2画面（`ec9vg` / `quhg6`）の固定データ。
  *
  * 正本は `FriendAddRoutingVersion` / `FriendAddRoutingValidation` /

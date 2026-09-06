@@ -41,6 +41,7 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   FRIEND_ADD_EVENTS,
+  FRIEND_ADD_RUNS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
@@ -148,6 +149,7 @@ const FRIEND_ADD_RULE = {
   versionId: 'rule-referral-v1',
   versionNumber: 1,
   versionStatus: 'published',
+  version: 1,
   lastTestStatus: 'succeeded',
   lastTestedAt: '2026-01-13T10:00:00+09:00',
   publishedAt: '2026-01-13T10:01:00+09:00',
@@ -165,6 +167,11 @@ const FRIEND_ADD_RULE = {
     friendCondition: '紹介キャンペーンから来た人へ特典を案内する。',
     activeFrom: null,
     activeUntil: null,
+    weekdays: [1, 2, 3, 4, 5, 6, 0],
+    timeWindows: [{ start: '08:00', end: '21:00' }],
+    resendSuppressionHours: 24,
+    deliveryChoices: { sendWelcomeMessage: true, startScenario: true, runActions: true },
+    unknownRouteAction: { sendCommonGuidance: true, notifyStaff: true },
   },
   routeNames: ['紹介キャンペーン'],
   scenarioName: '新規登録7日間フォロー',
@@ -181,6 +188,11 @@ const FRIEND_ADD_RULE_OPTIONS = {
     { id: 'scenario-common', name: '共通のあいさつ' },
   ],
   tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }],
+  folders: [
+    { id: 'friend-add-folder-store', name: '店頭' },
+    { id: 'friend-add-folder-ads', name: '広告' },
+    { id: 'friend-add-folder-referral', name: '紹介' },
+  ],
 }
 
 const FRIEND_ADD_RULES = {
@@ -192,7 +204,16 @@ const FRIEND_ADD_RULES = {
   ],
   summary: { rules: 4, active: 3, recentAdds: 86, captured: 74, unknownRoute: 12, delivered: 84, failed: 2 },
   options: FRIEND_ADD_RULE_OPTIONS,
+  total: 4,
+  nextCursor: null,
 }
+
+const FRIEND_ADD_RULE_MATCHES = new Map([
+  ['rule-shop', 241],
+  ['rule-instagram', 382],
+  ['rule-referral', 214],
+  ['rule-fallback', 12],
+])
 
 /** 期間の端。**時計を読まない**（読むと画像が毎回変わる）。 */
 const FIXED_FROM = '2026-01-01'
@@ -1217,8 +1238,32 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/friend-add-rules') {
     return { success: true, data: FRIEND_ADD_RULES }
   }
+  if (pathname === '/api/friend-add-rules/conflicts') {
+    return {
+      success: true,
+      data: {
+        conflicts: [],
+        rules: FRIEND_ADD_RULES.items.map((rule) => ({
+          id: rule.id,
+          name: rule.name,
+          priority: rule.priority,
+          weekdays: rule.definition.weekdays ?? [],
+          timeWindows: rule.definition.timeWindows ?? [],
+          friendCondition: rule.definition.friendCondition || null,
+          matchedLast28Days: FRIEND_ADD_RULE_MATCHES.get(rule.id) ?? 0,
+        })),
+      },
+    }
+  }
   if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
-    return { success: true, data: { rule: FRIEND_ADD_RULE, options: FRIEND_ADD_RULE_OPTIONS } }
+    return {
+      success: true,
+      data: {
+        rule: FRIEND_ADD_RULE,
+        options: FRIEND_ADD_RULE_OPTIONS,
+        staffNotification: { status: 'connected', reason: null },
+      },
+    }
   }
   if (pathname === '/api/identity-candidates/detect') {
     return {
@@ -1393,6 +1438,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       .filter((item) => !routingStatus || item.routingStatus === routingStatus)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_EVENTS, items } }
+  }
+  if (pathname === '/api/friend-add-runs') {
+    const status = query.get('status')
+    const ruleId = query.get('rule_id')
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 100)
+      : 20
+    const items = FRIEND_ADD_RUNS.items
+      .filter((item) => !status || item.status === status)
+      .filter((item) => !ruleId || item.rule?.id === ruleId)
+      .slice(0, limit)
+    return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
   }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
   const scenarioActions = pathname.match(/^\/api\/scenarios\/([^/]+)\/actions$/)
