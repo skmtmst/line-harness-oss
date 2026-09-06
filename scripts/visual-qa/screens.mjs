@@ -4108,6 +4108,7 @@ export const CAPTURED_AT = {
     { pr: 587, head: '425a6b1a', on: '2026-08-30', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '確認直前の空き再取得、完了画面のリマインダ時刻と台帳の事実。撮影データの slots[].date を要件どおりに直した' },
   ],
   24: [
+    { pr: 1076, head: '8e7c374991', on: '2026-09-07', screens: ['festr', 'Q55bb', 'X8JCA5', 'Se65i'], note: 'Issue #291。固定ポート3102/8789で通常・読込・空・失敗の全状態を1440/1920px撮影し、全画像で横はみ出し0。4画面の構造をV6へそろえた。通知実行の通常fixtureと配信・開封・再試行・版管理のAPI契約が未提供のため、理由つきの構造一致・データ未接続とした。' },
     { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
     { pr: 545, head: 'c9bb193d', on: '2026-08-30', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない。**head が `03022681` → `c9bb193d` へ動いたが撮り直していない**——`notification-run-list.tsx`・`operator/new/page.tsx`・`operator-notification-rules.tsx` の blob がいずれも同一（差分は development の取り込み）' },
     { pr: 564, head: 'ad59fde6', on: '2026-08-29', screens: ['DpxOK'], note: '絞り込みチップを状態で言い分ける。失敗・権限不足は `—`' },
