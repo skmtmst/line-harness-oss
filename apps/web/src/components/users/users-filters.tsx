@@ -9,14 +9,16 @@ interface Props {
   q: string
   onlyDups: boolean
   account: string
+  uid: string
   accountOptions: AccountOption[]
-  onChange: (next: { q?: string; onlyDups?: boolean; account?: string }) => void
+  onChange: (next: { q?: string; onlyDups?: boolean; account?: string; uid?: string }) => void
 }
 
 export default function UsersFilters({
   q,
   onlyDups,
   account,
+  uid,
   accountOptions,
   onChange,
 }: Props) {
@@ -38,11 +40,20 @@ export default function UsersFilters({
         複数アカウントのみ
       </label>
       <select
+        value={uid}
+        onChange={(e) => onChange({ uid: e.target.value })}
+        className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm text-[#1D1D1F]"
+      >
+        <option value="">UID：すべて</option>
+        <option value="linked">UID：連携済み</option>
+        <option value="unlinked">UID：未連携・要確認</option>
+      </select>
+      <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
         className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm text-[#1D1D1F]"
       >
-        <option value="">全アカウント</option>
+        <option value="">所属：すべて</option>
         {accountOptions.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}

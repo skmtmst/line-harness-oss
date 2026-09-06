@@ -4,12 +4,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
 import FriendListRow from './friend-list-row'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'last'
 
 interface Props {
   friends: FriendListItem[]
+  status?: 'loading' | 'ready' | 'error'
+  emptyTitle?: string
+  emptyDescription?: string
+  onRetry?: () => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   onToggleAll?: (select: boolean) => void
@@ -33,6 +38,10 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
 
 export default function FriendListTable({
   friends,
+  status = 'ready',
+  emptyTitle = '条件に合う友だちが見つかりません',
+  emptyDescription = '検索条件を外すか、別のキーワードでお試しください。',
+  onRetry,
   selectedIds,
   onToggleSelect,
   onToggleAll,
@@ -171,10 +180,22 @@ export default function FriendListTable({
       </div>
 
       <div className="min-h-0 flex-1">
-        {friends.length === 0 ? (
-          <div className="flex h-full min-h-77.5 flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm font-semibold text-ink-secondary">条件に合う友だちが見つかりません</p>
-            <p className="mt-1 text-xs text-ink-faint">検索条件を外すか、別のキーワードでお試しください。</p>
+        {status === 'loading' ? (
+          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+            <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
+          </div>
+        ) : status === 'error' ? (
+          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+            <ListState
+              kind="error"
+              title="表示できませんでした"
+              description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+              onRetry={onRetry}
+            />
+          </div>
+        ) : friends.length === 0 ? (
+          <div className="flex h-full min-h-77.5 items-center justify-center bg-canvas-sunken/30 px-6">
+            <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
         ) : friends.map((friend) => (
           <FriendListRow
@@ -191,7 +212,7 @@ export default function FriendListTable({
 
       <div className="flex h-12 shrink-0 items-center justify-between border-t border-hairline px-4">
         <span className="text-xs text-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} ariaLabel="友だち一覧のページ" />
+        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
     </section>
   )

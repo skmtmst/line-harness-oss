@@ -167,7 +167,7 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
             ) : null}
             <button
               type="button"
-              className="whitespace-nowrap rounded-control bg-action px-3 py-2 text-xs font-bold text-on-action hover:opacity-90"
+              className="whitespace-nowrap rounded-control bg-accent-deep px-3 py-2 text-xs font-bold text-on-accent hover:brightness-95"
               aria-expanded={expanded}
               onClick={() => setExpanded((value) => !value)}
             >

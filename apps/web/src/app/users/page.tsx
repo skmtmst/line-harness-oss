@@ -9,6 +9,7 @@ import UsersTable from '@/components/users/users-table'
 import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
 import { api } from '@/lib/api'
 import type { UserRowData } from '@/components/users/user-row'
+import Link from 'next/link'
 
 const PAGE_SIZE = 50
 
@@ -25,6 +26,7 @@ export default function UsersPage() {
   const [q, setQ] = useState('')
   const [onlyDups, setOnlyDups] = useState(false)
   const [account, setAccount] = useState('')
+  const [uid, setUid] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
@@ -120,6 +122,31 @@ export default function UsersPage() {
     [],
   )
 
+  const visibleRows = useMemo(() => rows.filter((row) => {
+    if (uid === 'linked') return row.identityKeyKind === 'uid'
+    if (uid === 'unlinked') return row.identityKeyKind !== 'uid'
+    return true
+  }), [rows, uid])
+
+  const exportCsv = () => {
+    const cell = (value: string) => `"${value.replaceAll('"', '""')}"`
+    const lines = [
+      ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(cell).join(','),
+      ...visibleRows.map((row) => [
+        row.displayName ?? '', row.emails[0] ?? row.phones[0] ?? '',
+        row.accounts.map((item) => item.accountName).join('・'),
+        row.identityKeyKind === 'uid' ? '連携済み' : row.identityKeyKind === 'url_token' ? '要確認' : '未連携',
+        row.lastActivityAt,
+      ].map(cell).join(',')),
+    ]
+    const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'merged-users.csv'
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (openedPersonId) {
     return (
       <div className="space-y-4" data-users-design="v6">
@@ -145,22 +172,28 @@ export default function UsersPage() {
         </p>
       </section>
 
-      <SummaryBar />
+      <SummaryBar rows={rows} />
 
-      <div className="flex items-stretch gap-3">
+      <div className="flex flex-wrap items-stretch gap-2">
+        <Link href="/friends/identity-candidates" className="inline-flex items-center rounded-control bg-accent-deep px-4 text-xs font-bold text-on-accent hover:brightness-95">
+          ＋ 統合ユーザーを作成
+        </Link>
         <div className="flex-1">
           <UsersFilters
             q={q}
             onlyDups={onlyDups}
             account={account}
+            uid={uid}
             accountOptions={accountOptions}
             onChange={(next) => {
               if (next.q !== undefined) setQ(next.q)
               if (next.onlyDups !== undefined) setOnlyDups(next.onlyDups)
               if (next.account !== undefined) setAccount(next.account)
+              if (next.uid !== undefined) setUid(next.uid)
             }}
           />
         </div>
+        <button type="button" onClick={exportCsv} className="rounded-control border border-hairline bg-canvas px-4 text-xs font-semibold text-ink-secondary shadow-card hover:bg-canvas-sunken">CSVで書き出す</button>
         <button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
@@ -173,8 +206,8 @@ export default function UsersPage() {
       </div>
 
       <UsersTable
-        rows={rows}
-        total={total}
+        rows={visibleRows}
+        total={uid ? visibleRows.length : total}
         page={page}
         pageSize={PAGE_SIZE}
         loading={loading}

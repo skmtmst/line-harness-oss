@@ -3,12 +3,11 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import type { FriendField, Folder } from '@line-crm/shared'
+import type { FriendField } from '@line-crm/shared'
 import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
-import FriendTimeline from '@/components/friends/friend-timeline'
 import SelectField from '@/components/shared/select-field'
 
 /**
@@ -27,13 +26,16 @@ import SelectField from '@/components/shared/select-field'
  * 消すと設計と並びが変わるので、出したうえで何が足りないかを書く。
  */
 const TABS = [
-  { key: 'timeline', label: 'タイムライン' },
-  { key: 'health', label: '健康記録', pending: '健康記録を残す仕組みがまだありません。' },
+  { key: 'timeline', label: '概要' },
+  { key: 'history', label: '履歴', pending: '全履歴を取得する仕組みがまだありません。' },
+  { key: 'info', label: '情報欄' },
+  { key: 'forms', label: '回答フォーム' },
+  { key: 'scenario', label: '配信・シナリオ', pending: 'この友だちの配信状況を引く口がまだありません。' },
+  { key: 'orders', label: '予約', pending: 'この友だちの予約を引く口がまだありません。' },
   { key: 'reminders', label: 'リマインダ', pending: 'この友だちのリマインダを引く口がまだありません。' },
   { key: 'actions', label: 'アクション', pending: '操作の履歴を残す仕組みがまだありません。' },
-  { key: 'forms', label: 'フォーム回答' },
-  { key: 'orders', label: '注文・定期便', pending: 'この友だちの注文を引く口がまだありません。' },
-  { key: 'info', label: '情報欄' },
+  { key: 'miles', label: 'マイル', pending: 'マイル履歴はマイル画面で確認できます。' },
+  { key: 'richmenu', label: 'リッチメニュー', pending: 'リッチメニューの履歴を引く口がまだありません。' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
@@ -183,7 +185,6 @@ function FriendDetailInner() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
-  const [groups, setGroups] = useState<Folder[]>([])
   const group = params.get('group') ?? BASIC_GROUP
 
   const load = useCallback(async () => {
@@ -195,16 +196,14 @@ function FriendDetailInner() {
     setError('')
     try {
       // マイル・リッチメニュー・フォルダは、取れなくても詳細は出す。
-      const [friendRes, fieldsRes, mileageRes, menuRes, groupsRes] = await Promise.all([
+      const [friendRes, fieldsRes, mileageRes, menuRes] = await Promise.all([
         api.friends.get(friendId),
         api.friendFields.forFriend(friendId),
         api.friends.mileage(friendId, 1).catch(() => null),
         api.friends.richMenu(friendId).catch(() => null),
-        api.folders.list('friend_field').catch(() => null),
       ])
       if (mileageRes?.success) setMileage(mileageRes.data.summary)
       if (menuRes?.success) setRichMenu(menuRes.data)
-      if (groupsRes?.success) setGroups(groupsRes.data)
       if (friendRes.success) setFriend(friendRes.data)
       if (fieldsRes.success) {
         setFields(fieldsRes.data.items)
@@ -284,18 +283,6 @@ function FriendDetailInner() {
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
-  /** 見出しの下に1行で出す素性。設計は「本名 ・ 追加 ・ 流入元 ・ ID」の並び。 */
-  const metaLine = [
-    realName ? `本名 ${realName}` : null,
-    friend?.createdAt
-      ? `追加 ${new Date(friend.createdAt).toLocaleDateString('ja-JP')}`
-      : null,
-    friend?.firstTrackedLinkName ? `流入元 ${friend.firstTrackedLinkName}` : null,
-    friend?.lineUserId ? `${friend.lineUserId.slice(0, 6)}…` : null,
-  ]
-    .filter(Boolean)
-    .join(' ・ ')
-
   return (
     <div data-friends-detail-design="v4">
       <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
@@ -308,8 +295,7 @@ function FriendDetailInner() {
 
       <div data-design="Head">
         <Header
-          title={friend?.displayName ?? '友だち詳細'}
-          description={metaLine || undefined}
+          title="友だち詳細"
           action={
             <div className="flex flex-wrap gap-2">
               {/* 一覧から隠す・LINE側でブロックする、どちらも受け口が無い。 */}
@@ -331,37 +317,13 @@ function FriendDetailInner() {
                 href={`/chats?friendId=${friendId}`}
                 className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
               >
-                個別トークを開く
+                受信箱で開く
               </Link>
+              <button type="button" className="border-hairline text-ink rounded-control border bg-canvas px-4 py-2 text-sm font-medium">個別操作</button>
+              <button type="button" aria-label="その他の操作" className="border-hairline text-ink rounded-control border bg-canvas px-3 py-2 text-sm font-bold">…</button>
             </div>
           }
         />
-      </div>
-
-      {/*
-        情報欄のグループ（設計の上段タブ）。「基本」＋フォルダ。
-        右端は分類そのものを直す場所への行き先。
-      */}
-      <div className="border-hairline mb-4 flex flex-wrap items-center gap-1 border-b">
-        {[{ id: BASIC_GROUP, name: '基本' }, ...groups].map((g) => (
-          <Link
-            key={g.id}
-            href={`/friends/detail?id=${friendId}${g.id === BASIC_GROUP ? '' : `&group=${g.id}`}`}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              group === g.id
-                ? 'border-accent text-accent'
-                : 'text-ink-secondary hover:text-ink border-transparent'
-            }`}
-          >
-            {g.name}
-          </Link>
-        ))}
-        <Link
-          href="/tags?tab=fields"
-          className="text-ink-secondary hover:text-ink ml-auto px-3 py-2 text-xs"
-        >
-          タブを編集（友だち情報欄）
-        </Link>
       </div>
 
       {error && (
@@ -375,25 +337,36 @@ function FriendDetailInner() {
           読み込み中...
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[20rem_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">
           {/* 左：プロフィール（設計の並び：マイル → 対応 → 名前 → タグ →
               ★つき友だち情報 → リッチメニュー → 友だち情報 → フォーム回答） */}
           <aside data-design="Left" className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <div className="border-hairline border-b px-5 py-3.5">
-              <h2 className="text-ink text-sm font-semibold">友だち詳細</h2>
+              <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" className="text-ink-faint text-lg">×</Link></div>
+            </div>
+
+            <div className="border-hairline flex flex-col items-center border-b px-5 py-5 text-center">
+              {friend?.pictureUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
+                <img src={friend.pictureUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
+              ) : <div className="bg-action flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold text-on-action">{friend?.displayName?.charAt(0) ?? '?'}</div>}
+              <h2 className="text-ink mt-3 text-sm font-bold">{friend?.displayName ?? '名前未登録'}</h2>
+              <p className="text-ink-faint mt-1 text-xs">LINE表示名</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px]">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-[11px]">表示中</span></div>
+              <Link href={`/friends/detail?id=${friendId}&tab=info`} className="border-hairline text-action mt-3 rounded-control border px-3 py-2 text-xs font-semibold">♙ 友だち詳細</Link>
             </div>
 
             {/*
               マイル。設計ではここだけ地を黒く反転している。ほかの節と
               同じ白地にすると、残高が並の情報に見える。
             */}
-            <div className="bg-ink px-5 py-4">
-              <p className="text-xs text-white/60">マイル</p>
-              <p className="mt-0.5 text-2xl font-bold tabular-nums text-white">
+            <div className="border-hairline border-b bg-canvas px-5 py-4">
+              <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る</Link></div>
+              <p className="bg-canvas-sunken text-ink mt-2 rounded-control px-3 py-3 text-right text-2xl font-bold tabular-nums">
                 {mileage ? mileage.available.toLocaleString('ja-JP') : '—'}
-                <span className="ml-1 text-xs font-normal text-white/60">mile</span>
+                <span className="text-ink-faint ml-1 text-xs font-normal">mile</span>
               </p>
-              <p className="text-xs text-white/60">
+              <p className="text-ink-faint mt-1 text-xs">
                 利用可能
                 {mileage && mileage.pending > 0
                   ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
@@ -559,7 +532,29 @@ function FriendDetailInner() {
               ))}
             </div>
 
-            {tab === 'timeline' && <FriendTimeline friendId={friendId} />}
+            {tab === 'timeline' && (
+              <div className="space-y-4">
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
+                    <h2 className="text-ink text-sm font-bold">進行中の配信・自動処理</h2>
+                    <dl className="text-ink-secondary mt-3 space-y-2 text-xs"><div className="flex gap-5"><dt className="font-semibold">シナリオ</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">リマインド</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">対象ルール</dt><dd>—</dd></div></dl>
+                    <button type="button" disabled className="border-hairline text-ink-faint mt-3 rounded-control border px-3 py-2 text-xs">配信状態を確認</button>
+                  </section>
+                  <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
+                    <h2 className="text-ink text-sm font-bold">同じ人としてつながる情報</h2>
+                    <p className="text-ink-secondary mt-3 text-xs">現在は1アカウントのみ</p>
+                    <p className="text-ink-faint mt-3 text-xs">重複候補が見つかると、根拠と確信度を表示します。</p>
+                    <Link href="/duplicates" className="border-hairline text-ink mt-3 inline-flex rounded-control border px-3 py-2 text-xs font-semibold">重複候補を確認</Link>
+                  </section>
+                </div>
+                <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
+                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent text-xs font-semibold">すべてを見る →</Link></div>
+                  <div className="bg-canvas-sunken border-hairline grid grid-cols-[140px_160px_1fr_140px] border-y px-4 py-3 text-xs font-semibold text-ink-faint"><span>日時</span><span>種別</span><span>内容</span><span>担当者</span></div>
+                  <div className="text-ink-secondary grid grid-cols-[140px_160px_1fr_140px] px-4 py-5 text-xs"><span>{friend?.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend?.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
+                </section>
+                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2><div className="mt-3 flex flex-wrap gap-2"><Link href={`/chats?friendId=${friendId}`} className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-bold">受信箱で開く</Link><button type="button" disabled className="border-accent text-accent rounded-control border px-3 py-2 text-xs font-semibold">ϟ アクションを実行</button><Link href="/templates" className="border-hairline text-ink rounded-control border px-3 py-2 text-xs font-semibold">テンプレートを送信</Link><Link href="/scenarios" className="border-hairline text-ink rounded-control border px-3 py-2 text-xs font-semibold">シナリオを操作</Link><Link href="/reminders" className="border-hairline text-ink rounded-control border px-3 py-2 text-xs font-semibold">リマインダを設定</Link></div></section>
+              </div>
+            )}
 
             {/* 出す先のデータを取る口が無いもの。何が足りないかを書く。 */}
             {TABS.map((t) =>
