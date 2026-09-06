@@ -4,6 +4,7 @@ const SUPPORTED_ACTION_TYPES = new Set([
   'add_tag',
   'remove_tag',
   'set_metadata',
+  'set_support_mark',
   'start_scenario',
   'stop_scenario',
   'resume_scenario',
@@ -11,6 +12,10 @@ const SUPPORTED_ACTION_TYPES = new Set([
   'send_webhook',
   'switch_rich_menu',
   'remove_rich_menu',
+  'start_reminder',
+  'stop_reminder',
+  'notify_staff',
+  'grant_mileage',
   'wait',
   'common_action',
 ]);
@@ -87,9 +92,28 @@ export interface CommonActionBinding {
 }
 
 export interface CommonActionResources {
+  trigger: 'tag.added' | null;
+  actionTypes: Array<{
+    id: string;
+    label: string;
+    actionType: string;
+    variant?: string;
+    resource?: string;
+    state: 'available' | 'unavailable';
+    reason: string | null;
+    schema: {
+      type: 'object';
+      required: string[];
+      properties: Record<string, Record<string, unknown>>;
+    };
+  }>;
   tags: Array<{ id: string; name: string }>;
   scenarios: Array<{ id: string; name: string }>;
   templates: Array<{ id: string; name: string }>;
+  friendFields: Array<{ id: string; name: string }>;
+  supportMarks: Array<{ id: string; name: string }>;
+  reminders: Array<{ id: string; name: string }>;
+  notificationRules: Array<{ id: string; name: string }>;
   webhooks: Array<{ id: string; name: string }>;
   richMenus: Array<{ id: string; name: string }>;
   commonActions: Array<{ id: string; name: string; version: number }>;
@@ -364,9 +388,23 @@ export async function listCommonActions(
 
 export async function listCommonActionResources(
   db: D1Database,
-  input: { lineAccountId: string; excludeCommonActionId?: string },
+  input: {
+    lineAccountId: string;
+    excludeCommonActionId?: string;
+    trigger?: 'tag.added';
+  },
 ): Promise<CommonActionResources> {
-  const [tags, scenarios, templates, webhooks, richMenus, commonActionRows] = await Promise.all([
+  const [
+    tags,
+    scenarios,
+    templates,
+    supportMarks,
+    reminders,
+    notificationRules,
+    webhooks,
+    richMenus,
+    commonActionRows,
+  ] = await Promise.all([
     db.prepare(
       `SELECT id, name FROM tags WHERE line_account_id = ? ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
@@ -375,6 +413,26 @@ export async function listCommonActionResources(
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
       `SELECT id, name FROM templates WHERE line_account_id = ? ORDER BY name ASC`,
+    ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
+    db.prepare(
+      `SELECT sm.id, sm.name
+         FROM support_marks sm
+         JOIN support_mark_scopes sms ON sms.mark_id = sm.id
+         JOIN line_accounts la ON la.id = ? AND la.tenant_id = sms.tenant_id
+        WHERE sm.archived_at IS NULL
+          AND (sms.line_account_id IS NULL OR sms.line_account_id = ?)
+        ORDER BY sm.display_order ASC, sm.name ASC`,
+    ).bind(input.lineAccountId, input.lineAccountId).all<{ id: string; name: string }>(),
+    db.prepare(
+      `SELECT id, name FROM reminders
+        WHERE line_account_id = ? AND deleted_at IS NULL
+          AND lifecycle_status <> 'stopped'
+        ORDER BY display_order ASC, name ASC`,
+    ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
+    db.prepare(
+      `SELECT id, name FROM notification_rules
+        WHERE line_account_id = ? AND is_active = 1
+        ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
       `SELECT id, name FROM outgoing_webhooks
@@ -403,10 +461,40 @@ export async function listCommonActionResources(
       input.excludeCommonActionId ?? '',
     ).all<{ id: string; name: string; version: number }>(),
   ]);
+  const objectSchema = (
+    required: string[],
+    properties: Record<string, Record<string, unknown>>,
+  ) => ({ type: 'object' as const, required, properties });
+  const commonTiming = {
+    delayMinutes: { type: 'integer', minimum: 0, maximum: 525600, multipleOf: 5 },
+    cancelIfTagRemoved: { type: 'boolean', default: true },
+  };
+  const actionTypes: CommonActionResources['actionTypes'] = input.trigger === 'tag.added' ? [
+    { id: 'send_text', label: 'テキスト送信', actionType: 'send_message', variant: 'text', state: 'available', reason: null, schema: objectSchema(['content'], { content: { type: 'string', minLength: 1 }, ...commonTiming }) },
+    { id: 'send_template', label: 'テンプレート送信', actionType: 'send_message', variant: 'template', resource: 'templates', state: 'available', reason: null, schema: objectSchema(['templateId'], { templateId: { type: 'string' }, ...commonTiming }) },
+    { id: 'add_tag', label: 'タグ追加', actionType: 'add_tag', resource: 'tags', state: 'available', reason: null, schema: objectSchema(['tagId'], { tagId: { type: 'string' }, ...commonTiming }) },
+    { id: 'remove_tag', label: 'タグ解除', actionType: 'remove_tag', resource: 'tags', state: 'available', reason: null, schema: objectSchema(['tagId'], { tagId: { type: 'string' }, ...commonTiming }) },
+    { id: 'set_metadata', label: '友だち情報更新', actionType: 'set_metadata', resource: 'friendFields', state: 'unavailable', reason: 'friend_field_scope_pending', schema: objectSchema(['fieldId', 'value'], { fieldId: { type: 'string' }, value: {}, ...commonTiming }) },
+    { id: 'set_support_mark', label: '対応マーク変更', actionType: 'set_support_mark', resource: 'supportMarks', state: 'available', reason: null, schema: objectSchema(['markId'], { markId: { type: 'string' }, ...commonTiming }) },
+    { id: 'start_scenario', label: 'シナリオ開始', actionType: 'start_scenario', resource: 'scenarios', state: 'available', reason: null, schema: objectSchema(['scenarioId'], { scenarioId: { type: 'string' }, ...commonTiming }) },
+    { id: 'stop_scenario', label: 'シナリオ停止', actionType: 'stop_scenario', resource: 'scenarios', state: 'available', reason: null, schema: objectSchema(['scenarioId'], { scenarioId: { type: 'string' }, ...commonTiming }) },
+    { id: 'start_reminder', label: 'リマインダ開始', actionType: 'start_reminder', resource: 'reminders', state: 'available', reason: null, schema: objectSchema(['reminderId'], { reminderId: { type: 'string' }, ...commonTiming }) },
+    { id: 'stop_reminder', label: 'リマインダ解除', actionType: 'stop_reminder', resource: 'reminders', state: 'available', reason: null, schema: objectSchema(['reminderId'], { reminderId: { type: 'string' }, ...commonTiming }) },
+    { id: 'switch_rich_menu', label: 'リッチメニュー切替', actionType: 'switch_rich_menu', resource: 'richMenus', state: 'available', reason: null, schema: objectSchema(['richMenuPageId'], { richMenuPageId: { type: 'string' }, ...commonTiming }) },
+    { id: 'notify_staff', label: '担当者通知', actionType: 'notify_staff', resource: 'notificationRules', state: 'available', reason: null, schema: objectSchema(['notificationRuleId', 'message'], { notificationRuleId: { type: 'string' }, message: { type: 'string', minLength: 1 }, ...commonTiming }) },
+    { id: 'grant_mileage', label: 'マイル付与', actionType: 'grant_mileage', state: 'available', reason: null, schema: objectSchema(['amount'], { amount: { type: 'integer', minimum: 1, maximum: 1000000 }, ...commonTiming }) },
+  ] : [];
   return {
+    trigger: input.trigger ?? null,
+    actionTypes,
     tags: tags.results ?? [],
     scenarios: scenarios.results ?? [],
     templates: templates.results ?? [],
+    // #318 が項目定義へアカウント範囲を追加するまで、別統括の項目を混ぜない。
+    friendFields: [],
+    supportMarks: supportMarks.results ?? [],
+    reminders: reminders.results ?? [],
+    notificationRules: notificationRules.results ?? [],
     webhooks: webhooks.results ?? [],
     richMenus: richMenus.results ?? [],
     commonActions: commonActionRows.results ?? [],

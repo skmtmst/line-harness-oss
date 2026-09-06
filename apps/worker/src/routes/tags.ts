@@ -16,6 +16,11 @@ import {
   updateTag,
   reorderTags,
   normalizeTagNameForCleanup,
+  createTagDefinition,
+  getScopedTagDeleteImpact,
+  getTagDefinition,
+  TagDefinitionError,
+  updateTagDefinition,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
 import type {
@@ -27,6 +32,8 @@ import type {
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { CommonActionValidationError, validateActionShape } from '../services/common-actions.js';
 
 const tags = new Hono<Env>();
 
@@ -62,6 +69,14 @@ function serializeTag(row: DbTag & Partial<TagWithUsage>) {
     // 友だち一覧の「★つきタグ」列に出すか。列が無い環境でも 0 として返す。
     isStarred: Number(row.is_starred ?? 0) === 1,
     displayOrder: Number(row.display_order ?? 0),
+    lineAccountId: row.line_account_id ?? null,
+    description: row.description ?? null,
+    manualAssignmentAllowed: Number(row.manual_assignment_allowed ?? 1) === 1,
+    reapplyPolicy: row.reapply_policy ?? 'first_only',
+    linkedEnabled: Number(row.linked_enabled ?? 0) === 1,
+    status: row.status ?? 'active',
+    version: Number(row.version ?? 1),
+    updatedAt: row.updated_at ?? row.created_at,
     createdAt: row.created_at,
     ...(row.friend_count !== undefined ? { friendCount: row.friend_count } : {}),
     ...(row.assign_source ? { assignSource: row.assign_source } : {}),
@@ -91,6 +106,103 @@ function serializeTag(row: DbTag & Partial<TagWithUsage>) {
     ...(row.cleanup_reasons !== undefined
       ? { cleanupReasons: row.cleanup_reasons }
       : {}),
+  };
+}
+
+function requestedLineAccountId(c: Context<Env>, body?: Record<string, unknown>): string | null {
+  const value = body?.lineAccountId
+    ?? body?.accountId
+    ?? c.req.query('lineAccountId')
+    ?? c.req.query('account_id');
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+async function requireVisibleLineAccount(c: Context<Env>, id: string): Promise<Response | null> {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.ids.includes(id)) {
+    return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
+  }
+  return null;
+}
+
+function tagDefinitionError(c: Context<Env>, error: unknown): Response | null {
+  if (error instanceof TagDefinitionError) {
+    const status = error.code === 'not_found' || error.code === 'folder_not_found' ? 404 : 409;
+    return c.json({ success: false, code: error.code, error: error.message }, status);
+  }
+  if (error instanceof CommonActionValidationError) {
+    return c.json({
+      success: false,
+      code: error.code,
+      error: error.message,
+      ...(error.field ? { field: error.field } : {}),
+    }, 422);
+  }
+  if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
+    return c.json({ success: false, code: 'name_conflict', error: '同じ名前のタグがあります' }, 409);
+  }
+  return null;
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' ? value.trim() : undefined;
+}
+
+function nullableText(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return typeof value === 'string' ? value.trim() || null : undefined;
+}
+
+function integer(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  field: string,
+): number {
+  const parsed = value === undefined ? fallback : Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new CommonActionValidationError(
+      'value_invalid',
+      `${field}は${minimum}〜${maximum}の整数で指定してください`,
+      field,
+    );
+  }
+  return parsed;
+}
+
+function parseMileage(value: unknown, required: boolean) {
+  if (value === undefined && !required) return undefined;
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const multiplierRaw = source.multiplier;
+  const multiplier = multiplierRaw === undefined || multiplierRaw === null || multiplierRaw === ''
+    ? null
+    : integer(multiplierRaw, 0, 1000, 100000, 'mileage.multiplier');
+  return {
+    self: integer(source.self, 0, 0, 1_000_000, 'mileage.self'),
+    referrer: integer(source.referrer, 0, 0, 1_000_000, 'mileage.referrer'),
+    multiplier,
+    priority: integer(source.priority, 0, 0, 1000, 'mileage.priority'),
+  };
+}
+
+function parseActions(value: unknown) {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value) && value.length === 0) return [];
+  return validateActionShape(value);
+}
+
+function tagDefinitionResponse(detail: Awaited<ReturnType<typeof getTagDefinition>>) {
+  if (!detail) return null;
+  const tag = serializeTag(detail.tag);
+  return {
+    // 旧画面は data.id を読む。新契約は data.tag.id を読むため両方を返す。
+    ...tag,
+    tag,
+    automation: detail.automation,
   };
 }
 
@@ -489,7 +601,14 @@ tags.get(
   requireRole('owner', 'admin'),
   async (c) => {
     try {
-      const impact = await getTagDeleteImpact(c.env.DB, c.req.param('id'));
+      const lineAccountId = requestedLineAccountId(c);
+      if (lineAccountId) {
+        const denied = await requireVisibleLineAccount(c, lineAccountId);
+        if (denied) return denied;
+      }
+      const impact = lineAccountId
+        ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId)
+        : await getTagDeleteImpact(c.env.DB, c.req.param('id'));
       if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
       return c.json({ success: true, data: impact });
     } catch (err) {
@@ -498,6 +617,54 @@ tags.get(
     }
   },
 );
+
+// 正本名。旧画面の delete-impact は件数オブジェクトを維持し、こちらは明細配列を返す。
+tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = requestedLineAccountId(c);
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
+    const denied = await requireVisibleLineAccount(c, lineAccountId);
+    if (denied) return denied;
+    const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({
+      success: true,
+      data: {
+        ...impact,
+        referenceCounts: impact.references,
+        references: impact.referenceItems,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/tags/:id/dependencies error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/tags/:id?withActions=1 - タグ設定と共通アクション下書きを同時に読む
+tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = requestedLineAccountId(c);
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
+    const denied = await requireVisibleLineAccount(c, lineAccountId);
+    if (denied) return denied;
+    const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!detail) return c.json({ success: false, error: 'tag not found' }, 404);
+    return c.json({
+      success: true,
+      data: c.req.query('withActions') === '1'
+        ? tagDefinitionResponse(detail)
+        : serializeTag(detail.tag),
+    });
+  } catch (error) {
+    console.error('GET /api/tags/:id error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 /**
  * PATCH /api/tags/reorder — 並び順をまとめて書く。
@@ -538,20 +705,78 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
  */
 tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name?: unknown; color?: unknown; isStarred?: unknown }>();
-    const patch: { name?: string; color?: string; isStarred?: boolean } = {};
-
-    if (body.isStarred !== undefined) {
-      patch.isStarred = body.isStarred === true || body.isStarred === 1;
+    const body = await c.req.json<Record<string, unknown>>();
+    if (body.expectedVersion !== undefined) {
+      const lineAccountId = requestedLineAccountId(c, body);
+      if (!lineAccountId) {
+        return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      }
+      const denied = await requireVisibleLineAccount(c, lineAccountId);
+      if (denied) return denied;
+      const expectedVersion = integer(body.expectedVersion, 0, 1, Number.MAX_SAFE_INTEGER, 'expectedVersion');
+      const name = text(body.name);
+      if (body.name !== undefined && (!name || name.length > 80)) {
+        return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+      }
+      const reapplyPolicy = body.reapplyPolicy;
+      if (reapplyPolicy !== undefined
+        && reapplyPolicy !== 'first_only'
+        && reapplyPolicy !== 'every_time') {
+        return c.json({ success: false, error: 'reapplyPolicy is invalid' }, 400);
+      }
+      const actions = parseActions(
+        body.actions ?? (body.automationDraft as Record<string, unknown> | undefined)?.actions,
+      );
+      const detail = await updateTagDefinition(c.env.DB, {
+        tagId: c.req.param('id'),
+        lineAccountId,
+        expectedVersion,
+        ...(body.name !== undefined ? { name } : {}),
+        ...(body.description !== undefined ? { description: nullableText(body.description) } : {}),
+        ...(body.groupId !== undefined
+          ? { groupId: body.groupId === null || body.groupId === '' ? null : String(body.groupId) }
+          : {}),
+        ...(body.isStarred !== undefined ? { isStarred: body.isStarred === true } : {}),
+        ...(body.manualAssignmentAllowed !== undefined
+          ? { manualAssignmentAllowed: body.manualAssignmentAllowed === true }
+          : {}),
+        ...(reapplyPolicy !== undefined ? { reapplyPolicy } : {}),
+        ...(body.linkedEnabled !== undefined ? { linkedEnabled: body.linkedEnabled === true } : {}),
+        ...(body.mileage !== undefined ? { mileage: parseMileage(body.mileage, true)! } : {}),
+        automationId: body.automationId === undefined
+          ? undefined
+          : body.automationId === null ? null : String(body.automationId),
+        automationDraftVersion: body.automationDraftVersion === undefined
+          ? undefined
+          : body.automationDraftVersion === null ? null : String(body.automationDraftVersion),
+        actions,
+        actorId: c.get('staff')?.id ?? null,
+      });
+      const applyToExisting = body.applyToExisting === true;
+      const mileage = body.mileage === undefined ? null : parseMileage(body.mileage, true)!;
+      const queued = applyToExisting && mileage && (mileage.self > 0 || mileage.referrer > 0)
+        ? await enqueueHistoricTagMileage(c.env.DB, detail.tag.id)
+        : 0;
+      return c.json({
+        success: true,
+        data: { ...tagDefinitionResponse(detail), queued },
+      });
     }
 
-    if (body.name !== undefined) {
-      const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const legacyBody = body as { name?: unknown; color?: unknown; isStarred?: unknown };
+    const patch: { name?: string; color?: string; isStarred?: boolean } = {};
+
+    if (legacyBody.isStarred !== undefined) {
+      patch.isStarred = legacyBody.isStarred === true || legacyBody.isStarred === 1;
+    }
+
+    if (legacyBody.name !== undefined) {
+      const name = typeof legacyBody.name === 'string' ? legacyBody.name.trim() : '';
       if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
       patch.name = name;
     }
-    if (body.color !== undefined) {
-      const color = typeof body.color === 'string' ? body.color.trim() : '';
+    if (legacyBody.color !== undefined) {
+      const color = typeof legacyBody.color === 'string' ? legacyBody.color.trim() : '';
       // 画面の色見本と自由入力の両方から来る。形だけ見て通す。
       if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
         return c.json({ success: false, error: 'color must be #RRGGBB' }, 400);
@@ -566,6 +791,8 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     if (!tag) return c.json({ success: false, error: 'tag not found' }, 404);
     return c.json({ success: true, data: serializeTag(tag) });
   } catch (err) {
+    const handled = tagDefinitionError(c, err);
+    if (handled) return handled;
     // tags.name は UNIQUE。重複は 500 ではなく 409 で返す。
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
@@ -629,7 +856,53 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
 // POST /api/tags - create tag
 tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name?: unknown; color?: string; groupId?: unknown }>();
+    const body = await c.req.json<Record<string, unknown>>();
+
+    const lineAccountId = requestedLineAccountId(c, body);
+    const usesV6Contract = lineAccountId !== null
+      || body.reapplyPolicy !== undefined
+      || body.linkedEnabled !== undefined
+      || body.mileage !== undefined
+      || body.automationDraft !== undefined;
+    if (usesV6Contract) {
+      if (!lineAccountId) {
+        return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      }
+      const denied = await requireVisibleLineAccount(c, lineAccountId);
+      if (denied) return denied;
+      const name = text(body.name) ?? '';
+      if (!name || name.length > 80) {
+        return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+      }
+      const reapplyPolicy = body.reapplyPolicy ?? 'first_only';
+      if (reapplyPolicy !== 'first_only' && reapplyPolicy !== 'every_time') {
+        return c.json({ success: false, error: 'reapplyPolicy is invalid' }, 400);
+      }
+      if (body.applyToExisting === true) {
+        return c.json({ success: false, error: 'new tags cannot be applied retroactively' }, 400);
+      }
+      const automationDraft = body.automationDraft && typeof body.automationDraft === 'object'
+        && !Array.isArray(body.automationDraft)
+        ? body.automationDraft as Record<string, unknown>
+        : {};
+      const actions = parseActions(automationDraft.actions ?? body.actions) ?? [];
+      const detail = await createTagDefinition(c.env.DB, {
+        lineAccountId,
+        name,
+        description: nullableText(body.description),
+        groupId: body.groupId === null || body.groupId === '' || body.groupId === undefined
+          ? null
+          : String(body.groupId),
+        isStarred: body.isStarred === true,
+        manualAssignmentAllowed: body.manualAssignmentAllowed !== false,
+        reapplyPolicy,
+        linkedEnabled: body.linkedEnabled === true,
+        mileage: parseMileage(body.mileage, true)!,
+        actions,
+        actorId: c.get('staff')?.id ?? null,
+      });
+      return c.json({ success: true, data: tagDefinitionResponse(detail) }, 201);
+    }
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
@@ -638,7 +911,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
 
     const tag = await createTag(c.env.DB, {
       name,
-      color: body.color,
+      color: typeof body.color === 'string' ? body.color : undefined,
       groupId:
         body.groupId === null || body.groupId === '' || body.groupId === undefined
           ? null
@@ -647,6 +920,8 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
 
     return c.json({ success: true, data: serializeTag(tag) }, 201);
   } catch (err) {
+    const handled = tagDefinitionError(c, err);
+    if (handled) return handled;
     // tags.name has a UNIQUE constraint — surface duplicates as 409, not 500
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
