@@ -454,14 +454,20 @@ function BroadcastList() {
                 { id: 'single', label: '1つのアカウントだけに送る' },
                 { id: 'dedup', label: '複数アカウントで同じ人を2回数えない' },
               ] as const).map((tab) => (
-                <button
+                <label
                   key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-pill border px-3 py-1 text-xs ${activeTab === tab.id ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}
+                  className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${activeTab === tab.id ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}
                 >
-                  {tab.label}
-                </button>
+                  <input
+                    type="radio"
+                    name="broadcast-range"
+                    value={tab.id}
+                    checked={activeTab === tab.id}
+                    onChange={() => setActiveTab(tab.id)}
+                    className="sr-only"
+                  />
+                  <span className="inline-flex min-w-[20px] items-center justify-center">{tab.label}</span>
+                </label>
               ))}
               {activeTab === 'dedup' && <span className="text-xs text-ink-faint">同じ人が2つのアカウントの友だちでも、1回だけ送ります</span>}
             </div>

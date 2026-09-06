@@ -45,6 +45,7 @@ import MessageKindFields, {
 } from '@/components/scenarios/message-kind-fields'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
@@ -1289,16 +1290,15 @@ export default function BroadcastForm({
         段を増やすと手間が増えるだけになる。
       */}
       {currentStep && currentStep !== 'confirm' ? (
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold"
         >
           {currentStep === 'basic' ? '対象設定へ'
             : currentStep === 'audience' ? 'メッセージ設定へ'
               : currentStep === 'message' ? '送信設定へ'
                 : '配信前チェックへ'}
-        </button>
+        </Button>
       ) : (
         <button
           disabled={saving || lengthNotice.tone === 'error'}
