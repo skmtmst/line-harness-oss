@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 19,
-  "match": 58,
-  "structureMatchDataPending": 49,
-  "needsFix": 150,
+  "match": 65,
+  "structureMatchDataPending": 50,
+  "needsFix": 142,
   "unjudged": 3,
-  "remaining": 210,
+  "remaining": 203,
   "features": [
     {
       "feature": 1,
@@ -167,11 +167,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 12,
-      "match": 3,
+      "match": 8,
       "structureMatchDataPending": 3,
-      "needsFix": 5,
+      "needsFix": 0,
       "unjudged": 1,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 520,
@@ -280,6 +280,19 @@
             "ux7of"
           ],
           "note": "Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。"
+        },
+        {
+          "pr": 983,
+          "head": "36e8b070b",
+          "on": "2026-09-06",
+          "screens": [
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "r7eSi"
+          ],
+          "note": "Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。"
         }
       ]
     },
@@ -651,11 +664,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 14,
+      "match": 2,
+      "structureMatchDataPending": 5,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 13,
       "capturedAt": [
         {
           "pr": 543,
@@ -814,6 +827,27 @@
             "TmHjF"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`TmHjF`（一覧の状態）が今回は撮れた。**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。"
+        },
+        {
+          "pr": 979,
+          "head": "3c6e4ec948",
+          "on": "2026-09-06",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "u6gHt",
+            "EGMb1",
+            "sqFXf",
+            "TmHjF"
+          ],
+          "note": "Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。"
         }
       ]
     },
@@ -2291,8 +2325,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
-      "structureMatchDataPending": 5,
-      "needsFix": 1,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
@@ -2347,6 +2381,21 @@
             "syWp4"
           ],
           "note": "Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している"
+        },
+        {
+          "pr": 989,
+          "head": "44e671b2c",
+          "on": "2026-09-06",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "WjYAC",
+            "Vdbv5",
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。"
         }
       ]
     },

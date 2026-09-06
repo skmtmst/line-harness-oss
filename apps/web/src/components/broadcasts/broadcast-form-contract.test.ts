@@ -48,7 +48,7 @@ describe('一斉配信の作成', () => {
 
   it('上限超過を、押す前に本文の文字で出す', () => {
     /* 右の点検欄は宛先と本文が決まるまで出ないので、こちらは常に出す。 */
-    expect(FORM).toContain("{lengthNotice.tone === 'error' && (")
+    expect(FORM).toContain("{shows('message') && lengthNotice.tone === 'error' && (")
     expect(FORM).toContain('<p className="text-danger text-sm font-bold">{lengthNotice.title}</p>')
     expect(FORM, '押せない理由が吹き出しに出ない').toContain(
       "title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}",

@@ -638,7 +638,7 @@
     "arbitrary-value": 57
   },
   "components/friends/bulk-run-dialog.tsx": {
-    "unresolved-classname": 42
+    "unresolved-classname": 54
   },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
