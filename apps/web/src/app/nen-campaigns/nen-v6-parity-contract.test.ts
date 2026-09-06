@@ -43,6 +43,7 @@ describe('V6 21 NEN配信の画面契約', () => {
   it('誕生日配信の実行時刻をプレビューにも表示する', () => {
     expect(OVERVIEW).toContain('誕生日の3日前 10:00 に届きます')
     expect(OVERVIEW).toContain('FeatureLinkCard')
+    expect(OVERVIEW).toContain('setPreviewPetId(pet.id)')
     for (const label of ['中身を見る', '飼い主を見る', 'ペットのご紹介（聞きとり）']) {
       expect(OVERVIEW).toContain(label)
     }
