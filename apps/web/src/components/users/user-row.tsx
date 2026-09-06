@@ -165,14 +165,14 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
                 統合ユーザーを開く
               </Button>
             ) : null}
-            <button
+            <Button
               type="button"
-              className="whitespace-nowrap rounded-control bg-accent-deep px-3 py-2 text-xs font-bold text-on-accent hover:brightness-95"
+              variant="primary"
               aria-expanded={expanded}
               onClick={() => setExpanded((value) => !value)}
             >
               {expanded ? '閉じる' : '詳細を見る'}
-            </button>
+            </Button>
           </div>
         </td>
       </tr>

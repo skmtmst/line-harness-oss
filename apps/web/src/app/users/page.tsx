@@ -7,9 +7,9 @@ import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
 import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
+import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
 import type { UserRowData } from '@/components/users/user-row'
-import Link from 'next/link'
 
 const PAGE_SIZE = 50
 
@@ -175,9 +175,9 @@ export default function UsersPage() {
       <SummaryBar rows={rows} />
 
       <div className="flex flex-wrap items-stretch gap-2">
-        <Link href="/friends/identity-candidates" className="inline-flex items-center rounded-control bg-accent-deep px-4 text-xs font-bold text-on-accent hover:brightness-95">
+        <Button href="/friends/identity-candidates" variant="primary">
           ＋ 統合ユーザーを作成
-        </Link>
+        </Button>
         <div className="flex-1">
           <UsersFilters
             q={q}
@@ -193,7 +193,7 @@ export default function UsersPage() {
             }}
           />
         </div>
-        <button type="button" onClick={exportCsv} className="rounded-control border border-hairline bg-canvas px-4 text-xs font-semibold text-ink-secondary shadow-card hover:bg-canvas-sunken">CSVで書き出す</button>
+        <Button type="button" onClick={exportCsv}>CSVで書き出す</Button>
         <button
           type="button"
           onClick={() => setPendingForceRefresh(true)}

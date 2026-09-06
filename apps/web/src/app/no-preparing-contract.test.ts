@@ -110,7 +110,6 @@ const REMAINING: Record<string, number> = {
   'app/webinars/page.tsx': 1,
   'components/broadcasts/broadcast-form.tsx': 7,
   'components/events/event-wizard.tsx': 2,
-  'components/friends/bulk-run-dialog.tsx': 1,
   'components/friends/friend-timeline.tsx': 1,
 }
 

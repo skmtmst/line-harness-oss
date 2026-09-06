@@ -103,9 +103,9 @@ describe('重複検出で取れない数を作らない契約', () => {
   })
 
   it('取れない数は「—」と未接続の説明にする', () => {
-    expect(DUPLICATES_BODY).toContain('label="重複による配信コスト"')
+    expect(DUPLICATES_BODY).toContain('label="重複配信の削減"')
     expect(DUPLICATES_BODY).toContain('value="—"')
-    expect(DUPLICATES_BODY).toContain('まだ繋がっていません。配信実績が接続されると表示されます。')
+    expect(DUPLICATES_BODY).toContain('配信前プレビューの実績を接続後に表示')
   })
 
   it('読込中と取得失敗を状態の言葉でそろえる', () => {

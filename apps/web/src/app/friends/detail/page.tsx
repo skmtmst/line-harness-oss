@@ -8,6 +8,7 @@ import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 
 /**
@@ -319,8 +320,8 @@ function FriendDetailInner() {
               >
                 受信箱で開く
               </Link>
-              <button type="button" className="border-hairline text-ink rounded-control border bg-canvas px-4 py-2 text-sm font-medium">個別操作</button>
-              <button type="button" aria-label="その他の操作" className="border-hairline text-ink rounded-control border bg-canvas px-3 py-2 text-sm font-bold">…</button>
+              <Button type="button">個別操作</Button>
+              <Button type="button" aria-label="その他の操作">…</Button>
             </div>
           }
         />
@@ -352,8 +353,8 @@ function FriendDetailInner() {
               ) : <div className="bg-action flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold text-on-action">{friend?.displayName?.charAt(0) ?? '?'}</div>}
               <h2 className="text-ink mt-3 text-sm font-bold">{friend?.displayName ?? '名前未登録'}</h2>
               <p className="text-ink-faint mt-1 text-xs">LINE表示名</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px]">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-[11px]">表示中</span></div>
-              <Link href={`/friends/detail?id=${friendId}&tab=info`} className="border-hairline text-action mt-3 rounded-control border px-3 py-2 text-xs font-semibold">♙ 友だち詳細</Link>
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
+              <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
             </div>
 
             {/*
@@ -538,21 +539,21 @@ function FriendDetailInner() {
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">進行中の配信・自動処理</h2>
                     <dl className="text-ink-secondary mt-3 space-y-2 text-xs"><div className="flex gap-5"><dt className="font-semibold">シナリオ</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">リマインド</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">対象ルール</dt><dd>—</dd></div></dl>
-                    <button type="button" disabled className="border-hairline text-ink-faint mt-3 rounded-control border px-3 py-2 text-xs">配信状態を確認</button>
+                    <Button type="button" disabled className="mt-3">配信状態を確認</Button>
                   </section>
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">同じ人としてつながる情報</h2>
                     <p className="text-ink-secondary mt-3 text-xs">現在は1アカウントのみ</p>
                     <p className="text-ink-faint mt-3 text-xs">重複候補が見つかると、根拠と確信度を表示します。</p>
-                    <Link href="/duplicates" className="border-hairline text-ink mt-3 inline-flex rounded-control border px-3 py-2 text-xs font-semibold">重複候補を確認</Link>
+                    <Button href="/duplicates" className="mt-3">重複候補を確認</Button>
                   </section>
                 </div>
                 <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
                   <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent text-xs font-semibold">すべてを見る →</Link></div>
-                  <div className="bg-canvas-sunken border-hairline grid grid-cols-[140px_160px_1fr_140px] border-y px-4 py-3 text-xs font-semibold text-ink-faint"><span>日時</span><span>種別</span><span>内容</span><span>担当者</span></div>
-                  <div className="text-ink-secondary grid grid-cols-[140px_160px_1fr_140px] px-4 py-5 text-xs"><span>{friend?.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend?.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
+                  <div className="bg-canvas-sunken border-hairline grid border-y px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>担当者</span></div>
+                  <div className="text-ink-secondary grid px-4 py-5 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend?.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend?.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
                 </section>
-                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2><div className="mt-3 flex flex-wrap gap-2"><Link href={`/chats?friendId=${friendId}`} className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-bold">受信箱で開く</Link><button type="button" disabled className="border-accent text-accent rounded-control border px-3 py-2 text-xs font-semibold">ϟ アクションを実行</button><Link href="/templates" className="border-hairline text-ink rounded-control border px-3 py-2 text-xs font-semibold">テンプレートを送信</Link><Link href="/scenarios" className="border-hairline text-ink rounded-control border px-3 py-2 text-xs font-semibold">シナリオを操作</Link><Link href="/reminders" className="border-hairline text-ink rounded-control border px-3 py-2 text-xs font-semibold">リマインダを設定</Link></div></section>
+                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2><div className="mt-3 flex flex-wrap gap-2"><Button href={`/chats?friendId=${friendId}`} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button><button type="button" disabled className="border-accent text-accent rounded-control border px-3 py-2 text-xs font-semibold">ϟ アクションを実行</button><Button href="/templates">テンプレートを送信</Button><Button href="/scenarios">シナリオを操作</Button><Button href="/reminders">リマインダを設定</Button></div></section>
               </div>
             )}
 

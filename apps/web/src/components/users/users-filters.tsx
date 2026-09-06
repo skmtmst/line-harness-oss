@@ -42,7 +42,7 @@ export default function UsersFilters({
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
-        className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm text-[#1D1D1F]"
+        className="rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink"
       >
         <option value="">UID：すべて</option>
         <option value="linked">UID：連携済み</option>

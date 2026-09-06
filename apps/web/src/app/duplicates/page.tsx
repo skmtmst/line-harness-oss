@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
+import { Th } from '@/components/shared/table'
 import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem } from '@line-crm/shared'
@@ -183,13 +185,19 @@ export default function DuplicatesPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
             <div className="flex flex-1 flex-wrap items-center gap-2">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・電話で検索" className="h-10 min-w-60 rounded-control border border-hairline bg-canvas px-3 text-sm" />
-              <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold">
-                <option value="">状態：すべて</option>
-                <option value="pending">状態：未確認</option>
-                <option value="linked">状態：確認済み</option>
-                <option value="deferred">状態：保留</option>
-                <option value="different">状態：別人</option>
-              </select>
+              <Select
+                aria-label="状態で絞り込む"
+                label="状態"
+                value={status}
+                onChange={setStatus}
+                options={[
+                  { value: '', label: 'すべて' },
+                  { value: 'pending', label: '未確認' },
+                  { value: 'linked', label: '確認済み' },
+                  { value: 'deferred', label: '保留' },
+                  { value: 'different', label: '別人' },
+                ]}
+              />
             </div>
             <div className="flex items-center gap-3">
               {data.computedAt && (
@@ -210,8 +218,8 @@ export default function DuplicatesPage() {
 
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
             <table className="w-full table-fixed text-sm">
-              <colgroup><col className="w-[18%]"/><col className="w-[10%]"/><col className="w-[27%]"/><col className="w-[18%]"/><col className="w-[12%]"/><col className="w-[8%]"/><col className="w-[12%]"/></colgroup>
-              <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary"><tr><th className="px-3 py-3">候補</th><th className="px-3 py-3">確信度</th><th className="px-3 py-3">一致した根拠</th><th className="px-3 py-3">所属アカウント</th><th className="px-3 py-3">最終更新</th><th className="px-3 py-3">状態</th><th className="px-3 py-3">操作</th></tr></thead>
+              <colgroup><col style={{ width: '18%' }}/><col style={{ width: '10%' }}/><col style={{ width: '27%' }}/><col style={{ width: '18%' }}/><col style={{ width: '12%' }}/><col style={{ width: '8%' }}/><col style={{ width: '12%' }}/></colgroup>
+              <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary"><tr><Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th>操作</Th></tr></thead>
               <tbody className="divide-y divide-hairline">
                 {visibleCandidates.length ? visibleCandidates.map((candidate) => (
                   <tr key={candidate.id}>
@@ -221,7 +229,7 @@ export default function DuplicatesPage() {
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
-                    <td className="px-3 py-2"><a href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`} className="inline-flex rounded-control bg-accent-deep px-3 py-2 text-xs font-semibold text-on-accent">重複候補を確認</a></td>
+                    <td className="px-3 py-2"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`} variant="primary">重複候補を確認</Button></td>
                   </tr>
                 )) : <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">条件に合う重複候補はありません</td></tr>}
               </tbody>
