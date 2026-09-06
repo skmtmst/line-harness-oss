@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 
 const db = vi.hoisted(() => ({
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => db.getLineAccounts(...args)),
   listFriendAddEvents: vi.fn(),
   getTags: vi.fn(),
   getStaffById: vi.fn(),

@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 241,
+  "compared": 242,
   "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 30,
-  "match": 80,
-  "structureMatchDataPending": 62,
-  "needsFix": 120,
+  "missing": 29,
+  "match": 81,
+  "structureMatchDataPending": 63,
+  "needsFix": 118,
   "unjudged": 5,
-  "remaining": 188,
+  "remaining": 187,
   "features": [
     {
       "feature": 1,
@@ -1832,11 +1832,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 8,
-      "needsFix": 3,
+      "match": 1,
+      "structureMatchDataPending": 9,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 549,
@@ -1973,6 +1973,16 @@
             "s6MBc"
           ],
           "note": "Issue #230 のS3第2段。Pencilの実ノードと同じ状態を1440・1920で横に並べて確認した。全対象で横スクロール0。絵は版に残さず `.txt` と判定注記を証拠にする。"
+        },
+        {
+          "pr": 1041,
+          "head": "16e2331cb",
+          "on": "2026-09-07",
+          "screens": [
+            "s98Vfw",
+            "s6MBc"
+          ],
+          "note": "Issue #230 の残件2画面。3104/8791で通常と全状態を1440・1920px撮影し、正本と同じ入力で左右比較した。全12枚で横はみ出し0。s6MBcは一致、s98Vfwは未接続API値を作らず構造一致・データ未接続。"
         }
       ]
     },
@@ -2270,11 +2280,11 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 1,
+      "compared": 2,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 3,
+      "missing": 2,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 1,
@@ -2295,6 +2305,15 @@
             "N2J629"
           ],
           "note": "development そのもので撮った。「理由を選んで見送る」→「見送る」に名前が変わっていた"
+        },
+        {
+          "pr": 1044,
+          "head": "98588d0275",
+          "on": "2026-09-07",
+          "screens": [
+            "Qu6Vk"
+          ],
+          "note": "Issue #235。3105/8792で通常・読込・空・失敗・権限不足の全12枚を1440/1920px撮影。全画像で横はみ出し0。残る審査時間・注意候補・一括審査API差は判定注記へ記録した。"
         }
       ]
     },

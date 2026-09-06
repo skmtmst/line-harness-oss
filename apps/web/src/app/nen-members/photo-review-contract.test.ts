@@ -24,6 +24,7 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('kind="loading"');
     expect(page).toContain('kind="empty"');
     expect(page).toContain('kind="error"');
+    expect(page).toContain('kind="forbidden"');
     expect(page).toContain('onRetry={() => void load()}');
     expect(page).toContain("countsReady ? counts.pending : '—'");
     expect(page).toContain("countsReady ? counts[value] : '—'");
@@ -43,7 +44,9 @@ describe('V6 photo review contract', () => {
   it('uses one set of operator words for reviewed states', () => {
     expect(page).toContain("['adopted', '通したもの']");
     expect(page).toContain("['rejected', '戻したもの']");
-    expect(page).toContain('通して5pt付与');
+    expect(page).toContain("['pending', '見ていないもの']");
+    expect(page).toContain("reviewing === photo.id ? '処理中...' : '通す'");
+    expect(page).toContain('response.data.awardedPoints');
     expect(page).not.toContain('承認済');
     expect(page).not.toContain('採用済み');
   });

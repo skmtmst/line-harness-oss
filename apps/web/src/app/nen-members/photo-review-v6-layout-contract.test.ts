@@ -22,6 +22,7 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
     // ボタン列で代用しない。押しボタンの帯は高さ40で、タブ帯の44にならない。
     expect(PAGE).not.toContain('rounded-control px-4 py-2.5')
     expect(readFileSync(join(SHARED, 'tabs.module.css'), 'utf8')).toContain('height: 44px;')
+    expect(PAGE.indexOf('<Tabs')).toBeLessThan(PAGE.indexOf('data-design="KPIs"'))
   })
 
   it('件数が取れていないときは — を出し、0件と読み替えない', () => {
@@ -42,10 +43,10 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
     expect(CSS).toMatch(/\.sideCard\s*\{[^}]*border-radius: var\(--radius-card\);/)
   })
 
-  it('自動で戻す条件は未接続として出し、数を作らない', () => {
-    expect(PAGE).toContain('自動で戻す条件')
+  it('AIは確認順の補助に限り、人の判断を自動化しない', () => {
+    expect(PAGE).toContain('確認順を決める条件')
     expect(PAGE).toContain(
-      'まだ繋がっていません。自動審査の口が接続されると表示されます。公開するかどうかは、いまも人が決めます。',
+      '注意候補APIがつながると、確認を急ぐ写真を先に並べます。通す・戻す・公開する判断は、必ず人が行います。',
     )
     // 口が無いのに「自動で戻しました」と読める押し口・件数を置かない。
     expect(PAGE).not.toContain('自動で戻しました')
@@ -65,8 +66,23 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
 
   it('つながる先は共通部品で出す', () => {
     expect(PAGE).toContain("import { FeatureLinkCard } from '@/components/shared/side-cards'")
-    for (const href of ['/nen-campaigns', '/line-notifications', '/ec-commerce']) {
+    for (const href of ['/chats', '/friends', '/ec-commerce', '/contents', '/templates']) {
       expect(PAGE, `${href} への行き先がありません`).toContain(`href: '${href}'`)
     }
+  })
+
+  it('1920pxでは設計どおり4列で並べ、右390pxを残す', () => {
+    expect(PAGE).toContain('mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6')
+    expect(PAGE).toContain('grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4')
+    expect(CSS).toContain('grid-template-columns: minmax(0, 1fr) 390px;')
+  })
+
+  it('選択と一括操作の場所を出し、未接続の操作を実行可能に見せない', () => {
+    expect(PAGE).toContain('枚を選択中')
+    expect(PAGE).toContain('togglePhotoSelection')
+    expect(PAGE).toContain('まとめて通す')
+    expect(PAGE).toContain('まとめて戻す')
+    expect(PAGE).toContain('一括審査はAPI接続待ちです')
+    expect(PAGE).toContain('<Button variant="primary" disabled title="一括審査APIがつながると使えます">')
   })
 })

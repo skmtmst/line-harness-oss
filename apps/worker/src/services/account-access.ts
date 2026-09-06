@@ -1,8 +1,8 @@
 import {
-  getLineAccounts,
+  getLineAccountScopeEntries,
   getStaffAccountScopeIds,
   getStaffById,
-  type LineAccount,
+  type LineAccountScopeEntry,
 } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
@@ -13,10 +13,10 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
  * tenant_id が未設定の既存行は既定統括に属するものとして扱い、管理画面から
  * 行方不明にならないようにする。親子階層は認可に使わない。
  */
-export function filterVisibleLineAccounts(
-  accounts: LineAccount[] | undefined,
+export function filterVisibleLineAccounts<T extends { tenant_id: string | null }>(
+  accounts: readonly T[] | undefined,
   staff: AuthenticatedStaff | undefined,
-): LineAccount[] {
+): T[] {
   // 認証されていない呼び出しを、既定統括のスタッフとして扱わない。
   if (!staff) return [];
   const staffTenant = staff?.tenantId ?? DEFAULT_TENANT_ID;
@@ -25,8 +25,8 @@ export function filterVisibleLineAccounts(
   );
 }
 
-export function canAccessLineAccount(
-  accounts: LineAccount[] | undefined,
+export function canAccessLineAccount<T extends { id: string; tenant_id: string | null }>(
+  accounts: readonly T[] | undefined,
   staff: AuthenticatedStaff | undefined,
   accountId: string,
 ): boolean {
@@ -34,7 +34,7 @@ export function canAccessLineAccount(
 }
 
 export type VisibleLineAccountScope = {
-  accounts: LineAccount[];
+  accounts: LineAccountScopeEntry[];
   /** Account IDs that every scoped query must filter against. */
   allowedAccountIds: string[];
   /** Only the default tenant may see legacy rows without an account assignment. */
@@ -59,8 +59,11 @@ export async function getVisibleLineAccountScope(
       isAccountScoped: true,
     };
   }
-  const allAccounts = await getLineAccounts(db);
-  const tenantAccounts = filterVisibleLineAccounts(allAccounts, staff);
+  const staffTenant = staff.tenantId ?? DEFAULT_TENANT_ID;
+  const tenantAccounts = filterVisibleLineAccounts(
+    await getLineAccountScopeEntries(db, staffTenant),
+    staff,
+  );
   if (staff?.id === 'env-owner') {
     const allowedAccountIds = tenantAccounts.map((account) => account.id);
     return {
@@ -82,7 +85,6 @@ export async function getVisibleLineAccountScope(
     ? tenantAccounts.filter((account) => scopedIds.has(account.id))
     : tenantAccounts;
   const allowedAccountIds = accounts.map((account) => account.id);
-  const staffTenant = staff?.tenantId ?? DEFAULT_TENANT_ID;
   return {
     accounts,
     allowedAccountIds,
@@ -108,7 +110,7 @@ export type HierarchyRelationship = { id: string; parentLineAccountId: string | 
 
 /** 親子関係が循環せず、親・子・孫の3階層以内に収まることを検証する。 */
 export function validateAccountHierarchy(
-  accounts: LineAccount[],
+  accounts: Array<{ id: string; parent_line_account_id: string | null }>,
   relationships: HierarchyRelationship[],
 ): string | null {
   const ids = new Set(accounts.map((account) => account.id));
