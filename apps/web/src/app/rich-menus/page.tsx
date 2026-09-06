@@ -36,7 +36,7 @@ const UNFILED = '__unfiled__'
 
 type SortKey = 'taps' | 'updated' | 'name' | 'priority'
 
-type RichMenuAction = 'load' | 'reorder' | 'delete' | 'externalDelete' | 'import'
+type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import'
 
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
 function richMenuError(error: unknown, action: RichMenuAction): string {
@@ -58,6 +58,8 @@ function richMenuError(error: unknown, action: RichMenuAction): string {
       return 'リッチメニューの順番を変更できませんでした。一覧を読み直してから、もう一度お試しください。'
     case 'delete':
       return 'リッチメニューを削除できませんでした。状態を確認して、もう一度お試しください。'
+    case 'unpublish':
+      return 'リッチメニューをLINEから取り下げられませんでした。状態を確認して、もう一度お試しください。'
     case 'externalDelete':
       return 'LINE上のリッチメニューを削除できませんでした。LINEの状態を確認して、もう一度お試しください。'
     case 'import':
@@ -166,8 +168,6 @@ export default function RichMenusListPage() {
   const impactRequestGenerationRef = useRef(0)
   /** 同じ窓の読み直しで、前の読み込み結果が後から上書きしないための世代。 */
   const impactLoadGenerationRef = useRef(0)
-  const [publishedDeleteTarget, setPublishedDeleteTarget] =
-    useState<RichMenuGroupListItem | null>(null)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
   const [importBusy, setImportBusy] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
@@ -185,7 +185,6 @@ export default function RichMenusListPage() {
     setExternalError(null)
     setApplyTo(null)
     setDeleteTarget(null)
-    setPublishedDeleteTarget(null)
     setImportTarget(null)
     setImportBusy(false)
     setImportError(null)
@@ -341,10 +340,6 @@ export default function RichMenusListPage() {
   }
 
   function handleDelete(group: RichMenuGroupListItem) {
-    if (group.status === 'published') {
-      setPublishedDeleteTarget(group)
-      return
-    }
     setDeleteError(null)
     setDeleteTarget({ kind: 'managed', group })
     if (!selectedAccount?.id) return
@@ -363,12 +358,16 @@ export default function RichMenusListPage() {
     if (!deleteTarget || deleteBusy) return
     const request = impactRequestRef.current
     if (!request) return
-    const action: RichMenuAction = deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'
+    const action: RichMenuAction = deleteTarget.kind === 'managed'
+      ? deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'
+      : 'externalDelete'
     setDeleteBusy(true)
     setDeleteError(null)
     try {
       if (deleteTarget.kind === 'managed') {
-        const res = await api.richMenuGroups.delete(deleteTarget.group.id)
+        const res = deleteTarget.group.status === 'published'
+          ? await api.richMenuGroups.unpublish(deleteTarget.group.id)
+          : await api.richMenuGroups.delete(deleteTarget.group.id)
         if (!res.success) throw new Error('delete_failed')
       } else {
         if (!selectedAccount?.id) throw new Error('account_missing')
@@ -849,7 +848,7 @@ export default function RichMenusListPage() {
                 </Link>
                 <button
                   onClick={() => handleDelete(g)}
-                  data-qa-open={g.status === 'published' ? 'szXsT-published' : 'szXsT'}
+                  data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'}
                   className="text-ink-faint hover:text-red-600 hover:underline"
                   title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
                 >
@@ -933,34 +932,6 @@ export default function RichMenusListPage() {
       />
 
       <ConfirmDialog
-        open={publishedDeleteTarget !== null}
-        designNode="szXsT"
-        title={
-          publishedDeleteTarget
-            ? `「${publishedDeleteTarget.name}」は先にLINEから取り下げてください`
-            : '先にLINEから取り下げてください'
-        }
-        description="LINEに登録中のリッチメニューは、管理画面だけから削除できません。いまは削除していません。"
-        cancelLabel="閉じる"
-        onCancel={() => setPublishedDeleteTarget(null)}
-      >
-        <ol className="space-y-2 text-sm text-ink-secondary">
-          <li>
-            <strong className="text-ink">次にすること：</strong>
-            「編集」→「危険な操作」→「LINEから取り下げ」の順に進んでください。
-          </li>
-          <li>
-            <strong className="text-ink">そのあと：</strong>
-            一覧へ戻り、改めて「削除」を選んでください。
-          </li>
-          <li>
-            <strong className="text-ink">いま残っているもの：</strong>
-            LINE上の表示、管理画面の設定、これまでのタップ記録は変更していません。
-          </li>
-        </ol>
-      </ConfirmDialog>
-
-      <ConfirmDialog
         open={deleteTarget !== null}
         designNode="szXsT"
         title={
@@ -970,11 +941,13 @@ export default function RichMenusListPage() {
         }
         description={
           deleteTarget?.kind === 'managed'
-            ? '管理画面に保存したこのリッチメニューを削除します。LINEに登録中のメニューは、先に取り下げない限り削除できません。'
+            ? deleteTarget.group.status === 'published'
+              ? 'いま表示中の人と使用先を確認し、まずLINEから取り下げます。取り下げても管理画面の設定は残ります。'
+              : '管理画面に保存したこのリッチメニューを削除します。元には戻せません。'
             : 'この管理画面外で作成されたリッチメニューを、LINE公式アカウントから削除します。'
         }
-        confirmLabel={deleteTarget?.kind === 'external' ? 'LINEから削除' : '削除する'}
-        destructive
+        confirmLabel={deleteTarget?.kind === 'external' ? 'LINEから削除' : deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'published' ? 'LINEから取り下げる' : '削除する'}
+        destructive={deleteTarget?.kind === 'external' || (deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'draft')}
         busy={deleteBusy}
         error={deleteError ?? undefined}
         onCancel={() => {
@@ -987,7 +960,7 @@ export default function RichMenusListPage() {
           setImpact(null)
           setImpactPhase('idle')
         }}
-        {...(deleteTarget?.kind === 'external' || canDeleteImpact({ impact, busy: deleteBusy })
+        {...(deleteTarget?.kind === 'external' || (deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'published') || canDeleteImpact({ impact, busy: deleteBusy })
           ? { onConfirm: () => void confirmDelete() }
           : {})}
       >
@@ -995,16 +968,19 @@ export default function RichMenusListPage() {
           <>
             <ul className="space-y-2 text-sm text-ink-secondary">
               <li>
-                <strong className="text-ink">消えるもの：</strong>
-                このリッチメニューの設定と画像
+                <strong className="text-ink">{deleteTarget.group.status === 'published' ? '取り下げるもの：' : '消えるもの：'}</strong>
+                {deleteTarget.group.status === 'published' ? 'LINE上のこのリッチメニュー' : 'このリッチメニューの設定と画像'}
               </li>
               <li>
                 <strong className="text-ink">残るもの：</strong>
-                同じフォルダのほかのメニューと、これまでのタップ記録
+                {deleteTarget.group.status === 'published' ? '管理画面の設定と、これまでのタップ記録' : '同じフォルダのほかのメニューと、これまでのタップ記録'}
               </li>
-              <li>
-                <strong className="text-danger">元に戻せません。</strong>
-              </li>
+              {deleteTarget.group.status === 'draft' ? <li>
+                 <strong className="text-danger">元に戻せません。</strong>
+              </li> : <>
+                <li><strong className="text-accent">取り下げは、もう一度公開すれば戻せます。</strong></li>
+                <li>取り下げたあと、管理画面から削除できます。</li>
+              </>}
             </ul>
             {/*
               消したあとに何が起きるか（契約 #608）。読込・失敗・通常を
@@ -1233,7 +1209,7 @@ function ExternalSection({
                       <div className="flex flex-col items-end gap-1">
                         <button
                           onClick={() => onImport(m)}
-                          data-qa-open="TL7tp"
+                        data-qa-open="TL7tp"
                           className="text-accent text-xs font-medium hover:underline"
                           title="管理画面に取り込んで以後 UI で操作可能にする"
                         >
@@ -1241,6 +1217,7 @@ function ExternalSection({
                         </button>
                         <button
                           onClick={() => onDeleteExternal(m)}
+                          data-qa-open="szXsT-external"
                           className="text-xs text-ink-faint hover:text-red-600 hover:underline"
                           title="LINE から削除 (管理画面外メニューのみ)"
                         >
