@@ -3694,6 +3694,19 @@ const ISSUE_212_REVIEW = {
   },
 }
 
+/**
+ * board #305。development bb8a139b3 を取り込んだ枝を 3107/8794 で起動し、
+ * tksPc の通常・読込中・取得失敗を1440/1920pxで再撮影して設計と比較した。
+ */
+const ISSUE_305_REVIEW = {
+  tksPc: {
+    verdict: 'structure_match_data_pending',
+    note: '曜日別の受付時間、担当者の切替、特別な休み・営業、予約ルール、顧客向けカレンダープレビュー、困りごと、関連画面、Googleカレンダー連携を設計順へそろえた。通常・読込中・取得失敗を1440/1920pxで撮影し、全6枚で横はみ出し0。残る差は、店舗共通の営業時間と複数休憩、休業理由つき例外日、店舗・設備単位の同時受付数、顧客向け○△×休プレビューを返すAPIがないこと。存在しない値を作らず、現在取得できる担当者別時間・特別営業時間・メニュー別ルール・Google連携だけを表示しているため一致にはしない。',
+    source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + 2026-09-07 1440/1920px screenshots',
+    head: '21a00b890',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -3827,6 +3840,13 @@ for (const screen of SCREENS) {
     screen.verdictSource = issue212Review.source
     screen.verdictHead = issue212Review.head ?? 'bf7434ff'
     if (issue212Review.states) screen.states = issue212Review.states
+  }
+  const issue305Review = ISSUE_305_REVIEW[screen.node]
+  if (screen.feature === 28 && issue305Review) {
+    screen.verdict = issue305Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #305で修正・再判定。** ${issue305Review.note}`
+    screen.verdictSource = issue305Review.source
+    screen.verdictHead = issue305Review.head
   }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
@@ -4287,6 +4307,7 @@ export const CAPTURED_AT = {
     { pr: 983, head: '36e8b070b', on: '2026-09-06', screens: ['IAf7j','I6UAdr','bzDn6','YzxU1','r7eSi'], note: 'Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。' },
   ],
   28: [
+    { pr: 0, head: '21a00b890', on: '2026-09-07', screens: ['tksPc'], note: 'Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。' },
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['QSLEH', 'GhOb3'], note: 'development そのもので撮った' },
