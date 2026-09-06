@@ -7,8 +7,8 @@
   "elsewhere": 0,
   "missing": 7,
   "match": 58,
-  "structureMatchDataPending": 47,
-  "needsFix": 152,
+  "structureMatchDataPending": 44,
+  "needsFix": 155,
   "unjudged": 3,
   "remaining": 210,
   "features": [
@@ -2291,8 +2291,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
-      "structureMatchDataPending": 5,
-      "needsFix": 1,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
