@@ -99,6 +99,7 @@ shared-button-importer app/templates/template-button.ts
 shared-button-importer app/users/page.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
+shared-button-importer app/webhooks/webhook-overviews.tsx
 shared-button-importer app/webinars/edit/page.tsx
 shared-button-importer app/webinars/new/page.tsx
 shared-button-importer app/webinars/page.tsx

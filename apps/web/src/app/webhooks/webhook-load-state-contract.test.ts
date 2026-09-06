@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
 
 describe('V6 外部連携の一覧状態', () => {
   it('受信と送信を別々に読込・成功・失敗へ分ける', () => {
@@ -28,17 +29,21 @@ describe('V6 外部連携の一覧状態', () => {
   })
 
   it('失敗を空状態や古い一覧として表示しない', () => {
-    const errorBranch = PAGE.indexOf("activeStatus === 'error'")
-    const emptyBranch = PAGE.indexOf("incoming.length === 0 && !showCreate")
-    expect(errorBranch).toBeGreaterThan(-1)
-    expect(emptyBranch).toBeGreaterThan(errorBranch)
-    expect(PAGE).toContain('登録内容は消えていません。')
+    const outgoingStart = OVERVIEWS.indexOf('export function OutgoingOverview')
+    const incomingStart = OVERVIEWS.indexOf('export function IncomingOverview')
+    const outgoing = OVERVIEWS.slice(outgoingStart, incomingStart)
+    const incoming = OVERVIEWS.slice(incomingStart)
+    expect(outgoing.indexOf("status === 'error'")).toBeGreaterThan(-1)
+    expect(outgoing.indexOf('items.length === 0 && !showCreate')).toBeGreaterThan(outgoing.indexOf("status === 'error'"))
+    expect(incoming.indexOf("status === 'error'")).toBeGreaterThan(-1)
+    expect(incoming.indexOf('!selected && !showCreate')).toBeGreaterThan(incoming.indexOf("status === 'error'"))
+    expect(OVERVIEWS.match(/登録内容は消えていません。/g)).toHaveLength(2)
     expect(PAGE).toContain("setIncoming([])\n      setIncomingStatus('error')")
     expect(PAGE).toContain("setOutgoing([])\n      setOutgoingStatus('error')")
   })
 
   it('失敗時に再読み込みできる', () => {
-    expect(PAGE).toContain('onClick={() => void load()}')
-    expect(PAGE).toContain('{activeLabel}を再読み込み')
+    expect(PAGE.match(/onReload=\{\(\) => void load\(\)\}/g)).toHaveLength(2)
+    expect(OVERVIEWS.match(/onClick=\{onReload\}/g)).toHaveLength(2)
   })
 })
