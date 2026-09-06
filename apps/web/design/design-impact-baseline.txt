@@ -13,8 +13,10 @@ shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/automations/page.tsx
+shared-button-importer app/booking/bookings/booking-calendar.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/menus/new/page.tsx
+shared-button-importer app/booking/bookings/page.tsx
 shared-button-importer app/booking/menus/page.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/page.tsx

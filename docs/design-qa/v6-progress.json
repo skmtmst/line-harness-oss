@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 30,
-  "match": 76,
+  "match": 80,
   "structureMatchDataPending": 61,
-  "needsFix": 125,
+  "needsFix": 121,
   "unjudged": 5,
-  "remaining": 192,
+  "remaining": 188,
   "features": [
     {
       "feature": 1,
@@ -21,11 +21,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 2,
+      "match": 5,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 2,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 419,
@@ -49,6 +49,16 @@
             "JN6mQ"
           ],
           "note": "Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。"
+        },
+        {
+          "pr": 1028,
+          "head": "7cc11af48",
+          "on": "2026-09-07",
+          "screens": [
+            "vUXKb",
+            "JN6mQ"
+          ],
+          "note": "Issue #267。#270の指標APIと#277の撮影モックを接続し、3102/8789で1440・1920pxを再撮影。両画面とも横はみ出し0、表示中の本文差0。有効友だち398人、送信枠197/200、7日推移、公式lin.ee URL、実QRを確認して一致にした。"
         }
       ]
     },
@@ -2288,8 +2298,8 @@
       "elsewhere": 0,
       "missing": 2,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 2,
+      "structureMatchDataPending": 2,
+      "needsFix": 0,
       "unjudged": 2,
       "remaining": 4,
       "capturedAt": [
@@ -2527,11 +2537,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 2,
       "structureMatchDataPending": 0,
-      "needsFix": 7,
+      "needsFix": 5,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 5,
       "capturedAt": [
         {
           "pr": 459,

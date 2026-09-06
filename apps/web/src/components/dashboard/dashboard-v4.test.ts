@@ -17,6 +17,7 @@ import {
   markDashboardNotificationRead,
 } from './notification-summary'
 import { formatTrendSources } from './friend-trend-table'
+import { resolveOfficialProfileUrl } from './qr-dialog'
 import type { BookingRequest } from '@/lib/api'
 import type { NotificationCenterData, StaffMember } from '@line-crm/shared'
 
@@ -53,6 +54,26 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(qrDialog).toContain('ダウンロード形式')
     expect(qrDialog).toContain('画像をダウンロード')
     expect(qrDialog).not.toContain('PNGをダウンロード')
+    expect(qrDialog).toContain("import QRCode from 'qrcode'")
+    expect(qrDialog).toContain('QRCode.toDataURL(link')
+    expect(qrDialog).toContain('src={qrDataUrl || qrSrc}')
+  })
+
+  it('新APIの指標を使い、旧Workerの値へだけ後方互換する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('data?.metrics?.friendTrend')
+    expect(source).toContain('data?.metrics?.monthlyQuota')
+    expect(source).toContain('data.metrics.activeFriends.value')
+    expect(source).toContain('data.metrics.officialProfileUrl.value')
+  })
+
+  it('基本QRはAPIのlin.ee短縮URLを優先し、旧WorkerだけbasicIdへ戻す', () => {
+    expect(resolveOfficialProfileUrl('https://lin.ee/nen-official', '@nen')).toBe(
+      'https://lin.ee/nen-official',
+    )
+    expect(resolveOfficialProfileUrl(undefined, 'nen')).toBe('https://line.me/R/ti/p/@nen')
+    expect(resolveOfficialProfileUrl(null, 'nen')).toBeNull()
+    expect(resolveOfficialProfileUrl(null, null)).toBeNull()
   })
 
   it('画面名はV6共通トップバーだけに表示する', () => {

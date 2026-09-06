@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -256,6 +257,14 @@ export default function NewProxyBookingPage() {
 
   return (
     <div data-design-node={NODE_BY_STEP[step]} className="space-y-4 pb-24">
+      <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
+        <Link href="/booking/bookings" className="text-accent">予約</Link>
+        <span className="mx-2">›</span>
+        <Link href="/booking/bookings" className="text-accent">予約管理</Link>
+        <span className="mx-2">›</span>
+        <span>電話の予約を入れる</span>
+      </nav>
+
       {error && (
         <div className="border-danger bg-danger-bg text-danger rounded-card border px-4 py-3 text-sm">
           {error}
@@ -263,9 +272,9 @@ export default function NewProxyBookingPage() {
       )}
 
       {step === 'input' && (
-        <div className="grid gap-4 xl:flex">
+        <div data-design="Body" className="grid gap-4 xl:flex">
           <div className="min-w-0 flex-1 space-y-4">
-            <Card title="だれの予約ですか">
+            <Card title="だれの予約ですか" note="LINEの友だちなら、名前で探して結びつけてください。">
               {friend ? (
                 <div className="border-hairline bg-canvas-sunken flex items-center justify-between rounded-control border px-3 py-3">
                   <div>
@@ -282,7 +291,7 @@ export default function NewProxyBookingPage() {
                   <input
                     value={friendQuery}
                     onChange={(event) => setFriendQuery(event.target.value)}
-                    placeholder="名前を2文字以上入力"
+                    placeholder="名前・電話番号で探す"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                   />
                   {friends.length > 0 && (
@@ -304,7 +313,7 @@ export default function NewProxyBookingPage() {
               </p>
             </Card>
 
-            <Card title="いつ・何を予約しますか">
+            <Card title="いつ・何を">
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="予約メニュー">
                   <Select
@@ -342,19 +351,62 @@ export default function NewProxyBookingPage() {
                   />
                 </Field>
               </div>
+              {date && time && selectedStaff && menu ? (
+                <div className="border-success bg-success-bg text-success mt-3 rounded-control border px-3 py-2 text-xs font-semibold">
+                  {dateLabel(date, time)} は空いています。{selectedStaff.duration_minutes}分のメニューです。
+                </div>
+              ) : null}
             </Card>
 
             <Card title="お客様からの要望">
               <textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
             </Card>
+
+            <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。">
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <span className="text-success font-bold">✓</span>
+                  <div><p className="text-ink text-sm font-medium">予約を受け付けたことを、いますぐLINEに送る</p><p className="text-ink-faint mt-0.5 text-xs">日時・メニュー・担当を書いた案内が届きます。</p></div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="text-success font-bold">✓</span>
+                  <div><p className="text-ink text-sm font-medium">前日に思い出してもらう</p><p className="text-ink-faint mt-0.5 text-xs">予約設定から計算した時刻に送ります。</p></div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="text-success font-bold">✓</span>
+                  <div><p className="text-ink text-sm font-medium">当日のお知らせを送る</p><p className="text-ink-faint mt-0.5 text-xs">開始まで十分な時間がある場合だけ送ります。</p></div>
+                </div>
+              </div>
+            </Card>
           </div>
 
-          <div className="w-full xl:flex-none" style={{ maxWidth: 390 }}>
-            <Card title="何を送りますか">
-              <p className="text-ink text-sm font-medium">予約確認LINE</p>
-              <p className="text-ink-faint mt-1 text-xs">予約登録後、選択した友だちへ確認を送ります。</p>
-              <p className="text-ink mt-4 text-sm font-medium">リマインダ</p>
-              <p className="text-ink-faint mt-1 text-xs">実際の送信時刻は予約設定から計算します。固定の時刻は表示しません。</p>
+          <div data-design="Right" className="w-full space-y-4 xl:flex-none" style={{ maxWidth: 390 }}>
+            <Card title={friend ? `${friend.displayName}さんにはこう届きます` : 'お客様にはこう届きます'}>
+              <div className="rounded-card bg-action-soft p-3">
+                <p className="text-action mb-2 text-center text-xs font-semibold">LINEプレビュー</p>
+                <div className="rounded-card bg-canvas p-4 text-sm leading-6">
+                  <p>{friend?.displayName ?? 'お客様'}さま</p>
+                  <p className="font-semibold">ご予約を承りました。</p>
+                  <p className="mt-3">{date && time ? dateLabel(date, time) : '日時を選ぶと表示されます'}</p>
+                  <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
+                </div>
+              </div>
+            </Card>
+            <Card title="この方について">
+              {friend ? (
+                <div className="space-y-2 text-xs">
+                  <p><strong className="text-success">LINEと結びついています</strong></p>
+                  <p className="text-ink-faint">来店履歴と前回の申し送りは、友だち詳細で確認できます。</p>
+                </div>
+              ) : <p className="text-ink-faint text-xs">友だちを選ぶと、連絡方法と来店履歴を確認できます。</p>}
+            </Card>
+            <Card title="つながる先">
+              <div className="text-ink-secondary space-y-2 text-xs">
+                <p>→ 予約管理　入れたあとの台帳</p>
+                <p>→ 予約設定　メニューと空き枠</p>
+                <p>→ リマインダ　前日・当日のお知らせ</p>
+                <p>→ 友だち　顧客カルテに残ります</p>
+              </div>
             </Card>
           </div>
         </div>
@@ -422,6 +474,7 @@ export default function NewProxyBookingPage() {
 
       {(step === 'input' || step === 'confirm') && (
         <StickyBar
+          status={step === 'input' ? 'まだ入っていません。保存すると台帳に並び、お客様にもお知らせします。' : '内容を確認してから予約を入れます。'}
           actions={(
             <>
               {step === 'confirm' && <Button onClick={() => setStep('input')}>予約入力に戻る</Button>}
@@ -442,8 +495,8 @@ export default function NewProxyBookingPage() {
   )
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink mb-4 text-sm font-semibold">{title}</h2>{children}</section>
+function Card({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+  return <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-semibold">{title}</h2>{note ? <p className="text-ink-faint mt-1 text-xs">{note}</p> : null}<div className="mt-4">{children}</div></section>
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
