@@ -9,7 +9,7 @@ const SETTINGS = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
 describe('V6 友だち追加時配信・実行結果の契約', () => {
   it('実ノードと実行結果への往復導線を持つ', () => {
     expect(PAGE).toContain('data-design-node="P2J0Te"')
-    expect(PAGE).toContain("usePageTitle('友だち追加時配信・実行結果')")
+    expect(PAGE).toContain("usePageTitle('新規友だち初回案内・実行結果')")
     expect(PAGE).not.toContain('<Header')
     expect(SETTINGS).toContain('<Button href="/friend-add-settings/runs">実行結果を見る</Button>')
     expect(PAGE).toContain('href="/friend-add-settings">← 友だち追加時の配信</Link>')
@@ -72,5 +72,10 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain('summary?.averageSendTimeMs')
     expect(PAGE).toContain('summary?.staffHandoffs.reason')
     expect(PAGE).toContain('使用ルール・版・処理結果と一緒に一覧で確認できます。')
+  })
+
+  it('処理エラーと配信自体の稼働状態を混同しない', () => {
+    expect(PAGE).toContain('<dt>状態</dt><dd className="font-bold">稼働中</dd>')
+    expect(PAGE).toContain('このページに表示中の記録を、流入経路ごとに確認できます。')
   })
 })

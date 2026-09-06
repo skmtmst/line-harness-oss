@@ -66,7 +66,7 @@ function csvCell(value: string) {
 }
 
 export default function FriendAddRunsPage() {
-  usePageTitle('友だち追加時配信・実行結果')
+  usePageTitle('新規友だち初回案内・実行結果')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const [kind, setKind] = useState<KindFilter>('all')
   const [attribution, setAttribution] = useState<AttributionFilter>('all')
@@ -304,7 +304,7 @@ export default function FriendAddRunsPage() {
 
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">流入経路別の内訳</h2>
-            <p className="mt-1 text-xs text-ink-faint">一覧を開かずに効果を確認できます。</p>
+            <p className="mt-1 text-xs text-ink-faint">このページに表示中の記録を、流入経路ごとに確認できます。</p>
             <div className="mt-3 divide-y divide-hairline">
               {routeBreakdown.map(([route, count]) => (
                 <div key={route} className="flex items-center justify-between gap-3 py-3 text-sm">
@@ -342,7 +342,7 @@ export default function FriendAddRunsPage() {
             <h2 className="font-bold">稼働状況</h2>
             <p className="mt-1 text-xs text-ink-faint">現在取得できる初回案内の状態です。</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{summary && summary.failed > 0 ? '要確認' : '稼働中'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">稼働中</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">有効</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstTime(latestProcessedAt)}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
