@@ -66,6 +66,8 @@ shared-button-importer app/nen-campaigns/columns/new/page.tsx
 shared-button-importer app/nen-campaigns/nen-overview.tsx
 shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
+shared-button-importer app/nen-members/photo-publications.tsx
+shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/reminders/detail/page.tsx
 shared-button-importer app/reminders/new/page.tsx
