@@ -241,6 +241,16 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
     if (!validated.ok) return c.json({ success: false, error: validated.error }, 422);
     const compiled = compileSavedSearch(validated.value);
     if (!compiled.ok) return c.json({ success: false, error: compiled.error }, 422);
+    const duplicate = await c.env.DB.prepare(
+      `SELECT id FROM saved_searches
+        WHERE scope = 'friends' AND condition_format = 'search_v1'
+          AND line_account_id = ? AND created_by = ?
+          AND lower(trim(name)) = lower(trim(?))
+        LIMIT 1`,
+    ).bind(access.lineAccountId, access.staffId, name).first<{ id: string }>();
+    if (duplicate) {
+      return c.json({ success: false, error: '同じ名前の保存した検索があります' }, 409);
+    }
     const count = await countSavedSearches(c.env.DB, {
       scope: 'friends',
       conditionFormat: 'search_v1',
@@ -1141,6 +1151,11 @@ friends.get(
                     'booking', b.id, COALESCE(b.updated_at, b.created_at), b.line_account_id
                FROM bookings b WHERE b.friend_id = ?
              UNION ALL
+             SELECT cb.id, 'calendar_booking', '外部カレンダー予約が更新されました',
+                    'calendar_booking', cb.id, COALESCE(cb.updated_at, cb.created_at), f.line_account_id
+               FROM calendar_bookings cb JOIN friends f ON f.id = cb.friend_id
+              WHERE cb.friend_id = ?
+             UNION ALL
              SELECT eb.id, 'event_booking', 'イベント予約が更新されました',
                     'event_booking', eb.id, COALESCE(eb.updated_at, eb.requested_at), eb.line_account_id
                FROM event_bookings eb WHERE eb.friend_id = ?
@@ -1166,7 +1181,7 @@ friends.get(
           ORDER BY timeline.occurred_at DESC, timeline.id DESC
           LIMIT ? OFFSET ?`,
       ).bind(
-        friendId, friendId, friendId, friendId, friendId, friendId, friendId,
+        friendId, friendId, friendId, friendId, friendId, friendId, friendId, friendId,
         limitRaw + 1, offsetRaw,
       ).all<{
         id: string;

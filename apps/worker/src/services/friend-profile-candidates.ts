@@ -52,6 +52,7 @@ const FIELD_LABELS: Record<string, string> = {
   system_display_name: 'システム表示名',
   status_message: 'ステータスメッセージ',
 };
+const FIELD_KEY = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/;
 
 const RAW_EMAIL = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi;
 const RAW_PHONE = /(?:\+?\d[\s().-]*){10,15}/g;
@@ -108,7 +109,9 @@ export async function getFriendProfileCandidates(
   for (const row of rows) {
     const values: ReadonlyArray<readonly [string, string, MergedPersonJsonValue | undefined]> = [
       ...Object.entries(FIELD_LABELS).map(([key, label]) => [key, label, sourceValue(row, key)] as const),
-      ...Object.entries(metadata(row)).map(([key, value]) => [`metadata.${key}`, key, value] as const),
+      ...Object.entries(metadata(row))
+        .filter(([key]) => FIELD_KEY.test(`metadata.${key}`))
+        .map(([key, value]) => [`metadata.${key}`, key, value] as const),
     ];
     for (const [fieldKey, fieldLabel, value] of values) {
       if (value === undefined || value === null || value === '') continue;

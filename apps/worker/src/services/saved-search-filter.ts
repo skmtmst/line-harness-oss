@@ -148,8 +148,11 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
 
     case 'calendar_booking': {
       const sql = `SELECT 1 FROM calendar_bookings scb
-        WHERE scb.friend_id = f.id${value ? ' AND scb.status = ?' : ''}`;
-      return existence(condition, sql, value ? [value] : []);
+        WHERE scb.friend_id = f.id${value ? ' AND scb.status = ?' : ''}
+        UNION ALL
+        SELECT 1 FROM bookings sb
+        WHERE sb.friend_id = f.id${value ? ' AND sb.status = ?' : ''}`;
+      return existence(condition, sql, value ? [value, value] : []);
     }
 
     case 'form': {
