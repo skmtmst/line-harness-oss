@@ -25,6 +25,7 @@ import { dashboard } from './dashboard.js';
 const account = (id: string) => ({
   id, channel_id: id, name: id, channel_access_token: `${id}-token`,
   channel_secret: 'secret', is_active: 1, parent_line_account_id: null,
+  official_profile_url: null, updated_at: '2026-08-26T10:00:00+09:00',
 });
 
 function app(tenantId?: string, role: 'owner' | 'admin' | 'staff' = 'staff') {
@@ -50,6 +51,22 @@ function overview(delivery: Record<string, unknown> = {}) {
     delivery,
     partialFailures: [],
     sections: { quota: { status: 'unavailable', asOf: '2026-08-26T10:00:00+09:00', period: 'this-month' } },
+    metrics: {
+      activeFriends: {
+        value: 0, state: 'empty', reason: null,
+        asOf: '2026-08-26T10:00:00+09:00', period: 'latest',
+      },
+      monthlyQuota: {
+        value: null, state: 'unavailable', reason: 'not_loaded', asOf: null, period: 'this-month',
+      },
+      friendTrend: {
+        value: [], state: 'empty', reason: null,
+        asOf: '2026-08-26T10:00:00+09:00', period: 'last7-fixed',
+      },
+      officialProfileUrl: {
+        value: null, state: 'unavailable', reason: 'not_loaded', asOf: null, period: 'latest',
+      },
+    },
   };
 }
 
@@ -128,6 +145,69 @@ describe('dashboard organization account policy', () => {
     expect(body.data.delivery).toMatchObject({
       sent: 12, broadcasts: 3, quotaLimit: null, quotaUsed: null,
     });
+  });
+
+  test('returns real quota values and the configured official profile URL', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({
+      ...account('account-1'),
+      official_profile_url: 'https://lin.ee/nen-official',
+    });
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/quota')) return Response.json({ type: 'limited', value: 200 });
+      return Response.json({ totalUsage: 3 });
+    });
+
+    const response = await app().request('/api/dashboard/overview?accountId=account-1', {}, env());
+    const body = await response.json() as { data: ReturnType<typeof overview> };
+
+    expect(response.status).toBe(200);
+    expect(body.data.metrics.monthlyQuota).toMatchObject({
+      value: { used: 3, limit: 200, remaining: 197 },
+      state: 'available', reason: null, period: 'this-month',
+    });
+    expect(body.data.metrics.monthlyQuota.asOf).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(body.data.metrics.officialProfileUrl).toEqual({
+      value: 'https://lin.ee/nen-official',
+      state: 'available',
+      reason: null,
+      asOf: '2026-08-26T10:00:00+09:00',
+      period: 'latest',
+    });
+  });
+
+  test('unconfigured LINE connection returns null instead of a false zero', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({
+      ...account('account-1'), channel_access_token: '', official_profile_url: null,
+    });
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+
+    const response = await app().request('/api/dashboard/overview?accountId=account-1', {}, env());
+    const body = await response.json() as { data: ReturnType<typeof overview> };
+
+    expect(response.status).toBe(200);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(body.data.metrics.monthlyQuota).toMatchObject({
+      value: null, state: 'unavailable', reason: 'not_connected', asOf: null,
+    });
+    expect(body.data.metrics.officialProfileUrl).toMatchObject({
+      value: null, state: 'unavailable', reason: 'not_connected', asOf: null,
+    });
+  });
+
+  test('LINE quota failure returns null and records a partial failure', async () => {
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
+
+    const response = await app().request('/api/dashboard/overview?accountId=account-1', {}, env());
+    const body = await response.json() as { data: ReturnType<typeof overview> };
+
+    expect(response.status).toBe(200);
+    expect(body.data.metrics.monthlyQuota).toMatchObject({
+      value: null, state: 'unavailable', reason: 'fetch_failed', asOf: null,
+    });
+    expect(body.data.partialFailures).toContain('quota');
   });
 
   test('loads the signed-in staff preference for the selected account', async () => {

@@ -102,6 +102,7 @@ function serializeLineAccount(row: DbLineAccount) {
     ogSiteName: row.og_site_name,
     ogDefaultImageUrl: row.og_default_image_url,
     ogDefaultDescription: row.og_default_description,
+    officialProfileUrl: row.official_profile_url ?? null,
     // 上限とアイコンは鍵ではない。閲覧のみの人にも見せる。
     friendCapacity: row.friend_capacity ?? null,
     capacityWarnAt: row.capacity_warn_at ?? null,
@@ -612,6 +613,34 @@ function normalizeOptionalString(v: unknown): string | null | undefined {
   return trimmed === '' ? null : trimmed;
 }
 
+function readOfficialProfileUrl(
+  value: unknown,
+): { ok: true; value: string | null | undefined } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (value === null) return { ok: true, value: null };
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+  try {
+    const url = new URL(trimmed);
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'lin.ee' ||
+      url.port !== '' ||
+      url.username ||
+      url.password ||
+      url.pathname === '/'
+    ) {
+      return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
+    }
+    return { ok: true, value: url.toString() };
+  } catch {
+    return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
+  }
+}
+
 // Pair-validate Login Channel ID / Secret. Required because the OAuth flow
 // asymmetrically gates on the two columns:
 //   /auth/line       — switches to account-specific client_id as soon as
@@ -699,6 +728,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       ogSiteName?: string | null;
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;
+      officialProfileUrl?: string | null;
       copyFromAccountId?: string | null;
       copyItems?: unknown;
     }>();
@@ -716,6 +746,8 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
     const loginChannelId = normalizeOptionalString(body.loginChannelId) ?? null;
     const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret) ?? null;
     const liffId = normalizeOptionalString(body.liffId) ?? null;
+    const officialProfileUrl = readOfficialProfileUrl(body.officialProfileUrl);
+    if (!officialProfileUrl.ok) return c.json({ success: false, error: officialProfileUrl.error }, 400);
 
     const pairError = validateLoginChannelPair(
       { loginChannelId, loginChannelSecret },
@@ -777,6 +809,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       ogSiteName: normalizeOptionalString(body.ogSiteName) ?? null,
       ogDefaultImageUrl: normalizeOptionalString(body.ogDefaultImageUrl) ?? null,
       ogDefaultDescription: normalizeOptionalString(body.ogDefaultDescription) ?? null,
+      officialProfileUrl: officialProfileUrl.value ?? null,
       tenantId: currentStaff.tenantId ?? DEFAULT_TENANT_ID,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
@@ -981,6 +1014,7 @@ lineAccounts.patch(
         friendCapacity?: unknown;
         capacityWarnAt?: unknown;
         iconUrl?: string | null;
+        officialProfileUrl?: string | null;
       }>();
       if (body.isActive === false && currentAccount.is_default) {
         return c.json({ success: false, error: 'ACCOUNT_DEFAULT' }, 409);
@@ -998,6 +1032,8 @@ lineAccounts.patch(
       const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
       const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
       const iconUrl = normalizeOptionalString(body.iconUrl);
+      const officialProfileUrl = readOfficialProfileUrl(body.officialProfileUrl);
+      if (!officialProfileUrl.ok) return c.json({ success: false, error: officialProfileUrl.error }, 400);
 
       // 警告値と上限の突き合わせには、送られていない側の現在値が要る。
       // 上限だけを下げたときに、既存の警告値が上限を超える場合があるため。
@@ -1053,9 +1089,10 @@ lineAccounts.patch(
         touchesOg ||
         touchesCapacity ||
         iconUrl !== undefined;
+      const touchesOfficialProfileUrl = officialProfileUrl.value !== undefined;
 
       // Route to the fields helper when name is not being changed.
-      if (body.name === undefined && fieldsTouched) {
+      if (body.name === undefined && (fieldsTouched || touchesOfficialProfileUrl)) {
         const updated = await updateLineAccountFields(c.env.DB, id, {
           country,
           role,
@@ -1067,6 +1104,7 @@ lineAccounts.patch(
           ogDefaultImageUrl,
           ogDefaultDescription,
           iconUrl,
+          officialProfileUrl: officialProfileUrl.value,
           ...capacity.value,
         });
         if (!updated) return c.json({ success: false, error: 'not found' }, 404);
@@ -1086,6 +1124,7 @@ lineAccounts.patch(
         icon_url: iconUrl,
         friend_capacity: capacity.value.friendCapacity,
         capacity_warn_at: capacity.value.capacityWarnAt,
+        official_profile_url: officialProfileUrl.value,
       });
       if (!updated) return c.json({ success: false, error: 'LINE account not found' }, 404);
       return c.json({ success: true, data: serializeLineAccount(updated) });
@@ -1132,6 +1171,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       ogSiteName?: string | null;
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;
+      officialProfileUrl?: string | null;
     }>();
     if (body.isActive === false && currentAccount.is_default) {
       return c.json({ success: false, error: 'ACCOUNT_DEFAULT' }, 409);
@@ -1145,6 +1185,8 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
     const ogSiteName = normalizeOptionalString(body.ogSiteName);
     const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
     const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
+    const officialProfileUrl = readOfficialProfileUrl(body.officialProfileUrl);
+    if (!officialProfileUrl.ok) return c.json({ success: false, error: officialProfileUrl.error }, 400);
 
     // Validate Login pair + uniqueness identically to PATCH. PUT is the
     // owner-only credential rotation endpoint, so the same correctness
@@ -1178,6 +1220,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       loginChannelSecret !== undefined ||
       liffId !== undefined ||
       body.isActive !== undefined;
+    const officialProfileUrlTouched = officialProfileUrl.value !== undefined;
 
     let updated = credentialsTouched
       ? await updateLineAccount(c.env.DB, id, {
@@ -1200,7 +1243,8 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       role !== undefined ||
       ogSiteName !== undefined ||
       ogDefaultImageUrl !== undefined ||
-      ogDefaultDescription !== undefined
+      ogDefaultDescription !== undefined ||
+      officialProfileUrlTouched
     ) {
       updated = await updateLineAccountFields(c.env.DB, id, {
         country,
@@ -1208,6 +1252,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
         ogSiteName,
         ogDefaultImageUrl,
         ogDefaultDescription,
+        officialProfileUrl: officialProfileUrl.value,
       });
       if (!updated) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
