@@ -253,7 +253,7 @@ export default function NewAffiliatePage() {
         </div>
 
         <Field label="LINEの友だちと結びつける（任意）" htmlFor="af-friend" note="結びつけると、成果が出たときに本人へ知らせられます。">
-          <select id="af-friend" value={friendId} onChange={(event) => setFriendId(event.target.value)} className="border-hairline rounded-control h-10 w-full max-w-[520px] border bg-white px-3 text-sm">
+          <select id="af-friend" aria-label="LINEの友だちと結びつける" value={friendId} onChange={(event) => setFriendId(event.target.value)} className="border-hairline rounded-control h-10 w-full max-w-[520px] border bg-white px-3 text-sm">
             <option value="">友だちの名前で探す</option>
             {friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName}</option>)}
           </select>

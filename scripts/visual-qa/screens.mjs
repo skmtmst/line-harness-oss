@@ -2883,33 +2883,51 @@ const FEATURE_15_REVIEW = {
 }
 
 // Issue #229（機能16）の実装後監査。
-// PR #916 相当の画面を1440px・1920pxで撮影し、設計画像と目視比較した。
-// 画面コードは変えず、残る見た目の差と未接続条件を分けて記録する。
+// Issue #229 の画面修正後に1440px・1920pxで撮影し、設計画像と目視比較した。
 const FEATURE_16_REVIEW = {
   PouPn: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #229 / PR #916相当 / HEAD f4296e63c で再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。4つの指標、成果の流れ、検索・並び順・表示件数・CSV・状態札・6行の一覧が設計と同じ役割で並ぶ。設計の「確定した報酬」と「未払い残高」は支払い台帳が無いため、実装は「承認済み報酬の合計」と `—` を理由付きで表示する。**接続条件:** 締め・支払い記録APIを接続し、確定日・支払日・未払い額を実データで再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で再撮影し、一致。** 1440px・1920pxとも横はみ出し0。支払い集計APIを接続し、4指標、5段の成果の流れ、検索・並び順・表示件数・CSV・状態札、設計と同じ6列表を目視比較した。支払済み台帳がまだ無い「未払い残高」だけは金額を作らず `—` と接続条件を表示する。',
     verdictSource: 'affiliates-v6/PouPn.txt + PouPn-1440.png + PouPn-1920.png',
+    verdictHead: '9a4c4d520',
   },
   GH8VL: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #229 / PR #916相当 / HEAD f4296e63c で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。説明、4つの指標、検索・並び順・表示件数・CSV・状態札・案件5件は表示でき、報酬単位も「マイル」。ただし設計の表は「紹介している人」「成果」を中心に6列で、実装は対象アカウント・タグ・シナリオなど9列となり、情報の配置と寸法が一致しない。案件ごとの成果数・確定報酬も一覧APIが返さない。**推奨修正:** 設計の6列へ情報をまとめ、案件別集計API接続後に成果数と確定報酬を表示して再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で再撮影し、一致。** 1440px・1920pxとも横はみ出し0。承認データを案件別に集計し、4指標と「案件・報酬・成果時の動き・紹介している人・成果・操作」の6列へ整理した。5案件の公開状態と未設定警告も設計画像と目視比較した。',
     verdictSource: 'affiliates-v6/GH8VL.txt + GH8VL-1440.png + GH8VL-1920.png',
+    verdictHead: '9a4c4d520',
   },
   n5VVTb: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #229 / PR #916相当 / HEAD f4296e63c で再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。重複注意、4つの指標、検索・並び順・表示件数・CSV・状態札、選択、まとめ承認、行ごとの承認・却下は設計と同じ役割で並ぶ。撮影データには名前を取れない3件が混ざるが、内部IDで埋めず理由を表示する。却下理由を保存するAPIが無く、設計の詳細確認とまとめ却下も出せない。**接続条件:** 却下理由・詳細確認APIを接続し、理由入力と確認画面を含めて再撮影する。',
-    verdictSource: 'affiliates-v6/n5VVTb.txt + n5VVTb-1440.png + n5VVTb-1920.png',
+    verdict: 'match',
+    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で通常・詳細を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。8件の承認待ち、3件の要確認、状態札、6列表、まとめ承認・まとめ却下、行ごとの認める・却下・見るを設計画像と目視比較した。却下理由そのものは保存口が無いため、状態だけ保存することを画面に明記する。',
+    verdictSource: 'affiliates-v6/n5VVTb.txt + n5VVTb-1440.png + n5VVTb-1920.png + n5VVTb-detail-1440.png + n5VVTb-detail-1920.png',
+    verdictHead: '9a4c4d520',
+    variants: [{ suffix: '-detail', steps: [{ click: '見る', nth: 0, after: 500 }] }],
   },
   xqT1Z: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #229 / PR #916相当 / HEAD f4296e63c で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。名前・連絡先・紹介コード、3つの報酬方式、保留日数、支払サイクル、振込先・友だち連携・成果時動作の未接続理由は出る。設計は主欄3区画と右欄の成果時動作を1画面に収めるが、実装は4段の縦長フォームで、右欄は説明だけ。**推奨修正:** 設計の主欄＋右欄へ再配置し、銀行口座・友だち連携・成果時動作API接続後に選択済み状態を再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。主欄を3区画、右欄を成果時動作・関連先・注意へ整理し、友だち候補API、名前・メール・コード、報酬方式、保留・支払サイクル、末尾4桁だけを扱う振込先の接続条件を設計画像と目視比較した。',
     verdictSource: 'affiliates-v6/xqT1Z.txt + xqT1Z-1440.png + xqT1Z-1920.png',
+    verdictHead: '9a4c4d520',
+    steps: [
+      { fill: '#af-name', selector: true, text: '田中 明' },
+      { fill: '#af-code', selector: true, text: 'tanaka01' },
+      { fill: '#af-email', selector: true, text: 'tanaka@example.com' },
+      { fill: '#af-cycle', selector: true, text: '月末締め翌月末払い' },
+      { select: 'LINEの友だちと結びつける', label: 'Kyohei Yamamoto' },
+    ],
   },
   GPWzq: {
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06、Issue #229 / PR #916相当 / HEAD f4296e63c で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。案件名・対象アカウント・説明、成果地点・期間・二重計上・自動承認、現金・マイル、タグ・シナリオ、右欄プレビューは出る。設計は4区画を横方向にまとめ、成果時の動作をカードで並べるが、実装は縦長の4段フォームで、未接続項目が大きな灰色枠を占める。**推奨修正:** 成果地点・紹介期間・二重計上・自動承認APIを接続し、設計の区画順と右欄幅へ再配置して再撮影する。',
+    verdict: 'match',
+    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。案件・成果条件・報酬・成果時動作の4区画、右欄プレビュー、対象LINEアカウント、現金とマイル、タグ・シナリオを設計画像と目視比較した。成果地点・期間・二重計上・自動承認は保存口が無いため、各欄に接続条件を表示する。',
     verdictSource: 'affiliates-v6/GPWzq.txt + GPWzq-1440.png + GPWzq-1920.png',
+    verdictHead: '9a4c4d520',
+    steps: [
+      { fill: '#of-name', selector: true, text: '定期便のはじめて購入' },
+      { fill: '#of-desc', selector: true, text: '初回の定期便が確定したら成果' },
+      { fill: '#of-amount', selector: true, text: '5000' },
+      { fill: '#of-miles', selector: true, text: '500' },
+    ],
   },
 }
 
