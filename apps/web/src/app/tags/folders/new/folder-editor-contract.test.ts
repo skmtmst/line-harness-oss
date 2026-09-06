@@ -8,13 +8,15 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 const FOLDER_EDITOR = 'app/tags/folders/new/page.tsx'
 
 describe('フォルダの作成・編集（設計 byqIW）', () => {
-  it('画面名を共通トップバーだけに置き、本文の大見出しへ戻さない', () => {
+  it('友だち属性の一覧に、追加・編集で同じモーダルを重ねる', () => {
     const source = read(FOLDER_EDITOR)
-    // 上部バーと同じ文字が本文にもう一度出ていた（`<h1 class="text-[32px]">`）。
-    expect(source).toContain("usePageTitle(editId ? 'フォルダを編集' : 'フォルダを追加')")
+    expect(source).toContain("usePageTitle('友だち属性')")
     expect(source).not.toContain('<h1')
-    // 32px はトークン外（`--text-display` は 30px）。値を直接書かない。
     expect(source).not.toContain('text-[32px]')
+    expect(source).toContain('<TagsPageV4 accountId={selectedAccountId} />')
+    expect(source).toContain('role="dialog"')
+    expect(source).toContain("{editId ? 'フォルダを編集' : 'フォルダを追加'}")
+    expect(source).toContain('useOverlayFocus(!deleteOpen, close, saving)')
   })
 
   it('色見本は枠38×38の中に20×20の円で、枠ごと塗らない', () => {
@@ -79,6 +81,13 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('disabled={saving || blockedReason !== null}')
     // 押せない見た目だけにしない。
     expect(source).toContain("{loadState === 'ready' && blockedReason && (")
+  })
+
+  it('編集時はフォルダだけを削除し、中のタグを残すことを確認する', () => {
+    const source = read(FOLDER_EDITOR)
+    expect(source).toContain('api.tagGroups.delete(editId)')
+    expect(source).toContain('このフォルダを削除')
+    expect(source).toContain('中にあるタグは削除されず、未分類へ戻ります。')
   })
 })
 

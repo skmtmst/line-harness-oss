@@ -27,14 +27,17 @@ describe('V6 対応マーク', () => {
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
     expect(EDITOR).toContain('api.supportMarks.list(selectedAccountId)')
-    for (const label of ['マーク名', '色', '並び順', '新着時の初期値にする']) expect(EDITOR).toContain(label)
+    for (const label of ['マーク名', '色', '並び順', '新しい友だちに最初から付ける']) expect(EDITOR).toContain(label)
   })
 
-  it('未接続の自動変更ルールを作ったように見せず、既存の受信時設定だけを残す', () => {
-    expect(EDITOR).not.toContain('>自動変更ルール</h2>')
-    expect(EDITOR).toContain('メッセージ受信時にこのマークへ変更')
-    expect(EDITOR).toContain('現在接続済みの受信時設定だけを変更します')
-    expect(EDITOR).not.toContain('担当者割当・期限超過')
+  it('基本情報・自動変更・使用先を同じ段で確認できる', () => {
+    expect(EDITOR).toContain('xl:grid-cols-3')
+    expect(EDITOR).toContain('<SupportMarkRulesPanel')
+    for (const label of ['受信箱での絞り込み', '一斉配信の配信対象', 'シナリオ配信の分岐条件', '自動応答の条件', 'オートメーションの条件']) {
+      expect(EDITOR).toContain(label)
+    }
+    expect(EDITOR).not.toContain('メッセージ受信時にこのマークへ変更')
+    expect(EDITOR).not.toContain('現在接続済みの受信時設定だけを変更します')
   })
 
   it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {

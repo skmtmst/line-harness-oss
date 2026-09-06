@@ -14,7 +14,15 @@ import SupportMarkRulesPanel from './support-mark-rules-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 
-const COLORS = ['#EF4B55', '#B86A00', '#06C755', '#2563D4', '#6B56CF', '#707981']
+const COLORS = [
+  { value: '#EF4B55', name: '赤' },
+  { value: '#B86A00', name: 'オレンジ' },
+  { value: '#06C755', name: '緑' },
+  { value: '#2563D4', name: '青' },
+  { value: '#6B56CF', name: '紫' },
+  { value: '#707981', name: 'グレー' },
+] as const
+const DESTINATIONS = ['受信箱での絞り込み', '一斉配信の配信対象', 'シナリオ配信の分岐条件', '自動応答の条件', 'オートメーションの条件']
 type MarkRow = SupportMark & { friendCount: number }
 
 export default function SupportMarkEditor({ markId }: { markId?: string }) {
@@ -26,10 +34,9 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const [items, setItems] = useState<MarkRow[]>([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
-  const [color, setColor] = useState(COLORS[0])
+  const [color, setColor] = useState<string>(COLORS[0].value)
   const [displayOrder, setDisplayOrder] = useState(0)
   const [isDefault, setIsDefault] = useState(false)
-  const [autoOnInbound, setAutoOnInbound] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
@@ -64,7 +71,6 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           setColor(current.color)
           setDisplayOrder(current.displayOrder)
           setIsDefault(current.isDefault)
-          setAutoOnInbound(current.autoOnInbound)
         } else if (editing) {
           setError('対応マークが見つかりません')
         } else {
@@ -83,8 +89,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
     setError('')
     try {
       const result = editing && markId
-        ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
-        : await api.supportMarks.create(selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
+        ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound: selected?.autoOnInbound ?? false })
+        : await api.supportMarks.create(selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false })
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch {
@@ -105,7 +111,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
         <Card padding="default">
           <h2 className="mb-4 text-sm font-bold text-ink">基本情報</h2>
           <label className="mb-4 block">
@@ -115,7 +121,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <fieldset className="mb-4">
             <legend className="mb-2 text-xs font-semibold text-ink-secondary">色</legend>
             <div className="flex flex-wrap gap-2">
-              {COLORS.map((item) => <button key={item} type="button" onClick={() => setColor(item)} aria-label={`色 ${item}`} aria-pressed={color === item} className={`h-8 w-8 rounded-full ${color === item ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item }} />)}
+              {COLORS.map((item) => <button key={item.value} type="button" onClick={() => setColor(item.value)} aria-label={item.name} title={item.name} aria-pressed={color === item.value} className={`h-8 w-8 rounded-full ${color === item.value ? 'ring-2 ring-ink ring-offset-2' : ''}`} style={{ backgroundColor: item.value }} />)}
             </div>
           </fieldset>
           <label className="mb-4 block">
@@ -123,41 +129,32 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" />
           </label>
           <label className="flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm font-semibold text-ink">
-            <span>新着時の初期値にする<small className="mt-1 block font-normal text-ink-faint">初期値は1つだけ選べます</small></span>
+            <span>新しい友だちに最初から付ける<small className="mt-1 block font-normal text-ink-faint">最初から付けるマークは1つだけ選べます</small></span>
             <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-5 w-5 accent-accent" />
           </label>
-          <label className="mt-4 flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm font-semibold text-ink">
-            <span>
-              メッセージ受信時にこのマークへ変更
-              <small className="mt-1 block font-normal text-ink-faint">現在接続済みの受信時設定だけを変更します</small>
-            </span>
-            <input type="checkbox" checked={autoOnInbound} onChange={(event) => setAutoOnInbound(event.target.checked)} className="h-5 w-5 accent-accent" />
-          </label>
         </Card>
+
+        {/* 設計 GMvBd は基本情報と自動変更を横並びで比較できる。 */}
+        {editing ? (
+          <Card padding="default">
+            <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} />
+          </Card>
+        ) : (
+          <Card padding="default">
+            <h2 className="mb-2 text-sm font-bold text-ink">自動変更</h2>
+            <p className="text-xs leading-relaxed text-ink-faint">マークを作成すると、担当者の割り当てや期限超過などをきっかけに変更するルールを追加できます。</p>
+          </Card>
+        )}
 
         <Card padding="default">
           <h2 className="mb-3 text-sm font-bold text-ink">どこで使われるか</h2>
-          {editing && currentUsages.length === 0 ? <p className="text-xs text-ink-faint">現在、参照している機能はありません。</p> : (
-            <ul className="space-y-2 text-xs text-ink">
-              {(editing ? currentUsages : ['作成後、受信箱や各機能の条件として選べます']).map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
-            </ul>
-          )}
-          <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは初期値へ移り、変更履歴は残ります。</p>
+          <ul className="space-y-2 text-xs text-ink">
+            {DESTINATIONS.map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
+          </ul>
+          {editing && currentUsages.length > 0 ? <p className="mt-4 text-xs font-semibold text-ink-secondary">現在の使用先：{currentUsages.join('、')}</p> : null}
+          <p className="mt-4 text-xs leading-relaxed text-ink-faint">配信などの使用先がある間は保管できません。使用先を外すと、友だちは最初から付けるマークへ移り、変更履歴は残ります。</p>
         </Card>
       </div>
-
-      {/*
-        自動変更ルール。設計 `GMvBd` は「基本情報」と同じ面に置いている。
-        **別画面にすると「このマークがいつ付くのか」を見るのに行き来する。**
-
-        **作る前は出さない。** まだ id が無いルールは保存先が無く、
-        押しても何も起きない口を並べることになる（`v6-common-rules` §5-5）。
-      */}
-      {editing ? (
-        <Card padding="default" className="mt-4">
-          <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} />
-        </Card>
-      ) : null}
 
       <StickyBar
         className="mt-4"

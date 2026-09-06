@@ -282,10 +282,9 @@ export default function SupportMarkRulesPanel({
                   <p className={styles.rowMeta}>
                     {eventLabel(rule.event)}
                     <span className={styles.dot}>・</span>
-                    優先順位 {rule.priority}
-                    <span className={styles.dot}>・</span>
-                    手動変更のあと {protectionText(rule.manualProtectionMinutes)}
+                    「{markName}」に変更
                   </p>
+                  <p className={styles.rowDetail}>優先順位 {rule.priority}・手動変更のあと {protectionText(rule.manualProtectionMinutes)}</p>
                 </div>
                 <span className={rule.isActive ? styles.on : styles.off}>{activeText(rule.isActive)}</span>
                 <span className={styles.rowActions}>
