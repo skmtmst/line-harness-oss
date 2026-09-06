@@ -903,8 +903,9 @@ export const SCREENS = [
   /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 一覧を正本 `M1EXwB` の4KPI・フォルダ・検索/状態/基準日・6列表・ページ送りへ統一。通常と全状態を1440/1920で撮影し、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
-    verdictHead: 'eb41ad0d', route: '/reminders',
+    verdictNote: '**2026-09-07 S2 #73。** 正本 `M1EXwB.png` の操作列に合わせ、削除をアイコン化し、「…」から配信予定と実行履歴を選べるようにした。通常・メニュー展開を1440/1920で撮影し、横はみ出し0。予定は実行台帳の公開状態 `planned` へ接続し、固定件数を作らない。head `a828e5afc3`。',
+    verdictSource: 'reminders-v6/M1EXwB.png + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
+    verdictHead: 'a828e5afc3', route: '/reminders',
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
@@ -977,9 +978,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #248。** 正本 `GC4St.png` / `GC4St.txt` と同じく、4KPI、通知実績、最近の実行、稼働状況、エラー時だけ出る要確認、LINEプレビュー、下部操作の骨格へ統一した。要件 §3-7 の予定・実行・試行・理由・次回再試行・LINE要求IDは、正本の4列表を崩さないよう関連するセルの補足行にまとめた。取得失敗時の集計値と停止予定、未実行時刻、要求IDなしを0で埋めず `—` とした。API/DBは既存の `GET /api/reminders/:id/runs`、冪等な再試行口、migration 269を使用。通常・読込中・0件・取得失敗を1440/1920で撮影（10枚）、横はみ出し0。PR実装 head `ba2f2c77` を比較した。',
-    verdictSource: 'reminders-v6/GC4St.txt + reminders-v6/GC4St-normal-1440.png + reminders-v6/GC4St-normal-1920.png',
-    verdictHead: 'ba2f2c77',
+    verdictNote: '**2026-09-07 S2 #73。** 正本 `GC4St.png` と同じ実行台帳の骨格を保ち、`?status=planned` では公開APIの `planned` だけを表示する。予定と履歴を相互に切り替えられ、予定画面には過去の送信エラー警告を混ぜない。通常・読込中・0件・取得失敗・予定を1440/1920で撮影し、横はみ出し0。固定件数なし。head `a828e5afc3`。',
+    verdictSource: 'reminders-v6/GC4St.png + reminders-v6/GC4St-{normal,loading,empty,error,planned}-{1440,1920}.png',
+    verdictHead: 'a828e5afc3',
   },
   {
     /*
