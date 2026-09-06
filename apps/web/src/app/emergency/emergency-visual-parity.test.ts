@@ -11,17 +11,17 @@ const visible = source
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '')
 
-describe('V3 10-4 運用状態の表示確認', () => {
+describe('V6 機能32 運用状態の表示確認', () => {
   it('確定済み画面と同じ小さな文字階層を3タブで共通利用する', () => {
     // 2026-09-04: 画面名の見出しは共通 `PageHeader` へ寄せた。
     // トップバーが「運用状態」を出しているので、本文では出さない
     // （題は `sr-only` で残る）。見出しの文字階層はこの下の節から。
     expect(source).toContain('<PageHeader')
     expect(visible).not.toMatch(/<h1[\s>]/)
-    expect(source).toContain('text-base font-bold text-gray-900">チェック結果')
-    expect(source).toContain('text-base font-bold text-gray-900">緊急停止')
-    expect(source).toContain('text-base font-bold text-blue-900">復旧')
-    expect(source).toContain('text-base font-bold text-gray-900">履歴')
+    expect(source).toContain('text-base font-bold text-ink">チェック結果')
+    expect(source).toContain('text-base font-bold text-ink">緊急停止')
+    expect(source).toContain('text-base font-bold text-info">復旧')
+    expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
     expect(source).toContain('text-[11px] font-bold')
   })
 
@@ -55,12 +55,22 @@ describe('V3 10-4 運用状態の表示確認', () => {
       expect(source).toContain(`label="${label}"`)
     }
     expect(source).not.toContain('label="今月の配信残数"')
-    expect(source).toContain('チェックを今すぐ実行')
-    expect(source).toContain('配信をすべて緊急停止')
+    expect(source).toContain('いますぐ確かめる')
+    expect(source).toContain('緊急停止を確認')
+    expect(source).toContain('aria-label="判定の見方"')
   })
 
   it('5分ごとに実データを再確認する', () => {
     expect(source).toContain('window.setInterval')
     expect(source).toContain('5 * 60 * 1000')
+  })
+
+  it('緊急停止と履歴をサーバー共通のAPIへ保存する', () => {
+    expect(source).toContain('api.operations.stop')
+    expect(source).toContain('api.operations.restore')
+    expect(source).toContain('api.operations.history')
+    expect(source).toContain("'auto_reply_dispatch'")
+    expect(source).not.toContain('nen_emergency_snapshot_v1')
+    expect(source).not.toContain('NEXT_PUBLIC_ADMIN_API_KEY')
   })
 })
