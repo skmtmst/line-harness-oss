@@ -534,12 +534,10 @@ export const SCREENS = [
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
-    gap: 'api',
-    gapNote: '異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る',
-    status: 'unimplemented',
-    why: '`/accounts` の権限を通すだけでは、設計のdry-run・全競合判断・影響確認・切り戻しを実行できない。正式要件 §12・§14 が専用run/itemと実行APIを要求し、LINE APIだけでは対応表を作れないと明記している',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #246 で一致。** 1920px設計画像と実装の1440・1920pxを横並びで目視比較した。5段、既存データへ影響しない注意、異なるプロバイダーの制約、移行元・先・利用目的・CSV、4区分の実値、競合3行、判断、本移行、履歴が同じ順序で揃い、横はみ出し0。`uid_migration_runs/items` の事前確認・競合判断・owner二者確認・本移行・切り戻しAPIへ接続した。共通shellの上部画面名はルート規則により「LINEアカウント」だが、機能本文のH1は「UID移行」で一致し、共通部品はs0所有のため変更していない。`undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictSource: 'friends-v6/vtBCu.txt + docs/design-qa/friends-v6/vtBCu.txt + apps/web/src/app/accounts/migration.tsx + apps/worker/src/routes/friend-migrations.ts',
   },
-
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態（`g2UNV` `M2b2B`）／#32 結果画面から作成中の操作を外し「設定サマリー」→「配信した設定」（`M2b2B`）／#40 主ボタンの緑を `$accent-deep` へ／#41 `bV5Vs` の削除欄を「このシナリオを削除」へ、複製枠を「配信を開始」へ。`kk8dz` から削除の押し口を消す／#43 メッセージ種別タブを9種・同じ並びに（`Flex`→リッチメッセージ）／#44 CSV書き出しを副次ボタンに統一（`M2b2B`）／#46 行に「その他操作（…）」／#48 表記統一。設計画像は `docs/design-reference/scenarios-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `2d0ee180` で撮り直した。#427 と #529 の直りが両方入っている。** ルート `/scenarios`。1440・1920とも横スクロール0。 **束6の完了条件を満たす**：読了済 728人 に **「登録合計 1,756人のうち 41%」** と母数が付く（728÷1,756＝41%で合う）。購読中 1,028人 にも「現在配信中・**重複を含む**」と断りが付き、**同じ人を二重に数えている可能性を隠していない**。 **見出しの下に「作成しただけでは配信されません。」** が出る。設計の注意帯そのもので、**作っただけで届くと思わせない**。 帯は シナリオ9件（稼働中8）／購読中1,028人／読了済728人／今週の配信342通（過去7日）。フォルダの縦帯もあり、「フォルダを消しても、入っていたシナリオは未分類として残ります。」と消したときの行き先を書く。 **取り込み順の心配（#427 → #529）は、development に両方入ったことで解消した。** 取得元：`scenarios-v6/TC1b1.txt`',
@@ -2796,9 +2794,9 @@ export const SCREENS = [
     */
     node: 'ux7of', feature: 3, name: '3-4-A UID・顧客データ移行／CSV',
     dir: 'friends-v6', route: '/friends/migrations', mode: 'page',
-    status: 'unimplemented', gap: 'api',
-    gapNote: '取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束',
-    why: '`/friends/migrations` が実装に無い。3-4 UID移行そのものが `gap: api` のまま',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #246 で実装・撮影。設計画像なし。** `docs/design-reference/friends-v6/ux7of.txt` の文言・節・状態と照合し、全件書き出し、CSV数式の無害化、7日期限、追加・更新・変更なし・競合・エラーの事前確認、同一ファイルの二重反映防止、履歴を本物のAPIへ接続した。実装の1440・1920pxは横はみ出し0。`undefined`・`NaN`・`Invalid Date`・`API error` は0件。',
+    verdictSource: 'friends-v6/ux7of.txt + docs/design-qa/friends-v6/ux7of.txt + apps/web/src/app/friends/migrations/page.tsx + apps/worker/src/routes/friend-migrations.ts',
   },
   {
     /*
@@ -3897,6 +3895,7 @@ export const CAPTURED_AT = {
     { pr: 628, head: '846be01f', on: '2026-09-01', screens: ['bzDn6'], note: '**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本' },
     { pr: 645, head: '6e9ed4d6', on: '2026-09-01', screens: ['IAf7j'], note: 'Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した' },
     { pr: 966, head: 'baa097e99', on: '2026-09-06', screens: ['PhxG6','LT8RS','Igi72','IAf7j','I6UAdr','bzDn6','YzxU1','InCDe','r7eSi','w8W4Eh'], note: 'Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。' },
+    { pr: 975, head: 'bdf6abfa7', on: '2026-09-06', screens: ['vtBCu', 'ux7of'], note: 'Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。' },
   ],
   28: [
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
