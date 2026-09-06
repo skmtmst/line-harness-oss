@@ -58,10 +58,13 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         api.ecCommerce.overview(accountId),
         api.ecCommerce.events({ lineAccountId: accountId, limit: 20 }),
       ])
+      if (!overviewResponse.success || !eventsResponse.success) {
+        throw new Error('invalid_ec_response')
+      }
       const hasOverview = typeof overviewResponse.data === 'object'
         && overviewResponse.data !== null
         && !Array.isArray(overviewResponse.data)
-      if (!overviewResponse.success || !eventsResponse.success || !hasOverview || !Array.isArray(eventsResponse.data)) {
+      if (!hasOverview || !Array.isArray(eventsResponse.data)) {
         throw new Error('invalid_ec_response')
       }
       setOverview(overviewResponse.data)
