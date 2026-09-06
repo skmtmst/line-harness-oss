@@ -44,10 +44,10 @@ describe('メディアの削除確認', () => {
     expect(PAGE).toContain('7種類を確認しました')
   })
 
-  it('まだ無い操作を押し口にしない', () => {
-    // 設計の「別の画像に差し替える」は口がまだ無い。
-    expect(PAGE).toContain('まとめて差し替える操作は、まだ用意していません')
-    expect(PAGE).not.toContain('別の画像に差し替え<')
+  it('使用中は削除ではなく、影響確認つきの差し替えへ進める', () => {
+    expect(PAGE).toContain('setReplacementFor(source)')
+    expect(PAGE).toContain('別のメディアに差し替える')
+    expect(PAGE).toContain('使用先をまとめて差し替えられます')
   })
 
   it('撮影の押し口に印を付ける', () => {
