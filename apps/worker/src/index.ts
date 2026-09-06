@@ -300,6 +300,7 @@ export const ADMIN_REQUEST_HEADERS = [
   'X-Filename',
   'Idempotency-Key',
   'X-Confirm-Irreversible',
+  'x-step-up-token',
 ] as const;
 
 // CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
