@@ -41,6 +41,7 @@ export type AuditAction =
   | 'dashboard.preference.reset'
   | 'dashboard.preference.default.update'
   | 'conversion.approval.update'
+  | 'ec.connector.update'
   | 'webinar.archive'
   | 'webinar.participant.export';
 

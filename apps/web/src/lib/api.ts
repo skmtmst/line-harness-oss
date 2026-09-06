@@ -1739,6 +1739,81 @@ export type EcCommerceEvent = {
   processedAt: string | null
 }
 
+export type EcSubscription = {
+  id: string
+  friendId: string
+  ownerName: string | null
+  petName: string | null
+  contractNumber: string | null
+  status: 'active' | 'paused' | 'at_risk' | 'cancelled'
+  statusLabel: string
+  riskReason: string | null
+  nextShippingAt: string | null
+  cycle: string | null
+  items: string | null
+  amount: number | null
+  continuedCount: number | null
+  startedAt: string | null
+  cancelledAt: string | null
+  cancellationReason: string | null
+  syncedAt: string
+}
+
+export type EcSubscriptionList = {
+  items: EcSubscription[]
+  summary: {
+    total: number
+    active: number
+    paused: number
+    atRisk: number
+    cancelled: number
+    monthlyAmount: number | null
+    startedThisMonth: number | null
+    cancelledThisMonth: number | null
+    cancellationTopReason: string | null
+  }
+  risk: {
+    source: 'payment_status'
+    ruleVersion: string
+    calculatedAt: string | null
+    predictiveScoreAvailable: false
+  }
+}
+
+export type EcConnector = {
+  id: string
+  provider: 'ec_cube' | 'shopify'
+  shopDomain: string
+  status: 'connected' | 'degraded' | 'paused' | 'auth_expired' | 'rate_limited'
+  secretConfigured: boolean
+  secretLastFour: string | null
+  secretUpdatedAt: string | null
+  eventTypes: string[]
+  identityRules: Array<'verified_email' | 'verified_phone' | 'manual_name_postal'>
+  version: number
+  updatedAt: string
+}
+
+export type EcConnectorOverview = {
+  configured: boolean
+  connector: EcConnector | null
+  health: {
+    today: number
+    last30Days: number
+    failed: number
+    lastReceivedAt: string | null
+    lastSucceededAt: string | null
+  }
+  impact: {
+    nenCampaigns: number | null
+    conversions: number | null
+    mileageRules: number | null
+    friendFields: number | null
+    analytics: number | null
+  }
+  retryPolicy: string | null
+}
+
 export type EcNotificationRun = {
   id: string
   recipientType: 'customer'
@@ -4558,6 +4633,30 @@ export const api = {
         `/api/ec-commerce/events${suffix}`,
       )
     },
+    subscriptions: (params: { lineAccountId: string; status?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.status) query.set('status', params.status)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcSubscriptionList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/subscriptions?${query}`,
+      )
+    },
+    connector: (lineAccountId: string) => fetchApi<ApiResponse<EcConnectorOverview>>(
+      `/api/ec-commerce/connector?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    ),
+    updateConnector: (lineAccountId: string, data: {
+      provider: EcConnector['provider']
+      shopDomain: string
+      status: EcConnector['status']
+      inboundSecret?: string
+      eventTypes: string[]
+      identityRules: EcConnector['identityRules']
+      expectedVersion: number
+    }) => fetchApi<ApiResponse<{ version: number }>>(
+      `/api/ec-commerce/connector?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
     notificationRuns: (params: { lineAccountId: string; view?: 'all' | 'failures'; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.view) query.set('view', params.view)
