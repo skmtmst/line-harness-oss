@@ -1053,8 +1053,8 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
     verdict: 'match',
-    verdictNote: '**2026-09-06 #249 で一致。** `docs/design-reference/auto-replies-v6/g46ja.png` と実装の1440・1920pxを横並びで確認。テスト入力、送信者選択、判定結果、設定要約、LINEプレビュー、中央の実行確認モーダルを設計どおり配置した。競合2件を確認してから実在する友だちでdry-runを実行する一連の操作に成功し、横はみ出し0。',
-    verdictSource: 'auto-replies-v6/g46ja.png + auto-replies-v6/g46ja-1440.png + auto-replies-v6/g46ja-1920.png + Playwright interaction',
+    verdictNote: '**2026-09-06 #249 で一致。** 1920pxの設計画像と実装の1440・1920pxを横並びで確認。テスト入力、送信者選択、判定結果、設定要約、LINEプレビュー、中央の実行確認モーダルを設計どおり配置した。競合2件を確認してから実在する友だちでdry-runを実行する一連の操作に成功し、横はみ出し0。',
+    verdictSource: 'auto-replies-v6/g46ja.txt + docs/design-qa/auto-replies-v6/g46ja.txt + apps/web/src/app/auto-replies/publish/page.tsx',
     verdictHead: '564c91d0fe',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 「確認したので次へ」で試す段へ */
@@ -1064,8 +1064,8 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 #249 で一致。** `docs/design-reference/auto-replies-v6/Yj6CQ.png` と実装の1440・1920pxを横並びで確認。有効化前チェック4項目、条件・時間・対象・返信・アクションの要約、28日一致数、競合確認数、LINEプレビュー、下部操作を設計どおり配置した。dry-run後に検証APIを通って到達し、横はみ出し0。未取得値は0件と誤表示しない。',
-    verdictSource: 'auto-replies-v6/Yj6CQ.png + auto-replies-v6/Yj6CQ-1440.png + auto-replies-v6/Yj6CQ-1920.png + Playwright interaction',
+    verdictNote: '**2026-09-06 #249 で一致。** 1920pxの設計画像と実装の1440・1920pxを横並びで確認。有効化前チェック4項目、条件・時間・対象・返信・アクションの要約、28日一致数、競合確認数、LINEプレビュー、下部操作を設計どおり配置した。dry-run後に検証APIを通って到達し、横はみ出し0。未取得値は0件と誤表示しない。',
+    verdictSource: 'auto-replies-v6/Yj6CQ.txt + docs/design-qa/auto-replies-v6/Yj6CQ.txt + apps/web/src/app/auto-replies/publish/page.tsx',
     verdictHead: '564c91d0fe',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 試してから最後の確認へ */
@@ -1075,8 +1075,8 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
     verdict: 'match',
-    verdictNote: '**2026-09-06 #249 で一致。** `docs/design-reference/auto-replies-v6/e6iJG.png` と実装の1440・1920pxを横並びで確認。有効化完了、稼働中の設定要約、Slack監視案内、次の操作4件、監視項目、LINEプレビューを設計どおり配置した。冪等キー付き公開APIまで押し切って完了画面へ到達し、横はみ出し0。',
-    verdictSource: 'auto-replies-v6/e6iJG.png + auto-replies-v6/e6iJG-1440.png + auto-replies-v6/e6iJG-1920.png + Playwright interaction',
+    verdictNote: '**2026-09-06 #249 で一致。** 1920pxの設計画像と実装の1440・1920pxを横並びで確認。有効化完了、稼働中の設定要約、Slack監視案内、次の操作4件、監視項目、LINEプレビューを設計どおり配置した。冪等キー付き公開APIまで押し切って完了画面へ到達し、横はみ出し0。',
+    verdictSource: 'auto-replies-v6/e6iJG.txt + docs/design-qa/auto-replies-v6/e6iJG.txt + apps/web/src/app/auto-replies/publish/page.tsx',
     verdictHead: '564c91d0fe',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 公開まで押し切る */
