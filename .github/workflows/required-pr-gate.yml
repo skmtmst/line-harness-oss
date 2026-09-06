@@ -26,6 +26,34 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Protect command-center owned documents
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "PR差分がない手動実行のため、司令塔の所有パス検査を飛ばします。"
+            exit 0
+          fi
+
+          case "$HEAD_REF" in
+            codex/kenta-r2-hq-*|codex/kenta-train-*)
+              echo "司令塔の枝のため、所有パスの変更を許可します。"
+              exit 0
+              ;;
+          esac
+
+          protected_files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" \
+            | grep -E '^(docs/brain/|docs/v6-requirements/|docs/v6-[^/]*\.md$)' || true)
+          if [ -n "$protected_files" ]; then
+            echo "::error::司令塔の所有パスを変更しています。laneのPRから変更できません。"
+            printf '%s\n' "$protected_files" | sed 's/^/    /'
+            exit 1
+          fi
+
+          echo "司令塔の所有パスは変更されていません。"
+
       - name: Select the required test scope
         id: scope
         env:

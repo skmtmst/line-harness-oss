@@ -2361,12 +2361,59 @@ export const AFFILIATE_LINKS = [
   版が見えないと「直してよいか」が判断できない、というのが設計の言いたいこと。
 */
 export const COMMON_ACTIONS = [
-  { id: 'ca-1', name: '来店後のご案内', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 3, bindingCount: 5, oldVersionBindingCount: 0, updatedAt: '2026-08-25T01:00:00.000Z' },
+  { id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 5, bindingCount: 5, oldVersionBindingCount: 1, updatedAt: '2026-08-25T01:00:00.000Z' },
   { id: 'ca-2', name: '定期便のご案内', description: 'メッセージ ほか2つ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
   { id: 'ca-3', name: '予約のリマインド', description: 'リマインダ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
   { /* 設計の「呼ばれていない 1」。 */ id: 'ca-4', name: '休業のお知らせ', description: 'メッセージ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T09:00:00.000Z' },
   { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: '口コミのお願い（下書き）', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
 ]
+
+/** 機能25の一覧。14本稼働・4本停止を同じAPI契約で返す。 */
+export const AUTOMATIONS = [
+  { id: 'au-1', name: '友だち追加から案内を始める', description: '流入リンクを通っていない人に、はじめての方へをご案内', eventType: 'friend_add', conditions: { inflow: 'none' }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-0' } }], isActive: true, priority: 100, lineAccountId: 'visual-qa-account', createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'au-2', name: '「予約」で予約画面を出す', description: 'すべての友だちに予約用メニューを表示', eventType: 'message_received', conditions: { keyword: '予約' }, actions: [{ type: 'switch_rich_menu', params: { richMenuId: 'rmg-1' } }], isActive: true, priority: 90, lineAccountId: 'visual-qa-account', createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-08-24T00:00:00.000Z' },
+  { id: 'au-3', name: '体験申込のフォローを始める', description: '30日買っていない人に体験前フォローを開始', eventType: 'tag_change', conditions: { tagId: 'tag-trial', purchaseDays: 30 }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-trial' } }], isActive: true, priority: 80, lineAccountId: 'visual-qa-account', createdAt: '2026-07-03T00:00:00.000Z', updatedAt: '2026-08-23T00:00:00.000Z' },
+  { id: 'au-4', name: '初回注文をSlackへ知らせる', description: '定期便を初めて買った人を外部連携へ通知', eventType: 'ec.order.confirmed', conditions: { firstSubscription: true }, actions: [{ type: 'send_webhook', params: { webhookId: 'wh-1' } }], isActive: true, priority: 70, lineAccountId: 'visual-qa-account', createdAt: '2026-07-04T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z' },
+  { id: 'au-5', name: '反応がない人を気にかける', description: '最終接触から7日たった人に対応タグを付ける', eventType: 'tag_change', conditions: { inactiveDays: 7 }, actions: [{ type: 'add_tag', params: { tagId: 'tag-care' } }], isActive: true, priority: 60, lineAccountId: 'visual-qa-account', createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-08-21T00:00:00.000Z' },
+  { id: 'au-6', name: '問い合わせを担当へ知らせる', description: 'メッセージを受けたら担当用タグを付ける', eventType: 'message_received', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: 'tag-support' } }], isActive: true, priority: 50, lineAccountId: null, createdAt: '2026-07-06T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z' },
+  ...Array.from({ length: 8 }, (_, index) => ({ id: `au-${index + 7}`, name: `定期フォロー ${index + 1}`, description: '条件に合う友だちへ順番に案内', eventType: 'tag_change', conditions: { group: index + 1 }, actions: [{ type: 'add_tag', params: { tagId: `tag-${index + 1}` } }], isActive: true, priority: 40 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z' })),
+  ...Array.from({ length: 4 }, (_, index) => ({ id: `au-${index + 15}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
+]
+
+/** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
+export const AUTOMATION_TEMPLATES = [
+  { key: 'welcome', name: 'はじめての人にあいさつする', description: '追加された友だちへ案内を始めます', triggerLabel: '友だちが追加されたとき', actionLabel: 'シナリオ「はじめての方へ」を始める' },
+  { key: 'reservation', name: '「予約」と送られたら予約画面を出す', description: '予約したい人を迷わせません', triggerLabel: 'メッセージに「予約」が入ったとき', actionLabel: 'リッチメニューを切り替える＋回答フォームを送る' },
+  { key: 'inactive', name: '7日 反応がない人に声をかける', description: '対応漏れを見つけます', triggerLabel: '最終接触から7日たったとき', actionLabel: '対応マーク「気にかける」を付ける' },
+  { key: 'first-order', name: 'はじめて買った人にお礼を送る', description: '初回購入のお礼を自動化します', triggerLabel: '注文が確定したとき（はじめての人だけ）', actionLabel: 'テンプレート「はじめてのご注文ありがとうございます」を送る' },
+  { key: 'tag-scenario', name: 'タグが付いたらシナリオを始める', description: '自由に組み替えられる見本です', triggerLabel: 'タグが付いたとき', actionLabel: '選んだシナリオを始める' },
+  { key: 'birthday', name: '誕生月にクーポンを送る', description: '誕生日に合わせて特典を届けます', triggerLabel: '誕生日の◯日前になったとき', actionLabel: 'クーポンを送る＋マイルを付ける' },
+  { key: 'review', name: '口コミを書いてくれた人にマイル', description: '回答後のお礼を自動化します', triggerLabel: '回答フォームが送られたとき', actionLabel: 'マイルを付ける＋タグを付ける' },
+  { key: 'winback', name: '買っていない人を掘り起こす', description: '休眠した友だちへ定期的に案内します', triggerLabel: '90日 買っていない人（毎週 月曜に見る）', actionLabel: '一斉配信「おひさしぶりです」に入れる' },
+  { key: 'block', name: 'ブロックされたら記録する', description: '解除後の対応に備えます', triggerLabel: 'ブロックされたとき', actionLabel: 'タグ「ブロック」を付ける＋外部連携に知らせる' },
+  { key: 'booking', name: '予約前日に確認を送る', description: '来店忘れを減らします', triggerLabel: '予約日の前日になったとき', actionLabel: '確認メッセージを送る' },
+  { key: 'score', name: '関心が高まった人を担当へ知らせる', description: '対応の優先順位を揃えます', triggerLabel: '行動スコアが80になったとき', actionLabel: '担当者タグを付ける＋外部連携に知らせる' },
+  { key: 'cancel', name: '解約相談を受けたら案内する', description: '相談窓口をすぐ案内します', triggerLabel: '「解約」と送られたとき', actionLabel: '相談予約フォームを送る' },
+]
+
+const caStep = (id, type, params = {}, onFailure = 'stop') => ({ id, type, params, onFailure })
+export const COMMON_ACTION_DETAIL = {
+  id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published',
+  currentDraftVersionId: null, currentPublishedVersionId: 'cav-4',
+  versions: [
+    { id: 'cav-4', versionNumber: 4, status: 'published', actions: [caStep('s41', 'add_tag', { tagId: 'tag-trial' }), caStep('s42', 'wait', { minutes: 30 }), caStep('s43', 'send_message', { templateId: 'template-usage-1', templateName: '体験のご案内', templateVersion: 4 }, 'continue'), caStep('s44', 'start_scenario', { scenarioId: 'scenario-0' }), caStep('s45', 'set_metadata', { assignee: '佐々木' }, 'continue')], createdBy: '佐々木', createdAt: '2026-08-20T05:02:00.000Z', publishedAt: '2026-08-20T05:02:00.000Z' },
+    { id: 'cav-3', versionNumber: 3, status: 'published', actions: [caStep('s31', 'add_tag'), caStep('s32', 'wait', { minutes: 30 }), caStep('s33', 'send_message'), caStep('s34', 'start_scenario')], createdBy: '田中', createdAt: '2026-08-12T00:40:00.000Z', publishedAt: '2026-08-12T00:40:00.000Z' },
+    { id: 'cav-2', versionNumber: 2, status: 'published', actions: [caStep('s21', 'add_tag'), caStep('s22', 'wait', { minutes: 10 }), caStep('s23', 'start_scenario')], createdBy: '佐々木', createdAt: '2026-08-04T08:20:00.000Z', publishedAt: '2026-08-04T08:20:00.000Z' },
+    { id: 'cav-1', versionNumber: 1, status: 'published', actions: [caStep('s11', 'add_tag'), caStep('s12', 'send_message')], createdBy: '佐々木', createdAt: '2026-07-28T02:15:00.000Z', publishedAt: '2026-07-28T02:15:00.000Z' },
+  ],
+  bindings: [
+    { id: 'cab-1', consumerType: 'scenario', consumerId: 'scenario-0', consumerPath: '体験前フォロー・1通目のあと', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 8, waitingCount: 2, updatedAt: '2026-08-25T00:00:00.000Z' },
+    { id: 'cab-2', consumerType: 'form', consumerId: 'form-1', consumerPath: '体験のお申し込み・送信後', versionId: 'cav-3', versionNumber: 3, latestVersionNumber: 4, hasNewerVersion: true, runningCount: 4, waitingCount: 1, updatedAt: '2026-08-24T00:00:00.000Z' },
+    { id: 'cab-3', consumerType: 'auto_reply', consumerId: 'ar-1', consumerPath: '「体験」と送られたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-23T00:00:00.000Z' },
+    { id: 'cab-4', consumerType: 'rich_menu', consumerId: 'rm-1', consumerPath: '体験を申し込む を押したとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-22T00:00:00.000Z' },
+    { id: 'cab-5', consumerType: 'automation', consumerId: 'au-3', consumerPath: 'タグ「体験申込」が付いたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, updatedAt: '2026-08-21T00:00:00.000Z' },
+  ],
+}
 
 /*
   予約メニュー。設計 `QSLEH` の「メニュー 8／止めているもの 2つ」。
