@@ -97,8 +97,12 @@ export default function NewTagPageV4() {
         multiplierPriority: copySource.tag.mileageMultiplierPriority ?? 0,
         applyToExisting: false,
         reapplyPolicy: copySource.tag.reapplyPolicy ?? 'first_only',
-        actions: (copySource.automation?.actions ?? []).map(linkedActionFromDefinition),
+        actions: (copySource.automation?.actions ?? []).map((action) => linkedActionFromDefinition(
+          action,
+          copySource.tag.linkedActions?.find((saved) => saved.id === action.id),
+        )),
       } : undefined}
+      referenceDrawerState={params.get('reference') === '1'}
       saving={saving}
       error={error}
       notice={notice}

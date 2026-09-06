@@ -41,7 +41,7 @@ describe('友だち属性 V4 contract', () => {
     expect(editor).not.toContain('text-[32px] font-bold tracking-tight')
     expect(editor).not.toContain('友だちを分類するタグを作ります。タグが付いた瞬間の連動')
     expect(editor).toContain('番目のアクションを複製')
-    expect(editor).toContain("action.type === 'タグ' || action.type === 'マイル'")
+    expect(editor).toContain("action.type === 'タグ追加' || action.type === 'タグ解除'")
     // マイル設定だけを根拠に、存在しない連動アクションを作って表示しない。
     expect(editor).not.toContain("id: 'sample-1'")
   })
@@ -52,7 +52,8 @@ describe('友だち属性 V4 contract', () => {
     expect(page).toContain('api.tags.definition(copyId, selectedAccountId)')
     expect(page).toContain('name: `${copySource.tag.name} のコピー`')
     expect(page).toContain('rewardMiles: copySource.tag.mileageReward ?? 0')
-    expect(page).toContain('map(linkedActionFromDefinition)')
+    expect(page).toContain('.map((action) => linkedActionFromDefinition(')
+    expect(page).toContain('copySource.tag.linkedActions?.find')
   })
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
