@@ -271,6 +271,37 @@ const DASHBOARD_OVERVIEW = {
     funnelAlerts: 0,
     automationFailures: 0,
   },
+  // PR #1016 の未取得判別契約。値だけでなく、基準時刻と期間も本番APIとそろえる。
+  metrics: {
+    activeFriends: {
+      value: 398,
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'latest',
+    },
+    monthlyQuota: {
+      value: { used: 3, limit: 200, remaining: 197 },
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'this-month',
+    },
+    friendTrend: {
+      value: DASHBOARD_TREND,
+      state: 'estimated',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'last7-fixed',
+    },
+    officialProfileUrl: {
+      value: 'https://lin.ee/nen-official',
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'latest',
+    },
+  },
 }
 
 /**
