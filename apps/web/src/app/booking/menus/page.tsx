@@ -69,7 +69,7 @@ function monthKey(offset: number): string {
 }
 
 function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuCount: (count: number | null) => void }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,6 +90,10 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [sort, setSort] = useState<'bookings' | 'order' | 'name'>('bookings')
   const [period, setPeriod] = useState<'current' | 'previous' | 'all'>('current')
   const loadGenerationRef = useRef(0)
+  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
+  const previewUrl = selectedAccount?.liffId
+    ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
+    : null
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -284,6 +288,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   return (
     <div data-design-node="QSLEH">
       <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+        {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
         <Button variant="primary" href="/booking/menus/new">
           予約メニューを作る
         </Button>
@@ -515,7 +520,7 @@ function BookingRulesSummary({ items, loading, error, onRetry }: {
     { label: 'キャンセル期限', key: 'cancel_deadline_hours_before' as const, unit: '時間前', none: '制限なし' },
   ]
   return (
-    <section data-design="Rules" className="space-y-4">
+    <section data-booking-rules className="space-y-4">
       <div className="bg-accent-soft rounded-card border-accent/30 border p-4">
         <h2 className="text-ink text-base font-semibold">予約のルールをまとめて確認</h2>
         <p className="text-ink-secondary mt-1 text-sm">いまはメニューごとに保存されている3つのルールを、ここで横並びに確認できます。</p>

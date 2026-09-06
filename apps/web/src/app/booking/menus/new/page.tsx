@@ -10,6 +10,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import Button from '@/components/shared/button'
 
 /**
  * メニューを追加する（設計 V2 8-2-1 / node swtmr）。
@@ -422,9 +423,10 @@ function ActionSummary({ title, detail, status, href }: {
       <span className="bg-success-bg text-success rounded-pill ml-auto shrink-0 px-2 py-1 text-xs font-medium">{status}</span>
     </>
   )
-  return href ? (
-    <a href={href} className="border-hairline hover:bg-canvas-sunken flex items-center gap-3 rounded-control border p-3">{content}</a>
-  ) : (
-    <div className="border-hairline flex items-center gap-3 rounded-control border p-3">{content}</div>
+  return (
+    <div className="border-hairline flex items-center gap-3 rounded-control border p-3">
+      {content}
+      {href && <Button href={href}>設定を見る</Button>}
+    </div>
   )
 }
