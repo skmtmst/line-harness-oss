@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SummaryCard from '@/components/shared/summary-card'
@@ -48,7 +49,8 @@ function formatJst(value: string | null): string {
   }).format(date)
 }
 
-type LoadState = 'loading' | 'ready' | 'error'
+type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
+type RunFilter = 'all' | 'failed' | 'excluded' | 'clicked'
 
 export default function NotificationRunList({
   lineAccountId,
@@ -61,6 +63,8 @@ export default function NotificationRunList({
   const [state, setState] = useState<LoadState>('loading')
   const [result, setResult] = useState<EcNotificationRunList | null>(null)
   const [total, setTotal] = useState(0)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<RunFilter>('all')
   const requestRef = useRef(0)
 
   useEffect(() => setPage(1), [lineAccountId, mode])
@@ -86,11 +90,11 @@ export default function NotificationRunList({
       setResult(response.data)
       setTotal(response.pagination.total)
       setState('ready')
-    } catch {
+    } catch (error) {
       if (request !== requestRef.current) return
       setResult(null)
       setTotal(0)
-      setState('error')
+      setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
   }, [lineAccountId, mode, page])
 
@@ -101,18 +105,58 @@ export default function NotificationRunList({
   const items = result?.items ?? []
   const summary = result?.summary ?? null
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const filters: Array<{ value: RunFilter; label: string }> = mode === 'failures'
+    ? [{ value: 'all', label: 'すべて' }, { value: 'failed', label: '送信できなかった' }, { value: 'excluded', label: '送信対象外' }]
+    : [{ value: 'all', label: 'すべて' }, { value: 'clicked', label: 'クリック記録あり' }, { value: 'failed', label: '送れなかった' }]
+  const visibleItems = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase('ja-JP')
+    return items.filter((item) => {
+      if (filter === 'clicked' && !item.clickedAt) return false
+      if (filter === 'failed' && item.status !== 'failed') return false
+      if (filter === 'excluded' && item.status !== 'excluded') return false
+      if (!normalized) return true
+      return [item.notificationName, item.friendName, item.orderNumber, item.reason]
+        .some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalized))
+    })
+  }, [filter, items, query])
+  const listState = !lineAccountId
+    ? 'account-required'
+    : state === 'ready' && items.length === 0
+      ? 'empty'
+      : state === 'ready' && visibleItems.length === 0
+        ? 'filtered-empty'
+        : state
 
   return (
-    <section className="space-y-4" data-design-node={nodeId} aria-label={title}>
+    <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="件" detail="LINEへの受付まで確認できたもの" variant="v6" loading={state === 'loading'} />
-        <SummaryCard title="送信できなかった" value={summary?.failed ?? null} unit="件" detail="確認と連絡が必要なもの" variant="v6" loading={state === 'loading'} badgeTone="danger" />
-        <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="件" detail="設定により送信しなかったもの" variant="v6" loading={state === 'loading'} />
-        <SummaryCard title="処理中" value={summary?.pending ?? null} unit="件" detail="受付または処理を待っているもの" variant="v6" loading={state === 'loading'} />
+        {mode === 'failures' ? <>
+          <SummaryCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail="確認と連絡が必要" variant="v6" loading={state === 'loading'} badgeTone="danger" />
+          <SummaryCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail="つながりや設定を確認" variant="v6" loading={state === 'loading'} />
+          <SummaryCard title="メールで届いた" value={null} unit="通" detail="メール送信記録の接続後に表示" variant="v6" />
+          <SummaryCard title="まだ連絡できていない" value={null} unit="通" detail="代替連絡の記録接続後に表示" variant="v6" />
+        </> : <>
+          <SummaryCard title="お知らせの記録" value={state === 'ready' ? total : null} unit="件" detail="選択中のLINEアカウント" variant="v6" loading={state === 'loading'} />
+          <SummaryCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail="LINEへの受付まで確認" variant="v6" loading={state === 'loading'} />
+          <SummaryCard title="押された" value={null} unit="通" detail="自社の短縮URL集計を接続後に表示" variant="v6" />
+          <SummaryCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail="対応が必要なもの" variant="v6" loading={state === 'loading'} badgeTone="danger" />
+        </>}
       </div>
 
       <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
-        選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。
+        {mode === 'failures'
+          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。メール結果と対応済みの記録は、送信台帳の接続後に表示します。'
+          : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
+        <span className="mt-1 block text-xs">試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="min-w-64 flex-1">
+          <span className="sr-only">お客様の名前・注文番号で検索</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-accent" />
+        </label>
+        {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
+        <span className="text-xs text-ink-faint">20件表示</span>
       </div>
 
       {!lineAccountId ? (
@@ -126,12 +170,16 @@ export default function NotificationRunList({
           description="登録済みの記録は消えていません。時間をおいて読み直してください。"
           action={<Button onClick={() => void load()}>記録を再読み込み</Button>}
         />
+      ) : state === 'forbidden' ? (
+        <ListState kind="forbidden" />
       ) : items.length === 0 ? (
         <ListState
           kind="empty"
           title={mode === 'failures' ? '送れなかったお知らせはありません' : 'お知らせの記録はまだありません'}
           description={mode === 'failures' ? '現在の表示範囲には、確認が必要な失敗はありません。' : 'ECからのお知らせを処理すると、ここに記録が残ります。'}
         />
+      ) : visibleItems.length === 0 ? (
+        <ListState kind="empty" title="条件に合う記録はありません" description="検索語か絞り込みを変えてください。" />
       ) : (
         <>
           <DataTable>
@@ -154,7 +202,7 @@ export default function NotificationRunList({
               </TableHeadRow>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <Tr key={item.id}>
                   <NameCell name={item.notificationName} sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source} />
                   <NameCell name={item.friendName || '名前は未取得'} sub="顧客へのお知らせ" />
