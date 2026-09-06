@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CircleHelp, FlaskConical, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
@@ -307,6 +309,10 @@ export default function ActionScoreRulesPage() {
 
   return (
     <main data-design-node="s6MBc" className="space-y-3.5 pb-24">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }, { label: 'ルール' }]} />
+        <Button href="#score-rule-test">1人で試す</Button>
+      </div>
       {!selectedAccountId && !accountLoading ? (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="スコアのルールは、共通トップバーで選んだLINEアカウントごとに保存します。" />
       ) : loading || accountLoading ? (
@@ -454,7 +460,7 @@ export default function ActionScoreRulesPage() {
           </section>
 
           <aside className="grid gap-3 md:grid-cols-3 2xl:grid-cols-1">
-            <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
+            <section id="score-rule-test" className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
               {/*
                 **呼び方は「帯」。** 行動スコアのタブ側は統一済みで、
                 この面だけ「層」に戻すと同じ機能の中で名前が2つになる。
@@ -500,6 +506,17 @@ export default function ActionScoreRulesPage() {
                   <p className="mt-1">合ったルール：{testResult.matched.length ? testResult.matched.map((item) => item.ruleName).join('、') : 'なし'}</p>
                 </div>
               ) : null}
+            </section>
+
+            <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
+              <p className="text-sm font-semibold text-v6-ink">つながる先</p>
+              <div className="mt-3 grid gap-2 text-xs">
+                <Link href="/broadcasts/new" className="text-v6-accent hover:underline">一斉配信 <span className="text-v6-ink-faint">— 帯で相手を選ぶ</span></Link>
+                <Link href="/scenarios" className="text-v6-accent hover:underline">シナリオ配信 <span className="text-v6-ink-faint">— 帯を条件にする</span></Link>
+                <Link href="/automations" className="text-v6-accent hover:underline">オートメーション <span className="text-v6-ink-faint">— 点が下がったときに動かす</span></Link>
+                <Link href="/analytics" className="text-v6-accent hover:underline">分析 <span className="text-v6-ink-faint">— 帯ごとの成果を見る</span></Link>
+                <Link href="/mileage" className="text-v6-accent hover:underline">マイル <span className="text-v6-ink-faint">— お客様の残高を見る</span></Link>
+              </div>
             </section>
           </aside>
         </div>
