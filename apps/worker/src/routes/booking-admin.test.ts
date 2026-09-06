@@ -1,6 +1,19 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Env } from '../index.js';
+
+const bookingCustomerMocks = vi.hoisted(() => ({
+  createBookingCustomer: vi.fn(),
+  getBookingCustomer: vi.fn(),
+  searchBookingCustomers: vi.fn(),
+}));
+vi.mock('@line-crm/db', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@line-crm/db')>(),
+  ...bookingCustomerMocks,
+}));
 
 const availabilityMocks = {
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -46,6 +59,98 @@ const emptyDb = {
     }),
   }),
 };
+
+describe('booking customers API', () => {
+  const summary = {
+    id: 'customer-1',
+    line_account_id: 'acc1',
+    friend_id: null,
+    display_name: '山田 花子',
+    phone_last4: '5678',
+    pet_name: 'ポチ',
+    is_line_linked: false,
+    created_at: '2026-09-07T00:00:00.000Z',
+    updated_at: '2026-09-07T00:00:00.000Z',
+  };
+
+  test('200で実データを返す', async () => {
+    bookingCustomerMocks.searchBookingCustomers.mockResolvedValueOnce([summary]);
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request(
+      '/api/booking/admin/customers?account_id=acc1&q=090-1234-5678',
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ customers: [summary] });
+    expect(bookingCustomerMocks.searchBookingCustomers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ lineAccountId: 'acc1', query: '090-1234-5678' }),
+    );
+  });
+
+  test('検索結果0件は空配列、取得失敗は503で区別する', async () => {
+    bookingCustomerMocks.searchBookingCustomers.mockResolvedValueOnce([]);
+    const { app, env } = makeApp(emptyDb);
+    const empty = await app.request('/api/booking/admin/customers?account_id=acc1&q=該当なし', {}, env);
+    expect(empty.status).toBe(200);
+    await expect(empty.json()).resolves.toEqual({ customers: [] });
+
+    bookingCustomerMocks.searchBookingCustomers.mockRejectedValueOnce(new Error('db unavailable'));
+    const failed = await app.request('/api/booking/admin/customers?account_id=acc1', {}, env);
+    expect(failed.status).toBe(503);
+    await expect(failed.json()).resolves.toEqual({ error: 'customer_data_unavailable' });
+  });
+
+  test('所属外アカウントは403で顧客検索へ進まない', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request('/api/booking/admin/customers?account_id=other', {}, env);
+    expect(res.status).toBe(403);
+    expect(bookingCustomerMocks.searchBookingCustomers).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ lineAccountId: 'other' }),
+    );
+  });
+
+  test('作成成功、入力不備、詳細なしを別状態で返す', async () => {
+    bookingCustomerMocks.createBookingCustomer.mockResolvedValueOnce(summary);
+    const { app, env } = makeApp(emptyDb);
+    const created = await app.request(
+      '/api/booking/admin/customers?account_id=acc1',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: '山田 花子',
+          phone: '090-1234-5678',
+          pet_name: 'ポチ',
+        }),
+      },
+      env,
+    );
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toEqual({ customer: summary });
+
+    bookingCustomerMocks.createBookingCustomer.mockRejectedValueOnce(
+      new Error('booking_customer_phone_invalid'),
+    );
+    const invalid = await app.request(
+      '/api/booking/admin/customers?account_id=acc1',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: '山田 花子', phone: 'abc' }),
+      },
+      env,
+    );
+    expect(invalid.status).toBe(422);
+
+    bookingCustomerMocks.getBookingCustomer.mockResolvedValueOnce(null);
+    const missing = await app.request('/api/booking/admin/customers/missing?account_id=acc1', {}, env);
+    expect(missing.status).toBe(404);
+  });
+});
 
 describe('GET /api/booking/admin/menus/:id/staff', () => {
   test('400 without account_id', async () => {
@@ -143,6 +248,34 @@ function scriptedDb(handlers: [string, Handler][]) {
   };
 }
 
+function sqliteAsD1(sqlite: Database.Database): D1Database {
+  const sqliteParams = (sql: string, params: unknown[]) => {
+    if (!/\?\d+/.test(sql)) return params;
+    return [Object.fromEntries(params.map((value, index) => [String(index + 1), value]))];
+  };
+  const prepare = (sql: string): D1PreparedStatement => {
+    const make = (params: unknown[]): D1PreparedStatement => ({
+      bind: (...next: unknown[]) => make(next),
+      first: async <T>() => (sqlite.prepare(sql).get(...sqliteParams(sql, params)) as T | undefined) ?? null,
+      all: async <T>() => ({ results: sqlite.prepare(sql).all(...sqliteParams(sql, params)) as T[], success: true, meta: {} }),
+      run: async <T>() => {
+        const info = sqlite.prepare(sql).run(...sqliteParams(sql, params));
+        return { success: true, results: [], meta: { changes: info.changes } } as T;
+      },
+      raw: async () => [],
+    } as unknown as D1PreparedStatement);
+    return make([]);
+  };
+  return {
+    prepare,
+    batch: async <T>(statements: D1PreparedStatement[]) => {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results as T;
+    },
+  } as unknown as D1Database;
+}
+
 const execCtx = {
   waitUntil: () => undefined,
   passThroughOnException: () => undefined,
@@ -168,6 +301,30 @@ describe('POST /api/booking/admin/bookings', () => {
   function happyDb(insertChanges = 1) {
     return scriptedDb([
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
+      ['FROM staff WHERE', { first: { ok: 1 } }],
+      [
+        'FROM menus m',
+        {
+          first: {
+            duration_minutes: 60,
+            buffer_after_minutes: 10,
+            dur: 60,
+            price: 8000,
+            is_offered: 1,
+          },
+        },
+      ],
+      ['FROM staff_shifts', { first: { start_time: '10:00', end_time: '19:00' } }],
+      ['SELECT starts_at, block_ends_at FROM bookings', { all: { results: [] } }],
+      ['INSERT INTO booking_idempotency_keys', { run: { meta: { changes: 1 } } }],
+      ['UPDATE booking_idempotency_keys', { run: { meta: { changes: 1 } } }],
+      ['INSERT INTO bookings', { run: { meta: { changes: insertChanges } } }],
+    ]);
+  }
+
+  function happyCustomerDb(insertChanges = 1) {
+    return scriptedDb([
+      ['FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
       [
         'FROM menus m',
@@ -371,6 +528,148 @@ describe('POST /api/booking/admin/bookings', () => {
       expect.anything(),
       expect.objectContaining({ from: `${sepYear}-09-10`, to: `${sepYear}-09-10` }),
     );
+  });
+
+  test('LINE未連携客を予約へ結び、LINE通知とリマインダは作らない', async () => {
+    availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
+    const db = happyCustomerDb();
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          booking_customer_id: 'customer-1',
+          menu_id: 'm1',
+          staff_id: 's1',
+          starts_at: futureStartsAt,
+          send_line_confirmation: false,
+        }),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'phone-booking-1' },
+      },
+      env,
+      execCtx,
+    );
+
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toMatchObject({
+      booking_customer_id: 'customer-1',
+      status: 'confirmed',
+      line_notification: 'not_applicable',
+    });
+    const insert = db.calls.find((call) => call.sql.includes('INSERT INTO bookings'));
+    expect(insert?.params).toContain('customer-1');
+    expect(insert?.params).toContain('phone');
+    expect(db.calls.some((call) => call.sql.includes('INSERT INTO booking_reminders'))).toBe(false);
+  });
+
+  test('実SQLiteでも電話客予約を保存し、予約一覧へ顧客名を返す', async () => {
+    availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
+    const sqlite = new Database(':memory:');
+    try {
+      sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+      sqlite.exec(`
+        INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+        VALUES ('acc1','channel-1','A店','token','secret');
+        INSERT INTO staff (id, line_account_id, name, display_name)
+        VALUES ('s1','acc1','担当A','担当A'), ('owner-1','acc1','Owner','Owner');
+        INSERT INTO menus (
+          id, line_account_id, name, duration_minutes, buffer_after_minutes,
+          base_price, concurrent_capacity
+        ) VALUES ('m1','acc1','相談',60,10,8000,1);
+        INSERT INTO staff_menus (staff_id, menu_id, is_offered)
+        VALUES ('s1','m1',1);
+        INSERT INTO booking_customers (
+          id, line_account_id, display_name, phone_normalized_hash,
+          phone_encrypted, phone_last4, pet_name
+        ) VALUES ('customer-1','acc1','山田 花子','hash','cipher','5678','ポチ');
+      `);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const created = await app.request(
+        '/api/booking/admin/bookings?account_id=acc1',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            booking_customer_id: 'customer-1',
+            menu_id: 'm1',
+            staff_id: 's1',
+            starts_at: futureStartsAt,
+            send_line_confirmation: false,
+          }),
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'phone-booking-real' },
+        },
+        env,
+        execCtx,
+      );
+      expect(created.status).toBe(201);
+
+      const listed = await app.request(
+        '/api/booking/admin/requests?account_id=acc1&status=all',
+        {},
+        env,
+      );
+      expect(listed.status).toBe(200);
+      await expect(listed.json()).resolves.toMatchObject({
+        requests: [expect.objectContaining({
+          booking_customer_id: 'customer-1',
+          friend_id: null,
+          friend_name: '山田 花子',
+          customer_phone_last4: '5678',
+          customer_pet_name: 'ポチ',
+          is_line_linked: 0,
+        })],
+      });
+      expect(sqlite.prepare('SELECT COUNT(*) AS count FROM booking_reminders').get())
+        .toEqual({ count: 0 });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('LINE未連携客へのLINE送信指定は422で予約を作らない', async () => {
+    const db = happyCustomerDb();
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          booking_customer_id: 'customer-1',
+          menu_id: 'm1',
+          staff_id: 's1',
+          starts_at: futureStartsAt,
+          send_line_confirmation: true,
+        }),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'phone-booking-2' },
+      },
+      env,
+      execCtx,
+    );
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    expect(db.calls.some((call) => call.sql.includes('INSERT INTO bookings'))).toBe(false);
+  });
+
+  test('別アカウントの電話客IDは404で予約へ結び付けない', async () => {
+    const db = scriptedDb([['FROM booking_customers', { first: null }]]);
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/bookings?account_id=acc1',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          booking_customer_id: 'customer-other',
+          menu_id: 'm1',
+          staff_id: 's1',
+          starts_at: futureStartsAt,
+        }),
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'phone-booking-3' },
+      },
+      env,
+      execCtx,
+    );
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'booking_customer_not_found' });
   });
 });
 

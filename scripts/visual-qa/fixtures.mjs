@@ -2509,6 +2509,66 @@ export const AUTOMATIONS = [
   ...Array.from({ length: 4 }, (_, index) => ({ id: `au-${index + 15}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
 ]
 
+/**
+ * 機能25「動いた記録」（設計 `DkPY0`）。
+ *
+ * 成功・条件外・失敗を混ぜ、通常状態で3つの結果表示を確かめられるようにする。
+ * `detail` は顧客本文ではなく、実行した処理の固定ラベルだけを持つ。
+ */
+const automationRun = ({
+  id, occurredAt, subject, accountLabel, triggerLabel, status, detail, durationMs,
+  automationId, automationName, domainStatus, successfulActions = [], failedAction = null,
+  failureReason = null,
+}) => ({
+  id,
+  ownerKind: 'automation',
+  ownerId: automationId,
+  lineAccountId: 'visual-qa-account',
+  occurredAt,
+  subject,
+  accountLabel,
+  triggerLabel,
+  reference: null,
+  status,
+  detail,
+  durationMs,
+  canRetry: false,
+  automationId,
+  automationName,
+  automationVersionId: `${automationId}-version-3`,
+  friendId: `friend-${id}`,
+  friendName: subject,
+  sourceEventId: `event-${id}`,
+  domainStatus,
+  startedAt: occurredAt,
+  completedAt: durationMs === null ? null : occurredAt,
+  successfulActions,
+  skippedActions: [],
+  failedAction,
+  failureReason,
+})
+
+export const AUTOMATION_RUNS = {
+  summary: {
+    total: 9660,
+    executed: 8420,
+    skipped: 1240,
+    failed: 6,
+    mostRunName: '「予約」と送られたとき',
+    mostRunCount: 486,
+  },
+  items: [
+    automationRun({ id: 'run-1', occurredAt: '2026-08-25T11:42:00+09:00', subject: '石田 未来', accountLabel: 'LINE 二号店', triggerLabel: '注文が確定したとき', status: 'succeeded', detail: '外部連携（Slack）／マイル 1,000', durationMs: 1200, automationId: 'au-order', automationName: '初回注文をSlackへ知らせる', domainStatus: 'success', successfulActions: ['外部連携（Slack）', 'マイル 1,000'] }),
+    automationRun({ id: 'run-2', occurredAt: '2026-08-25T10:31:00+09:00', subject: '新田 遥', accountLabel: 'LINE 本店', triggerLabel: 'タグ「体験申込」が付いたとき', status: 'succeeded', detail: 'シナリオ開始／担当者 佐々木', durationMs: 800, automationId: 'au-trial', automationName: '体験申込のフォローを始める', domainStatus: 'success', successfulActions: ['シナリオ開始', '担当者 佐々木'] }),
+    automationRun({ id: 'run-3', occurredAt: '2026-08-25T09:12:00+09:00', subject: '松本 圭', accountLabel: 'LINE 本店', triggerLabel: 'タグ「体験申込」が付いたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-trial', automationName: '体験申込のフォローを始める', domainStatus: 'skipped_condition' }),
+    automationRun({ id: 'run-4', occurredAt: '2026-08-24T18:40:00+09:00', subject: '木村 亮', accountLabel: 'LINE 二号店', triggerLabel: '注文が確定したとき', status: 'permanent_failed', detail: 'マイル 1,000 は付きました', durationMs: 30000, automationId: 'au-order', automationName: '初回注文をSlackへ知らせる', domainStatus: 'partial', successfulActions: ['マイル 1,000'], failedAction: '外部連携（Slack）', failureReason: '外部連携先が応答しませんでした' }),
+    automationRun({ id: 'run-5', occurredAt: '2026-08-24T14:02:00+09:00', subject: '佐藤 千尋', accountLabel: 'LINE 本店', triggerLabel: '「予約」と送られたとき', status: 'succeeded', detail: 'メニュー切替／回答フォーム送信', durationMs: 400, automationId: 'au-reserve', automationName: '「予約」で予約画面を出す', domainStatus: 'success', successfulActions: ['メニュー切替', '回答フォーム送信'] }),
+    automationRun({ id: 'run-6', occurredAt: '2026-08-24T09:05:00+09:00', subject: '高橋 直人', accountLabel: 'LINE 本店', triggerLabel: '7日 反応がないとき', status: 'succeeded', detail: '対応マーク「気にかける」', durationMs: 300, automationId: 'au-inactive', automationName: '反応がない人を気にかける', domainStatus: 'success', successfulActions: ['対応マーク「気にかける」'] }),
+    automationRun({ id: 'run-7', occurredAt: '2026-08-23T20:00:00+09:00', subject: '前田 さくら', accountLabel: 'LINE 本店', triggerLabel: '友だちが追加されたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-welcome', automationName: '友だち追加から案内を始める', domainStatus: 'skipped_condition' }),
+  ],
+  pagination: { total: 9660, limit: 20, offset: 0 },
+}
+
 /** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
 export const AUTOMATION_TEMPLATES = [
   { key: 'welcome', name: 'はじめての人にあいさつする', description: '追加された友だちへ案内を始めます', triggerLabel: '友だちが追加されたとき', actionLabel: 'シナリオ「はじめての方へ」を始める' },
