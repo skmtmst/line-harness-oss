@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
-import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
+import type { IncomingWebhook, OutgoingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationsPage from '@/app/notifications/page'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
+import { IncomingOverview, OutgoingOverview } from './webhook-overviews'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -86,6 +86,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
   const [incomingStatus, setIncomingStatus] = useState<LoadStatus>('loading')
   const [outgoingStatus, setOutgoingStatus] = useState<LoadStatus>('loading')
+  const [interactionSummary, setInteractionSummary] = useState<WebhookInteractionSummary | null>(null)
+  const [summaryStatus, setSummaryStatus] = useState<LoadStatus>('loading')
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -131,19 +133,23 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     const requestAccountId = selectedAccountId
     setIncoming([])
     setOutgoing([])
+    setInteractionSummary(null)
     setLoadedAccountId(null)
     setError('')
     if (!requestAccountId) {
       setIncomingStatus('ready')
       setOutgoingStatus('ready')
+      setSummaryStatus('ready')
       return
     }
     setIncomingStatus('loading')
     setOutgoingStatus('loading')
+    setSummaryStatus('loading')
     setError('')
-    const [incomingResult, outgoingResult] = await Promise.allSettled([
+    const [incomingResult, outgoingResult, interactionsResult] = await Promise.allSettled([
       api.webhooks.incoming.list(requestAccountId),
       api.webhooks.outgoing.list(requestAccountId),
+      api.webhooks.interactions.list(requestAccountId, { periodDays: 30, page: 1, limit: 1 }),
     ])
     // アカウント切替後に、前のアカウントの遅い応答で一覧を上書きしない。
     if (
@@ -166,6 +172,18 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     } else {
       setOutgoing([])
       setOutgoingStatus('error')
+    }
+
+    if (
+      interactionsResult.status === 'fulfilled'
+      && interactionsResult.value.success
+      && interactionsResult.value.data?.summary
+    ) {
+      setInteractionSummary(interactionsResult.value.data.summary)
+      setSummaryStatus('ready')
+    } else {
+      setInteractionSummary(null)
+      setSummaryStatus('error')
     }
     setLoadedAccountId(requestAccountId)
   }, [selectedAccountId])
@@ -380,21 +398,24 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   const endpointUrl = (id: string) =>
     `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/incoming/${id}/receive`
   const activeStatus = tab === 'incoming' ? incomingStatus : outgoingStatus
-  const activeLabel = tab === 'incoming' ? 'こちらで受け取る設定' : 'こちらから送る設定'
 
   return (
     <div>
       <div data-design="Head">
         <Header
-          title="外部連携"
-          description="外部サービスから受け取る情報と、外部サービスへ送る通知を設定します。"
+          title={tab === 'incoming' ? 'こちらで受け取る' : '外部連携'}
+          description={
+            tab === 'incoming'
+              ? '相手のサービスで起きたことを、うちに取り込みます。'
+              : 'うちで起きたことを、相手のサービスへ安全に知らせます。'
+          }
           action={
             <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" onClick={() => { window.location.href = '/webhooks?tab=notify' }}>
-                未対応の通知
+              <Button variant="secondary" href="/webhooks?tab=notify">
+                見本から作る
               </Button>
               <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-                {showCreate ? 'キャンセル' : 'Webhookを追加'}
+                {showCreate ? 'キャンセル' : tab === 'incoming' ? '受け取り口を追加' : '送り先を追加'}
               </Button>
             </div>
           }
@@ -497,12 +518,6 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           {error}
         </div>
       )}
-
-      <div className="mb-4 flex justify-end">
-        <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-          {showCreate ? 'キャンセル' : tab === 'incoming' ? '受け取り口を追加' : '送り先を追加'}
-        </Button>
-      </div>
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
@@ -680,240 +695,41 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         </form>
       )}
 
-      {activeStatus === 'loading' ? (
-        <ListState kind="loading" title={`${activeLabel}を読み込んでいます`} />
-      ) : activeStatus === 'error' ? (
-        <ListState
-          kind="error"
-          title={`${activeLabel}を表示できませんでした`}
-          description="登録内容は消えていません。再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button variant="secondary" onClick={() => void load()}>{activeLabel}を再読み込み</Button>}
+      {tab === 'incoming' ? (
+        <IncomingOverview
+          items={incoming}
+          status={activeStatus}
+          showCreate={showCreate}
+          endpointUrl={endpointUrl}
+          onReload={() => void load()}
+          onToggle={handleToggleIncoming}
+          onRotate={(wh) => {
+            setRotateTarget({ kind: 'incoming', id: wh.id, name: wh.name, activate: !wh.hasSecret })
+            setRotateSecretValue('')
+          }}
+          onDelete={(wh) => askDelete('incoming', wh.id, wh.name)}
         />
-      ) : tab === 'incoming' ? (
-        /* Incoming table */
-        incoming.length === 0 && !showCreate ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">こちらで受け取る設定はまだありません。「Webhookを追加」から作成してください。</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">どこから来るか</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">エンドポイントURL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">シークレット</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ステータス</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">作成日</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {incoming.map((wh) => (
-                  <tr key={wh.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{wh.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{sourceLabel(wh.sourceType)}</td>
-                    <td className="px-4 py-3">
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 break-all">
-                        {endpointUrl(wh.id)}
-                      </code>
-                    </td>
-                    <td className="px-4 py-3">
-                      {wh.hasSecret ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          設定済
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          未設定
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleToggleIncoming(wh.id, wh.isActive)}
-                        disabled={!wh.hasSecret && !wh.isActive}
-                        className={`text-xs px-2 py-0.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${
-                          wh.isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}
-                        title={!wh.hasSecret && !wh.isActive ? 'シークレット未設定のため有効化できません' : ''}
-                      >
-                        {wh.isActive ? '有効' : '無効'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {new Date(wh.createdAt).toLocaleDateString('ja-JP')}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => {
-                          setRotateTarget({
-                            kind: 'incoming',
-                            id: wh.id,
-                            name: wh.name,
-                            activate: !wh.hasSecret,
-                          })
-                          setRotateSecretValue('')
-                        }}
-                        className="text-xs text-gray-600 hover:text-gray-900 mr-3"
-                      >
-                        {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
-                      </button>
-                      <button
-                        onClick={() => askDelete('incoming', wh.id, wh.name)}
-                        className="text-red-500 hover:text-red-700 text-sm"
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
-        )
       ) : (
-        /* Outgoing table */
-        outgoing.length === 0 && !showCreate ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-500">こちらから送る設定はまだありません。「Webhookを追加」から作成してください。</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">URL</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">イベントタイプ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">シークレット</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ステータス</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">送信状況</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">作成日</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {outgoing.map((wh) => {
-                  const hasValidUrl = isHttpsUrl(wh.url)
-                  const canActivate = wh.hasSecret && hasValidUrl
-                  const blockedReason = !canActivate
-                    ? !wh.hasSecret && !hasValidUrl
-                      ? 'シークレット未設定 + URL が https:// ではないため有効化できません'
-                      : !wh.hasSecret
-                        ? 'シークレット未設定のため有効化できません'
-                        : 'URL が https:// ではないため有効化できません'
-                    : ''
-                  return (
-                  <tr key={wh.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{wh.name}</td>
-                    <td className="px-4 py-3">
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 break-all">
-                        {wh.url}
-                      </code>
-                      {!hasValidUrl && (
-                        <p className="text-xs text-amber-700 mt-1">
-                          ※ https:// で始まる完全な URL に作り直してください
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {wh.eventTypes.map((et) => (
-                          <span
-                            key={et}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700"
-                          >
-                            {et}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {wh.hasSecret ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          設定済
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          未設定
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleToggleOutgoing(wh.id, wh.isActive)}
-                        disabled={!canActivate && !wh.isActive}
-                        className={`text-xs px-2 py-0.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${
-                          wh.isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}
-                        title={blockedReason}
-                      >
-                        {wh.isActive ? '有効' : '無効'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* 連続失敗があるときだけ出す。自動では止めないので、
-                          ここで気づけないと送られていないことに気づけない。 */}
-                      {(wh.consecutiveFailures ?? 0) > 0 ? (
-                        <div>
-                          <span className="bg-danger-bg text-danger rounded-pill px-2 py-0.5 text-xs font-medium">
-                            {wh.consecutiveFailures}回連続で失敗
-                          </span>
-                          {wh.lastFailedAt && (
-                            <p className="text-ink-faint mt-1 text-[11px]">
-                              最終 {new Date(wh.lastFailedAt).toLocaleString('ja-JP')}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-ink-faint text-xs">—</span>
-                      )}
-                      <p className="text-ink-faint mt-1 text-[11px] tabular-nums">
-                        送り直し {wh.maxRetries ?? 0} 回
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {new Date(wh.createdAt).toLocaleDateString('ja-JP')}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => {
-                          setRotateTarget({
-                            kind: 'outgoing',
-                            id: wh.id,
-                            name: wh.name,
-                            activate: hasValidUrl && !wh.hasSecret,
-                          })
-                          setRotateSecretValue('')
-                        }}
-                        className="text-xs text-gray-600 hover:text-gray-900 mr-3"
-                      >
-                        {wh.hasSecret ? 'シークレット更新' : 'シークレット設定'}
-                      </button>
-                      <button
-                        onClick={() => askDelete('outgoing', wh.id, wh.name)}
-                        className="text-red-500 hover:text-red-700 text-sm"
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            </div>
-          </div>
-        )
+        <OutgoingOverview
+          items={outgoing}
+          status={activeStatus}
+          showCreate={showCreate}
+          summary={interactionSummary}
+          summaryStatus={summaryStatus}
+          incomingCount={incoming.length}
+          onReload={() => void load()}
+          onToggle={handleToggleOutgoing}
+          onRotate={(wh) => {
+            setRotateTarget({
+              kind: 'outgoing',
+              id: wh.id,
+              name: wh.name,
+              activate: isHttpsUrl(wh.url) && !wh.hasSecret,
+            })
+            setRotateSecretValue('')
+          }}
+          onDelete={(wh) => askDelete('outgoing', wh.id, wh.name)}
+        />
       )}
 
       <ConfirmDialog
