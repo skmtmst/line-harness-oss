@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 247,
-  "unimplemented": 6,
+  "compared": 246,
+  "unimplemented": 2,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 19,
-  "match": 68,
-  "structureMatchDataPending": 52,
-  "needsFix": 139,
-  "unjudged": 3,
-  "remaining": 200,
+  "missing": 24,
+  "match": 71,
+  "structureMatchDataPending": 60,
+  "needsFix": 130,
+  "unjudged": 5,
+  "remaining": 197,
   "features": [
     {
       "feature": 1,
@@ -1070,11 +1070,21 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "structureMatchDataPending": 2,
+      "needsFix": 8,
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
+        {
+          "pr": 1010,
+          "head": "3d6b7e7e8",
+          "on": "2026-09-06",
+          "screens": [
+            "ec9vg",
+            "quhg6"
+          ],
+          "note": "Issue #222。3104/8791で最終確認5状態と有効化完了を1440・1920px撮影し、設計本文に構造・文言を合わせた。現APIで取得不能・未接続の項目はデータ待ちとして明記"
+        },
         {
           "pr": 962,
           "head": "9b8f7451",
@@ -1375,12 +1385,24 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 3,
-      "needsFix": 4,
+      "match": 3,
+      "structureMatchDataPending": 6,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
+        {
+          "pr": 1007,
+          "head": "f2be359e5",
+          "on": "2026-09-06",
+          "screens": [
+            "GO8RQ",
+            "XtfO3",
+            "TL7tp",
+            "RW5Tb"
+          ],
+          "note": "Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。"
+        },
         {
           "pr": 509,
           "head": "e148615c",
@@ -1489,11 +1511,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 3,
+      "match": 1,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 2,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 436,
@@ -2208,13 +2230,13 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 2,
-      "unimplemented": 2,
+      "compared": 1,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 3,
       "match": 0,
-      "structureMatchDataPending": 1,
+      "structureMatchDataPending": 3,
       "needsFix": 1,
       "unjudged": 0,
       "remaining": 4,
@@ -2241,14 +2263,14 @@
       "name": "EC連携",
       "total": 4,
       "compared": 2,
-      "unimplemented": 2,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 2,
       "match": 0,
       "structureMatchDataPending": 0,
       "needsFix": 2,
-      "unjudged": 0,
+      "unjudged": 2,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2268,6 +2290,16 @@
             "ELayY"
           ],
           "note": "同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」"
+        },
+        {
+          "pr": 1006,
+          "head": "f7623915e",
+          "on": "2026-09-06",
+          "screens": [
+            "bfB50",
+            "oHAN4"
+          ],
+          "note": "Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。"
         }
       ]
     },
@@ -2421,11 +2453,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
+      "match": 1,
+      "structureMatchDataPending": 0,
       "needsFix": 3,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 547,
@@ -2767,34 +2799,6 @@
       "name": "20-1-D 定期レポートをつくる",
       "gap": "api",
       "gapNote": "決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る"
-    },
-    {
-      "feature": 22,
-      "node": "hHrz8",
-      "name": "22-1-A 写真を1枚ずつ見る",
-      "gap": "api",
-      "gapNote": "一覧写真を拡大するだけでは完成しない。非公開original、review/public派生画像、crop/rotateの版、risk flag、同意、審査競合、original download権限を持つasset・decision API/DBが要る"
-    },
-    {
-      "feature": 22,
-      "node": "J3Wxl8",
-      "name": "22-1-C 出しているもの",
-      "gap": "api",
-      "gapNote": "通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る"
-    },
-    {
-      "feature": 23,
-      "node": "bfB50",
-      "name": "23-1-B 定期便",
-      "gap": "api",
-      "gapNote": "Stripe定期便本体の接続。実装に「接続後に有効化します」と明記"
-    },
-    {
-      "feature": 23,
-      "node": "oHAN4",
-      "name": "23-1-C EC連携のつなぎ先",
-      "gap": "api",
-      "gapNote": "つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記"
     },
     {
       "feature": 25,

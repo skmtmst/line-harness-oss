@@ -13,6 +13,7 @@
 import type { FormAction, FormOptions } from '@line-crm/shared'
 import ActionEditor from './action-editor'
 import { fieldInput, fieldSelect, type FormRefs } from './form-refs'
+import Button from '@/components/shared/button'
 
 function Row({
   label,
@@ -62,11 +63,13 @@ export default function OptionsDialog({
   refs,
   onChange,
   onClose,
+  onSave,
 }: {
   value: FormOptions
   refs: FormRefs
   onChange: (next: FormOptions) => void
   onClose: () => void
+  onSave: () => Promise<void>
 }) {
   const patch = (next: Partial<FormOptions>) => onChange({ ...value, ...next })
 
@@ -79,14 +82,17 @@ export default function OptionsDialog({
     >
       <div className="bg-canvas rounded-panel my-8 w-full max-w-3xl shadow-lg">
         <div className="border-hairline flex items-center justify-between border-b px-5 py-3">
-          <h2 className="text-ink text-base font-bold">オプション設定</h2>
+          <div>
+            <h2 className="text-ink text-base font-bold">オプション設定</h2>
+            <p className="mt-0.5 text-xs text-ink-faint">答え終わったあとの動きと、受付のきまり</p>
+          </div>
           <button onClick={onClose} className="text-ink-faint hover:text-ink px-2 text-lg">
             ×
           </button>
         </div>
 
         <div className="divide-hairline max-h-[70vh] divide-y overflow-y-auto px-5 py-2">
-          <Row label="回答後の動作" note="送信できた人に対して行います。">
+          <Row label="答え終わったあと" note="実行すること">
             <ActionEditor
               value={value.afterActions ?? []}
               onChange={(afterActions: FormAction[]) => patch({ afterActions })}
@@ -95,8 +101,8 @@ export default function OptionsDialog({
           </Row>
 
           <Row
-            label="送信後の画面"
-            note="URLを入れるとそこへ飛ばします。空ならこの文面を出します。"
+            label="答えたあとに開くページ（任意）"
+            note="URLを使わないときは、下の文を表示します。"
           >
             <input
               type="url"
@@ -111,17 +117,18 @@ export default function OptionsDialog({
               onChange={(e) => patch({ thanksText: e.target.value })}
               placeholder="ご回答ありがとうございました。"
               className={`${fieldInput} resize-y`}
+              aria-label="ページを使わないときに出す文"
             />
           </Row>
 
-          <Row label="2回目以降の回答" note="前に答えた内容を、初めから入れておきます。">
+          <Row label="受付のきまり" note="同じ人が答え直すときの動きを決めます。">
             <label className="text-ink-secondary flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={value.restorePrevious ?? false}
                 onChange={(e) => patch({ restorePrevious: e.target.checked })}
               />
-              前回の回答を出しておく
+              前回の答えを最初から入れておく
             </label>
           </Row>
 
@@ -178,13 +185,13 @@ export default function OptionsDialog({
             </select>
           </Row>
 
-          <Row label="送信前の確認" note="押し間違いを減らしたいときに使います。">
+          <Row label="送信前の確認" note="入力ミスを減らせます。ブロックが多いフォームで効きます。">
             <Toggle
               checked={value.confirmDialog?.enabled ?? false}
               onChange={(enabled) =>
                 patch({ confirmDialog: { ...value.confirmDialog, enabled } })
               }
-              label="確認の画面を出す"
+              label="送信する前に確認画面を出す"
             >
               <input
                 type="text"
@@ -208,7 +215,7 @@ export default function OptionsDialog({
             <Toggle
               checked={value.deadline?.enabled ?? false}
               onChange={(enabled) => patch({ deadline: { ...value.deadline, enabled } })}
-              label="期限を決める"
+              label="受付の期限を決める"
             >
               <input
                 type="datetime-local"
@@ -238,7 +245,7 @@ export default function OptionsDialog({
               onChange={(enabled) =>
                 patch({ oncePerFriend: { ...value.oncePerFriend, enabled } })
               }
-              label="同じ人は1回だけ"
+              label="1人1回だけ答えられるようにする"
             >
               <input
                 type="text"
@@ -300,12 +307,12 @@ export default function OptionsDialog({
         </div>
 
         <div className="border-hairline flex justify-end gap-2 border-t px-5 py-3">
-          <button
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium"
-          >
+          <Button onClick={onClose}>
             閉じる
-          </button>
+          </Button>
+          <Button variant="primary" onClick={() => void onSave()}>
+            保存する
+          </Button>
         </div>
       </div>
     </div>
