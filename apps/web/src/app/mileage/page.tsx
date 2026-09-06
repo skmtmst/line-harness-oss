@@ -525,13 +525,13 @@ function MileagePageInner() {
             <table className="w-full table-fixed">
               <thead>
                 <TableHeadRow>
-                  <Th className="w-[32%]">友だち</Th>
-                  <Th className="w-[10%]">ランク</Th>
-                  <Th className="w-[10%]" align="right">いまの残高</Th>
-                  <Th className="w-[10%]" align="right">今月の増減</Th>
-                  <Th className="w-[12%]">消える予定</Th>
-                  <Th className="w-[12%]">最終行動</Th>
-                  <Th className="w-[14%]" align="right">操作</Th>
+                  <Th className="w-1/4">友だち</Th>
+                  <Th className="w-1/12">ランク</Th>
+                  <Th className="w-1/12" align="right">いまの残高</Th>
+                  <Th className="w-1/12" align="right">今月の増減</Th>
+                  <Th className="w-1/12">消える予定</Th>
+                  <Th className="w-1/6">最終行動</Th>
+                  <Th className="w-1/6" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-gray-100">

@@ -23,7 +23,6 @@ import {
   type ActionScoreRuleConfiguration,
   type ActionScoreRuleTestResult,
 } from '@/lib/api'
-import styles from './score-rules.module.css'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -66,14 +65,13 @@ function ruleFrequencyLabel(rule: ActionScoreRule) {
 }
 
 function RuleIcon({ eventType }: { eventType: string }) {
-  const className = 'h-4 w-4 shrink-0'
-  if (eventType === 'link_clicked') return <MousePointerClick className={className} aria-hidden="true" />
-  if (eventType === 'message_received') return <MessageCircle className={className} aria-hidden="true" />
-  if (eventType === 'form_submitted') return <ClipboardList className={className} aria-hidden="true" />
-  if (eventType === 'booking_created') return <CalendarCheck className={className} aria-hidden="true" />
-  if (eventType === 'purchase_completed') return <ShoppingBag className={className} aria-hidden="true" />
-  if (eventType === 'inactivity_30d') return <Clock3 className={className} aria-hidden="true" />
-  return <Ban className={className} aria-hidden="true" />
+  if (eventType === 'link_clicked') return <MousePointerClick className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'message_received') return <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'form_submitted') return <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'booking_created') return <CalendarCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'purchase_completed') return <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'inactivity_30d') return <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
+  return <Ban className="h-4 w-4 shrink-0" aria-hidden="true" />
 }
 
 function localDateTime(value: string | null) {
@@ -336,7 +334,7 @@ export default function ActionScoreRulesPage() {
   }, [configuration])
 
   return (
-    <main data-design-node="s6MBc" className={styles.page}>
+    <main data-design-node="s6MBc" className="flex flex-col gap-3.5" style={{ minHeight: 'calc(100vh - 98px)' }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }, { label: 'ルール' }]} />
         <Button onClick={() => setTestOpen(true)}>1人で試す</Button>
@@ -362,13 +360,13 @@ export default function ActionScoreRulesPage() {
               ) : (
                 <div className="grid gap-2">
                   {bundle.rules.map((rule, index) => (
-                    <div key={rule.id} className={`grid min-h-10 grid-cols-12 items-center gap-3 rounded-control px-3 py-2 ${rule.enabled ? 'bg-surface-pearl' : 'bg-canvas-sunken text-ink-faint'}`}>
+                    <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-3 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)', opacity: rule.enabled ? 1 : 0.72 }}>
                       <button type="button" disabled={!canEdit} className="col-span-6 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
-                        <span className={rule.value < 0 || rule.operation === 'set' ? 'text-status-warn-deep' : 'text-accent-hover'}><RuleIcon eventType={rule.eventType} /></span>
+                        <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}><RuleIcon eventType={rule.eventType} /></span>
                         <span className="truncate">{rule.name}</span>
                         {canEdit ? <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" /> : null}
                       </button>
-                      <span className={`col-span-2 text-right text-sm font-bold ${rule.value < 0 || rule.operation === 'set' ? 'text-status-warn-deep' : 'text-accent-hover'}`}>{rulePointLabel(rule)}</span>
+                      <span className="col-span-2 text-right text-sm font-bold" style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}>{rulePointLabel(rule)}</span>
                       <span className="col-span-3 text-xs text-ink-secondary">{ruleFrequencyLabel(rule)}</span>
                       {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-status-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
                     </div>
@@ -416,7 +414,7 @@ export default function ActionScoreRulesPage() {
         {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-v6-accent-hover" role="status">{notice}</p> : null}
         {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
 
-        <div className={`${styles.footer} sticky bottom-0 z-20 grid min-h-16 grid-cols-4 items-center rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur`}>
+        <div className="sticky bottom-0 z-20 mt-auto grid min-h-16 grid-cols-4 items-center rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
           <p className="text-xs text-v6-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
           <div className="col-span-2 flex items-center justify-center gap-3">
           {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
