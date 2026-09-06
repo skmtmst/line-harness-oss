@@ -3,7 +3,9 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import {
   PREFECTURES,
   collectInputs,
+  formThemeButtonText,
   nextSectionIndex,
+  normalizeFormTheme,
   validateAnswer,
   type FormBlock,
   type FormLayout,
@@ -256,18 +258,31 @@ export default function Form() {
   }
 
   const options = layout.options ?? {};
+  const theme = normalizeFormTheme(options.theme);
   const multi = layout.sections.length > 1;
+  const radius = theme.cornerRadius === 'none' ? '0' : theme.cornerRadius === 'round' ? '1rem' : '0.5rem';
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div
+      className="mx-auto min-h-screen max-w-md p-4 pb-24"
+      style={{
+        color: theme.text,
+        backgroundColor: theme.sub,
+        backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
+        fontFamily: theme.fontFamily === 'serif' ? 'serif' : 'sans-serif',
+      }}
+    >
       {multi && options.sectionHeader !== 'none' && (
         <div className="mb-4 flex items-center justify-center gap-2">
           {layout.sections.map((s, i) => (
             <span
               key={s.id}
               className={`text-xs tabular-nums ${
-                i === sectionIndex ? 'font-bold text-emerald-600' : 'text-gray-400'
+                i === sectionIndex ? 'font-bold' : 'text-gray-400'
               }`}
+              style={i === sectionIndex ? { color: theme.main } : undefined}
             >
               {options.sectionHeader === 'name' ? s.name : i + 1}
             </span>
@@ -305,7 +320,8 @@ export default function Form() {
         <button
           onClick={isLast ? submit : goNext}
           disabled={sending}
-          className="flex-1 rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white disabled:opacity-50"
+          className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
+          style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
         >
           {sending ? '送信中...' : isLast ? options.submitLabel || '送信' : options.nextLabel || '次へ'}
         </button>
@@ -326,7 +342,8 @@ export default function Form() {
               </button>
               <button
                 onClick={submit}
-                className="flex-1 rounded-lg bg-emerald-500 py-2 text-sm font-bold text-white"
+                className="flex-1 py-2 text-sm font-bold"
+                style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
               >
                 {options.confirmDialog?.okLabel || '送信'}
               </button>

@@ -380,6 +380,61 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
 /** 分析の指標1つ。`state` と `reason` を持つのが契約。 */
 const METRIC = (value, state = 'available', reason = null) => ({ value, state, reason })
 
+const PENDING_APPROVALS = [
+  ['木村 亮', '合同会社ノース', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, true],
+  ['大西 健一', '合同会社ノース', 'ao-4', '資料請求', '資料請求', 1500, true],
+  ['岡本 遥', '旧パートナーA（停止中）', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, true],
+  ['高橋 直人', '田中 明', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, false],
+  ['藤井 理沙', '中村 彩', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
+  ['前田 さくら', '木村 亮', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
+  ['松本 圭', '山口 商店', 'ao-3', '友だち追加', '友だち追加', 100, false],
+  ['石田 未来', '田中 明', 'ao-4', '資料請求', '資料請求', 6000, false],
+].map(([friendName, affiliateName, offerId, offerName, conversionPointName, value, duplicateFlag], index) => ({
+  eventId: `cv-p-${index + 1}`,
+  createdAt: `2026-09-0${Math.min(index + 1, 6)}T${String(8 + index).padStart(2, '0')}:12:00+09:00`,
+  friendId: `friend-${index + 1}`,
+  friendName,
+  affiliateId: `af-${(index % 6) + 1}`,
+  affiliateName,
+  offerId,
+  offerName,
+  offerRewardMiles: 0,
+  conversionPointName,
+  value,
+  approvalStatus: 'pending',
+  duplicateFlag,
+}))
+
+const APPROVED_APPROVALS = Array.from({ length: 34 }, (_, index) => {
+  const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
+  const rewards = [0, 3000, 5000, 100, 1500]
+  const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
+  return {
+    eventId: `cv-a-${index + 1}`,
+    createdAt: `2026-09-0${(index % 6) + 1}T10:00:00+09:00`,
+    friendId: `approved-friend-${index + 1}`,
+    friendName: `承認済みの友だち ${index + 1}`,
+    affiliateId: `af-${(index % 6) + 1}`,
+    affiliateName: AFFILIATES[index % AFFILIATES.length].name,
+    offerId: `ao-${offerIndex}`,
+    offerName: names[offerIndex],
+    offerRewardMiles: 0,
+    conversionPointName: names[offerIndex],
+    value: rewards[offerIndex],
+    approvalStatus: 'approved',
+    duplicateFlag: false,
+  }
+})
+
+const REJECTED_APPROVALS = Array.from({ length: 8 }, (_, index) => ({
+  ...PENDING_APPROVALS[index],
+  eventId: `cv-r-${index + 1}`,
+  approvalStatus: 'rejected',
+  duplicateFlag: false,
+}))
+
+const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
+
 const SHAPES = {
   '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
   /*
@@ -404,31 +459,13 @@ const SHAPES = {
     行が無いと「表に無い種別が内部の記号のまま出ていないか」も見られないので、
     承認待ち・承認済み・重複ありの3行を置く。
   */
-  '/api/conversions/approvals': [
-    {
-      eventId: 'cv-1', createdAt: '2026-08-24T20:53:00+09:00',
-      friendId: 'friend-1', friendName: 'さかもとまさと',
-      affiliateId: 'af-1', affiliateName: 'Masato.S',
-      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
-      conversionPointName: '購入完了', value: 12000,
-      approvalStatus: 'pending', duplicateFlag: false,
-    },
-    {
-      eventId: 'cv-2', createdAt: '2026-08-19T09:12:00+09:00',
-      friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
-      affiliateId: 'af-1', affiliateName: 'Masato.S',
-      offerId: null, offerName: null, offerRewardMiles: null,
-      conversionPointName: '資料請求', value: null,
-      approvalStatus: 'approved', duplicateFlag: false,
-    },
-    {
-      eventId: 'cv-3', createdAt: '2026-08-13T20:52:00+09:00',
-      friendId: 'friend-3', friendName: null,
-      affiliateId: 'af-2', affiliateName: null,
-      offerId: 'of-1', offerName: '夏の紹介キャンペーン', offerRewardMiles: 50,
-      conversionPointName: '購入完了', value: 8000,
-      approvalStatus: 'pending', duplicateFlag: true,
-    },
+  '/api/conversions/approvals': CONVERSION_APPROVALS,
+  '/api/affiliate-payments': [
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 9, approvedReward: 84000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0 },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 8, approvedReward: 72000, heldConversions: 1, heldReward: 12000, holdStatusUnknown: 0 },
+    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 7, approvedReward: 64000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0 },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 42000, heldConversions: 1, heldReward: 9000, holdStatusUnknown: 0 },
+    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 60, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 50000, heldConversions: 2, heldReward: 15000, holdStatusUnknown: 0 },
   ],
   '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
@@ -823,6 +860,13 @@ function reminderStepsOf(reminder) {
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+  }
+  if (pathname === '/api/conversions/approvals') {
+    const status = query.get('status')
+    return {
+      success: true,
+      data: status ? CONVERSION_APPROVALS.filter((item) => item.approvalStatus === status) : CONVERSION_APPROVALS,
+    }
   }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*

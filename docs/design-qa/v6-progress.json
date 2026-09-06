@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 246,
-  "unimplemented": 10,
+  "compared": 248,
+  "unimplemented": 8,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 16,
-  "match": 48,
-  "structureMatchDataPending": 47,
-  "needsFix": 151,
-  "unjudged": 12,
-  "remaining": 220,
+  "match": 55,
+  "structureMatchDataPending": 49,
+  "needsFix": 153,
+  "unjudged": 3,
+  "remaining": 213,
   "features": [
     {
       "feature": 1,
@@ -39,6 +39,16 @@
             "Alekb"
           ],
           "note": "ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）"
+        },
+        {
+          "pr": 971,
+          "head": "d69099cd9",
+          "on": "2026-09-06",
+          "screens": [
+            "vUXKb",
+            "JN6mQ"
+          ],
+          "note": "Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。"
         }
       ]
     },
@@ -157,11 +167,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 0,
-      "needsFix": 10,
+      "match": 3,
+      "structureMatchDataPending": 3,
+      "needsFix": 5,
       "unjudged": 1,
-      "remaining": 11,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 520,
@@ -242,6 +252,24 @@
             "IAf7j"
           ],
           "note": "Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した"
+        },
+        {
+          "pr": 966,
+          "head": "baa097e99",
+          "on": "2026-09-06",
+          "screens": [
+            "PhxG6",
+            "LT8RS",
+            "Igi72",
+            "IAf7j",
+            "I6UAdr",
+            "bzDn6",
+            "YzxU1",
+            "InCDe",
+            "r7eSi",
+            "w8W4Eh"
+          ],
+          "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
         }
       ]
     },
@@ -1004,6 +1032,21 @@
       "remaining": 10,
       "capturedAt": [
         {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "Q3qP1r"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認"
+        },
+        {
           "pr": 431,
           "head": "2ab18c88",
           "on": "2026-08-30",
@@ -1046,10 +1089,29 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 11,
+      "needsFix": 13,
+      "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 962,
+          "head": "9b8f7451",
+          "on": "2026-09-06",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "Q8sHa",
+            "yxyzQ",
+            "LKuAQ",
+            "zCQXe"
+          ],
+          "note": "Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認"
+        },
         {
           "pr": 917,
           "head": "c5e1095e",
@@ -1378,15 +1440,15 @@
       "feature": 13,
       "name": "回答フォーム",
       "total": 7,
-      "compared": 5,
-      "unimplemented": 2,
+      "compared": 7,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 0,
+      "structureMatchDataPending": 2,
+      "needsFix": 3,
+      "unjudged": 2,
       "remaining": 7,
       "capturedAt": [
         {
@@ -1569,11 +1631,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 3,
-      "needsFix": 4,
+      "match": 5,
+      "structureMatchDataPending": 1,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 558,
@@ -2627,20 +2689,6 @@
     }
   ],
   "gaps": [
-    {
-      "feature": 13,
-      "node": "ava2n",
-      "name": "13-1-B フォームのデザイン設定",
-      "gap": "drop",
-      "gapNote": "**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」"
-    },
-    {
-      "feature": 13,
-      "node": "gBp2J",
-      "name": "13-1-E フォームの削除確認",
-      "gap": "api",
-      "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
     {
       "feature": 16,
       "node": "QX70l",

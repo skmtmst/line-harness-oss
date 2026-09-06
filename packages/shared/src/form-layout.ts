@@ -207,6 +207,28 @@ export interface FormOptions {
   totalLimit?: { enabled: boolean; max?: number; message?: string };
   /** 送信できたあとに動かす動作 */
   afterActions?: FormAction[];
+  /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
+  theme?: FormTheme;
+}
+
+export type FormFontFamily = "sans" | "serif";
+export type FormCornerRadius = "none" | "medium" | "round";
+
+/**
+ * フォームの見た目は5つの色の役割だけで持つ。
+ *
+ * CSS文字列を受け取らないことで、管理画面から任意のコードを公開画面へ
+ * 混ぜられないようにする。
+ */
+export interface FormTheme {
+  main: string;
+  sub: string;
+  accent: string;
+  error: string;
+  text: string;
+  fontFamily: FormFontFamily;
+  cornerRadius: FormCornerRadius;
+  backgroundImageUrl: string | null;
 }
 
 export interface FormLayout {
@@ -247,6 +269,17 @@ export const FORM_OPTIONS_DEFAULT: FormOptions = {
   oncePerFriend: { enabled: false },
   totalLimit: { enabled: false },
   afterActions: [],
+};
+
+export const FORM_THEME_DEFAULT: FormTheme = {
+  main: "#008f3d",
+  sub: "#e8f8ee",
+  accent: "#175cd3",
+  error: "#e5484d",
+  text: "#1d1d1f",
+  fontFamily: "sans",
+  cornerRadius: "medium",
+  backgroundImageUrl: null,
 };
 
 /**
@@ -496,6 +529,10 @@ export function normalizeLayout(input: unknown): FormLayout | null {
         }))
     : [];
 
+  const rawOptions = raw.options && typeof raw.options === "object"
+    ? (raw.options as Record<string, unknown>)
+    : {};
+
   return {
     version: 2,
     header: normalizeBlocks(raw.header),
@@ -504,11 +541,60 @@ export function normalizeLayout(input: unknown): FormLayout | null {
       : [{ id: newBlockId("s"), name: "セクション1", blocks: [] }],
     options: {
       ...FORM_OPTIONS_DEFAULT,
-      ...(raw.options && typeof raw.options === "object"
-        ? (raw.options as FormOptions)
-        : {}),
+      ...(rawOptions as FormOptions),
+      ...(rawOptions.theme === undefined
+        ? {}
+        : { theme: normalizeFormTheme(rawOptions.theme) }),
     },
   };
+}
+
+/** 保存前にテーマの値を許可した形へ絞る。 */
+export function normalizeFormTheme(input: unknown): FormTheme {
+  const raw = input && typeof input === "object"
+    ? (input as Record<string, unknown>)
+    : {};
+  const hex = (value: unknown, fallback: string) =>
+    typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback;
+  const backgroundImageUrl = typeof raw.backgroundImageUrl === "string"
+    && /^https:\/\//i.test(raw.backgroundImageUrl)
+    ? raw.backgroundImageUrl.slice(0, 2048)
+    : null;
+
+  return {
+    main: hex(raw.main, FORM_THEME_DEFAULT.main),
+    sub: hex(raw.sub, FORM_THEME_DEFAULT.sub),
+    accent: hex(raw.accent, FORM_THEME_DEFAULT.accent),
+    error: hex(raw.error, FORM_THEME_DEFAULT.error),
+    text: hex(raw.text, FORM_THEME_DEFAULT.text),
+    fontFamily: raw.fontFamily === "serif" ? "serif" : "sans",
+    cornerRadius: raw.cornerRadius === "none" || raw.cornerRadius === "round"
+      ? raw.cornerRadius
+      : "medium",
+    backgroundImageUrl,
+  };
+}
+
+/** 主ボタンの背景に対して、4.5:1以上を優先して読みやすい文字色を返す。 */
+export function formThemeButtonText(theme: FormTheme): string {
+  const white = contrastRatio(theme.main, "#ffffff");
+  const body = contrastRatio(theme.main, theme.text);
+  if (white >= 4.5 && white >= body) return "#ffffff";
+  if (body >= 4.5) return theme.text;
+  return contrastRatio(theme.main, "#000000") >= white ? "#000000" : "#ffffff";
+}
+
+function contrastRatio(left: string, right: string): number {
+  const luminance = (hex: string) => {
+    const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255);
+    const [r, g, b] = channels.map((channel) =>
+      channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+    );
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const a = luminance(left);
+  const b = luminance(right);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
 function normalizeBlocks(input: unknown): FormBlock[] {

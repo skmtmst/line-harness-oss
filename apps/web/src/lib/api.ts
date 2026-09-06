@@ -2859,6 +2859,9 @@ export const api = {
           onSubmitMessageContent: string | null
           isActive: boolean
           submitCount: number
+          ogTitle: string | null
+          ogDescription: string | null
+          ogImageUrl: string | null
         }>
       >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
     create: (
@@ -2887,6 +2890,9 @@ export const api = {
         onSubmitMessageType?: string | null
         onSubmitMessageContent?: string | null
         isActive?: boolean
+        ogTitle?: string | null
+        ogDescription?: string | null
+        ogImageUrl?: string | null
       },
     ) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
