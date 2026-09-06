@@ -683,10 +683,10 @@ export const SCREENS = [
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #384で再撮影。** 一覧KPI・保存した検索・ページ情報は実API契約の固定データで表示でき、1440/1920pxで横はみ出し0。固定データの平均開封率がAPI契約の69.4ではなく0.694のため画面も0.694%となる。画面側で推測補正すると本番の0.7%を70%に誤表示するため行わず、共通担当 #388 の修正待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 一覧KPI・保存した検索・ページ情報を実API契約の固定データで表示。共通固定データ #388 / PR #1142 の統合後に平均開封率69.4%を確認し、画面側の推測補正は行っていない。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: '/broadcasts',
+    verdictHead: 'a19b5d73aa', route: '/broadcasts',
     // ---- 2026-09-02 `df3f4e3b` で撮り直した（#674 マージ後）。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：**列が設計どおりの6列になった**（タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作）。
     //       上の P2「実装は8列」は解消。状態が独立した桁になり、削除が「操作」に入って、1列ずれも消えている。
@@ -889,10 +889,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #384で再撮影。** KPI・フォルダ・検索・絞り込み・6列一覧、保存した検索の読込と保存、操作メニューと追加窓を1440/1920pxで撮影し、横はみ出し0。固定データの平均開封率がAPI契約の69.4ではなく0.694のため画面も0.694%となり、共通担当 #388 の修正待ち。', route: '/broadcasts',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** KPI・フォルダ・検索・絞り込み・6列一覧、保存した検索の読込と保存、操作メニューと追加窓を撮影。共通固定データ #388 / PR #1142 の統合後に平均開封率69.4%を確認した。1440/1920pxで横はみ出し0。', route: '/broadcasts',
     verdictSource: 'broadcasts-v6/xkRDb.txt + broadcasts-v6/xkRDb-1440.png + broadcasts-v6/xkRDb-1920.png + broadcasts-v6/xkRDb-add-1440.png + broadcasts-v6/xkRDb-add-1920.png',
-    verdictHead: '55b3531ecb',
+    verdictHead: 'a19b5d73aa',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
