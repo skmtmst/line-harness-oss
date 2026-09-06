@@ -67,11 +67,12 @@ export async function syncConfirmedBookingToGoogle(
   const row = await db
     .prepare(
       `SELECT b.id, b.starts_at, b.ends_at, b.customer_note, b.external_event_id,
-              f.display_name AS friend_name, m.name AS menu_name,
+              COALESCE(f.display_name, bc.display_name) AS customer_name, m.name AS menu_name,
               s.display_name AS staff_name,
               gc.id AS connection_id, gc.calendar_id, gc.auth_type, gc.access_token
          FROM bookings b
-         INNER JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN friends f ON f.id = b.friend_id
+         LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          LEFT JOIN google_calendar_connections gc
@@ -87,7 +88,7 @@ export async function syncConfirmedBookingToGoogle(
       ends_at: string;
       customer_note: string | null;
       external_event_id: string | null;
-      friend_name: string | null;
+      customer_name: string | null;
       menu_name: string;
       staff_name: string;
       connection_id: string | null;
@@ -107,7 +108,7 @@ export async function syncConfirmedBookingToGoogle(
   };
   const client = await clientForConnection(connection, credentials);
   const created = await client.createEvent({
-    summary: `${row.friend_name ?? 'お客様'}｜${row.menu_name}`,
+    summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
     start: row.starts_at,
     end: row.ends_at,
     description: [
