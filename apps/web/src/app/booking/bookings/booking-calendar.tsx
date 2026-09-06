@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import type { BookingRequest } from '@/lib/api'
+import Button from '@/components/shared/button'
 
 const HOURS = Array.from({ length: 10 }, (_, index) => index + 9)
 const DAY_MS = 86_400_000
@@ -84,25 +85,25 @@ function BookingCard({ booking, compact = false, onOpen }: {
     <button
       type="button"
       onClick={() => onOpen(booking.id)}
-      className={`w-full rounded-md border-l-[3px] px-2 py-1.5 text-left transition hover:brightness-95 ${
+      className={`w-full rounded-md border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
         phone
-          ? 'border-blue-600 bg-blue-50 text-blue-800'
+          ? 'border-action bg-action-soft text-action'
           : 'border-success bg-success-bg text-success'
       }`}
       aria-label={`${bookingTime(booking)} ${booking.friend_name ?? '電話予約のお客さま'} ${booking.menu_name}の詳細`}
     >
-      {!compact && <p className="truncate text-[11px] font-semibold">{booking.menu_name}</p>}
-      <p className="truncate text-[11px] font-medium">
+      {!compact && <p className="truncate text-xs font-semibold">{booking.menu_name}</p>}
+      <p className="truncate text-xs font-medium">
         {compact ? `${bookingTime(booking)} ` : ''}{booking.friend_name ?? '電話予約のお客さま'}
         {!compact && ` ／ ${phone ? '電話' : 'LINE'}`}
       </p>
-      {compact && <p className="truncate text-[10px] opacity-80">{booking.staff_name}</p>}
+      {compact && <p className="truncate text-xs opacity-80">{booking.staff_name}</p>}
     </button>
   )
 }
 
 function EmptyCell() {
-  return <span className="text-ink-faint text-[10px] opacity-50">あき</span>
+  return <span className="text-ink-faint text-xs opacity-50">あき</span>
 }
 
 function CalendarFrame({
@@ -121,11 +122,11 @@ function CalendarFrame({
   children: React.ReactNode
 }) {
   return (
-    <section data-design="Calendar" className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-sm">
+    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-sm">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <button type="button" onClick={onPrevious} aria-label="前の期間" className="rounded-control border-hairline h-8 w-8 border">‹</button>
-          <button type="button" onClick={onNext} aria-label="次の期間" className="rounded-control border-hairline h-8 w-8 border">›</button>
+          <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>
+          <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="h-8 w-8">›</Button>
           <p className="text-ink text-sm font-semibold">{title}</p>
           <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent">今日</button>
         </div>
@@ -143,13 +144,13 @@ function DayGrid({ items, staff, onOpen }: {
 }) {
   const columns = `64px repeat(${Math.max(staff.length, 1)}, minmax(0, 1fr))`
   return (
-    <div data-design="DayGrid" className="min-w-0">
+    <div className="min-w-0">
       <div className="border-hairline grid border-b bg-canvas-sunken" style={{ gridTemplateColumns: columns }}>
         <div />
         {staff.map((name) => <div key={name} className="border-hairline border-l px-2 py-2 text-center text-xs font-semibold">{name}</div>)}
       </div>
       {HOURS.map((hour) => (
-        <div key={hour} className="border-hairline grid min-h-[58px] border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
+        <div key={hour} className="border-hairline grid min-h-14 border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
           <div className="text-ink-secondary px-2 py-2 text-xs font-semibold tabular-nums">{hour}:00</div>
           {staff.map((name) => {
             const cell = items.filter((booking) => booking.staff_name === name && bookingHour(booking) === hour)
@@ -174,7 +175,7 @@ function WeekGrid({ days, items, onOpen }: {
 }) {
   const columns = '64px repeat(7, minmax(0, 1fr))'
   return (
-    <div data-design="WeekGrid" className="min-w-0">
+    <div className="min-w-0">
       <div className="border-hairline grid border-b bg-canvas-sunken" style={{ gridTemplateColumns: columns }}>
         <div />
         {days.map((day) => {
@@ -182,13 +183,13 @@ function WeekGrid({ days, items, onOpen }: {
           return (
             <div key={day} className="border-hairline border-l px-1 py-2 text-center">
               <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
-              <p className="text-success mt-0.5 text-[10px] font-semibold">{count}件</p>
+              <p className="text-success mt-0.5 text-xs font-semibold">{count}件</p>
             </div>
           )
         })}
       </div>
       {HOURS.map((hour) => (
-        <div key={hour} className="border-hairline grid min-h-[58px] border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
+        <div key={hour} className="border-hairline grid min-h-14 border-b last:border-b-0" style={{ gridTemplateColumns: columns }}>
           <div className="text-ink-secondary px-2 py-2 text-xs font-semibold tabular-nums">{hour}:00</div>
           {days.map((day) => {
             const cell = items.filter((booking) => jstDay(booking.starts_at) === day && bookingHour(booking) === hour)
@@ -239,20 +240,20 @@ export default function BookingCalendar({ mode, items, onOpen }: {
 
   return (
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi title={mode === 'day' ? '今日の予約' : '今週の予約'} value={`${visible.length}件`} detail={`LINEから ${lineCount}・電話 ${phoneCount}`} />
         <Kpi title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'} value={mode === 'day' ? `${available}枠` : `${Math.round((visible.length / Math.max(1, visible.length + available)) * 100)}%`} detail={mode === 'day' ? '時間と担当から確認できます' : `${visible.length + available}枠のうち ${visible.length}枠`} />
         <Kpi title={mode === 'day' ? '未承認・要対応' : 'あいている枠'} value={mode === 'day' ? `${requested}件` : `${available}枠`} detail={requested > 0 ? '確認が必要です' : '現在、確認待ちはありません'} />
         <Kpi title="キャンセル" value={`${cancelled}件`} detail={mode === 'day' ? '選んだ日' : 'この1週間'} />
       </div>
 
-      <div data-design="Guide" className="mb-4 rounded-control bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700">
+      <div className="bg-action-soft text-action mb-4 rounded-control px-4 py-3 text-xs font-semibold">
         {mode === 'day'
           ? '今日の予約を、時間と担当で並べた台帳です。LINEからの予約（緑）と電話の予約（青）を同じところに並べます。'
           : '今週の予約を曜日ごとに並べています。空いているところと詰まっているところが1目で分かります。'}
       </div>
 
-      <div data-design="Body" className="flex min-w-0 flex-col gap-4 xl:flex-row">
+      <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
         <div className="min-w-0 flex-1">
           {mode === 'day' ? (
             <CalendarFrame
@@ -277,7 +278,7 @@ export default function BookingCalendar({ mode, items, onOpen }: {
           )}
         </div>
 
-        <aside data-design="Aside" className="w-full shrink-0 space-y-3 xl:w-[300px]">
+        <aside className="w-full shrink-0 space-y-3 xl:w-72">
           <SidePanel title={mode === 'day' ? '今日 気をつけること' : '今週 気をつけること'} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
             {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
             {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
@@ -286,7 +287,7 @@ export default function BookingCalendar({ mode, items, onOpen }: {
           <SidePanel title={mode === 'day' ? '今日の流れ' : '今週の内訳'}>
             <p className="flex justify-between"><span>予約</span><strong>{visible.length}件</strong></p>
             <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{lineCount}件</strong></p>
-            <p className="flex justify-between"><span>うち電話</span><strong className="text-blue-700">{phoneCount}件</strong></p>
+            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{phoneCount}件</strong></p>
             <p className="flex justify-between"><span>売上見込み</span><strong>{money(sales)}</strong></p>
           </SidePanel>
           <SidePanel title="つながる先">

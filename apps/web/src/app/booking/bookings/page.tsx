@@ -6,6 +6,7 @@ import Header from '@/components/layout/header'
 import { bookingApi, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
 import BookingCalendar from './booking-calendar'
 
 /**
@@ -304,6 +305,7 @@ export default function BookingsPage() {
           description="トリミングなどの予約を管理します。友だちが自分で予約履歴を確認できるURLも発行できます。"
         />
         <div className="mb-4 flex flex-wrap items-center gap-2">
+          <Button href="/support">マニュアル</Button>
           <Link
             href="/booking/staff/shifts"
             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
@@ -318,7 +320,7 @@ export default function BookingsPage() {
           </Link>
         </div>
       </div>
-      <nav data-design="Tabs" aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+      <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
         {([
           ['day', `今日 ${todayCount}`],
           ['week', `今週 ${weekCount}`],
@@ -568,7 +570,7 @@ export default function BookingsPage() {
                         <td className="px-4 py-3 text-sm">{b.staff_name}</td>
                         <td className="px-4 py-3 text-sm">
                           <span
-                            className={`${b.friend_id ? 'bg-success-soft text-success' : 'bg-info-soft text-info'} rounded-pill px-2 py-0.5 text-xs`}
+                            className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
                           >
                             {b.friend_id ? 'LINE' : '電話'}
                           </span>

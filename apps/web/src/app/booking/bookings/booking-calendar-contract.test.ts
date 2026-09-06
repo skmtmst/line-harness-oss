@@ -13,8 +13,8 @@ describe('V6 予約管理の時間台帳', () => {
   })
 
   test('今日を時間×担当、今週を時間×曜日の格子で表示する', () => {
-    expect(CALENDAR).toContain('data-design="DayGrid"')
-    expect(CALENDAR).toContain('data-design="WeekGrid"')
+    expect(CALENDAR).toContain('function DayGrid')
+    expect(CALENDAR).toContain('function WeekGrid')
     expect(CALENDAR).toContain('repeat(${Math.max(staff.length, 1)}, minmax(0, 1fr))')
     expect(CALENDAR).toContain("'64px repeat(7, minmax(0, 1fr))'")
     expect(CALENDAR).toContain('LINEからの予約（緑）と電話の予約（青）')

@@ -382,8 +382,8 @@ export default function NewProxyBookingPage() {
 
           <div data-design="Right" className="w-full space-y-4 xl:flex-none" style={{ maxWidth: 390 }}>
             <Card title={friend ? `${friend.displayName}さんにはこう届きます` : 'お客様にはこう届きます'}>
-              <div className="rounded-card bg-blue-100 p-3">
-                <p className="mb-2 text-center text-xs font-semibold text-blue-800">LINEプレビュー</p>
+              <div className="rounded-card bg-action-soft p-3">
+                <p className="text-action mb-2 text-center text-xs font-semibold">LINEプレビュー</p>
                 <div className="rounded-card bg-canvas p-4 text-sm leading-6">
                   <p>{friend?.displayName ?? 'お客様'}さま</p>
                   <p className="font-semibold">ご予約を承りました。</p>
