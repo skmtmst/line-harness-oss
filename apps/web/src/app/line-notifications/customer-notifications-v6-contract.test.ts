@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 /**
  * 顧客へのお知らせ（★V6 `festr` / `Q55bb`）の寸法の見張り。
  *
- * **`Q55bb`（お知らせの中身を編集する）の本体はまだ作らない。** 版を分けて
- * 公開する口（下書き版・公開版・テスト受信者・差込項目の許可リスト）が
- * 無いためで、いまある `updateSetting` は公開中の内容を直に書き換える。
- * 作りかけの編集画面を先に置くと、公開版を直接編集できるように見える。
+ * **`Q55bb`（お知らせの中身を編集する）は、現行設定で安全に出せる範囲だけ描く。**
+ * 版を分けて公開する口（下書き版・公開版・テスト受信者）が無いため、
+ * 「下書き保存」「公開」は出さない。現行の `updateSetting` で扱える入力と、
+ * きっかけ・差込項目・プレビューの確認構造だけを設計へ寄せる。
  * 引き継ぎは `docs/design-qa/v6-photo-notify-automation-handoff.md`。
  */
 
@@ -53,6 +53,13 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain('rounded-card')
   })
 
+  it('一覧は設計どおり1ページ6件に区切り、件数とページ送りを同じ場所に出す', () => {
+    expect(PAGE).toContain('const CUSTOMER_PAGE_SIZE = 6')
+    expect(PAGE).toContain('const visiblePage = visible.slice(')
+    expect(PAGE).toContain('<Pagination page={customerPage}')
+    expect(PAGE).toContain('お知らせの種類 {settings.length}つのうち {visiblePage.length}つを表示')
+  })
+
   it('タブ帯は共通部品（高さ44）を使う', () => {
     expect(PAGE).toContain("import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'")
     const tabs = readFileSync(
@@ -62,9 +69,13 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(tabs).toContain('height: 44px;')
   })
 
-  it('版を分けて公開する編集画面はまだ作らない', () => {
-    // 口ができるまで、この画面を先に置かない（置くと公開版を直に編集できる形になる）。
+  it('編集は専用レイアウトへ切り替えるが、版APIが無いうちは公開操作を作らない', () => {
     expect(existsSync(join(HERE, 'customer'))).toBe(false)
+    expect(PAGE).toContain('function CustomerNotificationEditor')
+    expect(PAGE).toContain('data-design-node="Q55bb"')
+    expect(PAGE).toContain('いつ送りますか')
+    expect(PAGE).toContain('このお知らせで差し込める項目（EC連携から来ます）')
+    expect(PAGE).toContain('取引メールと対応済み記録は、送信台帳の接続後に設定できます。')
     expect(PAGE).not.toContain('公開する')
     expect(PAGE).not.toContain('下書きを保存')
     // 引き継ぎが消えたら、作らない理由も消える。

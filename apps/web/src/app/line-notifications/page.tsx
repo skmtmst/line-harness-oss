@@ -7,6 +7,7 @@ import NotificationRunList from '@/components/line-notifications/notification-ru
 import OperatorNotificationRules from '@/components/line-notifications/operator-notification-rules'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
 import { ApiError, api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
@@ -27,6 +28,7 @@ const categories = [
   ['support', 'キャンセル・返金'],
   ['subscription', '定期便'],
 ] as const
+const CUSTOMER_PAGE_SIZE = 6
 
 /**
  * 見出しの下に、**内部のイベントキーを出さない**。
@@ -100,6 +102,95 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
   </div>
 }
 
+function CustomerNotificationEditor({
+  setting,
+  busy,
+  onChange,
+  onClose,
+  onSave,
+  onTestSend,
+}: {
+  setting: EcNotificationSetting
+  busy: boolean
+  onChange: (patch: Partial<EcNotificationSetting>) => void
+  onClose: () => void
+  onSave: () => void
+  onTestSend: () => void
+}) {
+  return <main data-design-node="Q55bb" className="space-y-4 pb-24">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="text-xs font-semibold text-accent">LINE通知　›　お知らせの種類</p>
+        <h1 className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</h1>
+        <p className="mt-1 text-xs text-ink-faint">公開中の内容を編集します。保存した内容は次の通知から使われます。</p>
+      </div>
+      <button type="button" onClick={onTestSend} disabled={busy} className={`${styles.action} ${styles.actionSecondary}`}>自分にテスト送信</button>
+    </div>
+
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <div className="min-w-0 space-y-4">
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h2 className="font-bold text-ink">いつ送りますか</h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <div><p className="text-xs font-semibold text-ink-faint">きっかけ</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">{triggerLabel(setting)}</p></div>
+            <div><p className="text-xs font-semibold text-ink-faint">送りかた</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">{timingLabel(setting)}</p></div>
+            <div><p className="text-xs font-semibold text-ink-faint">送らない相手</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">なし（全員に送る）</p></div>
+          </div>
+        </section>
+
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h2 className="font-bold text-ink">送るもの</h2>
+          <div className="mt-3 space-y-4">
+            <label className="block text-sm font-semibold text-ink-secondary">通知の見出し<input value={setting.title ?? ''} maxLength={80} onChange={(event) => onChange({ title: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal text-ink" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">ご案内文<textarea value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal leading-6 text-ink" /></label>
+            <div className="rounded-control border border-nen-border bg-nen-ivory p-4">
+              <p className="text-sm font-bold text-nen-green">このお知らせで差し込める項目（EC連携から来ます）</p>
+              <div className="mt-2 flex flex-wrap gap-2">{setting.fixedFields.map((field) => <span key={field} className="rounded-pill bg-canvas px-2.5 py-1 text-xs text-nen-chip ring-1 ring-nen-gold-soft">{field}</span>)}</div>
+            </div>
+            <label className="block text-sm font-semibold text-ink-secondary">結びの文章<textarea value={setting.outroText} maxLength={800} rows={3} onChange={(event) => onChange({ outroText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal leading-6 text-ink" /></label>
+          </div>
+        </section>
+
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h2 className="font-bold text-ink">ボタン</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-semibold text-ink-secondary">ボタンの文字<input value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal" /></label>
+            <label className="block text-sm font-semibold text-ink-secondary">押したときに開く先<input value={setting.buttonUrl} placeholder="注文情報のURLを使う場合は空欄" onChange={(event) => onChange({ buttonUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal" /></label>
+          </div>
+          <label className="mt-3 block text-sm font-semibold text-ink-secondary">カード画像URL<input value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(event) => onChange({ imageUrl: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-white px-3 py-2.5 font-normal" /></label>
+        </section>
+
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h2 className="font-bold text-ink">届かなかったときの決めごと</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">取引メールと対応済み記録は、送信台帳の接続後に設定できます。いまは受信箱から別の手だてで連絡してください。</p>
+        </section>
+      </div>
+
+      <aside className="min-w-0 space-y-3">
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <p className="mb-2 text-xs font-semibold text-ink-faint">高橋 直人さんにはこう届きます</p>
+          <CardPreview setting={setting} />
+        </section>
+        <section className="rounded-card border border-warning bg-warning-bg p-4 text-sm text-warning">
+          <h2 className="font-bold">これは「お知らせ」です</h2>
+          <ul className="mt-2 space-y-2 leading-5"><li>配信を止めている人にも届きます</li><li>売り込みの文章は入れないでください</li><li>遅れると問い合わせが増えます</li></ul>
+        </section>
+        <section className="rounded-card border border-hairline bg-canvas p-4 text-sm">
+          <h2 className="font-bold text-ink">つながる先</h2>
+          <div className="mt-2 space-y-2 text-accent"><p>EC連携</p><p>共通情報</p><p>受信箱</p><p>NEN配信</p><p>外部連携</p></div>
+        </section>
+      </aside>
+    </div>
+
+    <div className="fixed bottom-0 left-[var(--sidebar-width,0px)] right-0 z-20 border-t border-hairline bg-canvas/95 px-6 py-3 shadow-lg backdrop-blur">
+      <div className="ml-auto flex max-w-[1584px] flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-ink-faint">出しています。保存すると、次のお知らせから新しい文面が使われます。</p>
+        <div className="flex gap-2"><button type="button" onClick={onClose} className={`${styles.action} ${styles.actionSecondary}`}>キャンセル</button><button type="button" onClick={onTestSend} disabled={busy} className={`${styles.action} ${styles.actionSecondary}`}>自分にテスト送信</button><button type="button" onClick={onSave} disabled={busy} className={`${styles.action} ${styles.actionPrimary}`}>お知らせを保存</button></div>
+      </div>
+    </div>
+  </main>
+}
+
 export default function LineNotificationsPage() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -107,6 +198,7 @@ export default function LineNotificationsPage() {
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [filter, setFilter] = useState<CustomerFilter>('all')
+  const [customerPage, setCustomerPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
@@ -146,6 +238,9 @@ export default function LineNotificationsPage() {
     if (filter === 'incomplete') return isIncomplete(setting)
     return true
   }), [filter, settings])
+  const customerPageCount = Math.max(1, Math.ceil(visible.length / CUSTOMER_PAGE_SIZE))
+  const visiblePage = visible.slice((customerPage - 1) * CUSTOMER_PAGE_SIZE, customerPage * CUSTOMER_PAGE_SIZE)
+  const expandedSetting = settings.find((setting) => setting.eventType === expanded) ?? null
   const filterCount = (value: CustomerFilter): number => {
     if (value === 'enabled') return settings.filter((setting) => setting.isEnabled).length
     if (value === 'stopped') return settings.filter((setting) => !setting.isEnabled).length
@@ -199,11 +294,19 @@ export default function LineNotificationsPage() {
   }
 
   return <>
-    <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" />
+    {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
-    {tab === 'customer' ? <main
+    {tab === 'customer' && expandedSetting ? <CustomerNotificationEditor
+      setting={expandedSetting}
+      busy={busy === expandedSetting.eventType}
+      onChange={(patch) => update(expandedSetting.eventType, patch)}
+      onClose={() => setExpanded(null)}
+      onSave={() => void save(expandedSetting)}
+      onTestSend={() => void testSend(expandedSetting)}
+    /> : null}
+    {tab === 'customer' && !expandedSetting ? <main
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
@@ -234,7 +337,7 @@ export default function LineNotificationsPage() {
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
-        {customerFilters.map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`${styles.category} ${filter === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{loadState === 'ready' ? filterCount(value) : '—'}</span></button>)}
+        {customerFilters.map(([value, label]) => <button key={value} type="button" onClick={() => { setFilter(value); setCustomerPage(1) }} className={`${styles.category} ${filter === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{loadState === 'ready' ? filterCount(value) : '—'}</span></button>)}
       </div>
       <p className="text-xs text-ink-faint">送った数が多い順</p>
     </div>
@@ -251,7 +354,7 @@ export default function LineNotificationsPage() {
         <div className="line-notification-v6-header">
           <span>お知らせ</span><span>いつ送るか</span><span>今日</span><span>この30日</span><span>状態</span><span>操作</span>
         </div>
-        {visible.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
+        {visiblePage.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
           <div className="line-notification-v6-row">
             <div className="min-w-0">
               <h2 className="truncate font-bold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2>
@@ -264,21 +367,11 @@ export default function LineNotificationsPage() {
             <div className="flex items-center gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span></div>
             <button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button>
           </div>
-          {expanded === setting.eventType && <div className="border-hairline bg-canvas-sunken/60 grid gap-5 border-t p-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="min-w-0 space-y-4">
-              <label className="block text-sm font-semibold text-ink-secondary">通知の見出し<input value={setting.title ?? ''} maxLength={80} onChange={(e) => update(setting.eventType, { title: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal text-ink" /></label>
-              <label className="block text-sm font-semibold text-ink-secondary">ご案内文<textarea value={setting.introText} maxLength={800} rows={4} onChange={(e) => update(setting.eventType, { introText: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal leading-6 text-ink" /></label>
-              <div className="border-nen-border bg-nen-ivory rounded-control border p-4"><p className="text-nen-green text-sm font-bold">注文情報から自動表示</p><div className="mt-2 flex flex-wrap gap-2">{setting.fixedFields.map((field) => <span key={field} className="bg-canvas text-nen-chip ring-nen-gold-soft rounded-md px-2 py-1 text-xs ring-1">{field}</span>)}</div></div>
-              <label className="block text-sm font-semibold text-ink-secondary">結びの文章<textarea value={setting.outroText} maxLength={800} rows={3} onChange={(e) => update(setting.eventType, { outroText: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal leading-6 text-ink" /></label>
-              <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-semibold text-ink-secondary">ボタン名<input value={setting.buttonLabel} maxLength={20} onChange={(e) => update(setting.eventType, { buttonLabel: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal" /></label><label className="block text-sm font-semibold text-ink-secondary">ボタンURL<input value={setting.buttonUrl} placeholder="注文情報のURLを使う場合は空欄" onChange={(e) => update(setting.eventType, { buttonUrl: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal" /></label></div>
-              <label className="block text-sm font-semibold text-ink-secondary">カード画像URL<input value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(e) => update(setting.eventType, { imageUrl: e.target.value })} className="border-hairline mt-1.5 w-full rounded-control border bg-white px-3 py-2.5 font-normal" /></label>
-              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => void testSend(setting)} disabled={busy === setting.eventType} className={`${styles.action} ${styles.actionSecondary}`}>テスト送信</button><button type="button" onClick={() => void save(setting)} disabled={busy === setting.eventType} className={`${styles.action} ${styles.actionPrimary}`}>設定を保存</button></div>
-            </div>
-            <div className="min-w-0"><p className="mb-2 text-xs font-semibold text-ink-faint">LINEプレビュー</p><CardPreview setting={setting} /></div>
-          </div>}
         </article>)}
-        <p className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">お知らせの種類 {settings.length}つのうち {visible.length}つを表示
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
+          <p className="text-xs text-ink-faint">お知らせの種類 {settings.length}つのうち {visiblePage.length}つを表示</p>
+          <Pagination page={customerPage} pageCount={customerPageCount} onPageChange={setCustomerPage} ariaLabel="お知らせのページ送り" />
+        </div>
         </>}
     </section>
     </main> : null}
