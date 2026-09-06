@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
+import Button from '@/components/shared/button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
@@ -181,13 +182,13 @@ export default function ScenarioList({
           <p className="text-ink mt-3 text-sm font-bold">まだシナリオがありません</p>
           <p className="text-ink-faint mt-1 text-xs">1つ作ると、順番に届く配信をここで管理できます。</p>
           {onCreate ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={onCreate}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control mt-3 px-4 py-2 text-sm font-medium"
+              className="mt-3"
             >
               ＋ シナリオを作る
-            </button>
+            </Button>
           ) : null}
         </div>
         {confirmDialog}

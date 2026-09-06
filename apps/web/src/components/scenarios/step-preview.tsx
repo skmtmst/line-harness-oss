@@ -140,10 +140,10 @@ export default function StepPreview({
       aria-label="1通目の下見"
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
-      <section className={`${styles.linePreview} p-4`}>
-        <h3 className="text-center text-sm font-bold text-white">LINEプレビュー</h3>
+      <section className="bg-line-preview -mx-4 -mt-4 mb-4 min-h-75 rounded-t-card p-4">
+        <h3 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h3>
         <p className="mt-3 flex justify-center">
-          <span className={`${styles.previewBand} rounded-pill flex items-center gap-1 px-2.5 py-1 text-micro font-semibold text-white`}>
+          <span className="bg-line-preview-label text-on-accent rounded-pill inline-flex items-center gap-1 px-2.5 py-1 text-micro font-semibold">
             <Clock aria-hidden size={13} strokeWidth={1.75} />
             {words}に届きます（1通目）
           </span>

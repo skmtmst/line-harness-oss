@@ -13,17 +13,6 @@
   border-radius: 10px;
 }
 
-.linePreview {
-  min-height: 300px;
-  margin: -16px -16px 16px;
-  border-radius: 10px 10px 0 0;
-  background: #7898bf;
-}
-
-.previewBand {
-  background: rgb(30 64 105 / 55%);
-}
-
 /* 届く日時の帯。設計 h=26・角丸は全周。 */
 .band {
   height: 26px;
