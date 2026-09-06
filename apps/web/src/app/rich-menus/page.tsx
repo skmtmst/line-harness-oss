@@ -102,6 +102,16 @@ type RichMenuGroupListItem = {
   /** 160: 自分で決める並び順。 */
   displayOrder: number
   thumbnailR2Key: string | null
+  monthlyStats?: {
+    from: string
+    to: string
+    taps: number
+    uniqueAudience: {
+      value: number | null
+      state: 'available' | 'partial' | 'unavailable'
+      reason: 'preexisting_assignments_not_backfilled' | null
+    }
+  }
   createdAt: string
   updatedAt: string
 }
@@ -124,6 +134,19 @@ type LineMenu = {
   chatBarText: string
   size: { width: number; height: number }
   areasCount: number
+  areas?: Array<{
+    bounds: { x: number | null; y: number | null; width: number | null; height: number | null }
+    action: {
+      type: string
+      label: string | null
+      url: string | null
+      text: string | null
+      displayText: string | null
+      richMenuAliasId: string | null
+      supported: boolean
+      unsupportedReason: 'unsupported_or_incomplete_action' | null
+    }
+  }>
   isCurrentDefault: boolean
   adminManaged: boolean
   adminInfo: {
@@ -491,7 +514,8 @@ export default function RichMenusListPage() {
   const sorted = [...inSaved].sort((a, b) => {
     switch (sortKey) {
       case 'taps':
-        return (tapsByGroup.get(b.id) ?? 0) - (tapsByGroup.get(a.id) ?? 0)
+        return (b.monthlyStats?.taps ?? tapsByGroup.get(b.id) ?? 0)
+          - (a.monthlyStats?.taps ?? tapsByGroup.get(a.id) ?? 0)
       case 'name':
         return a.name.localeCompare(b.name, 'ja')
       case 'updated':
@@ -770,8 +794,18 @@ export default function RichMenusListPage() {
                           {g.isDefaultForAll ? 'すべての友だち（既定）' : g.targetingEnabled && g.targetingCondition ? '条件で出し分け' : g.status === 'draft' ? '公開前' : 'すべての友だち'}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <p className="text-ink font-semibold tabular-nums">{tapStats ? `${(tapsByGroup.get(g.id) ?? 0).toLocaleString('ja-JP')}回` : '—'}</p>
-                          <p className="text-ink-faint mt-1 text-micro">のべ人数は未取得</p>
+                          <p className="text-ink font-semibold tabular-nums">
+                            {g.monthlyStats
+                              ? `${g.monthlyStats.taps.toLocaleString('ja-JP')}回`
+                              : tapStats
+                                ? `${(tapsByGroup.get(g.id) ?? 0).toLocaleString('ja-JP')}回`
+                                : '—'}
+                          </p>
+                          <p className="text-ink-faint mt-1 text-micro">
+                            {g.monthlyStats?.uniqueAudience.value == null
+                              ? 'のべ人数は未取得'
+                              : `のべ${g.monthlyStats.uniqueAudience.value.toLocaleString('ja-JP')}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`}
+                          </p>
                         </td>
                         <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
                           {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}
@@ -1065,7 +1099,20 @@ function ExternalImportWorkspace({
                   {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-bold">{area}</span>)}
                 </div>
                 <h3 className="text-ink-secondary mt-3 text-xs font-bold">面ごとの動き（LINEから読んだもの）</h3>
-                <p className="text-ink-faint mt-2 text-xs leading-5">面ごとの動きを読むAPIが接続されると、URLや送信文をここで確認できます。</p>
+                {selected.areas?.length ? (
+                  <ul className="mt-2 space-y-2 text-xs">
+                    {selected.areas.slice(0, 6).map((area, index) => (
+                      <li key={`${selected.richMenuId}-${index}`} className="border-hairline grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-control border p-2">
+                        <strong className="text-ink">{String.fromCharCode(65 + index)}</strong>
+                        <span className={area.action.supported ? 'text-ink-secondary break-words' : 'text-danger break-words'}>
+                          {externalActionText(area.action)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-ink-faint mt-2 text-xs leading-5">LINEから面ごとの動きを取得できませんでした。読み直してから取り込んでください。</p>
+                )}
                 <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
               </section>
               <section className="bg-warning-bg text-warning rounded-card p-4 text-xs leading-6">
@@ -1079,4 +1126,17 @@ function ExternalImportWorkspace({
       ) : null}
     </div>
   )
+}
+
+function externalActionText(action: NonNullable<LineMenu['areas']>[number]['action']): string {
+  if (!action.supported) return `未対応の動き（${action.type || '種類不明'}）`
+  if (action.type === 'uri' && action.url) return `URLを開く（${action.url}）`
+  if (action.type === 'message' && action.text) return `メッセージを送る「${action.text}」`
+  if (action.type === 'postback') {
+    return action.displayText ? `操作を実行して「${action.displayText}」と表示` : '操作を実行'
+  }
+  if (action.type === 'richmenuswitch' && action.richMenuAliasId) {
+    return `別のメニューへ切り替える（${action.richMenuAliasId}）`
+  }
+  return `未対応の動き（${action.type || '種類不明'}）`
 }

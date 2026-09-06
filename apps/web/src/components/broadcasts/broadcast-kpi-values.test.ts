@@ -13,6 +13,7 @@ import type { BroadcastStats } from '@/lib/api'
 const FULL: BroadcastStats = {
   thisMonth: 12,
   scheduled: 4,
+  drafts: 3,
   delivered: 1842,
   failed: 3,
   openRate: 69.4,
@@ -28,17 +29,16 @@ describe('帯の4枚', () => {
     ])
   })
 
-  it('口が返さない「下書き」は、いつでも未取得', () => {
-    /*
-     * `/api/broadcasts/stats` は下書きの数を返さない。一覧から数えると
-     * 基準が違う（一覧は LINE アカウントで絞れるのに集計は絞らない）。
-     * **0 と書くと「下書きは無い」という別の意味になり、作りかけを見落とす。**
-     */
-    for (const stats of [FULL, null]) {
-      const draft = buildBroadcastKpiCards(stats).find((c) => c.title === '下書き')
-      expect(draft?.value, '下書きに数を入れている').toBeNull()
-      expect(draft?.detail).toBe('編集途中 ・ 未取得')
-    }
+  it('一覧の口が返す「下書き」を表示する', () => {
+    const draft = buildBroadcastKpiCards(FULL).find((c) => c.title === '下書き')
+    expect(draft?.value).toBe(3)
+    expect(draft?.detail).toBe('編集途中')
+  })
+
+  it('旧 stats 契約では「下書き」を未取得のままにする', () => {
+    const draft = buildBroadcastKpiCards({ ...FULL, drafts: undefined }).find((c) => c.title === '下書き')
+    expect(draft?.value).toBeNull()
+    expect(draft?.detail).toBe('編集途中 ・ 未取得')
   })
 
   it('実測 0 は 0 のまま出す', () => {

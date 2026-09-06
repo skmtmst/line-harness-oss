@@ -1,4 +1,4 @@
-import type { BroadcastStats } from '@/lib/api'
+import type { BroadcastListKpis, BroadcastStats } from '@/lib/api'
 
 /**
  * 一斉配信の一覧に出す帯の 4 枚（設計 `q76C35` ★V6 6-1）。
@@ -41,7 +41,7 @@ function numberOrNull(value: unknown): number | null {
  * はテナント全体を数える）。基準の違う数を同じ帯に並べると、足しても
  * 合わない 4 枚になる。取れないものは `—` のままにする。
  */
-export function buildBroadcastKpiCards(stats: BroadcastStats | null): BroadcastKpiCard[] {
+export function buildBroadcastKpiCards(stats: BroadcastStats | BroadcastListKpis | null): BroadcastKpiCard[] {
   return [
     {
       title: '予約中',
@@ -52,10 +52,10 @@ export function buildBroadcastKpiCards(stats: BroadcastStats | null): BroadcastK
     },
     {
       title: '下書き',
-      value: null,
+      value: numberOrNull(stats?.drafts),
       unit: '件',
       /* 同上。**0件と書くと「下書きは無い」という別の意味になる。** */
-      detail: '編集途中 ・ 未取得',
+      detail: stats?.drafts == null ? '編集途中 ・ 未取得' : '編集途中',
     },
     {
       title: '今月の配信',

@@ -46,10 +46,11 @@ import {
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
-  AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS,
+  AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
-  BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS,
+  BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
+  BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
@@ -68,7 +69,8 @@ import {
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
   STAFF_MEMBERS, LOGIN_AUDIT,
-  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
+  MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY,
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
@@ -80,6 +82,7 @@ import {
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
+  FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -848,29 +851,7 @@ const SHAPES = {
     },
   },
   '/api/mileage/rewards': MILEAGE_REWARDS,
-  '/api/mileage/history': {
-    items: [
-      {
-        id: 'ml-1', friendId: 'friend-1', friendName: 'さかもとまさと',
-        entryType: 'earn', status: 'confirmed', mode: 'automatic',
-        amount: 5, balanceAfter: 5, reason: '写真の投稿が通りました',
-        occurredAt: '2026-08-24T20:53:00+09:00', createdAt: '2026-08-24T20:53:00+09:00',
-      },
-      {
-        id: 'ml-2', friendId: 'friend-2', friendName: 'Kyohei Yamamoto',
-        entryType: 'earn', status: 'confirmed', mode: 'automatic',
-        amount: 3, balanceAfter: 3, reason: '友だち追加',
-        occurredAt: '2026-08-19T09:12:00+09:00', createdAt: '2026-08-19T09:12:00+09:00',
-      },
-      {
-        id: 'ml-3', friendId: 'friend-3', friendName: '菅野 亮',
-        entryType: 'spend', status: 'confirmed', mode: 'manual',
-        amount: -2, balanceAfter: 1, reason: '手で減らしました',
-        occurredAt: '2026-08-13T20:52:00+09:00', createdAt: '2026-08-13T20:52:00+09:00',
-      },
-    ],
-    pagination: { total: 3, limit: 20, offset: 0 },
-  },
+  '/api/mileage/history': MILEAGE_HISTORY,
   '/api/settings/features': {
     features: FEATURES,
     sidebarOrder: null,
@@ -940,6 +921,12 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
+    return FRIEND_ADD_RULE_VALIDATE
+  }
+  if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
+    return FRIEND_ADD_RULE_PUBLISH
+  }
   if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
     return FRIEND_FIELD_MIGRATION_PREVIEW
   }
@@ -951,6 +938,9 @@ function visualQaWriteBody(method, pathname) {
       isShared: false,
       matchCount: 1,
     }
+  }
+  if (method === 'POST' && pathname === '/api/broadcasts/saved-views') {
+    return BROADCAST_SAVED_VIEWS[0]
   }
   if (method === 'POST' && pathname === '/api/analytics/cross/query') {
     return { id: 'visual-cross-result-1', state: 'pending' }
@@ -983,11 +973,7 @@ function visualQaWriteBody(method, pathname) {
     }
   }
   if (method === 'POST' && pathname === '/api/broadcasts/preflight') {
-    return {
-      audienceCount: 624,
-      hiddenExcluded: 12,
-      warnings: [],
-    }
+    return BROADCAST_PREFLIGHT
   }
   if (method === 'POST' && pathname === '/api/friend-add-routing/validate') {
     return FRIEND_ADD_LIFECYCLE_VALIDATION
@@ -1377,6 +1363,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: BOOKING_SETTINGS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  if (pathname === '/api/auto-replies/conflicts') {
+    return { success: true, data: AUTO_REPLY_CONFLICT_SUMMARY }
+  }
   if (pathname === '/api/auto-reply-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -1468,12 +1457,21 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
     return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
   }
+  if (pathname === '/api/broadcasts/saved-views') {
+    return { success: true, data: BROADCAST_SAVED_VIEWS }
+  }
+  const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
+  if (broadcastInsight) {
+    return { success: true, data: BROADCAST_INSIGHTS[broadcastInsight[1]] ?? null }
+  }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
     const found = BROADCASTS.find((item) => item.id === broadcastOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
-  if (pathname === '/api/broadcasts') return { success: true, data: BROADCASTS }
+  if (pathname === '/api/broadcasts') {
+    return { success: true, data: BROADCASTS, ...BROADCAST_LIST_META }
+  }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
@@ -1789,6 +1787,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
   if (pathname === '/api/mileage/overview') return { success: true, data: MILEAGE_OVERVIEW }
+  if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
+  if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
