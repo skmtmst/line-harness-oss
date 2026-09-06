@@ -45,6 +45,15 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
     expect(PAGE).toContain('item.usageCount === 0')
     expect(PAGE).toContain('formatListDate(item.updatedAt)')
+    expect(PAGE).toContain('placeholderText(item.name)')
+    expect(PAGE).not.toContain('>{`{{var.${item.varKey}}}`}</code>')
+  })
+
+  it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
+    expect(PAGE).toContain("setStateFilter(value)")
+    expect(PAGE).toContain("label: '使われている数が多い順'")
+    expect(PAGE).toContain('commonVarsCsv(filtered)')
+    expect(PAGE).toContain('中身が空のまま使われているものが')
   })
 
   it('初回空と検索0件を言い分ける', () => {

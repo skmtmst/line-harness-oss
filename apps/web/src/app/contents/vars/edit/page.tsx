@@ -16,7 +16,7 @@ import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
-import { checkedAtText } from '../delete-impact'
+import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import {
@@ -33,6 +33,7 @@ import {
   saveErrorText,
   type ChangeImpactState,
 } from '../change-impact'
+import ImpactReview from '../impact-review'
 
 /**
  * 共通情報の編集。
@@ -63,6 +64,7 @@ function EditCommonVarInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [showImpactReview, setShowImpactReview] = useState(false)
 
   const [name, setName] = useState('')
   const [folderId, setFolderId] = useState('')
@@ -197,6 +199,7 @@ function EditCommonVarInner() {
         return
       }
       setSaved(true)
+      setShowImpactReview(false)
       void load()
     } catch (e) {
       // `fetchApi` は2xx以外を投げる。ここで一言にまとめてしまうと、
@@ -320,6 +323,17 @@ function EditCommonVarInner() {
     }
   }
 
+  if (showImpactReview && impact && 'canSave' in impact) {
+    return (
+      <ImpactReview
+        impact={impact}
+        busy={saving}
+        onBack={() => setShowImpactReview(false)}
+        onSave={() => void save()}
+      />
+    )
+  }
+
   return (
     <div>
       <nav className="text-ink-faint mb-3 text-xs">
@@ -385,7 +399,7 @@ function EditCommonVarInner() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-ink-secondary mb-1 text-sm font-medium">差し込み名</p>
-                <code className="bg-canvas-sunken text-ink block rounded px-2 py-2 text-sm">{`{{var.${item.varKey}}}`}</code>
+                <code className="bg-canvas-sunken text-ink block rounded px-2 py-2 text-sm">{placeholderText(item.name)}</code>
                 <p className="text-ink-faint mt-1 text-xs">
                   あとから変えられません。変えるとテンプレートの差し込みが空になります。
                 </p>
@@ -635,6 +649,15 @@ function EditCommonVarInner() {
                     {blocked[0]}。直すまで保存できません。
                   </span>
                 )}
+                {impact && 'canSave' in impact && impact.blockingTotal > 0 ? (
+                  <Button
+                    type="button"
+                    data-qa-open="uNBlA"
+                    onClick={() => setShowImpactReview(true)}
+                  >
+                    {impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="primary"
@@ -786,7 +809,7 @@ function EditCommonVarInner() {
                 ・消えること: この共通情報に登録した更新スケジュールも一緒に消えます。
               </p>
               <p className="text-ink-secondary">
-                ・残ること: テンプレートは残ります。{`{{var.${deleteTarget?.item.varKey ?? ''}}}`}
+                ・残ること: テンプレートは残ります。{placeholderText(deleteTarget?.item.name ?? '')}
                 と書いてある場所は、これから空欄で送られます。
               </p>
               <p className="text-ink-secondary">・残ること: すでに送ったものは変わりません。</p>
