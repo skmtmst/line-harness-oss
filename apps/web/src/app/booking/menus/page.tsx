@@ -270,8 +270,10 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     [items],
   )
   const businessHours = businessHourSummary(settings)
-  const bookingWindowDays = settings?.bookingWindowDays
-    ?? (activeWindowDays.length === 1 ? activeWindowDays[0] : null)
+  const configuredWindowDays = settings?.bookingWindowDays
+  const bookingWindowDays = typeof configuredWindowDays === 'number' && configuredWindowDays > 0
+    ? configuredWindowDays
+    : (activeWindowDays.length === 1 ? activeWindowDays[0] : null)
 
   return (
     <div data-design-node="QSLEH">
