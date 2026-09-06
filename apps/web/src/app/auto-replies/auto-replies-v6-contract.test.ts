@@ -12,7 +12,7 @@ const PUBLISH = fs.readFileSync(
   'utf8',
 )
 const PUBLISH_CSS = fs.readFileSync(
-  path.join(__dirname, 'publish/publish.module.css'),
+  path.join(__dirname, 'publish/publish.css'),
   'utf8',
 )
 

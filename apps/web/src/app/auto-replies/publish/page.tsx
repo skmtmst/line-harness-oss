@@ -33,7 +33,7 @@ import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, type FriendListItem } from '@/lib/api'
 import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
-import styles from './publish.module.css'
+import './publish.css'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 type FriendLoadState = 'loading' | 'ready' | 'error'
@@ -89,13 +89,13 @@ const ACTION_LABELS: Record<string, string> = {
 function Wizard({ stage }: { stage: PublishStage }) {
   const current = stage === 'conflicts' || stage === 'test' ? 3 : 4
   return (
-    <ol className={styles.steps} aria-label="自動応答編集の進み方">
+    <ol className={"arp-steps"} aria-label="自動応答編集の進み方">
       {WIZARD_STEPS.map((label, index) => {
         const done = stage === 'done' || index < current
         const active = !done && index === current
         return (
-          <li key={label} className={styles.step} aria-current={active ? 'step' : undefined}>
-            <span className={done ? styles.stepDone : active ? styles.stepCurrent : styles.stepTodo}>
+          <li key={label} className={"arp-step"} aria-current={active ? 'step' : undefined}>
+            <span className={done ? "arp-stepDone" : active ? "arp-stepCurrent" : "arp-stepTodo"}>
               {done ? <Check aria-hidden="true" /> : index + 1}
             </span>
             <span>
@@ -111,7 +111,7 @@ function Wizard({ stage }: { stage: PublishStage }) {
 
 function PanelHeading({ title, description }: { title: string; description?: string }) {
   return (
-    <header className={styles.panelHeading}>
+    <header className={"arp-panelHeading"}>
       <h2>{title}</h2>
       {description ? <p>{description}</p> : null}
     </header>
@@ -120,7 +120,7 @@ function PanelHeading({ title, description }: { title: string; description?: str
 
 function SummaryRows({ rows }: { rows: Array<{ label: string; value: string }> }) {
   return (
-    <dl className={styles.summaryRows}>
+    <dl className={"arp-summaryRows"}>
       {rows.map((row) => (
         <div key={row.label}>
           <dt>{row.label}</dt>
@@ -135,15 +135,15 @@ function LinePreview({
   lead,
   message,
   actionLabel = '予約を確認',
-  className,
+  variant,
 }: {
   lead: string
   message: string
   actionLabel?: string
-  className?: string
+  variant?: 'confirm' | 'done'
 }) {
   return (
-    <section className={`${styles.linePreview} ${className ?? ''}`} aria-label="LINEプレビュー">
+    <section className={`arp-linePreview ${variant === 'confirm' ? 'arp-confirmPreview' : variant === 'done' ? 'arp-donePreview' : ''}`} aria-label="LINEプレビュー">
       <strong>LINEプレビュー</strong>
       <span>{lead}</span>
       <div>
@@ -331,8 +331,8 @@ function AutoReplyPublishInner() {
   })
 
   return (
-    <div className={styles.page} data-design-node={stage === 'conflicts' ? 'U9hzqH' : stage === 'test' ? 'g46ja' : stage === 'confirm' ? 'Yj6CQ' : 'e6iJG'}>
-      <Link href="/auto-replies" className={styles.backLink}>
+    <div className={"arp-page"} data-design-node={stage === 'conflicts' ? 'U9hzqH' : stage === 'test' ? 'g46ja' : stage === 'confirm' ? 'Yj6CQ' : 'e6iJG'}>
+      <Link href="/auto-replies" className={"arp-backLink"}>
         <ArrowLeft aria-hidden="true" />
         {stage === 'test' ? '自動応答編集' : '自動応答一覧'}
       </Link>
@@ -340,19 +340,19 @@ function AutoReplyPublishInner() {
       <Wizard stage={stage} />
 
       {actionError ? (
-        <div className={styles.errorNotice} role="alert">
+        <div className={"arp-errorNotice"} role="alert">
           <AlertTriangle aria-hidden="true" />
           {actionError}
         </div>
       ) : null}
 
       {stage === 'conflicts' ? (
-        <section className={styles.panel}>
+        <section className={"arp-panel"}>
           <PanelHeading title="競合と優先順位" description="同じメッセージに反応する自動応答を確認します。上にあるものが先に動きます。" />
           {conflicts.length === 0 ? (
             <ListState kind="empty" title="重なる自動応答はありません" description="この下書きだけが反応します。" />
           ) : (
-            <ul className={styles.conflictList}>
+            <ul className={"arp-conflictList"}>
               {conflicts.map((conflict) => {
                 const tone = conflictTone(conflict, draft.autoReplyId)
                 const checked = acknowledged.has(conflict.autoReplyId)
@@ -382,7 +382,7 @@ function AutoReplyPublishInner() {
               })}
             </ul>
           )}
-          <div className={styles.inlineActions}>
+          <div className={"arp-inlineActions"}>
             <Button
               data-qa-open="g46ja"
               variant="primary"
@@ -397,11 +397,11 @@ function AutoReplyPublishInner() {
 
       {stage === 'test' ? (
         <>
-          <div className={styles.columns}>
-            <div className={styles.mainColumn}>
-              <section className={`${styles.panel} ${styles.confirmPanel}`}>
+          <div className={"arp-columns"}>
+            <div className={"arp-mainColumn"}>
+              <section className={`${"arp-panel"} ${"arp-confirmPanel"}`}>
                 <PanelHeading title="テスト入力" description="受信した想定の言葉を入力します。" />
-                <div className={styles.testFields}>
+                <div className={"arp-testFields"}>
                   <label>
                     <span>メッセージ</span>
                     <input
@@ -411,7 +411,7 @@ function AutoReplyPublishInner() {
                       placeholder="例：予約変更したい"
                     />
                   </label>
-                  <div className={styles.selectField}>
+                  <div className={"arp-selectField"}>
                     <span>送信者</span>
                     <Select
                       aria-label="送信者"
@@ -427,9 +427,9 @@ function AutoReplyPublishInner() {
                 </div>
               </section>
 
-              <section className={styles.panel}>
+              <section className={"arp-panel"}>
                 <PanelHeading title="判定結果" description="どのルールが反応するか確認します。" />
-                <div className={styles.resultCards}>
+                <div className={"arp-resultCards"}>
                   <div>
                     <MessageCircle aria-hidden="true" />
                     <span><small>一致したルール</small><strong>{dryRun?.winner?.name ?? ruleName}</strong></span>
@@ -440,7 +440,7 @@ function AutoReplyPublishInner() {
                   </div>
                 </div>
                 {dryRun ? (
-                  <ol className={styles.evaluationList}>
+                  <ol className={"arp-evaluationList"}>
                     {dryRun.candidates.map((candidate) => (
                       <li key={candidate.autoReplyId}>
                         <span>{candidate.priority}. {candidate.name}</span>
@@ -455,8 +455,8 @@ function AutoReplyPublishInner() {
               </section>
             </div>
 
-            <aside className={styles.sideColumn}>
-              <section className={styles.panel}>
+            <aside className={"arp-sideColumn"}>
+              <section className={"arp-panel"}>
                 <PanelHeading title="設定内容" />
                 <SummaryRows rows={[
                   { label: '本番への影響', value: 'なし' },
@@ -465,17 +465,17 @@ function AutoReplyPublishInner() {
                   { label: '実行される内容', value: actionLabel(testedActionTypes) },
                 ]} />
               </section>
-              <LinePreview lead="［テスト］受信後すぐに返信" message={previewMessage} actionLabel="空き枠を見る" />
-              <div className={styles.previewActions}>
+              <LinePreview lead="［テスト］受信から 3秒後に返信" message={previewMessage} actionLabel="空き枠を見る" />
+              <div className={"arp-previewActions"}>
                 <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テスト送信</Button>
                 <Button onClick={() => setTestDialogOpen(true)}><Eye aria-hidden="true" />応答イメージを見る</Button>
               </div>
             </aside>
           </div>
 
-          <div className={styles.stickyBar}>
+          <div className={"arp-stickyBar"}>
             <div />
-            <div className={styles.stickyActions}>
+            <div className={"arp-stickyActions"}>
               <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
               <Button variant="primary" onClick={() => setTestDialogOpen(true)} disabled={busy || !selectedFriendId}>
                 自動応答をテスト
@@ -500,9 +500,9 @@ function AutoReplyPublishInner() {
 
       {stage === 'confirm' ? (
         <>
-          <div className={styles.columns}>
-            <div className={styles.mainColumn}>
-              <section className={`${styles.panel} ${styles.checkPanel}`}>
+          <div className={"arp-columns"}>
+            <div className={"arp-mainColumn"}>
+              <section className={`${"arp-panel"} ${"arp-checkPanel"}`}>
                 <PanelHeading title="有効化前チェック" />
                 <ul>
                   {gates.map((gate) => (
@@ -514,7 +514,7 @@ function AutoReplyPublishInner() {
                 </ul>
               </section>
 
-              <section className={styles.panel}>
+              <section className={"arp-panel"}>
                 <PanelHeading title="最終確認" description="有効化すると受信メッセージを自動判定します。" />
                 <SummaryRows rows={[
                   { label: 'ルール名', value: ruleName },
@@ -524,7 +524,7 @@ function AutoReplyPublishInner() {
                   { label: '返信', value: responseLabel(draft) },
                   { label: 'アクション', value: actionLabel(draftActionTypes) },
                 ]} />
-                <div className={styles.warningNotice}>
+                <div className={"arp-warningNotice"}>
                   <AlertTriangle aria-hidden="true" />
                   {draft.settings.oncePerFriend ? '最初の1件だけ実行し、' : ''}
                   {draft.settings.cooldownMinutes
@@ -534,9 +534,9 @@ function AutoReplyPublishInner() {
               </section>
             </div>
 
-            <aside className={styles.sideColumn}>
-              <LinePreview className={styles.confirmPreview} lead={`${conditionLabel(draft)}メッセージが届いたら、すぐに返します`} message={previewMessage} />
-              <section className={styles.panel}>
+            <aside className={"arp-sideColumn"}>
+              <LinePreview variant="confirm" lead={`${conditionLabel(draft)}メッセージが届いたら、すぐに返します`} message={previewMessage} />
+              <section className={"arp-panel"}>
                 <PanelHeading title="有効化する内容" />
                 <SummaryRows rows={[
                   { label: '状態', value: '有効化前' },
@@ -553,9 +553,9 @@ function AutoReplyPublishInner() {
             </aside>
           </div>
 
-          <div className={styles.stickyBar}>
+          <div className={"arp-stickyBar"}>
             <div />
-            <div className={styles.stickyActions}>
+            <div className={"arp-stickyActions"}>
               <Button onClick={() => setStage('test')}><ArrowLeft aria-hidden="true" />戻って修正</Button>
               <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
               <Button
@@ -584,12 +584,12 @@ function AutoReplyPublishInner() {
 
       {stage === 'done' && published ? (
         <>
-          <div className={styles.columns}>
-            <section className={`${styles.panel} ${styles.donePanel}`}>
-              <div className={styles.doneMark}><MessageCircle aria-hidden="true" /></div>
+          <div className={"arp-columns"}>
+            <section className={`${"arp-panel"} ${"arp-donePanel"}`}>
+              <div className={"arp-doneMark"}><MessageCircle aria-hidden="true" /></div>
               <h2>自動応答を有効化しました</h2>
               <p>受信メッセージを判定し、一致した友だちへ自動で返信します。</p>
-              <div className={styles.doneSummary}>
+              <div className={"arp-doneSummary"}>
                 <SummaryRows rows={[
                   { label: 'ルール名', value: ruleName },
                   { label: 'どんなときに動くか', value: conditionLabel(draft) },
@@ -598,11 +598,11 @@ function AutoReplyPublishInner() {
                   { label: '状態', value: '稼働中' },
                 ]} />
               </div>
-              <div className={styles.infoNotice}>
+              <div className={"arp-infoNotice"}>
                 <Bell aria-hidden="true" />
                 実行エラー・競合増加・担当者引継ぎはSlackへ通知します。
               </div>
-              <div className={styles.doneActions}>
+              <div className={"arp-doneActions"}>
                 <Button href="/auto-replies"><List aria-hidden="true" />一覧へ戻る</Button>
                 <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId)}`} variant="primary">
                   <Activity aria-hidden="true" />実行状況を確認
@@ -610,40 +610,40 @@ function AutoReplyPublishInner() {
               </div>
             </section>
 
-            <aside className={styles.sideColumn}>
-              <section className={styles.panel}>
+            <aside className={"arp-sideColumn"}>
+              <section className={"arp-panel"}>
                 <PanelHeading title="次にできること" description="稼働中でも安全に変更できます。" />
-                <div className={styles.nextActions}>
+                <div className={"arp-nextActions"}>
                   <Button><PauseCircle aria-hidden="true" />自動応答を一時停止</Button>
                   <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}><Pencil aria-hidden="true" />内容を編集する</Button>
                   <Button onClick={openTestStage}><FlaskConical aria-hidden="true" />テストを再実行</Button>
                   <Button href="/auto-replies"><Copy aria-hidden="true" />自動応答を複製して作成</Button>
                 </div>
               </section>
-              <section className={styles.panel}>
+              <section className={"arp-panel"}>
                 <PanelHeading title="監視中" description="問題が起きた場合だけ表示します。" />
-                <ul className={styles.monitorList}>
+                <ul className={"arp-monitorList"}>
                   {['実行失敗', '競合数の増加', 'ループ検知', '担当者引継ぎ失敗'].map((label) => (
                     <li key={label}><Activity aria-hidden="true" />{label}</li>
                   ))}
                 </ul>
               </section>
-              <LinePreview className={styles.donePreview} lead={`「${testMessage}」を受信したらすぐ返します`} message={previewMessage} actionLabel="空き枠を見る" />
+              <LinePreview variant="done" lead={`「${testMessage}」を受信したらすぐ返します`} message={previewMessage} actionLabel="空き枠を見る" />
             </aside>
           </div>
-          <div className={styles.stickyBar} aria-hidden="true"><div /></div>
+          <div className={"arp-stickyBar"} aria-hidden="true"><div /></div>
         </>
       ) : null}
 
       {stage === 'test' && testDialogOpen ? (
-        <div className={styles.overlay} role="presentation">
-          <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="test-dialog-title">
-            <div className={styles.dialogTitle}>
+        <div className={"arp-overlay"} role="presentation">
+          <section className={"arp-dialog"} role="dialog" aria-modal="true" aria-labelledby="test-dialog-title">
+            <div className={"arp-dialogTitle"}>
               <CheckCircle2 aria-hidden="true" />
               <h2 id="test-dialog-title">テストを実行しますか？</h2>
             </div>
             <p>入力内容に一致するルールと実行予定のアクションを確認します。</p>
-            <div className={styles.dialogActions}>
+            <div className={"arp-dialogActions"}>
               <Button onClick={() => { setTestDialogOpen(false); setStage('conflicts') }}>競合と優先順位へ戻る</Button>
               <Button data-qa-open="g46ja-run" onClick={runDryTest} disabled={busy || !selectedFriendId || !testMessage.trim()}>
                 {busy ? 'テスト中…' : '自動応答をテスト'}
