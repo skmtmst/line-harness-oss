@@ -522,7 +522,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           <div className="bg-accent-soft rounded-control px-3 py-2">
             <p className="text-ink-faint text-xs">報酬</p>
             <p className="text-ink mt-1 text-lg font-semibold tabular-nums">{formatYen(paymentTotal)}</p>
-            <p className="text-ink-faint mt-0.5 text-[11px]">保留中 {formatYen(heldTotal)} を含む</p>
+            <p className="text-ink-faint mt-0.5 text-xs">保留中 {formatYen(heldTotal)} を含む</p>
           </div>
         </div>
       </section>
@@ -1978,7 +1978,7 @@ function OffersList({
               </td>
               <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                 {(offerStats.get(offer.id)?.conversions ?? 0).toLocaleString()}件
-                <span className="text-ink-faint block text-[11px]">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
+                <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
               <td className="px-4 py-3 text-center">
                 <button
@@ -1987,7 +1987,7 @@ function OffersList({
                 >
                   編集
                 </button>
-                <span className="text-ink-faint ml-2 text-[11px]">{offer.isActive ? '公開中' : '停止・終了'}</span>
+                <span className="text-ink-faint ml-2 text-xs">{offer.isActive ? '公開中' : '停止・終了'}</span>
               </td>
             </tr>
           ))}

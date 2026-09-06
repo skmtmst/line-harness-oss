@@ -10,6 +10,7 @@ import CreatePage, {
   FormSection,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import SelectField from '@/components/shared/select-field'
 
 /**
  * 入力欄の幅。
@@ -100,7 +101,7 @@ export default function NewAffiliatePage() {
 
   return (
     <CreatePage
-      title="アフィリエイターを追加する"
+      title="アフィリエイターを登録する"
       description="紹介してくれる方に専用のリンクを渡し、成果と報酬を記録します。"
       parent={['成果とアフィリエイト', '/conversions?tab=affiliates']}
       saveLabel="登録して、紹介リンクを発行する"
@@ -253,10 +254,17 @@ export default function NewAffiliatePage() {
         </div>
 
         <Field label="LINEの友だちと結びつける（任意）" htmlFor="af-friend" note="結びつけると、成果が出たときに本人へ知らせられます。">
-          <select id="af-friend" aria-label="LINEの友だちと結びつける" value={friendId} onChange={(event) => setFriendId(event.target.value)} className="border-hairline rounded-control h-10 w-full max-w-[520px] border bg-white px-3 text-sm">
-            <option value="">友だちの名前で探す</option>
-            {friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName}</option>)}
-          </select>
+          <SelectField
+            id="af-friend"
+            aria-label="LINEの友だちと結びつける"
+            value={friendId}
+            onChange={(event) => setFriendId(event.target.value)}
+            className="w-full max-w-lg"
+            options={[
+              { value: '', label: '友だちの名前で探す' },
+              ...friends.map((friend) => ({ value: friend.id, label: friend.displayName })),
+            ]}
+          />
         </Field>
       </FormSection>
 
