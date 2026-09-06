@@ -29,6 +29,7 @@ import {
   MILEAGE_REWARDS,
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
+  COMMON_VAR_FOLDERS,
   COMMON_VAR_DELETE_IMPACT,
   commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
@@ -44,7 +45,7 @@ import {
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
   FRIEND_ADD_LIFECYCLE_VALIDATION,
-  AUTO_REPLIES, AUTO_REPLY_FOLDERS,
+  AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_ATTRIBUTE_SAVED_SEARCHES, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
@@ -57,7 +58,7 @@ import {
   OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
-  TAGS, TAG_GROUPS, REMINDER_RUNS,
+  TAGS, TAG_GROUPS, TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
@@ -66,7 +67,7 @@ import {
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
-  EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
@@ -1287,6 +1288,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
+    return { success: true, data: COMMON_VAR_FOLDERS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
     return { success: true, data: MEDIA_FOLDERS }
   }
@@ -1294,6 +1298,20 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: WEBINAR_FOLDERS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
+  if (pathname === '/api/auto-reply-runs') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    return {
+      success: true,
+      data: {
+        ...AUTO_REPLY_RUNS,
+        items: AUTO_REPLY_RUNS.items.slice(offset, offset + limit),
+        pagination: { total: AUTO_REPLY_RUNS.items.length, limit, offset },
+      },
+    }
+  }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
   }
@@ -1580,6 +1598,20 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
+  if (pathname === '/api/ec-commerce/notification-runs') {
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20
+    const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    return {
+      success: true,
+      data: {
+        ...EC_NOTIFICATION_RUNS,
+        items: EC_NOTIFICATION_RUNS.items.slice(offset, offset + limit),
+      },
+      pagination: { total: EC_NOTIFICATION_RUNS.items.length, limit, offset },
+    }
+  }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }
   if (pathname === '/api/nen-members/photos/publications') return { success: true, data: NEN_PHOTO_PUBLICATIONS }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
@@ -2005,6 +2037,27 @@ const server = createServer((req, res) => {
     // DB更新はせず、ほかのPOSTは従来どおり405にする。
     if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns') {
       res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
+      return
+    }
+    /*
+      タグCSVの下見と結果。保存はせず、受け取った行を固定規則で判定する。
+      空欄・長すぎる名前・制御文字・既存名・不明フォルダを同じ入力なら
+      毎回同じ結果にし、成功と一部失敗の両方を撮れるようにする。
+    */
+    if (method === 'POST' && (url.pathname === '/api/tags/import/preview' || url.pathname === '/api/tags/import')) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let rows = TAG_IMPORT_SAMPLE_ROWS
+        try {
+          const parsed = JSON.parse(raw || '{}')
+          if (Array.isArray(parsed.rows) && parsed.rows.length > 0) rows = parsed.rows
+        } catch {
+          rows = TAG_IMPORT_SAMPLE_ROWS
+        }
+        const data = url.pathname.endsWith('/preview') ? tagImportPreview(rows) : tagImportResult(rows)
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
+      })
       return
     }
     /*
