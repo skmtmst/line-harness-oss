@@ -783,13 +783,12 @@ function VarsPageInner() {
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
-                      <select
+                      <SelectField
                         disabled
                         aria-label="差し替え先"
-                        className="border-hairline bg-canvas text-ink-faint rounded-control mt-1 w-full border px-3 py-2"
-                      >
-                        <option>候補を取得できません</option>
-                      </select>
+                        className="mt-1 w-full"
+                        options={[{ value: '', label: '候補を取得できません' }]}
+                      />
                     </label>
                   </div>
                   <div className="border-hairline rounded-control border p-3" aria-disabled={!singleImpact.canDelete}>

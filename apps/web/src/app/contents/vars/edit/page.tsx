@@ -484,7 +484,7 @@ function EditCommonVarInner() {
                 <div className="bg-canvas rounded-card border-hairline border">
                   <div className="border-hairline flex items-center justify-between gap-3 border-b px-4 py-3">
                     <div>
-                      <p className="text-ink-faint text-[11px] font-bold">影響確認</p>
+                      <p className="text-ink-faint text-xs font-bold">影響確認</p>
                       <h2 className="text-ink text-sm font-bold">使われている場所</h2>
                     </div>
                     <span className="text-action text-xs font-bold">
