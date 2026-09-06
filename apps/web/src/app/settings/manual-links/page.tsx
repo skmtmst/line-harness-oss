@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
-import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -37,7 +35,7 @@ export default function ManualLinksPage() {
     トップバーの画面名。`/settings/` で始まるので、そのままだと
     メニューの「機能設定」が出てしまう。設計 `f9oUm` は「マニュアル」。
   */
-  usePageTitle('マニュアル')
+  usePageTitle('マニュアルの正本表')
   const [role, setRole] = useState<string | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
@@ -84,36 +82,33 @@ export default function ManualLinksPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        breadcrumb={[{ label: '設定' }, { label: 'マニュアルの正本表' }]}
-        title="マニュアルの正本表"
-        description="画面のトップバーにある「マニュアル」は、ここで決めた行き先を開きます。表を直すと、その画面のマニュアルの行き先が変わります。お客さまの組織からは見えません。"
-      />
-
-      <NoteBar tone="warn">{MISSING_SCREENS_NOTE}</NoteBar>
+      <div className={styles.operatorNote} role="note">
+        <strong>この表を直せるのは運営だけです</strong>
+        <span>画面のトップバーにある「マニュアル」は、ここで決めた行き先を開きます。表を直すと、その画面のマニュアルの行き先が変わります。お客さまの組織からは見えません。</span>
+      </div>
 
       <ListToolbar
         searchPlaceholder="画面ID・画面名で検索"
         searchValue={query}
         onSearchChange={setQuery}
       >
-        {STATUS_FILTERS.map((f) => (
-          <FilterChip
-            key={f.value}
-            selected={filter === f.value}
-            onChange={() => setFilter(f.value)}
-          >
-            {f.label}
-          </FilterChip>
-        ))}
+        <SelectField
+          aria-label="リンクの状態"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value as StatusFilter)}
+          options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
+        />
         {/* 押せないものを、押せる形にしない。 */}
         <span className={styles.blocked} title={VERIFY_UNAVAILABLE_NOTE}>
           いま全部を確かめる
         </span>
       </ListToolbar>
 
-      <p className={styles.count}>画面とマニュアルの対応 {rows.length}件</p>
-      {notice ? <NoteBar tone="danger">{notice}</NoteBar> : null}
+      <div className={styles.tableTitle}>
+        <strong>画面とマニュアルの対応 {rows.length}件</strong>
+        <span>{MISSING_SCREENS_NOTE}</span>
+        {notice ? <span className={styles.danger}>{notice}</span> : null}
+      </div>
 
       {shown.length === 0 ? (
         <ListState
@@ -126,18 +121,17 @@ export default function ManualLinksPage() {
           <thead>
             <TableHeadRow>
               <Th>画面ID</Th>
-              <Th>作業ID</Th>
               <Th>画面名</Th>
               <Th>公式記事のURL</Th>
               <Th>最後に確かめた日</Th>
               <Th>リンクの状態</Th>
+              <Th>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
             {shown.map((row) => (
               <Tr key={row.taskId ?? row.screenId}>
                 <Td>{row.screenId}</Td>
-                <Td>{row.taskId ?? '—'}</Td>
                 <Td>{row.name}</Td>
                 <Td>
                   <span className={row.url ? styles.url : styles.urlEmpty}>
@@ -153,6 +147,7 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
+                <Td><span className={styles.editBlocked}>直す</span></Td>
               </Tr>
             ))}
           </tbody>
