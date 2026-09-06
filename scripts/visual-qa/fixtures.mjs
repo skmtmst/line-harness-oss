@@ -1397,6 +1397,85 @@ export const COMMON_VAR_DELETE_IMPACT_ERROR = {
   error: '使用先を確認できないため削除できません',
 }
 
+/** PR #1131 の詳細・差し替え契約。既存の会社名と使用先を共通で使う。 */
+const COMMON_VAR_SOURCE = COMMON_VARS.find((variable) => variable.id === COMMON_VAR_DELETE_IMPACT.variable.id)
+const COMMON_VAR_REPLACEMENT = COMMON_VARS.find((variable) => variable.id === 'common-var-hours')
+
+export const COMMON_VAR_DETAIL = {
+  ...COMMON_VAR_SOURCE,
+  memo: '契約書・請求書・お客さま案内で使う正式な会社名',
+  version: 3,
+  archivedAt: null,
+  usageByKind: COMMON_VAR_DELETE_IMPACT.byKind,
+  usages: COMMON_VAR_DELETE_IMPACT.items,
+  usagePage: {
+    total: COMMON_VAR_DELETE_IMPACT.total,
+    shown: COMMON_VAR_DELETE_IMPACT.items.length,
+    hasMore: COMMON_VAR_DELETE_IMPACT.total > COMMON_VAR_DELETE_IMPACT.items.length,
+    unavailableCount: COMMON_VAR_DELETE_IMPACT.unscopedFormTotal,
+  },
+  history: [
+    {
+      id: 'common-var-version-3', version: 3, name: '会社名', value: '株式会社NEN',
+      memo: '契約書・請求書・お客さま案内で使う正式な会社名',
+      changeReason: '登記上の表記に統一', actorId: 'staff-1', createdAt: '2026-08-01T10:12:00.000+09:00',
+    },
+    {
+      id: 'common-var-version-2', version: 2, name: '会社名', value: 'NEN', memo: '',
+      changeReason: '初回登録', actorId: 'staff-1', createdAt: '2025-11-20T16:40:00.000+09:00',
+    },
+  ],
+}
+
+export const COMMON_VAR_REPLACEMENT_CANDIDATES = {
+  source: {
+    id: COMMON_VAR_SOURCE.id,
+    name: COMMON_VAR_SOURCE.name,
+    type: COMMON_VAR_SOURCE.type,
+    version: COMMON_VAR_DETAIL.version,
+  },
+  candidates: COMMON_VARS
+    .filter((variable) => variable.id !== COMMON_VAR_SOURCE.id && variable.type === COMMON_VAR_SOURCE.type)
+    .map((variable) => ({
+      id: variable.id,
+      name: variable.name,
+      varKey: variable.varKey,
+      type: variable.type,
+      value: variable.value,
+      version: 1,
+    })),
+}
+
+export const COMMON_VAR_REPLACEMENT_PREVIEW = {
+  source: COMMON_VAR_REPLACEMENT_CANDIDATES.source,
+  replacement: {
+    id: COMMON_VAR_REPLACEMENT.id,
+    name: COMMON_VAR_REPLACEMENT.name,
+    type: COMMON_VAR_REPLACEMENT.type,
+    version: 1,
+  },
+  usageTotal: COMMON_VAR_DELETE_IMPACT.total,
+  replaceableTotal: COMMON_VAR_DELETE_IMPACT.blockingTotal,
+  blockedTotal: 0,
+  historicalTotal: COMMON_VAR_DELETE_IMPACT.historicalTotal,
+  unscopedFormTotal: COMMON_VAR_DELETE_IMPACT.unscopedFormTotal,
+  byKind: COMMON_VAR_DELETE_IMPACT.byKind,
+  canReplace: true,
+  revision: '8d8c3f91f498b423cd7c37562f0fd5b2e1676959e040bc6b126de36a537a6926',
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+}
+
+export const COMMON_VAR_REPLACEMENT_RESULT = {
+  runId: 'common-var-replace-run-1',
+  archivedVersion: COMMON_VAR_DETAIL.version + 1,
+  sourceId: COMMON_VAR_SOURCE.id,
+  replacementId: COMMON_VAR_REPLACEMENT.id,
+  replacedUsageCount: COMMON_VAR_REPLACEMENT_PREVIEW.replaceableTotal,
+  remainingUsageCount: 0,
+  verification: 'verified',
+  completedAt: '2026-09-07T10:01:00.000+09:00',
+}
+
 /**
  * 機能15 `YfTfJ` の登録メディアと削除影響。
  *

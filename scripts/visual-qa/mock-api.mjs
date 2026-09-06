@@ -30,9 +30,13 @@ import {
   FORM_DELETE_IMPACT_FIXTURES,
   COMMON_VARS,
   COMMON_VAR_FOLDERS,
+  COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
   commonVarChangeImpact,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
+  COMMON_VAR_REPLACEMENT_CANDIDATES,
+  COMMON_VAR_REPLACEMENT_PREVIEW,
+  COMMON_VAR_REPLACEMENT_RESULT,
   MEDIA_DELETE_IMPACT,
   MEDIA_DELETE_IMPACT_EMPTY,
   MEDIA_REPLACEMENT_IMPACT,
@@ -1825,6 +1829,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data }
   }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
+  if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
@@ -2253,6 +2258,25 @@ const server = createServer((req, res) => {
           success: true,
           data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
         }))
+      })
+      return
+    }
+    /*
+      共通情報の差し替え（PR #1131）。候補取得・影響確認・実行完了を
+      同じPOSTの入力で分けるが、モックは保存せず固定結果だけ返す。
+    */
+    if (method === 'POST' && url.pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}/replace`) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const data = !body.replacementId
+          ? COMMON_VAR_REPLACEMENT_CANDIDATES
+          : body.apply === true
+            ? COMMON_VAR_REPLACEMENT_RESULT
+            : COMMON_VAR_REPLACEMENT_PREVIEW
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
       })
       return
     }

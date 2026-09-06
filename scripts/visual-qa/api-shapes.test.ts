@@ -25,6 +25,8 @@ import { MEDIA_DELETE_IMPACT, MEDIA_FOLDERS, MEDIA_ITEMS } from './fixtures.mjs'
 import { BROADCAST_LIST_META, TEMPLATES } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { COMMON_VAR_DETAIL, COMMON_VAR_REPLACEMENT_CANDIDATES, COMMON_VAR_REPLACEMENT_PREVIEW, COMMON_VAR_REPLACEMENT_RESULT } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -148,6 +150,44 @@ describe('テンプレートの画面確認データ', () => {
 describe('一斉配信一覧の画面確認データ', () => {
   it('開封率を割合ではなくAPI契約どおりのパーセント値で返す', () => {
     expect(BROADCAST_LIST_META.kpis.openRate).toBe(69.4);
+  });
+});
+
+describe('共通情報の詳細・差し替え契約', () => {
+  it('詳細はメモ・版・使用先・変更履歴を同じ対象で返す', () => {
+    expect(COMMON_VAR_DETAIL).toMatchObject({
+      id: 'common-var-delete-target',
+      memo: expect.any(String),
+      version: 3,
+      usageCount: 15,
+      usageByKind: { template: 12, form: 3 },
+      usagePage: { total: 15, shown: 6, hasMore: true, unavailableCount: 0 },
+    });
+    expect(COMMON_VAR_DETAIL.usages).toHaveLength(COMMON_VAR_DETAIL.usagePage.shown);
+    expect(COMMON_VAR_DETAIL.history[0]).toMatchObject({ version: 3, changeReason: expect.any(String) });
+  });
+
+  it('候補・影響・実行完了でIDと件数が食い違わない', () => {
+    expect(COMMON_VAR_REPLACEMENT_CANDIDATES.source).toMatchObject({
+      id: COMMON_VAR_DETAIL.id,
+      version: COMMON_VAR_DETAIL.version,
+    });
+    expect(COMMON_VAR_REPLACEMENT_PREVIEW).toMatchObject({
+      source: { id: COMMON_VAR_DETAIL.id },
+      replacement: { id: COMMON_VAR_REPLACEMENT_CANDIDATES.candidates[0].id },
+      usageTotal: COMMON_VAR_DETAIL.usageCount,
+      replaceableTotal: COMMON_VAR_DETAIL.usageCount,
+      blockedTotal: 0,
+      canReplace: true,
+    });
+    expect(COMMON_VAR_REPLACEMENT_PREVIEW.revision).toMatch(/^[0-9a-f]{64}$/);
+    expect(COMMON_VAR_REPLACEMENT_RESULT).toMatchObject({
+      sourceId: COMMON_VAR_DETAIL.id,
+      replacementId: COMMON_VAR_REPLACEMENT_PREVIEW.replacement.id,
+      replacedUsageCount: COMMON_VAR_REPLACEMENT_PREVIEW.replaceableTotal,
+      remainingUsageCount: 0,
+      verification: 'verified',
+    });
   });
 });
 
