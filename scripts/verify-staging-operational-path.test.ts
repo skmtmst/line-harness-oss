@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
+  countVerificationLeftovers,
   createD1Query,
   findSyntheticFriendReferences,
   insertSyntheticDeliveryRows,
@@ -75,11 +76,14 @@ describe('staging operational verification safety', () => {
 
   test('finds aggregate references to synthetic friends without returning row values', async () => {
     const queryMock = vi.fn(async (sql: string, _params?: unknown[]): Promise<unknown[]> => {
-      if (sql.includes('pragma_foreign_key_list')) {
-        return [
-          { table_name: 'friend_scenarios', column_name: 'friend_id' },
-          { table_name: 'bookings', column_name: 'friend_id' },
-        ];
+      if (sql.includes('sqlite_schema')) {
+        return [{ name: 'friend_scenarios' }, { name: 'bookings' }];
+      }
+      if (sql.includes('foreign_key_list("friend_scenarios")')) {
+        return [{ table: 'friends', from: 'friend_id' }];
+      }
+      if (sql.includes('foreign_key_list("bookings")')) {
+        return [{ table: 'friends', from: 'friend_id' }];
       }
       return [{ count: sql.includes('friend_scenarios') ? 41 : 0 }];
     });
@@ -90,6 +94,27 @@ describe('staging operational verification safety', () => {
     await expect(findSyntheticFriendReferences(query, 'verify-b88-line-run-%'))
       .resolves.toEqual(['friend_scenarios.friend_id=41']);
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('line_user_id LIKE ?'), ['verify-b88-line-run-%']);
+  });
+
+  test('counts each cleanup target separately and skips a notification rule that was never created', async () => {
+    const queryMock = vi.fn(async (sql: string, _params?: unknown[]): Promise<Array<{ count: number }>> => [
+      { count: sql.includes('FROM friends ') ? 41 : 0 },
+    ]);
+    const query = async <T>(sql: string, params?: unknown[]): Promise<T[]> => (
+      await queryMock(sql, params)
+    ) as T[];
+
+    await expect(countVerificationLeftovers(query, {
+      sessionHash: 'hash',
+      scenarioId: 'verify-b88-scenario-run',
+      lineUserIdPattern: 'verify-b88-line-run-%',
+      notificationRuleId: null,
+    })).resolves.toEqual({
+      total: 41,
+      counts: { admin_sessions: 0, scenarios: 0, friends: 41, friend_scenarios: 0 },
+    });
+    expect(queryMock).toHaveBeenCalledTimes(4);
+    expect(queryMock.mock.calls.some(([sql]) => sql.includes('notification_rules'))).toBe(false);
   });
 
   test('inserts 41 delivery rows in bounded batches instead of one request per row', async () => {

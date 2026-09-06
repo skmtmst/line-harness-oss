@@ -58,29 +58,65 @@ export async function findSyntheticFriendReferences(
   query: QueryD1,
   lineUserIdPattern: string,
 ): Promise<string[]> {
-  const foreignKeys = await query<{ table_name: string; column_name: string }>(
-    `SELECT schema_table.name AS table_name, foreign_key."from" AS column_name
-       FROM sqlite_schema AS schema_table
-       JOIN pragma_foreign_key_list(schema_table.name) AS foreign_key
-      WHERE schema_table.type = 'table'
-        AND foreign_key."table" = 'friends'
-      ORDER BY schema_table.name, foreign_key."from"`,
+  const tables = await query<{ name: string }>(
+    `SELECT name FROM sqlite_schema
+      WHERE type = 'table'
+        AND sql LIKE '%REFERENCES friends%'
+      ORDER BY name`,
   );
   const references: string[] = [];
-  for (const foreignKey of foreignKeys) {
-    const table = quoteIdentifier(foreignKey.table_name);
-    const column = quoteIdentifier(foreignKey.column_name);
-    const rows = await query<{ count: number }>(
-      `SELECT COUNT(*) AS count FROM ${table}
-        WHERE ${column} IN (
-          SELECT id FROM friends WHERE line_user_id LIKE ?
-        )`,
-      [lineUserIdPattern],
+  for (const row of tables) {
+    const table = quoteIdentifier(row.name);
+    const foreignKeys = await query<{ table: string; from: string }>(
+      `PRAGMA foreign_key_list(${table})`,
     );
-    const count = Number(rows[0]?.count ?? 0);
-    if (count > 0) references.push(`${foreignKey.table_name}.${foreignKey.column_name}=${count}`);
+    for (const foreignKey of foreignKeys.filter((key) => key.table === 'friends')) {
+      const column = quoteIdentifier(foreignKey.from);
+      const rows = await query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM ${table}
+          WHERE ${column} IN (
+            SELECT id FROM friends WHERE line_user_id LIKE ?
+          )`,
+        [lineUserIdPattern],
+      );
+      const count = Number(rows[0]?.count ?? 0);
+      if (count > 0) references.push(`${row.name}.${foreignKey.from}=${count}`);
+    }
   }
   return references;
+}
+
+export async function countVerificationLeftovers(
+  query: QueryD1,
+  values: {
+    sessionHash: string;
+    scenarioId: string;
+    lineUserIdPattern: string;
+    notificationRuleId: string | null;
+  },
+): Promise<{ total: number; counts: Record<string, number> }> {
+  const checks: Array<{ name: string; sql: string; value: string }> = [
+    { name: 'admin_sessions', sql: 'SELECT COUNT(*) AS count FROM admin_sessions WHERE token_hash = ?', value: values.sessionHash },
+    { name: 'scenarios', sql: 'SELECT COUNT(*) AS count FROM scenarios WHERE id = ?', value: values.scenarioId },
+    { name: 'friends', sql: 'SELECT COUNT(*) AS count FROM friends WHERE line_user_id LIKE ?', value: values.lineUserIdPattern },
+    { name: 'friend_scenarios', sql: 'SELECT COUNT(*) AS count FROM friend_scenarios WHERE scenario_id = ?', value: values.scenarioId },
+  ];
+  if (values.notificationRuleId) {
+    checks.push({
+      name: 'notification_rules',
+      sql: 'SELECT COUNT(*) AS count FROM notification_rules WHERE id = ?',
+      value: values.notificationRuleId,
+    });
+  }
+  const counts: Record<string, number> = {};
+  for (const check of checks) {
+    const rows = await query<{ count: number }>(check.sql, [check.value]);
+    counts[check.name] = Number(rows[0]?.count ?? 0);
+  }
+  return {
+    total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+    counts,
+  };
 }
 
 function required(name: string, value: string | undefined): string {
@@ -447,30 +483,24 @@ async function main(): Promise<void> {
   }
 
   let leftoverCount = -1;
+  let leftoverCounts: Record<string, number> = {};
   try {
-    const leftovers = await query<{ count: number }>(
-      `SELECT
-         (SELECT COUNT(*) FROM admin_sessions WHERE token_hash = ?) +
-         (SELECT COUNT(*) FROM scenarios WHERE id = ?) +
-         (SELECT COUNT(*) FROM friends WHERE line_user_id LIKE ?) +
-         (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id = ?) +
-         (SELECT COUNT(*) FROM notification_rules WHERE id = ?) AS count`,
-      [
-        sessionHash,
-        `verify-b88-scenario-${runId}`,
-        `verify-b88-line-${runId}-%`,
-        `verify-b88-scenario-${runId}`,
-        notificationRuleId ?? '',
-      ],
-    );
-    leftoverCount = Number(leftovers[0]?.count ?? 0);
+    const leftovers = await countVerificationLeftovers(query, {
+      sessionHash,
+      scenarioId: `verify-b88-scenario-${runId}`,
+      lineUserIdPattern: `verify-b88-line-${runId}-%`,
+      notificationRuleId,
+    });
+    leftoverCount = leftovers.total;
+    leftoverCounts = leftovers.counts;
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'unknown leftover-check failure';
     cleanupFailures.push(`leftover-check[reason=${reason}]`);
   }
   if (cleanupFailures.length !== 0 || leftoverCount !== 0) {
     throw new Error(
-      `Staging cleanup incomplete: stages=${cleanupFailures.join(',') || 'none'}, leftovers=${leftoverCount}`,
+      `Staging cleanup incomplete: stages=${cleanupFailures.join(',') || 'none'},`
+      + ` leftovers=${leftoverCount}, counts=${JSON.stringify(leftoverCounts)}`,
     );
   }
   if (verificationError) throw verificationError;
