@@ -26,7 +26,7 @@
     "@line-crm/shared": "workspace:*",
     "@line-harness/update-engine": "workspace:*",
     "lucide-react": "^1.34.0",
-    "next": "^15.1.0",
+    "next": "^15.5.21",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

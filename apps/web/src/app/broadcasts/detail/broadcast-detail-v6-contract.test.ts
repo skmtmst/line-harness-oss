@@ -26,6 +26,17 @@ describe('V6 一斉配信詳細の契約', () => {
     expect(PAGE).toContain('api.broadcasts.getInsight(id)')
     expect(PAGE).not.toContain('api.analytics.broadcasts(selectedAccountId)')
   })
+
+  it('画面にある実測値をCSVで書き出せる', () => {
+    expect(PAGE).toContain('CSVで書き出す')
+    expect(PAGE).toContain('broadcastDetailCsv({')
+    expect(PAGE).toContain('URL.revokeObjectURL(url)')
+  })
+
+  it('壊れた日時を Invalid Date のまま出さない', () => {
+    expect(PAGE).toContain('formatBroadcastDateTime(broadcast.createdAt)')
+    expect(PAGE).not.toContain('new Date(broadcast.createdAt).toLocaleString')
+  })
 })
 
 describe('V6 一斉配信詳細の、取れない数の断り', () => {

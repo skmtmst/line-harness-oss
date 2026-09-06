@@ -10,6 +10,7 @@ import {
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import { audienceText } from '@/app/webinars/overview-view'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -192,6 +193,7 @@ export default function WebinarNotifications({ webinarId }: { webinarId: string 
   ]
 
   const available = overview !== null
+  const audience = audienceText(overview?.audience)
 
   return (
     <section className="space-y-4" data-design-node="Ho8z4">
@@ -228,6 +230,14 @@ export default function WebinarNotifications({ webinarId }: { webinarId: string 
       {!available && (
         <p className="text-ink-faint text-xs">送った結果はまだ読めていません。—（未取得）</p>
       )}
+
+      <div className="bg-canvas rounded-card border-hairline border px-4 py-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="text-ink-faint text-xs">通知の対象</p>
+          <p className="text-ink text-lg font-bold tabular-nums">{audience.people}</p>
+        </div>
+        <p className="text-ink-faint mt-1 text-xs">{audience.note}</p>
+      </div>
 
       <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
         {rows.map((row) => (
