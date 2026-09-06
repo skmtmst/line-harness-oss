@@ -18,39 +18,58 @@ import Notice from '@/components/shared/notice'
 
 const NAME_LIMIT = 40
 
-export type SavedViewCondition = { label: string; value: string }
 export type SavedViewSaveResult =
   | { success: true }
   | { success: false; error: string }
 
+export type SavedViewDraft = {
+  name: string
+  status: 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
+  due: 'all' | 'overdue'
+  channel: 'all' | 'line' | 'email'
+  assignee: string
+  favorite: boolean
+}
+
 export default function SavedViewDialog({
   open,
-  conditions,
+  initialValue,
+  operators,
   existingNames,
   saving,
   onSave,
   onClose,
 }: {
   open: boolean
-  /** 「保存する条件」に並べる中身。設計は 対応状況・期限 など */
-  conditions: SavedViewCondition[]
+  initialValue: Omit<SavedViewDraft, 'name'>
+  operators: Array<{ id: string; name: string }>
   /** 同じ名前があるかを見るための一覧 */
   existingNames: string[]
   saving: boolean
   /** 保存先が成功を返したときだけ、完了画面へ進める。 */
-  onSave: (name: string) => Promise<SavedViewSaveResult>
+  onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult>
   onClose: () => void
 }) {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [status, setStatus] = useState(initialValue.status)
+  const [due, setDue] = useState(initialValue.due)
+  const [channel, setChannel] = useState(initialValue.channel)
+  const [assignee, setAssignee] = useState(initialValue.assignee)
+  const [favorite, setFavorite] = useState(initialValue.favorite)
 
   useEffect(() => {
     if (!open) return
     setName('')
     setError('')
     setDone(false)
-  }, [open])
+    setStatus(initialValue.status)
+    setDue(initialValue.due)
+    setChannel(initialValue.channel)
+    setAssignee(initialValue.assignee)
+    setFavorite(initialValue.favorite)
+  }, [open, initialValue.status, initialValue.due, initialValue.channel, initialValue.assignee, initialValue.favorite])
 
   useEffect(() => {
     if (!open) return
@@ -87,7 +106,7 @@ export default function SavedViewDialog({
       return
     }
     setError('')
-    const result = await onSave(trimmed)
+    const result = await onSave({ name: trimmed, status, due, channel, assignee, favorite })
     if (!result.success) {
       setError(result.error)
       return
@@ -146,36 +165,75 @@ export default function SavedViewDialog({
                 aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
                 className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${error || nameMissing ? 'border-danger' : 'border-hairline'}`}
               />
-              {/*
-                **断りは共通の赤い帯で出す。** 設計 `AuSDY`（2-16）は
-                ⚠ の付いた赤い帯で「検索名を入力してください。」と言う。
-                小さな灰色の字だと、**赤い枠だけ見えて理由が読まれない。**
-
-                空のときと、押して断られたときで**同じ見た目**にする。
-                片方だけ帯にすると、同じ「入力してください」が2通りの
-                見え方をして、別のことを言われたように読める。
-              */}
-              {error || nameMissing ? (
-                <Notice
-                  id={error ? 'saved-view-error' : 'saved-view-name-hint'}
-                  tone="error"
-                  message={error || '検索名を入力してください。'}
-                  className="mt-1.5"
-                />
-              ) : null}
             </div>
 
             <div>
               <p className="text-ink-secondary text-xs font-medium">保存する条件</p>
               <dl className="border-hairline rounded-control mt-1.5 divide-y divide-[color:var(--color-hairline)] border">
-                {conditions.map((condition) => (
-                  <div key={condition.label} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                    <dt className="text-ink-secondary text-xs">{condition.label}</dt>
-                    <dd className="text-ink font-medium">{condition.value}</dd>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                  <dt className="text-ink-secondary text-xs">対応状況</dt>
+                  <dd>
+                    <select aria-label="保存する対応状況" value={status} onChange={(event) => setStatus(event.target.value as SavedViewDraft['status'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
+                      <option value="all">すべて</option>
+                      <option value="unread">未対応</option>
+                      <option value="in_progress">対応中</option>
+                      <option value="on_hold">保留</option>
+                      <option value="resolved">対応済み</option>
+                    </select>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                  <dt className="text-ink-secondary text-xs">期限</dt>
+                  <dd>
+                    <select aria-label="保存する期限" value={due} onChange={(event) => setDue(event.target.value as SavedViewDraft['due'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
+                      <option value="all">すべて</option>
+                      <option value="overdue">期限超過</option>
+                    </select>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                  <dt className="text-ink-secondary text-xs">受信経路</dt>
+                  <dd>
+                    <select aria-label="保存する受信経路" value={channel} onChange={(event) => setChannel(event.target.value as SavedViewDraft['channel'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
+                      <option value="all">LINE・MAIL</option>
+                      <option value="line">LINE</option>
+                      <option value="email">MAIL</option>
+                    </select>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                  <dt className="text-ink-secondary text-xs">担当者</dt>
+                  <dd>
+                    <select aria-label="保存する担当者" value={assignee} onChange={(event) => setAssignee(event.target.value)} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
+                      <option value="all">すべて</option>
+                      <option value="unassigned">未割り当て</option>
+                      {operators.map((operator) => <option key={operator.id} value={operator.id}>{operator.name}</option>)}
+                    </select>
+                  </dd>
+                </div>
               </dl>
             </div>
+
+            <label className="flex items-center justify-between gap-4">
+              <span>
+                <span className="text-ink block text-xs font-medium">よく使うに追加</span>
+                <span className="text-ink-faint mt-0.5 block text-[11px]">保存した検索一覧の上部に表示します</span>
+              </span>
+              <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+                <input type="checkbox" checked={favorite} onChange={(event) => setFavorite(event.target.checked)} aria-label="よく使うに追加" className="peer sr-only" />
+                <span className="bg-canvas-sunken peer-checked:bg-accent-deep absolute inset-0 rounded-full transition-colors" />
+                <span className="bg-canvas absolute left-1 h-4 w-4 rounded-full shadow transition-transform peer-checked:translate-x-5" />
+              </span>
+            </label>
+
+            {/* 設計 `AuSDY` と同じく、直す場所を見たあとに理由を読む。 */}
+            {error || nameMissing ? (
+              <Notice
+                id={error ? 'saved-view-error' : 'saved-view-name-hint'}
+                tone="error"
+                message={error || '検索名を入力してください。'}
+              />
+            ) : null}
           </div>
         )}
 
