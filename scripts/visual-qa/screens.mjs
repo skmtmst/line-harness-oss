@@ -2960,28 +2960,28 @@ export const SCREENS = [
 // Issue #245（機能32）。同じ実装headで4画面と全状態を撮り直した最新判定。
 const FEATURE_32_REVIEW = {
   UgonK: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を1440・1920で設計と目視比較。** 6列（確認する項目／結果／いまの数字／目安／最後の確認／操作）、次回確認時刻、判定の見方4種を追加し、横はみ出し0。画面を開いている間は5分ごとに再取得する。**残るもの**：サーバー側の定期実行結果を保存して共有する専用の健全性チェック口が無く、端末を閉じた状態の自動確認・異常履歴は未接続。',
-    verdictSource: 'operations-v6/UgonK.txt',
-    verdictHead: '1121a74eee',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 6列、次回確認時刻、判定の見方4種を設計の情報順で表示。サーバー保存の健全性結果と観測時刻を読み、古い結果を未確認にし、手動確認も同じ契約へ保存する。両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/UgonK.txt + operations-v6/UgonK-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
   b3HfZ: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` を通常・読込・失敗の各状態で1440・1920撮影し、設計と目視比較。** 停止対象ごとの件数・人数、理由とアカウント、補足、復旧、右欄の「止めるとどうなるか／止めたあとにすること／つながる先」、下部の固定操作帯を設計と同じ情報順で表示した。取得失敗時は0件にせず停止ボタンを無効化し、全画像で横はみ出し0。**残るもの**：ログインユーザー全員へのLINE・メール通知と操作専用の段階認証は未接続。',
-    verdictSource: 'operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt',
-    verdictHead: '875d5f74e',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` の通常・読込・失敗を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** サーバーの下見値で件数・人数・理由・アカウント・補足・復旧を表示し、取得失敗は0件にせず操作不可。停止・復旧は操作専用の6桁本人確認、重複防止、版番号確認を通し、ログインユーザーへのLINE・メール通知もサーバー契約へ接続した。全状態・両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt + operations-v6/b3HfZ-*-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
   UhC2O: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` を1440・1920撮影し、設計と目視比較。** サーバー保存の停止・復旧履歴、期間、CSV、4つの概要、停止記録と管理画面更新の2表、右欄の監査説明・関連画面・注意事項を設計と同じ構造で表示し、横はみ出し0。**残るもの**：管理画面更新は反映時間・停止時間・移行詳細を持つ配備台帳とは未接続で、停止記録の詳細画面も未接続。',
-    verdictSource: 'operations-v6/UhC2O.txt',
-    verdictHead: '875d5f74e',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** サーバーが保存した停止・復旧と管理画面更新を統合履歴から読み、期間、CSV、4つの概要、停止記録と更新履歴の2表、右欄を設計の構造で表示する。反映時間・停止時間・移行内容を含む配備記録も同じ履歴へ接続済み。両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/UhC2O.txt + operations-v6/UhC2O-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
   U0BwS: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` の最終確認を1440・1920撮影し、設計と目視比較。** 下見と同じ件数・人数、アカウント、選んだ対象、理由、止まらないもの、取り消せない配信を再計算せず表示し、「停止」入力と版番号つきサーバー保存で誤操作・同時更新を防ぐ。通知予定も窓の下部に明示し、横はみ出し0。**残るもの**：操作専用の段階認証と、ログインユーザー全員へのLINE・メール通知の実送信は未接続。',
-    verdictSource: 'operations-v6/U0BwS.txt',
-    verdictHead: '875d5f74e',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` の最終確認を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 下見と同じ件数・人数、アカウント、対象、理由、止まらないもの、取り消せない配信を表示。「停止」入力後に操作専用の6桁本人確認を行い、重複防止キーと版番号を付けて停止する。ログインユーザーへのLINE・メール通知も実送信契約へ接続済み。両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/U0BwS.txt + operations-v6/U0BwS-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
 }
 
@@ -4318,6 +4318,8 @@ export const CAPTURED_AT = {
       note: '#245。サーバー共通の停止・復旧・追記履歴へ接続し、通常・読込・失敗・最終確認を1440/1920で撮影。絵は版に残さず、追跡済みの `.txt` を証拠にする。' },
     { pr: 1064, head: '875d5f74e', on: '2026-09-07', screens: ['b3HfZ', 'UhC2O', 'U0BwS'],
       note: 'Issue #300。対象3画面と定義済み状態の12枚を固定ポート3105/8792で1440/1920px撮影。全画像で横はみ出し0。右欄・固定操作帯・履歴2表・最終確認をV6の情報順へそろえ、3画面を構造一致へ更新した。' },
+    { pr: 0, head: '88912c59c3', on: '2026-09-07', screens: ['UgonK', 'b3HfZ', 'UhC2O', 'U0BwS'],
+      note: 'Issue #387。固定ポート3105/8792で4画面14枚（通常・読込・失敗を含む）を1440/1920px撮影。全画像で横はみ出し0。健全性保存、停止・復旧、統合履歴、本人確認、通知の本流契約へ接続し、4画面を一致へ更新した。' },
   ],
   4: [
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
