@@ -42,9 +42,9 @@ describe('V6 顧客へのお知らせの寸法', () => {
   })
 
   it('行の中の小さな操作は 高さ32 / 角丸6', () => {
-    expect(CSS).toMatch(/\.rowAction\s*\{[^}]*height: 32px;/)
-    expect(CSS).toMatch(/\.rowAction\s*\{[^}]*border-radius: var\(--radius-mini\);/)
-    expect(PAGE).toContain('className={styles.rowAction}')
+    expect(CSS).toMatch(/line-notification-v6-row-action\)\s*\{[^}]*height: 32px;/)
+    expect(CSS).toMatch(/line-notification-v6-row-action\)\s*\{[^}]*border-radius: var\(--radius-mini\);/)
+    expect(PAGE).toContain('className="line-notification-v6-row-action"')
   })
 
   it('カードは r10', () => {

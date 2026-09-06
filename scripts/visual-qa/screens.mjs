@@ -601,7 +601,7 @@ export const SCREENS = [
   },
   {
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: '変更' }],
+    mode: 'viewport', height: 1080, steps: [{ qaOpen: 'EvVO5', after: 900 }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態（`g2UNV` `M2b2B`）／#32 結果画面から作成中の操作を外し「設定サマリー」→「配信した設定」（`M2b2B`）／#40 主ボタンの緑を `$accent-deep` へ／#41 `bV5Vs` の削除欄を「このシナリオを削除」へ、複製枠を「配信を開始」へ。`kk8dz` から削除の押し口を消す／#43 メッセージ種別タブを9種・同じ並びに（`Flex`→リッチメッセージ）／#44 CSV書き出しを副次ボタンに統一（`M2b2B`）／#46 行に「その他操作（…）」／#48 表記統一。設計画像は `docs/design-reference/scenarios-v6/` を撮り直した。**実装との突き合わせはこれから。** **P1 設計の「シナリオの開始条件」の窓が無い。** ルート `/scenarios/detail?id=scenario-0`（変更）。設計はきっかけ6種類（友だち追加・タグ追加・フォーム回答・予約確定・手動開始・API/Webhook）を選ぶ面、開始する友だちの条件、初回のみ/毎回の選択、一致人数の再計算（一致124人・すでに購読中8人・新規開始予定116人）を持つ。**実装は設定欄のトリガーの選び口1つ。** 「何人が新しく始まるか」を押す前に見られない。取得元：`scenarios-v6/EvVO5.txt`。1440・1920とも横スクロール0 **推奨修正**：**「何人が新しく始まるか」を押す前に出すのが先**。設計が一致人数の再計算（一致124人・すでに購読中8人・新規開始予定116人）を求めるのは、**押したあとに戻せないから**。人数を数える口は `cPk8A`（配信の対象条件）が既に持っている。',
     verdictSource: 'scenarios-v6/EvVO5.txt', verdictHead: '7b509106',
   },
@@ -1055,9 +1055,10 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも、設計の重なり確認「営業時間への一律返信」が表示されず、テスト段へ進めない。**推奨修正**：競合結果を画面に出し、2項目の確認後に試験入力へ進めるようにする。取得元 `auto-replies-v6/g46ja.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #249 で一致。** 1920pxの設計画像と実装の1440・1920pxを横並びで確認。テスト入力、送信者選択、判定結果、設定要約、LINEプレビュー、中央の実行確認モーダルを設計どおり配置した。競合2件を確認してから実在する友だちでdry-runを実行する一連の操作に成功し、横はみ出し0。',
+    verdictSource: 'auto-replies-v6/g46ja.txt + docs/design-qa/auto-replies-v6/g46ja.txt + apps/web/src/app/auto-replies/publish/page.tsx',
+    verdictHead: '564c91d0fe',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 「確認したので次へ」で試す段へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }],
@@ -1065,22 +1066,24 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。重なり確認の項目が表示されないため、1440・1920とも最終確認へ進めない。**推奨修正**：競合確認と試験を通過した後、設計の条件・応答・優先順位の要約を表示する。取得元 `auto-replies-v6/Yj6CQ.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #249 で一致。** 1920pxの設計画像と実装の1440・1920pxを横並びで確認。有効化前チェック4項目、条件・時間・対象・返信・アクションの要約、28日一致数、競合確認数、LINEプレビュー、下部操作を設計どおり配置した。dry-run後に検証APIを通って到達し、横はみ出し0。未取得値は0件と誤表示しない。',
+    verdictSource: 'auto-replies-v6/Yj6CQ.txt + docs/design-qa/auto-replies-v6/Yj6CQ.txt + apps/web/src/app/auto-replies/publish/page.tsx',
+    verdictHead: '564c91d0fe',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 試してから最後の確認へ */
-    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }],
+    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { qaOpen: 'g46ja-run', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }],
 
   },
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。重なり確認の項目が表示されないため、1440・1920とも公開完了へ進めない。**推奨修正**：前段の確認を接続し、公開後は設計の有効状態・優先順位・次の操作を表示する。取得元 `auto-replies-v6/e6iJG.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #249 で一致。** 1920pxの設計画像と実装の1440・1920pxを横並びで確認。有効化完了、稼働中の設定要約、Slack監視案内、次の操作4件、監視項目、LINEプレビューを設計どおり配置した。冪等キー付き公開APIまで押し切って完了画面へ到達し、横はみ出し0。',
+    verdictSource: 'auto-replies-v6/e6iJG.txt + docs/design-qa/auto-replies-v6/e6iJG.txt + apps/web/src/app/auto-replies/publish/page.tsx',
+    verdictHead: '564c91d0fe',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 公開まで押し切る */
-    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }, { click: 'この内容で公開する', after: 1200 }],
+    steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { qaOpen: 'g46ja-run', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }, { click: '自動応答を有効化', after: 1200 }],
 
   },
   {
@@ -2184,7 +2187,7 @@ export const SCREENS = [
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。タブ帯の件数（顧客へのお知らせ9／運用者へのお知らせ11／送れなかったもの4）と帯（止めているもの 2種類／注文96・発送32・入金20）、札、期間、行の副題（注文が確定したとき ／ EC連携から）、「お知らせの種類 9つのうち 6つを表示」が無い。実装の「通知のON/OFFを切り替えても、ECから受け取った履歴は残ります。」は残す。※ **内部語**「通知ON」（設計は「出している」）。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** head `4af43fb6` で「要確認 N件」から**送れなかったものの一覧へ渡す**ようにした。数を出すだけでは、その N件がどれかを探す場所が無かった。**0件のときは押し口を出さない**（押しても何も無い）。通常・0件・取得失敗・権限不足の4状態を撮った。残る差：設計は種類ごとに直近の送信結果と失敗理由をその場で開く', verdictSource: 'Claude実装' , verdictHead: '31293424' },
+    }, name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** タブの件数、4つの集計帯、すべて／出している／止めている／文面未設定の絞り込み、行のきっかけ・当日数・状態、表示件数を復元。「通知ON/OFF」を「出している／止めている」へ直した。通常・0件・取得失敗・権限不足を1440・1920で撮影し、全10枚で横はみ出し0。残る差はこの30日の種類別数・LINE集計の表示人数と、種類ごとの直近失敗理由で、現行APIに集計口が無いため要修正を維持。', verdictSource: 'line-notify-v6/festr-normal.txt', verdictHead: '1a0a71ba' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#504 `806ed169` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の通知テンプレート編集は、差し込みの一覧と送信前の見え方を並べて確かめる。実装との差は送信処理がつながってから見る **ルート**：`/line-notifications`（お知らせの中身を編集）。**取得元**：`line-notify-v6/Q55bb.txt`。**推奨修正**：差し込みの一覧と送信前の見え方を並べる。**`vCqUj`（フォーム）と `NNDMR`（質問）が差し込みの選び口を既に持っている**ので写す。送信処理がつながってから細かな差を見る。', verdictSource: 'line-notify-v6/Q55bb.txt',
@@ -2200,9 +2203,9 @@ export const SCREENS = [
     route: '/line-notifications?tab=failures', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**設計の肝は「LINEで届かなかった人に、次に何をするか」**（LINEでは今後も届きません／メールで届いた2／まだ何もできていない2／代わりの連絡先）だが、実装にその導線が無い。※ **内部語**「LINE API受付済み」「LINEへの受付まで確認できたもの」。設計は「届いた／届かなかった」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#545 で「送れなかったもの」が入り、未実装ではなくなった。** 失敗理由が行ごとに出る（「相手がブロックしています」「LINEの受け取り上限を超えました」）。**未取得と0件が分かれている**：通常では LINE受付・試行・クリックが `—`（まだ記録していない）、空では帯が **0件**（数えて0）。再試行のボタンは**出していない**——型が `retryAvailable: false` で、画面にも「試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。」と理由を書く。**出せないものを出さない**形で、`TimXl` と同じ。1440・1920とも横スクロール0。P2 設計は届かなかったものを「ブロック中の人／メールで届いた／まだ何もできていない」に分けるが、実装は状態ごとの分けまで。「その日のうちに別の手だてで届けてください」の案内も無い **ルート**：`/line-notifications?tab=failures`。**取得元**：`line-notify-v6/X8JCA5.txt`（通常と空を別々に撮った）。**推奨修正**：**「試行回数・自動再試行・個人の既読は、現在の記録からは取得できません。」と理由を書いて再試行を出さない形は維持する**（`TimXl` と同じ手本）。届かなかったものの分け方（ブロック中／メールで届いた）は、記録に理由が入ってから。',
+    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 届かなかった／送信対象外／メールで届いた／まだ連絡できていないの帯、名前・注文番号検索、状態絞り込み、その日のうちに代替連絡する案内を追加。再試行は安全なAPIが無いため出さず、理由も維持。1440・1920の通常・読込・空・失敗で横はみ出し0。メール結果・対応済みを返す口と撮影用の通常データが無く、設計の通常行を比較できないため要修正を維持。',
     verdictSource: 'line-notify-v6/X8JCA5-normal.txt',
-    verdictHead: '31293424',
+    verdictHead: '1a0a71ba',
   },
   {
     /*
@@ -2214,26 +2217,26 @@ export const SCREENS = [
     route: '/line-notifications?tab=history', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。帯（この30日に送った）、期間、札（すべて3,826／押された842／届かなかった4）、LINEアカウントごとの区別、CSVが無い。内部語は `X8JCA5` と同じ。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#545 で「記録」が入り、未実装ではなくなった。** 通常・空・失敗の3つが `data-list-state` でも分かれる。**個人の既読はどこにも作っていない**：列は「試行・クリック」で、行は「クリック —」。型（`EcNotificationRun`）にも既読の欄が無く、画面に「個人の既読は、現在の記録からは取得できません。」と書いてある。**所属を確定できない過去分も出さない**（`unassignedHistoricalRowsExcluded: true`、画面にも「選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します」）。空のとき帯は 0件（数えて0）。1440・1920とも横スクロール0。P2 設計の絞り込みチップ（すべて／押された／届かなかった）と「CSVで書き出す」が無い **ルート**：`/line-notifications?tab=history`。**取得元**：`line-notify-v6/Se65i.txt` ＋ `EcNotificationRun` の型。**推奨修正**：**「所属を確定できない過去分を出さない」（`unassignedHistoricalRowsExcluded`）は維持する。** 個人の既読は型にも記録にも無いので、**画面の直しでは出せない**。絞り込みの追加はそのあと。',
+    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 記録数／LINE API受付／押された／送れなかったの帯、名前・注文番号検索、すべて／クリック記録あり／送れなかったの絞り込みを追加。過去の所属不明行と個人既読は出さず、押下は自社短縮URLだけと明記。data-list-state で通常・読込・空・失敗・絞込0件を区別し、1440・1920で横はみ出し0。期間集計・CSV出力権限の口と撮影用の通常データが無いため、要修正を維持。',
     verdictSource: 'line-notify-v6/Se65i-normal.txt',
-    verdictHead: '31293424',
+    verdictHead: '1a0a71ba',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
     route: '/line-notifications?tab=operator', mode: 'page',
     states: { apis: ['**/api/notifications/rules?**', '**/api/notifications/rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。「運用者へのお知らせがまだありません」の空の絵。**札の形は設計と同じ**（すべて／下書き／受け取る人がいない）。件数は0。CSVは「CSVは実行記録を接続してから利用できます。」と**未接続の断りとして正しい**。設計の連絡手段「電話・LINEどちらも」が無い。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#564 `ad59fde6` で、記録していたP2が直った。5状態すべてを撮って確かめた。** 絞り込みチップが状態で言い分ける：通常「すべて 3／下書き 1／受け取る人がいない 3」、空「0／0／0」（数えて0）、失敗と権限不足は **「すべて —／下書き —／受け取る人がいない —」**。帯も同じで、失敗・権限不足は3枚とも `—件`。**読めていないものを0と断定しなくなった。** 通常・読込・空・失敗・権限不足の5つが `data-list-state` で名前で分かれ、1440・1920とも横スクロール0。P2 送信処理が接続されるまで「今日届いた数」は `—件` のまま（画面にも「送信処理を接続後に表示」と書いてあり、これは正しい断り方） **ルート**：`/line-notifications?tab=operator`。**取得元**：`line-notify-v6/DpxOK.txt`（通常・読込・空・失敗・権限不足の5状態を撮った）。**推奨修正**：**5状態を `data-list-state` で名前で分ける形を、ほかの一覧へ写す**（撮影側から状態を確かめられる）。「今日届いた数」が `—件` なのは送信処理が未接続のためで、**正しい断り**。',
+    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 帯・作成導線・検索・絞り込み・表・CSV未接続の断りを維持。読込・通常・空・失敗・権限不足・絞込0件を data-list-state で名前付きにし、取得不能な数を0にしない。1440・1920の5状態、全12枚で横はみ出し0。送信処理と実行記録が未接続のため、構造一致・データ未接続を維持。',
     verdictSource: 'line-notify-v6/DpxOK-forbidden.txt + DpxOK-normal.txt',
-    verdictHead: '31293424',
+    verdictHead: '1a0a71ba',
   },
   {
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
     route: '/line-notifications/operator/new', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正（差は小さい）。設計に在って実装に無いのは**「LINEでログインしている人にだけ届きます。担当が決まっていないと届きません。」**と「LINEでログインしていない人がいるとき」。**届かない条件を先に言う文なので足す。** それ以外は一致。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#545 で作成画面が入り、未実装ではなくなった。** **下書きだけを保存する安全な段階になっている**：ボタンは「下書きに保存」だけで、公開・テスト送信は出さない。「下書きを保存しても通知は始まりません。」「未入力の下書きは公開できません。」「受け取る人が0人だと公開できません。」と、公開できない条件を先に書く。宛先の取り違えも「宛先はお店の人です。あとから顧客向けへは変えられません。」で止める。**本文に画面名の重複は無い**（パンくずのみ）。1440・1920とも横スクロール0。P2 設計との細かな差（受け取る人の選び方の面）は、送信処理が接続されてから見る **ルート**：`/line-notifications/operator/new`。**取得元**：`line-notify-v6/N2gAza.txt`。**推奨修正**：**「下書きだけを保存する」段階のまま置く**。公開・テスト送信は送信処理がつながってから足す。「宛先はお店の人です。あとから顧客向けへは変えられません。」の断りは残す。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 PR #958（Issue #237）head `1a0a71ba` で設計と再比較。** 「LINEログインを済ませた人にだけ届く」「担当が未設定だと届かない」「LINEにログインしていない人はメールへ切り替える」を先に明記。宛先・きっかけ・重要度・重複防止・注意・関連導線と、下書きだけ保存する安全な動きを1440・1920で確認し、横はみ出し0。スタッフ人数と送信プレビューは送信処理接続後のため、構造一致・データ未接続へ更新。',
     verdictSource: 'line-notify-v6/N2gAza.txt',
-    verdictHead: '31293424',
+    verdictHead: '1a0a71ba',
   },
 
   // ── 機能25 オートメーション ─────────────────────────────
@@ -3223,6 +3226,70 @@ const ISSUE_265_REVIEW = {
 }
 
 /**
+ * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
+ * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
+ * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
+ */
+const ISSUE_266_REVIEW = {
+  TC1b1: {
+    verdict: 'needs_fix',
+    note: '案内帯、4指標、フォルダ、一覧、作成導線は出ており、2幅とも横はみ出し0。ただし設計より一覧の列・行密度・絞り込み・各行の操作が少なく、同じ情報量で比較できない。**推奨修正**：設計の固定データと列構成を接続し、一覧密度と操作位置をそろえる。',
+  },
+  cCB7r: {
+    verdict: 'needs_fix',
+    note: '配信方式を2択する流れと次へ進む操作はあり、2幅とも横はみ出し0。ただし設計の見出し、説明、カード寸法、選択状態、ウィザード上部の構成と一致しない。**推奨修正**：2カードの寸法と説明、現在地、下部操作を設計順にそろえる。',
+  },
+  kk8dz: {
+    verdict: 'needs_fix',
+    note: '3段の現在地、LINEプレビュー、配信の流れ、設定サマリーを追加し、2幅とも横はみ出し0。ただし設計の入力例、本文・日時・配信後操作の配置と右欄の寸法に差が残る。**推奨修正**：作り物の本文は入れず、撮影用固定データを接続して設計と同じ入力済み状態で再比較する。',
+  },
+  bV5Vs: {
+    verdict: 'needs_fix',
+    note: '状態、開始条件、終了条件、ステップ一覧、開始操作は確認でき、2幅とも横はみ出し0。ただし設計の表の列・行密度・各ステップ操作・設定カードの配置が異なる。**推奨修正**：設計のステップ表を正本に、列と行操作を同じ位置へそろえる。',
+  },
+  xfYLn: {
+    verdict: 'needs_fix',
+    note: '対象ステップの本文・日時・対象・送信後設定は編集でき、2幅とも横はみ出し0。ただし設計の種別タブ順、編集欄とLINEプレビューの幅、保存操作、設定サマリーが一致しない。**推奨修正**：個別ステップだけの編集構成を設計の左右配置へそろえる。',
+  },
+  r6Gzsu: {
+    verdict: 'needs_fix',
+    note: '配信対象の条件窓は開き、2幅とも横はみ出し0。ただし設計のAND/OR条件行、15軸の候補、現在の条件、対象人数、除外条件に対し、実装は小さな汎用絞り込み窓に留まる。**推奨修正**：条件契約と人数APIを接続し、設計の条件編集構造へそろえる。',
+  },
+  hz9ti: {
+    verdict: 'needs_fix',
+    note: '送信後アクション窓は開き、2幅とも横はみ出し0。ただし設計の8種類と設定済みの連鎖に対し、実装契約は5種類で固定データも空。**接続条件**：テキスト・テンプレート・リマインド・イベント等の不足アクションをWorker/APIへ追加し、複数アクションの順序と条件を表示する。',
+  },
+  dqFft: {
+    verdict: 'match',
+    note: '対象ステップの編集背景上で削除確認が開き、削除対象、配信対象とアクションも消える影響、履歴が残ること、取り消せないこと、戻る・削除の操作が設計と一致。1440/1920pxとも横はみ出し0。',
+  },
+  EvVO5: {
+    verdict: 'structure_match_data_pending',
+    note: '安定した撮影入口から開始条件のオーバーレイを開け、6種類のきっかけ、開始する友だちの条件、初回のみ/毎回、不足機能の無効理由を確認。2幅とも横はみ出し0。予約確定・手動開始・API/Webhookと、新規開始予定人数を返すAPIが未接続のためデータ待ち。',
+  },
+  RUxNf: {
+    verdict: 'needs_fix',
+    note: '開始確認窓は開き、対象シナリオと取り消せない注意を確認でき、2幅とも横はみ出し0。ただし設計の開始条件・終了条件・配信概要を左右で確認する構成と操作順が不足する。**推奨修正**：開始前に影響を判断できる要約を設計順にそろえる。',
+  },
+  NrBkW: {
+    verdict: 'structure_match_data_pending',
+    note: '開始成功の案内、配信中の状態、停止・変更、開始履歴への次の行動を表示し、2幅とも横はみ出し0。開始日時と新規開始予定人数は現在のAPIが返さないため、作り物を出さず取得できない旨を表示してデータ待ち。',
+  },
+  g2UNV: {
+    verdict: 'needs_fix',
+    note: 'テスト送信の宛先を選ぶ窓は開き、2幅とも横はみ出し0。ただし設計の送信内容確認と最終確認を中心にした小窓に対し、実装は宛先一覧を中心にした大きな窓。**推奨修正**：宛先選択の次に、誰へ何を送るか確認する設計状態を追加する。',
+  },
+  M2b2B: {
+    verdict: 'structure_match_data_pending',
+    note: '通常・読込中・取得失敗を両幅で撮影し、指標、ステップ別反応、プレビュー、配信した設定の2列構成を確認。全状態で横はみ出し0。開封・クリック・失敗の集計APIが未接続で値を「—」としているためデータ待ち。',
+  },
+  q5G45: {
+    verdict: 'match',
+    note: '通常・読込中・0件・取得失敗を両幅で撮影。読込中を0件と誤表示せず、0件は作成導線、取得失敗は再試行を出し、案内帯と4指標も同じ面に残る。全状態で横はみ出し0。',
+  },
+}
+
+/**
  * board #212。2026-09-06 に development bf7434ff を 3107/8794 で起動し、
  * 機能14〜32に残っていた未判定11 Nodeを設計1920pxと実装1440/1920pxで比較した。
  * 画面コードは変更せず、見えた差と撮影不能を判定として記録する。
@@ -3305,6 +3372,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-06 Issue #265で修正・再判定。** ${issue265Review.note}`
     screen.verdictSource = issue265Review.source
     delete screen.verdictHead
+  }
+  const issue266Review = ISSUE_266_REVIEW[screen.node]
+  if (screen.feature === 5 && issue266Review) {
+    screen.verdict = issue266Review.verdict
+    screen.verdictNote = `**2026-09-06 #266で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue266Review.note}`
+    screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
+    screen.verdictHead = 'c03ebf864'
   }
   const issue212Review = ISSUE_212_REVIEW[screen.node]
   if (screen.feature >= 14 && screen.feature <= 32 && issue212Review) {
@@ -3656,6 +3730,7 @@ export const CAPTURED_AT = {
     { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
+    { pr: 955, head: '564c91d0fe', on: '2026-09-06', screens: ['g46ja', 'Yj6CQ', 'e6iJG'], note: '競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。' },
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
     { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' },
@@ -3663,6 +3738,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 954, head: 'c03ebf864', on: '2026-09-06',
+      screens: ['TC1b1', 'cCB7r', 'kk8dz', 'bV5Vs', 'xfYLn', 'r6Gzsu', 'hz9ti', 'dqFft', 'EvVO5', 'RUxNf', 'NrBkW', 'g2UNV', 'M2b2B', 'q5G45'],
+      note: 'Issue #266。latest developmentを取り込み、1440・1920と全状態を3102/8789で撮影。全画像で横はみ出し0。' },
     { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
     { pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },

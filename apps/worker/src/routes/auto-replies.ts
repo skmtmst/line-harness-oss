@@ -7,6 +7,7 @@ import {
   updateAutoReply,
   deleteAutoReply,
   getAutoReplyHitCounts,
+  getAutoReplyHitCountSince,
   getFriendById,
   getTemplateById,
   autoReplyRowFromDraftSettings,
@@ -188,6 +189,7 @@ interface AutoReplyDraftVersion {
   lastTestStatus: 'succeeded' | 'failed' | null;
   lastTestedAt: string | null;
   publishedAt: string | null;
+  matchedLast28Days?: number | null;
 }
 
 interface AutoReplyConflict {
@@ -813,7 +815,20 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
     const version = await getAutoReplyDraftVersion(c.env.DB, id)
       ?? await getAutoReplyPublishedVersion(c.env.DB, id);
     if (!version) return c.json({ success: false, error: '確認する設定がありません' }, 404);
-    return c.json({ success: true, data: draftVersionResponse(version) });
+    let matchedLast28Days: number | null = null;
+    try {
+      const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1_000).toISOString();
+      matchedLast28Days = await getAutoReplyHitCountSince(c.env.DB, version.auto_reply_id, since);
+    } catch (err) {
+      console.error(JSON.stringify({
+        message: 'failed to count 28 day auto reply hits',
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    }
+    return c.json({
+      success: true,
+      data: { ...draftVersionResponse(version), matchedLast28Days },
+    });
   } catch (err) {
     console.error('GET /api/auto-replies/:id/draft error:', err);
     return c.json({ success: false, error: '自動応答の下書きを読み込めませんでした' }, 500);
