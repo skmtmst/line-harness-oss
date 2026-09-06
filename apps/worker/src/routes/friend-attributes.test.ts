@@ -25,9 +25,12 @@ const searches = {
   getSavedSearchById: vi.fn(),
   createSavedSearch: vi.fn(),
   updateSavedSearch: vi.fn(),
+  updateSavedSearchWithRevision: vi.fn(),
   deleteSavedSearch: vi.fn(),
   countSavedSearches: vi.fn(),
   getSavedSearchReferences: vi.fn(),
+  getSavedSearchUsageCounts: vi.fn(),
+  getSavedSearchReferenceUsageCounts: vi.fn(),
   SAVED_SEARCH_LIMIT: 50,
   SAVED_SEARCH_SCOPES: ['friends', 'chats', 'bookings'],
   validateSearchConditions: (raw: unknown) => {
@@ -50,6 +53,7 @@ const accountAccess = {
 };
 const savedSearchInsights = {
   getSavedSearchMatchInsights: vi.fn(),
+  getSavedSearchMatchPreview: vi.fn(),
 };
 const supportMarkAutomation = {
   SUPPORT_MARK_RULE_EVENTS: [
@@ -119,11 +123,12 @@ const MARK = {
   auto_on_inbound: 1,
   display_order: 0,
   created_at: '2026-08-16',
+  revision: 1,
+  updated_by: 'u-1',
+  updated_at: '2026-08-16',
   archived_at: null,
   version: 1,
-  updated_at: '2026-08-16',
   created_by: 'u-1',
-  updated_by: 'u-1',
   tenant_id: 'tenant-1',
   line_account_id: 'account-1',
   is_inherited: 0,
@@ -208,12 +213,21 @@ beforeEach(() => {
   searches.getSavedSearchById.mockResolvedValue(SEARCH);
   searches.createSavedSearch.mockResolvedValue(SEARCH);
   searches.updateSavedSearch.mockResolvedValue(SEARCH);
+  searches.updateSavedSearchWithRevision.mockResolvedValue({ status: 'updated', search: SEARCH });
   searches.deleteSavedSearch.mockResolvedValue(true);
   searches.countSavedSearches.mockResolvedValue(0);
   searches.getSavedSearchReferences.mockResolvedValue([]);
+  searches.getSavedSearchUsageCounts.mockResolvedValue(new Map([['s-1', 4]]));
+  searches.getSavedSearchReferenceUsageCounts.mockResolvedValue(new Map());
   savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValue(new Map([
     ['s-1', { matchCount: 7, matchCountError: null }],
   ]));
+  savedSearchInsights.getSavedSearchMatchPreview.mockResolvedValue({
+    total: 7,
+    byChannel: { line: 6, mail: 1 },
+    calculatedAt: '2026-09-07T04:00:00.000+09:00',
+    error: null,
+  });
   segmentQuery.buildSegmentWhere.mockReturnValue({ sql: '1 = 1', bindings: [] });
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     accounts: [{ id: 'account-1' }],
@@ -747,7 +761,7 @@ describe('保存した検索', () => {
       name: '別の名前',
     });
     expect(res.status).toBe(404);
-    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.updateSavedSearchWithRevision).not.toHaveBeenCalled();
   });
 
   it('別機能の scope は汎用APIで扱わない', async () => {
@@ -771,7 +785,185 @@ describe('保存した検索', () => {
       }>;
     };
     expect(body.data[0].conditions.all).toHaveLength(1);
-    expect(body.data[0]).toMatchObject({ matchCount: 7, usedIn: [], canDelete: true });
+    expect(body.data[0]).toMatchObject({
+      matchCount: 7,
+      usedIn: [],
+      canDelete: true,
+      revision: 1,
+      callCountThisMonth: 4,
+    });
+  });
+
+  it('一覧に集計・ページ位置・同じitemsを追加し、既存data配列も維持する', async () => {
+    const res = await req(
+      '/api/saved-searches?lineAccountId=account-1&owner=me&limit=10&cursor=0',
+      'GET',
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: [{ id: 's-1', callCountThisMonth: 4 }],
+      items: [{ id: 's-1', revision: 1 }],
+      summary: {
+        total: 1,
+        usedInBroadcasts: 0,
+        zeroMatches: 0,
+        callsThisMonth: 4,
+      },
+      pagination: { total: 1, limit: 10, cursor: '0', nextCursor: null },
+    });
+  });
+
+  it('owner=me の集計へ他人の共有検索を混ぜない', async () => {
+    searches.getSavedSearches.mockResolvedValueOnce([
+      SEARCH,
+      { ...SEARCH, id: 's-2', created_by: 'u-2', is_shared: 1 },
+    ]);
+    savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValueOnce(new Map([
+      ['s-1', { matchCount: 7, matchCountError: null }],
+      ['s-2', { matchCount: 0, matchCountError: null }],
+    ]));
+    searches.getSavedSearchUsageCounts.mockResolvedValueOnce(new Map([
+      ['s-1', 4],
+      ['s-2', 9],
+    ]));
+    const res = await req(
+      '/api/saved-searches?lineAccountId=account-1&owner=me',
+      'GET',
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [{ id: 's-1' }],
+      summary: { total: 1, zeroMatches: 0, callsThisMonth: 4 },
+      pagination: { total: 1 },
+    });
+  });
+
+  it('保存した検索が無い状態を0件の集計と空配列で返す', async () => {
+    searches.getSavedSearches.mockResolvedValueOnce([]);
+    savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValueOnce(new Map());
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [],
+      items: [],
+      summary: { total: 0, usedInBroadcasts: 0, zeroMatches: 0, callsThisMonth: 0 },
+      pagination: { total: 0, nextCursor: null },
+    });
+  });
+
+  it('一覧の取得失敗を成功の空配列へ潰さない', async () => {
+    searches.getSavedSearches.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ success: false });
+  });
+
+  it('詳細に条件・所有者・版・人数内訳・使用先を返す', async () => {
+    searches.getSavedSearchReferences.mockResolvedValueOnce([{
+      saved_search_id: 's-1',
+      line_account_id: 'account-1',
+      reference_kind: 'broadcast',
+      reference_id: 'broadcast-1',
+      reference_name: 'VIP未契約案内',
+      reference_mode: 'live',
+      revision: 1,
+      last_used_at: '2026-09-07T01:00:00.000+09:00',
+      created_at: '2026-09-01T01:00:00.000+09:00',
+    }]);
+    searches.getSavedSearchReferenceUsageCounts.mockResolvedValueOnce(new Map([
+      ['s-1:broadcast:broadcast-1', 3],
+    ]));
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        id: 's-1',
+        revision: 1,
+        owner: { id: 'u-1', isCurrentUser: true },
+        accountScope: { type: 'line_account', id: 'account-1' },
+        match: {
+          total: 7,
+          byChannel: { line: 6, mail: 1 },
+          error: null,
+        },
+        usedIn: [{
+          kind: 'broadcast',
+          name: 'VIP未契約案内',
+          mode: 'live',
+          revision: 1,
+          callCountThisMonth: 3,
+        }],
+      },
+    });
+  });
+
+  it('スタッフへ他人の個人検索の詳細を漏らさない', async () => {
+    searches.getSavedSearchById.mockResolvedValueOnce({
+      ...SEARCH,
+      created_by: 'u-2',
+      is_shared: 0,
+    });
+    const res = await req(
+      '/api/saved-searches/s-1?lineAccountId=account-1',
+      'GET',
+      undefined,
+      'staff',
+    );
+    expect(res.status).toBe(404);
+    expect(savedSearchInsights.getSavedSearchMatchPreview).not.toHaveBeenCalled();
+  });
+
+  it('未保存の条件も同じ評価器で事前確認する', async () => {
+    const conditions = { all: [{ kind: 'tag', op: 'has', value: 'tag-vip' }] };
+    const res = await req('/api/saved-searches/preview', 'POST', {
+      lineAccountId: 'account-1',
+      conditions,
+    });
+    expect(res.status).toBe(200);
+    expect(savedSearchInsights.getSavedSearchMatchPreview).toHaveBeenCalledWith(
+      env.DB,
+      conditions,
+      'account-1',
+    );
+    expect(await res.json()).toMatchObject({
+      data: {
+        savedSearchId: null,
+        revision: 0,
+        match: { total: 7, byChannel: { line: 6, mail: 1 } },
+        usedIn: [],
+      },
+    });
+  });
+
+  it('古い版で詳細を事前確認したら409と現在版を返す', async () => {
+    searches.getSavedSearchById.mockResolvedValueOnce({ ...SEARCH, revision: 3 });
+    const res = await req('/api/saved-searches/preview', 'POST', {
+      lineAccountId: 'account-1',
+      savedSearchId: 's-1',
+      revision: 2,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'SAVED_SEARCH_REVISION_CONFLICT',
+      data: { currentRevision: 3 },
+    });
+  });
+
+  it('別担当が先に更新した場合は後勝ちにせず409にする', async () => {
+    searches.updateSavedSearchWithRevision.mockResolvedValueOnce({
+      status: 'conflict',
+      current: { ...SEARCH, revision: 2 },
+    });
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', {
+      name: '古い画面からの変更',
+      expectedRevision: 1,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'SAVED_SEARCH_REVISION_CONFLICT',
+      data: { currentRevision: 2, usedIn: [] },
+    });
   });
 
   it('使用先と該当人数を同じ一覧APIで返す', async () => {
@@ -823,7 +1015,7 @@ describe('保存した検索', () => {
     const deleteRes = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE', undefined, 'staff');
     expect(patchRes.status).toBe(404);
     expect(deleteRes.status).toBe(404);
-    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.updateSavedSearchWithRevision).not.toHaveBeenCalled();
     expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
   });
 
@@ -831,10 +1023,11 @@ describe('保存した検索', () => {
     searches.getSavedSearchById.mockResolvedValue({ ...SEARCH, created_by: 'u-2', is_shared: 0 });
     const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', { name: '管理名' }, 'admin');
     expect(res.status).toBe(200);
-    expect(searches.updateSavedSearch).toHaveBeenCalledWith(
+    expect(searches.updateSavedSearchWithRevision).toHaveBeenCalledWith(
       env.DB,
       's-1',
       expect.objectContaining({ lineAccountId: 'account-1', canManageAll: true }),
+      1,
       expect.objectContaining({ name: '管理名' }),
     );
   });
@@ -852,7 +1045,7 @@ describe('保存した検索', () => {
     const wrongAccount = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE', undefined, 'admin');
     expect(wrongScope.status).toBe(404);
     expect(wrongAccount.status).toBe(404);
-    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.updateSavedSearchWithRevision).not.toHaveBeenCalled();
     expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
   });
 

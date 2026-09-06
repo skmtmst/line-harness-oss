@@ -11,8 +11,15 @@ import {
   getFriendFieldMap,
   getFriendFieldsWithValues,
   countFriendFieldValues,
+  getFriendFieldUsageForScope,
   validateFieldKey,
 } from '../src/friend-fields.js';
+import {
+  createFieldMigrationPreview,
+  executeFieldMigration,
+  getFieldMigrationRun,
+  queueFieldMigration,
+} from '../src/field-migrations.js';
 import {
   createSupportMark,
   updateSupportMark,
@@ -274,6 +281,16 @@ describe('友だち情報欄', () => {
     expect(await getFriendFieldMap(db, 'f-1')).toEqual({ pet_kind: '犬' });
   });
 
+  test('選択肢IDは本文へ差し込むとき表示名に戻し、画像・PDFは差し込まない', async () => {
+    await createFriendField(db, {
+      name: '都道府県', fieldKey: 'prefecture', type: 'select',
+      optionsJson: JSON.stringify([{ id: 'tokyo-id', label: '東京都', color: null, status: 'active', displayOrder: 0 }]),
+      defaultValue: 'tokyo-id',
+    });
+    await createFriendField(db, { name: '本人確認', fieldKey: 'identity_file', type: 'pdf' });
+    expect(await getFriendFieldMap(db, 'f-1')).toEqual({ prefecture: '東京都' });
+  });
+
   test('差し込み名は重複できない', async () => {
     await createFriendField(db, { name: 'A', fieldKey: 'dup', type: 'text' });
     await expect(
@@ -287,6 +304,63 @@ describe('友だち情報欄', () => {
     sqlite.prepare(`PRAGMA foreign_keys = ON`).run();
     sqlite.prepare(`DELETE FROM friends WHERE id = 'f-1'`).run();
     expect(await countFriendFieldValues(db, field.id)).toBe(0);
+  });
+
+  test.each(['datetime', 'image', 'pdf'] as const)('V6の%s型を既存表を残したまま保存できる', async (type) => {
+    const field = await createFriendField(db, { name: type, fieldKey: `field_${type}`, type });
+    expect(field.type).toBe(type);
+    const stored = sqlite.prepare(`SELECT type, type_v6, version, status FROM friend_fields WHERE id = ?`).get(field.id) as {
+      type: string; type_v6: string; version: number; status: string;
+    };
+    expect(stored).toMatchObject({ type: 'text', type_v6: type, version: 1, status: 'active' });
+  });
+
+  test('回答フォームの実参照を選択中アカウントだけで数える', async () => {
+    const field = await createFriendField(db, { name: '住所', fieldKey: 'address', type: 'textarea' });
+    sqlite.prepare(
+      `INSERT INTO forms (id, name, fields, status) VALUES ('form-1', '申込フォーム', ?, 'active')`,
+    ).run(JSON.stringify([{ id: 'address', friendFieldId: field.id }]));
+    sqlite.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'account-1')`).run();
+    expect(await getFriendFieldUsageForScope(db, [field.id], SCOPE)).toEqual([
+      { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: field.id, switchable: true },
+    ]);
+  });
+
+  test('移行台帳で値を型付き列へ移し、元項目を30日間読取専用にする', async () => {
+    const source = await createFriendField(db, { name: '年齢（旧）', fieldKey: 'age_old', type: 'text' });
+    const target = await createFriendField(db, { name: '年齢', fieldKey: 'age', type: 'number' });
+    await setFriendFieldValue(db, { friendId: 'f-1', fieldId: source.id, value: '12', updatedBy: 'staff-1' });
+    await createFieldMigrationPreview(db, {
+      runId: 'run-1', scope: SCOPE, sourceFieldId: source.id, targetFieldId: target.id,
+      sourceVersion: 1, targetVersion: 1, previewTokenHash: 'token-hash', snapshotHash: 'snapshot',
+      expiresAt: '2999-01-01T00:00:00.000Z', usageTargets: [], createdBy: 'staff-1',
+      items: [{ friendId: 'f-1', sourceValue: '12', convertedValue: '12', status: 'convertible', reason: null }],
+    });
+    expect(await queueFieldMigration(db, 'run-1', 'request-1')).toBe(true);
+    await executeFieldMigration(db, 'run-1', 'number', 'staff-1');
+    const value = sqlite.prepare(
+      `SELECT value, value_number, source_type, source_id FROM friend_field_values WHERE friend_id = 'f-1' AND field_id = ?`,
+    ).get(target.id);
+    expect(value).toEqual({ value: '12', value_number: 12, source_type: 'field_migration', source_id: 'run-1' });
+    expect(sqlite.prepare(`SELECT status FROM friend_fields WHERE id = ?`).get(source.id)).toEqual({ status: 'read_only' });
+    const run = await getFieldMigrationRun(db, 'run-1', SCOPE);
+    expect(run).toMatchObject({ status: 'succeeded', succeeded_count: 1, failed_count: 0 });
+    expect(run?.rollback_deadline).toBeTruthy();
+  });
+
+  test('要確認行が残る部分失敗では元項目を読取専用にしない', async () => {
+    const source = await createFriendField(db, { name: '年齢（旧）', fieldKey: 'age_review_old', type: 'text' });
+    const target = await createFriendField(db, { name: '年齢', fieldKey: 'age_review', type: 'number' });
+    await createFieldMigrationPreview(db, {
+      runId: 'run-partial', scope: SCOPE, sourceFieldId: source.id, targetFieldId: target.id,
+      sourceVersion: 1, targetVersion: 1, previewTokenHash: 'partial-token', snapshotHash: 'partial-snapshot',
+      expiresAt: '2999-01-01T00:00:00.000Z', usageTargets: [], createdBy: 'staff-1',
+      items: [{ friendId: 'f-1', sourceValue: '不明', convertedValue: null, status: 'review', reason: '数値ではありません' }],
+    });
+    await queueFieldMigration(db, 'run-partial', 'partial-request');
+    await executeFieldMigration(db, 'run-partial', 'number', 'staff-1');
+    expect(await getFieldMigrationRun(db, 'run-partial', SCOPE)).toMatchObject({ status: 'partial', failed_count: 1 });
+    expect(sqlite.prepare(`SELECT status FROM friend_fields WHERE id = ?`).get(source.id)).toEqual({ status: 'active' });
   });
 });
 

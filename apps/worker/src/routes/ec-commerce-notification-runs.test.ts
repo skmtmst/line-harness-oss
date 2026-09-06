@@ -47,18 +47,15 @@ function app() {
   return instance;
 }
 
-function notificationRow(overrides: Row = {}): Row {
+function deliveryRow(overrides: Row = {}): Row {
   return {
-    id: 'event-a',
-    external_event_id: 'external-a',
-    event_type: 'ec.order.confirmed',
-    status: 'processed',
-    error_message: null,
-    received_at: '2026-08-28T09:00:00+09:00',
-    processed_at: '2026-08-28T09:00:02+09:00',
-    order_number: 'NEN-1001',
-    friend_id: 'friend-a',
-    friend_name: '小林 彩',
+    id: 'delivery-a', audience_type: 'customer', recipient_type: 'friend', recipient_id: 'friend-a',
+    channel: 'line', status: 'provider_accepted', retryable: 0, attempts: 1, next_retry_at: null,
+    provider_status: 'provider_accepted', error_code: null, error_message_safe: null,
+    queued_at: '2026-08-28T09:00:00+09:00', accepted_at: '2026-08-28T09:00:02+09:00',
+    execution_mode: 'automatic', version: 1, source_event_type: 'ec.order.confirmed',
+    source_event_id: 'external-a', source_metadata_json: '{"orderNumber":"NEN-1001"}',
+    definition_name: '注文完了', definition_version: 2, friend_name: '小林 彩', clicked_at: null,
     ...overrides,
   };
 }
@@ -68,7 +65,7 @@ beforeEach(() => {
   access.mockResolvedValue(true);
 });
 
-describe('GET /api/ec-commerce/notification-runs', () => {
+describe('GET /api/ec-commerce/notification-runs compatibility route', () => {
   it('requires an explicitly selected LINE account', async () => {
     const db = fakeDb();
     const response = await app().request('/api/ec-commerce/notification-runs', {}, { DB: db } as never);
@@ -87,8 +84,8 @@ describe('GET /api/ec-commerce/notification-runs', () => {
     expect(db.calls).toHaveLength(0);
   });
 
-  it('scopes every query through the selected friend account and excludes profile-only events', async () => {
-    const db = fakeDb([notificationRow()]);
+  it('reads the account-scoped common delivery ledger instead of legacy EC events', async () => {
+    const db = fakeDb([deliveryRow()]);
     const response = await app().request(
       '/api/ec-commerce/notification-runs?lineAccountId=account-a', {}, { DB: db } as never,
     );
@@ -96,54 +93,53 @@ describe('GET /api/ec-commerce/notification-runs', () => {
     expect(access).toHaveBeenCalledWith(db, expect.anything(), ['account-a']);
     expect(db.calls).toHaveLength(3);
     for (const call of db.calls) {
-      expect(call.sql).toContain('f.line_account_id = ?');
-      expect(call.sql).not.toContain('ec.customer.profile_updated');
+      expect(call.sql).toContain('notification_deliveries');
+      expect(call.sql).not.toContain('ec_events');
       expect(call.bindings[0]).toBe('account-a');
     }
   });
 
-  it('returns LINE API acceptance without claiming delivery or read status', async () => {
-    const db = fakeDb([notificationRow()]);
+  it('returns provider acceptance, attempts, clicks and the frozen definition version', async () => {
     const response = await app().request(
-      '/api/ec-commerce/notification-runs?lineAccountId=account-a', {}, { DB: db } as never,
+      '/api/ec-commerce/notification-runs?lineAccountId=account-a',
+      {},
+      { DB: fakeDb([deliveryRow({ clicked_at: '2026-08-28T09:05:00+09:00' })]) } as never,
     );
     const body = await response.json() as {
       data: { items: Array<Record<string, unknown>>; coverage: Record<string, unknown> };
     };
     expect(body.data.items[0]).toMatchObject({
       status: 'accepted', acceptedAt: '2026-08-28T09:00:02+09:00',
-      attemptCount: null, clickedAt: null, retryAvailable: false,
+      attemptCount: 1, clickedAt: '2026-08-28T09:05:00+09:00', version: 2,
+      retryAvailable: false,
     });
     expect(JSON.stringify(body)).not.toMatch(/届きました|開きました|既読/);
     expect(body.data.coverage).toMatchObject({
-      unassignedHistoricalRowsExcluded: true,
-      attemptHistoryAvailable: false,
-      retryAvailable: false,
+      source: 'notification_delivery_ledger', attemptHistoryAvailable: true, retryAvailable: true,
     });
   });
 
-  it('does not expose raw upstream errors and distinguishes excluded from failed', async () => {
+  it('exposes only safe errors and keeps excluded separate from failed', async () => {
     const rows = [
-      notificationRow({ id: 'failed', status: 'failed', error_message: 'secret upstream response' }),
-      notificationRow({ id: 'skipped', status: 'skipped', error_message: 'notification_disabled' }),
+      deliveryRow({ id: 'failed', status: 'retry_wait', retryable: 1, error_message_safe: '一時的な問題です' }),
+      deliveryRow({ id: 'excluded', status: 'excluded', error_message_safe: '送信対象外になりました' }),
     ];
     const response = await app().request(
       '/api/ec-commerce/notification-runs?lineAccountId=account-a', {}, { DB: fakeDb(rows) } as never,
     );
     const body = await response.json() as { data: { items: Array<Record<string, unknown>> } };
-    expect(body.data.items[0]).toMatchObject({ status: 'failed' });
-    expect(body.data.items[1]).toMatchObject({
-      status: 'excluded', reason: 'このお知らせが停止中だったため、送信しませんでした',
-    });
-    expect(JSON.stringify(body)).not.toContain('secret upstream response');
+    expect(body.data.items[0]).toMatchObject({ status: 'failed', retryAvailable: true });
+    expect(body.data.items[1]).toMatchObject({ status: 'excluded' });
+    expect(JSON.stringify(body)).not.toContain('raw provider response');
   });
 
-  it('adds the failed-only predicate only for the failures view', async () => {
+  it('limits failures view to excluded and failed/retry-wait records', async () => {
     const db = fakeDb([]);
     const response = await app().request(
       '/api/ec-commerce/notification-runs?lineAccountId=account-a&view=failures', {}, { DB: db } as never,
     );
     expect(response.status).toBe(200);
-    expect(db.calls.filter((call) => /AND e\.status = 'failed'/.test(call.sql))).toHaveLength(2);
+    expect(db.calls.filter((call) => /d\.status IN \('excluded', 'retry_wait', 'failed'\)/.test(call.sql)))
+      .toHaveLength(2);
   });
 });

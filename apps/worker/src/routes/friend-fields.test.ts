@@ -14,7 +14,16 @@ const mocks = {
   countFriendFieldValues: vi.fn(),
   countFriendFieldValuesForScope: vi.fn(),
   getFriendFieldListSummary: vi.fn(),
+  getFriendFieldUsageForScope: vi.fn(),
   getFriendFieldValuesForMigration: vi.fn(),
+  createFieldMigrationPreview: vi.fn(),
+  getFieldMigrationRun: vi.fn(),
+  getFieldMigrationRunByToken: vi.fn(),
+  getFieldMigrationRunByIdempotencyKey: vi.fn(),
+  getFieldMigrationItems: vi.fn(),
+  queueFieldMigration: vi.fn(),
+  markFieldMigrationStale: vi.fn(),
+  executeFieldMigration: vi.fn(),
   getFriendFieldsWithValues: vi.fn(),
   setFriendFieldValue: vi.fn(),
   recordLoginAudit: vi.fn(),
@@ -27,13 +36,17 @@ const mocks = {
     'textarea',
     'number',
     'date',
+    'datetime',
     'select',
     'multi_select',
     'checkbox',
     'url',
     'tel',
     'email',
+    'image',
+    'pdf',
   ],
+  getFolderById: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
 const accountMocks = {
@@ -89,6 +102,8 @@ const FIELD = {
   display_order: 0,
   created_at: '2026-08-16',
   updated_at: '2026-08-16',
+  status: 'active',
+  version: 1,
 };
 
 beforeEach(() => {
@@ -104,7 +119,17 @@ beforeEach(() => {
   mocks.countFriendFieldValues.mockResolvedValue(0);
   mocks.countFriendFieldValuesForScope.mockResolvedValue(0);
   mocks.getFriendFieldListSummary.mockResolvedValue({ total: 1, inUse: 0, registeredFriends: 0, formLinks: null, updatedThisMonth: 0 });
+  mocks.getFriendFieldUsageForScope.mockResolvedValue([]);
   mocks.getFriendFieldValuesForMigration.mockResolvedValue([]);
+  mocks.createFieldMigrationPreview.mockResolvedValue(undefined);
+  mocks.getFieldMigrationRun.mockResolvedValue(null);
+  mocks.getFieldMigrationRunByToken.mockResolvedValue(null);
+  mocks.getFieldMigrationRunByIdempotencyKey.mockResolvedValue(null);
+  mocks.getFieldMigrationItems.mockResolvedValue([]);
+  mocks.queueFieldMigration.mockResolvedValue(true);
+  mocks.markFieldMigrationStale.mockResolvedValue(undefined);
+  mocks.executeFieldMigration.mockResolvedValue(undefined);
+  mocks.getFolderById.mockResolvedValue({ id: 'folder-1', kind: 'friend_field' });
   mocks.getFriendFieldsWithValues.mockResolvedValue([{ ...FIELD, value: null, updated_by: null }]);
 });
 
@@ -156,6 +181,47 @@ describe('項目の作成', () => {
     });
     expect(res.status).toBe(409);
   });
+
+  it.each(['datetime', 'image', 'pdf'])('V6の%s項目を作れる', async (type) => {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: type,
+      fieldKey: `field_${type}`,
+      type,
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.createFriendFieldForScope).toHaveBeenCalledWith(
+      env.DB,
+      expect.anything(),
+      expect.objectContaining({ type }),
+    );
+  });
+
+  it('選択肢を不変ID付きで保存する', async () => {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: '都道府県', fieldKey: 'prefecture', type: 'select', options: ['東京', '大阪'], defaultValue: '東京',
+    });
+    expect(res.status).toBe(201);
+    const input = mocks.createFriendFieldForScope.mock.calls.at(-1)?.[2] as { optionsJson: string; defaultValue: string };
+    const options = JSON.parse(input.optionsJson) as Array<{ id: string; label: string }>;
+    expect(options.map((item) => item.label)).toEqual(['東京', '大阪']);
+    expect(options.every((item) => item.id.length > 0)).toBe(true);
+    expect(input.defaultValue).toBe(options[0].id);
+  });
+
+  it('画像・PDFの既定値と本文差し込みを拒否する', async () => {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: '本人確認', fieldKey: 'identity_file', type: 'pdf', defaultValue: 'media-1', allowTextInsertion: true,
+    });
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+  });
+
+  it('staffは定義を作れない', async () => {
+    const res = await req(makeApp('staff'), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: '項目', fieldKey: 'field', type: 'text',
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('LINEアカウントの境界', () => {
@@ -169,6 +235,19 @@ describe('LINEアカウントの境界', () => {
     const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-2', 'GET');
     expect(res.status).toBe(404);
     expect(mocks.getFriendFieldsForScope).not.toHaveBeenCalled();
+  });
+
+  it('使用人数・回答フォーム数・使用先を実データから返す', async () => {
+    mocks.countFriendFieldValuesForScope.mockResolvedValue(3);
+    mocks.getFriendFieldUsageForScope.mockResolvedValue([
+      { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: 'ff-1', switchable: true },
+      { kind: 'reminder', id: 'reminder-1', name: '誕生日通知', fieldId: 'ff-1', switchable: true },
+    ]);
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1&withUsage=1', 'GET');
+    const body = await res.json() as { data: Array<{ usageCount: number; formUsageCount: number; displayTargets: string[] }> };
+    expect(body.data[0]).toMatchObject({
+      usageCount: 3, formUsageCount: 1, displayTargets: ['申込フォーム', '誕生日通知'],
+    });
   });
 });
 
@@ -193,6 +272,15 @@ describe('項目の更新', () => {
       name: '新しい名前',
     });
     expect(res.status).toBe(200);
+  });
+
+  it('保存中にversionが変わったら409', async () => {
+    mocks.updateFriendField.mockResolvedValue(null);
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'PATCH', {
+      version: 1, name: '新しい名前',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
   });
 });
 
@@ -275,6 +363,101 @@ describe('項目移行の事前確認', () => {
     const body = (await res.json()) as { data: { summary: { review: number }; rows: Array<{ reason: string }> } };
     expect(body.data.summary.review).toBe(1);
     expect(body.data.rows[0].reason).toContain('存在する日付');
+  });
+
+  it('実在する移行先を指定すると期限付きtokenと使用先を保存する', async () => {
+    const target = { ...FIELD, id: 'ff-2', field_key: 'pet_name_new', type: 'tel', version: 2 };
+    mocks.getFriendFieldByIdForScope.mockImplementation(async (_db: unknown, id: string) =>
+      id === 'ff-2' ? target : { ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+    mocks.getFriendFieldValuesForMigration.mockResolvedValue([{ friend_id: 'friend-1', value: '090-1234-5678' }]);
+    mocks.getFriendFieldUsageForScope.mockResolvedValue([
+      { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: 'ff-1', switchable: true },
+    ]);
+    const res = await req(makeApp(), '/api/friend-fields/ff-1/migration-preview?lineAccountId=account-1', 'POST', {
+      targetFieldId: 'ff-2',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { runId: string; previewToken: string; usageTargets: unknown[] } };
+    expect(body.data.runId).toBeTruthy();
+    expect(body.data.previewToken).toBeTruthy();
+    expect(body.data.usageTargets).toHaveLength(1);
+    expect(mocks.createFieldMigrationPreview).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      sourceFieldId: 'ff-1', targetFieldId: 'ff-2', targetVersion: 2,
+    }));
+  });
+});
+
+describe('項目移行の実行と照会', () => {
+  const RUN = {
+    id: 'run-1', tenant_id: 'tenant-1', line_account_id: 'account-1',
+    source_field_id: 'ff-1', target_field_id: 'ff-2', source_version: 1, target_version: 1,
+    preview_token_hash: 'hash', preview_snapshot_hash: 'snapshot',
+    preview_expires_at: '2999-01-01T00:00:00.000Z', idempotency_key: null, status: 'previewed',
+    usage_targets_json: '[]', total_count: 1, convertible_count: 1, review_count: 0, invalid_count: 0,
+    processed_count: 0, succeeded_count: 0, failed_count: 0, error_message: null,
+    created_by: 'u-1', created_at: '2026-09-07', started_at: null, completed_at: null,
+    rollback_deadline: null, updated_at: '2026-09-07',
+  };
+
+  it('Idempotency-Keyなしでは実行しない', async () => {
+    const res = await req(makeApp(), '/api/friend-fields/ff-1/migrations?lineAccountId=account-1', 'POST', {
+      previewToken: 'token',
+    });
+    expect(res.status).toBe(422);
+    expect(mocks.queueFieldMigration).not.toHaveBeenCalled();
+  });
+
+  it('同じ冪等キーは同じrunIdを返す', async () => {
+    mocks.getFieldMigrationRunByIdempotencyKey.mockResolvedValue(RUN);
+    const app = makeApp();
+    const res = await app.fetch(new Request(
+      'https://example.com/api/friend-fields/ff-1/migrations?lineAccountId=account-1',
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'same-key' }, body: JSON.stringify({ previewToken: 'token' }) },
+    ), env);
+    expect(res.status).toBe(202);
+    expect(await res.json()).toMatchObject({ data: { runId: 'run-1' } });
+  });
+
+  it('担当外の実行履歴は404にする', async () => {
+    const res = await req(makeApp(), '/api/field-migrations/run-1?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(404);
+  });
+
+  it('staffは移行を実行できない', async () => {
+    const app = makeApp('staff');
+    const res = await app.fetch(new Request(
+      'https://example.com/api/friend-fields/ff-1/migrations?lineAccountId=account-1',
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'key' }, body: JSON.stringify({ previewToken: 'token' }) },
+    ), env);
+    expect(res.status).toBe(403);
+  });
+
+  it('プレビュー後に値が変わったら409にする', async () => {
+    mocks.getFieldMigrationRunByToken.mockResolvedValue(RUN);
+    mocks.getFriendFieldByIdForScope.mockImplementation(async (_db: unknown, id: string) => ({
+      ...FIELD, id, field_key: id === 'ff-2' ? 'target' : 'pet_name', type: id === 'ff-2' ? 'number' : 'text',
+      line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0,
+    }));
+    mocks.getFriendFieldValuesForMigration.mockResolvedValue([{ friend_id: 'friend-new', value: '99' }]);
+    const app = makeApp();
+    const res = await app.fetch(new Request(
+      'https://example.com/api/friend-fields/ff-1/migrations?lineAccountId=account-1',
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'new-key' }, body: JSON.stringify({ previewToken: 'token' }) },
+    ), env);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'PREVIEW_STALE' });
+    expect(mocks.markFieldMigrationStale).toHaveBeenCalledWith(env.DB, 'run-1');
+  });
+
+  it('進捗・行別理由・切戻し期限を返す', async () => {
+    mocks.getFieldMigrationRun.mockResolvedValue({ ...RUN, status: 'partial', rollback_deadline: '2026-10-07T00:00:00.000Z' });
+    mocks.getFieldMigrationItems.mockResolvedValue([{ run_id: 'run-1', friend_id: 'friend-1', source_value: '不明', converted_value: null, status: 'review', reason: '数値として確認できません', migrated_at: null }]);
+    const res = await req(makeApp(), '/api/field-migrations/run-1?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: {
+      runId: 'run-1', status: 'partial', rollbackDeadline: '2026-10-07T00:00:00.000Z',
+      rows: [{ friendId: 'friend-1', reason: '数値として確認できません' }],
+    } });
   });
 });
 
