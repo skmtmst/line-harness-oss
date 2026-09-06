@@ -21,7 +21,7 @@ export { countText }
  * はテナント全体を数える）。基準の違う数を同じ帯に並べると、足しても
  * 合わない4枚になる。取れないものは `—` のままにする。
  */
-export default function BroadcastKpis() {
+export default function BroadcastKpis({ unavailable = false }: { unavailable?: boolean }) {
   const [stats, setStats] = useState<BroadcastStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -66,7 +66,9 @@ export default function BroadcastKpis() {
               </>
             )}
           </p>
-          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">{card.detail}</p>
+          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
+            {unavailable || (!loading && stats === null) ? '読み込めていません' : card.detail}
+          </p>
         </div>
       ))}
     </div>

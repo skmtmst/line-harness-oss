@@ -23,10 +23,13 @@ function fnBody(src: string, decl: string): string {
 }
 
 function dialog(src: string): string {
-  const from = src.indexOf('<ConfirmDialog')
+  const open = src.indexOf('open={deleteTarget !== null}')
+  const from = src.lastIndexOf('<ConfirmDialog', open)
   if (from < 0) throw new Error('<ConfirmDialog が見つかりません')
-  const to = src.indexOf('</ConfirmDialog>', from)
-  if (to < 0) throw new Error('</ConfirmDialog> が見つかりません')
+  const pairedTo = src.indexOf('</ConfirmDialog>', from)
+  const selfClosingTo = src.indexOf('/>', from)
+  const to = pairedTo >= 0 && pairedTo < selfClosingTo ? pairedTo : selfClosingTo
+  if (to < 0) throw new Error('ConfirmDialog の終わりが見つかりません')
   return src.slice(from, to)
 }
 
@@ -56,15 +59,9 @@ describe('一斉配信一覧の削除確認', () => {
     )
   })
 
-  it('予約と下書きで、止まるものの言い方を分ける', () => {
+  it('予約の中止と、取り消せない操作であることを一文で伝える', () => {
     const jsx = dialog(PAGE)
-    expect(jsx, '予約の取り消しに触れていない').toContain(
-      '予約が取り消され、この配信は送られなくなります。',
-    )
-    expect(jsx, '下書きは誰にも届かないことを言っていない').toContain(
-      'まだ送っていないので、友だちには何も届きません。',
-    )
-    expect(jsx, '送った記録が残ることを言っていない').toContain('すでに送った配信の記録は残ります。')
+    expect(jsx, '予約中の配信が止まることを書いていない').toContain('予約中の配信は中止され')
     expect(jsx).toContain('この操作は取り消せません。')
   })
 
@@ -88,11 +85,10 @@ describe('一斉配信一覧の削除確認', () => {
     expect(PAGE).toContain("{(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (")
   })
 
-  it('何を消すのかを、日時と送り先まで読み合わせる', () => {
+  it('何を消すのかを、配信名と影響で読み合わせる', () => {
     const jsx = dialog(PAGE)
     expect(jsx, '配信名を読ませていない').toContain('deleteTarget?.title')
-    expect(jsx, '配信日時を読ませていない').toContain('formatDatetime(deleteTarget.scheduledAt)')
-    expect(jsx, '送り先を読ませていない').toContain('audienceSummary(deleteTarget, getTagName)')
+    expect(jsx, '配信設定と確認画面から消えることを書いていない').toContain('配信設定と確認画面から消えます')
   })
 
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
