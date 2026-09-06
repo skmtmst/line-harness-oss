@@ -2920,6 +2920,34 @@ export const SCREENS = [
   },
 ]
 
+// Issue #245（機能32）。同じ実装headで4画面と全状態を撮り直した最新判定。
+const FEATURE_32_REVIEW = {
+  UgonK: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を1440・1920で設計と目視比較。** 6列（確認する項目／結果／いまの数字／目安／最後の確認／操作）、次回確認時刻、判定の見方4種を追加し、横はみ出し0。画面を開いている間は5分ごとに再取得する。**残るもの**：サーバー側の定期実行結果を保存して共有する専用の健全性チェック口が無く、端末を閉じた状態の自動確認・異常履歴は未接続。',
+    verdictSource: 'operations-v6/UgonK.txt',
+    verdictHead: '1121a74eee',
+  },
+  b3HfZ: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を通常・読込・失敗の各状態で1440・1920撮影。** 停止前の件数・人数、オートメーションと自動応答を同時に止める対象、サーバー共通の停止状態、権限、版競合を表示・送信する。取得失敗時は0件にせず停止ボタンを無効化。横はみ出し0。**残るもの**：設計の右側にある「止めるとどうなるか／止めたあとにすること」と下部の固定操作帯が無く、ログインユーザーへのLINE・メール通知も未接続。',
+    verdictSource: 'operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt',
+    verdictHead: '1121a74eee',
+  },
+  UhC2O: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を1440・1920で設計と目視比較。** 端末内保存と公開管理鍵の読出しを廃止し、停止・復旧履歴をサーバーから取得。期間、CSV、4つの概要、設計と同じ5列、直近10件のシステム更新を表示し、横はみ出し0。**残るもの**：設計の各行「中身を見る」と右側の監査説明・関連画面への導線が無い。システム更新も反映時間・停止時間まで記録する配備台帳とは未接続。',
+    verdictSource: 'operations-v6/UhC2O.txt',
+    verdictHead: '1121a74eee',
+  },
+  U0BwS: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` の最終確認を1440・1920で設計と目視比較。** 下見と同じ件数・人数を再計算せず表示し、選ばなかった自動処理・手動返信・予約受付が止まらないこと、LINEへ渡した配信は取り消せないことを明示。「停止」入力と版番号つきサーバー保存で誤操作・同時更新を防ぐ。横はみ出し0。**残るもの**：操作専用の段階認証と、ログインユーザー全員へのLINE・メール通知が未接続。',
+    verdictSource: 'operations-v6/U0BwS.txt',
+    verdictHead: '1121a74eee',
+  },
+}
+
 // Issue #228（機能15）の実装後監査。
 // 設計寄せした固定データと画面を1440px・1920pxの全状態で撮影し、
 // 設計画像と目視比較した。残る差と未接続条件も記録する。
@@ -3467,6 +3495,9 @@ const ISSUE_212_REVIEW = {
 }
 
 for (const screen of SCREENS) {
+  if (screen.feature === 32 && FEATURE_32_REVIEW[screen.node]) {
+    Object.assign(screen, FEATURE_32_REVIEW[screen.node])
+  }
   if (screen.feature === 15 && FEATURE_15_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_15_REVIEW[screen.node])
     delete screen.verdictHead
@@ -3681,6 +3712,8 @@ export const CAPTURED_AT = {
   32: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['UgonK','b3HfZ','UhC2O','U0BwS'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
+    { pr: 1001, head: '1121a74eee', on: '2026-09-06', screens: ['UgonK', 'b3HfZ', 'UhC2O', 'U0BwS'],
+      note: '#245。サーバー共通の停止・復旧・追記履歴へ接続し、通常・読込・失敗・最終確認を1440/1920で撮影。絵は版に残さず、追跡済みの `.txt` を証拠にする。' },
   ],
   4: [
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
