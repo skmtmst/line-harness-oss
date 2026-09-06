@@ -1631,14 +1631,14 @@ export const SCREENS = [
 
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
-    ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 空のまま・期限つき・未使用の絞り込み、使用数順、20/50/100件表示、検索、CSV出力、空のまま使用中の警告、6列（共通情報／差し込みキー／中身／使われている場所／更新・次の変更／操作）を実装した。差し込みキーは内部表記を出さず `{営業時間}` 形式、使用数未取得は0件にせず `—（未取得）`。Playwrightで1440・1920を撮影し横はみ出し0。**要修正を維持**：現行APIに設計の説明文と種類別使用数が無く、固定データに空のまま使用中の行も無いため警告状態を画像比較できない。フォルダ行の「…」は共通 `FolderPanel` が未対応でS0所有のため触っていない。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + list-model.test.ts', verdictHead: '57477f85c',
+    ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `23f6d6f2e`。構造一致・データ未接続。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込み、6列一覧、ページ送りの骨格を確認した。1440・1920とも横はみ出し0。**データ未接続**：現行APIは設計の説明文と種類別使用数を返さず、固定データも設計の3フォルダ・6行・空のまま使用中の警告状態を持たないため、内容と件数の一致は未確認。取得できない使用数は偽の0件にせず `—（未取得）` と表示する。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-{1440,1920}.png + list-model.test.ts', verdictHead: '23f6d6f2e',
   },
   {
-    ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 差し込みキーを内部表記から `{営業時間}` 形式へ変更し、使用数・送信済み件数・使用先・現在文を保存前から表示する状態を1440・1920で撮影した。横はみ出し0。**要修正を維持**：設計の2カラム構成、社内メモ、期限、追記型の変更履歴、右側の使用先一覧と変更後プレビューは、現行の詳細・版・期限APIが返さない。偽データでは埋めない。',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6-contract.test.ts', verdictHead: '57477f85c',
+    ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `23f6d6f2e`。構造一致・データ未接続。** 設計画像と、値を変更して保存前の影響が出た実装画像を同じ比較入力で見比べた。入力欄を左、使用先と保存後プレビューを右に置く2カラム構成、期限、履歴、固定保存欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：社内メモと追記型履歴のAPIが無く、固定データも設計と同じ会社名・15使用先を持たないため内容一致は未確認。無い値は偽データで埋めず、未接続理由を表示する。',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-{1440,1920}.png + change-impact.test.ts', verdictHead: '23f6d6f2e',
   },
   {
     /*
@@ -1681,10 +1681,10 @@ export const SCREENS = [
       */
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 対象の差し込みキーを `{営業時間}` 形式で示し、使用中は影響先を見せて削除を止め、未使用なら確認キーを入力して削除できる安全側の2状態を1440・1920で撮影した。横はみ出し0。**要修正を維持**：設計の「別の共通情報に差し替えてから削除する」は、まとめて差し替えるAPIが未提供。押しても働かない操作や偽の候補は置かず、現行は物理削除を止める。',
-    verdictSource: 'common-vars-v6/yPkWe-1440.png + common-vars-v6/yPkWe.txt + delete-impact.test.ts',
-    verdictHead: '57477f85c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #295 / UI HEAD `23f6d6f2e`。構造一致・データ未接続。** 設計画像と、使用中・未使用の実装画像を同じ比較入力で見比べた。対象、影響、差し替え案、このまま削除する案、使用先一覧、固定操作欄を揃え、1440・1920とも横はみ出し0。**データ未接続**：設計の差し替え候補を取得して一括置換するAPIが無いため、候補は偽造せず未接続として選べない状態にした。使用中は削除を止め、未使用だけ確認キー入力後に削除できる。',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + delete-impact.test.ts',
+    verdictHead: '23f6d6f2e',
 
   },
 
