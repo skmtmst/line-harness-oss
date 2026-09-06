@@ -21,15 +21,22 @@ describe('V6回答フォーム一覧', () => {
   it('初回空・検索0件・読込中・失敗を言い分ける', () => {
     expect(PAGE).toContain("kind=\"loading\"")
     expect(PAGE).toContain("kind=\"error\"")
-    expect(PAGE).toContain('まだ回答フォームがありません')
+    expect(PAGE).toContain('フォームがまだ1つも無いときの見え方です。')
+    expect(PAGE).toContain('まだフォームがありません')
+    expect(PAGE).toContain('最初の1つを作ると、集まった回答もここから見られます。')
     expect(PAGE).toContain('条件に合うフォームはありません')
     expect(PAGE).toContain('onRetry={() => void loadForms()}')
   })
 
-  it('フォーム数と公開中は未取得を0件にせずダッシュで表示する', () => {
-    expect(PAGE).toContain('const formCountsAvailable = !accountLoading && Boolean(selectedAccountId) && !loading && !loadError')
-    expect(PAGE).toContain('value={formCountsAvailable ? forms.length : null}')
-    expect(PAGE).toContain('value={formCountsAvailable ? forms.filter((form) => form.isActive).length : null}')
+  it('フォルダ・保存した検索・一覧表を正本と同じ順で置く', () => {
+    expect(PAGE).toContain('data-design="Bar"')
+    expect(PAGE).toContain('<FolderPanel')
+    expect(PAGE).toContain('data-design="Saved"')
+    expect(PAGE).toContain('フォーム名・質問文で検索')
+    expect(PAGE).toContain('<TableHeadRow>')
+    for (const label of ['フォーム', '状態', '回答の保存先', '回答数', '更新', '操作']) {
+      expect(PAGE).toContain(label)
+    }
   })
 
   it('フォームを公開せず下書きで作って編集画面へ進む', () => {
@@ -50,7 +57,7 @@ describe('V6回答フォーム一覧', () => {
   it('一覧で回答の保存先をフォーム定義の実値から表示する', () => {
     expect(PAGE).toContain('summarizeFormDestinations(form.layout, form.onSubmitTagId)')
     expect(PAGE).toContain('回答の保存先')
-    expect(PAGE).toContain('{destinationSummary.label}')
+    expect(PAGE).toContain('{destinationSummary.label}</td>')
   })
 
   it('選択中のLINE公式アカウントだけを読み書きする', () => {
@@ -62,6 +69,30 @@ describe('V6回答フォーム一覧', () => {
 })
 
 describe('V6回答フォームの未実装3画面', () => {
+  it('vCqUj は12種の追加口・顧客プレビュー・作成元を表示する', () => {
+    expect(EDIT_PAGE).toContain('ブロックを追加（12種）')
+    expect(EDIT_PAGE).toContain('お客さまに見える形')
+    expect(EDIT_PAGE).toContain('実際にお客さまが見る画面です')
+    expect(EDIT_PAGE).toContain('このフォームは {selectedAccount?.name')
+    expect(EDIT_PAGE).not.toContain('このアカウントに LIFF を登録すると')
+  })
+
+  it('cSqvP はURL・受付条件・回答後アクションを保存できる', () => {
+    const OPTIONS = readFileSync(join(HERE, '..', '..', 'components', 'forms', 'options-dialog.tsx'), 'utf8')
+    expect(EDIT_PAGE).toContain("params.get('tab') === 'options'")
+    expect(EDIT_PAGE).toContain('onSave={async () =>')
+    for (const label of [
+      '答え終わったあとの動きと、受付のきまり',
+      '答えたあとに開くページ（任意）',
+      'ページを使わないときに出す文',
+      '1人1回だけ答えられるようにする',
+      '前回の答えを最初から入れておく',
+      '受付の期限を決める',
+      '送信する前に確認画面を出す',
+      '保存する',
+    ]) expect(OPTIONS).toContain(label)
+  })
+
   it('ava2n は押せるデザイン設定で、5色・書体・角丸・背景とSNS表示を保存する', () => {
     expect(EDIT_PAGE).toContain("params.get('tab') === 'design'")
     expect(EDIT_PAGE).toContain('<FormDesignSettings')

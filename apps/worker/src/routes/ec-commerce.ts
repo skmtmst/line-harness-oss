@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getLineAccountById, jstNow } from '@line-crm/db';
+import { encryptCredential, getLineAccountById, jstNow } from '@line-crm/db';
 import { addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
@@ -8,6 +8,7 @@ import { logOutgoingMessage } from '../services/event-bus.js';
 import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { auditLog } from '../lib/audit-log.js';
 
 const ecCommerce = new Hono<Env>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
@@ -15,6 +16,9 @@ const STATUS_SET = new Set(['received', 'identity_pending', 'processing', 'proce
 const NOTIFICATION_EVENT_TYPES = EC_EVENT_TYPES.filter(
   (eventType) => eventType !== 'ec.customer.profile_updated',
 );
+const CONNECTOR_PROVIDERS = new Set(['ec_cube', 'shopify']);
+const CONNECTOR_STATUSES = new Set(['connected', 'degraded', 'paused', 'auth_expired', 'rate_limited']);
+const IDENTITY_RULES = new Set(['verified_email', 'verified_phone', 'manual_name_postal']);
 
 const EVENT_LABELS: Record<string, string> = {
   'ec.order.confirmed': '注文完了',
@@ -42,6 +46,51 @@ const FIXED_FIELDS: Record<string, string[]> = {
   'ec.subscription.card_updated': ['定期便番号', 'カード変更・再決済結果', 'お支払い金額', '定期便管理URL'],
   'ec.subscription.cancelled': ['解約受付の案内', '定期便番号'],
 };
+
+function stringList(value: unknown, allowed: ReadonlySet<string>): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const result = value.filter((item): item is string => typeof item === 'string');
+  if (result.length !== value.length || new Set(result).size !== result.length) return null;
+  return result.every((item) => allowed.has(item)) ? result : null;
+}
+
+function storedStringList(value: unknown, allowed: ReadonlySet<string>): string[] {
+  try { return stringList(JSON.parse(String(value || '[]')), allowed) ?? []; } catch { return []; }
+}
+
+function subscriptionState(value: unknown): 'active' | 'paused' | 'at_risk' | 'cancelled' {
+  const status = String(value || '').toLowerCase();
+  if (status.includes('cancel') || status.includes('解約') || status.includes('停止')) return 'cancelled';
+  if (status.includes('pause') || status.includes('休止')) return 'paused';
+  if (status.includes('failed') || status.includes('決済')) return 'at_risk';
+  return 'active';
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function subscriptionContracts(value: unknown): Array<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(String(value || 'null')) as { contracts?: unknown } | null;
+    return Array.isArray(parsed?.contracts)
+      ? parsed.contracts.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      : [];
+  } catch { return []; }
+}
+
+function subscriptionItems(value: unknown): string | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const labels = value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === 'string' ? record.name.trim().slice(0, 80) : '';
+    if (!name) return [];
+    const quantity = finiteNumber(record.quantity);
+    return [quantity === null ? name : `${name} × ${quantity}`];
+  });
+  return labels.length ? labels.join('、') : null;
+}
 
 type NotificationRunStatus = 'pending' | 'accepted' | 'excluded' | 'failed';
 
@@ -221,6 +270,248 @@ ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff')
     })),
     pagination: { total: countRow?.count ?? 0, limit, offset },
   });
+});
+
+ecCommerce.get('/api/ec-commerce/subscriptions', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
+  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const filter = c.req.query('status') || 'all';
+  if (!['all', 'active', 'paused', 'at_risk', 'cancelled'].includes(filter)) {
+    return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
+  }
+  const requestedLimit = Number(c.req.query('limit') || '20');
+  const requestedOffset = Number(c.req.query('offset') || '0');
+  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+  const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+  const rows = await c.env.DB.prepare(
+    `SELECT s.friend_id, s.subscription_json, s.synced_at,
+            f.display_name AS owner_name,
+            (SELECT p.name FROM nen_pet_profiles p
+              WHERE p.friend_id = s.friend_id ORDER BY p.created_at LIMIT 1) AS pet_name
+       FROM nen_ec_member_snapshots s
+       JOIN friends f ON f.id = s.friend_id
+      WHERE f.line_account_id = ? AND s.subscription_json IS NOT NULL
+      ORDER BY s.synced_at DESC
+      LIMIT 500`,
+  ).bind(lineAccountId).all<{
+    friend_id: string;
+    subscription_json: string;
+    synced_at: string;
+    owner_name: string | null;
+    pet_name: string | null;
+  }>();
+
+  const items = rows.results.flatMap((row) => subscriptionContracts(row.subscription_json).map((contract, index) => {
+    const state = subscriptionState(contract.status_code || contract.status);
+    const id = String(contract.id || contract.contract_number || `${row.friend_id}:${index}`);
+    const amount = finiteNumber(contract.amount);
+    const nextShippingAt = typeof contract.next_shipping_date === 'string'
+      ? contract.next_shipping_date
+      : typeof contract.scheduled_shipping_date === 'string'
+        ? contract.scheduled_shipping_date
+        : null;
+    return {
+      id,
+      friendId: row.friend_id,
+      ownerName: row.owner_name,
+      petName: row.pet_name,
+      contractNumber: typeof contract.contract_number === 'string' ? contract.contract_number : null,
+      status: state,
+      statusLabel: state === 'active' ? '続いています' : state === 'paused' ? '休止中です'
+        : state === 'at_risk' ? '決済の確認が必要です' : '止まりました',
+      riskReason: state === 'at_risk' ? '定期便のお支払いを確認できませんでした' : null,
+      nextShippingAt,
+      cycle: typeof contract.cycle === 'string' ? contract.cycle : null,
+      items: subscriptionItems(contract.items),
+      amount,
+      continuedCount: finiteNumber(contract.continued_count),
+      startedAt: typeof contract.started_at === 'string' ? contract.started_at : null,
+      cancelledAt: typeof contract.cancelled_at === 'string' ? contract.cancelled_at : null,
+      cancellationReason: typeof contract.cancellation_reason === 'string' ? contract.cancellation_reason : null,
+      syncedAt: row.synced_at,
+    };
+  })).sort((left, right) => {
+    if (left.nextShippingAt === null) return 1;
+    if (right.nextShippingAt === null) return -1;
+    return left.nextShippingAt.localeCompare(right.nextShippingAt);
+  });
+  const visible = filter === 'all' ? items : items.filter((item) => item.status === filter);
+  const knownAmounts = items.map((item) => item.amount).filter((value): value is number => value !== null);
+
+  return c.json({
+    success: true,
+    data: {
+      items: visible.slice(offset, offset + limit),
+      summary: {
+        total: items.length,
+        active: items.filter((item) => item.status === 'active').length,
+        paused: items.filter((item) => item.status === 'paused').length,
+        atRisk: items.filter((item) => item.status === 'at_risk').length,
+        cancelled: items.filter((item) => item.status === 'cancelled').length,
+        monthlyAmount: items.length > 0 && knownAmounts.length === items.length
+          ? knownAmounts.reduce((sum, value) => sum + value, 0)
+          : null,
+        startedThisMonth: null,
+        cancelledThisMonth: null,
+        cancellationTopReason: null,
+      },
+      risk: {
+        source: 'payment_status',
+        ruleVersion: 'subscription-payment-status-v1',
+        calculatedAt: rows.results[0]?.synced_at ?? null,
+        predictiveScoreAvailable: false,
+      },
+    },
+    pagination: { total: visible.length, limit, offset },
+  });
+});
+
+ecCommerce.get('/api/ec-commerce/connector', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
+  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const [connector, health] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, provider, shop_domain, status, inbound_secret_encrypted,
+              inbound_secret_last4, secret_updated_at, event_types_json,
+              identity_rules_json, version, updated_at
+         FROM ec_connectors WHERE line_account_id = ? LIMIT 1`,
+    ).bind(lineAccountId).first<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT
+         SUM(CASE WHEN date(received_at) = date('now') THEN 1 ELSE 0 END) AS today,
+         SUM(CASE WHEN datetime(received_at) >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS last_30_days,
+         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+         MAX(received_at) AS last_received_at,
+         MAX(CASE WHEN status = 'processed' THEN processed_at END) AS last_succeeded_at
+       FROM ec_events WHERE line_account_id = ?`,
+    ).bind(lineAccountId).first<Record<string, unknown>>(),
+  ]);
+  return c.json({
+    success: true,
+    data: {
+      configured: Boolean(connector),
+      connector: connector ? {
+        id: connector.id,
+        provider: connector.provider,
+        shopDomain: connector.shop_domain,
+        status: connector.status,
+        secretConfigured: Boolean(connector.inbound_secret_encrypted),
+        secretLastFour: connector.inbound_secret_last4,
+        secretUpdatedAt: connector.secret_updated_at,
+        eventTypes: storedStringList(connector.event_types_json, EVENT_TYPE_SET),
+        identityRules: storedStringList(connector.identity_rules_json, IDENTITY_RULES),
+        version: connector.version,
+        updatedAt: connector.updated_at,
+      } : null,
+      health: {
+        today: Number(health?.today ?? 0),
+        last30Days: Number(health?.last_30_days ?? 0),
+        failed: Number(health?.failed ?? 0),
+        lastReceivedAt: health?.last_received_at ?? null,
+        lastSucceededAt: health?.last_succeeded_at ?? null,
+      },
+      impact: {
+        nenCampaigns: null,
+        conversions: null,
+        mileageRules: null,
+        friendFields: null,
+        analytics: null,
+      },
+      retryPolicy: null,
+    },
+  });
+});
+
+ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
+  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const body = await c.req.json<{
+    provider?: string;
+    shopDomain?: string;
+    status?: string;
+    inboundSecret?: string;
+    eventTypes?: unknown;
+    identityRules?: unknown;
+    expectedVersion?: number;
+  }>().catch(() => null);
+  const provider = String(body?.provider || '');
+  const shopDomain = String(body?.shopDomain || '').trim().toLowerCase();
+  const status = String(body?.status || 'connected');
+  const eventTypes = stringList(body?.eventTypes, EVENT_TYPE_SET);
+  const identityRules = stringList(body?.identityRules, IDENTITY_RULES);
+  const expectedVersion = Number(body?.expectedVersion);
+  if (!CONNECTOR_PROVIDERS.has(provider) || !CONNECTOR_STATUSES.has(status)
+    || !/^(?=.{3,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/.test(shopDomain)
+    || eventTypes === null || identityRules === null
+    || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+    return c.json({ success: false, error: 'つなぎ先の設定を確認してください' }, 400);
+  }
+  const inboundSecret = typeof body?.inboundSecret === 'string' ? body.inboundSecret.trim() : '';
+  if (inboundSecret && inboundSecret.length < 32) {
+    return c.json({ success: false, error: 'つなぐための鍵は32文字以上で入力してください' }, 400);
+  }
+  const current = await c.env.DB.prepare(
+    `SELECT id, version, inbound_secret_encrypted, inbound_secret_last4, secret_updated_at
+       FROM ec_connectors WHERE line_account_id = ? LIMIT 1`,
+  ).bind(lineAccountId).first<Record<string, unknown>>();
+  if ((current ? Number(current.version) : 0) !== expectedVersion) {
+    return c.json({ success: false, error: 'ほかの担当者が先に設定を変更しました' }, 409);
+  }
+  const now = jstNow();
+  let encrypted = current?.inbound_secret_encrypted ?? null;
+  let lastFour = current?.inbound_secret_last4 ?? null;
+  let secretUpdatedAt = current?.secret_updated_at ?? null;
+  if (inboundSecret) {
+    try {
+      encrypted = await encryptCredential(inboundSecret, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    } catch {
+      return c.json({ success: false, error: 'つなぐための鍵を安全に保存できませんでした' }, 503);
+    }
+    lastFour = inboundSecret.slice(-4);
+    secretUpdatedAt = now;
+  }
+  const nextVersion = Number(expectedVersion) + 1;
+  if (current) {
+    const result = await c.env.DB.prepare(
+      `UPDATE ec_connectors
+          SET provider = ?, shop_domain = ?, status = ?, inbound_secret_encrypted = ?,
+              inbound_secret_last4 = ?, secret_updated_at = ?, event_types_json = ?,
+              identity_rules_json = ?, version = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ?`,
+    ).bind(
+      provider, shopDomain, status, encrypted, lastFour, secretUpdatedAt,
+      JSON.stringify(eventTypes), JSON.stringify(identityRules), nextVersion, now,
+      current.id, lineAccountId, expectedVersion,
+    ).run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'ほかの担当者が先に設定を変更しました' }, 409);
+  } else {
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO ec_connectors
+          (id, line_account_id, provider, shop_domain, status, inbound_secret_encrypted,
+           inbound_secret_last4, secret_updated_at, event_types_json, identity_rules_json,
+           version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), lineAccountId, provider, shopDomain, status, encrypted,
+        lastFour, secretUpdatedAt, JSON.stringify(eventTypes), JSON.stringify(identityRules),
+        nextVersion, now, now,
+      ).run();
+    } catch {
+      return c.json({ success: false, error: 'ほかの担当者が先に設定を追加しました' }, 409);
+    }
+  }
+  auditLog(c, 'ec.connector.update', { kind: 'line_account', id: lineAccountId });
+  return c.json({ success: true, data: { version: nextVersion } });
 });
 
 /**

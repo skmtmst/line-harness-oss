@@ -1179,22 +1179,22 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/friend-add-settings`（最終確認）。読込・空・失敗の3状態を1440・1920で撮った。**LINEプレビューと、設計の「登録直後から5分以内」「Slack通知」が無い。** 内部語が2件——「LINEアカウントとWebhookイベントの組み合わせで、同じ通知を1回だけ処理します。」「webhookの記録で防ぎます」。取得元 `friend-add-v6/ec9vg.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
+    verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
 
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/friend-add-settings`（有効化完了）。**設計の「未送信・二重送信・シナリオ開始失敗はSlackへ通知します。」が無い。** 内部語「有効（webhookの記録で判定）」が出ている。取得元 `friend-add-v6/quhg6.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
+    verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
-    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
 
   },
   {
@@ -1485,13 +1485,19 @@ export const SCREENS = [
     突き合わせる形にする。
   */
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。1440・1920で撮った（はみ出し0）。**優先順位の説明（設計「上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、いちばん上の1つだけが出ます。」）が無い。** 実装だけにある帯が3行（「LINE 公式アカウントの現状」「LINE 上に登録されているメニュー」「LINE 公式アカウントにはまだ rich menu が登録されていません。」）で、**最後の1行に内部語 `rich menu` が出ている。** 取得元 `rich-menus-v6/GO8RQ.txt`',
-    verdictHead: '49e1341c', },
+    mode: 'viewport', height: 1080,
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・ユニーク人数の集計口待ち。設計画像と実装画像を同じ比較入力で見比べ、フォルダ、作成・並べ替え・検索・表示件数、保存した検索、優先順位の説明、一覧6列と操作を確認した。今月のタップ回数は実データだが、のべ人数を返す口が無いため設計の8,140人などを作らず「のべ人数は未取得」と表示する。1440・1920とも横スクロール0。取得元 `rich-menus-v6/GO8RQ.txt` と同Node画像。',
+    verdictHead: 'f2be359e5', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/new`。**3段のステッパー（STEP 1〜3）が無い。** 面の分け方の記号（A〜F）、トークの下に出る文字の説明（14字まで）、寸法（大 2500 × 1686px／小 2500 × 843px）、LINEプレビュー、公開前の注意（「面 F のアクションが未設定です。」）が無い。言い方も設計と違う（設計「上下2面」／実装「上下2分割」）。取得元 `rich-menus-v6/XtfO3.txt`',
-    verdictHead: '49e1341c', route: '/rich-menus/new', },
+    mode: 'viewport', height: 1200,
+    steps: [
+      { fill: 'メニュー名', text: '通常メニュー（会員向け）' },
+      { fill: 'メニューを開くボタンの文字', text: 'メニュー' },
+    ],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・下書き保存後の編集口待ち。設計画像と実装画像を同じ比較入力で見比べ、3段の進み方、名称・フォルダ・14字までのボタン文字、大小の寸法、切替タブ、A〜Fの7レイアウト、LINEプレビュー、面Fの未設定警告を確認した。画像と開閉状態は新規作成時に存在しないIDへ書かず、下書き保存後の編集画面で登録する旨を表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/XtfO3.txt` と同Node画像。',
+    verdictHead: 'f2be359e5', route: '/rich-menus/new', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
@@ -1530,9 +1536,11 @@ export const SCREENS = [
       { fill: '出しおわり', text: '2026-09-30T23:59' },
     ], },
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/connections`（管理画面の外のメニューを取り込む）。**「LINEから読み直す」と、面ごとの動きの一覧（設計「A：URLを開く（https://example.co.jp/menu）」など）が無い。** 取り込まずに消したときの注意（「お客さまのメニューがすぐ消えます」）も無い。内部語 `rich menu` が帯に出る。取得元 `rich-menus-v6/TL7tp.txt`',
-    verdictHead: '49e1341c', },
+    mode: 'viewport', height: 1080,
+    steps: [{ qaOpen: 'TL7tp' }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・面ごとの動きを読むAPI待ち。設計画像と実装画像を同じ比較入力で見比べ、LINEからの読み直し、管理外メニューの選択、6面プレビュー、取り込み後にできること、表示を変えない説明、削除時の注意、取り込み操作を確認した。LINEから面ごとのURLや送信文を返す口が無いため例示値を作らず、接続後に確認できる内容を本文に明記した。1440・1920とも横スクロール0。取得元 `rich-menus-v6/TL7tp.txt` と同Node画像。',
+    verdictHead: 'f2be359e5', },
   {
     /*
       **#575 で `ConfirmDialog` につながった。**管理画面のメニューと、
@@ -1548,9 +1556,10 @@ export const SCREENS = [
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**失敗のとき「公開中 —・一覧を取得できませんでした」と、未取得の `—` と失敗の文が同じ行に並ぶ。** 設計の優先順位の説明も無い。取得元 `rich-menus-v6/RW5Tb-*.txt`',
-    verdictHead: '49e1341c',
+    mode: 'viewport', height: 1080,
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #225 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、共通の操作列・優先順位の説明・保存した検索・フォルダを残したまま、読込中「読み込んでいます」、0件「まだリッチメニューがありません」、失敗「表示できませんでした」を別状態で確認した。未取得の集計帯は表示せず、実値0と取得失敗を混ぜていない。通常・読込中・0件・取得失敗を1440・1920で撮影し、全画像で横スクロール0。取得元 `rich-menus-v6/RW5Tb*.txt` と同Node画像。',
+    verdictHead: 'f2be359e5',
     states: { apis: ['**/api/rich-menu-groups*', '**/api/rich-menu-groups/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
 
   },
@@ -1563,8 +1572,8 @@ export const SCREENS = [
   */
   { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 構造一致・データ未接続。ルート `/form-submissions`。1440・1920で撮った（はみ出し0）。**面の作りは設計どおりだが、行が1つも無い**——モックの `/api/forms` が空で、設計の6つのフォーム（来店アンケート・イベント申込ほか）が並ばない。ブロック数と友だち情報欄の要約が出せているかは、行が並んでから見る。取得元 `forms-v6/EMBIK.txt`',
-    verdictHead: '49e1341c', /*
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・データ待ち。設計画像と実装画像を同じ比較入力で見比べ、上部3操作、左のフォルダ、検索、保存した検索、20件表示、6列の一覧表を設計順へ合わせた。`/api/forms` の画面確認データが0件のため、設計の6行・フォルダ別件数は作らず、空状態で撮影した。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/EMBIK*.txt` と同Node画像。',
+    verdictHead: '79257c7bd', /*
       **#586 の受入条件。**通常・読込・空・失敗を言い分けられるかを見る。
       読む口はフォームの一覧と帯。
     */
@@ -1573,9 +1582,9 @@ export const SCREENS = [
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions/edit`。**「ブロックを追加（12種）」の口が無い。** 作成者の表示と、URLを流入リンクとして発行できる説明も無い。内部語「このアカウントに LIFF を登録すると、配れるURLが出ます。」が出ている。取得元 `forms-v6/vCqUj.txt`',
-    verdictHead: '49e1341c', route: FORM_EDIT, },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・画面確認データ待ち。「ブロックを追加（12種）」から実装済み12種類を選べる口、顧客プレビュー、作成元アカウント、保存操作を追加し、未設定URLの説明から内部語 `LIFF` を除いた。画面確認用 `/api/forms/form-1` がフォーム定義を返さず、設計の9ブロックと実値は表示できないため固定値で埋めていない。1440・1920とも横はみ出し0。取得元 `forms-v6/vCqUj.txt` と同Node画像。',
+    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=basic`, },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
     verdict: 'unjudged',
@@ -1586,10 +1595,10 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions/edit`（オプション設定）。**回答後のアクション（設計「タグ「来店アンケート回答済み」を付ける ／ マイルを 50 付与」）と、お礼ページのURLの欄が無い。** 内部語 `LIFF` も出る。取得元 `forms-v6/cSqvP.txt`',
-    verdictHead: '49e1341c', route: FORM_EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: 'オプション設定' }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・設定値待ち。専用URLでオプション窓を開き、回答後アクション、お礼ページURLと代替文、1人1回、前回答復元、期限、送信前確認、表示文言を設計順へ寄せ、「保存する」でフォーム保存APIへ接続した。画面確認用フォーム定義と参照データが無いため、設計のタグ・マイル・お礼URLは作らず未設定のまま撮影した。1440・1920とも横はみ出し0。取得元 `forms-v6/cSqvP.txt` と同Node画像。',
+    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=options`,
+    mode: 'viewport', height: 1080,
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
@@ -1612,9 +1621,9 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/form-submissions`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**空のときの誘い文が設計と違う**——設計「フォームがまだ1つも無いときの見え方です。「フォームを作る」から最初の1つを作ると、ここに一覧が並びます。」「最初の1つを作ると、集まった回答もここから見られます。」が出ていない。取得元 `forms-v6/ZOPyc-*.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で一致。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込みを保ったまま、読込・空・取得失敗を同じ一覧枠で表示することを確認した。空状態の2つの案内文、作成ボタン、失敗時の再読込も設計文言へ合わせた。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/ZOPyc*.txt` と同Nodeの状態別実装画像。',
+    verdictHead: '79257c7bd',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
 
   },
@@ -2179,13 +2188,14 @@ export const SCREENS = [
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
-  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。**写真の固定データが空**で「審査待ち（0）／通したもの（0）／戻したもの（0）／すべて（0）」。格子は比べられない。**状態の札に件数を出す形は設計と同じ。** 枠で見ると、帯4本（見ていないもの18／通したもの486／戻したもの24／出しているもの62、いちばん古いもの 2日前、この30日に見た、平均22秒）と「通したら 100 付ける」（採用時にマイルを付ける決め）が無い。実装の「まだ繋がっていません。自動審査の口が接続されると表示されます。公開するかどうかは、いまも人が決めます。」は**未接続の断りと、人が決めることの明示として正しい**。※ `/api/nen-members/overview` は `pendingPhotos: 1` を返すのに一覧は0件で、モックの中で数と一覧が食い違っている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 写真審査の一覧。作りは設計に近い。P0から下げる。** ルート `/photos`。帯4つ（未審査3件／承認済1件／見送り1件／投稿の合計5件）に**それぞれ説明が付き**、タブも「審査待ち（3）採用済み（1）見送り（1）すべて（5）」と件数を持つ。行は 投稿者・日時・状態・本文・「見送る」「採用して5pt付与」。**良い点**：本文が無い投稿を「コメントなし」と書き、空欄にしていない。付与するマイル数をボタンの文言に出している。**P2 残る差**：設計は審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。実装は「審査ルールを設定」への導線まで。**写真そのものは撮影用の固定データで、実在の投稿ではない。** 取得元：`photos-v6/Qu6Vk.txt`。1440・1920とも横スクロール0 **推奨修正**：審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。**写真は撮影用の固定データで、実在の投稿ではない。**', verdictSource: 'photos-v6/Qu6Vk.txt' , verdictHead: '31293424' },
+  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 #257の入口追加後に撮影。** 固定写真6枚（未審査3／通したもの2／戻したもの1）で一覧を確認し、一枚表示と「出しているもの」へ実際に移れる。1440・1920とも横スクロール0。自動審査の条件は未接続のまま値を作らず「—」と理由を示す。実運用の写真データと派生画像生成は接続待ち。', verdictSource: 'photos-v6/Qu6Vk.txt' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
-    gap: 'api',
-    gapNote: '一覧写真を拡大するだけでは完成しない。非公開original、review/public派生画像、crop/rotateの版、risk flag、同意、審査競合、original download権限を持つasset・decision API/DBが要る',
-    status: 'unimplemented',
-    why: '現行 `/api/nen-members/photos` は公開URL相当と簡単な採否だけで、設計が求める派生画像、原本保護、crop/rotateを原本と分離する版、risk flag、同意、同時審査409を持たない。正式要件 §4〜§6・§9〜§10 が先',
+    states: { apis: ['**/api/nen-members/photos/ph-1*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    steps: [{ qaOpen: 'hHrz8', after: 700 }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・派生画像生成待ち。** `hHrz8.txt` の一枚表示、前後移動、警告、画像操作、投稿者・pet・日時・言葉、risk候補、つながる先、下部の採否操作を同じ順で確認した。通常・読込・空・失敗・権限不足を撮り分け、1440・1920とも横スクロール0。個別APIは審査用派生画像だけを返し、原本URLを返さない。採否はexpectedVersionで409競合、採用時の5ポイントはDBのoutboxへ一度だけ積む。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。crop派生画像の生成と、原本download専用権限・再認証は未接続なので、誤って原本を出さないよう押し口を無効にした。',
+    verdictSource: 'photos-v6/hHrz8.txt + photos-v6/hHrz8-normal-1440.png + photos-v6/hHrz8-normal-1920.png',
   },
   {
     /*
@@ -2196,7 +2206,7 @@ export const SCREENS = [
       設計の高さでビューポートを取る。
     */
     ...PHOTO, node: 'N2J629', name: '22-1-B 写真を戻す理由をえらぶ',
-    verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** 写真が1枚も無く、押し口「理由を選んで戻す」が0件。固定データが入ってから撮る。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 構造一致・要修正 P1', verdictSource: 'photos-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 #257の固定写真で撮影・目視判定。構造一致・実運用データ待ち。** 写真、投稿者、届いた日時、定型理由5つ、補足、投稿者へ届く本文、戻る／確定を確認した。理由と本文previewは同じ値から作る。1440・1920とも横スクロール0。', verdictSource: 'photos-v6/design-qa.md',
     mode: 'viewport', height: 1080,
     /* 名前が三度変わった。#535 で「見送る」→「理由を選んで戻す」。
        設計の言葉に寄せたもので、実装の不具合ではない。 */
@@ -2205,10 +2215,12 @@ export const SCREENS = [
   },
   {
     ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
-    gap: 'api',
-    gapNote: '通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る',
-    status: 'unimplemented',
-    why: '通した写真をどこで使っているか（リッチメニュー・コラム・サイト）を並べるタブが無い。状態の札は4本（審査待ち／採用済み／見送り／すべて）で「出しているもの」が無い',
+    states: { apis: ['**/api/nen-members/photos/publications*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    steps: [{ click: '出しているもの', scope: 'main', after: 700 }],
+    variants: [{ suffix: '-placements', steps: [{ click: '出しているもの', scope: 'main', after: 700 }, { qaOpen: 'J3Wxl8-placements', after: 500 }] }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・実運用データ待ち。** `J3Wxl8.txt` の4つの帯、同意案内、写真カード、表示回数、氏名非表示、掲載先、使う場所、外す操作、決めごとを同じ順で確認した。通常・読込・空・失敗・権限不足と掲載先ダイアログを撮り分け、1440・1920とも横スクロール0。APIは採用・公開同意済みだけをaccount scopeで返し、未取得の表示回数は0でなく「—（未取得）」。掲載先保存と全掲載解除はexpectedVersion＋Idempotency-Keyを持ち、解除後も審査・同意履歴を残す。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。',
+    verdictSource: 'photos-v6/J3Wxl8.txt + photos-v6/J3Wxl8-normal-1440.png + photos-v6/J3Wxl8-normal-1920.png + photos-v6/J3Wxl8-placements-1920.png',
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
@@ -2229,18 +2241,19 @@ export const SCREENS = [
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
-    gap: 'api',
-    gapNote: 'Stripe定期便本体の接続。実装に「接続後に有効化します」と明記',
-    status: 'unimplemented',
-    why: '定期便のタブが無い。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）',
-    verdictNote: '**判断済み（2026-08-30）：Stripe接続待ちとして今回のV6対象外候補。仮画面は作らない。** ルート `/ec-commerce`。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）。**受け口はできていて、外の接続だけが残っている。** **仮画面を作らない**——中身の無いタブを足すと、使える機能があるように見える。**この状態のまま据え置く。** 接続が済んだら、`ec_events` の定期便イベントを読む一覧として作る。',
+    route: '/ec-commerce?tab=subscriptions',
+    states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** `nen_ec_member_snapshots` の定期便契約をLINEアカウントで絞って表示し、通常・読込・空・失敗・権限不足を分けた。取得できない月別集計は0件にせず「—／未取得」。支払い確認はECの決済状態だけを根拠にし、将来止めるという予測はしていない。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値0。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
-    gap: 'api',
-    gapNote: 'つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記',
-    status: 'unimplemented',
-    why: 'つなぎ先も、人を見分ける決めごとも画面から変えられない。「接続先や突合キーを画面から変える口が無い」と書いてある（`page.tsx:174`）',
+    route: '/ec-commerce?tab=connector',
+    states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** LINEアカウントごとにECの種類・ドメイン・取り込む出来事・会員照合ルールを保存できる。鍵は暗号文と末尾4文字だけを保存し、画面へ値を返さない。通常・読込・空・失敗・権限不足を分け、取得できない影響件数は「— 未取得」。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値・秘密値露出0。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -2367,12 +2380,10 @@ export const SCREENS = [
   */
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
-    verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。**設計は「こちらから送る6／こちらで受け取る3／見本14」の3タブで、送り先をSlack・Googleスプレッドシート・kintone のような**サービス名**で見せる。実装は「Webhook」という**内部語のタブ**と「Webhookを追加」だけ。帯・期間・札・「こちらから送る 6本のうち 5本を表示」も無い。**運用者が「どこへ何を送っているか」を読めない。** 用語と見せ方の両方を直す。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#527 `c6fd4388` で束3の完了条件を満たした。** タブが「受信 (Incoming)」「送信 (Outgoing)」から **「こちらで受け取る」「こちらから送る」** になり、`Incoming` `Outgoing` は0件。見出しも「受信Webhook作成」→「受け取る設定を追加」、空の文も「こちらで受け取る設定はまだありません。」に変わった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（Webhookごとの直近の成否、再送の導線）はこの直しの外 **ルート**：`/webhooks`。**取得元**：`webhooks-v6/k3WxrO.txt`（`Incoming` `Outgoing` を数えて0件）。**推奨修正**：**同じ言い換えが `M0Gb7` にまだ残っている**ので、そちらへも当てる。一覧の直近の成否と再送は `KNG00`（やり取りの記録）が既に持っているので、そこへ飛ばす。', verdictSource: 'webhooks-v6/k3WxrO.txt',
-    /* **#527 でタブ名が変わった**（「送信 (Outgoing)」→「こちらから送る」）。 */
-    steps: [{ click: 'こちらから送る' }],
-    verdictHead: '31293424',
+    route: '/webhooks?tab=outgoing',
+    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブの名称・件数と送り先6本はそろい、1440px・1920pxとも横はみ出し0。ただし設計の4指標、説明帯、状態・期間の絞り込み、送信回数・直近結果・中身を見る導線が一覧に無く、URL・シークレット・作成日を中心にした管理用の表のまま。**推奨修正：やり取りAPIの集計を一覧へ接続し、送信回数・直近結果・再送導線を設計の列へまとめる。**', verdictSource: 'webhooks-v6/k3WxrO.txt', verdictHead: 'eb86ea2df1',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは**受け取り口のURLと合言葉**（`https://in.harness.jp/hook/…` ／ `hns_••••••••3a91`）、**受け取る中身の見本と差し込みチップ**（`{{email}}` `{{booked_at}}` `{{menu}}` `{{staff}}`）、「相手のサービスの「Webhook URL」に、下のURLを貼ってください。」。実装は「こちらで受け取る設定はまだありません。」だけで、**貼る先が分からない。**※ 設計側: 見本が生の JSON と差し込みチップの2通りで書かれている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P1 見本から作る道が無い。** ルート `/webhooks`。受信Webhookの追加は名前とソースタイプを自分で決める形で、**設計の「予約サービス」「アンケートツール」といった見本を選んで作る道が無い**。**P2 タブの言葉に内部の語が残る**——「受信 (Incoming)」「送信 (Outgoing)」。同じ言い回しは #545 で `k3WxrO` が「こちらから送る」へ直っているので、**ここだけ直っていない**。**良い点**：シークレットを「設定済」「未設定」とだけ書き、**値そのものを画面に出していない**（秘密値を出さない決めごとを守れている）。**P2 エンドポイントURLが撮影環境のもの**（`http://localhost:3180/...`）——環境由来で実装の不具合ではない。取得元：`webhooks-v6/M0Gb7.txt`。1440・1920とも横スクロール0 **推奨修正**：**タブの「受信 (Incoming)」「送信 (Outgoing)」を日本語だけにする**（同じ言い回しは #545 で `k3WxrO` が「こちらから送る」へ直っており、**ここだけ残っている**）。見本から作る道はそのあと。**シークレットを「設定済／未設定」とだけ書き値を出さない形は、`oHAN4`（EC連携のつなぎ先）の手本になるので残す。**', verdictSource: 'webhooks-v6/M0Gb7.txt' , verdictHead: '31293424' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブと受け取り口3件、日本語だけの見出し、安全なシークレット状態はそろい、横はみ出し0。ただし設計は選択した受け取り口のURL・合言葉・対応付け・届いたデータの見本・差し込み項目・注意を1画面で確認する詳細面。実装は3件の一覧だけで、受信サンプルを返すAPIも無い。**推奨修正：受け取り口詳細と、本文をマスクした最新受信サンプルのAPIを用意し、一覧行から詳細へ進めるようにする。**', verdictSource: 'webhooks-v6/M0Gb7.txt', verdictHead: 'eb86ea2df1' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -2392,16 +2403,16 @@ export const SCREENS = [
     ...WEBHOOK, node: 'KNG00', name: '26-1-B やり取りの記録',
     route: '/webhooks?tab=interactions', mode: 'page',
     states: { apis: ['**/api/webhooks/interactions?**', '**/api/webhooks/interactions'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。帯（すべて Slack。8/24 に集中／平均 0.4秒／いちばん遅くて 10.0秒）と、行の中身（注文 #12492・¥12,800・石田 未来 ／ 受け取り口 1）が無い。**何が送られたかが行から読めない。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#547 でやり取りの記録が入り、未実装ではなくなった。** 読む台帳が無いと書いていたが、Codexが作った。帯4つ（この30日1,972回〈送った1,486・受け取った486〉／成功1,966回99.7%／失敗6回〈やり直す〉／**返事までの時間0.4秒**）と「失敗したものをまとめてやり直す」まで設計どおり。**応答時間は duration_ms からの実値で、作り物ではない**（Pencilから外さなかった判断はこれで正しかった）。**本文と接続情報を一覧に出さない**：「安全のため本文と接続情報は一覧に表示しません」と画面に書いてある。処理中の行はかかった時間が—。P2 帯に「失敗6回・すべてSlack・8/24に集中」の内訳と「いちばん遅くて10.0秒」が出ない（表には10秒の行がある） **ルート**：`/webhooks?tab=interactions`。**取得元**：`webhooks-v6/KNG00.txt`（応答時間は `duration_ms` からの実値）。**推奨修正**：**「安全のため本文と接続情報は一覧に表示しません」は維持する**（秘密値を出さない手本で、`oHAN4` へ写せる）。帯の内訳（失敗6回・すべてSlack・8/24に集中）は、失敗行を集計するだけで出せる。',
-    verdictSource: 'webhooks-v6/KNG00-normal-1920.png',
-    verdictHead: '31293424',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて一致を確認。** 4指標、失敗先、最長10秒、安全な送受信要約、7行の密度、絞り込み、再送、ページ送りがそろった。本文・URL・シークレットは設計の意図を保って一覧には出さない。全10枚で1440px・1920pxとも横はみ出し0。',
+    verdictSource: 'webhooks-v6/KNG00-normal-1920.png + KNG00-loading.txt + KNG00-empty.txt + KNG00-error.txt',
+    verdictHead: 'eb86ea2df1',
   },
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。4状態は撮れている。`k3WxrO` と同じ差。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#515 → #527 `c6fd4388` で束1と束3の完了条件を満たした。** 失敗のとき「受信Webhookを表示できませんでした／**登録内容は消えていません。**」となり、**作成の誘いを同時に出さない**（束1、#515）。タブの英語も消えた（束3、#527）。読込・空・失敗が `data-list-state` で分かれる。この画面は件数の帯を持たないので束4は当てはまらない。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（直近の成否と再送）はこの直しの外 **ルート**：`/webhooks`（空・読込・失敗）。**取得元**：`webhooks-v6/f8SBSh.txt`。**推奨修正**：**「登録内容は消えていません。」と書き、作成の誘いを同時に出さない形は維持する**（束1の手本）。一覧の直近の成否と再送は `k3WxrO` と同じ束。',
-    verdictSource: 'webhooks-v6/f8SBSh-error.txt', verdictHead: '31293424',
+    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて確認。** 3状態は分かれ、取得失敗で登録内容が消えていない説明と再読込を出し、全8枚で横はみ出し0。ただし設計は4指標・説明帯・絞り込み・ページ送りを残した同じ一覧枠の中で各状態を見せる。実装は状態部分だけになり、一覧の文脈が消える。**推奨修正：k3WxrOの集計・絞り込み・ページ送りを先に接続し、その共通枠の表領域だけを3状態へ差し替える。**',
+    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: 'eb86ea2df1',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -3603,6 +3614,7 @@ export const DESIGN_SIZE = {
   ee0sk: [1920, 1590], VjXGX: [1920, 1590], byqIW: [1920, 1080],
   A1ZYeP: [1920, 1080], KoT6c: [1920, 1080], GMvBd: [1920, 1080],
   zGZMA: [1920, 1080], XBkiQ: [1920, 1136],
+  bfB50: [1920, 1080], oHAN4: [1920, 1080],
   uLQQc: [1920, 1080], s9gAx: [1920, 1080], W1wzCa: [1920, 1080],
   K0Dbr2: [1920, 1080], txMO9: [1920, 1080], U3SI5: [1920, 1080], Q3qP1r: [1920, 1080],
 }
@@ -3799,6 +3811,7 @@ export const CAPTURED_AT = {
       note: 'Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。' },
   ],
   12: [
+    { pr: 1007, head: 'f2be359e5', on: '2026-09-06', screens: ['GO8RQ', 'XtfO3', 'TL7tp', 'RW5Tb'], note: 'Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。' },
     { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },
     { pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['GO8RQ', 'XtfO3', 'kQ1bs', 'UMiJ9', 'TL7tp'], note: '同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**' },
@@ -3999,8 +4012,10 @@ export const CAPTURED_AT = {
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
     { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
+    { pr: 1006, head: 'f7623915e', on: '2026-09-06', screens: ['bfB50', 'oHAN4'], note: 'Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。' },
   ],
   9: [
+    { pr: 1010, head: '3d6b7e7e8', on: '2026-09-06', screens: ['ec9vg', 'quhg6'], note: 'Issue #222。3104/8791で最終確認5状態と有効化完了を1440・1920px撮影し、設計本文に構造・文言を合わせた。現APIで取得不能・未接続の項目はデータ待ちとして明記' },
     { pr: 962, head: '9b8f7451', on: '2026-09-06', screens: ['uLQQc', 's9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5', 'Q3qP1r'], note: 'Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認' },
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },
