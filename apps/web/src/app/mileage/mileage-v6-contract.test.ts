@@ -40,6 +40,8 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(HISTORY).toContain("kind=\"error\"")
     expect(FRIEND_DETAIL).toContain('data-design-node="HIU5O"')
     expect(FRIEND_DETAIL).toContain('api.friends.mileage')
+    expect(FRIEND_DETAIL).toContain('api.mileage.friendsV6')
+    expect(FRIEND_DETAIL).toContain('v6Friend?.expiringMiles30d')
     expect(FRIEND_DETAIL).toContain('usePageTitle')
     expect(FRIEND_DETAIL).not.toContain('準備中')
   })
