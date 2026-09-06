@@ -10,11 +10,14 @@ import type {
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { getFriendProfileCandidates } from '../services/friend-profile-candidates.js';
 import {
   getMergedPerson,
+  listMergedPeople,
   mergedPersonAccountIds,
   MergedPersonError,
+  unlinkMergedPersonFriend,
   updateMergedPerson,
   updateMergedPersonDeliveryPriorities,
 } from '../services/merged-people.js';
@@ -162,13 +165,38 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
     && canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds);
 }
 
+function positiveInt(value: string | undefined, fallback: number, max: number): number | null {
+  if (value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= max ? parsed : null;
+}
+
+mergedPeople.get('/api/friends/people', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const limit = positiveInt(c.req.query('limit'), 20, 100);
+    const offset = positiveInt(c.req.query('offset'), 0, 100_000);
+    if (limit === null || limit < 1 || offset === null) {
+      return c.json({ success: false, error: 'ページ位置が正しくありません', code: 'INVALID_PAGINATION' }, 400);
+    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
+    const data = await listMergedPeople(c.env.DB, tenantId(c), scope.allowedAccountIds, limit, offset);
+    return c.json({ success: true, data });
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
 mergedPeople.get('/api/friends/people/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     if (!await canAccessPerson(c, c.req.param('id'))) {
       return c.json({ success: false, error: 'この統合ユーザーを表示する権限がありません', code: 'FORBIDDEN' }, 403);
     }
     const data = await getMergedPerson(c.env.DB, tenantId(c), c.req.param('id'));
-    return c.json({ success: true, data });
+    const candidates = await getFriendProfileCandidates(
+      c.env.DB,
+      data.linkedFriends.map((friend) => friend.friendId),
+    );
+    return c.json({ success: true, data: { ...data, ...candidates } });
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -206,6 +234,36 @@ mergedPeople.patch(
         { id: staff.id, name: staff.name, tenantId: tenantId(c) },
         c.req.param('id'),
         parsePrioritiesBody(await safeBody(c)),
+      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return errorResponse(c, error);
+    }
+  },
+);
+
+mergedPeople.delete(
+  '/api/friends/people/:id/links/:friendId',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      if (!await canAccessPerson(c, c.req.param('id'))) {
+        return c.json({ success: false, error: 'この結び付けを解除する権限がありません', code: 'FORBIDDEN' }, 403);
+      }
+      const raw = await safeBody(c);
+      if (!isRecord(raw)
+          || !Number.isInteger(raw.expectedRevision)
+          || Number(raw.expectedRevision) < 1
+          || typeof raw.reason !== 'string') {
+        throw new MergedPersonError(422, 'INVALID_BODY', '読み込んだ版と解除理由を確認してください');
+      }
+      const staff = getStaff(c)!;
+      const data = await unlinkMergedPersonFriend(
+        c.env.DB,
+        { id: staff.id, name: staff.name, tenantId: tenantId(c) },
+        c.req.param('id'),
+        c.req.param('friendId'),
+        { expectedRevision: Number(raw.expectedRevision), reason: raw.reason },
       );
       return c.json({ success: true, data });
     } catch (error) {

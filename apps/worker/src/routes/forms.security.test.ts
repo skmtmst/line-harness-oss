@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   createForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   getFormSubmissionsPage: vi.fn(),
+  getFormSubmissionAnalytics: vi.fn(),
+  updateFormSubmissionDestinationWriteResult: vi.fn(),
   verifyCallerLineIdentity: vi.fn(),
   getLineAccountById: vi.fn(),
   dispatchLineProxyLocally: vi.fn(),
@@ -33,7 +35,9 @@ vi.mock('@line-crm/db', () => ({
   deleteFormAtRevision: mocks.deleteFormAtRevision,
   getFormSubmissions: mocks.getFormSubmissions,
   getFormSubmissionsPage: mocks.getFormSubmissionsPage,
+  getFormSubmissionAnalytics: mocks.getFormSubmissionAnalytics,
   createFormSubmission: mocks.createFormSubmission,
+  updateFormSubmissionDestinationWriteResult: mocks.updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: vi.fn(),
   getTrackedLinkById: vi.fn(),
@@ -145,6 +149,22 @@ beforeEach(() => {
   mocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
   mocks.formBelongsToLineAccount.mockResolvedValue(true);
   mocks.canAccessAllLineAccounts.mockResolvedValue(true);
+  mocks.getFormSubmissionAnalytics.mockResolvedValue({
+    startedUnique: 0,
+    submitted: 0,
+    completionRate: null,
+    destinationWrites: {
+      pending: 0,
+      succeeded: 0,
+      partial: 0,
+      failed: 0,
+      not_requested: 0,
+      unknown: 0,
+    },
+    dateAnsweredUniqueFriends: 0,
+    dateFields: [],
+  });
+  mocks.updateFormSubmissionDestinationWriteResult.mockResolvedValue('not_requested');
   mocks.createFormSubmission.mockImplementation(async (_db, input) => ({
     id: 'submission-1',
     form_id: input.formId,
@@ -269,7 +289,7 @@ describe('submission pagination compatibility', () => {
     expect(mocks.getFormSubmissionsPage).toHaveBeenCalledWith(
       bindings.DB,
       'form-1',
-      { page: 2, limit: 20 },
+      { page: 2, limit: 20, lineAccountId: 'account-a' },
     );
     expect(mocks.getFormSubmissions).not.toHaveBeenCalled();
   });
@@ -290,8 +310,120 @@ describe('submission pagination compatibility', () => {
     expect(mocks.getFormSubmissionsPage).toHaveBeenCalledWith(
       bindings.DB,
       'form-1',
-      { page: 1, limit: expected },
+      { page: 1, limit: expected, lineAccountId: 'account-a' },
     );
+  });
+
+  test('全回答から開始実人数・書き込み結果・日付項目を返す', async () => {
+    mocks.getFormById.mockResolvedValue({
+      ...baseForm,
+      fields: JSON.stringify([
+        { name: 'next_visit', label: '次回来店日', type: 'date' },
+      ]),
+    });
+    mocks.getFormSubmissionsPage.mockResolvedValue({
+      items: [{
+        id: 'submission-1',
+        form_id: 'form-1',
+        friend_id: 'friend-1',
+        friend_name: '山田さん',
+        data: '{"next_visit":"2026-09-20"}',
+        destination_write_status: 'succeeded',
+        destination_write_attempted: 1,
+        destination_write_succeeded: 1,
+        destination_write_failed: 0,
+        destination_write_completed_at: '2026-09-07T05:00:00+09:00',
+        created_at: '2026-09-07T04:59:00+09:00',
+      }],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+    mocks.getFormSubmissionAnalytics.mockResolvedValue({
+      startedUnique: 4,
+      submitted: 3,
+      completionRate: 75,
+      destinationWrites: {
+        pending: 0, succeeded: 2, partial: 0, failed: 1, not_requested: 0, unknown: 0,
+      },
+      dateAnsweredUniqueFriends: 2,
+      dateFields: [{
+        key: 'next_visit', label: '次回来店日', answered: 2, uniqueFriends: 2,
+        minDate: '2026-09-20', maxDate: '2026-09-25',
+      }],
+    });
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?page=1&limit=20&account_id=account-a',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        items: [{ destinationWrite: { status: 'succeeded', attempted: 1, succeeded: 1, failed: 0 } }],
+        summary: {
+          startedUnique: 4,
+          submitted: 3,
+          completionRate: 75,
+          dateAnsweredUniqueFriends: 2,
+          dateFields: [{ key: 'next_visit', answered: 2 }],
+        },
+      },
+    });
+    expect(mocks.getFormSubmissionAnalytics).toHaveBeenCalledWith(
+      bindings.DB,
+      'form-1',
+      'account-a',
+      [{ key: 'next_visit', label: '次回来店日' }],
+    );
+  });
+
+  test('回答が空でも取得済みの0件と開始0件を返す', async () => {
+    mocks.getFormSubmissionsPage.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?page=1&limit=20&account_id=account-a',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        items: [],
+        total: 0,
+        summary: { startedUnique: 0, submitted: 0, completionRate: null },
+      },
+    });
+  });
+
+  test('集計DBが失敗したときは偽の0件を返さない', async () => {
+    mocks.getFormSubmissionsPage.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+    mocks.getFormSubmissionAnalytics.mockRejectedValueOnce(new Error('db unavailable'));
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?page=1&limit=20&account_id=account-a',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(await res.json())).not.toContain('startedUnique');
+  });
+
+  test('別アカウントの権限では集計を読まない', async () => {
+    mocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?page=1&limit=20&account_id=account-other',
+      {},
+      bindings,
+    );
+
+    expect(res.status).toBe(404);
+    expect(mocks.getFormSubmissionAnalytics).not.toHaveBeenCalled();
   });
 });
 

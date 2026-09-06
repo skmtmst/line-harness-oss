@@ -12,8 +12,10 @@ import {
   deleteFormAtRevision,
   getFormSubmissions,
   getFormSubmissionsPage,
+  getFormSubmissionAnalytics,
   getLatestFormSubmission,
   createFormSubmission,
+  updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount,
   getFriendById,
   getLineAccountById,
@@ -28,6 +30,7 @@ import { listLimit, listPage } from './list-pagination.js';
 import type {
   Form as DbForm,
   FormSubmission as DbFormSubmission,
+  FormDestinationWriteResult,
   FormUsedByAccount,
   Friend as DbFriend,
 } from '@line-crm/db';
@@ -264,8 +267,69 @@ function serializeSubmission(row: DbFormSubmission & { friend_name?: string | nu
     friendId: row.friend_id,
     friendName: row.friend_name || null,
     data: JSON.parse(row.data || '{}') as Record<string, unknown>,
+    destinationWrite: {
+      status: row.destination_write_status ?? 'unknown',
+      attempted: row.destination_write_attempted ?? null,
+      succeeded: row.destination_write_succeeded ?? null,
+      failed: row.destination_write_failed ?? null,
+    },
     createdAt: row.created_at,
   };
+}
+
+function dateFieldsOfForm(form: DbForm): Array<{ key: string; label: string }> {
+  const layout = form.layout ? parseLayout(form.layout, form.fields) : null;
+  if (layout) {
+    return collectInputs(layout)
+      .filter((block) => block.type === 'date' && block.name)
+      .map((block) => ({ key: block.name, label: block.label || block.name }));
+  }
+  return parseFormFields(form.fields)
+    .filter((field) => field.type === 'date')
+    .map((field) => ({
+      key: field.name ?? field.id ?? '',
+      label: field.label ?? field.name ?? field.id ?? '',
+    }))
+    .filter((field) => field.key);
+}
+
+async function writeLegacyFriendFields(
+  db: D1Database,
+  form: DbForm,
+  submissionData: Record<string, unknown>,
+  friendId: string,
+): Promise<FormDestinationWriteResult> {
+  const result: FormDestinationWriteResult = { attempted: 0, succeeded: 0, failed: 0 };
+  const targets = parseFormFields(form.fields).filter((field) => field.friendFieldId);
+  if (targets.length === 0) return result;
+  const { setFriendFieldValue, getFriendFieldById } = await import('@line-crm/db');
+  for (const field of targets) {
+    const answer = submissionData[field.name ?? field.id ?? ''];
+    if (answer === undefined) continue;
+    result.attempted += 1;
+    try {
+      const target = await getFriendFieldById(db, field.friendFieldId!);
+      if (!target || target.ec_is_master === 1) {
+        result.failed += 1;
+        continue;
+      }
+      await setFriendFieldValue(db, {
+        friendId,
+        fieldId: field.friendFieldId!,
+        value: answer == null
+          ? null
+          : Array.isArray(answer)
+            ? answer.join(', ')
+            : String(answer),
+        updatedBy: 'form',
+      });
+      result.succeeded += 1;
+    } catch (error) {
+      result.failed += 1;
+      console.error('form -> friend_fields failed:', error);
+    }
+  }
+  return result;
 }
 
 /**
@@ -637,7 +701,15 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     }
     const page = listPage(c.req.query('page'));
     const limit = listLimit(c.req.query('limit'), 20);
-    const submissions = await getFormSubmissionsPage(c.env.DB, id, { page, limit });
+    const [submissions, summary] = await Promise.all([
+      getFormSubmissionsPage(c.env.DB, id, { page, limit, lineAccountId: c.req.query('account_id')! }),
+      getFormSubmissionAnalytics(
+        c.env.DB,
+        id,
+        c.req.query('account_id')!,
+        dateFieldsOfForm(form),
+      ),
+    ]);
     return c.json({
       success: true,
       data: {
@@ -645,6 +717,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
         total: submissions.total,
         page: submissions.page,
         limit: submissions.limit,
+        summary,
       },
     });
   } catch (err) {
@@ -997,6 +1070,19 @@ forms.post('/api/forms/:id/submit', async (c) => {
           friendId,
           data: JSON.stringify({ ...submissionData, _webhookResult: webhookResult.data }),
         });
+        try {
+          const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, {
+            attempted: 0,
+            succeeded: 0,
+            failed: 0,
+          });
+          submission.destination_write_status = status;
+          submission.destination_write_attempted = 0;
+          submission.destination_write_succeeded = 0;
+          submission.destination_write_failed = 0;
+        } catch (error) {
+          console.error('form destination write result failed:', error);
+        }
         return c.json({ success: true, data: { ...serializeSubmission(submission), webhookPassed: false, webhookData: webhookResult.data } }, 201);
       }
     }
@@ -1079,6 +1165,11 @@ forms.post('/api/forms/:id/submit', async (c) => {
       }
 
       const sideEffects: Promise<unknown>[] = [];
+      let destinationWriteResult: FormDestinationWriteResult = {
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+      };
 
       // Save response data to friend's metadata
       if (form.save_to_metadata) {
@@ -1130,6 +1221,8 @@ forms.post('/api/forms/:id/submit', async (c) => {
                 (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
               );
             },
+          }).then((result) => {
+            destinationWriteResult = result.destinationWrites;
           }).catch((err) => console.error('form layout effects failed:', err)),
         );
       }
@@ -1144,35 +1237,11 @@ forms.post('/api/forms/:id/submit', async (c) => {
       // 置き場で、情報欄は型と差し込み名を持つ。両方に入れておけば、
       // 既存の {{metadata.KEY}} を使っているテンプレートも壊れない。
       sideEffects.push(
-        (async () => {
-          // layout があるときは applyFormLayoutEffects が書くので、ここは
-          // 動かさない。同じ値を2回書いても結果は同じだが、ECが正かどうかの
-          // 判定を2度走らせるだけ無駄になる。
-          if (layout) return;
-          const formFields = parseFormFields(form.fields);
-          const targets = formFields.filter((f) => f.friendFieldId);
-          if (targets.length === 0) return;
-          const { setFriendFieldValue, getFriendFieldById } = await import('@line-crm/db');
-          for (const field of targets) {
-            const answer = submissionData[field.name ?? field.id ?? ''];
-            if (answer === undefined) continue;
-            // ECが正の項目には書かない。フォームの回答で上書きすると、
-            // 次のEC同期で戻り、入れたはずの値が消えたように見える。
-            const target = await getFriendFieldById(db, field.friendFieldId!);
-            if (!target || target.ec_is_master === 1) continue;
-            await setFriendFieldValue(db, {
-              friendId: friendId!,
-              fieldId: field.friendFieldId!,
-              value:
-                answer == null
-                  ? null
-                  : Array.isArray(answer)
-                    ? answer.join(', ')
-                    : String(answer),
-              updatedBy: 'form',
-            });
-          }
-        })().catch((err) => console.error('form -> friend_fields failed:', err)),
+        layout
+          ? Promise.resolve()
+          : writeLegacyFriendFields(db, form, submissionData, friendId!).then((result) => {
+              destinationWriteResult = result;
+            }),
       );
 
       // Add tag — guarded attach so a tag_added-triggered scenario fires on
@@ -1341,6 +1410,20 @@ forms.post('/api/forms/:id/submit', async (c) => {
         for (const r of results) {
           if (r.status === 'rejected') console.error('Form side-effect failed:', r.reason);
         }
+      }
+      try {
+        const status = await updateFormSubmissionDestinationWriteResult(
+          db,
+          submission.id,
+          destinationWriteResult,
+        );
+        submission.destination_write_status = status;
+        submission.destination_write_attempted = destinationWriteResult.attempted;
+        submission.destination_write_succeeded = destinationWriteResult.succeeded;
+        submission.destination_write_failed = destinationWriteResult.failed;
+      } catch (error) {
+        // 回答自体は保存済み。記録失敗を回答失敗へ見せず pending のまま残す。
+        console.error('form destination write result failed:', error);
       }
     }
 

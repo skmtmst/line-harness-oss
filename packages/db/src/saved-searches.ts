@@ -102,11 +102,18 @@ const CONDITION_KINDS = new Set([
   'form',
   'purchase',
   'mark',
+  'assignee',
   'scenario',
+  'event_booking',
+  'calendar_booking',
   'chat_status',
+  'last_activity',
+  'reminder',
+  'memo',
   'following',
   'status_message',
   'created_at',
+  'common_event',
 ]);
 
 /**
