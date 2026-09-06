@@ -37,7 +37,7 @@ describe('保存した検索の該当人数', () => {
     expect(statement.bind).toHaveBeenCalledWith('account-1', 'tag-vip');
   });
 
-  it('壊れた条件を0人にせず理由付きの未取得にする', async () => {
+  it('使えない比較方法を0人にせず理由付きの未取得にする', async () => {
     const db = { prepare: vi.fn(), batch: vi.fn() } as unknown as D1Database;
     const result = await getSavedSearchMatchInsights(db, [
       row('broken-json', '{'),
@@ -49,7 +49,7 @@ describe('保存した検索の該当人数', () => {
       matchCountError: '条件のJSONが壊れています',
     });
     expect(result.get('unsupported')?.matchCount).toBeNull();
-    expect(result.get('unsupported')?.matchCountError).toContain('未接続');
+    expect(result.get('unsupported')?.matchCountError).toContain('使えない比較方法');
     expect(db.batch).not.toHaveBeenCalled();
   });
 
