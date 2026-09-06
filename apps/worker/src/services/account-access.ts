@@ -41,6 +41,8 @@ export type VisibleLineAccountScope = {
   canSeeUnassigned: boolean;
   /** Kept for account-specific authorization call sites. */
   ids: string[];
+  /** True when the staff member is limited to explicitly assigned accounts. */
+  isAccountScoped: boolean;
 };
 
 /** Resolve account visibility once at a route boundary and reuse it in every query. */
@@ -54,6 +56,7 @@ export async function getVisibleLineAccountScope(
       allowedAccountIds: [],
       canSeeUnassigned: false,
       ids: [],
+      isAccountScoped: true,
     };
   }
   const allAccounts = await getLineAccounts(db);
@@ -65,6 +68,7 @@ export async function getVisibleLineAccountScope(
       allowedAccountIds,
       canSeeUnassigned: true,
       ids: allowedAccountIds,
+      isAccountScoped: false,
     };
   }
 
@@ -84,6 +88,7 @@ export async function getVisibleLineAccountScope(
     allowedAccountIds,
     canSeeUnassigned: !isAccountScoped && staffTenant === DEFAULT_TENANT_ID,
     ids: allowedAccountIds,
+    isAccountScoped,
   };
 }
 
