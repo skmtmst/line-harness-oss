@@ -10,7 +10,7 @@ import { buildSupportEmailInboxQuery } from './support-email-query'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
-import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
+import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -109,6 +109,7 @@ type InboxSavedView = {
   conditions: InboxSavedViewConditions
   createdBy: string | null
   isShared: boolean
+  isFavorite?: boolean
   /** 保存条件を現在の受信箱へ当てた件数。未接続は null。 */
   matchCount?: number | null
 }
@@ -668,26 +669,29 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     void loadSavedViews()
   }, [loadSavedViews])
 
-  const currentSavedViewConditions = (): InboxSavedViewConditions => ({
+  const currentSavedViewConditions = (draft?: Omit<SavedViewDraft, 'name' | 'favorite'>): InboxSavedViewConditions => ({
     version: 1,
     query: nameQuery.trim(),
-    channels: channel === 'all' ? ['line', 'email'] : [channel],
-    statuses: statusFilter === 'all'
+    channels: (draft?.channel ?? channel) === 'all'
+      ? ['line', 'email']
+      : [(draft?.channel ?? channel) as 'line' | 'email'],
+    statuses: (draft?.status ?? statusFilter) === 'all'
       ? ['unread', 'in_progress', 'on_hold', 'resolved']
-      : [statusFilter],
-    assignees: assigneeFilter === 'all' ? [] : [assigneeFilter],
+      : [(draft?.status ?? statusFilter) as Exclude<StatusFilter, 'all'>],
+    assignees: (draft?.assignee ?? assigneeFilter) === 'all' ? [] : [draft?.assignee ?? assigneeFilter],
     unread: 'all',
     messageTypes: [],
     receivedFrom: null,
     receivedTo: null,
     sort: 'newest',
+    due: draft?.due ?? (quickFilter === 'overdue' ? 'overdue' : 'all'),
   })
 
-  const createSavedView = async (nameOverride?: string): Promise<SavedViewSaveResult> => {
+  const createSavedView = async (draft?: SavedViewDraft): Promise<SavedViewSaveResult> => {
     if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
     // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
     // 状態の更新を待つと、1回目の保存が空の名前で走る。
-    const name = (nameOverride ?? savedViewName).trim()
+    const name = (draft?.name ?? savedViewName).trim()
     if (!name) {
       const message = '名前を入力してください'
       setSavedViewError(message)
@@ -703,7 +707,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       }
       const response = await api.chats.savedViews.create(selectedAccountId, {
         name,
-        conditions: currentSavedViewConditions(),
+        conditions: currentSavedViewConditions(draft),
+        isFavorite: draft?.favorite ?? false,
       })
       if (!response.success) {
         const message = '保存できませんでした。時間を置いてもう一度お試しください。'
@@ -733,7 +738,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setNameQuery(conditions.query ?? '')
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
-    setQuickFilter('all')
+    setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')
     const nextChannel = conditions.channels.length === 1 ? conditions.channels[0] : 'all'
     router.push(nextChannel === 'all' ? '/chats' : `/chats?channel=${nextChannel}`)
     setSavedViewsOpen(false)
@@ -1345,16 +1350,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
         <SavedViewDialog
           open={saveDialogOpen}
-          conditions={[
-            { label: '対応状況', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
-            { label: '担当者', value: assigneeFilter === 'all' ? 'すべて' : assigneeFilter === 'unassigned' ? '未割り当て' : (operators.find((o) => o.id === assigneeFilter)?.name ?? 'すべて') },
-            { label: '受信経路', value: channel === 'all' ? 'LINE・MAIL' : channel === 'line' ? 'LINE' : 'MAIL' },
-          ]}
+          initialValue={{
+            status: statusFilter,
+            due: quickFilter === 'overdue' ? 'overdue' : 'all',
+            channel,
+            assignee: assigneeFilter,
+            favorite: true,
+          }}
+          operators={operators}
           existingNames={savedViews.map((view) => view.name)}
           saving={savingView}
-          onSave={async (name) => {
-            setSavedViewName(name)
-            return createSavedView(name)
+          onSave={async (draft) => {
+            setSavedViewName(draft.name)
+            return createSavedView(draft)
           }}
           onClose={() => setSaveDialogOpen(false)}
         />

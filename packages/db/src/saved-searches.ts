@@ -64,6 +64,7 @@ export interface SavedSearchReference {
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
+export const INBOX_SAVED_VIEW_DUE = ['all', 'overdue'] as const;
 
 /** 受信箱専用。友だち検索の AND/OR 条件と混ぜず、版を持って移行できる形にする。 */
 export interface InboxSavedViewConditions {
@@ -77,6 +78,7 @@ export interface InboxSavedViewConditions {
   receivedFrom: string | null;
   receivedTo: string | null;
   sort: (typeof INBOX_SAVED_VIEW_SORTS)[number];
+  due: (typeof INBOX_SAVED_VIEW_DUE)[number];
 }
 
 const CONDITION_KINDS = new Set([
@@ -281,6 +283,10 @@ export function validateInboxSavedViewConditions(
   if (!(INBOX_SAVED_VIEW_SORTS as readonly unknown[]).includes(input.sort)) {
     return { ok: false, error: '並び順が正しくありません' };
   }
+  const due = input.due === undefined ? 'all' : input.due;
+  if (!(INBOX_SAVED_VIEW_DUE as readonly unknown[]).includes(due)) {
+    return { ok: false, error: '期限条件が正しくありません' };
+  }
   const query = typeof input.query === 'string' ? input.query.trim().slice(0, 200) : '';
   const receivedFrom = input.receivedFrom === null || typeof input.receivedFrom === 'string'
     ? input.receivedFrom as string | null
@@ -301,6 +307,7 @@ export function validateInboxSavedViewConditions(
       receivedFrom,
       receivedTo,
       sort: input.sort as InboxSavedViewConditions['sort'],
+      due: due as InboxSavedViewConditions['due'],
     },
   };
 }
