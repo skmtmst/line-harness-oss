@@ -1,13 +1,17 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo, useState } from 'react'
+import MergedTabs from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
+import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import {
   ConfidenceTag,
-  IdentityAssurance,
   IdentityEvidenceList,
   IdentityHistoryList,
   IdentityImpactList,
@@ -17,6 +21,7 @@ import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import { maskedText, NOT_AVAILABLE } from '@/components/identity/identity-view'
 import styles from '@/components/identity/identity-review.module.css'
+import { EC_TABS } from '../ec-tabs'
 
 /**
  * 設計 `ELayY` 23-1-A「会員のつき合わせ」。
@@ -31,9 +36,24 @@ import styles from '@/components/identity/identity-review.module.css'
 export default function EcIdentityCandidatesPage() {
   const review = useIdentityReview('ec_member')
   const detail = review.detail
+  const [view, setView] = useState<'all' | 'candidate' | 'none' | 'conflict'>('all')
+  const [sort, setSort] = useState<'newest' | 'confidence'>('newest')
+  const candidateCount = review.items.filter((item) => Boolean(item.right.label)).length
+  const noneCount = review.items.length - candidateCount
+  const conflictCount = review.items.filter((item) => item.confidence.label === 'medium').length
+  const shown = useMemo(() => review.items
+    .filter((item) => {
+      if (view === 'candidate') return Boolean(item.right.label)
+      if (view === 'none') return !item.right.label
+      if (view === 'conflict') return item.confidence.label === 'medium'
+      return true
+    })
+    .toSorted((left, right) => sort === 'confidence'
+      ? right.confidence.score - left.confidence.score
+      : Date.parse(right.detectedAt) - Date.parse(left.detectedAt)), [review.items, sort, view])
 
   return (
-    <div className={styles.screen}>
+    <div className="flex min-w-0 flex-col gap-4 px-10 pb-8 pt-4">
       <PageHeader
         breadcrumb={[
           { label: 'EC連携', href: '/ec-commerce' },
@@ -41,8 +61,10 @@ export default function EcIdentityCandidatesPage() {
         ]}
         title="会員のつき合わせ"
         description="ECの注文・会員とLINEの友だちが同じ人かを決めます。"
-        actions={<Button href="/ec-commerce">EC連携へ</Button>}
+        actions={<Button href="/ec-commerce?tab=connector">つき合わせの決めごと</Button>}
       />
+
+      <MergedTabs basePath="/ec-commerce" tabs={EC_TABS} active="identity" defaultKey="events" />
 
       <IdentityStateBlock
         state={review.state}
@@ -53,9 +75,37 @@ export default function EcIdentityCandidatesPage() {
 
       {review.state === 'ready' ? (
         <>
-          <IdentityAssurance>
-            結び付けても、ECの注文とLINEの友だちはどちらも残ります。過去のLINE送信は再送しません。
-          </IdentityAssurance>
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <SummaryCard variant="v6" title="結びついていない" value={review.items.length} unit="件" detail="確認待ちの注文・会員" badge="要対応" />
+            <SummaryCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="確認済みの連絡先や名前が近い人" />
+            <SummaryCard variant="v6" title="自動で結びついた" value={null} unit="件" detail="集計の取得元は未接続" />
+            <SummaryCard variant="v6" title="結びつけると増える売上" value={null} unit="円" detail="影響額の取得元は未接続" />
+          </div>
+
+          <NoteBar>確認済みのメールアドレスか電話番号が同じなら候補になります。名前だけが同じ人は、別人のこともあるため自動では結びつけません。</NoteBar>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Tabs items={([
+                ['all', 'すべて', review.items.length],
+                ['candidate', '候補あり', candidateCount],
+                ['none', '候補なし', noneCount],
+                ['conflict', '同じ人が2人いる疑い', conflictCount],
+              ] as const).map(([value, label, count]) => ({
+                label,
+                count,
+                current: view === value,
+                onClick: () => setView(value),
+              }))} />
+            <Select
+              aria-label="候補の並び順"
+              value={sort}
+              onChange={(value) => setSort(value as typeof sort)}
+              options={[
+                { value: 'newest', label: '注文が新しい順' },
+                { value: 'confidence', label: '確からしさが高い順' },
+              ]}
+            />
+          </div>
 
           <div className={styles.tableWrap}>
             <DataTable>
@@ -65,11 +115,12 @@ export default function EcIdentityCandidatesPage() {
                   <Th>LINEの候補</Th>
                   <Th>似ているところ</Th>
                   <Th>確からしさ</Th>
+                  <Th>結びつけると</Th>
                   <Th align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
-                {review.items.map((item) => (
+                {shown.map((item) => (
                   <Tr key={item.id}>
                     <Td>
                       <span className={styles.cellStack}>
@@ -94,6 +145,7 @@ export default function EcIdentityCandidatesPage() {
                     <Td>
                       <ConfidenceTag confidence={item.confidence} />
                     </Td>
+                    <Td>{NOT_AVAILABLE}</Td>
                     <ActionCell>
                       <Button type="button" onClick={() => review.select(item.id)}>
                         候補を見る
@@ -114,8 +166,9 @@ export default function EcIdentityCandidatesPage() {
           </div>
 
           <p className={styles.footerNote}>
-            結びついていない {review.items.length.toLocaleString('ja-JP')} 件を表示しています。
+            結びついていない {review.items.length.toLocaleString('ja-JP')} 件中 {shown.length.toLocaleString('ja-JP')} 件を表示しています。
             自動で結びついた件数と、結び付けたときに増える売上は {NOT_AVAILABLE} です。
+            結び付けても元の注文とLINEの友だちは残り、過去のLINE送信は再送しません。
           </p>
 
           {detail ? (

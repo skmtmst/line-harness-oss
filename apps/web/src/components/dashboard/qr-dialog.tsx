@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -30,6 +31,16 @@ const FORMATS = [
   { value: 'svg', label: 'SVG' },
 ]
 
+export function resolveOfficialProfileUrl(
+  officialProfileUrl?: string | null,
+  accountBasicId?: string | null,
+): string | null {
+  if (officialProfileUrl !== undefined) return officialProfileUrl
+  if (!accountBasicId) return null
+  const basicId = accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`
+  return `https://line.me/R/ti/p/${basicId}`
+}
+
 function DownloadIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -42,6 +53,7 @@ export default function QrDialog({
   open,
   onClose,
   accountName,
+  officialProfileUrl,
   accountBasicId,
   baseLink,
   initialRouteId = '',
@@ -49,6 +61,8 @@ export default function QrDialog({
   open: boolean
   onClose: () => void
   accountName: string
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
+  officialProfileUrl?: string | null
   /** 公式アカウントのID（`@nen` など）。QRの下に出す案内先の組み立てに使う。 */
   accountBasicId?: string | null
   baseLink: string
@@ -60,6 +74,7 @@ export default function QrDialog({
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
   const [copied, setCopied] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
   // 経路を変えていたら、次に開いたときはそちらが正。
@@ -83,11 +98,27 @@ export default function QrDialog({
     }
   }, [open])
 
-  if (!open) return null
-
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
+
+  useEffect(() => {
+    let cancelled = false
+    setQrDataUrl('')
+    void QRCode.toDataURL(link, {
+      width: 220,
+      margin: 1,
+      color: { dark: '#171717', light: '#ffffff' },
+    }).then((dataUrl) => {
+      if (!cancelled) setQrDataUrl(dataUrl)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [link])
+
+  if (!open) return null
+
   const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
   const saveHref = `${qrSrc}&download=1&filename=${encodeURIComponent(
     route ? `qr-${route.refCode}` : 'qr-friend-add',
@@ -99,15 +130,12 @@ export default function QrDialog({
    * 経路を選んでいればその経路のリンク。経路ごとに分けて発行したのに
    * ここが公式アカウントのままだと、どのQRを見ているのか分からない。
    *
-   * 基本のときは公式アカウントのURL。LINE が配る lin.ee の短縮URLは
-   * API から取れないので、公式ID（basicId）から組み立てる。同じ場所に
-   * 着く。ID が無いアカウントでは何も出さない。
+   * 基本のときはAPIが返した公式プロフィール短縮URLを優先する。
+   * 段階配備中の旧Workerでは公式ID（basicId）から同じ行き先を組み立てる。
    */
   const profileUrl = route
     ? link
-    : accountBasicId
-      ? `https://line.me/R/ti/p/${accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`}`
-      : null
+    : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
   const copy = async () => {
     try {
@@ -180,7 +208,7 @@ export default function QrDialog({
             <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
               <img
-                src={qrSrc}
+                src={qrDataUrl || qrSrc}
                 alt="友だち追加QRコード"
                 width={220}
                 height={220}

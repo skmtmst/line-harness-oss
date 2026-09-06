@@ -6,6 +6,8 @@ import Header from '@/components/layout/header'
 import { bookingApi, type BookingMenu, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import BookingCalendar from './booking-calendar'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -105,6 +107,7 @@ function monthKey(offset: number): string {
 
 export default function BookingsPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
+  const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
@@ -277,26 +280,32 @@ export default function BookingsPage() {
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
-  const detail = detailId ? (items.find((b) => b.id === detailId) ?? null) : null
+  const detail = detailId
+    ? (allItems.find((b) => b.id === detailId) ?? items.find((b) => b.id === detailId) ?? null)
+    : null
   useEffect(() => {
-    if (detailId && !items.some((b) => b.id === detailId)) setDetailId(null)
-  }, [items, detailId])
+    if (detailId && !allItems.some((b) => b.id === detailId) && !items.some((b) => b.id === detailId)) {
+      setDetailId(null)
+    }
+  }, [allItems, items, detailId])
 
-  return (
-    <div>
+  const today = jstDay(new Date().toISOString())
+  const weekAhead = jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString())
+  const todayCount = allItems.filter((booking) => jstDay(booking.starts_at) === today).length
+  const weekCount = allItems.filter((booking) => {
+    const day = jstDay(booking.starts_at)
+    return day >= today && day <= weekAhead
+  }).length
+
+  const pageHead = (
+    <>
       <div data-design="Head">
         <Header
           title="予約管理"
           description="トリミングなどの予約を管理します。友だちが自分で予約履歴を確認できるURLも発行できます。"
         />
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
+          <Button href="/support">マニュアル</Button>
           <Link
             href="/booking/staff/shifts"
             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
@@ -311,6 +320,69 @@ export default function BookingsPage() {
           </Link>
         </div>
       </div>
+      <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+        {([
+          ['day', `今日 ${todayCount}`],
+          ['week', `今週 ${weekCount}`],
+          ['month', `今月 ${kpi.total}`],
+          ['list', '一覧'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            className={`border-b-2 px-1 py-3 text-sm font-semibold ${
+              view === key ? 'border-accent text-accent' : 'border-transparent text-ink-secondary'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+    </>
+  )
+
+  const dialogs = (
+    <>
+      {detail && (
+        <BookingDetailPanel
+          booking={detail}
+          onClose={() => setDetailId(null)}
+          onAction={(a) => handleDecide(detail.id, a)}
+        />
+      )}
+      <ConfirmDialog
+        open={decideTarget !== null}
+        title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
+        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
+        confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
+        destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
+        busy={deciding}
+        error={decideError || undefined}
+        onCancel={() => { setDecideTarget(null); setDecideError('') }}
+        onConfirm={() => { if (decideTarget) void runDecide(decideTarget.id, decideTarget.action) }}
+      />
+    </>
+  )
+
+  if (view === 'day' || view === 'week') {
+    return (
+      <div>
+        {pageHead}
+        {error && (
+          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
+            {error}
+          </div>
+        )}
+        <BookingCalendar mode={view} items={allItems} onOpen={setDetailId} />
+        {dialogs}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {pageHead}
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
@@ -483,20 +555,24 @@ export default function BookingsPage() {
                           {formatShort(b.starts_at)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <Link
-                            href={`/chats?friend=${b.friend_id}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {b.friend_name ?? '-'}
-                          </Link>
+                          {b.friend_id ? (
+                            <Link
+                              href={`/chats?friend=${b.friend_id}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {b.friend_name ?? '-'}
+                            </Link>
+                          ) : (
+                            <span>{b.friend_name ?? 'LINE未連携のお客さま'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">{b.menu_name}</td>
                         <td className="px-4 py-3 text-sm">{b.staff_name}</td>
-                        {/* 予約はいまLINE内の予約フォームからしか入らない。
-                            経路の列は bookings に無いので、実態どおり LINE と出す。 */}
                         <td className="px-4 py-3 text-sm">
-                          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
-                            LINE
+                          <span
+                            className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
+                          >
+                            {b.friend_id ? 'LINE' : '電話'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right text-sm tabular-nums">
@@ -589,25 +665,7 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      {detail && (
-        <BookingDetailPanel
-          booking={detail}
-          onClose={() => setDetailId(null)}
-          onAction={(a) => handleDecide(detail.id, a)}
-        />
-      )}
-
-      <ConfirmDialog
-        open={decideTarget !== null}
-        title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
-        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
-        confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
-        destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
-        busy={deciding}
-        error={decideError || undefined}
-        onCancel={() => { setDecideTarget(null); setDecideError('') }}
-        onConfirm={() => { if (decideTarget) void runDecide(decideTarget.id, decideTarget.action) }}
-      />
+      {dialogs}
     </div>
   )
 }
