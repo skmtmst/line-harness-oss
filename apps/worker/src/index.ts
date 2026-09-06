@@ -134,6 +134,8 @@ import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
+import { runScheduledOperationHealthChecks } from './services/operations-health.js';
+import { processOperationNotificationOutbox } from './services/operation-notifications.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
@@ -192,6 +194,8 @@ export type Env = {
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
     TOTP_ENCRYPTION_KEY?: string;
+    /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
+    OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.
     LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
@@ -1395,6 +1399,20 @@ async function scheduled(
     return;
   }
   if (lane !== 'delivery') return;
+
+  // 管理画面を開いていなくても、各LINEアカウントの6項目を5分窓ごとに保存する。
+  // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
+  try {
+    await runScheduledOperationHealthChecks(env.DB);
+  } catch (error) {
+    console.error('operation health checks error:', error);
+  }
+
+  try {
+    await processOperationNotificationOutbox(env);
+  } catch (error) {
+    console.error('operation notification outbox error:', error);
+  }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
 

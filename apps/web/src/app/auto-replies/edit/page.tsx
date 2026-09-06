@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import EditDialog, { toDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 
 /**
  * 自動応答の編集を、URL で開けるようにする。
@@ -30,9 +30,15 @@ function AutoReplyEditInner() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
     void (async () => {
       try {
-        const tplRes = await api.templates.list()
+        const [tplRes, draftRes, liveRes] = await Promise.all([
+          api.templates.list(),
+          id ? api.autoReplies.getDraft(id) : Promise.resolve(null),
+          id ? api.autoReplies.get(id).catch(() => null) : Promise.resolve(null),
+        ])
+        if (!active) return
         if (tplRes.success) {
           setTemplates(
             tplRes.data.map((t) => ({
@@ -44,11 +50,19 @@ function AutoReplyEditInner() {
           )
         }
         if (id) {
-          const res = await api.autoReplies.get(id)
-          if (res.success) {
-            setDraft(toDraft(res.data))
+          if (draftRes?.success) {
+            const [conflictRes, summaryRes] = await Promise.all([
+              api.autoReplies.conflicts(id).catch(() => null),
+              api.autoReplies.summary(draftRes.data.settings.lineAccountId).catch(() => null),
+            ])
+            if (!active) return
+            setDraft(toVersionDraft(draftRes.data, {
+              isActive: liveRes?.success ? liveRes.data.isActive : true,
+              conflictAttentionCount: conflictRes?.success ? conflictRes.data.conflicts.length : null,
+              receiveSourceCounts: summaryRes?.success ? summaryRes.data.receiveSourceCounts : null,
+            }))
           } else {
-            setError(res.error)
+            setError(draftRes?.error ?? '下書きを読み込めませんでした')
           }
         } else {
           setDraft({
@@ -64,11 +78,14 @@ function AutoReplyEditInner() {
           })
         }
       } catch {
-        setError('読み込みに失敗しました')
+        if (active) setError('読み込みに失敗しました')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     })()
+    return () => {
+      active = false
+    }
   }, [id])
 
   return (

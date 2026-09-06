@@ -23,6 +23,68 @@ beforeAll(async () => {
   } = await import('./api'))
 })
 
+describe('api.autoReplies の V6 集計・下書き契約', () => {
+  it('選択中のLINEアカウントを競合集計へ渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { conflicts: [], conflictCount: 0 } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.autoReplies.summary('account/a')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/auto-replies/conflicts?accountId=account%2Fa',
+    )
+  })
+
+  it('下書き保存に現在の版と追加設定を含める', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const input = {
+      keyword: '予約',
+      matchType: 'contains' as const,
+      responseType: 'text',
+      responseContent: '承りました',
+      templateId: null,
+      lineAccountId: 'account-1',
+      activeFrom: null,
+      activeUntil: null,
+      cooldownMinutes: null,
+      skipWhenOperatorActive: false,
+      priority: 2,
+      messageKinds: null,
+      friendConditions: null,
+      actions: null,
+      responseWeekdays: null,
+      responseHolidayRule: null,
+      oncePerFriend: false,
+      keywords: null,
+      respondToAll: false,
+      name: '予約変更',
+      keywordMatchMode: 'any' as const,
+      folderId: null,
+      internalMemo: '一次対応',
+      replyDelaySeconds: 30,
+      unmatchedAction: { type: 'notify_operator' },
+      expectedVersion: 3,
+    }
+
+    await api.autoReplies.saveDraft('reply/1', input)
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/auto-replies/reply/1/draft',
+    )
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify(input),
+    })
+  })
+})
+
 describe('api.nenCampaigns.createColumn', () => {
   it('sends only the selected account query and the public create fields', async () => {
     const fetchSpy = vi.fn(async () => new Response(
@@ -169,6 +231,70 @@ describe('api.mileage reward draft contract', () => {
       headers: expect.objectContaining({
         'X-Confirm-Irreversible': 'mileage-reward-publish',
       }),
+    })
+  })
+})
+
+describe('api.mileage V6 admin contract', () => {
+  it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    const draft = {
+      name: '予約で300マイル',
+      eventType: 'booking_created',
+      source: 'booking',
+      amount: 300,
+      initialStatus: 'available' as const,
+      validFrom: null,
+      validUntil: null,
+      expiresAfterDays: 365,
+      cancellationEventTypes: ['booking_cancelled'],
+      targetConditions: null,
+      sortOrder: 1,
+    }
+
+    await api.mileage.friendsV6({ accountId: 'account/1', search: '高橋', limit: 20, offset: 20 })
+    await api.mileage.earningRulesV6({ accountId: 'account/1', limit: 20, offset: 0 })
+    await api.mileage.saveEarningRuleDraft('rule/1', {
+      accountId: 'account/1', expectedVersion: 2, draft,
+    })
+
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/mileage/friends?accountId=account%2F1&search=%E9%AB%98%E6%A9%8B&limit=20&offset=20',
+      'https://worker.example.com/api/mileage/earning-rules?accountId=account%2F1&limit=20&offset=0',
+      'https://worker.example.com/api/mileage/earning-rules/rule%2F1/draft',
+    ])
+    expect(fetchSpy.mock.calls[2]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({ accountId: 'account/1', expectedVersion: 2, draft }),
+    })
+  })
+
+  it('手動増減へ期限と自動通知の指定を渡す', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.mileage.adjust({
+      accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 300,
+      reasonCategory: 'campaign', reason: '来店キャンペーン',
+      expiresAt: '2099-12-31T14:59:59.000Z', notifyFriend: true,
+    }, 'mileage-adjustment-test-1')
+
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        'Idempotency-Key': 'mileage-adjustment-test-1',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      }),
+    })
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      expiresAt: '2099-12-31T14:59:59.000Z', notifyFriend: true,
     })
   })
 })
