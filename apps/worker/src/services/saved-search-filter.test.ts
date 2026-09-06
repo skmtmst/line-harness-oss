@@ -31,10 +31,32 @@ describe('compileSavedSearch', () => {
     }
   });
 
-  it('未接続の購入条件を黙って無視しない', () => {
+  it('予約・回答・リマインダ・購入を同じOR群へ接続する', () => {
+    const result = compileSavedSearch({
+      any: [
+        { kind: 'event_booking', op: 'exists', value: 'event-a' },
+        { kind: 'calendar_booking', op: 'exists', value: 'confirmed' },
+        { kind: 'form', formId: 'form-a', op: 'exists' },
+        { kind: 'reminder', op: 'exists', value: 'reminder-a' },
+        { kind: 'purchase', op: 'exists' },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.sql).toContain('event_bookings');
+      expect(result.value.sql).toContain('calendar_bookings');
+      expect(result.value.sql).toContain('form_submissions');
+      expect(result.value.sql).toContain('friend_reminders');
+      expect(result.value.sql).toContain('ec_events');
+      expect(result.value.sql).toContain(' OR ');
+      expect(result.value.binds).toEqual(['event-a', 'confirmed', 'confirmed', 'form-a', 'reminder-a']);
+    }
+  });
+
+  it('使えない演算子を黙って無視しない', () => {
     expect(compileSavedSearch({ all: [{ kind: 'purchase', op: 'gte', value: 1 }] })).toEqual({
       ok: false,
-      error: '購入履歴の条件は、購入と友だちを結ぶ口が未接続です',
+      error: '存在確認で使えない比較方法が指定されています',
     });
   });
 });
