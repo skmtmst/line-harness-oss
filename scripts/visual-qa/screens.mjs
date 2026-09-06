@@ -2897,9 +2897,9 @@ export const SCREENS = [
   {
     node: 'RAW35', feature: 34, name: '34-1 はじめの設定',
     dir: 'settings-v6', route: '/getting-started', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。5段の大枠と右欄はそろうが、上部の進捗帯の色、各段の余白・操作位置、段3〜5の状態名と次にすることが設計と違う。**推奨修正**：設計の緑の進捗帯、段ごとの状態色、右寄せ操作へそろえ、段3と最終段の案内文を設計どおりにする。',
-    verdictSource: 'settings-v6/RAW35.txt', verdictHead: '4c5708ace',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・順路判定API待ち。** 2幅とも横スクロール0。緑の進捗帯、5段の状態色、右寄せ操作、右欄の理由・つながる先・注意を設計と同じ骨格へそろえた。現在は `GET /api/getting-started` が無く既存APIを合成しているため、固定データでは段4が「止まっています」、最終段が「確かめられません」となり、設計の「まだです」「権限がありません」を再現できない。**残件**：5段の状態・次の行動・権限・最初の1通を返す固定応答を追加して同じ2幅で再判定する。',
+    verdictSource: 'settings-v6/RAW35.txt', verdictHead: 'e13c2e40c6',
   },
   {
     node: 'y0P0Qx', feature: 34, name: '34-2 レシピ一覧',
@@ -2911,16 +2911,16 @@ export const SCREENS = [
   {
     node: 'D5UaX', feature: 34, name: '34-3 レシピを複製する',
     dir: 'settings-v6', route: '/recipes/clone?id=signup-7day-follow', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が正しい固定レシピIDへ直し、1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。作られる16件と必要機能はそろうが、設計は名前と作成先を同じ主欄に置き、右欄に必要機能・作ったあと・注意をまとめる。実装は各節が縦に分かれ、未接続の警告が加わっている。**推奨修正**：設計の主欄＋右欄へ再配置し、複製API接続後に作成操作を有効化して撮り直す。',
-    verdictSource: 'settings-v6/D5UaX.txt', verdictHead: '4c5708ace',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・複製API待ち。** 2幅とも横スクロール0。名前と作成先を同じ主欄にまとめ、16件の内訳を続け、右390欄へ必要な機能・作ったあと・注意を設計順で配置した。画面名、パンくず、作成先選択、下部操作も設計の骨格へそろえた。**残件**：`POST /api/recipes/{id}/clone` が無いため作成操作は安全のため非活性で、設計の実行可能状態を再現していない。複製APIと成功/失敗固定応答が入ったら操作を接続して再判定する。',
+    verdictSource: 'settings-v6/D5UaX.txt', verdictHead: 'e13c2e40c6',
   },
   {
     node: 'f9oUm', feature: 34, name: '34-4 マニュアルの正本表',
     dir: 'settings-v6', route: '/settings/manual-links', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S0 が1920px設計と1440/1920px実装を撮って判定。要修正。** 2幅とも横スクロール0。設計は266画面の対応表とURL・確認日・状態・直す操作を出すが、実装は店舗登録向け4件だけで、運用者向けでない作業ID列が増えている。絞り込みの形と上部案内も違う。**推奨修正**：画面ID、画面名、公式記事URL、確認日、状態、操作の6列へ戻し、全画面の正本一覧を読み込む。',
-    verdictSource: 'settings-v6/f9oUm.txt', verdictHead: '4c5708ace',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 S0 が第2周で1920px設計と1440/1920px実装を再撮影。構造一致・正本表API待ち。** 2幅とも横スクロール0。運営向け案内、検索＋状態選択＋全件確認、画面ID・画面名・公式記事URL・確認日・状態・操作の6列へ設計どおり戻した。**残件**：`GET /api/manual-links` が無く、現在は店舗登録用の作業リンク4件しか読めないため、設計の266画面・URL・確認日・開ける/開けない状態は未再現。全画面の固定応答と確認APIが入ったら実値で再判定する。',
+    verdictSource: 'settings-v6/f9oUm.txt', verdictHead: 'e13c2e40c6',
   },
 ]
 
