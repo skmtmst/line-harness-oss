@@ -88,9 +88,9 @@ export default function GettingStartedPage() {
       ) : (
         <>
           <div className={styles.progress} role="note">
-            <div className={styles.progressCopy}>
-              <strong className={styles.headline}>{progressHeadline(steps)}</strong>
-              <span className={styles.progressDescription}>
+            <div>
+              <strong>{progressHeadline(steps)}</strong>
+              <span>
                 順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。
               </span>
             </div>

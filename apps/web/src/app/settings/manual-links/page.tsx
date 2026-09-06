@@ -82,7 +82,7 @@ export default function ManualLinksPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.operatorNote} role="note">
+      <div role="note">
         <strong>この表を直せるのは運営だけです</strong>
         <span>画面のトップバーにある「マニュアル」は、ここで決めた行き先を開きます。表を直すと、その画面のマニュアルの行き先が変わります。お客さまの組織からは見えません。</span>
       </div>
@@ -104,10 +104,10 @@ export default function ManualLinksPage() {
         </span>
       </ListToolbar>
 
-      <div className={styles.tableTitle}>
+      <div data-manual-table-title>
         <strong>画面とマニュアルの対応 {rows.length}件</strong>
         <span>{MISSING_SCREENS_NOTE}</span>
-        {notice ? <span className={styles.danger}>{notice}</span> : null}
+        {notice ? <em>{notice}</em> : null}
       </div>
 
       {shown.length === 0 ? (
@@ -147,7 +147,7 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
-                <Td><span className={styles.editBlocked}>直す</span></Td>
+                <Td><span className={styles.blocked}>直す</span></Td>
               </Tr>
             ))}
           </tbody>

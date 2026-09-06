@@ -23,14 +23,14 @@
   color: var(--color-accent-deep);
 }
 
-.progressCopy {
+.progress > div {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 6px;
 }
 
-.progressDescription {
+.progress > div > span {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: 1.5;
@@ -221,7 +221,7 @@
 
 /* --- 案内帯の中身 ----------------------------------------------------- */
 
-.headline {
+.progress strong {
   font-weight: 700; /* fontWeight: 700 */
 }
 
