@@ -52,7 +52,8 @@ import {
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
-  LIST_STATS, NEN_COLUMN_CREATE, OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
+  LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
+  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, REMINDER_RUNS,
@@ -1752,9 +1753,14 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       },
     }
   }
+  if (pathname === '/api/nen-campaigns/settings') return { success: true, data: NEN_CAMPAIGN_SETTINGS }
+  if (pathname === '/api/nen-campaigns/columns') return { success: true, data: NEN_COLUMNS }
+  if (pathname === '/api/nen-campaigns/pets') return { success: true, data: NEN_PETS }
+  if (pathname === '/api/nen-campaigns/jobs') return { success: true, data: NEN_JOBS }
+  if (pathname === '/api/nen-campaigns/birthday-coupon') return { success: true, data: NEN_BIRTHDAY_COUPON }
   if (pathname === '/api/nen-campaigns/overview') {
     // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
-    return { success: true, data: { activeCampaigns: 2, jobs: { total: 18, pending: 3, sent: 14, failed: 1 }, columns: 6, pets: 4, coupons: 2 } }
+    return { success: true, data: { activeCampaigns: 6, jobs: { total: 2640, pending: 148, sent: 2486, failed: 6 }, columns: 24, pets: 864, coupons: 28 } }
   }
   if (pathname === '/api/webhooks/interactions') {
     /*

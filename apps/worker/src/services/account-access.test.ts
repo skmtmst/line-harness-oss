@@ -82,6 +82,7 @@ describe('filterVisibleLineAccounts', () => {
       allowedAccountIds: [],
       canSeeUnassigned: false,
       ids: [],
+      isAccountScoped: true,
     });
   });
 
