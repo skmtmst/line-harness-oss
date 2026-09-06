@@ -139,6 +139,7 @@ function serializeInboxSavedView(row: SavedSearch) {
     lineAccountId: row.line_account_id,
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
+    isFavorite: row.display_order < 0,
     createdAt: row.created_at,
   };
 }
@@ -840,6 +841,7 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
     createdBy: staff.id,
     lineAccountId: access.lineAccountId,
     isShared,
+    displayOrder: body.isFavorite === true ? -1 : 0,
   });
   return c.json({ success: true, data: serializeInboxSavedView(saved) }, 201);
 });
@@ -877,6 +879,9 @@ chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff')
   if (body.isShared !== undefined) {
     if (staff.role === 'staff') return c.json({ success: false, error: '共有設定を変える権限がありません' }, 403);
     patch.isShared = body.isShared === true;
+  }
+  if (body.isFavorite !== undefined) {
+    patch.displayOrder = body.isFavorite === true ? -1 : 0;
   }
   const saved = await updateSavedSearch(c.env.DB, existing.id, access, patch);
   if (!saved) return c.json({ success: false, error: '保存検索が見つかりません' }, 404);

@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 250,
-  "unimplemented": 17,
+  "compared": 255,
+  "unimplemented": 12,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 5,
-  "match": 31,
-  "structureMatchDataPending": 40,
-  "needsFix": 158,
-  "unjudged": 22,
-  "remaining": 237,
+  "match": 38,
+  "structureMatchDataPending": 39,
+  "needsFix": 168,
+  "unjudged": 11,
+  "remaining": 230,
   "features": [
     {
       "feature": 1,
@@ -51,11 +51,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 1,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 14,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 14,
       "capturedAt": [
         {
           "pr": 513,
@@ -959,14 +959,14 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 10,
-      "compared": 6,
-      "unimplemented": 4,
+      "compared": 10,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
+      "needsFix": 10,
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
@@ -1127,12 +1127,29 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 6,
       "structureMatchDataPending": 1,
-      "needsFix": 9,
+      "needsFix": 3,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 944,
+          "head": "98abf756a",
+          "on": "2026-09-06",
+          "screens": [
+            "W7LBc",
+            "GFlD7",
+            "FRkls",
+            "NNDMR",
+            "j9ixI",
+            "hsBtl",
+            "J3GxEZ",
+            "M9cij",
+            "NKyoA"
+          ],
+          "note": "割当ポート3104/8791で通常・状態別を含む36枚を撮影。対象9画面は一致6、構造一致・集計未接続1、要修正2。横はみ出し0"
+        },
         {
           "pr": 433,
           "head": "51020a97",
@@ -1514,14 +1531,14 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 6,
-      "unimplemented": 3,
+      "compared": 7,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 3,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
@@ -1846,8 +1863,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 2,
-      "unjudged": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1958,8 +1975,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2029,8 +2046,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 0,
-      "unjudged": 1,
+      "needsFix": 1,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2096,8 +2113,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 1,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
         {
@@ -2276,8 +2293,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 4,
+      "needsFix": 7,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2335,8 +2352,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 2,
-      "needsFix": 1,
-      "unjudged": 1,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2445,8 +2462,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 2,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2568,34 +2585,6 @@
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
     },
     {
-      "feature": 9,
-      "node": "s9gAx",
-      "name": "9-1-A 基本設定",
-      "gap": "drop",
-      "gapNote": "設定はアカウントに1枚。名前もフォルダも優先順位も要らない"
-    },
-    {
-      "feature": 9,
-      "node": "W1wzCa",
-      "name": "9-1-B 流入条件",
-      "gap": "drop",
-      "gapNote": "実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記"
-    },
-    {
-      "feature": 9,
-      "node": "K0Dbr2",
-      "name": "9-1-C 初回案内",
-      "gap": "drop",
-      "gapNote": "最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**"
-    },
-    {
-      "feature": 9,
-      "node": "Q3qP1r",
-      "name": "9-1-I 削除確認",
-      "gap": "drop",
-      "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
-    },
-    {
       "feature": 13,
       "node": "ava2n",
       "name": "13-1-B フォームのデザイン設定",
@@ -2608,13 +2597,6 @@
       "name": "13-1-E フォームの削除確認",
       "gap": "api",
       "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
-    {
-      "feature": 16,
-      "node": "njLGA",
-      "name": "16-1-C 支払い",
-      "gap": "build",
-      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
     },
     {
       "feature": 16,

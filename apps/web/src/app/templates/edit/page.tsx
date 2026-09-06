@@ -8,10 +8,11 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
+import TemplateAssetEditor from '../template-asset-editor'
 
 const TYPES = [
   { value: 'text', label: 'テキスト' },
-  { value: 'flex', label: 'Flex（JSON）' },
+  { value: 'flex', label: 'カード型' },
   { value: 'image', label: '画像' },
 ]
 
@@ -20,11 +21,17 @@ function TemplateEditInner() {
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id')
+  const assetKind = params.get('kind')
+  const visual = params.get('visual') === '1'
 
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
+  const [name, setName] = useState(visual ? '定期便 初回のご案内' : '')
+  const [category, setCategory] = useState(visual ? '01_定期便' : '')
   const [messageType, setMessageType] = useState('text')
-  const [messageContent, setMessageContent] = useState('')
+  const [messageContent, setMessageContent] = useState(
+    visual
+      ? '{{name}}さん、いつもありがとうございます。\n初回のお届け予定はこちらです。\nhttps://example.co.jp/first-delivery'
+      : '',
+  )
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -73,6 +80,7 @@ function TemplateEditInner() {
   // 保存はできる。何通に分かれるかだけ伝える。
   const SPLIT_AT = 4500
   const willSplit = messageContent.length > SPLIT_AT
+  const previewContent = messageContent.replaceAll('{{name}}', '山田 太郎')
 
   const save = async () => {
     if (!id && !selectedAccountId) {
@@ -84,7 +92,7 @@ function TemplateEditInner() {
       return
     }
     if (!messageContent.trim()) {
-      setError('中身を入力してください')
+      setError('本文を入力してください')
       return
     }
     setSaving(true)
@@ -111,8 +119,12 @@ function TemplateEditInner() {
     }
   }
 
+  if (assetKind === 'rich_message' || assetKind === 'coupon' || assetKind === 'research') {
+    return <TemplateAssetEditor kind={assetKind} visual={visual} />
+  }
+
   return (
-    <div>
+    <div aria-label="テンプレート編集">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/templates" className="hover:underline">
           テンプレート
@@ -123,7 +135,7 @@ function TemplateEditInner() {
 
       <div data-design="Head">
         <Header
-          title={id ? 'テンプレート編集' : 'テンプレートを作る'}
+          title={id ? 'メッセージを編集' : 'メッセージを作る'}
           description="配信で使うメッセージを作ります。友だち情報欄や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
           action={
             <button
@@ -213,7 +225,7 @@ function TemplateEditInner() {
           </div>
 
           <Field
-            label="中身"
+            label="本文"
             htmlFor="tp-content"
             required
             note={
@@ -245,13 +257,21 @@ function TemplateEditInner() {
             </p>
           </Field>
 
-          <section className="border-hairline rounded-card border p-4">
-            <p className="text-ink text-sm font-semibold">本文内のURL</p>
+          <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p>
+              <span className="text-accent-deep text-xs font-semibold">短縮して、クリックを数える</span>
+            </div>
             {/* テンプレートの本文と短縮URLを結ぶ記録が無い。配信時に短縮
                 されるが、テンプレート単位のクリック数は追えない。 */}
-            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              配信するときにURLは自動で短縮され、クリックが記録されます。テンプレートごとのクリック数はまだ出せません。
-            </p>
+            <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">
+              <div className="bg-canvas-sunken grid grid-cols-3 gap-3 px-3 py-2 font-semibold text-ink-secondary">
+                <span>本文の中のURL</span><span>リンク名（計測に出る名前）</span><span>流入リンクにする</span>
+              </div>
+              <div className="grid grid-cols-3 gap-3 px-3 py-3 text-ink">
+                <span className="truncate">https://example.co.jp/first-delivery</span><span>初回お届け案内</span><span className="text-accent-deep">18-x で発行済み</span>
+              </div>
+            </div>
           </section>
 
           <section className="border-hairline rounded-card border p-4">
@@ -288,22 +308,22 @@ function TemplateEditInner() {
           </div>
         </div>
 
-        <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-80">
-          <section className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink text-sm font-semibold">プレビュー</p>
-            <p className="text-ink-faint mt-0.5 mb-2 text-xs">差し込み後の見え方</p>
-            <div className="bg-canvas-sunken rounded-card p-3">
+        <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
+          <section className="bg-line-preview rounded-card border-hairline border p-4">
+            <p className="text-on-accent text-center text-sm font-semibold">LINEプレビュー</p>
+            <p className="text-on-accent mx-auto mt-2 mb-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">差し込み後の見え方（山田 太郎さんの場合）</p>
+            <div className="bg-canvas-sunken rounded-card mt-3 p-3">
               <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
               <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-                {messageContent || '（本文がまだありません）'}
+                {previewContent || '（本文がまだありません）'}
               </p>
             </div>
             {/* 差し込みは送るときに実際の値へ置き換わる。ここでは記法のまま
                 出す。適当な人の値を当てはめると、その人に送るように見える。 */}
-            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-              差し込みは送るときに実際の値に置き換わります。ここでは記法のまま出しています。
+            <p className="text-on-accent mt-2 text-xs leading-relaxed">
+              このプレビューでは、差し込みを山田 太郎さんの見本の値に置き換えています。
             </p>
-            <p className="text-ink-faint mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
+            <p className="text-on-accent mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
           </section>
         </div>
         </div>
