@@ -43,6 +43,7 @@ vi.mock('@line-crm/db', () => ({
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),
+  createStepUpGrant: vi.fn(async () => undefined),
   updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
   // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
@@ -261,6 +262,35 @@ describe('Authenticator verification', () => {
     expect(body.csrfToken).toBeTruthy();
     expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
+  });
+
+  test('authenticated operator exchanges a TOTP code for a one-time step-up grant', async () => {
+    const db = await import('@line-crm/db');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    const masterKey = 'test-master-key-which-is-longer-than-32-characters';
+    vi.mocked(db.getStaffById).mockResolvedValueOnce({
+      id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
+      permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
+      totp_secret_enc: await encryptTotpSecret(secret, masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      tenant_id: '00000000-0000-4000-8000-000000000001',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    const response = await app().request('/api/auth/step-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer staff-key' },
+      body: JSON.stringify({
+        purpose: 'operations.control',
+        code: await totpAtStep(secret, Math.floor(Date.now() / 30_000)),
+      }),
+    }, env({ TOTP_ENCRYPTION_KEY: masterKey }));
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { token: expect.any(String), purpose: 'operations.control', expiresAt: expect.any(String) },
+    });
+    expect(db.createStepUpGrant).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      staffId: 'staff-1', purpose: 'operations.control', tokenHash: expect.any(String),
+    }));
   });
 });
 

@@ -71,6 +71,10 @@ interface AutoReply {
   folderId: string | null
   /** 152: 当たった回数（今月・累計）。 */
   hits?: { period: number; total: number }
+  /** 実行台帳で成功を確認できた後続処理の累計。 */
+  actionExecutionCount?: number | null
+  /** 同じ受信に当たり得る、有効な別ルールの数。 */
+  conflictAttentionCount?: number | null
   createdAt: string
   effectiveAccounts?: EffectiveAccount[]
 }
@@ -161,6 +165,7 @@ export default function AutoRepliesPage() {
   const [query, setQuery] = useState('')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [templateListAvailable, setTemplateListAvailable] = useState(true)
+  const [conflictCount, setConflictCount] = useState<number | null>(null)
   /**
    * 読み込みの状態。**「まだ読んでいる」「読めなかった」「権限が無い」を
    * 混ぜない。** 混ぜると、登録したものが消えたように読める。
@@ -186,10 +191,14 @@ export default function AutoRepliesPage() {
     const requestAccountId = selectedAccountId
     const requestGeneration = ++loadGenerationRef.current
     setLoadState('loading')
+    setConflictCount(null)
     try {
-      const [arRes, tplRes] = await Promise.all([
+      const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
         api.templates.list(),
+        selectedAccountId
+          ? api.autoReplies.summary(selectedAccountId).catch(() => null)
+          : Promise.resolve(null),
       ])
       if (!isCurrentAutoReplyLoad(
         requestAccountId,
@@ -204,6 +213,7 @@ export default function AutoRepliesPage() {
         return
       }
       setItems(arRes.data)
+      setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
       setTemplateListAvailable(tplRes.success)
       setTemplates(tplRes.success
         ? tplRes.data.map((t) => ({
@@ -382,6 +392,10 @@ export default function AutoRepliesPage() {
   const totalHits = hitsAllKnown
     ? items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
     : null
+  const actionExecutionsAllKnown = items.every((r) => r.actionExecutionCount != null)
+  const actionExecutionCount = actionExecutionsAllKnown
+    ? items.reduce((sum, r) => sum + (r.actionExecutionCount ?? 0), 0)
+    : null
   // アカウントが変わってから新しい取得が始まるまでの1描画でも、前の一覧を
   // 見せない。取得側の照合と表示側の照合を両方持つ。
   const visibleLoadState = visibleAutoReplyLoadState(
@@ -516,20 +530,24 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">アクション実行</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            —
+            {ready && actionExecutionCount != null ? actionExecutionCount : '—'}
+            {ready && actionExecutionCount != null && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {ready ? '実行結果の集計が接続されると表示します' : LOAD_STATE_WORDS[visibleLoadState].label}
+            {ready
+              ? actionExecutionCount == null ? '実行結果を取得できませんでした' : 'タグ・シナリオなど'
+              : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">要確認</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            —
+            {ready && conflictCount != null ? conflictCount : '—'}
+            {ready && conflictCount != null && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? '競合判定が接続されると表示します'
+              ? conflictCount == null ? '競合判定を取得できませんでした' : '条件重複'
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
