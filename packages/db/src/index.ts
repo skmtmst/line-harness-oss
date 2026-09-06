@@ -54,6 +54,7 @@ export * from './affiliate-report';
 export * from './affiliate-payments';
 export * from './affiliate-settlements';
 export * from './account-settings';
+export * from './ec-operations';
 export * from './webinars';
 
 /**
