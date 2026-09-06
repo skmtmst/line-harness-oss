@@ -41,6 +41,9 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).toContain('data-design-node="HIU5O"')
     expect(FRIEND_DETAIL).toContain('api.friends.mileage')
     expect(FRIEND_DETAIL).toContain('api.mileage.friendsV6')
+    expect(FRIEND_DETAIL).toContain('api.mileage.history')
+    expect(FRIEND_DETAIL).toContain('item.primaryFriendId === friendId')
+    expect(FRIEND_DETAIL).toContain('displayedHistory')
     expect(FRIEND_DETAIL).toContain('v6Friend?.expiringMiles30d')
     expect(FRIEND_DETAIL).toContain('usePageTitle')
     expect(FRIEND_DETAIL).not.toContain('準備中')
@@ -81,6 +84,11 @@ describe('V6 マイルの正本URLと概念分離', () => {
     for (const label of ['ゴールド', 'シルバー', 'ブロンズ', '消える予定', '残高が多い順']) {
       expect(PAGE).toContain(label)
     }
+    expect(PAGE).toContain("rank === 'gold'")
+    expect(PAGE).toContain('displayRank')
+    expect(PAGE).toContain("friend_added: '友だち登録'")
+    expect(PAGE).toContain("broadcast_link_clicked: '配信リンククリック'")
+    expect(PAGE).toContain("inflow_return: 'LINE帰還'")
     expect(PAGE).toContain('増やす・減らす')
     expect(PAGE).toContain('&adjust=1')
     expect(FRIEND_DETAIL).toContain("searchParams.get('adjust') === '1'")

@@ -42,8 +42,10 @@ const TABS = [
 ] as const
 
 const EVENT_LABELS: Record<string, string> = {
+  friend_added: '友だち登録',
   message_received: 'メッセージ',
   link_clicked: 'リンククリック',
+  broadcast_link_clicked: '配信リンククリック',
   form_submitted: 'フォーム',
   booking_created: '予約',
   affiliate_conversion_approved: '紹介成果',
@@ -55,6 +57,7 @@ const EVENT_LABELS: Record<string, string> = {
   instagram_comment_created: 'Instagramコメント',
   instagram_story_mentioned: 'ストーリーズ',
   instagram_line_returned: 'LINE帰還',
+  inflow_return: 'LINE帰還',
   friend_registered: '友だち登録',
   friend_following_7d: '継続7日',
   friend_following_30d: '継続30日',
@@ -67,6 +70,13 @@ const EVENT_LABELS: Record<string, string> = {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ja-JP').format(value)
+}
+
+function rankLabel(rank: string | null) {
+  if (rank === 'gold') return 'ゴールド'
+  if (rank === 'silver') return 'シルバー'
+  if (rank === 'bronze') return 'ブロンズ'
+  return null
 }
 
 function isMileageFriendsV6Overview(value: unknown): value is MileageFriendsV6Overview {
@@ -562,13 +572,14 @@ function MileagePageInner() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {members.map((member) => {
+                  const displayRank = rankLabel(member.rank)
                   return (
                     <tr key={member.friendId} className="hover:bg-gray-50/70">
                       <td className="px-4 py-3">
                         <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
                         <p className="mt-1 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </td>
-                      <td className="px-4 py-4 text-sm text-ink-secondary" title={member.rankReason}>{member.rank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</td>
+                      <td className="px-4 py-4 text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</td>
                       <td className="px-4 py-4 text-right">
                         <p className="font-bold text-accent-hover">{formatNumber(member.available)}</p>
                         {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatNumber(member.pending)}</p>}

@@ -15,6 +15,7 @@ import {
   type FriendDetail,
   type MileageConnectedAccount,
   type MileageFriendV6,
+  type MileageAdminHistoryItem,
   type MileageHistoryItem,
   type MileageSelfInsights,
   type MileageSummary,
@@ -37,6 +38,23 @@ type MileageDetail = {
   connections: MileageConnectedAccount[]
 }
 
+function friendHistoryItem(item: MileageAdminHistoryItem): MileageHistoryItem {
+  return {
+    id: item.id,
+    entryType: item.entryType,
+    status: item.status,
+    amount: item.amount,
+    reason: item.reason,
+    source: item.source,
+    sourceEventId: item.hasSourceEvent ? item.id : null,
+    sourceReferenceId: item.sourceReferenceId,
+    ruleName: item.ruleName,
+    mode: item.mode,
+    executedByStaffName: item.executedByStaffName,
+    occurredAt: item.occurredAt,
+  }
+}
+
 function FriendMileageInner() {
   const searchParams = useSearchParams()
   const friendId = searchParams.get('id') ?? ''
@@ -46,6 +64,7 @@ function FriendMileageInner() {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
   const [v6Friend, setV6Friend] = useState<MileageFriendV6 | null>(null)
+  const [v6History, setV6History] = useState<MileageHistoryItem[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [canAdjust, setCanAdjust] = useState(false)
@@ -58,6 +77,7 @@ function FriendMileageInner() {
       setFriend(null)
       setMileage(null)
       setV6Friend(null)
+      setV6History(null)
       setLoading(false)
       return
     }
@@ -67,10 +87,16 @@ function FriendMileageInner() {
     try {
       const friendResponse = await api.friends.get(friendId)
       if (!friendResponse.success) throw new Error('load_failed')
-      const [mileageResponse, staffResponse, v6Response] = await Promise.all([
+      const [mileageResponse, staffResponse, v6Response, historyResponse] = await Promise.all([
         api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
         api.staff.me().catch(() => null),
         api.mileage.friendsV6({
+          accountId: selectedAccountId,
+          search: friendResponse.data.displayName || undefined,
+          limit: 100,
+          offset: 0,
+        }).catch(() => null),
+        api.mileage.history({
           accountId: selectedAccountId,
           search: friendResponse.data.displayName || undefined,
           limit: 100,
@@ -84,6 +110,11 @@ function FriendMileageInner() {
       setV6Friend(v6Response?.success && Array.isArray(v6Response.data?.items)
         ? v6Response.data.items.find((item) => item.friendId === friendId) ?? null
         : null)
+      setV6History(historyResponse?.success && Array.isArray(historyResponse.data?.items)
+        ? historyResponse.data.items
+          .filter((item) => item.primaryFriendId === friendId)
+          .map(friendHistoryItem)
+        : null)
       setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
       setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))
     } catch {
@@ -91,6 +122,7 @@ function FriendMileageInner() {
       setFriend(null)
       setMileage(null)
       setV6Friend(null)
+      setV6History(null)
       setCanAdjust(false)
       setCanConfigureAdjustmentPolicy(false)
       setError(true)
@@ -131,6 +163,7 @@ function FriendMileageInner() {
   const available = v6Friend?.available ?? mileage.summary.available
   const rewardedActions = mileageRewardedActions(mileage.insights)
   const connectedAccounts = mileageConnectedAccounts(mileage.connections)
+  const displayedHistory = v6History ?? mileage.history
   return (
     <div data-design-node="HIU5O" className="space-y-4">
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
@@ -172,14 +205,14 @@ function FriendMileageInner() {
       </Card>
 
       <Card overflow="hidden">
-        <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${mileage.history.length.toLocaleString('ja-JP')}件`} />
-        {mileage.history.length === 0 ? (
+        <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${displayedHistory.length.toLocaleString('ja-JP')}件`} />
+        {displayedHistory.length === 0 ? (
           <ListState kind="empty" title="マイルの履歴はありません" description="付与や使用が記録されると、ここに理由と日時が表示されます。" />
         ) : (
           <DataTable>
             <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th></tr></thead>
             <tbody>
-              {mileage.history.map((item) => (
+              {displayedHistory.map((item) => (
                 <Tr key={item.id}>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
                   <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
