@@ -3138,7 +3138,7 @@ export const OPERATION_CONTROL_PREVIEW = {
     scopeKey: 'all', lineAccountId: null, version: 8,
     states: OPERATION_RUNNING_STATES, activeIncidentId: null,
     reason: null, actorId: null, stoppedAt: null,
-    updatedAt: '2026-09-07T02:30:00+09:00',
+    updatedAt: '2026-08-25T06:00:00+09:00',
   },
   counts: {
     broadcast_dispatch: 1, scenario_dispatch: 4, reminder_dispatch: 10,
@@ -3148,7 +3148,7 @@ export const OPERATION_CONTROL_PREVIEW = {
   impact: {
     broadcast_dispatch: {
       itemCount: 1, friendCount: 8_486, pendingCount: 1,
-      nearestScheduledAt: '2026-09-08T20:00:00+09:00',
+      nearestScheduledAt: '2026-08-28T20:00:00+09:00',
     },
     scenario_dispatch: { itemCount: 4, friendCount: 486 },
     reminder_dispatch: { itemCount: 10, friendCount: 12 },
@@ -3156,7 +3156,7 @@ export const OPERATION_CONTROL_PREVIEW = {
     auto_reply_dispatch: { itemCount: 10, friendCount: null },
   },
   permissions: { canControl: true },
-  calculatedAt: '2026-09-07T02:30:00+09:00',
+  calculatedAt: '2026-08-25T06:00:00+09:00',
 }
 
 function operationControlSnapshot({ version, activeIncidentId, reason, actorId, stoppedAt, capturedAt, stoppedCapabilities = [] }) {
