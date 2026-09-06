@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 31,
-  "match": 123,
-  "structureMatchDataPending": 123,
+  "match": 126,
+  "structureMatchDataPending": 120,
   "needsFix": 17,
   "unjudged": 5,
-  "remaining": 145,
+  "remaining": 142,
   "features": [
     {
       "feature": 1,
@@ -498,12 +498,28 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 6,
-      "structureMatchDataPending": 8,
+      "match": 7,
+      "structureMatchDataPending": 7,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 8,
+      "remaining": 7,
       "capturedAt": [
+        {
+          "pr": 1121,
+          "head": "1d9e8d36c",
+          "on": "2026-09-07",
+          "screens": [
+            "kk8dz",
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5",
+            "RUxNf",
+            "g2UNV",
+            "NrBkW",
+            "M2b2B"
+          ],
+          "note": "Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。"
+        },
         {
           "pr": 1084,
           "head": "31c2fddcc",
@@ -2808,12 +2824,22 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 4,
+      "match": 2,
+      "structureMatchDataPending": 2,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 2,
       "capturedAt": [
+        {
+          "pr": 1126,
+          "head": "e1126c5c9",
+          "on": "2026-09-07",
+          "screens": [
+            "QSLEH",
+            "W6465r"
+          ],
+          "note": "Issue #370。店舗設定と8件のメニューを実API契約へ接続し、通常・読込中・空・失敗を3107/8794で1440/1920px撮影。全10枚で横はみ出し0、2画面を一致へ更新した。"
+        },
         {
           "pr": 1096,
           "head": "a89279ce7",

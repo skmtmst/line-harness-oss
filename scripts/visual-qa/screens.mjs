@@ -2565,7 +2565,7 @@ export const SCREENS = [
 
   // ── 機能28 予約設定 ─────────────────────────────────────
   /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・店舗共通設定API待ち。** メニュー件数つきの4入口、出している数・最多・受付時間・受付範囲の4指標、設計順の6列表、担当者名、中身を見る・担当を決める・止める／出す、表示件数をそろえた。予約のルールでは全メニューの受付期間・締め切り・キャンセル期限を横並びで確認できる。1440・1920pxとも横はみ出し0。残る差は店舗共通値と営業時間・例外日を返すAPI、設計8件に対して撮影固定データが6件であること。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', clock: '2026-08-26T00:00:00.000Z', verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `e1126c5c9` を3107/8794で再撮影し、★V6設計と一致。** PR #1107 の店舗設定と8件のメニューを実API契約で読み、4入口、出している6件・休止2件、最多メニュー、9:00〜19:00の受付時間、60日先までの受付範囲、設計順の6列表、担当者、料金、公開操作、ページ送りをそろえた。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 QSLEH 1440/1920px screenshots', verdictHead: 'e1126c5c9' },
   { ...BOOKING_SET, node: 'tksPc',
     /*
       スタッフを選ぶまで受付時間が出ない画面。選ばずに撮ると
@@ -2580,9 +2580,10 @@ export const SCREENS = [
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
-    states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で通常・読込・空・失敗を再撮影。構造一致・店舗設定API待ち。** 4入口とV6の4指標を全状態で同じ位置に保ち、読込・失敗は —、空は数えて0と未取得を分けた。失敗時は作成誘導を出さず再読込を表示する。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。残る差は店舗営業時間・共通受付範囲を返すAPIと、設計見本と同量の固定データ。',
-    verdictSource: 'booking-settings-v6/W6465r-{loading,empty,error}.txt + 2026-09-07 screenshots', verdictHead: 'abae52d46',
+    clock: '2026-08-26T00:00:00.000Z',
+    states: { apis: ['**/api/booking/admin/settings*', '**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #370 / UI HEAD `e1126c5c9` を3107/8794で通常・読込中・空・失敗まで再撮影し、★V6設計と一致。** 4入口と4指標を同じ位置に保ち、読込中・失敗は未取得の —、空はメニュー0件と設定未取得を言い分けた。空の返事でも画面全体を落とさず作成誘導を出し、失敗時だけ再読込を出す。通常を含む4状態を1440・1920pxで撮影し、全8枚で横はみ出し0、内部語・壊れ値0件。',
+    verdictSource: 'booking-settings-v6/W6465r.txt + W6465r-{loading,empty,error}.txt + 2026-09-07 normal/loading/empty/error 1440/1920px screenshots', verdictHead: 'e1126c5c9',
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
@@ -3745,6 +3746,54 @@ const ISSUE_325_REVIEW = {
 }
 
 /**
+ * board #366。統合 #1110 後の機能5を3104/8791で起動し、残っていた8 Nodeを
+ * 1440/1920pxで再撮影した。設計1920pxとの目視比較で残る差を記録する。
+ */
+const ISSUE_366_REVIEW = {
+  kk8dz: {
+    verdict: 'match',
+    note: '一致。固定データの1通目を読み、編集値は `{{name}}` のまま保ちながらLINEプレビューだけを「Kentaさん」に差し込み表示した。3段の現在地、9種類のメッセージ、配信の流れ、設定サマリーまで設計と同じ役割・順序で確認した。',
+    source: 'scenarios-v6/kk8dz.txt + scenarios-v6/kk8dz-1440.png + scenarios-v6/kk8dz-1920.png',
+  },
+  r6Gzsu: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。幅広の条件面、AND/OR、実装済み14軸、現在条件、戻る・保存を表示した。撮影対象の固定ステップは条件が空で、対象人数を返す契約と設計のシナリオ専用軸も無いため、選択済み条件と人数は作らず保留した。',
+    source: 'scenarios-v6/r6Gzsu.txt + scenarios-v6/r6Gzsu-1440.png + scenarios-v6/r6Gzsu-1920.png',
+  },
+  hz9ti: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。固定データの3動作を順番・条件・繰り返し制御付きで表示し、追加・変更・削除・並べ替え時はV6下書きAPIへ保存するよう接続した。下書きを読み返す口がなく、契約が保存できるのも5種類までのため、設計の8種類すべては作らず保留した。',
+    source: 'scenarios-v6/hz9ti.txt + scenarios-v6/hz9ti-1440.png + scenarios-v6/hz9ti-1920.png',
+  },
+  EvVO5: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。6種類の開始条件、現在条件、初回のみ/毎回、人数内訳の段を表示し、一致・購読中・新規開始予定・除外を試算APIから読むよう接続した。撮影用固定応答は試算を返さず、4種類の開始条件を保存する契約も無いため、値と無効な選択肢は作らず保留した。',
+    source: 'scenarios-v6/EvVO5.txt + scenarios-v6/EvVO5-1440.png + scenarios-v6/EvVO5-1920.png',
+  },
+  RUxNf: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。対象・開始のきっかけ・配信方式・通数・購読中、4項目の配信前チェック、開始後の影響を設計順に表示し、試算と開始記録を並列で読むよう接続した。固定応答で再開できる対象が設計対象と異なり、試算・開始記録・送信枠も返らないため、未取得項目を確認済みにせず保留した。',
+    source: 'scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-1440.png + scenarios-v6/RUxNf-1920.png',
+  },
+  g2UNV: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API結果待ち。宛先選択後の確認面に、送信先、固定データの全4通、3つの確認項目、LINEプレビュー、本番状態を変えない説明、戻る・開始を表示し、開始記録から直近のテスト送信も読むよう接続した。現行APIは合計送信数だけで通ごとの成否を返さないため、通別結果は作らず保留した。',
+    source: 'scenarios-v6/g2UNV.txt + scenarios-v6/g2UNV-1440.png + scenarios-v6/g2UNV-1920.png',
+  },
+  NrBkW: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。開始成功の案内、配信中状態、4通の一覧、開始履歴への導線を表示し、試算の新規開始予定人数と開始記録の開始日時を読むよう接続した。撮影用固定応答は両APIを返さないため、取得できない日時と人数を作らず明記して保留した。',
+    source: 'scenarios-v6/NrBkW.txt + scenarios-v6/NrBkW-1440.png + scenarios-v6/NrBkW-1920.png',
+  },
+  M2b2B: {
+    route: '/scenarios/results?id=scenario-0',
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API指標待ち。設計対象へ入口を直し、参加428人、完了312人、全4通の到達数、プレビュー、配信した設定を実値で表示した。開始記録を接続して集計値と取得不能理由も読むが、現行APIはLINEの通別開封・クリック・失敗を返せないため「—」と理由を表示して保留した。通常・読込中・取得失敗でも同じ指標構成を保った。',
+    source: 'scenarios-v6/M2b2B.txt + scenarios-v6/M2b2B-{normal,loading,error}.txt + scenarios-v6/M2b2B-{normal,loading,error}-{1440,1920}.png',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -3964,6 +4013,14 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #325で固定データ反映後に再判定。** 設計1920pxと実装1920pxを同じ比較画像に並べ、実装1440/1920pxも確認。${issue325Review.note}`
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png + 2026-09-07 same-input comparison`
     screen.verdictHead = '31c2fddcc'
+  }
+  const issue366Review = ISSUE_366_REVIEW[screen.node]
+  if (screen.feature === 5 && issue366Review) {
+    screen.verdict = issue366Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #366で再撮影・再判定。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue366Review.note}`
+    screen.verdictSource = issue366Review.source
+    screen.verdictHead = '1d9e8d36c'
+    if (issue366Review.route) screen.route = issue366Review.route
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
@@ -4384,6 +4441,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1121, head: '1d9e8d36c', on: '2026-09-07',
+      screens: ['kk8dz', 'r6Gzsu', 'hz9ti', 'EvVO5', 'RUxNf', 'g2UNV', 'NrBkW', 'M2b2B'],
+      note: 'Issue #366 / PR #1121 の差し戻し対応。機能5の8画面を試算・開始記録・V6下書きAPIへ接続し、3104/8791で1440・1920pxと結果画面3状態を撮影。全22枚で横はみ出し0。1画面を一致、契約が返さない値だけを理由付き構造一致・データ待ちとして記録した。' },
     { pr: 1084, head: '31c2fddcc', on: '2026-09-07',
       screens: ['TC1b1', 'kk8dz', 'bV5Vs', 'r6Gzsu', 'hz9ti', 'RUxNf', 'g2UNV'],
       note: 'Issue #325。#1073の固定データを含む木を3104/8791で1440・1920px撮影し、設計1920pxと同じ状態で横並び比較した。全14枚で横はみ出し0。固定データで差が解消した2画面を一致へ更新し、残る5画面は不足する固定値またはAPI契約を理由に残した。' },
@@ -4459,6 +4519,7 @@ export const CAPTURED_AT = {
     { pr: 983, head: '36e8b070b', on: '2026-09-06', screens: ['IAf7j','I6UAdr','bzDn6','YzxU1','r7eSi'], note: 'Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。' },
   ],
   28: [
+    { pr: 1126, head: 'e1126c5c9', on: '2026-09-07', screens: ['QSLEH', 'W6465r'], note: 'Issue #370。店舗設定と8件のメニューを実API契約へ接続し、通常・読込中・空・失敗を3107/8794で1440/1920px撮影。全10枚で横はみ出し0、2画面を一致へ更新した。' },
     { pr: 1096, head: 'a89279ce7', on: '2026-09-07', screens: ['tksPc'], note: 'Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。' },
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
