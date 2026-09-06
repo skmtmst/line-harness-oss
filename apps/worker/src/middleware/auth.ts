@@ -337,6 +337,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/api/integrations/stripe/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
+    // Update service signs the exact body; browser/admin credentials are never accepted here.
+    path === '/api/internal/deployments/events' ||
     // Codex clients sign the exact body with a dedicated shared secret.
     path === '/api/integrations/codex-slack/events' ||
     // Slack button actions are verified with the Slack app signing secret.

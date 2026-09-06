@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 31,
-  "match": 128,
-  "structureMatchDataPending": 118,
-  "needsFix": 17,
+  "match": 140,
+  "structureMatchDataPending": 103,
+  "needsFix": 20,
   "unjudged": 5,
-  "remaining": 140,
+  "remaining": 128,
   "features": [
     {
       "feature": 1,
@@ -1078,12 +1078,24 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 4,
+      "match": 10,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 1,
       "capturedAt": [
+        {
+          "pr": 1135,
+          "head": "a86933ba8",
+          "on": "2026-09-07",
+          "screens": [
+            "cmDfJ",
+            "K7vg2",
+            "nzWIX",
+            "ivDoe"
+          ],
+          "note": "Issue #375。4画面を実API契約へ接続し、統合 #1132 の固定データで3101/8788・1440/1920pxを正式撮影。横はみ出し0。3画面を一致、受信元の保存値を契約が返さない1画面だけ理由付き構造一致・データ待ちとした。"
+        },
         {
           "pr": 1082,
           "head": "c1355bb54",
@@ -1172,11 +1184,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 3,
-      "structureMatchDataPending": 7,
+      "match": 10,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 1079,
@@ -1702,11 +1714,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 4,
+      "match": 3,
+      "structureMatchDataPending": 2,
       "needsFix": 0,
       "unjudged": 2,
-      "remaining": 6,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 436,
@@ -2006,11 +2018,28 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
-      "structureMatchDataPending": 9,
-      "needsFix": 1,
+      "structureMatchDataPending": 6,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
+        {
+          "pr": 1137,
+          "head": "5e1ccd22d",
+          "on": "2026-09-07",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "qlVLJ",
+            "MvZm5",
+            "BmoGY",
+            "HIU5O",
+            "vz0Ji",
+            "k8VCU",
+            "z3PB2"
+          ],
+          "note": "Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。"
+        },
         {
           "pr": 549,
           "head": "0ae3e094",

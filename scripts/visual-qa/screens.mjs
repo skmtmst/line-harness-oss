@@ -1037,33 +1037,34 @@ export const SCREENS = [
     #221 で5段と右サマリーを足した。各段の入力分割は次の修正点として残る。
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で構造一致・集計未接続。** `/auto-replies` を割当ポート3104/8791で1440/1920px撮影（はみ出し0）。設計の4指標、フォルダ、検索、保存した条件、6列表を同Node画像と比較し、行に「部分一致 3語 / テンプレート＋対応マーク」形式の副題を追加。「準備中」は0件。アクション実行数と競合要確認数は一覧APIに集計が無いため `—` と接続条件を表示しており、設計の実数にはできない。取得元 `auto-replies-v6/cmDfJ.txt`。',
-    verdictHead: '235d99f10', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 一覧APIと全体競合集計APIへ接続し、ルール数・今月の応答・累計、アクション実行214回、要確認3件、フォルダ別件数と5行の実データを表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並びで4指標、案内帯、検索・並び順、フォルダ、6列表を比較。両幅とも横はみ出し0で、未接続の `—` は解消した。',
+    verdictSource: 'auto-replies-v6/cmDfJ.png + docs/design-qa/auto-replies-v6/cmDfJ-{1440,1920}.png + cmDfJ.txt',
+    verdictHead: '06d05c170', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 基本設定だけを独立した段に分け、ルール名・フォルダ・優先順位、反応条件要約、ひな形3件、右の設定内容・LINEプレビュー、固定操作帯を設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは社内メモを保存せず、競合件数も基本設定の取得口に無いため、その2値は未接続表示。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・公開版・テンプレート・競合集計APIへ接続し、自動応答名、フォルダ、優先順位、社内メモ、反応条件要約、ひな形3件、過去28日の応答214件、同時に当たるルール2件を実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、社内メモと競合件数の未接続表示は解消した。',
     verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + K7vg2.txt',
-    verdictHead: '1a0b0291e',
+    verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=basic',
 
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 反応条件だけを独立した段に分け、複数キーワードのOR/AND、一致方法、曜日・時間帯・受信元、友だち条件、右の判定要約と過去28日欄を設計順に配置した。友だち条件は「条件を編集」で実際の条件ビルダーを開ける。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。固定データはキーワード1件で、現行APIは受信元と過去28日の該当件数を返さないためデータ待ち。',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で構造一致・契約データ待ち。** 下書きと集計APIへ接続し、キーワード、一致方法、曜日・時間帯、友だち条件、28日間の一致214件、実測受信5,842件と種別内訳（テキスト5,740・画像76・スタンプ26）を表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較、両幅とも横はみ出し0。現行契約は受信メッセージ種別の集計を返すが、設計の「受信元 LINE・メール」の保存値を返さないため、その1項目だけ作り物にせず未表示とした。',
     verdictSource: 'auto-replies-v6/nzWIX.png + docs/design-qa/auto-replies-v6/nzWIX-{1440,1920}.png + nzWIX.txt',
-    verdictHead: '1a0b0291e',
+    verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=trigger',
 
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 返信と後続処理だけを独立した段に分け、返し方、テンプレート/本文、差し込み項目、配信後アクション、待ち時間・連続返信・未一致時、右の返信要約とLINEプレビューを設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは返信遅延と未一致時の別動作を保存しないため、画面では作り物を保存せず未接続理由を表示。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・テンプレートAPIへ接続し、返し方、テンプレート選択、後続処理2件、返信待ち時間、連続返信5分、未一致時の担当者引き継ぎ、有効状態とLINEプレビューを実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、返信遅延と未一致時動作の未接続表示は解消した。',
     verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + ivDoe.txt',
-    verdictHead: '1a0b0291e',
+    verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=response',
 
   },
@@ -1164,29 +1165,29 @@ export const SCREENS = [
   // ── 機能9 友だち追加時の配信 ────────────────────────────
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信',
     states: { apis: ['**/api/friend-add-rules*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を通常・読込・空・失敗・権限不足で1440/1920px撮影し、Pencilと目視比較。** 4指標・2タブ・フォルダ・検索・6列表・ページ送りを同じ情報順にそろえ、最初に送る内容はメッセージ種別とシナリオ名を併記。全12枚で横はみ出し0。**残るもの**：一覧APIにカーソルと総件数、フォルダ作成APIが無いため、ページ番号とフォルダ追加は実データ未接続。',
-    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-normal-1920.png + uLQQc*.txt', verdictHead: 'de8b7c75b', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 新しいルール一覧APIの総件数・カーソル・フォルダを接続し、4指標、2タブ、流入の束、検索、6列表、実内容、ページ送りを実値で表示した。通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで撮影し、全12枚で横はみ出し0。フォルダ追加も専用APIと確認ダイアログへ接続済み。',
+    verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-{normal,loading,empty,error,forbidden}-{1440,1920}.png + Issue #374 visual/text comparison', verdictHead: '60bb0631c', },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定', route: '/friend-add-settings?view=edit&id=rule-referral&step=basic',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** 5段表示、設定名、フォルダ、優先順位、判定対象、社内メモ、実際の状態・直近7日・二重送信を含む設定サマリー、LINEプレビュー、追従操作を表示し、横はみ出し0。**残るもの**：フォルダ追加APIが無く、基本設定からのテスト送信は確認段へ集約している。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 実APIから設定名、フォルダ、優先順位、判定する人、社内メモ、状態、直近7日、二重送信、配信内容、アクションを読み、5段、設定サマリー、LINEプレビュー、追従操作へ表示した。3102/8789の1440/1920pxで横はみ出し0。',
     verdictSource: 'friend-add-v6/s9gAx.txt + s9gAx-1920.png',
-    verdictHead: 'de8b7c75b',
+    verdictHead: '60bb0631c',
   },
   {
     ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件', route: '/friend-add-settings?view=edit&id=rule-referral&step=routes',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** 流入リンクの複数選択、有効期間、優先判定、判定サマリーを同じ左右構造で表示。取れない過去28日人数を0人にせず未取得とし、未接続項目を案内帯で明示した。横はみ出し0。**残るもの**：曜日・時間帯・友だち条件の保存先と過去28日の該当集計APIが無い。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 流入リンクの複数選択、曜日、時間帯、有効期間、友だち条件、優先判定を保存済みルールから表示し、競合集計APIの過去28日214人を判定サマリーへ接続した。3102/8789の1440/1920pxで横はみ出し0。',
     verdictSource: 'friend-add-v6/W1wzCa.txt + W1wzCa-1920.png',
-    verdictHead: 'de8b7c75b',
+    verdictHead: '60bb0631c',
   },
   {
     ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内', route: '/friend-add-settings?view=edit&id=rule-referral&step=message',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・`de8b7c75b` を1440/1920px撮影し、同Nodeの設計本文と文字照合。** テキスト・テンプレート・回答フォーム、本文、シナリオ、送信時刻、設定サマリー、LINEプレビュー、追従操作を同じ構造で表示。未接続項目を案内帯で明示し、横はみ出し0。**残るもの**：選択肢、24時間の再送制限、経路不明時の共通案内／担当者通知を保存するAPIが無い。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** テキスト・テンプレート・回答フォーム・シナリオ、初回本文、後続シナリオ、送信時刻、24時間の再送制限、経路不明時の共通案内と担当者通知の接続状態を保存済みルールから表示した。設定サマリー、LINEプレビュー、追従操作を3102/8789の1440/1920pxで確認し、横はみ出し0。',
     verdictSource: 'friend-add-v6/K0Dbr2.txt + K0Dbr2-1920.png',
-    verdictHead: 'de8b7c75b',
+    verdictHead: '60bb0631c',
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'match',
@@ -1201,20 +1202,20 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
-    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
-    verdictHead: '3d6b7e7e8',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 検証APIの合格結果、保存済みルールの設定名・流入条件・送信時刻・対象・初回案内・アクション・24時間制限、最後のテスト、対象214人、Slack監視の接続状態を表示した。Pencil画像と通常・読込・空・失敗・権限不足を3102/8789の1440/1920pxで目視比較し、全12枚で横はみ出し0。',
+    verdictSource: 'friend-add-v6/ec9vg.png + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png + ec9vg*.txt',
+    verdictHead: 'a0278d076',
     route: '/friend-add-settings/publish',
-    states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/friend-add-rules*', '**/api/friend-add-rules/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
 
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
-    verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
-    verdictHead: '3d6b7e7e8',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `a0278d076`・固定データ PR #1130（統合 #1132）で一致。** 公開APIの第1版・公開日時、保存済みルールの設定名・流入条件・対象・二重送信防止・対象214人・稼働状態を表示し、全STEP完了、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄をPencil画像と目視比較した。3102/8789の1440/1920pxで2枚とも横はみ出し0。複製は機能9の契約外なので誤操作を避けて無効表示にしている。',
+    verdictSource: 'friend-add-v6/quhg6.png + quhg6-{1440,1920}.png + quhg6.txt',
+    verdictHead: 'a0278d076',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
 
@@ -1222,11 +1223,11 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
     route: '/friend-add-settings/runs', mode: 'page',
-    states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #290・UI HEAD `f13421d869` を固定ポート3105/8792で再実装・再判定。** 正常4件、読込、空、失敗を1440/1920pxで撮影し、Pencilの1920px設計画像と横並び比較（全状態で横はみ出し0）。4指標、コンパクトな友だち追加履歴、流入経路内訳、稼働状況、要テスト、担当者シナリオ開始、CSV、絞り込み、必要時だけのページ送り、下部操作をそろえた。通常URL・公式QRの経路は推測せず未取得と表示する。現行APIが返さない累計配信、シナリオ開始件数、平均送信時間、担当者引き継ぎ集計、実行したルール・版・アクション詳細と一時停止操作は未取得または未接続と明示しているためデータ待ち。',
+    states: { apis: ['**/api/friend-add-runs*', '**/api/friend-add-runs/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #374・UI HEAD `60bb0631c`・固定データ PR #1125（統合 #1128）で一致。** 新しい実行結果APIを接続し、直近28日214人、累計1,842通、シナリオ開始198件、エラー3件、平均0.8秒、使用ルール・版、実行アクション、CSV、絞り込み、一時停止を表示した。担当者引き継ぎはAPIが返す「結ぶ記録がない」を未取得理由として表示し、推測値を作っていない。通常・読込・空・失敗を3102/8789の1440/1920pxで撮影し、全10枚で横はみ出し0。',
     verdictSource: 'friend-add-v6/P2J0Te.txt + P2J0Te-{normal,loading,empty,error}-{1440,1920}.png',
-    verdictHead: 'f13421d869',
+    verdictHead: '60bb0631c',
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
@@ -1613,9 +1614,9 @@ export const SCREENS = [
     verdictNote: '**2026-09-06 Issue #254 / UI HEAD 19422a3b7で設計1920pxと実装1440px・1920pxを目視比較。** 上部操作、2タブ、4指標、6行の回答表、ページ送りを設計と同じ順で配置し、両幅とも横はみ出し0を確認した。実回答はAPI側ページングし、全回答CSV・詳細・表示中の検索を備える。開いた実人数・回答単位の書き込み結果・日付項目の全件集計は取得口が無いため、0を作らず `—` と理由を表示する。',
     verdictSource: 'forms-v6/v9tYhl.txt + v9tYhl-{1440,1920}.png + v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
     verdictHead: '19422a3b7',
-    route: '/form-submissions/responses?id=form-visit',
+    route: '/form-submissions/responses?id=form-1',
     states: {
-      apis: ['**/api/forms/form-visit', '**/api/forms/form-visit/submissions*'],
+      apis: ['**/api/forms/form-1', '**/api/forms/form-1/submissions*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     }, },
   {
@@ -1943,7 +1944,7 @@ export const SCREENS = [
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。`N46cQ` と同じ差。4状態は撮れている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像は `docs/design-reference/mileage-v6/` を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。設計と一致。** 読込・空・失敗が分かれ、**実装が設計より2点足している**（未取得と実値0の言い分け、取れていない理由を言葉で出す）。1440・1920とも横スクロール0', verdictSource: 'mileage-v6/k8VCU-error.txt + mileage-v6/design-qa.md',
     route: '/mileage?tab=earning-rules',
-    states: { apis: ['**/api/mileage/rules*', '**/api/mileage/overview*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/mileage/earning-rules*'], kinds: ['loading', 'empty', 'error'] },
     verdictHead: '31293424',
   },
   {
@@ -3074,51 +3075,57 @@ const FEATURE_16_REVIEW = {
 const FEATURE_17_REVIEW = {
   s98Vfw: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #230 / PR #1041 / HEAD 16e2331cb で再実装・再撮影。** Pencil実ノード `s98Vfw` と実装を同じ1920px入力で左右に並べ、1440pxも確認した。4つの集計帯、案内、検索・絞り込み札、固定幅の一覧、明細と手動調整、件数・ページ送りをV6構造へ揃え、横スクロール0。残る未接続はランク、今月の増減、失効予定のAPI値。設計サンプル値を作らず `— 未取得` と理由を表示する。',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。友だち1,284人、残高、保留、友だちごとの今月の増減・失効予定・ランクを実値で表示し、英語ランクは日本語に直した。残る未接続は、今月の増減の全体合計とランク別人数。APIが返さない値は作らず `— 未取得` にした。',
     verdictSource: 'mileage-v6/s98Vfw.txt',
-    verdictHead: '16e2331cb',
+    verdictHead: '5e1ccd22d',
   },
   N46cQ: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。指標、説明、検索、並び替え、CSVを設計順にそろえた。残る差は30日間の付与数と利用範囲を返すAPI、並び替え保存API。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。9本の公開版・下書き版、30日の付与1,281回・対象外27回、有効期限と取消時の扱いを実値で表示。新契約の `friend_added` `broadcast_link_clicked` `inflow_return` も日本語化した。残る差は、公開版の中身を見る導線、利用対象条件の表示、並び順保存。`sortOrder` と `targetConditions` は口にあるので、画面側の修正が残る。',
     verdictSource: 'mileage-v6/N46cQ.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
   },
   qlVLJ: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。ランク3段と行ごとの確認・公開停止操作を追加した。残る差はランク人数・特典名・交換割合を返すAPIと、使い道作成画面 `p9CcEB` の取り込み待ち。',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し通常・読込中・0件・取得失敗を確定撮影。** 1440・1920とも横スクロール0。公開4件、今月の使用18,900マイル・58回、ランク到達人数、各使い道の交換実績を実値で表示。残る未接続は「1回も使っていない人」と、交換で渡す特典の固有名。APIの `null` を0人と決めつけず、理由付きの `—` にした。',
     verdictSource: 'mileage-v6/qlVLJ-normal.txt + qlVLJ-error.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
   },
   MvZm5: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。4つの指標、CSV、残高、操作者を追加し、撮影データも履歴として表示できる形へ正規化した。残る差は期間別の集計値と操作者を返すAPI。',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。期間の4,180件、手動12件、取消3件と履歴行の理由・発生元・操作者を実値で表示した。残る未接続は反映待ち件数、LINEアカウント名、変更後残高。履歴契約に無い値は `— 未取得` と表示した。',
     verdictSource: 'mileage-v6/MvZm5.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
   },
   BmoGY: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。設計の2列構成、LINEプレビュー、追従する状態と保存操作をそろえた。残る差は有効期限・予約取消・15軸条件を保存するAPIが無いこと。未接続項目は選べるように見せず明記した。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。有効期限、予約取消時の差し引き、タグ条件をV6下書きへ保存し、LINEプレビューも表示した。残る差は、15軸から選ぶ条件ビルダーと自動通知の送信口。`targetConditions` はAPIにあるが画面はタグ1軸のみのため、画面側の要修正とする。',
     verdictSource: 'mileage-v6/BmoGY.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
   },
   HIU5O: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で再撮影。** 1440・1920とも横スクロール0。英語単位 `mile` を運用者向けの `マイル` に統一した。残る差はランク進捗・失効予定・つながる先・付与理由別集計を返すAPI。',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。利用可能8,420、失効予定2,100、生涯付与12,400、使用済3,980と接続LINEアカウントを実値で表示。旧口で空だった友だち履歴も新しい全体履歴から友だちIDで絞り、2件接続した。残る未接続はランク進捗、付与理由別集計、履歴の変更後残高。',
     verdictSource: 'mileage-v6/HIU5O.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
+  },
+  vz0Ji: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で新契約へ接続し確定撮影。** 1440・1920とも横スクロール0。増減、理由、調整元ID、有効期限、自動LINE通知、変更前・変更量・変更後の2段確認を実API入力へ接続した。手動返信ではない自動通知のため `X-Line-Harness-Source: manual` は付けない。残る未接続は高額調整の承認境界の固定データで、未設定は安全側に実行を止める。',
+    verdictSource: 'mileage-v6/vz0Ji.txt',
+    verdictHead: '5e1ccd22d',
   },
   k8VCU: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。各状態を混同せず、未取得と実値0を分けて表示する。残る差は N46cQ と同じ集計・利用範囲・並び替え保存API。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で通常・読込中・0件・取得失敗を確定撮影。** 4状態×2幅の8枚はすべて横スクロール0。取得中・0件・取得失敗を混同せず、通常時は30日実績や有効期限を実値で表示した。残る画面差は N46cQ と同じ、公開版の中身を見る導線、利用対象条件、並び順保存。',
     verdictSource: 'mileage-v6/k8VCU.txt + k8VCU-error.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
   },
   z3PB2: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、Issue #230 / PR #914 / HEAD 48742a352 で通常・読込中・0件・取得失敗を再撮影。** 1440・1920とも横スクロール0。撮影データの得点と最終行動を正しく読み、スコアルールへの入口を追加した。残る差は帯ごとの理由を返すAPIと設計見本と同量の固定データ。',
+    verdictNote: '**2026-09-07、Issue #373 / HEAD 5e1ccd22d で通常・読込中・0件・取得失敗を確定撮影。** 4状態×2幅の8枚はすべて横スクロール0。高い・ふつう・低いの帯、30日間の変化、最後の反応を実値で表示し、スコアがマイルと別物である説明も保った。残る未接続は「点数が変わった理由」。固定データは帯集計5人に対し一覧が3人で、数の不一致もデータ側の残りと明記する。',
     verdictSource: 'mileage-v6/z3PB2.txt + z3PB2-error.txt',
-    verdictHead: '48742a352',
+    verdictHead: '5e1ccd22d',
   },
   s6MBc: {
     verdict: 'match',
@@ -3796,6 +3803,33 @@ const ISSUE_366_REVIEW = {
 }
 
 /**
+ * board #368。統合済みのフォーム固定データと回答集計APIを使い、機能13の
+ * 4 Nodeを3104/8791で再撮影した。Pencil 1920pxとの目視比較結果。
+ */
+const ISSUE_368_REVIEW = {
+  EMBIK: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・一覧契約待ち。固定データから6フォームを読み、検索、公開状態、回答数、更新日、回答・編集・削除の操作を表示した。現行の実APIはフォームのフォルダ所属、全件数、今週回答数、保存先の内訳を一覧応答で返さないため、設計の18件・フォルダ別件数・週次値・保存先内訳を作らず保留した。通常・読込中・0件・取得失敗も同じ一覧骨格で確認した。',
+    source: 'forms-v6/EMBIK.txt + forms-v6/EMBIK-{1440,1920}.png + forms-v6/EMBIK-{normal,loading,empty,error}-{1440,1920}.png',
+  },
+  vCqUj: {
+    verdict: 'match',
+    note: '一致。固定フォーム定義から、共通ヘッダを含む9ブロック、質問ごとの入力種別・選択肢・保存先、顧客プレビュー、公開状態、回答URL、回答数、保存操作を表示した。値は運用データで変わるが、配置・項目・操作は一致する。',
+    source: 'forms-v6/vCqUj.txt + forms-v6/vCqUj-{1440,1920}.png',
+  },
+  cSqvP: {
+    verdict: 'match',
+    note: '一致。固定フォーム定義から回答後の3動作、お礼ページ、前回答の復元、ページ名、ボタン文言、見出し、送信前確認、受付期限、1人1回を読み、保存APIへつながるオプション画面を確認した。値は運用データで変わるが、配置・項目・操作は一致する。',
+    source: 'forms-v6/cSqvP.txt + forms-v6/cSqvP-{1440,1920}.png',
+  },
+  v9tYhl: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・撮影用回答データ待ち。実画面はページ分け回答APIのsummaryから、本人確認済み開始数に対する回答率、情報欄へ書けた件数と失敗数、次回来店日の重複を除いた人数を表示し、各回答にも書き込み成否を出すよう接続した。撮影用mockはフォーム定義だけで回答とsummaryを返さないため、0件の通常状態で未取得理由を表示し、設計の6行と実集計値は作らず保留した。通常・読込中・0件・取得失敗を確認した。',
+    source: 'forms-v6/v9tYhl.txt + forms-v6/v9tYhl-{1440,1920}.png + forms-v6/v9tYhl-{normal,loading,empty,error}-{1440,1920}.png',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -4055,6 +4089,13 @@ for (const screen of SCREENS) {
     screen.verdictSource = issue366Review.source
     screen.verdictHead = '1d9e8d36c'
     if (issue366Review.route) screen.route = issue366Review.route
+  }
+  const issue368Review = ISSUE_368_REVIEW[screen.node]
+  if (screen.feature === 13 && issue368Review) {
+    screen.verdict = issue368Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue368Review.note}`
+    screen.verdictSource = issue368Review.source
+    delete screen.verdictHead
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
@@ -4438,6 +4479,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '4af43fb6', on: '2026-09-01', screens: ['festr'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   17: [
+    { pr: 1137, head: '5e1ccd22d', on: '2026-09-07', screens: ['s98Vfw', 'N46cQ', 'qlVLJ', 'MvZm5', 'BmoGY', 'HIU5O', 'vz0Ji', 'k8VCU', 'z3PB2'], note: 'Issue #373。機能17の新しい残高・付与ルール・使い道・履歴契約へ接続し、固定ポート3105/8792で通常と定義済みの全状態を1440/1920px撮影。全画像で横はみ出し0。友だち明細は全体履歴を友だちIDで絞り込んで表示するようにした。残差は画面とAPIに分けて各verdictNoteへ記録。' },
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
@@ -4474,6 +4516,7 @@ export const CAPTURED_AT = {
     { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
+    { pr: 1135, head: 'a86933ba8', on: '2026-09-07', screens: ['cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: 'Issue #375。4画面を実API契約へ接続し、統合 #1132 の固定データで3101/8788・1440/1920pxを正式撮影。横はみ出し0。3画面を一致、受信元の保存値を契約が返さない1画面だけ理由付き構造一致・データ待ちとした。' },
     { pr: 1082, head: 'c1355bb54', on: '2026-09-07', screens: ['K7vg2', 'nzWIX', 'ivDoe', 'U9hzqH', 't7UtYQ'], note: 'Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。' },
     { pr: 955, head: '564c91d0fe', on: '2026-09-06', screens: ['g46ja', 'Yj6CQ', 'e6iJG'], note: '競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。' },
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
