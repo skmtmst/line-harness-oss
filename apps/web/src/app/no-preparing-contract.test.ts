@@ -102,9 +102,6 @@ const REMAINING: Record<string, number> = {
   'app/events/page.tsx': 6,
   'app/form-submissions/edit/page.tsx': 1,
   'app/friends/detail/page.tsx': 1,
-  'app/inflow-links/ad-integration.tsx': 2,
-  'app/inflow-links/detail/page.tsx': 1,
-  'app/inflow-links/page.tsx': 2,
   'app/reminders/page.tsx': 1,
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
@@ -119,7 +116,6 @@ const REMAINING: Record<string, number> = {
   'components/events/event-wizard.tsx': 2,
   'components/friends/bulk-run-dialog.tsx': 1,
   'components/friends/friend-timeline.tsx': 1,
-  'components/inflow-links/site-script.tsx': 5,
 }
 
 describe('画面に「準備中」を置かない', () => {
