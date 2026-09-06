@@ -19,6 +19,9 @@ import {
   getFollowingLineUserIdsByTag,
   getTrackedLinkById,
   getRichMenuTapStats,
+  getRichMenuAudienceStats,
+  recordRichMenuAssignmentsByLineUserIds,
+  clearRichMenuAssignmentsForGroup,
   jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
@@ -102,6 +105,50 @@ function serializeGroupWithPages(row: RichMenuGroupWithPages) {
         trackedLinkId: a.tracked_link_id,
       })),
     })),
+  };
+}
+
+type ExternalLineArea = {
+  bounds?: { x?: number; y?: number; width?: number; height?: number };
+  action?: {
+    type?: string;
+    label?: string;
+    uri?: string;
+    text?: string;
+    displayText?: string;
+    richMenuAliasId?: string;
+  };
+};
+
+/** LINE 未管理メニューの動きを、画面が安全に説明できる最小形へ絞る。 */
+function serializeExternalArea(area: ExternalLineArea) {
+  const type = typeof area.action?.type === 'string' ? area.action.type : 'unknown';
+  const supported = type === 'uri'
+    ? typeof area.action?.uri === 'string'
+    : type === 'message'
+      ? typeof area.action?.text === 'string'
+      : type === 'postback' || type === 'richmenuswitch';
+  return {
+    bounds: {
+      x: typeof area.bounds?.x === 'number' ? area.bounds.x : null,
+      y: typeof area.bounds?.y === 'number' ? area.bounds.y : null,
+      width: typeof area.bounds?.width === 'number' ? area.bounds.width : null,
+      height: typeof area.bounds?.height === 'number' ? area.bounds.height : null,
+    },
+    action: {
+      type,
+      label: typeof area.action?.label === 'string' ? area.action.label : null,
+      url: type === 'uri' && typeof area.action?.uri === 'string' ? area.action.uri : null,
+      text: type === 'message' && typeof area.action?.text === 'string' ? area.action.text : null,
+      displayText: type === 'postback' && typeof area.action?.displayText === 'string'
+        ? area.action.displayText
+        : null,
+      richMenuAliasId: type === 'richmenuswitch' && typeof area.action?.richMenuAliasId === 'string'
+        ? area.action.richMenuAliasId
+        : null,
+      supported,
+      unsupportedReason: supported ? null : 'unsupported_or_incomplete_action',
+    },
   };
 }
 
@@ -608,7 +655,7 @@ richMenuGroups.get('/api/rich-menu-groups/external', async (c) => {
     chatBarText: string;
     selected: boolean;
     size: { width: number; height: number };
-    areas: unknown[];
+    areas: ExternalLineArea[];
   };
 
   // 並列に問い合わせる
@@ -665,6 +712,7 @@ richMenuGroups.get('/api/rich-menu-groups/external', async (c) => {
           chatBarText: m.chatBarText,
           size: m.size,
           areasCount: Array.isArray(m.areas) ? m.areas.length : 0,
+          areas: Array.isArray(m.areas) ? m.areas.map(serializeExternalArea) : [],
           isCurrentDefault: currentDefault === m.richMenuId,
           adminManaged: !!admin,
           adminInfo: admin
@@ -753,15 +801,25 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'line account not found' }, 404);
   }
-  const groups = await getRichMenuGroups(c.env.DB, accountId);
-  // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
-  // 一覧カードでサムネを出すために 1 クエリで JOIN する。
-  let imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
-  if (groups.length > 0) {
-    const placeholders = groups.map(() => '?').join(',');
-    const result = await c.env.DB
-      .prepare(
-        `SELECT
+  try {
+    const groups = await getRichMenuGroups(c.env.DB, accountId);
+    const range = currentMonthRange(jstNow());
+    const [audienceStats, tapStats] = groups.length > 0
+      ? await Promise.all([
+          getRichMenuAudienceStats(c.env.DB, accountId, range.from, range.to, groups),
+          getRichMenuTapStats(c.env.DB, accountId, range.from, range.to),
+        ])
+      : [[], { byGroup: [] }];
+    const audienceByGroup = new Map(audienceStats.map((item) => [item.groupId, item]));
+    const tapsByGroup = new Map(tapStats.byGroup.map((item) => [item.groupId, item.taps]));
+    // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
+    // 一覧カードでサムネを出すために 1 クエリで JOIN する。
+    const imageByGroupId = new Map<string, { key: string; contentType: string | null }>();
+    if (groups.length > 0) {
+      const placeholders = groups.map(() => '?').join(',');
+      const result = await c.env.DB
+        .prepare(
+          `SELECT
             g.id AS group_id,
             COALESCE(
               (SELECT image_r2_key FROM rich_menu_pages WHERE id = g.default_page_id),
@@ -773,25 +831,39 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
             ) AS image_content_type
            FROM rich_menu_groups g
           WHERE g.id IN (${placeholders})`,
-      )
-      .bind(...groups.map((g) => g.id))
-      .all<{ group_id: string; image_r2_key: string | null; image_content_type: string | null }>();
-    for (const r of result.results ?? []) {
-      if (r.image_r2_key) {
-        imageByGroupId.set(r.group_id, {
-          key: r.image_r2_key,
-          contentType: r.image_content_type,
-        });
+        )
+        .bind(...groups.map((g) => g.id))
+        .all<{ group_id: string; image_r2_key: string | null; image_content_type: string | null }>();
+      for (const r of result.results ?? []) {
+        if (r.image_r2_key) {
+          imageByGroupId.set(r.group_id, {
+            key: r.image_r2_key,
+            contentType: r.image_content_type,
+          });
+        }
       }
     }
+    return c.json({
+      success: true,
+      data: groups.map((g) => ({
+        ...serializeGroup(g),
+        thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
+        monthlyStats: {
+          from: range.from,
+          to: range.to,
+          taps: tapsByGroup.get(g.id) ?? 0,
+          uniqueAudience: {
+            value: audienceByGroup.get(g.id)?.monthlyUniqueAudience ?? 0,
+            state: 'partial',
+            reason: 'preexisting_assignments_not_backfilled',
+          },
+        },
+      })),
+    });
+  } catch (error) {
+    console.error('GET /api/rich-menu-groups error:', error);
+    return c.json({ success: false, error: 'リッチメニュー一覧を取得できませんでした' }, 503);
   }
-  return c.json({
-    success: true,
-    data: groups.map((g) => ({
-      ...serializeGroup(g),
-      thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
-    })),
-  });
 });
 
 richMenuGroups.get(
@@ -1439,6 +1511,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
   try {
     const result = await unpublishRichMenuGroup(groupInput, line);
     await markRichMenuGroupUnpublished(c.env.DB, groupId);
+    await clearRichMenuAssignmentsForGroup(c.env.DB, groupId);
     return c.json({ success: true, data: result });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -1548,10 +1621,22 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
 
   try {
     const line = createLineClient(account.channel_access_token);
+    const assignmentRunId = crypto.randomUUID();
     const result = await linkRichMenuBulkChunked(
       line,
       targetPage.line_richmenu_id,
       userIds,
+      async (linkedUserIds, chunkIndex) => {
+        await recordRichMenuAssignmentsByLineUserIds(c.env.DB, {
+          lineAccountId: group.account_id,
+          groupId,
+          lineRichMenuId: targetPage.line_richmenu_id!,
+          lineUserIds: linkedUserIds,
+          reasonKind: tagId ? 'tag_bulk_apply' : 'all_followers_bulk_apply',
+          reasonEventId: assignmentRunId,
+          idempotencyPrefix: `${assignmentRunId}:${chunkIndex}`,
+        });
+      },
     );
     return c.json({ success: true, data: result });
   } catch (e) {

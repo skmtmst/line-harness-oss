@@ -12,7 +12,7 @@ import type {
   SupportMark,
   Tag,
 } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/layout/breadcrumb'
@@ -232,7 +232,7 @@ function SavedSearchEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const { selectedAccountId } = useAccount()
-  const [original, setOriginal] = useState<SavedSearch | null>(null)
+  const [original, setOriginal] = useState<SavedSearchDetail | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [marks, setMarks] = useState<SupportMark[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -244,6 +244,7 @@ function SavedSearchEditInner() {
   /** 保存済みの総数。上限50件までの残りを共有範囲の下に出すために持つ。 */
   const [savedCount, setSavedCount] = useState<number | null>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
+  const [preview, setPreview] = useState<SavedSearchMatchPreview | null>(null)
   const [previewStale, setPreviewStale] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -255,12 +256,15 @@ function SavedSearchEditInner() {
   const recount = useCallback(async () => {
     if (!selectedAccountId || !id) return
     try {
-      const res = await api.friends.list({ accountId: selectedAccountId, savedSearchId: id, limit: 1, includeTags: false })
-      setPreviewCount(res.success ? res.data.total : null)
+      const res = await api.savedSearches.preview(selectedAccountId, { savedSearchId: id, conditions, revision: original?.revision })
+      setPreviewCount(res.success ? res.data.match.total : null)
+      setPreview(res.success ? res.data.match : null)
+      setPreviewStale(false)
     } catch {
       setPreviewCount(null)
+      setPreview(null)
     }
-  }, [id, selectedAccountId])
+  }, [conditions, id, original?.revision, selectedAccountId])
 
   useEffect(() => {
     let cancelled = false
@@ -271,12 +275,13 @@ function SavedSearchEditInner() {
       return
     }
     void Promise.all([
-      api.savedSearches.list(selectedAccountId),
+      api.savedSearches.detail(id, selectedAccountId),
+      api.savedSearches.list(selectedAccountId, { limit: 50 }),
       api.tags.list(),
       api.supportMarks.list(selectedAccountId).catch(() => null),
       api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
       api.friendFields.list(selectedAccountId).catch(() => null),
-    ]).then(([searches, tagResult, markResult, scenarioResult, fieldResult]) => {
+    ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult]) => {
       if (cancelled) return
       if (tagResult.success) setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
@@ -287,8 +292,8 @@ function SavedSearchEditInner() {
         scenarios: scenarioResult?.success !== true,
         fields: fieldResult?.success !== true,
       })
-      setSavedCount(searches.success ? searches.data.length : null)
-      const found = searches.success ? searches.data.find((item) => item.id === id) ?? null : null
+      setSavedCount(searches.success ? searches.summary.total : null)
+      const found = detail.success ? detail.data : null
       if (!found) {
         setError('保存した検索が見つかりません')
         return
@@ -298,13 +303,14 @@ function SavedSearchEditInner() {
       setConditions(normalizeForEdit(found))
       setIsShared(found.isShared)
       setPreviewCount(found.matchCount ?? null)
+      setPreview(found.match)
     }).catch(() => {
       if (!cancelled) setError('保存した検索を読み込めませんでした')
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [id, recount, selectedAccountId])
+  }, [id, selectedAccountId])
 
   const dirty = useMemo(() => {
     if (!original) return false
@@ -331,10 +337,12 @@ function SavedSearchEditInner() {
     setSaving(true)
     setError('')
     try {
-      const res = await api.savedSearches.update(id, selectedAccountId, { name: name.trim(), conditions, isShared })
+      const res = await api.savedSearches.update(id, selectedAccountId, { name: name.trim(), conditions, isShared, expectedRevision: original?.revision ?? 1 })
       if (!res.success) { setError(res.error); return }
-      setOriginal(res.data)
-      setConditions(normalizeForEdit(res.data))
+      const refreshed = await api.savedSearches.detail(id, selectedAccountId)
+      if (!refreshed.success) throw new Error(refreshed.error)
+      setOriginal(refreshed.data)
+      setConditions(normalizeForEdit(refreshed.data))
       setPreviewStale(false)
       await recount()
     } catch (saveError) {
@@ -423,8 +431,14 @@ function SavedSearchEditInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
             <p className="mt-3 text-3xl font-bold tabular-nums text-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
-            <p className="mt-2 text-xs text-ink-faint">{previewStale ? '変更を保存すると再計算します' : '保存済み条件で集計'}</p>
-            <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary" className="mt-3">該当者を確認</Button>
+            <p className="mt-2 text-xs text-ink-faint">{previewStale ? '条件を変更しました。再計算してください' : preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
+            <div className="mt-3 flex flex-wrap gap-2"><Button type="button" onClick={() => void recount()}>人数を再計算</Button><Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary">該当者を確認</Button></div>
+          </section>
+
+          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <h2 className="text-base font-bold text-ink">使うときの参照の仕方</h2>
+            <div className="mt-3 space-y-2 text-sm text-ink-secondary"><p><strong className="text-ink">ライブ参照</strong>　使うたびに条件で数え直し、人の出入りを反映します。</p><p><strong className="text-ink">固定</strong>　保存した時点の人を使い、あとから条件を変えても対象は変えません。</p></div>
+            <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">{original.usedIn?.some((usage) => usage.mode === 'live') ? 'ライブ参照の使用先は、条件を変えると次回実行から対象が変わります。' : '現在、ライブ参照の使用先はありません。'}</p>
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">

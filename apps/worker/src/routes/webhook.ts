@@ -410,19 +410,8 @@ async function handleEvent(
       }
       throw err;
     }
-    if (friendAddEventId && lineAccountId) {
-      try {
-        await markFriendAddEventRouting(db, {
-          eventId: friendAddEventId,
-          lineAccountId,
-          status: routing?.suppressed ? 'suppressed' : 'completed',
-          routingRuleId: routing?.ruleId ?? null,
-          winningRuleVersionId: routing?.ruleVersionId ?? null,
-        });
-      } catch (err) {
-        logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
-      }
-    }
+    let scenarioEnrollmentId = routing?.enrollments[0]?.enrollment.id ?? null;
+    let friendAddDeliveryCount = 0;
 
     if (routing?.routed) {
       for (const { scenarioId, enrollment, resumed } of routing.enrollments) {
@@ -443,7 +432,10 @@ async function handleEvent(
               skipCooldown: true,
             },
           );
-          if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
+          if (sent) {
+            friendAddDeliveryCount += 1;
+            console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
+          }
         } catch (err) {
           logWebhookStepFailure('routed_scenario_delivery', err, lineAccountId, event);
         }
@@ -471,6 +463,7 @@ async function handleEvent(
           // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
           if (!friendScenario) continue; // already enrolled
+          scenarioEnrollmentId ??= friendScenario.id;
 
           // Immediate delivery: step1 が「now 以前」にスケジュールされる場合のみ
           // replyMessage で即時送信する (reply token は無料・push 枠を消費しない)。
@@ -492,10 +485,29 @@ async function handleEvent(
               skipCooldown: true,
             },
           );
-          if (sent) console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
+          if (sent) {
+            friendAddDeliveryCount += 1;
+            console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
+          }
         } catch (err) {
           logWebhookStepFailure('scenario_enrollment', err, lineAccountId, event);
         }
+      }
+    }
+
+    if (friendAddEventId && lineAccountId) {
+      try {
+        await markFriendAddEventRouting(db, {
+          eventId: friendAddEventId,
+          lineAccountId,
+          status: routing?.suppressed ? 'suppressed' : 'completed',
+          routingRuleId: routing?.ruleId ?? null,
+          winningRuleVersionId: routing?.ruleVersionId ?? null,
+          scenarioEnrollmentId,
+          deliveryCount: friendAddDeliveryCount,
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
       }
     }
 
