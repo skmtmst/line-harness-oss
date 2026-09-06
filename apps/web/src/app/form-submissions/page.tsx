@@ -502,7 +502,7 @@ export default function FormSubmissionsPage() {
                   <td className="px-3 py-2.5 text-right text-xs">
                     <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} className="text-accent hover:underline">回答</Link>
                     <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
-                    <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`}>削除</button>
+                    <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
                   </td>
                 </tr>
               )
