@@ -2186,7 +2186,14 @@ export const SCREENS = [
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
-  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 #257の入口追加後に撮影。** 固定写真6枚（未審査3／通したもの2／戻したもの1）で一覧を確認し、一枚表示と「出しているもの」へ実際に移れる。1440・1920とも横スクロール0。自動審査の条件は未接続のまま値を作らず「—」と理由を示す。実運用の写真データと派生画像生成は接続待ち。', verdictSource: 'photos-v6/Qu6Vk.txt' },
+  {
+    ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査',
+    states: { apis: ['**/api/nen-members/photos?*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #235 / UI HEAD 98588d0275 を3105/8792で撮影・目視判定。構造一致・データ待ち。** 実運用の写真一覧と審査用派生画像は接続済み。設計順の4タブ、4指標、説明帯、選択と一括操作、並べる／一枚表示、4列カード、390pxの右欄をそろえた。通常・読込・空・失敗・権限不足の全12枚を1440/1920pxで確認し、横はみ出し0。残る差は審査時間集計・一覧向け注意候補・一括審査APIで、取れない値を0や作り値にせず `—` と接続条件を表示する。AIは確認順の補助に限定し、通す・戻す・公開は必ず人が決めるため、旧設計の自動公開表現には戻さない。',
+    verdictSource: 'photos-v6/Qu6Vk-1920.png + photos-v6/Qu6Vk-{normal,loading,empty,error,forbidden}.txt + Pencil node Qu6Vk',
+    verdictHead: '98588d0275',
+  },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
     states: { apis: ['**/api/nen-members/photos/ph-1*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
