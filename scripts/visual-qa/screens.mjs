@@ -1989,7 +1989,7 @@ export const SCREENS = [
     使われ方・保存した分析が入っている。数は `AnalyticsMetric`
     （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
-  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'match', verdictNote: '**2026-09-06、#233で一致。** KPI4枚、増加を上・減少を下に置く30日グラフ、日付選択時の内訳、同日の施策、経路ごとの実測表を設計画像と見比べた。未取得は0にせず `—`。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/Zxezb.txt + Zxezb-1440.png + Zxezb-1920.png', verdictHead: 'pending-233' },
+  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #924で一致。** KPI4枚、増加を上・減少を下に置く30日グラフ、日付選択時の内訳、同日の施策、経路ごとの実測表を設計画像と見比べた。未取得は0にせず `—`。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/Zxezb.txt + Zxezb-1440.png + Zxezb-1920.png', verdictHead: 'bd8f0482' },
     // ---- 2026-09-02 `a0bb3f44`（#676 マージ後）で撮り直した ----
     // **「データ未接続」は実装の話ではなく、撮影側に口が無かっただけだった。**
     //   `/api/analytics/friends` がモックに無く、既定の器 `{items,total,page,limit}` が返っていた。
@@ -2002,8 +2002,8 @@ export const SCREENS = [
     // #676 の直し（集計できていない値を0と書かない）は
     // `analytics-pending-value-contract.test.ts` が見張っている（わざと戻して落ちるところまで確認済み）。
     // 取得元：`analytics-v6/Zxezb-1440.png`（`a0bb3f44`）
-  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'match', verdictNote: '**2026-09-06、#233で一致。** KPI4枚、時間帯グラフ、配信別の到達・開封・クリック・成果表、取得対象外の理由を設計画像と見比べた。LINEクリックと自社URLクリックは混ぜていない。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/J6Inc.txt + J6Inc-1440.png + J6Inc-1920.png', verdictHead: 'pending-233' },
-  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'match', verdictNote: '**2026-09-06、#233で一致。** 成果・広告費・差し引きのKPI、4段の流れ、経路別の成果・売上・費用・CPA・差し引き、Search Console導線を設計画像と見比べた。費用未接続の経路は差し引きも `—`。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/YBGtm.txt + YBGtm-1440.png + YBGtm-1920.png', verdictHead: 'pending-233' },
+  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #924で一致。** KPI4枚、時間帯グラフ、配信別の到達・開封・クリック・成果表、取得対象外の理由を設計画像と見比べた。LINEクリックと自社URLクリックは混ぜていない。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/J6Inc.txt + J6Inc-1440.png + J6Inc-1920.png', verdictHead: 'bd8f0482' },
+  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #924で一致。** 成果・広告費・差し引きのKPI、4段の流れ、経路別の成果・売上・費用・CPA・差し引き、Search Console導線を設計画像と見比べた。費用未接続の経路は差し引きも `—`。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/YBGtm.txt + YBGtm-1440.png + YBGtm-1920.png', verdictHead: 'bd8f0482' },
   {
     ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage',
     /*
@@ -2015,8 +2015,8 @@ export const SCREENS = [
       apis: ['**/api/analytics/usage*', '**/api/settings/features*'],
       kinds: ['loading', 'empty', 'error'],
     },
-    verdict: 'match', verdictNote: '**2026-09-06、#233で一致。** KPI4枚、未使用を整理する説明帯、利用状況表、中身を見る・片づける導線を設計画像と見比べた。未使用が0または未取得ならカードの片づける操作を出さない。通常・読込・空・失敗を1440px・1920pxで撮影し、横スクロール0。',
-    verdictSource: 'analytics-v6/QQ1SR.txt + QQ1SR-loading.txt + QQ1SR-empty.txt + QQ1SR-error.txt + 1440/1920px screenshots', verdictHead: 'pending-233' },
+    verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #924で一致。** KPI4枚、未使用を整理する説明帯、利用状況表、中身を見る・片づける導線を設計画像と見比べた。未使用が0または未取得ならカードの片づける操作を出さない。通常・読込・空・失敗を1440px・1920pxで撮影し、横スクロール0。',
+    verdictSource: 'analytics-v6/QQ1SR.txt + QQ1SR-loading.txt + QQ1SR-empty.txt + QQ1SR-error.txt + 1440/1920px screenshots', verdictHead: 'bd8f0482' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     gap: 'api',
@@ -2024,10 +2024,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
   },
-  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06、#233で構造一致・データ待ち。** 観測範囲の説明、縦横軸、数えるもの、期間、KPI、行列表、選択マス、保存、CSVを設計順に確認。撮影モックに結果が無く空状態までを1440px・1920pxで確認した。追加条件15個はAPIが `filters: []` 固定のため接続待ちで、必要な接続を画面内に明記。', verdictSource: 'analytics-v6/f5HsX.txt + f5HsX-1440.png + f5HsX-1920.png', verdictHead: 'pending-233' },
-  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06、#233で構造一致・データ待ち。** 上から順に1人1回、判定期間と途中の扱いを説明し、段設定・離脱・対象者・保存・CSVの構造を確認。撮影モックにファネルが無いため作成導線つき空状態までを1440px・1920pxで確認し、横スクロール0。', verdictSource: 'analytics-v6/C2I7ry.txt + C2I7ry-1440.png + C2I7ry-1920.png', verdictHead: 'pending-233' },
-  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'match', verdictNote: '**2026-09-06、#233で一致。** KPI4枚、中継URLだけを数える説明、検索、CSV、リンク元・クリック・実人数・露出分母・率・状態を設計画像と見比べた。APIの16.9を1690%にしていた表示も修正。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/Fh2Qj.txt + Fh2Qj-1440.png + Fh2Qj-1920.png', verdictHead: 'pending-233' },
-  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06、#233で構造一致・データ待ち。** KPI4枚、定義と結果を分ける説明、検索、CSV、一覧、選択した分析の履歴パネルを設計順に実装。撮影モックに保存分析が無いため、作成案内つき空状態までを1440px・1920pxで確認し、横スクロール0。定期レポートは対象外の `URqOA` が未実装のため「なし」と明記した。', verdictSource: 'analytics-v6/dfwD4.txt + dfwD4-1440.png + dfwD4-1920.png', verdictHead: 'pending-233' },
+  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06、台帳 #233・PR #924で構造一致・データ待ち。** 観測範囲の説明、縦横軸、数えるもの、期間、KPI、行列表、選択マス、保存、CSVを設計順に確認。撮影モックに結果が無く空状態までを1440px・1920pxで確認した。追加条件15個はAPIが `filters: []` 固定のため接続待ちで、必要な接続を画面内に明記。', verdictSource: 'analytics-v6/f5HsX.txt + f5HsX-1440.png + f5HsX-1920.png', verdictHead: 'bd8f0482' },
+  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06、台帳 #233・PR #924で構造一致・データ待ち。** 上から順に1人1回、判定期間と途中の扱いを説明し、段設定・離脱・対象者・保存・CSVの構造を確認。撮影モックにファネルが無いため作成導線つき空状態までを1440px・1920pxで確認し、横スクロール0。', verdictSource: 'analytics-v6/C2I7ry.txt + C2I7ry-1440.png + C2I7ry-1920.png', verdictHead: 'bd8f0482' },
+  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #924で一致。** KPI4枚、中継URLだけを数える説明、検索、CSV、リンク元・クリック・実人数・露出分母・率・状態を設計画像と見比べた。APIの16.9を1690%にしていた表示も修正。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/Fh2Qj.txt + Fh2Qj-1440.png + Fh2Qj-1920.png', verdictHead: 'bd8f0482' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06、台帳 #233・PR #924で構造一致・データ待ち。** KPI4枚、定義と結果を分ける説明、検索、CSV、一覧、選択した分析の履歴パネルを設計順に実装。撮影モックに保存分析が無いため、作成案内つき空状態までを1440px・1920pxで確認し、横スクロール0。定期レポートは対象外の `URqOA` が未実装のため「なし」と明記した。', verdictSource: 'analytics-v6/dfwD4.txt + dfwD4-1440.png + dfwD4-1920.png', verdictHead: 'bd8f0482' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
@@ -3108,6 +3108,8 @@ export const CAPTURED_AT = {
   20: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Zxezb','J6Inc','YBGtm','QQ1SR','f5HsX','C2I7ry','Fh2Qj','dfwD4'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
+    { pr: 924, head: 'bd8f0482', on: '2026-09-06', screens: ['Zxezb','J6Inc','YBGtm','QQ1SR','f5HsX','C2I7ry','Fh2Qj','dfwD4'],
+      note: '台帳 #233。PR headの同じ実装を1440px・1920pxで撮影し、22枚すべて横スクロール0。設計との比較は一致5枚、構造一致・データ未接続3枚。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
   21: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['VLMGH','DEX0k','q4lajm','WeXbL','ymXJK','i9sQP'],
