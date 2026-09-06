@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
 import { Suspense } from 'react'
@@ -383,6 +384,23 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
   return (
     <div>
+      <div data-design="Head">
+        <Header
+          title="外部連携"
+          description="外部サービスから受け取る情報と、外部サービスへ送る通知を設定します。"
+          action={
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={() => { window.location.href = '/webhooks?tab=notify' }}>
+                未対応の通知
+              </Button>
+              <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+                {showCreate ? 'キャンセル' : 'Webhookを追加'}
+              </Button>
+            </div>
+          }
+        />
+      </div>
+
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
