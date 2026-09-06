@@ -1007,12 +1007,12 @@ export const SCREENS = [
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #221 で構造一致・集計未接続。** `/auto-replies` を割当ポート3104/8791で1440/1920px撮影（はみ出し0）。設計の4指標、フォルダ、検索、保存した条件、6列表を同Node画像と比較し、行に「部分一致 3語 / テンプレート＋対応マーク」形式の副題を追加。「準備中」は0件。アクション実行数と競合要確認数は一覧APIに集計が無いため `—` と接続条件を表示しており、設計の実数にはできない。取得元 `auto-replies-v6/cmDfJ.txt`。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で構造一致・集計未接続。** `/auto-replies` を割当ポート3104/8791で1440/1920px撮影（はみ出し0）。設計の4指標、フォルダ、検索、保存した条件、6列表を同Node画像と比較し、行に「部分一致 3語 / テンプレート＋対応マーク」形式の副題を追加。「準備中」は0件。アクション実行数と競合要確認数は一覧APIに集計が無いため `—` と接続条件を表示しており、設計の実数にはできない。取得元 `auto-replies-v6/cmDfJ.txt`。',
     verdictHead: '235d99f10', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 で再判定。** 5段表示、右の設定内容、LINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。1440/1920pxとも横はみ出し0。ただし設計は基本設定だけを1画面に収めるのに対し、実装は条件・返信・後続処理まで同じ長い面に並ぶため要修正を維持する。取得元 `auto-replies-v6/K7vg2.txt` と同Node画像。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、右の設定内容、LINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。1440/1920pxとも横はみ出し0。ただし設計は基本設定だけを1画面に収めるのに対し、実装は条件・返信・後続処理まで同じ長い面に並ぶため要修正を維持する。取得元 `auto-replies-v6/K7vg2.txt` と同Node画像。',
     verdictHead: '235d99f10',
     route: '/auto-replies/edit?id=ar-2',
 
@@ -1020,7 +1020,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 で再判定。** 5段表示、複数キーワードの接続説明、過去28日の注意、標準互換15軸／この画面だけの6軸を追加し、1440/1920pxとも横はみ出し0。ただし設計の条件専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/nzWIX.txt` と同Node画像。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、複数キーワードの接続説明、過去28日の注意、標準互換15軸／この画面だけの6軸を追加し、1440/1920pxとも横はみ出し0。ただし設計の条件専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/nzWIX.txt` と同Node画像。',
     verdictHead: '235d99f10',
     route: '/auto-replies/edit?id=ar-2',
 
@@ -1028,7 +1028,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 で再判定。** 5段表示とLINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。返信と後続処理は保存契約へ接続済みで、1440/1920pxとも横はみ出し0。ただし設計の返信専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/ivDoe.txt` と同Node画像。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示とLINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。返信と後続処理は保存契約へ接続済みで、1440/1920pxとも横はみ出し0。ただし設計の返信専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/ivDoe.txt` と同Node画像。',
     verdictHead: '235d99f10',
     route: '/auto-replies/edit?id=ar-2',
 
@@ -1036,7 +1036,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 で再判定。** 読込・失敗・権限不足は3104/8791で1440/1920px撮影し、横はみ出し0。通常状態は撮影用モックに下書きと競合の固定データが無く「下書きを表示できませんでした」になるため、設計の競合順位・勝者・判定例と比較できず要修正を維持する。`scripts/visual-qa/mock-api.mjs` はClaude所有なので変更していない。取得元 `auto-replies-v6/U9hzqH*.txt`。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 読込・失敗・権限不足は3104/8791で1440/1920px撮影し、横はみ出し0。通常状態は撮影用モックに下書きと競合の固定データが無く「下書きを表示できませんでした」になるため、設計の競合順位・勝者・判定例と比較できず要修正を維持する。`scripts/visual-qa/mock-api.mjs` はClaude所有なので変更していない。取得元 `auto-replies-v6/U9hzqH*.txt`。',
     verdictHead: '235d99f10',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 重なりの確認。最初に開く段 */
@@ -1107,7 +1107,7 @@ export const SCREENS = [
     */
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #221 で一致。** `/auto-replies` の行から削除確認を開き、1440/1920pxで撮影（はみ出し0）。対象名、止まる自動返信と後続処理、残る過去履歴、元に戻せないこと、赤い削除操作を同Node画像と比較した。背面の一覧にも行副題を追加し、「準備中」は0件。取得元 `auto-replies-v6/Gy9OK.txt`。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で一致。** `/auto-replies` の行から削除確認を開き、1440/1920pxで撮影（はみ出し0）。対象名、止まる自動返信と後続処理、残る過去履歴、元に戻せないこと、赤い削除操作を同Node画像と比較した。背面の一覧にも行副題を追加し、「準備中」は0件。取得元 `auto-replies-v6/Gy9OK.txt`。',
     verdictHead: '235d99f10',
     mode: 'viewport', height: 1080,
     steps: [{ click: '削除' }],
@@ -1116,7 +1116,7 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #221 で一致。** `/auto-replies` の通常・読込・空・取得失敗を割当ポート3104/8791で各1440/1920px撮影（はみ出し0）。4指標、絞り込み、フォルダ、6列表の骨格を全状態で維持し、空は0件、読めない数は `—`、失敗は再読込を表示。「準備中」と壊れ値は0件。取得元 `auto-replies-v6/q8wSqO*.txt` と同Node画像。',
+    verdictNote: '**2026-09-06 Issue #221 / PR #956 で一致。** `/auto-replies` の通常・読込・空・取得失敗を割当ポート3104/8791で各1440/1920px撮影（はみ出し0）。4指標、絞り込み、フォルダ、6列表の骨格を全状態で維持し、空は0件、読めない数は `—`、失敗は再読込を表示。「準備中」と壊れ値は0件。取得元 `auto-replies-v6/q8wSqO*.txt` と同Node画像。',
     verdictHead: '235d99f10',
     /* **通常も撮る。** 内部の言葉は行の上に出るので、行が無い3状態だけでは見えない。 */
     states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
