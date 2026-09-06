@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
 import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
@@ -19,6 +20,7 @@ import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -100,6 +102,7 @@ function FolderIcon({ className = '' }: { className?: string }) {
  * 友だち追加・クリック・最新追加日は並べ替えられる。
  */
 type RouteSort = 'friends-desc' | 'clicks-desc' | 'latest-desc' | 'name'
+type RouteFilter = 'all' | 'has-friends' | 'no-friends' | 'unconfigured'
 
 const SORT_OPTIONS: Array<{ value: RouteSort; label: string }> = [
   { value: 'friends-desc', label: '友だち追加が多い順' },
@@ -118,6 +121,7 @@ const MERGED_TABS = [
   { key: 'links', label: '流入経路' },
   { key: 'script', label: 'サイトスクリプト' },
   { key: 'ads', label: '広告連携' },
+  { key: 'connections', label: '広告とのつなぎ' },
 ]
 
 function InflowLinksPageInner() {
@@ -138,6 +142,7 @@ function InflowLinksPageInner() {
   // 一覧そのものを引けなかったとき。空（1件も無い）と言い分けるために持つ。
   const [loadFailed, setLoadFailed] = useState(false)
   const [sort, setSort] = useState<RouteSort>('friends-desc')
+  const [filter, setFilter] = useState<RouteFilter>('all')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   // editing state:
@@ -474,11 +479,19 @@ function InflowLinksPageInner() {
     ? accountFilteredRows.filter((row) => !row.genre)
     : accountFilteredRows.filter((row) => row.genre === selectedGenre)
   const normalizedSearch = search.trim().toLocaleLowerCase('ja')
-  const filteredRows = normalizedSearch
+  const searchedRows = normalizedSearch
     ? genreRows.filter((row) =>
         row.name.toLocaleLowerCase('ja').includes(normalizedSearch)
         || row.refCode.toLocaleLowerCase('ja').includes(normalizedSearch))
     : genreRows
+  const filteredRows = searchedRows.filter((row) => {
+    if (filter === 'has-friends') return (row.stats?.friendCount ?? 0) > 0
+    if (filter === 'no-friends') return (row.stats?.friendCount ?? 0) === 0
+    if (filter === 'unconfigured') {
+      return !row.scenarioId && !row.tagId && row.source === 'entry_route'
+    }
+    return true
+  })
   const sortedRows = [...filteredRows].sort((a, b) => {
     if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
     if (sort === 'clicks-desc') return (b.stats?.clickCount ?? 0) - (a.stats?.clickCount ?? 0)
@@ -563,18 +576,6 @@ function InflowLinksPageInner() {
           action={
             <div className="flex flex-wrap gap-2">
               <Button
-                disabled
-                title="マニュアルは準備中です"
-              >
-                マニュアル
-              </Button>
-              <Button
-                disabled
-                title="並び替えは準備中です"
-              >
-                並び替え
-              </Button>
-              <Button
                 onClick={() => setEditingGenre('new')}
               >
                 フォルダを追加
@@ -583,7 +584,7 @@ function InflowLinksPageInner() {
                 href="/inflow-links/new"
                 variant="primary"
               >
-                URLを発行
+                流入リンクをつくる
               </Button>
             </div>
           }
@@ -625,13 +626,13 @@ function InflowLinksPageInner() {
           title="クリック"
           value={summaryAvailable ? totalClicks : null}
           unit="回"
-          detail={summaryAvailable ? '累計' : '取得できません'}
+          detail={summaryAvailable ? '累計' : loading ? '読み込んでいます' : '取得できません'}
         />
         <KpiCard
           title="平均の追加率"
           value={addRate}
           unit="%"
-          detail="クリックのうち"
+          detail={summaryAvailable ? 'クリックした人のうち' : loading ? '読み込んでいます' : '取得できません'}
         />
       </div>
 
@@ -735,8 +736,8 @@ function InflowLinksPageInner() {
                   setSearch('')
                   setPage(1)
                 }}
-                placeholder="流入元名で検索"
-                aria-label="流入元名で検索"
+                placeholder="流入元の名前・REFで検索"
+                aria-label="流入元の名前・REFで検索"
                 className="w-full sm:w-64"
               />
               <Select
@@ -765,7 +766,7 @@ function InflowLinksPageInner() {
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
                 title={selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
               >
-                ＋ このフォルダにURLを発行
+                ＋ このフォルダに流入リンクをつくる
               </Button>
               {/*
                 **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
@@ -775,6 +776,26 @@ function InflowLinksPageInner() {
                 CSVで書き出す
               </Button>
             </div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
+            {([
+              ['all', `すべて ${genreRows.length}`],
+              ['has-friends', `友だち追加あり ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length}`],
+              ['no-friends', `友だち追加なし ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length}`],
+              ['unconfigured', `動きが未設定 ${genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length}`],
+            ] as Array<[RouteFilter, string]>).map(([value, label]) => (
+              <FilterChip
+                key={value}
+                selected={filter === value}
+                onChange={() => {
+                  setFilter(value)
+                  setPage(1)
+                }}
+              >
+                {label}
+              </FilterChip>
+            ))}
           </div>
 
           {/*
@@ -816,7 +837,7 @@ function InflowLinksPageInner() {
           title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
           description={
             selectedGenre
-              ? '「このフォルダにURLを発行」から作ると、ここに出ます。'
+              ? '「このフォルダに流入リンクをつくる」から作ると、ここに出ます。'
               : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
           }
         />
@@ -845,7 +866,7 @@ function InflowLinksPageInner() {
                   REF
                 </Th>
                 <Th>
-                  Pool
+                  追加先
                 </Th>
                 <Th>
                   シナリオ
@@ -854,7 +875,7 @@ function InflowLinksPageInner() {
                   自動付与
                 </Th>
                 <Th>
-                  モード
+                  同時に動く配信
                 </Th>
                 <Th align="right">
                   友だち追加
@@ -905,7 +926,7 @@ function InflowLinksPageInner() {
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
                             className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-hover"
-                            title="tracked_links 登録済み — クリック計測 + シナリオ起動が設定されています。Pool 振り分けは持ちません。"
+                            title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
                           </span>
@@ -915,7 +936,7 @@ function InflowLinksPageInner() {
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
                             className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-[9px] text-status-warn-deep"
-                            title="entry_routes / tracked_links いずれにも未登録 — X Harness など外部システムが発行した ref。流入実績のみ集計。"
+                            title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
                           </span>
@@ -931,14 +952,14 @@ function InflowLinksPageInner() {
                       ) : r.source === 'tracked_link' ? (
                         <span
                           className="text-ink-faint"
-                          title="tracked_links は Pool 振り分けを持ちません (グローバルデフォルトに従う)。"
+                          title="追加先の振り分けは全体設定に従います。"
                         >
                           —
                         </span>
                       ) : (
                         <span
                           className="text-ink-faint"
-                          title="DB に pool_id 未設定。実行時は URL クエリ ?pool= で振り分けられている可能性あり。"
+                          title="追加先が設定されていません。"
                         >
                           未設定
                         </span>
@@ -1212,12 +1233,15 @@ function ReferralQrModal({
 
 function InflowLinksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const params = useSearchParams()
+  const adView = params.get('view') === 'history' ? 'history' : 'connections'
   return (
     <div>
       <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
       {tab === 'links' && <InflowLinksPageInner />}
       {tab === 'script' && <SiteScript />}
-      {tab === 'ads' && <AdIntegration />}
+      {tab === 'ads' && <AdIntegration view="metrics" />}
+      {tab === 'connections' && <AdIntegration view={adView} />}
     </div>
   )
 }

@@ -1,13 +1,16 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import StickyBar from '@/components/shared/sticky-bar'
+import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
+import { useAccount } from '@/contexts/account-context'
 import {
   folderSaveErrorMessage,
   isCurrentFolderRequest,
@@ -37,11 +40,13 @@ const COLORS: ReadonlyArray<{ value: string; name: string }> = [
 function FolderEditor() {
   const router = useRouter()
   const params = useSearchParams()
+  const { selectedAccountId } = useAccount()
   const editId = params.get('id')
   const [name, setName] = useState('')
   const [color, setColor] = useState(COLORS[0].value)
   const [scope, setScope] = useState<'tag' | 'friend_field'>('tag')
   const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [error, setError] = useState('')
   const activeRequestRef = useRef<FolderRequestKey>({ editId, generation: 0 })
   /**
@@ -54,7 +59,10 @@ function FolderEditor() {
 
   // 画面名は共通トップバーだけに置く（`docs/v6-common-rules.md` §1）。
   // 本文に大見出しを戻すと、上部バーと同じ文字が2つ並ぶ。
-  usePageTitle(editId ? 'フォルダを編集' : 'フォルダを追加')
+  usePageTitle('友だち属性')
+
+  const close = () => router.push('/tags')
+  const dialogRef = useOverlayFocus(!deleteOpen, close, saving)
 
   const loadFolder = () => {
     const request = {
@@ -128,6 +136,29 @@ function FolderEditor() {
     }
   }
 
+  const remove = async () => {
+    if (!editId || saving) return
+    const request = { ...activeRequestRef.current }
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api.tagGroups.delete(editId)
+      if (!result.success) throw new Error('delete_failed')
+      if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
+      router.push('/tags')
+    } catch (reason) {
+      if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
+      setDeleteOpen(false)
+      setError(folderSaveErrorMessage(reason instanceof ApiError ? reason.status : undefined))
+    } finally {
+      if (isCurrentFolderRequest(activeRequestRef.current, request)) setSaving(false)
+    }
+  }
+
+  const closeFromBackdrop = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget && !saving) close()
+  }
+
   /**
    * 保存を止めている理由。**押せないだけにしない。**
    * 何が足りないのか本文に出さないと、直しようがないまま詰まる。
@@ -141,19 +172,26 @@ function FolderEditor() {
 
   return (
     <div data-design="friend-attributes-folder-v4" data-design-node="byqIW">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-ink-secondary text-sm">タグや友だち情報欄を、運用目的ごとに整理します。</p>
-          <nav className="text-ink-faint mt-3 text-xs">
-            <Link href="/tags" className="text-action hover:underline">友だち属性</Link>
-            <span className="mx-2">›</span>
-            {editId ? 'フォルダを編集' : 'フォルダを追加'}
-          </nav>
-        </div>
-        <Link href="/tags" className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium">友だち属性へ</Link>
-      </header>
-
-      <section className="rounded-card border-hairline bg-canvas mx-auto w-full max-w-[720px] border p-7 [box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]">
+      {/* 設計 byqIW はタグ一覧を残したまま、追加・編集で同じ窓を重ねる。 */}
+      <TagsPageV4 accountId={selectedAccountId} />
+      <div
+        ref={dialogRef}
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4"
+        onMouseDown={closeFromBackdrop}
+      >
+        <section
+          className="rounded-card border-hairline bg-canvas flex max-h-full w-full max-w-[720px] flex-col overflow-hidden border shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="folder-editor-title"
+        >
+          <header className="border-hairline border-b px-7 py-5">
+            <h2 id="folder-editor-title" className="text-xl font-bold text-ink">
+              {editId ? 'フォルダを編集' : 'フォルダを追加'}
+            </h2>
+            <p className="text-ink-secondary mt-1 text-sm">タグや友だち情報欄を、運用目的ごとに整理します。</p>
+          </header>
+          <div className="min-h-0 overflow-y-auto px-7 py-6">
         {loadState === 'forbidden' ? (
           <p className="text-ink-secondary text-sm">見る権限がありません</p>
         ) : (
@@ -249,16 +287,34 @@ function FolderEditor() {
             )}
 
             <StickyBar
+              className="mt-6"
+              destructive={editId ? (
+                <Button type="button" className="border-danger/30 text-danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
+                  このフォルダを削除
+                </Button>
+              ) : undefined}
               actions={(
                 <>
-                  <Button type="button" onClick={() => router.back()}>キャンセル</Button>
+                  <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium disabled:opacity-40">キャンセル</button>
                   <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</Button>
                 </>
               )}
             />
           </>
         )}
+          </div>
       </section>
+      </div>
+      <ConfirmDialog
+        open={deleteOpen}
+        title={`「${name}」を削除しますか？`}
+        description="フォルダだけを削除します。中にあるタグは削除されず、未分類へ戻ります。"
+        confirmLabel="このフォルダを削除"
+        destructive
+        busy={saving}
+        onCancel={() => { if (!saving) setDeleteOpen(false) }}
+        onConfirm={() => void remove()}
+      />
     </div>
   )
 }

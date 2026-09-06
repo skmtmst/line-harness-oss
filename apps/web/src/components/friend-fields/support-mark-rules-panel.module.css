@@ -28,6 +28,7 @@
 .rowBody { display: flex; flex-direction: column; gap: 2px; flex: 1 1 220px; min-width: 0; }
 .rowName { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; }
 .rowMeta { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.rowDetail { color: var(--color-ink-faint); font-size: var(--text-nano); }
 .dot { color: var(--color-ink-faint); }
 .rowActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .on, .off { border-radius: var(--radius-pill); padding: 2px 10px; font-size: var(--text-nano); font-weight: 700; }

@@ -12,16 +12,7 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 import SelectField from '@/components/shared/select-field'
 
-/**
- * リンクを発行する（設計 V2 6-2-2）。
- *
- * 設計は「どのリンクか → このリンクから友だちになったとき → 貼り付けて使うURL」
- * の3節。何が起きるかを、貼る前に読み切れる形にしてある。
- *
- * 設計はここだけ「ジャンル」と呼んでいるが、一覧（6-2）とタグ・テンプレート・
- * シナリオの各画面は「フォルダ」なので、こちらに揃えた。同じものが2つの名前を
- * 持つと、画面を行き来したときに別の機能に見える。
- */
+/** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
 /** ref コードはURLに出る。日本語や記号を許すと /r/xxx が壊れる。 */
 const REF_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/
@@ -87,27 +78,24 @@ export default function NewInflowLinkPage() {
     }
   }, [])
 
-  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const validRef = REF_PATTERN.test(refCode)
-  const previewUrl = validRef ? `${workerBase}/r/${refCode}` : null
 
   return (
     <CreatePage
-      title="リンクを発行する"
+      title="流入リンクをつくる"
       description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
       parent={['流入と計測', '/inflow-links']}
-      saveLabel="リンクを発行"
+      saveLabel="発行してURLを受け取る"
+      successHref={(id) => `/inflow-links/detail?id=${id}`}
+      designNode="TEVk8"
+      variant="v6"
+      statusLabel="まだ発行されていません。発行すると、すぐにこのURLが使えます。"
       validate={() => {
         if (!name.trim()) return 'リンク名を入力してください'
         if (!validRef) {
           return 'refコードは、半角英小文字・数字・ハイフンで2〜64文字にしてください'
         }
         return null
-      }}
-      onReset={() => {
-        setName('')
-        setRefCode('')
-        setRefTouched(false)
       }}
       onSave={async () => {
         const res = await api.entryRoutes.create({
@@ -125,16 +113,26 @@ export default function NewInflowLinkPage() {
         return res.data.id
       }}
       aside={
-        <AsideCard title="気をつけること">
-          <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
-            <li>・refコードはあとから変更できません</li>
-            <li>・同じ人が別のリンクから再度追加しても、最初の経路が残ります</li>
-            <li>・フォルダはあとから移動できます</li>
-          </ul>
-        </AsideCard>
+        <>
+          <AsideCard title="お客さまはこの順に進みます">
+            <ol className="space-y-3 text-xs leading-relaxed text-ink-secondary">
+              <FlowStep step="1" title="案内や広告を見る" description="投稿・広告・チラシなどの案内を見ます。" />
+              <FlowStep step="2" title="このURLを一瞬だけ通る" description="画面には何も出ません。ここで経路を記録します。" />
+              <FlowStep step="3" title="LINEの友だち追加が開く" description="いつもの追加画面で、友だち追加をします。" />
+              <FlowStep step="4" title="あいさつとシナリオが届く" description="左で決めた動きが、この瞬間に始まります。" />
+            </ol>
+          </AsideCard>
+          <AsideCard title="気をつけること">
+            <ul className="space-y-2 text-xs leading-relaxed text-ink-faint">
+              <li>REFを変えると別の経路になります。</li>
+              <li>印刷ずみのQRコードは古いREFのままです。</li>
+              <li>LINEの追加ボタンを直接置くと数えられません。かならず発行したURLを通してください。</li>
+            </ul>
+          </AsideCard>
+        </>
       }
     >
-      <FormSection step={1} label="どのリンクか">
+      <FormSection step={1} label="どこに置くリンクですか">
         <Field label="フォルダ" htmlFor="ir-genre" note="選んだフォルダの中に追加されます。">
           <input
             id="ir-genre"
@@ -146,7 +144,7 @@ export default function NewInflowLinkPage() {
           />
         </Field>
 
-        <Field label="リンク名" htmlFor="ir-name" required note="管理画面での呼び名です。">
+        <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
           <input
             id="ir-name"
             type="text"
@@ -161,12 +159,12 @@ export default function NewInflowLinkPage() {
         </Field>
 
         <Field
-          label="refコード"
+          label="REF（URLに入る文字）"
           htmlFor="ir-ref"
           required
           note={
             <>
-              URLの末尾に使われます。半角英小文字・数字・ハイフンで2〜64文字。
+              URLの末尾に使います。半角英小文字・数字・ハイフンで2〜64文字。
               <br />
               <strong>あとから変えられません。</strong>配ったURLが使えなくなるためです。
             </>
@@ -186,7 +184,7 @@ export default function NewInflowLinkPage() {
         </Field>
       </FormSection>
 
-      <FormSection step={2} label="このリンクから友だちになったとき">
+      <FormSection step={2} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
         <Field
           label="タグを自動で付ける"
           htmlFor="ir-tag"
@@ -246,24 +244,6 @@ export default function NewInflowLinkPage() {
           />
         </Field>
 
-        <Field
-          label="追加先アカウント"
-          htmlFor="ir-pool"
-          note="選ばないと、全体の既定の振り分けに従います。"
-        >
-          <SelectField
-            id="ir-pool"
-            value={poolId}
-            onChange={(e) => setPoolId(e.target.value)}
-            aria-label="友だちの追加先アカウント"
-            className={inputClass}
-            options={[
-              { value: '', label: 'メインプールで自動振り分け' },
-              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
-            ]}
-          />
-        </Field>
-
         {/* 有効期限を持つ列が無い。入れられるように見せると、期限が来ても
             止まらないリンクができる。 */}
         <Field label="有効期限" note="期限での自動停止は、まだ保存する場所がありません。">
@@ -303,30 +283,43 @@ export default function NewInflowLinkPage() {
         </label>
       </FormSection>
 
-      <FormSection step={3} label="貼り付けて使うURL" note="保存すると確定します。">
-        <div className="border-hairline rounded-control flex items-center gap-2 border px-3 py-2">
-          <code className="text-ink-secondary min-w-0 flex-1 truncate text-xs">
-            {previewUrl ?? 'refコードを入れると出ます'}
-          </code>
-          <button
-            disabled
-            title="保存すると押せるようになります"
-            className="border-hairline text-ink-faint rounded-control border px-2 py-1 text-xs opacity-50"
-          >
-            コピー
-          </button>
-        </div>
-        <p className="text-ink-faint text-xs">
-          チラシや店頭POPにはQRコードが便利です。
-          <button
-            disabled
-            title="保存すると押せるようになります"
-            className="border-hairline text-ink-faint rounded-control ml-2 border px-2 py-1 opacity-50"
-          >
-            QRコードを保存
-          </button>
+      <FormSection step={3} label="どのLINEアカウントに入れるか">
+        <Field
+          label="入れるアカウント"
+          htmlFor="ir-pool"
+          note="選ばないと、全体の既定の振り分けに従います。"
+        >
+          <SelectField
+            id="ir-pool"
+            value={poolId}
+            onChange={(e) => setPoolId(e.target.value)}
+            aria-label="友だちの追加先アカウント"
+            className={inputClass}
+            options={[
+              { value: '', label: 'メインプールで自動振り分け' },
+              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+            ]}
+          />
+        </Field>
+        <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-faint">
+          いっぱいのときの振り分けは、LINEアカウント側の設定に従います。
+        </p>
+      </FormSection>
+
+      <FormSection step={4} label="発行されるURL">
+        <p className="rounded-control bg-canvas-sunken px-3 py-3 text-xs leading-relaxed text-ink-faint">
+          発行に成功すると、通常のURLを詳細画面でコピーできます。短いURLとQR画像は、発行APIが対応したあとに同じ詳細画面へ表示します。
         </p>
       </FormSection>
     </CreatePage>
+  )
+}
+
+function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
+  return (
+    <li className="flex gap-2">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{step}</span>
+      <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
+    </li>
   )
 }
