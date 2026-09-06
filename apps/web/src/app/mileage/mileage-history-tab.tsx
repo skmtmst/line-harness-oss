@@ -4,9 +4,11 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
+import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
-import { api, type MileageAdminHistory, type MileageHistoryItem } from '@/lib/api'
+import { api, type MileageAdminHistory, type MileageAdminHistoryItem, type MileageHistoryItem } from '@/lib/api'
 import {
   formatMileageChange,
   formatMileageDate,
@@ -22,6 +24,31 @@ const PAGE_SIZE = 50
 type EntryTypeFilter = '' | MileageHistoryItem['entryType']
 type StatusFilter = '' | MileageHistoryItem['status']
 type ModeFilter = '' | 'automatic' | 'manual'
+
+type HistoryRow = Partial<{
+  friendId: string
+  friendName: string
+  balanceAfter: number
+  createdAt: string
+  entryType: string
+  status: string
+  primaryFriendId: string
+  displayName: string
+  occurredAt: string
+}>
+
+function historyView(item: MileageAdminHistoryItem) {
+  const raw = item as unknown as HistoryRow
+  return {
+    ...item,
+    primaryFriendId: item.primaryFriendId || raw.friendId || '',
+    displayName: item.displayName || raw.friendName || '名前未取得',
+    entryType: (raw.entryType === 'earn' ? 'grant' : raw.entryType ?? item.entryType) as MileageHistoryItem['entryType'],
+    status: (raw.status === 'confirmed' ? 'available' : raw.status ?? item.status) as MileageHistoryItem['status'],
+    balanceAfter: typeof raw.balanceAfter === 'number' ? raw.balanceAfter : null,
+    occurredAt: item.occurredAt || raw.createdAt || '',
+  }
+}
 
 export default function MileageHistoryTab({ accountId }: { accountId: string }) {
   const requestRef = useRef(0)
@@ -85,8 +112,42 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
   const total = mileagePaginationTotal(result)
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE))
 
+  const exportHistoryCsv = () => {
+    if (items.length === 0) return
+    const rows = items.map(historyView).map((item) => [
+      item.occurredAt,
+      item.displayName,
+      item.amount,
+      item.reason,
+      item.balanceAfter ?? '',
+      item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : '自動',
+    ])
+    const csv = [['日時', '友だち', '増減', '理由', '残高', 'だれが'], ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .join('\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard variant="v6" title="この30日の記録" value={total} unit="件" detail="付与・使用の内訳は未取得" />
+        <SummaryCard variant="v6" title="手で動かした分" value={null} unit="件" detail="期間別の集計口は未接続" badge="未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="取り消し" value={null} unit="件" detail="期間別の集計口は未接続" badge="未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="反映を待っている" value={null} unit="件" detail="待機中の集計口は未接続" badge="未取得" badgeTone="neutral" />
+      </div>
+
+      <NoteBar>マイルが増えた・減った記録です。手で増やしたものは理由と担当者が残り、あとから辿れます。</NoteBar>
+
+      <div className="flex justify-end">
+        <Button onClick={exportHistoryCsv} disabled={items.length === 0}>履歴をCSVで書き出す</Button>
+      </div>
+
       <div className="rounded-card border border-hairline bg-canvas p-4">
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid w-52 gap-1 text-xs font-semibold text-ink-secondary">
@@ -159,29 +220,29 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
           />
         ) : (
           <DataTable>
-            <thead><tr><Th>友だち</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th>理由</Th><Th>発生元</Th><Th>発生日時</Th></tr></thead>
+            <thead><tr><Th>いつ・だれに</Th><Th align="right">増減</Th><Th>なぜ</Th><Th align="right">残高</Th><Th>だれが</Th><Th align="right">操作</Th></tr></thead>
             <tbody>
-              {items.map((item) => (
-                <Tr key={item.id}>
+              {items.map((rawItem) => {
+                const item = historyView(rawItem)
+                return <Tr key={item.id}>
                   <NameCell
-                    name={<Link href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`} className="font-semibold text-accent hover:underline">{item.displayName}</Link>}
-                    sub="マイル明細を見る"
+                    name={<><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time><span className="mx-1">／</span><Link href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`} className="font-semibold text-accent hover:underline">{item.displayName}</Link></>}
+                    sub="LINEアカウントは未取得"
                   />
+                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)}</span></Td>
                   <Td>
-                    <p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p>
-                    <p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}・{item.mode === 'manual' ? '手動' : '自動'}</p>
-                  </Td>
-                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
-                  <Td><p className="max-w-52 truncate font-medium text-ink" title={item.reason}>{item.reason}</p><p className="mt-1 text-xs text-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : item.ruleName ?? 'ルール情報なし'}</p></Td>
-                  <Td>
-                    <p>{mileageSourceLabel(item.source)}</p>
-                    <p className="mt-1 text-xs text-ink-faint">
+                    <p className="max-w-52 truncate font-medium text-ink" title={item.reason}>{item.reason}</p>
+                    <p className="mt-1 text-xs text-ink-faint">{mileageEntryTypeLabel(item.entryType)}・{mileageStatusLabel(item.status)}</p>
+                    <p className="mt-1 text-xs text-ink-faint">{mileageSourceLabel(item.source)}</p>
+                    <p className="text-xs text-ink-faint">
                       {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: item.hasSourceEvent })}
                     </p>
                   </Td>
-                  <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
+                  <Td align="right" className="tabular-nums">{item.balanceAfter === null ? <span className="text-ink-faint">— 未取得</span> : item.balanceAfter.toLocaleString('ja-JP')}</Td>
+                  <Td>{item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}</Td>
+                  <Td align="right"><Button href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`}>友だちを見る</Button></Td>
                 </Tr>
-              ))}
+              })}
             </tbody>
           </DataTable>
         )}

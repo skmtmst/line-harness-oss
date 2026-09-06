@@ -41,7 +41,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作41個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作39個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -74,7 +74,9 @@ describe('標準ボタンの第1段階移行', () => {
     //   今回は**押すと実際に書き出せる**ものとして戻す。42 → 43。
     // 2026-09-04: 取得失敗の再読み込み2個は、画面ごとの `action` から
     // `ListState.onRetry` へ移した。共通部品が描くので、この7ルートでは数えない。
-    expect(openings).toHaveLength(41)
+    // 2026-09-06: 流入と計測の見出しから、押しても目的地が無い
+    // マニュアルと並び替えの2操作を外した。41 → 39。
+    expect(openings).toHaveLength(39)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(16)
   })
 
@@ -238,7 +240,9 @@ describe('標準ボタンの第1段階移行', () => {
     // 225 から合わせて締め直す。**減ったので締め直す。**
     // 2026-09-04: ダッシュボード編集のタブとキャンセルを
     // 共通Buttonへ寄せたため、さらに2つ減らした。
-    expect(debt['direct-secondary-button']).toBe(220)
+    // 2026-09-06: 機能18の押せない操作と自前ボタンを整理し、10個減った。
+    // 流入経路の絞り込みも共通FilterChipへ寄せ、さらに1個減った。
+    expect(debt['direct-secondary-button']).toBe(209)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -304,7 +308,8 @@ describe('標準ボタンの第1段階移行', () => {
     // テンプレート一覧から内部の値 `category` の行を外し、素の選び口を
     // 共通部品へ寄せたぶんで減った。**両方が動いたので実測へ締め直す。**
     // 2026-09-04: 共通情報一覧から旧 `max-w-[18rem]` を外して1178。
-    expect(debt['arbitrary-value']).toBe(1178)
+    // 2026-09-06: 流入と計測のV6化で任意値指定が2つ減ったため、実測へ締め直す。
+    expect(debt['arbitrary-value']).toBe(1176)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

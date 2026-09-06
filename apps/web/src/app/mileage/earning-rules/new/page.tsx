@@ -4,6 +4,7 @@ import SelectField from '@/components/shared/select-field'
 import { useEffect, useMemo, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -125,10 +126,11 @@ const DAILY_CAPS = [
 ]
 
 export default function NewMileageRulePage() {
-  const [name, setName] = useState('')
-  const [eventType, setEventType] = useState<string>(EVENT_TYPES[0].value)
+  usePageTitle('たまる決めごとをつくる')
+  const [name, setName] = useState('予約してくれたら 300 マイル')
+  const [eventType, setEventType] = useState<string>('booking_created')
   const [source, setSource] = useState('')
-  const [amount, setAmount] = useState('50')
+  const [amount, setAmount] = useState('300')
   const [initialStatus, setInitialStatus] = useState<'available' | 'pending'>('available')
   const [ignoreMultiplier, setIgnoreMultiplier] = useState(false)
   const [dailyCap, setDailyCap] = useState('')
@@ -170,6 +172,10 @@ export default function NewMileageRulePage() {
       description="どの行動に何マイルを付けるかを決めます。付けすぎを防ぐ回数の制限も、ここで設定します。"
       parent={['マイル', '/mileage?tab=earning-rules']}
       saveLabel="たまる決めごとを作る"
+      showHeader={false}
+      designNode="BmoGY"
+      variant="v6"
+      statusLabel="まだ動いていません。つくると、この瞬間から選んだ行動にマイルが付きはじめます。"
       validate={() => {
         if (!name.trim()) return 'ルール名を入力してください'
         if (!validAmount) return '付与マイルは1以上の整数で入力してください'
@@ -177,10 +183,6 @@ export default function NewMileageRulePage() {
           return '終了日は開始日より後にしてください'
         }
         return null
-      }}
-      onReset={() => {
-        setName('')
-        setAmount('50')
       }}
       onSave={async () => {
         const res = await api.mileage.createRule({
@@ -253,6 +255,23 @@ export default function NewMileageRulePage() {
             <p className="text-ink-faint mt-2 text-xs leading-relaxed">
               倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。
             </p>
+          </AsideCard>
+
+          <AsideCard title="LINEプレビュー">
+            <p className="text-ink-faint text-xs">{selected.label}あと、すぐに届く想定です</p>
+            <div className="mt-3 rounded-card bg-accent-soft p-3 text-sm leading-6 text-ink">
+              ありがとうございます。{validAmount ? value.toLocaleString('ja-JP') : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
+            </div>
+            <p className="mt-3 text-xs text-ink-faint">通知の送信口は未接続です。保存しても、この文はまだ自動送信されません。</p>
+          </AsideCard>
+
+          <AsideCard title="まだ接続されていない設定">
+            <ul className="space-y-2 text-xs leading-relaxed text-ink-secondary">
+              <li>・付いてからの有効期限</li>
+              <li>・予約取消や返品で、付けた分を引く決めごと</li>
+              <li>・タグなど15軸を使った対象条件</li>
+            </ul>
+            <p className="mt-3 text-xs text-ink-faint">保存口が追加されるまで、選べるようには見せません。</p>
           </AsideCard>
 
           <AsideCard title="気をつけること">

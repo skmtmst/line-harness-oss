@@ -70,6 +70,8 @@ function stockText(reward: MileageRewardSummary): string | null {
 export default function MileageRewardsTab({ accountId }: { accountId: string | null }) {
   const [overview, setOverview] = useState<MileageRewardAdminOverview | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  const [busyRewardId, setBusyRewardId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -95,6 +97,25 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
   }, [accountId])
 
   useEffect(() => { void load() }, [load])
+
+  const changePublishedState = async (reward: MileageRewardSummary) => {
+    if (!accountId || (reward.status !== 'published' && reward.status !== 'draft')) return
+    setBusyRewardId(reward.id)
+    setActionError('')
+    try {
+      const response = reward.status === 'published'
+        ? await api.mileage.stopReward(reward.id, accountId)
+        : await api.mileage.publishReward(reward.id, accountId)
+      if (!response.success) throw new Error(response.error)
+      await load()
+    } catch {
+      setActionError(reward.status === 'published'
+        ? '使い道を止められませんでした。もう一度お試しください。'
+        : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+    } finally {
+      setBusyRewardId(null)
+    }
+  }
 
   const summary = overview?.summary
   const rewards = overview?.rewards ?? []
@@ -178,6 +199,18 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         <Button variant="primary" href="/mileage/rewards/edit">使い道をつくる</Button>
       </div>
 
+      {actionError ? <div className="mb-4 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{actionError}</div> : null}
+
+      <section aria-label="ランクごとの使い道" className="mb-4 grid gap-3 md:grid-cols-3">
+        {['ブロンズ', 'シルバー', 'ゴールド'].map((rank) => (
+          <div key={rank} className="rounded-card border border-hairline bg-canvas p-4">
+            <p className="font-bold text-ink">{rank}</p>
+            <p className="mt-1 text-sm text-ink-faint">必要マイルと対象人数は未取得</p>
+            <p className="mt-3 text-xs text-ink-secondary">ランク条件の取得口が接続されると、交換できる使い道をここに表示します。</p>
+          </div>
+        ))}
+      </section>
+
       <DataTable>
         <thead>
           <TableHeadRow>
@@ -208,8 +241,17 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                         <Td align="right" className="tabular-nums">{reward.exchangedThisMonth.toLocaleString('ja-JP')}回</Td>
                         <Td>{STATUS_LABEL[reward.status]}</Td>
                         <Td align="right">
-                          {/* 行から直に直せる。名前を控えて探し直さなくてよい。 */}
-                          <Button href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}>内容を編集</Button>
+                          <div className="flex justify-end gap-2">
+                            <Button aria-label="内容を編集" href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}>中身を見る</Button>
+                            {reward.status === 'published' || reward.status === 'draft' ? (
+                              <Button
+                                disabled={busyRewardId === reward.id}
+                                onClick={() => void changePublishedState(reward)}
+                              >
+                                {busyRewardId === reward.id ? '反映しています' : reward.status === 'published' ? '止める' : '出す'}
+                              </Button>
+                            ) : null}
+                          </div>
                         </Td>
                       </Tr>
                     )

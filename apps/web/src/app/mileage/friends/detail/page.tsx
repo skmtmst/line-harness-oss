@@ -116,17 +116,17 @@ function FriendMileageInner() {
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="利用可能" value={mileage.summary.available} unit=" mile" detail="いま使える残高" />
-        <SummaryCard variant="v6" title="確定待ち" value={mileage.summary.pending} unit=" mile" detail="条件の確定を待っています" />
-        <SummaryCard variant="v6" title="30日以内に失効" value={null} unit=" mile" detail="失効ロットの接続が必要" badge="未取得" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="利用可能" value={mileage.summary.available} unit=" マイル" detail="いま使える残高" />
+        <SummaryCard variant="v6" title="確定待ち" value={mileage.summary.pending} unit=" マイル" detail="条件の確定を待っています" />
+        <SummaryCard variant="v6" title="30日以内に失効" value={null} unit=" マイル" detail="失効ロットの接続が必要" badge="未取得" badgeTone="neutral" />
         <SummaryCard
           variant="v6"
           title="生涯付与"
           value={mileage.summary.lifetimeEarned}
-          unit=" mile"
+          unit=" マイル"
           detail={rewardedActions === null ? '付与記録の回数は未取得' : `${rewardedActions.toLocaleString('ja-JP')}回の付与記録`}
         />
-        <SummaryCard variant="v6" title="使用済み" value={mileage.summary.spent} unit=" mile" detail="交換などで使った合計" />
+        <SummaryCard variant="v6" title="使用済み" value={mileage.summary.spent} unit=" マイル" detail="交換などで使った合計" />
       </div>
 
       <Card overflow="hidden">
@@ -163,7 +163,7 @@ function FriendMileageInner() {
                 <Tr key={item.id}>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
                   <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
-                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
+                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} マイル</span></Td>
                   <Td><p className="max-w-56 truncate font-medium text-ink" title={item.reason}>{item.reason}</p></Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
