@@ -57,6 +57,14 @@ function maskedUrl(value: string): string {
   }
 }
 
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 function matchesOutgoing(item: OutgoingWebhook, filter: OutgoingFilter, query: string): boolean {
   const matchesFilter = filter === 'all'
     || (filter === 'active' && item.isActive)

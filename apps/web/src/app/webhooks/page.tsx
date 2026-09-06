@@ -39,8 +39,8 @@ function isHttpsUrl(value: string): boolean {
 }
 
 const MERGED_TABS = [
-  { key: 'incoming', label: 'こちらで受け取る 3' },
   { key: 'outgoing', label: 'こちらから送る 6' },
+  { key: 'incoming', label: 'こちらで受け取る 3' },
   { key: 'interactions', label: 'やり取りの記録' },
   { key: 'notify', label: '見本 14' },
 ]
