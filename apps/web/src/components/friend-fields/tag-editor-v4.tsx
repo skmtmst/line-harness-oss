@@ -262,7 +262,7 @@ export default function TagEditorV4({
   const [applyToExisting, setApplyToExisting] = useState(initialValues?.applyToExisting ?? initialApplyToExisting)
   const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>('once')
   // マイル設定から連動アクションを推測しない。保存先が別なので、取得できた定義だけを出す。
-  const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? [])
+  const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? tag?.linkedActions ?? [])
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
   const [retroactiveOpen, setRetroactiveOpen] = useState(initialRetroactiveOpen)
 

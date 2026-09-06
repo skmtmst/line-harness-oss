@@ -16,7 +16,7 @@ type MarkRow = SupportMark & { friendCount: number }
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 function autoRuleLabel(mark: MarkRow): string {
-  return mark.autoOnInbound ? '受信時' : '—'
+  return mark.automaticChangeLabel ?? (mark.autoOnInbound ? '受信時' : '—')
 }
 
 /**

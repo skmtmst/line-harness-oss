@@ -20,17 +20,17 @@ describe('V6 ウェビナー公開ページ確認の契約', () => {
   })
 
   it('公開中かつLIFF設定済みのときだけ別窓で開く', () => {
-    expect(PAGE).toContain("webinar.status === 'active' && publicUrl")
+    expect(PAGE).toContain("const canOpenPublicPage = webinar.status === 'active' && publicUrl !== null")
     expect(PAGE).toContain('target="_blank"')
     expect(PAGE).toContain('rel="noreferrer"')
     expect(PAGE).toContain('公開すると、友だちが見るページを確認できます')
     expect(PAGE).toContain('LIFF IDが設定されていません')
-    expect(PAGE).toContain('<Button data-design-node="GB0NR" disabled')
+    expect(PAGE).toContain('<Button disabled title={publicPageReason}>公開ページを見る</Button>')
   })
 
   it('アカウント読込中や所属未取得をLIFF未設定と言い切らない', () => {
     expect(PAGE).toContain('const { accounts, loading: accountsLoading } = useAccount()')
-    expect(PAGE).toContain("accountsLoading\n      ? 'LINE公式アカウントを確認しています'")
+    expect(PAGE).toContain("accountsLoading\n    ? 'LINE公式アカウントを確認しています。'")
     expect(PAGE).toContain('!webinar.accountId || !webinarAccount')
     expect(PAGE).toContain('このウェビナーのLINE公式アカウントを確認できません')
   })

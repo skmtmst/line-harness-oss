@@ -12,6 +12,9 @@ export interface Webinar {
   cta_json: string | null;
   tag_on_attend: string | null;
   tag_on_cta_click: string | null;
+  folder_id: string | null;
+  publication_starts_at: string | null;
+  publication_ends_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +144,21 @@ export interface WebinarCreateInput {
   ctaJson?: string | null;
   tagOnAttend?: string | null;
   tagOnCtaClick?: string | null;
+  folderId?: string | null;
+  publicationStartsAt?: string | null;
+  publicationEndsAt?: string | null;
+}
+
+export interface WebinarListRow extends Webinar {
+  folder_name: string | null;
+  registration_count: number;
+  viewer_count: number | null;
+}
+
+export interface WebinarListScope {
+  allowedAccountIds: string[];
+  canSeeUnassigned: boolean;
+  accountId?: string;
 }
 
 export type WebinarActionTrigger = 'completed' | 'cta_clicked' | 'unviewed';
@@ -175,6 +193,73 @@ export async function getWebinars(db: D1Database): Promise<Webinar[]> {
     .prepare('SELECT * FROM webinars ORDER BY created_at DESC')
     .all<Webinar>();
   return results ?? [];
+}
+
+function webinarScopeWhere(scope: WebinarListScope, alias = 'w'): {
+  sql: string;
+  bindings: string[];
+} {
+  if (scope.accountId) {
+    if (!scope.allowedAccountIds.includes(scope.accountId)) {
+      return { sql: '1 = 0', bindings: [] };
+    }
+    return { sql: `${alias}.account_id = ?`, bindings: [scope.accountId] };
+  }
+  const accountSql = scope.allowedAccountIds.length > 0
+    ? `${alias}.account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})`
+    : null;
+  if (accountSql && scope.canSeeUnassigned) {
+    return {
+      sql: `(${accountSql} OR ${alias}.account_id IS NULL)`,
+      bindings: scope.allowedAccountIds,
+    };
+  }
+  if (accountSql) return { sql: accountSql, bindings: scope.allowedAccountIds };
+  return {
+    sql: scope.canSeeUnassigned ? `${alias}.account_id IS NULL` : '1 = 0',
+    bindings: [],
+  };
+}
+
+/** V6一覧用。人数は予約枠数ではなく、ウェビナーごとの重複しない友だち数。 */
+export async function getWebinarList(
+  db: D1Database,
+  scope: WebinarListScope,
+): Promise<WebinarListRow[]> {
+  const where = webinarScopeWhere(scope);
+  const result = await db.prepare(
+    `SELECT w.*,
+            f.name AS folder_name,
+            (SELECT COUNT(DISTINCT r.friend_id)
+               FROM webinar_registrations r
+              WHERE r.webinar_id = w.id AND r.status = 'active') AS registration_count,
+            (SELECT COUNT(DISTINCT v.friend_id)
+               FROM webinar_viewers v
+              WHERE v.webinar_id = w.id) AS viewer_count
+       FROM webinars w
+       LEFT JOIN folders f ON f.id = w.folder_id AND f.kind = 'webinar'
+      WHERE ${where.sql} AND w.status <> 'archived'
+      ORDER BY w.created_at DESC`,
+  ).bind(...where.bindings).all<WebinarListRow>();
+  return result.results ?? [];
+}
+
+/** GET /api/folders?kind=webinar の各フォルダに表示する、権限内の件数。 */
+export async function getWebinarFolderCounts(
+  db: D1Database,
+  scope: WebinarListScope,
+): Promise<Record<string, number>> {
+  const where = webinarScopeWhere(scope);
+  const result = await db.prepare(
+    `SELECT w.folder_id, COUNT(*) AS item_count
+       FROM webinars w
+       JOIN folders f ON f.id = w.folder_id AND f.kind = 'webinar'
+      WHERE ${where.sql} AND w.status <> 'archived'
+      GROUP BY w.folder_id`,
+  ).bind(...where.bindings).all<{ folder_id: string; item_count: number }>();
+  return Object.fromEntries(
+    (result.results ?? []).map((row) => [row.folder_id, Number(row.item_count)]),
+  );
 }
 
 export async function getWebinarOverview(
@@ -253,13 +338,14 @@ export async function createWebinar(db: D1Database, input: WebinarCreateInput): 
     .prepare(
       `INSERT INTO webinars (id, account_id, title, slug, status, video_prefix,
          duration_seconds, schedule_json, cta_json, tag_on_attend, tag_on_cta_click,
-         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         folder_id, publication_starts_at, publication_ends_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.accountId ?? null, input.title, input.slug, input.status ?? 'draft',
       input.videoPrefix ?? null, input.durationSeconds ?? 0, input.scheduleJson ?? '[]',
       input.ctaJson ?? null, input.tagOnAttend ?? null, input.tagOnCtaClick ?? null,
+      input.folderId ?? null, input.publicationStartsAt ?? null, input.publicationEndsAt ?? null,
       now, now,
     )
     .run();
@@ -277,7 +363,8 @@ export async function updateWebinar(
     .prepare(
       `UPDATE webinars SET account_id = ?, title = ?, slug = ?, status = ?,
          video_prefix = ?, duration_seconds = ?, schedule_json = ?, cta_json = ?,
-         tag_on_attend = ?, tag_on_cta_click = ?, updated_at = ?
+         tag_on_attend = ?, tag_on_cta_click = ?, folder_id = ?,
+         publication_starts_at = ?, publication_ends_at = ?, updated_at = ?
        WHERE id = ?`,
     )
     .bind(
@@ -291,6 +378,10 @@ export async function updateWebinar(
       patch.ctaJson !== undefined ? patch.ctaJson : existing.cta_json,
       patch.tagOnAttend !== undefined ? patch.tagOnAttend : existing.tag_on_attend,
       patch.tagOnCtaClick !== undefined ? patch.tagOnCtaClick : existing.tag_on_cta_click,
+      patch.folderId !== undefined ? patch.folderId : existing.folder_id,
+      patch.publicationStartsAt !== undefined
+        ? patch.publicationStartsAt : existing.publication_starts_at,
+      patch.publicationEndsAt !== undefined ? patch.publicationEndsAt : existing.publication_ends_at,
       jstNow(), id,
     )
     .run();

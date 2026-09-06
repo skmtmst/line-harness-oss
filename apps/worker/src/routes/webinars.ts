@@ -37,12 +37,15 @@ import {
   getWebinarDailyStats,
   getWebinarFormFunnelStats,
   getWebinarOverview,
+  getWebinarList,
   getWebinarActions,
   replaceWebinarActions,
   getFriendByLineUserId,
   getFriendByLineUserIdForAccount,
   getFormById,
   type Webinar,
+  type WebinarListRow,
+  getFolderById,
   getUpcomingWebinarRegistration,
   getWebinarRegistration,
   recordWebinarPickerOpen,
@@ -721,6 +724,17 @@ webinarRoutes.get('/api/webinars/overview', async (c) => {
 webinarRoutes.use('/api/webinars/:id', requireVisibleWebinar);
 webinarRoutes.use('/api/webinars/:id/*', requireVisibleWebinar);
 
+function publicationState(row: Webinar) {
+  const startsAt = row.publication_starts_at ? Date.parse(row.publication_starts_at) : null;
+  const endsAt = row.publication_ends_at ? Date.parse(row.publication_ends_at) : null;
+  const now = Date.now();
+  if (endsAt !== null && endsAt <= now) return 'ended' as const;
+  if (startsAt !== null && startsAt > now) return 'scheduled' as const;
+  if (row.status !== 'active') return 'unset' as const;
+  if (startsAt === null && endsAt === null) return 'always' as const;
+  return 'period' as const;
+}
+
 function serializeWebinar(row: Webinar) {
   return {
     id: row.id,
@@ -734,8 +748,21 @@ function serializeWebinar(row: Webinar) {
     cta: row.cta_json ? (JSON.parse(row.cta_json) as unknown) : null,
     tagOnAttend: row.tag_on_attend,
     tagOnCtaClick: row.tag_on_cta_click,
+    folderId: row.folder_id ?? null,
+    publicationState: publicationState(row),
+    publicationStartsAt: row.publication_starts_at ?? null,
+    publicationEndsAt: row.publication_ends_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function serializeWebinarList(row: WebinarListRow) {
+  return {
+    ...serializeWebinar(row),
+    folderName: row.folder_name ?? null,
+    registrationCount: Number(row.registration_count),
+    viewerCount: row.viewer_count === null ? null : Number(row.viewer_count),
   };
 }
 
@@ -750,6 +777,9 @@ interface WebinarBody {
   cta?: { label?: string; url?: string; showAtSeconds?: number } | null;
   tagOnAttend?: string | null;
   tagOnCtaClick?: string | null;
+  folderId?: string | null;
+  publicationStartsAt?: string | null;
+  publicationEndsAt?: string | null;
 }
 
 const WEBINAR_ACTION_TYPES = new Set<WebinarActionType>([
@@ -827,6 +857,26 @@ function validateWebinarBody(
       return 'invalid_duration';
     }
   }
+  if (
+    body.folderId !== undefined && body.folderId !== null &&
+    (typeof body.folderId !== 'string' || !body.folderId.trim())
+  ) {
+    return 'invalid_folder';
+  }
+  for (const value of [body.publicationStartsAt, body.publicationEndsAt]) {
+    if (
+      value !== undefined && value !== null &&
+      (typeof value !== 'string' || Number.isNaN(Date.parse(value)))
+    ) {
+      return 'invalid_publication_period';
+    }
+  }
+  if (
+    body.publicationStartsAt && body.publicationEndsAt &&
+    Date.parse(body.publicationStartsAt) > Date.parse(body.publicationEndsAt)
+  ) {
+    return 'invalid_publication_period';
+  }
   let scheduleJson: string | undefined;
   if (body.schedule !== undefined) {
     if (!Array.isArray(body.schedule)) return 'invalid_schedule';
@@ -862,24 +912,27 @@ function validateWebinarBody(
   if (ctaJson !== undefined) input.ctaJson = ctaJson;
   if (body.tagOnAttend !== undefined) input.tagOnAttend = body.tagOnAttend;
   if (body.tagOnCtaClick !== undefined) input.tagOnCtaClick = body.tagOnCtaClick;
+  if (body.folderId !== undefined) input.folderId = body.folderId;
+  if (body.publicationStartsAt !== undefined) {
+    input.publicationStartsAt = body.publicationStartsAt;
+  }
+  if (body.publicationEndsAt !== undefined) input.publicationEndsAt = body.publicationEndsAt;
   return input;
 }
 
 webinarRoutes.get('/api/webinars', async (c) => {
   try {
-    const { scope, where } = await adminAccountScope(c);
+    const { scope } = await adminAccountScope(c);
     const requestedAccountId = c.req.query('account_id');
     if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const listWhere = requestedAccountId
-      ? "account_id = ? AND status <> 'archived'"
-      : `(${where}) AND status <> 'archived'`;
-    const bindings = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
-    const items = await c.env.DB.prepare(
-      `SELECT * FROM webinars WHERE ${listWhere} ORDER BY created_at DESC`,
-    ).bind(...bindings).all<Webinar>();
-    return c.json({ success: true, data: items.results.map(serializeWebinar) });
+    const items = await getWebinarList(c.env.DB, {
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
+      accountId: requestedAccountId || undefined,
+    });
+    return c.json({ success: true, data: items.map(serializeWebinarList) });
   } catch (err) {
     console.error('GET /api/webinars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -897,6 +950,12 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
     }
     const input = validateWebinarBody(body, { requireCore: true });
     if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
+    if (body.folderId) {
+      const folder = await getFolderById(c.env.DB, body.folderId);
+      if (!folder || folder.kind !== 'webinar') {
+        return c.json({ success: false, error: 'invalid_folder' }, 400);
+      }
+    }
     const existing = await getWebinarBySlug(c.env.DB, body.slug!);
     if (existing) return c.json({ success: false, error: 'slug_taken' }, 409);
     const created = await createWebinar(
@@ -1050,6 +1109,12 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
     }
     const input = validateWebinarBody(body, { requireCore: false });
     if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
+    if (body.folderId) {
+      const folder = await getFolderById(c.env.DB, body.folderId);
+      if (!folder || folder.kind !== 'webinar') {
+        return c.json({ success: false, error: 'invalid_folder' }, 400);
+      }
+    }
     if (body.slug && body.slug !== row.slug) {
       const dupe = await getWebinarBySlug(c.env.DB, body.slug);
       if (dupe) return c.json({ success: false, error: 'slug_taken' }, 409);

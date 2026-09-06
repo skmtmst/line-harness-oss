@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 import ConditionBuilder, {
   isEmptyCondition,
   pruneCondition,
@@ -22,16 +23,18 @@ function Shell({
   onClose,
   children,
   footer,
+  wide = false,
 }: {
   title: string
   description?: string
   onClose: () => void
   children: React.ReactNode
   footer?: React.ReactNode
+  wide?: boolean
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="rounded-panel w-full max-w-3xl bg-white shadow-lg">
+      <div className={`rounded-panel w-full bg-white shadow-lg ${wide ? 'max-w-5xl' : 'max-w-3xl'}`}>
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">{title}</h2>
@@ -75,6 +78,7 @@ export function ConditionDialog({
       title={title}
       description={description}
       onClose={onClose}
+      wide
       footer={
         <>
           <button
@@ -290,6 +294,7 @@ export function TestSendDialog({
   const [friends, setFriends] = useState<{ id: string; displayName: string | null }[]>([])
   const [friendsStatus, setFriendsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
 
@@ -297,6 +302,7 @@ export function TestSendDialog({
     let cancelled = false
     setFriends([])
     setSelected(null)
+    setConfirming(false)
     setResult(null)
     setFriendsStatus('loading')
     const timer = setTimeout(() => {
@@ -326,6 +332,30 @@ export function TestSendDialog({
     }
   }, [lineAccountId, search, selectedAccountId])
 
+  const selectedFriend = friends.find((friend) => friend.id === selected) ?? null
+  const sendTest = async () => {
+    if (!selected) return
+    setSending(true)
+    setResult(null)
+    try {
+      const res = stepId
+        ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
+        : await api.scenarios.testSend(scenarioId, selected)
+      setResult(
+        res.success
+          ? { ok: true, message: `${res.data.sent} 通を送りました。` }
+          : { ok: false, message: res.error },
+      )
+    } catch (sendError) {
+      setResult({
+        ok: false,
+        message: sendError instanceof Error ? sendError.message : 'テスト送信に失敗しました。',
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <Shell
       title="テスト送信"
@@ -334,7 +364,21 @@ export function TestSendDialog({
       // 誰に届くか決まっていないまま本物のLINEが飛ぶ。
       onClose={onClose}
       footer={
-        <>
+        confirming ? (
+          <>
+            <Button onClick={() => setConfirming(false)} disabled={sending}>
+              戻る
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!selected || sending}
+              onClick={() => void sendTest()}
+            >
+              {sending ? '送信中…' : 'テスト送信を開始'}
+            </Button>
+          </>
+        ) : (
+          <>
           <button
             type="button"
             onClick={onClose}
@@ -345,37 +389,46 @@ export function TestSendDialog({
           <button
             type="button"
             disabled={!selected || sending}
-            onClick={async () => {
-              if (!selected) return
-              setSending(true)
-              setResult(null)
-              try {
-                const res = stepId
-                  ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
-                  : await api.scenarios.testSend(scenarioId, selected)
-                setResult(
-                  res.success
-                    ? { ok: true, message: `${res.data.sent} 通を送りました。` }
-                    : { ok: false, message: res.error },
-                )
-              } catch (sendError) {
-                setResult({
-                  ok: false,
-                  message: sendError instanceof Error
-                    ? sendError.message
-                    : 'テスト送信に失敗しました。',
-                })
-              } finally {
-                setSending(false)
-              }
-            }}
+            onClick={() => setConfirming(true)}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
-            {sending ? '送信中…' : '送る'}
+            内容を確認
           </button>
-        </>
+          </>
+        )
       }
     >
+      {confirming ? (
+        <div className="space-y-4">
+          <div className="bg-warning-bg rounded-panel px-4 py-3">
+            <p className="text-warning text-sm font-bold">本物のLINEへ送信します</p>
+            <p className="text-ink-secondary mt-1 text-xs">送信先と通数を確認してください。送信後は取り消せません。</p>
+          </div>
+          <dl className="border-hairline rounded-panel divide-hairline divide-y border text-sm">
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="text-ink-faint">送信先</dt>
+              <dd className="text-ink font-bold">{selectedFriend?.displayName || '（名前なし）'}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="text-ink-faint">送る内容</dt>
+              <dd className="text-ink font-bold">{stepLabel}・{steps.length}通</dd>
+            </div>
+          </dl>
+          {steps.length > 0 ? (
+            <ul className="border-hairline rounded-panel divide-hairline divide-y border">
+              {steps.map((row) => (
+                <li key={row.id} className="text-ink-secondary flex items-center gap-3 px-4 py-3 text-xs">
+                  <span className="text-ink font-bold">{row.stepOrder}通目</span>
+                  <span>{row.timing}</span>
+                  <span className="ml-auto">{row.kind}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="text-ink-faint text-xs">本番の登録は増えません。配信予定も作りません。</p>
+        </div>
+      ) : (
+      <>
       {/*
         設計（g2UNV）の断り。「購読の進み具合は変わりません」だけでは、
         **登録が増えるのか・配信予定が積まれるのか**が読み取れなかった。
@@ -445,6 +498,8 @@ export function TestSendDialog({
           <p className="text-ink-faint px-4 py-6 text-center text-sm">見つかりません</p>
         )}
       </div>
+      </>
+      )}
       {result && (
         <p
           className={`rounded-panel mt-3 px-4 py-3 text-sm ${

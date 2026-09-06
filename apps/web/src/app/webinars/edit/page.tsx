@@ -2,12 +2,11 @@
 
 import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
-import WebinarLinePreview from '@/components/webinars/webinar-line-preview'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
-import { ctaPreview, notificationPreview, videoPreview } from './preview-body'
+import { notificationPreview, videoPreview } from './preview-body'
 import {
   STEPS,
   nextLabelOf,
@@ -50,6 +49,93 @@ function fmtSession(epoch: number): string {
 
 const inputClass =
   'w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+function webinarStatusLabel(status: Webinar['status']): string {
+  if (status === 'active') return '公開中'
+  if (status === 'draft') return '下書き'
+  return 'アーカイブ'
+}
+
+function durationLabel(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  return `${minutes}分${String(rest).padStart(2, '0')}秒`
+}
+
+type WebinarWithPublication = Webinar & {
+  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
+  publicationStartsAt?: string | null
+  publicationEndsAt?: string | null
+}
+
+function deliveryWindow(webinar: Webinar): string {
+  const publication = webinar as WebinarWithPublication
+  const format = (value: string | null | undefined, withTime = false) => {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+    const dateText = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
+    if (!withTime) return dateText
+    const time = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' })
+    return `${dateText} ${time}`
+  }
+  if (publication.publicationState === 'always') return '常時公開'
+  if (publication.publicationState === 'scheduled') return format(publication.publicationStartsAt, true) ?? '—'
+  if (publication.publicationState === 'ended') return '公開終了'
+  if (publication.publicationState === 'unset') return '未設定'
+  if (publication.publicationState === 'period') {
+    const start = format(publication.publicationStartsAt)
+    const end = format(publication.publicationEndsAt)
+    if (start && end) return `${start}〜${end}`
+  }
+  const daily = webinar.schedule.find((rule) => rule.type === 'daily' && rule.time)
+  const once = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
+  if (once?.at) return fmtSession(Math.floor(new Date(once.at).getTime() / 1000))
+  if (daily?.time) return `毎日 ${daily.time}`
+  return '—（公開期間は未設定）'
+}
+
+function SummaryAside({
+  rows,
+  previewBody,
+  previewButton,
+  children,
+}: {
+  rows: Array<[string, string]>
+  previewBody: string
+  previewButton?: string | null
+  children?: ReactNode
+}) {
+  return (
+    <aside className="space-y-3 xl:w-[390px] xl:shrink-0">
+      <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+        <h2 className="text-ink text-sm font-bold">設定サマリー</h2>
+        <dl className="divide-hairline mt-3 divide-y">
+          {rows.map(([label, value]) => (
+            <div key={label} className="flex items-start justify-between gap-4 py-3 text-xs"><dt className="text-ink-faint">{label}</dt><dd className="text-ink text-right font-semibold">{value}</dd></div>
+          ))}
+        </dl>
+        <p className="text-ink mt-2 text-xs font-semibold">タグ「配信済み」を追加</p>
+      </section>
+      <section className="bg-info min-h-[365px] rounded-card p-4 text-on-accent shadow-card">
+        <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
+        <p className="mx-auto mt-3 w-fit rounded-pill bg-ink/20 px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
+        <div className="bg-canvas text-ink mt-4 rounded-control p-4 text-sm font-medium leading-relaxed">{previewBody}</div>
+        {previewButton ? <div className="bg-accent-deep text-on-accent mx-auto mt-3 w-fit rounded-control px-4 py-2 text-xs font-bold">{previewButton}</div> : null}
+      </section>
+      {children}
+    </aside>
+  )
+}
+
+function EditorDetails({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="group border-hairline bg-canvas overflow-hidden rounded-card border">
+      <summary className="text-ink-secondary flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold">{label}<span className="text-ink-faint group-open:rotate-180">▾</span></summary>
+      <div className="border-hairline border-t p-4">{children}</div>
+    </details>
+  )
+}
 
 function CommentsTab({ webinarId }: { webinarId: string }) {
   const [comments, setComments] = useState<WebinarSakuraComment[]>([])
@@ -259,7 +345,7 @@ function ParticipantAvatar({
   )
 }
 
-function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' }) {
+function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy' }) {
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [userComments, setUserComments] = useState<WebinarUserComment[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -284,6 +370,63 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
   if (!analytics) return <div className="text-gray-500 text-sm">読み込み中...</div>
 
   const { summary } = analytics
+  const completionRate = percent(summary.completed, summary.viewers)
+  const participationRows = analytics.participants.slice(0, 8)
+
+  if (view === 'participants') {
+    const unviewed = Math.max(0, summary.reservations - summary.viewers)
+    const watching = Math.max(0, summary.viewers - summary.completed)
+    return (
+      <div className="space-y-4" data-design-node="Q8sHa">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div><Button href={webinarApi.participantsCsvUrl(webinarId)}>参加者をCSVで書き出す</Button></div>
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[['申込', summary.reservations, 'text-success'], ['視聴開始', summary.viewers, 'text-accent'], ['視聴完了', summary.completed, 'text-warning'], ['エラー', analytics.formFunnel.submitErrors, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
+        </section>
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <section className="border-hairline bg-canvas overflow-hidden rounded-card border shadow-card">
+            <div className="border-hairline border-b px-4 py-3"><h3 className="text-ink font-bold">参加者一覧</h3><p className="text-ink-faint mt-1 text-xs">何をきっかけに、何が実行されたかを分析できます。</p></div>
+            <div className="divide-hairline divide-y">{participationRows.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">まだ参加者がいません。</p> : participationRows.map((participant) => {
+              const name = participant.friendName ?? '名前未取得'
+              const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
+              const state = participant.maxWatchedSeconds === 0 ? '視聴エラー' : rate >= 90 ? `視聴完了 ${rate}%` : rate > 0 ? `視聴中 ${rate}%` : '未視聴'
+              const action = participant.formSubmittedAt ? '動画・CTA＋フォーム送信' : participant.ctaClickedAt ? '動画・CTA' : participant.maxWatchedSeconds > 0 ? '動画視聴' : '要対応へ追加'
+              const status = participant.maxWatchedSeconds === 0 ? 'エラー' : rate >= 90 ? '成功' : '分析待ち'
+              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(150px,1.2fr)_minmax(130px,1fr)_minmax(170px,1.3fr)_90px_70px] md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}</span><span className="text-ink-secondary">{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-[11px] font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{compactDateTime(participant.latestJoinedAt).split(' ').at(-1)}</time></div>
+            })}</div>
+          </section>
+          <aside className="space-y-3">
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">参加状況の内訳</h3><p className="text-ink-faint mt-1 text-xs">一覧を開かずに効果を分析できます。</p><dl className="divide-hairline mt-3 divide-y">{[['予約', summary.registeredAndJoined, percent(summary.registeredAndJoined, summary.reservations)], ['視聴中', watching, percent(watching, summary.reservations)], ['未視聴', unviewed, percent(unviewed, summary.reservations)]].map(([label, count, rate]) => <div key={String(label)} className="flex items-center justify-between py-3 text-xs"><dt className="text-ink-secondary">{label}</dt><dd className="text-ink font-bold">{Number(count).toLocaleString('ja-JP')}回 <span className="text-ink-faint ml-2 font-normal">{rate}</span></dd></div>)}</dl></section>
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">稼働状況</h3><dl className="divide-hairline mt-3 divide-y text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="text-success font-bold">稼働中</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">公開状態</dt><dd className="text-ink font-bold">公開中</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">平均視聴</dt><dd className="text-ink font-bold">{fmtSec(summary.avgWatchedSeconds)}</dd></div></dl></section>
+            <section className="border-danger bg-danger-bg rounded-card border p-4"><h3 className="text-danger text-sm font-bold">要分析</h3><p className="text-danger mt-2 text-xs">視聴・送信エラー {analytics.formFunnel.submitErrors}件</p></section>
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">担当者視聴完了</h3><p className="text-ink-faint mt-2 text-xs">未視聴・相談希望の連携状況は運用者通知で確認します。</p></section>
+          </aside>
+        </div>
+      </div>
+    )
+  }
+
+  if (view === 'analytics') {
+    const avgRate = durationSeconds > 0 ? Math.round((summary.avgWatchedSeconds / durationSeconds) * 1000) / 10 : 0
+    return (
+      <div className="space-y-4" data-design-node="yxyzQ">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{['概要', '視聴', '離脱', 'CTA', '申込'].map((label, index) => <span key={label} className={`rounded-control px-3 py-2 text-sm font-semibold ${index === 0 ? 'bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary border'}`}>{label}</span>)}</div><Button href={webinarApi.participantsCsvUrl(webinarId)}>CSVで書き出す</Button></div>
+        <div className="flex flex-col gap-4 xl:flex-row">
+          <div className="min-w-0 flex-1 space-y-3">
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-bold">{summary.reservations.toLocaleString('ja-JP')}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-bold">{summary.viewers.toLocaleString('ja-JP')}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴行動</h2><p className="text-ink-faint mt-1 text-xs">離脱箇所とCTA反応を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">平均視聴時間</dt><dd className="text-ink text-sm font-bold">{fmtSec(summary.avgWatchedSeconds)}（{avgRate}%）</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">最大離脱</dt><dd className="text-ink text-sm font-bold">{analytics.dropoff.length > 0 ? `${fmtSec(analytics.dropoff[0].bucketStart)}付近` : '—（区間未取得）'}</dd></div></dl></section>
+          </div>
+          <SummaryAside rows={[
+            ['視聴完了', `${summary.completed.toLocaleString('ja-JP')}人`],
+            ['CTAクリック', `${summary.ctaClicks.toLocaleString('ja-JP')}人`],
+            ['申込転換', percent(summary.ctaClicks, summary.reservations)],
+          ]} previewBody={analytics.dropoff.length > 0 ? 'もっとも視聴された区間を分析できます。' : '視聴区間の集計はまだ取得できていません。'}>
+            <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
+          </SummaryAside>
+        </div>
+      </div>
+    )
+  }
+
   const maxDropoff = Math.max(1, ...analytics.dropoff.map((d) => d.viewers))
   const daily = analytics.daily.slice(-14)
   const maxDaily = Math.max(
@@ -350,7 +493,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
     },
   ]
 
-  if (view === 'participants') {
+  if (view === 'legacy') {
     return (
       <div className="space-y-4" data-design-node="Q8sHa">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -729,6 +872,84 @@ function parseMinSec(v: string): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
 }
 
+function VideoDesignStep({ webinar, registrations }: { webinar: Webinar; registrations: number | null }) {
+  return (
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="PV1Vh">
+      <div className="min-w-0 flex-1 space-y-3">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <h2 className="text-ink text-base font-bold">動画設定</h2>
+          <p className="text-ink-faint mt-1 text-xs">動画ファイルまたは外部動画URLを設定します。</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,1fr)]">
+            <div><p className="text-ink-faint text-xs font-semibold">動画</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{webinar.videoPrefix ? `${webinar.slug}.mp4` : '—（未設定）'}</div></div>
+            <div><p className="text-ink-faint text-xs font-semibold">再生時間</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{durationLabel(webinar.durationSeconds)}</div></div>
+          </div>
+        </section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <h2 className="text-ink text-base font-bold">公開設定</h2>
+          <p className="text-ink-faint mt-1 text-xs">公開期間・視聴条件・自動再生を設定します。</p>
+          <div className="mt-4 space-y-3">
+            <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-bold">公開期間</p><p className="text-ink-faint mt-1 text-xs">{deliveryWindow(webinar)}</p></div><span className="text-action">›</span></div>
+            <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-bold">視聴条件</p><p className="text-ink-faint mt-1 text-xs">—（対象条件はAPI未接続）</p></div><span className="text-action">›</span></div>
+          </div>
+        </section>
+        <EditorDetails label="動画・公開の詳細を編集する"><WebinarForm initial={webinar} /></EditorDetails>
+      </div>
+      <SummaryAside rows={[
+        ['動画', webinar.videoPrefix ? 'アップロード済み' : '未設定'],
+        ['公開', webinarStatusLabel(webinar.status)],
+        ['申込', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
+      ]} previewBody={videoPreview(webinar).body ?? videoPreview(webinar).empty}>
+        <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled={!webinar.videoPrefix}>公開ページを見る</Button></div>
+      </SummaryAside>
+    </div>
+  )
+}
+
+function NotificationDesignStep({ webinarId, registrations }: { webinarId: string; registrations: number | null }) {
+  const [settings, setSettings] = useState<Awaited<ReturnType<typeof webinarApi.notifications>>['data']['settings'] | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    webinarApi.notifications(webinarId)
+      .then((response) => setSettings(response.data.settings))
+      .catch(() => setSettings(null))
+      .finally(() => setLoaded(true))
+  }, [webinarId])
+
+  const enabled = (value: boolean | undefined) => !loaded ? '—（確認中）' : value ? '設定済み' : '未設定'
+
+  return (
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Ho8z4">
+      <div className="min-w-0 flex-1 space-y-3">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <h2 className="text-ink text-base font-bold">事前案内</h2>
+          <p className="text-ink-faint mt-1 text-xs">申込直後・前日・1時間前の案内を設定します。</p>
+          <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline">
+            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-bold">申込完了</dt><dd className="text-ink-faint mt-1 text-xs">申込完了直後に案内を送信</dd></div><span className="text-success text-xs font-semibold">{enabled(settings?.registrationEnabled)}</span></div>
+            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-bold">開催前日</dt><dd className="text-ink-faint mt-1 text-xs">LINEでリマインド</dd></div><span className="text-success text-xs font-semibold">{enabled(settings?.dayBeforeEnabled)}</span></div>
+          </dl>
+        </section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <h2 className="text-ink text-base font-bold">当日・見逃し案内</h2>
+          <p className="text-ink-faint mt-1 text-xs">開始前・開始時・未視聴者への案内を設定します。</p>
+          <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline">
+            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">配信タイミング</dt><dd className="text-ink-faint mt-1 text-xs">前日 {settings?.dayBeforeTime ?? '—'}／{settings?.hourBeforeMinutes ? `${settings.hourBeforeMinutes}分前` : '—'}／開始時</dd></div>
+            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">見逃し案内</dt><dd className="text-ink-faint mt-1 text-xs">未視聴者へ翌日{settings?.missedTime ?? '—'}に送信</dd></div>
+          </dl>
+        </section>
+        <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications webinarId={webinarId} /></EditorDetails>
+      </div>
+      <SummaryAside rows={[
+        ['申込完了', enabled(settings?.registrationEnabled)],
+        ['リマインド', settings?.dayBeforeEnabled || settings?.hourBeforeEnabled ? 'リマインド中' : loaded ? '未設定' : '—（確認中）'],
+        ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
+      ]} previewBody={notificationPreview(null).empty}>
+        <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
+      </SummaryAside>
+    </div>
+  )
+}
+
 function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: string | null }) {
   const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
   const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
@@ -899,6 +1120,39 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
   )
 }
 
+function CtaDesignStep({ webinarId, accountId, registrations }: { webinarId: string; accountId: string | null; registrations: number | null }) {
+  const [ctas, setCtas] = useState<WebinarCtaCard[]>([])
+  const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
+
+  useEffect(() => {
+    webinarApi.ctas(webinarId).then((response) => setCtas(Array.isArray(response.data) ? response.data : [])).catch(() => setCtas([]))
+    if (!accountId) return
+    fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
+      .then((response) => setForms(Array.isArray(response.data) ? response.data : []))
+      .catch(() => setForms([]))
+  }, [accountId, webinarId])
+
+  const primary = ctas[0]
+  const selectedForm = forms.find((form) => form.id === primary?.formId)
+
+  return (
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="d3rFGD">
+      <div className="min-w-0 flex-1 space-y-3">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">CTA設定</h2><p className="text-ink-faint mt-1 text-xs">動画内に表示するボタンとタイミングを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">表示タイミング</dt><dd className="text-ink text-sm font-bold">{primary ? `動画の${Math.floor(primary.atSeconds / 60)}分${String(primary.atSeconds % 60).padStart(2, '0')}秒` : '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ボタン文言</dt><dd className="text-ink text-sm font-bold">{primary?.buttonLabel || '—（未設定）'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">申込フォーム</h2><p className="text-ink-faint mt-1 text-xs">申込情報の保存先と完了アクションを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">入力項目</dt><dd className="text-ink text-sm font-bold">{selectedForm?.name ?? (primary?.formId ? '選択した回答フォーム' : '—（未設定）')}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">完了アクション</dt><dd className="text-ink text-sm font-bold">回答フォーム側の設定に従う</dd></div></dl></section>
+        <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} accountId={accountId} /></EditorDetails>
+      </div>
+      <SummaryAside rows={[
+        ['CTA', `${ctas.length.toLocaleString('ja-JP')}件`],
+        ['フォーム', primary?.formId ? '公開中' : '未設定'],
+        ['申込', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
+      ]} previewBody={primary?.body || 'CTAの説明文はまだ設定されていません。'} previewButton={primary?.buttonLabel || null}>
+        <div className="flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
+      </SummaryAside>
+    </div>
+  )
+}
+
 const ACTION_LABELS: Record<WebinarAction['actionType'], string> = {
   add_tag: 'タグを付ける',
   remove_tag: 'タグを外す',
@@ -968,8 +1222,34 @@ function WebinarActionsTab({ webinarId }: { webinarId: string }) {
     }
   }
 
+  const completedActions = actions.filter((action) => action.trigger === 'completed')
+
   return (
-    <section className="space-y-4" data-design-node="Xjk8q">
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Xjk8q">
+      <div className="min-w-0 flex-1 space-y-3">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <h2 className="text-ink text-base font-bold">CTA・フォーム</h2>
+          <p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p>
+          <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className={`rounded-pill border px-3 py-1 text-xs font-semibold ${item.key === 'completed' ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}>{item.label}</span>)}</div>
+        </section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <div className="flex items-center justify-between gap-3"><h2 className="text-ink text-base font-bold">視聴完了メッセージ</h2><Button disabled>変数を挿入</Button></div>
+          <div className="border-hairline bg-canvas-sunken text-ink-faint mt-4 min-h-28 rounded-control border p-4 text-sm leading-relaxed">送信するテンプレート本文は共通アクションへの接続後に表示します。</div>
+          <div className="mt-3 flex flex-wrap gap-2"><Button disabled>資料を受け取る</Button><Button disabled>個別相談を予約</Button><Button disabled>あとで見る</Button></div>
+        </section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <dl className="divide-hairline divide-y rounded-control border border-hairline">
+            <div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">実行タイミング</dt><dd className="text-ink text-sm font-bold">視聴完了直後</dd></div>
+            <div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">同じ視聴への実行</dt><dd className="text-ink text-sm font-bold">1回だけ</dd></div>
+          </dl>
+        </section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-ink text-base font-bold">配信後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">保存済みの実行内容です。</p></div><span className="text-ink-faint text-xs">{completedActions.length}件</span></div>
+          <ul className="divide-hairline mt-3 divide-y rounded-control border border-hairline">{completedActions.length === 0 ? <li className="text-ink-faint p-4 text-sm">まだ設定されていません。</li> : completedActions.map((action, index) => <li key={action.id ?? index} className="text-ink px-4 py-3 text-sm font-semibold">{ACTION_LABELS[action.actionType]}</li>)}</ul>
+        </section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">視聴結果を取得できない場合</h2><p className="text-ink-faint mt-1 text-xs">再取得するか、要対応へ追加するか選択できます。</p><div className="mt-3 flex gap-2"><Button disabled>要対応へ追加</Button><Button disabled>翌日に再取得</Button></div></section>
+        <EditorDetails label="通知・アクションの詳細を編集する">
+        <section className="space-y-4">
       <div><h2 className="text-ink font-bold">視聴後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p></div>
       <div className="flex flex-wrap gap-2">
         {TRIGGERS.map((item) => <Button key={item.key} variant={trigger === item.key ? 'primary' : 'secondary'} onClick={() => setTrigger(item.key)}>{item.label}</Button>)}
@@ -997,25 +1277,46 @@ function WebinarActionsTab({ webinarId }: { webinarId: string }) {
         <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? '保存中…' : '視聴後アクションを保存'}</Button>
       </div>
       {notice ? <p className="text-ink-secondary text-sm">{notice}</p> : null}
-    </section>
+        </section>
+        </EditorDetails>
+      </div>
+      <SummaryAside rows={[
+        ['完了案内', '視聴完了＋ボタン'],
+        ['実行時点', '視聴完了直後'],
+        ['通知・アクション', completedActions.length > 0 ? `${completedActions.length}件` : '未設定'],
+        ['結果未取得時', '要対応／翌日再取得'],
+      ]} previewBody="送信するテンプレート本文は共通アクションへの接続後に表示します。" />
+    </div>
   )
 }
 
-function PublicPreviewStep({ webinar, publicUrl }: { webinar: Webinar; publicUrl: string | null }) {
+function PublicPreviewStep({
+  webinar,
+  publicUrl,
+  registrations,
+  publicPageReason,
+}: {
+  webinar: Webinar
+  publicUrl: string | null
+  registrations: number | null
+  publicPageReason: string
+}) {
+  const canOpenPublicPage = webinar.status === 'active' && publicUrl !== null
   return (
-    <section className="space-y-4" data-design-node="GB0NR">
-      <div><h2 className="text-ink font-bold">公開ページプレビュー</h2><p className="text-ink-faint mt-1 text-xs">公開前に、タイトル・URL・申込条件を確認します。</p></div>
-      <dl className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
-        {[
-          ['ページタイトル', webinar.title],
-          ['公開URL', publicUrl ?? '—（LINE公式アカウントのLIFF ID未設定）'],
-          ['動画', webinar.videoPrefix ? 'アップロード済み' : '未設定'],
-          ['公開状態', webinar.status === 'active' ? '公開中' : webinar.status === 'draft' ? '下書き' : 'アーカイブ'],
-        ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-3xl break-all text-sm">{value}</dd></div>)}
-      </dl>
-      <div className="bg-accent-soft rounded-2xl p-5 sm:p-8"><div className="bg-canvas mx-auto max-w-md rounded-2xl p-5 shadow-sm"><p className="text-ink font-bold">{webinar.title}</p><p className="text-ink-faint mt-2 text-sm">動画を視聴すると、視聴状況が友だちごとに記録されます。</p></div></div>
-      {publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <p className="text-ink-faint text-xs">公開URLはLIFF IDを設定すると開けます。</p>}
-    </section>
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="GB0NR">
+      <div className="min-w-0 flex-1 space-y-3">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">公開ページ</h2><p className="text-ink-faint mt-1 text-xs">タイトル・説明・申込フォームを最終確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ページタイトル</dt><dd className="text-ink text-sm font-bold">{webinar.title}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">公開URL</dt><dd className="text-ink max-w-[70%] truncate text-sm font-bold" title={publicUrl ?? undefined}>{publicUrl ?? '—（LIFF ID未設定）'}</dd></div></dl></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">表示内容</h2><p className="text-ink-faint mt-1 text-xs">PC・スマートフォンの表示を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">メイン動画</dt><dd className="text-ink text-sm font-bold">16:9・自動再生なし</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込フォーム</dt><dd className="text-ink text-sm font-bold">動画視聴前に表示</dd></div></dl></section>
+      </div>
+      <SummaryAside rows={[
+        ['状態', webinar.videoPrefix ? '公開準備完了' : '動画未設定'],
+        ['公開期間', deliveryWindow(webinar)],
+        ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
+      ]} previewBody={webinar.title}>
+        <div className="flex gap-2"><Button disabled>テスト送信</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        {!canOpenPublicPage ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
+      </SummaryAside>
+    </div>
   )
 }
 
@@ -1043,14 +1344,13 @@ type PaneKey = StepKey | ExtraKey
  * STEP 5 確認（設計 `D6yO7e`）。**公開の前に、足りないものを1つずつ言う。**
  * ここで言えないと、公開してから友だちの画面で気づくことになる。
  */
-function ReviewStep({ webinar, onBack }: { webinar: Webinar; onBack: (key: StepKey) => void }) {
+function ReviewStep({ webinar, registrations, onBack }: { webinar: Webinar; registrations: number | null; onBack: (key: StepKey) => void }) {
   const blockers = publishBlockers(webinar)
   return (
-    <section className="border-hairline bg-canvas space-y-4 rounded-2xl border p-5 shadow-sm sm:p-6" data-design-node="D6yO7e">
-      <div>
-        <h2 className="text-ink font-bold">公開の前に確認</h2>
-        <p className="text-ink-faint mt-1 text-xs">公開すると、友だちが申込・視聴できるようになります。</p>
-      </div>
+    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="D6yO7e">
+      <div className="min-w-0 flex-1 space-y-3">
+      <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
+      <div><h2 className="text-ink font-bold">公開前チェック</h2><p className="text-ink-faint mt-1 text-xs">公開に必要な設定を確認します。</p></div>
       {blockers.length > 0 ? (
         <div className="text-warning bg-warning-bg rounded-card p-4 text-sm">
           <p className="font-bold">このままでは公開できません。</p>
@@ -1063,12 +1363,23 @@ function ReviewStep({ webinar, onBack }: { webinar: Webinar; onBack: (key: StepK
           必要なものは揃っています。
         </p>
       )}
+      <ul className="divide-hairline border-hairline divide-y rounded-xl border text-sm">
+        <li className="text-ink flex items-center gap-2 px-4 py-3"><span className="text-success">✓</span>動画・公開が設定されています</li>
+        <li className="text-ink flex items-center gap-2 px-4 py-3"><span className="text-success">✓</span>CTA・フォームとアクションが設定されています</li>
+        <li className="text-ink flex items-center gap-2 px-4 py-3"><span className="text-warning">!</span>公開ページと通知のテスト結果は未接続です</li>
+        <li className="text-ink flex items-center gap-2 px-4 py-3"><span className="text-success">✓</span>リマインド重複と公開期間を確認します</li>
+      </ul>
+      </section>
+      <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
+      <div><h2 className="text-ink font-bold">最終確認</h2><p className="text-ink-faint mt-1 text-xs">公開すると、申込・配信条件に合う友だちが視聴できます。</p></div>
       <dl className="divide-hairline border-hairline divide-y rounded-xl border">
         {[
-          ['タイトル', webinar.title || '未設定'],
-          ['公開ページ', `/webinar/${webinar.slug || '未設定'}`],
-          ['動画の長さ', `${Math.round(webinar.durationSeconds / 60)}分`],
-          ['配信枠', `${webinar.schedule.length}件`],
+          ['ウェビナー名', webinar.title || '未設定'],
+          ['動画・公開', webinar.videoPrefix ? '申込者向け' : '未設定'],
+          ['公開期間', deliveryWindow(webinar)],
+          ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
+          ['CTA・フォーム', webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
+          ['アクション', '設定内容は視聴後アクションで確認'],
         ].map(([label, value]) => (
           <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
             <dt className="text-ink-faint text-xs font-semibold">{label}</dt>
@@ -1080,23 +1391,50 @@ function ReviewStep({ webinar, onBack }: { webinar: Webinar; onBack: (key: StepK
         <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
         <Button onClick={() => onBack('video')}>動画へ戻る</Button>
       </div>
-      {/* 公開そのものは「基本設定」の公開状態を変えて保存する。ここに2つ目の公開口を作らない。 */}
       <p className="text-ink-faint text-xs">公開するときは、基本設定の「公開状態」を公開中にして保存してください。</p>
-    </section>
+      </section>
+      </div>
+      <SummaryAside rows={[
+        ['状態', webinar.status === 'active' ? '公開中' : '有効化前'],
+        ['申込見込み', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
+        ['通知重複', '—（検査API未接続）'],
+        ['監視', '運用者通知へ連携'],
+      ]} previewBody="公開ページと通知のテスト結果は、検査APIへの接続後に表示します。" />
+    </div>
   )
 }
 
 function EditWebinarInner() {
-  const id = useSearchParams().get('id')
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id')
   const { accounts, loading: accountsLoading } = useAccount()
   const [webinar, setWebinar] = useState<Webinar | null>(null)
+  const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   /*
     **編集画面なので、開いた直後は設定の1段目**。前は「概要・分析」を先頭に
     置いていたので、直しに来た人が結果の画面から始めることになっていた。
   */
-  const [pane, setPane] = useState<PaneKey>('basic')
+  const requestedPane = searchParams.get('pane')
+  const initialPane = ([...STEPS.map((step) => step.key), ...EXTRAS.map(([key]) => key)] as string[]).includes(requestedPane ?? '')
+    ? requestedPane as PaneKey
+    : 'basic'
+  const [pane, setPane] = useState<PaneKey>(initialPane)
+
+  const paneTitle: Record<PaneKey, string> = {
+    basic: 'ウェビナー編集',
+    video: '動画と公開設定',
+    cta: 'CTAと申込フォーム',
+    notifications: '通知とリマインド',
+    review: 'ウェビナー・公開前確認',
+    comments: 'コメント演出',
+    actions: 'ウェビナー・視聴後通知・アクション',
+    preview: '公開ページプレビュー',
+    participants: webinar ? `${webinar.title}・参加者管理` : 'ウェビナー参加者管理',
+    analytics: 'ウェビナー分析',
+  }
+  usePageTitle(paneTitle[pane])
 
   useEffect(() => {
     if (!id) return
@@ -1106,6 +1444,7 @@ function EditWebinarInner() {
       .then((res) => setWebinar(res.data))
       .catch((err) => setLoadError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false))
+    webinarApi.analytics(id).then((response) => setAnalytics(response.data)).catch(() => setAnalytics(null))
   }, [id])
 
   if (!id) {
@@ -1139,80 +1478,47 @@ function EditWebinarInner() {
   const publicUrl = webinarAccount?.liffId
     ? `https://liff.line.me/${encodeURIComponent(webinarAccount.liffId)}/webinar/${encodeURIComponent(webinar.slug)}`
     : null
-  const previewUnavailableReason = webinar.status !== 'active'
-    ? '公開すると、友だちが見るページを確認できます'
-    : accountsLoading
-      ? 'LINE公式アカウントを確認しています'
-      : !webinar.accountId || !webinarAccount
-        ? 'このウェビナーのLINE公式アカウントを確認できません'
-        : 'このLINE公式アカウントにはLIFF IDが設定されていません'
+  const publicPageReason = accountsLoading
+    ? 'LINE公式アカウントを確認しています。'
+    : !webinar.accountId || !webinarAccount
+      ? 'このウェビナーのLINE公式アカウントを確認できません。'
+      : !webinarAccount.liffId
+        ? 'LINE公式アカウントにLIFF IDが設定されていません。'
+        : webinar.status !== 'active'
+          ? '公開すると、友だちが見るページを確認できます。'
+          : ''
+  const registrations = analytics?.summary.reservations ?? null
+  const railPane: StepKey = pane === 'actions'
+    ? 'notifications'
+    : pane === 'preview'
+      ? 'review'
+      : STEPS.some((step) => step.key === pane)
+        ? pane as StepKey
+        : 'basic'
+  const showSteps = ['basic', 'video', 'cta', 'notifications', 'actions', 'preview', 'review'].includes(pane)
+  const nextPane: PaneKey | null = pane === 'notifications'
+    ? 'actions'
+    : pane === 'actions'
+      ? 'preview'
+      : pane === 'preview'
+        ? 'review'
+        : nextStepOf(pane as StepKey)
+  const nextPaneLabel = pane === 'notifications'
+    ? '視聴後アクションへ'
+    : pane === 'actions'
+      ? 'プレビューへ'
+      : pane === 'preview'
+        ? '公開前確認へ'
+        : nextLabelOf(pane as StepKey)
 
   return (
-    <>
-      <nav data-design="Crumb" className="text-ink-faint mx-auto max-w-[1400px] px-3 pt-4 text-xs sm:px-6">
-        <Link href="/webinars" className="hover:underline">
-          ウェビナー
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>編集</span>
-      </nav>
+    <main className="mx-auto max-w-[1600px] px-6 pb-24 pt-4">
+      <nav data-design="Crumb" className="text-action mb-5 text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
 
-      <div data-design="Head">
-        <Header
-          title="ウェビナーの編集"
-          description="動画セミナーの公開設定と、視聴中・視聴後の動きを決めます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {webinar.status === 'active' && publicUrl ? (
-                <Button
-                  data-design-node="GB0NR"
-                  href={publicUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  公開ページを見る
-                </Button>
-              ) : (
-                <Button data-design-node="GB0NR" disabled title={previewUnavailableReason}>
-                  公開ページを見る
-                </Button>
-              )}
-              <Link
-                href="/webinars"
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm font-medium"
-              >
-                ← 一覧へ
-              </Link>
-            </div>
-          }
-        />
-      </div>
-      <div className="mx-auto max-w-[1400px] px-3 pb-10 sm:px-6">
-        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${webinar.status === 'active' ? 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]' : webinar.status === 'draft' ? 'bg-slate-400' : 'bg-amber-500'}`} />
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-700">{webinar.status === 'active' ? '24時間 配信中' : webinar.status === 'draft' ? '下書き' : 'アーカイブ'}</div>
-              <div className="mt-0.5 truncate font-mono text-[11px] text-slate-400">/webinar/{webinar.slug}</div>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="rounded-full bg-slate-100 px-2.5 py-1">動画 {fmtSec(webinar.durationSeconds)}</span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1">開催ルール {webinar.schedule.length}件</span>
-          </div>
-        </div>
-
-        {/*
-          段の進み表示（設計 4-8 の STEP 1〜5）。**いま何段目で、あと何が
-          残っているか**を出す。前は横並びのタブで、押した先が設定なのか
-          結果なのかも、まだ足りない段があるのかも言えていなかった。
-
-          印は**通り過ぎたかではなく、その段の入力が入っているか**で決める。
-          通り過ぎただけで済みにすると、空のまま公開へ進める。
-        */}
-        <ol className="border-hairline bg-canvas mb-4 flex flex-wrap items-center gap-1 rounded-2xl border p-3 shadow-sm">
+      {showSteps ? (
+        <ol data-design="Steps" className="border-hairline bg-canvas mb-4 flex flex-wrap items-center gap-1 rounded-2xl border p-3 shadow-sm">
           {STEPS.map((step) => {
-            const state = stepStateOf(step.key, pane as StepKey, webinar)
+            const state = stepStateOf(step.key, railPane, webinar)
             return (
               <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
                 <button
@@ -1220,7 +1526,7 @@ function EditWebinarInner() {
                   data-qa-open={step.mark}
                   data-design-node={step.node}
                   onClick={() => setPane(step.key)}
-                  aria-current={pane === step.key ? 'step' : undefined}
+                  aria-current={railPane === step.key ? 'step' : undefined}
                   className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition-colors ${
                     state === 'current'
                       ? 'bg-accent-soft text-ink'
@@ -1248,81 +1554,28 @@ function EditWebinarInner() {
             )
           })}
         </ol>
+      ) : null}
 
-        {/* 段の外にあるもの。作り終えるのに必要な手順と混ぜない。 */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {EXTRAS.map(([key, label]) => (
-            <Button
-              key={key}
-              variant={pane === key ? 'primary' : 'secondary'}
-              onClick={() => setPane(key)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
+      {pane === 'basic' && <WebinarForm initial={webinar} />}
+      {pane === 'video' && <VideoDesignStep webinar={webinar} registrations={registrations} />}
+      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} registrations={registrations} />}
+      {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} registrations={registrations} />}
+      {pane === 'review' && <ReviewStep webinar={webinar} registrations={registrations} onBack={setPane} />}
+      {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
+      {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} />}
+      {pane === 'preview' && <PublicPreviewStep webinar={webinar} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} />}
+      {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" />}
+      {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
 
-        <div className="border-hairline bg-canvas overflow-hidden rounded-2xl border shadow-sm">
-          <div className="p-4 sm:p-6 xl:p-8">
-            {/*
-              基本設定と動画は同じ入力面（`WebinarForm`）が受け持つ。
-              **段を分けるために面を割らない**——割ると、いま在る1枚の
-              保存の口が2つに増え、片方だけ保存する事故が起きる。
-            */}
-            {(pane === 'basic' || pane === 'video') && (
-              /*
-                設計は段の右にLINEプレビューを置く（`PV1Vh` `d3rFGD` `Ho8z4`）。
-                **中身は各段の入力から組み立てる。新しい口は使わない。**
-                入力がまだ無いときは、それらしい文を作らずに何を入れれば
-                埋まるかを書く——見本の文を置くと、保存すればそれが届くと
-                読めてしまう。
-              */
-              <div className="flex flex-col gap-6 xl:flex-row">
-                <div className="min-w-0 flex-1"><WebinarForm initial={webinar} /></div>
-                {pane === 'video' && (
-                  <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...videoPreview(webinar)} /></div>
-                )}
-              </div>
-            )}
-            {pane === 'cta' && (
-              <div className="flex flex-col gap-6 xl:flex-row">
-                <div className="min-w-0 flex-1"><CtasTab webinarId={webinar.id} accountId={webinar.accountId} /></div>
-                <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...ctaPreview(webinar)} /></div>
-              </div>
-            )}
-            {pane === 'notifications' && (
-              <div className="flex flex-col gap-6 xl:flex-row">
-                <div className="min-w-0 flex-1"><WebinarNotifications webinarId={webinar.id} /></div>
-                {/*
-                  通知の本文はまだこの画面で書けない（送る中身は共通の文面）。
-                  プレビューは「何を入れれば埋まるか」だけを出す。
-                */}
-                <div className="xl:w-80 xl:shrink-0"><WebinarLinePreview {...notificationPreview(null)} /></div>
-              </div>
-            )}
-            {pane === 'review' && <ReviewStep webinar={webinar} onBack={setPane} />}
-            {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
-            {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} />}
-            {pane === 'preview' && <PublicPreviewStep webinar={webinar} publicUrl={publicUrl} />}
-            {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" />}
-            {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
-          </div>
-          {/* 次の段へ。設計は行き先の名前で書く（「動画へ」「確認へ」）。 */}
-          {nextStepOf(pane as StepKey) && (
-            <div className="border-hairline flex justify-end border-t px-4 py-3 sm:px-6">
-              <Button variant="primary" onClick={() => setPane(nextStepOf(pane as StepKey) as StepKey)}>
-                {nextLabelOf(pane as StepKey)}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
+      {showSteps && nextPane && nextPaneLabel ? (
+        <div className="border-hairline bg-canvas fixed inset-x-0 bottom-0 z-20 flex justify-end border-t px-8 py-3 shadow-card"><div className="flex gap-2"><Button disabled>下書き保存</Button><Button variant="primary" onClick={() => setPane(nextPane)}>{nextPaneLabel}</Button></div></div>
+      ) : null}
+      {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+    </main>
   )
 }
 
 export default function EditWebinarPage() {
-  usePageTitle('ウェビナー編集')
   return (
     <Suspense
       fallback={
