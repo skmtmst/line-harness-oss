@@ -1179,22 +1179,22 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/friend-add-settings`（最終確認）。読込・空・失敗の3状態を1440・1920で撮った。**LINEプレビューと、設計の「登録直後から5分以内」「Slack通知」が無い。** 内部語が2件——「LINEアカウントとWebhookイベントの組み合わせで、同じ通知を1回だけ処理します。」「webhookの記録で防ぎます」。取得元 `friend-add-v6/ec9vg.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
+    verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
 
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/friend-add-settings`（有効化完了）。**設計の「未送信・二重送信・シナリオ開始失敗はSlackへ通知します。」が無い。** 内部語「有効（webhookの記録で判定）」が出ている。取得元 `friend-add-v6/quhg6.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
+    verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
-    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
 
   },
   {
@@ -2188,13 +2188,14 @@ export const SCREENS = [
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
-  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。**写真の固定データが空**で「審査待ち（0）／通したもの（0）／戻したもの（0）／すべて（0）」。格子は比べられない。**状態の札に件数を出す形は設計と同じ。** 枠で見ると、帯4本（見ていないもの18／通したもの486／戻したもの24／出しているもの62、いちばん古いもの 2日前、この30日に見た、平均22秒）と「通したら 100 付ける」（採用時にマイルを付ける決め）が無い。実装の「まだ繋がっていません。自動審査の口が接続されると表示されます。公開するかどうかは、いまも人が決めます。」は**未接続の断りと、人が決めることの明示として正しい**。※ `/api/nen-members/overview` は `pendingPhotos: 1` を返すのに一覧は0件で、モックの中で数と一覧が食い違っている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 写真審査の一覧。作りは設計に近い。P0から下げる。** ルート `/photos`。帯4つ（未審査3件／承認済1件／見送り1件／投稿の合計5件）に**それぞれ説明が付き**、タブも「審査待ち（3）採用済み（1）見送り（1）すべて（5）」と件数を持つ。行は 投稿者・日時・状態・本文・「見送る」「採用して5pt付与」。**良い点**：本文が無い投稿を「コメントなし」と書き、空欄にしていない。付与するマイル数をボタンの文言に出している。**P2 残る差**：設計は審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。実装は「審査ルールを設定」への導線まで。**写真そのものは撮影用の固定データで、実在の投稿ではない。** 取得元：`photos-v6/Qu6Vk.txt`。1440・1920とも横スクロール0 **推奨修正**：審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。**写真は撮影用の固定データで、実在の投稿ではない。**', verdictSource: 'photos-v6/Qu6Vk.txt' , verdictHead: '31293424' },
+  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 #257の入口追加後に撮影。** 固定写真6枚（未審査3／通したもの2／戻したもの1）で一覧を確認し、一枚表示と「出しているもの」へ実際に移れる。1440・1920とも横スクロール0。自動審査の条件は未接続のまま値を作らず「—」と理由を示す。実運用の写真データと派生画像生成は接続待ち。', verdictSource: 'photos-v6/Qu6Vk.txt' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
-    gap: 'api',
-    gapNote: '一覧写真を拡大するだけでは完成しない。非公開original、review/public派生画像、crop/rotateの版、risk flag、同意、審査競合、original download権限を持つasset・decision API/DBが要る',
-    status: 'unimplemented',
-    why: '現行 `/api/nen-members/photos` は公開URL相当と簡単な採否だけで、設計が求める派生画像、原本保護、crop/rotateを原本と分離する版、risk flag、同意、同時審査409を持たない。正式要件 §4〜§6・§9〜§10 が先',
+    states: { apis: ['**/api/nen-members/photos/ph-1*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    steps: [{ qaOpen: 'hHrz8', after: 700 }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・派生画像生成待ち。** `hHrz8.txt` の一枚表示、前後移動、警告、画像操作、投稿者・pet・日時・言葉、risk候補、つながる先、下部の採否操作を同じ順で確認した。通常・読込・空・失敗・権限不足を撮り分け、1440・1920とも横スクロール0。個別APIは審査用派生画像だけを返し、原本URLを返さない。採否はexpectedVersionで409競合、採用時の5ポイントはDBのoutboxへ一度だけ積む。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。crop派生画像の生成と、原本download専用権限・再認証は未接続なので、誤って原本を出さないよう押し口を無効にした。',
+    verdictSource: 'photos-v6/hHrz8.txt + photos-v6/hHrz8-normal-1440.png + photos-v6/hHrz8-normal-1920.png',
   },
   {
     /*
@@ -2205,7 +2206,7 @@ export const SCREENS = [
       設計の高さでビューポートを取る。
     */
     ...PHOTO, node: 'N2J629', name: '22-1-B 写真を戻す理由をえらぶ',
-    verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** 写真が1枚も無く、押し口「理由を選んで戻す」が0件。固定データが入ってから撮る。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 構造一致・要修正 P1', verdictSource: 'photos-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 #257の固定写真で撮影・目視判定。構造一致・実運用データ待ち。** 写真、投稿者、届いた日時、定型理由5つ、補足、投稿者へ届く本文、戻る／確定を確認した。理由と本文previewは同じ値から作る。1440・1920とも横スクロール0。', verdictSource: 'photos-v6/design-qa.md',
     mode: 'viewport', height: 1080,
     /* 名前が三度変わった。#535 で「見送る」→「理由を選んで戻す」。
        設計の言葉に寄せたもので、実装の不具合ではない。 */
@@ -2214,10 +2215,12 @@ export const SCREENS = [
   },
   {
     ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
-    gap: 'api',
-    gapNote: '通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る',
-    status: 'unimplemented',
-    why: '通した写真をどこで使っているか（リッチメニュー・コラム・サイト）を並べるタブが無い。状態の札は4本（審査待ち／採用済み／見送り／すべて）で「出しているもの」が無い',
+    states: { apis: ['**/api/nen-members/photos/publications*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    steps: [{ click: '出しているもの', scope: 'main', after: 700 }],
+    variants: [{ suffix: '-placements', steps: [{ click: '出しているもの', scope: 'main', after: 700 }, { qaOpen: 'J3Wxl8-placements', after: 500 }] }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・実運用データ待ち。** `J3Wxl8.txt` の4つの帯、同意案内、写真カード、表示回数、氏名非表示、掲載先、使う場所、外す操作、決めごとを同じ順で確認した。通常・読込・空・失敗・権限不足と掲載先ダイアログを撮り分け、1440・1920とも横スクロール0。APIは採用・公開同意済みだけをaccount scopeで返し、未取得の表示回数は0でなく「—（未取得）」。掲載先保存と全掲載解除はexpectedVersion＋Idempotency-Keyを持ち、解除後も審査・同意履歴を残す。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。',
+    verdictSource: 'photos-v6/J3Wxl8.txt + photos-v6/J3Wxl8-normal-1440.png + photos-v6/J3Wxl8-normal-1920.png + photos-v6/J3Wxl8-placements-1920.png',
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
@@ -2238,18 +2241,19 @@ export const SCREENS = [
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
-    gap: 'api',
-    gapNote: 'Stripe定期便本体の接続。実装に「接続後に有効化します」と明記',
-    status: 'unimplemented',
-    why: '定期便のタブが無い。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）',
-    verdictNote: '**判断済み（2026-08-30）：Stripe接続待ちとして今回のV6対象外候補。仮画面は作らない。** ルート `/ec-commerce`。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）。**受け口はできていて、外の接続だけが残っている。** **仮画面を作らない**——中身の無いタブを足すと、使える機能があるように見える。**この状態のまま据え置く。** 接続が済んだら、`ec_events` の定期便イベントを読む一覧として作る。',
+    route: '/ec-commerce?tab=subscriptions',
+    states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** `nen_ec_member_snapshots` の定期便契約をLINEアカウントで絞って表示し、通常・読込・空・失敗・権限不足を分けた。取得できない月別集計は0件にせず「—／未取得」。支払い確認はECの決済状態だけを根拠にし、将来止めるという予測はしていない。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値0。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
-    gap: 'api',
-    gapNote: 'つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記',
-    status: 'unimplemented',
-    why: 'つなぎ先も、人を見分ける決めごとも画面から変えられない。「接続先や突合キーを画面から変える口が無い」と書いてある（`page.tsx:174`）',
+    route: '/ec-commerce?tab=connector',
+    states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #258 で実装・撮影。設計画像なし。** LINEアカウントごとにECの種類・ドメイン・取り込む出来事・会員照合ルールを保存できる。鍵は暗号文と末尾4文字だけを保存し、画面へ値を返さない。通常・読込・空・失敗・権限不足を分け、取得できない影響件数は「— 未取得」。5状態を1440・1920pxで撮影し、全12枚で横はみ出し0、壊れ値・秘密値露出0。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -3599,6 +3603,7 @@ export const DESIGN_SIZE = {
   ee0sk: [1920, 1590], VjXGX: [1920, 1590], byqIW: [1920, 1080],
   A1ZYeP: [1920, 1080], KoT6c: [1920, 1080], GMvBd: [1920, 1080],
   zGZMA: [1920, 1080], XBkiQ: [1920, 1136],
+  bfB50: [1920, 1080], oHAN4: [1920, 1080],
   uLQQc: [1920, 1080], s9gAx: [1920, 1080], W1wzCa: [1920, 1080],
   K0Dbr2: [1920, 1080], txMO9: [1920, 1080], U3SI5: [1920, 1080], Q3qP1r: [1920, 1080],
 }
@@ -3996,8 +4001,10 @@ export const CAPTURED_AT = {
   23: [
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['eI3gs'], note: '同上' },
     { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
+    { pr: 1006, head: 'f7623915e', on: '2026-09-06', screens: ['bfB50', 'oHAN4'], note: 'Issue #258。定期便とつなぎ先を実APIへ接続し、通常・読込・空・失敗・権限不足の全24枚を1440・1920pxで撮影。全画像で横はみ出し0、壊れ値・秘密値露出0。設計画像なしのため本文照合で未判定。' },
   ],
   9: [
+    { pr: 1010, head: '3d6b7e7e8', on: '2026-09-06', screens: ['ec9vg', 'quhg6'], note: 'Issue #222。3104/8791で最終確認5状態と有効化完了を1440・1920px撮影し、設計本文に構造・文言を合わせた。現APIで取得不能・未接続の項目はデータ待ちとして明記' },
     { pr: 962, head: '9b8f7451', on: '2026-09-06', screens: ['uLQQc', 's9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5', 'Q3qP1r'], note: 'Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認' },
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },
