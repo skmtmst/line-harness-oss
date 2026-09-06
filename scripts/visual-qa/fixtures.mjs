@@ -3840,25 +3840,64 @@ export const AFFILIATE_LINKS = [
   **呼ばれていない1**。全部が公開中・呼ばれている状態だと、その4つが撮れない。
   版が見えないと「直してよいか」が判断できない、というのが設計の言いたいこと。
 */
+const COMMON_ACTION_METRICS = {
+  'ca-1': [1_284, 2, '2026-08-25T10:31:00+09:00'],
+  'ca-2': [620, 2, '2026-08-25T09:42:00+09:00'],
+  'ca-3': [360, 0, '2026-08-25T09:05:00+09:00'],
+  'ca-4': [210, 1, '2026-08-24T18:40:00+09:00'],
+  'ca-5': [0, 0, null], 'ca-6': [160, 1, '2026-08-24T14:02:00+09:00'],
+  'ca-7': [90, 0, '2026-08-24T11:18:00+09:00'], 'ca-8': [55, 0, '2026-08-23T20:00:00+09:00'],
+  'ca-9': [40, 0, '2026-08-23T18:12:00+09:00'], 'ca-10': [20, 0, '2026-08-22T15:25:00+09:00'],
+  'ca-11': [8, 0, '2026-08-20T10:10:00+09:00'], 'ca-12': [0, 0, null],
+  'ca-13': [0, 0, null], 'ca-14': [0, 0, null],
+}
+
 export const COMMON_ACTIONS = [
   { id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 5, bindingCount: 5, oldVersionBindingCount: 1, updatedAt: '2026-08-25T01:00:00.000Z' },
-  { id: 'ca-2', name: '定期便のご案内', description: 'メッセージ ほか2つ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
-  { id: 'ca-3', name: '予約のリマインド', description: 'リマインダ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
+  { id: 'ca-2', name: '購入のお礼', description: 'お礼＋マイル＋タグ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
+  { id: 'ca-3', name: '予約が入ったとき', description: '前日・当日の通知を用意', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
+  { id: 'ca-6', name: '写真を通したとき', description: 'お礼＋マイル＋置き場へ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 3, bindingCount: 5, oldVersionBindingCount: 0, updatedAt: '2026-08-21T09:00:00.000Z' },
+  { id: 'ca-7', name: '解約を止めたいとき', description: '相談の案内を送る', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 4, oldVersionBindingCount: 0, updatedAt: '2026-08-19T09:00:00.000Z' },
+  { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: 'アンケートの回収', description: '回答をタグにする', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
   { /* 設計の「呼ばれていない 1」。 */ id: 'ca-4', name: '休業のお知らせ', description: 'メッセージ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T09:00:00.000Z' },
-  { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: '口コミのお願い（下書き）', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
-]
+  ...Array.from({ length: 5 }, (_, index) => ({ id: `ca-${index + 8}`, name: `定期運用 ${index + 1}`, description: 'よく使う処理をまとめたアクション', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: [4, 4, 3, 3, 3][index], oldVersionBindingCount: 0, updatedAt: '2026-08-18T09:00:00.000Z' })),
+  { id: 'ca-13', name: '会員登録後の処理', description: '公開前の下書き', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 2, bindingCount: 2, oldVersionBindingCount: 0, updatedAt: '2026-08-17T09:00:00.000Z' },
+  { id: 'ca-14', name: '担当者への通知', description: '公開前の下書き', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-16T09:00:00.000Z' },
+].map((action) => ({
+  ...action,
+  executionCountThisMonth: COMMON_ACTION_METRICS[action.id][0],
+  failureCountThisMonth: COMMON_ACTION_METRICS[action.id][1],
+  lastRunAt: COMMON_ACTION_METRICS[action.id][2],
+}))
 
 /** 機能25の一覧。14本稼働・4本停止を同じAPI契約で返す。 */
+const AUTOMATION_METRICS = {
+  'au-1': [56, 0], 'au-2': [486, 0], 'au-3': [42, 0], 'au-4': [12, 6], 'au-5': [124, 0],
+  'au-6': [1_000, 0], 'au-7': [950, 0], 'au-8': [900, 0], 'au-9': [850, 0],
+  'au-10': [800, 0], 'au-11': [750, 0], 'au-12': [700, 0], 'au-13': [650, 0], 'au-14': [600, 0],
+  'au-15': [0, 0], 'au-16': [0, 0], 'au-17': [0, 0], 'au-18': [500, 0],
+}
+
 export const AUTOMATIONS = [
   { id: 'au-1', name: '友だち追加から案内を始める', description: '流入リンクを通っていない人に、はじめての方へをご案内', eventType: 'friend_add', conditions: { inflow: 'none' }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-0' } }], isActive: true, priority: 100, lineAccountId: 'visual-qa-account', createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
   { id: 'au-2', name: '「予約」で予約画面を出す', description: 'すべての友だちに予約用メニューを表示', eventType: 'message_received', conditions: { keyword: '予約' }, actions: [{ type: 'switch_rich_menu', params: { richMenuId: 'rmg-1' } }], isActive: true, priority: 90, lineAccountId: 'visual-qa-account', createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-08-24T00:00:00.000Z' },
   { id: 'au-3', name: '体験申込のフォローを始める', description: '30日買っていない人に体験前フォローを開始', eventType: 'tag_change', conditions: { tagId: 'tag-trial', purchaseDays: 30 }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-trial' } }], isActive: true, priority: 80, lineAccountId: 'visual-qa-account', createdAt: '2026-07-03T00:00:00.000Z', updatedAt: '2026-08-23T00:00:00.000Z' },
   { id: 'au-4', name: '初回注文をSlackへ知らせる', description: '定期便を初めて買った人を外部連携へ通知', eventType: 'ec.order.confirmed', conditions: { firstSubscription: true }, actions: [{ type: 'send_webhook', params: { webhookId: 'wh-1' } }], isActive: true, priority: 70, lineAccountId: 'visual-qa-account', createdAt: '2026-07-04T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z' },
   { id: 'au-5', name: '反応がない人を気にかける', description: '最終接触から7日たった人に対応タグを付ける', eventType: 'tag_change', conditions: { inactiveDays: 7 }, actions: [{ type: 'add_tag', params: { tagId: 'tag-care' } }], isActive: true, priority: 60, lineAccountId: 'visual-qa-account', createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-08-21T00:00:00.000Z' },
+  { id: 'au-15', name: '誕生日の7日前になったとき', description: 'ペットの誕生日に合わせてクーポンを送信', eventType: 'calendar_booked', conditions: { birthdayRegistered: true }, actions: [{ type: 'send_message', params: { templateId: 'birthday-coupon' } }], isActive: false, priority: 55, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
   { id: 'au-6', name: '問い合わせを担当へ知らせる', description: 'メッセージを受けたら担当用タグを付ける', eventType: 'message_received', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: 'tag-support' } }], isActive: true, priority: 50, lineAccountId: null, createdAt: '2026-07-06T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z' },
   ...Array.from({ length: 8 }, (_, index) => ({ id: `au-${index + 7}`, name: `定期フォロー ${index + 1}`, description: '条件に合う友だちへ順番に案内', eventType: 'tag_change', conditions: { group: index + 1 }, actions: [{ type: 'add_tag', params: { tagId: `tag-${index + 1}` } }], isActive: true, priority: 40 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z' })),
-  ...Array.from({ length: 4 }, (_, index) => ({ id: `au-${index + 15}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
-]
+  ...Array.from({ length: 3 }, (_, index) => ({ id: `au-${index + 16}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
+].map((automation) => ({
+  ...automation,
+  triggerConfig: automation.conditions,
+  status: automation.isActive ? 'active' : 'stopped',
+  versionId: `${automation.id}-version-3`,
+  version: 3,
+  executionCount30d: AUTOMATION_METRICS[automation.id][0],
+  failureCount30d: AUTOMATION_METRICS[automation.id][1],
+  lastRunAt: AUTOMATION_METRICS[automation.id][0] === 0 ? null : '2026-08-25T10:31:00+09:00',
+}))
 
 /**
  * 機能25「動いた記録」（設計 `DkPY0`）。

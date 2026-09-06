@@ -53,6 +53,7 @@ export * from './affiliate-attribution';
 export * from './affiliate-report';
 export * from './affiliate-payments';
 export * from './affiliate-settlements';
+export * from './affiliate-payouts';
 export * from './account-settings';
 export * from './webinars';
 

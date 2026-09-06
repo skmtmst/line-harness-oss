@@ -5,19 +5,21 @@ import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
-import { api, type NenCampaignSetting, type NenColumn, type NenPetProfile } from '@/lib/api'
-import { NenOverview, type NenCoupon, type NenJob, type NenTab } from './nen-overview'
+import {
+  api,
+  type NenCampaignSetting,
+  type NenColumn,
+  type NenColumnMetrics,
+  type NenDeliveryDetail,
+  type NenDeliveryList,
+  type NenFlowMetrics,
+  type NenPetMetrics,
+  type NenPetProfile,
+} from '@/lib/api'
+import { NenOverview, type NenCoupon, type NenTab } from './nen-overview'
 
 type Notice = { tone: 'success' | 'error'; text: string }
 type FriendOption = { id: string; displayName: string | null }
-type Overview = {
-  activeCampaigns: number
-  jobs: { total?: number; pending: number; sent: number; failed: number }
-  columns: number
-  pets: number
-  coupons: number
-}
-
 function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: () => void }) {
   return (
     <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
@@ -48,8 +50,11 @@ export default function NenCampaignsPage() {
   const [columns, setColumns] = useState<NenColumn[]>([])
   const [pets, setPets] = useState<NenPetProfile[]>([])
   const [friends, setFriends] = useState<FriendOption[]>([])
-  const [jobs, setJobs] = useState<NenJob[]>([])
-  const [overview, setOverview] = useState<Overview | null>(null)
+  const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
+  const [columnMetrics, setColumnMetrics] = useState<NenColumnMetrics | null>(null)
+  const [petMetrics, setPetMetrics] = useState<NenPetMetrics | null>(null)
+  const [deliveryList, setDeliveryList] = useState<NenDeliveryList | null>(null)
+  const [deliveryDetail, setDeliveryDetail] = useState<NenDeliveryDetail | null>(null)
   const [coupon, setCoupon] = useState<NenCoupon>({ isEnabled: true, codePrefix: 'NENBDAY', benefitLabel: 'お誕生日月限定クーポン', discountAmount: 500, validityDays: 31 })
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
@@ -67,15 +72,23 @@ export default function NenCampaignsPage() {
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current
     setLoading(true); setLoadError('')
-    if (!selectedAccountId) { setSettings([]); setColumns([]); setPets([]); setJobs([]); setOverview(null); setLoading(false); return }
+    if (!selectedAccountId) {
+      setSettings([]); setColumns([]); setPets([])
+      setFlowMetrics(null); setColumnMetrics(null); setPetMetrics(null); setDeliveryList(null); setDeliveryDetail(null)
+      setLoading(false); return
+    }
     try {
-      const [settingRes, columnRes, petRes, jobRes, overviewRes, couponRes] = await Promise.all([
+      const [settingRes, columnRes, petRes, couponRes, flowRes, columnMetricRes, petMetricRes, deliveryRes] = await Promise.all([
         api.nenCampaigns.settings(selectedAccountId), api.nenCampaigns.columns(selectedAccountId), api.nenCampaigns.pets(selectedAccountId),
-        api.nenCampaigns.jobs(selectedAccountId), api.nenCampaigns.overview(selectedAccountId), api.nenCampaigns.birthdayCoupon(selectedAccountId),
+        api.nenCampaigns.birthdayCoupon(selectedAccountId),
+        api.nenCampaigns.flowMetrics(selectedAccountId), api.nenCampaigns.columnMetrics(selectedAccountId, 90),
+        api.nenCampaigns.petMetrics(selectedAccountId), api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 }),
       ])
       if (sequence !== loadSequence.current) return
-      if (!settingRes.success || !columnRes.success || !petRes.success || !jobRes.success || !overviewRes.success || !couponRes.success) throw new Error()
-      setSettings(settingRes.data); setColumns(columnRes.data); setPets(petRes.data); setJobs(jobRes.data); setOverview(overviewRes.data); setCoupon(couponRes.data)
+      if (!settingRes.success || !columnRes.success || !petRes.success || !couponRes.success
+        || !flowRes.success || !columnMetricRes.success || !petMetricRes.success || !deliveryRes.success) throw new Error()
+      setSettings(settingRes.data); setColumns(columnRes.data); setPets(petRes.data); setCoupon(couponRes.data)
+      setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data); setPetMetrics(petMetricRes.data); setDeliveryList(deliveryRes.data)
     } catch { if (sequence === loadSequence.current) setLoadError('フォロー配信の情報を読み込めませんでした。') }
     finally { if (sequence === loadSequence.current) setLoading(false) }
   }, [selectedAccountId])
@@ -141,10 +154,35 @@ export default function NenCampaignsPage() {
     try { await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon); setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' }) }
     catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
   }
+  const showDelivery = async (id: string) => {
+    if (!selectedAccountId) return
+    if (deliveryDetail?.id === id) { setDeliveryDetail(null); return }
+    try {
+      const result = await api.nenCampaigns.delivery(id, selectedAccountId)
+      if (!result.success) throw new Error()
+      setDeliveryDetail(result.data)
+    } catch { setNotice({ tone: 'error', text: '配信時の内容を表示できませんでした。' }) }
+  }
+  const changeDeliveryView = async (status?: string, cursor?: string) => {
+    if (!selectedAccountId) return
+    try {
+      const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, cursor })
+      if (!result.success) throw new Error()
+      setDeliveryList(result.data); setDeliveryDetail(null)
+    } catch { setNotice({ tone: 'error', text: '配信履歴を更新できませんでした。' }) }
+  }
+  const retryDelivery = async (id: string, expectedVersion: number, reason: string) => {
+    if (!selectedAccountId || !reason.trim()) { setNotice({ tone: 'error', text: '再送する理由を入力してください。' }); return }
+    try {
+      const result = await api.nenCampaigns.retryDelivery(id, { lineAccountId: selectedAccountId, expectedVersion, reason: reason.trim() })
+      if (!result.success) throw new Error()
+      setNotice({ tone: 'success', text: '配信を再送待ちへ戻しました。' }); setDeliveryDetail(null); await load()
+    } catch { setNotice({ tone: 'error', text: '配信を再送待ちへ戻せませんでした。状態を更新して確認してください。' }) }
+  }
   const changeTab = (next: NenTab) => { setTab(next); window.history.replaceState(window.history.state, '', next === 'flow' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`) }
 
   if (loading) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="loading" /></main></>
-  if (loadError) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="error" description={loadError} action={<Button variant="primary" onClick={() => void load()}>フォロー配信を再読み込み</Button>} /></main></>
+  if (loadError) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="error" description={tab === 'columns' ? '再読み込みしても直らないときは、エラー報告へお知らせください。' : loadError} action={<Button variant="primary" onClick={() => void load()}>{tab === 'columns' ? 'もう一度読み込む' : 'フォロー配信を再読み込み'}</Button>} /></main></>
 
   const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
     : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>
@@ -155,7 +193,8 @@ export default function NenCampaignsPage() {
     <>
       <div data-design="Head"><Header title="NEN配信" description="購入してくれた方へ、到着確認から記念日までの配信を管理します。" action={headerAction} /></div>
       <NenOverview
-        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} pets={pets} friends={friends} jobs={jobs} overview={overview} coupon={coupon}
+        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} pets={pets} friends={friends} coupon={coupon}
+        flowMetrics={flowMetrics} columnMetrics={columnMetrics} petMetrics={petMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
         testFriendId={testFriendId} previewCampaignKey={previewCampaignKey} previewColumnId={previewColumnId} editingColumnId={editingColumnId}
         saving={saving} testing={testing} savingColumnId={savingColumnId} petDraft={petDraft} notice={notice}
         onTestFriendChange={setTestFriendId} onPreviewCampaign={setPreviewCampaignKey} onPreviewColumn={setPreviewColumnId} onEditColumn={setEditingColumnId}
@@ -163,6 +202,8 @@ export default function NenCampaignsPage() {
         onSaveColumn={(column) => void saveColumnMessage(column)} onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
         onToggleSetting={(setting) => void saveSetting(setting, { isEnabled: !setting.isEnabled })} onTestSend={(setting) => void testSend(setting)}
         onPetDraftChange={setPetDraft} onAddPet={() => void addPet()} onDeletePet={(pet) => void deletePet(pet)} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()}
+        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
+        onChangeDeliveryView={(status, cursor) => void changeDeliveryView(status, cursor)}
         renderCampaignPreview={(setting) => <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}
         renderColumnPreview={(column) => <ColumnLinePreview column={column} onClose={() => setPreviewColumnId(null)} />}
       />

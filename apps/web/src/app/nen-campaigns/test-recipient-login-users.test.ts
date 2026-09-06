@@ -23,7 +23,10 @@ describe('NEN配信のテスト送信先', () => {
 
   test('設定・履歴・コラム・ペット・クーポンを選択中LINEアカウントへ限定する', () => {
     expect(page).toContain('api.nenCampaigns.settings(selectedAccountId)');
-    expect(page).toContain('api.nenCampaigns.jobs(selectedAccountId)');
+    expect(page).toContain('api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })');
+    expect(page).toContain('api.nenCampaigns.flowMetrics(selectedAccountId)');
+    expect(page).toContain('api.nenCampaigns.columnMetrics(selectedAccountId, 90)');
+    expect(page).toContain('api.nenCampaigns.petMetrics(selectedAccountId)');
     expect(page).toContain('api.nenCampaigns.columns(selectedAccountId)');
     expect(page).toContain('api.nenCampaigns.pets(selectedAccountId)');
     expect(page).toContain('api.nenCampaigns.birthdayCoupon(selectedAccountId)');
@@ -44,10 +47,10 @@ describe('NEN配信のテスト送信先', () => {
   });
 
   test('取得済みの失敗・待機件数を表示し、配信日時を日本時間へ変える', () => {
-    expect(overview).toContain('overview?.jobs.pending ?? null');
-    expect(overview).toContain('overview?.jobs.failed ?? null');
-    expect(overview).toContain('formatNenJobDateTime(job.sentAt || job.scheduledAt)');
-    expect(overview).not.toContain('予定：{job.scheduledAt}');
+    expect(overview).toContain('deliveryList.summary.pending + deliveryList.summary.processing');
+    expect(overview).toContain('deliveryList.summary.failed + deliveryList.summary.skipped');
+    expect(overview).toContain('formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)');
+    expect(overview).not.toContain('予定：{delivery.scheduledAt}');
   });
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {

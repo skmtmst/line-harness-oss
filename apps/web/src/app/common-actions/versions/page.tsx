@@ -4,7 +4,7 @@ import { usageSummaryDetail } from '../usage-summary'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, ApiError, type CommonActionDetail, type CommonActionVersion } from '@/lib/api'
+import { api, ApiError, type CommonActionDetail, type CommonActionSummary, type CommonActionVersion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import NoteBar from '@/components/shared/note-bar'
@@ -20,6 +20,14 @@ const ACTION_LABELS: Record<string, string> = {
   resume_scenario: 'シナリオを再開する', send_message: 'LINEメッセージを送る',
   send_webhook: '外部サービスへ送る', switch_rich_menu: 'リッチメニューを切り替える',
   remove_rich_menu: 'リッチメニューを外す', wait: '待つ', common_action: '別の共通アクションを呼ぶ',
+}
+
+const CONSUMER_LABELS: Record<string, string> = {
+  scenario: 'シナリオ配信',
+  form: '回答フォーム',
+  auto_reply: '自動応答',
+  rich_menu: 'リッチメニュー',
+  automation: 'オートメーション',
 }
 
 function versionChangeSummary(version: CommonActionVersion, versions: CommonActionVersion[]): string {
@@ -47,6 +55,7 @@ function CommonActionVersionsInner() {
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
+  const [summary, setSummary] = useState<CommonActionSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState('')
   const [error, setError] = useState('')
@@ -60,11 +69,17 @@ function CommonActionVersionsInner() {
     }
     setLoading(true)
     setError('')
+    setSummary(null)
     try {
-      const response = await api.commonActions.get(id, selectedAccountId)
+      const [response, listResponse] = await Promise.all([
+        api.commonActions.get(id, selectedAccountId),
+        api.commonActions.list({ accountId: selectedAccountId }),
+      ])
       if (response.success) setDetail(response.data)
       else setError(response.error)
+      setSummary(listResponse.success ? listResponse.data.find((item) => item.id === id) ?? null : null)
     } catch (caught) {
+      setSummary(null)
       setError(caught instanceof Error ? caught.message : '版と利用先を読み込めませんでした')
     } finally {
       setLoading(false)
@@ -153,11 +168,12 @@ function CommonActionVersionsInner() {
         )}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="現在の公開版" value={published?.versionNumber ?? null} unit="" detail={published ? `v${published.versionNumber}を利用できます` : 'まだ公開していません'} />
-        <SummaryCard variant="v6" title="版の数" value={detail.versions.length} unit="" detail="下書きを含む" />
-        <SummaryCard variant="v6" title="使われている場所" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
-        <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="確認して更新します" />
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <SummaryCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
+        <SummaryCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
+        <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="実行記録から集計" />
+        <SummaryCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="部分成功を含む" />
+        <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
       <NoteBar>
@@ -167,11 +183,59 @@ function CommonActionVersionsInner() {
       {error ? <p className="text-danger my-4 text-sm" role="alert">{error}</p> : null}
 
       <section className="mt-4">
+        <h2 className="text-ink font-semibold">どこから呼ばれているか</h2>
+        <p className="text-ink-faint mt-1 text-sm">公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。</p>
+        {detail.bindings.length === 0 ? (
+          <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだどこからも呼ばれていません。</div>
+        ) : (
+          <DataTable className="mt-3">
+              <thead>
+                <TableHeadRow>
+                  <Th style={{ width: '35%' }}>利用先</Th>
+                  <Th style={{ width: '15%' }}>固定中の版</Th>
+                  <Th style={{ width: '14%' }}>実行中</Th>
+                  <Th style={{ width: '14%' }}>待機中</Th>
+                  <Th style={{ width: '22%' }}>操作</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody>
+                {detail.bindings.map((binding) => (
+                  <Tr key={binding.id}>
+                    <NameCell
+                      name={<span className="truncate" title={binding.consumerId}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>}
+                      sub={<span className="truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
+                    />
+                    <Td>
+                      <span className="text-ink-secondary">v{binding.versionNumber}</span>
+                      {binding.hasNewerVersion ? <StatusBadge tone="warning" size="compact" className="ml-2">新版あり</StatusBadge> : null}
+                    </Td>
+                    <Td className="text-ink-secondary" title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? '—'}</Td>
+                    <Td className="text-ink-secondary" title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</Td>
+                    <ActionCell>
+                      {canManage && binding.hasNewerVersion && published ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(working)}
+                          className="text-action font-semibold hover:underline disabled:opacity-40"
+                          onClick={() => setPendingBindingId(binding.id)}
+                        >
+                          v{published.versionNumber}への変更内容を確認
+                        </button>
+                      ) : <span className="text-ink-faint">{binding.hasNewerVersion ? '編集権限が必要' : '最新版を使用中'}</span>}
+                    </ActionCell>
+                  </Tr>
+                ))}
+              </tbody>
+          </DataTable>
+        )}
+      </section>
+
+      <section className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
-            <p className="text-ink-faint mt-1 text-xs">この30日の実行失敗: —（未接続。版ごとの実行結果を集計する口が必要です）</p>
+            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {summary?.executionCountThisMonth.toLocaleString('ja-JP') ?? '—'}回・失敗 {summary?.failureCountThisMonth.toLocaleString('ja-JP') ?? '—'}回</p>
           </div>
         </div>
         <DataTable>
@@ -234,52 +298,21 @@ function CommonActionVersionsInner() {
         </DataTable>
       </section>
 
-      <section className="mt-6">
-        <h2 className="text-ink font-semibold">使われている場所</h2>
-        <p className="text-ink-faint mt-1 text-sm">実行中・待機中の処理は、切り替えても開始時の版のまま完了します。</p>
-        {detail.bindings.length === 0 ? (
-          <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだどこからも呼ばれていません。</div>
-        ) : (
-          <DataTable className="mt-3">
-              <thead>
-                <TableHeadRow>
-                  <Th style={{ width: '35%' }}>利用先</Th>
-                  <Th style={{ width: '15%' }}>固定中の版</Th>
-                  <Th style={{ width: '14%' }}>実行中</Th>
-                  <Th style={{ width: '14%' }}>待機中</Th>
-                  <Th style={{ width: '22%' }}>操作</Th>
-                </TableHeadRow>
-              </thead>
-              <tbody>
-                {detail.bindings.map((binding) => (
-                  <Tr key={binding.id}>
-                    <NameCell
-                      name={<span className="truncate" title={binding.consumerId}>{binding.consumerType}</span>}
-                      sub={<span className="truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
-                    />
-                    <Td>
-                      <span className="text-ink-secondary">v{binding.versionNumber}</span>
-                      {binding.hasNewerVersion ? <StatusBadge tone="warning" size="compact" className="ml-2">新版あり</StatusBadge> : null}
-                    </Td>
-                    <Td className="text-ink-secondary" title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? '—'}</Td>
-                    <Td className="text-ink-secondary" title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</Td>
-                    <ActionCell>
-                      {canManage && binding.hasNewerVersion && published ? (
-                        <button
-                          type="button"
-                          disabled={Boolean(working)}
-                          className="text-action font-semibold hover:underline disabled:opacity-40"
-                          onClick={() => setPendingBindingId(binding.id)}
-                        >
-                          v{published.versionNumber}への変更内容を確認
-                        </button>
-                      ) : <span className="text-ink-faint">{binding.hasNewerVersion ? '編集権限が必要' : '最新版を使用中'}</span>}
-                    </ActionCell>
-                  </Tr>
-                ))}
-              </tbody>
-          </DataTable>
-        )}
+      <section className="mt-6 grid gap-3 sm:grid-cols-2">
+        <SummaryCard
+          variant="v6"
+          title="このアクションを実行中"
+          value={detail.bindings.reduce((sum, binding) => sum + (binding.runningCount ?? 0), 0)}
+          unit="件"
+          detail="始まったときの版のまま最後まで進みます"
+        />
+        <SummaryCard
+          variant="v6"
+          title="待ち時間の途中"
+          value={detail.bindings.reduce((sum, binding) => sum + (binding.waitingCount ?? 0), 0)}
+          unit="件"
+          detail="設定した待ち時間の途中です"
+        />
       </section>
 
       <Dialog

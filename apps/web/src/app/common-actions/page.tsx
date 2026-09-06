@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
@@ -17,6 +17,7 @@ import { useCanManageCommonActions } from '@/components/automations/use-common-a
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused'
+const PAGE_SIZE = 6
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: 'all', label: 'すべて' },
@@ -33,7 +34,6 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 }
 
 export default function CommonActionsPage() {
-  const router = useRouter()
   const canManage = useCanManageCommonActions()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [items, setItems] = useState<CommonActionSummary[]>([])
@@ -41,9 +41,10 @@ export default function CommonActionsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [duplicating, setDuplicating] = useState('')
   const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
 
@@ -51,6 +52,7 @@ export default function CommonActionsPage() {
     if (!selectedAccountId) {
       setItems([])
       setSummaryItems([])
+      setTotal(0)
       setLoading(false)
       return
     }
@@ -59,12 +61,21 @@ export default function CommonActionsPage() {
     try {
       const [summaryResponse, response, automationsResponse, templatesResponse] = await Promise.all([
         api.commonActions.list({ accountId: selectedAccountId }),
-        api.commonActions.list({ accountId: selectedAccountId, status: filter, query: deferredQuery }),
+        api.commonActions.list({
+          accountId: selectedAccountId,
+          status: filter,
+          query: deferredQuery,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
         api.automations.list({ accountId: selectedAccountId }).catch(() => null),
         api.automations.templates(selectedAccountId).catch(() => null),
       ])
       if (summaryResponse.success) setSummaryItems(summaryResponse.data)
-      if (response.success) setItems(response.data)
+      if (response.success) {
+        setItems(response.data)
+        setTotal(response.pagination?.total ?? response.data.length)
+      }
       else setError(response.error)
       setAutomationCounts(automationsResponse?.success ? {
         active: automationsResponse.data.filter((item) => item.isActive).length,
@@ -76,32 +87,28 @@ export default function CommonActionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [deferredQuery, filter, selectedAccountId])
+  }, [deferredQuery, filter, page, selectedAccountId])
 
   useEffect(() => {
     if (!accountLoading) void load()
   }, [accountLoading, load])
 
-  const duplicate = async (id: string) => {
-    if (!selectedAccountId || duplicating) return
-    setDuplicating(id)
-    setError('')
-    try {
-      const response = await api.commonActions.duplicate(id, selectedAccountId)
-      if (!response.success) throw new Error(response.error)
-      router.push(`/common-actions/edit?id=${encodeURIComponent(response.data.id)}`)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
-    } finally {
-      setDuplicating('')
-    }
-  }
-
   const totals = useMemo(() => ({
     actions: summaryItems.reduce((sum, item) => sum + item.actionCount, 0),
     bindings: summaryItems.reduce((sum, item) => sum + item.bindingCount, 0),
     outdated: summaryItems.reduce((sum, item) => sum + item.oldVersionBindingCount, 0),
+    outdatedItems: summaryItems.filter((item) => item.oldVersionBindingCount > 0).length,
+    published: summaryItems.filter((item) => item.status === 'published').length,
+    executions: summaryItems.reduce((sum, item) => sum + item.executionCountThisMonth, 0),
+    failures: summaryItems.reduce((sum, item) => sum + item.failureCountThisMonth, 0),
   }), [summaryItems])
+
+  const filterCount = (value: Filter): number => {
+    if (value === 'all') return summaryItems.length
+    if (value === 'old_version') return totals.outdatedItems
+    if (value === 'unused') return summaryItems.filter((item) => item.status === 'published' && item.bindingCount === 0).length
+    return summaryItems.filter((item) => item.status === value).length
+  }
 
   return (
     <div data-design-node="xOpDs">
@@ -129,23 +136,24 @@ export default function CommonActionsPage() {
       ]} className="mb-4" />
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : summaryItems.length} unit="" detail="公開中と下書き" loading={loading} />
-        <SummaryCard variant="v6" title="中の処理" value={loading ? null : totals.actions} unit="" detail="表示中の合計" loading={loading} />
-        <SummaryCard variant="v6" title="呼び出し場所" value={loading ? null : totals.bindings} unit="" detail="固定している利用先" loading={loading} />
-        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdated} unit="" detail="新しい版へ更新できます" loading={loading} badge={totals.outdated > 0 ? '要確認' : undefined} />
+        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : summaryItems.length} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
+        <SummaryCard variant="v6" title="呼び出し元" value={loading ? null : totals.bindings} unit="" detail="5機能から" loading={loading} />
+        <SummaryCard variant="v6" title="今月 動いた回数" value={loading ? null : totals.executions} unit="" detail={loading ? '' : `失敗 ${totals.failures}`} loading={loading} />
+        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdatedItems} unit="" detail={loading ? '' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={totals.outdatedItems > 0 ? '要確認' : undefined} />
       </div>
 
       <NoteBar>
-        公開しても利用先の内容は自動で変わりません。利用先ごとに、確認してから新しい版へ更新します。この30日の実行と失敗は未接続のため、集計口の接続後に表示します。
+        ここを直すと、呼び出している機能すべてに効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
       </NoteBar>
 
       <div className="my-3 flex flex-wrap items-center gap-2">
         {canManage ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : null}
+        {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
         <SearchField
           value={query}
-          onChange={setQuery}
-          onClear={() => setQuery('')}
-          placeholder="名前や説明で検索"
+          onChange={(value) => { setQuery(value); setPage(1) }}
+          onClear={() => { setQuery(''); setPage(1) }}
+          placeholder="アクション名・中の処理で探す"
           aria-label="共通アクションを検索"
           loading={loading && query !== deferredQuery}
           className="min-w-72 flex-1"
@@ -166,8 +174,8 @@ export default function CommonActionsPage() {
               ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
               : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
           >
-            <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => setFilter(option.value)} />
-            {option.label}
+            <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
+            {option.label} {filterCount(option.value)}
           </label>
         ))}
       </div>
@@ -216,16 +224,21 @@ export default function CommonActionsPage() {
                   </Td>
                   <ActionCell>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <a
+                    <Link
                       href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`}
                       className="text-action inline-flex items-center gap-1 whitespace-nowrap font-medium hover:underline"
                     >
                       中身を見る <ExternalLink size={14} aria-hidden />
-                    </a>
+                    </Link>
                     {canManage ? (
-                      <button type="button" disabled={Boolean(duplicating)} onClick={() => void duplicate(item.id)} className="text-action whitespace-nowrap text-xs font-medium hover:underline disabled:opacity-40">
-                        {duplicating === item.id ? '複製中' : '複製して下書きを作る'}
-                      </button>
+                      <Link
+                        href={item.status === 'draft'
+                          ? `/common-actions/edit?id=${encodeURIComponent(item.id)}`
+                          : `/common-actions/versions?id=${encodeURIComponent(item.id)}`}
+                        className="text-action whitespace-nowrap text-xs font-medium hover:underline"
+                      >
+                        {item.status === 'draft' ? '公開する' : '使われている場所'}
+                      </Link>
                     ) : null}
                     </div>
                   </ActionCell>
@@ -234,6 +247,18 @@ export default function CommonActionsPage() {
             </tbody>
         </DataTable>
       )}
+      {!loading && !error && items.length > 0 ? (
+        <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">
+          <span>{total}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+          <div className="flex items-center gap-3" aria-label="ページ送り">
+            <button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="text-action disabled:text-ink-faint">前へ</button>
+            {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, index) => index + 1).map((pageNumber) => (
+              <button key={pageNumber} type="button" aria-current={pageNumber === page ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === page ? 'text-action font-bold' : 'text-ink-faint'}>{pageNumber}</button>
+            ))}
+            <button type="button" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
