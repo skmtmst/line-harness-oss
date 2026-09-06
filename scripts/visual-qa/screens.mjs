@@ -3964,6 +3964,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '2d0ee180', on: '2026-08-30', screens: ['xOpDs', 'py5CG', 'syWp4'], note: 'development そのもので撮り直した。帯4つと複製は既に入っていた' },
     { pr: 594, head: 'a389b70a', on: '2026-08-30', screens: ['syWp4'], note: 'Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している' },
     { pr: 989, head: '44e671b2c', on: '2026-09-06', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5', 'xOpDs', 'py5CG', 'syWp4'], note: 'Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。' },
+    { pr: 1055, head: '08369795c', on: '2026-09-07', screens: ['gief7', 'Rv8Jv', 'DkPY0', 'WjYAC', 'py5CG'], note: 'Issue #299。5画面をV6の情報順と密度へそろえ、PR #1051 の通常データを含む通常・読込中・0件・取得失敗を固定ポート3105/8792で撮影。全30枚で1440・1920pxの横はみ出し0を確認し、一致1・構造一致4を記録した。' },
   ],
   32: [
     { pr: 482, head: 'b346d467', on: '2026-08-29', screens: ['b3HfZ', 'U0BwS'], note: '緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）' },
