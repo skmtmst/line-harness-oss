@@ -1,135 +1,98 @@
 # Project Instructions
 
-- 依頼で明示されない限り、親リポジトリ `nen-petfood-eccube` のファイルを変更しないでください。
-- 親リポジトリの参照（読み取り）は、必要に応じて行って構いません。
-- 親側の変更が必要と判断した場合は、変更せずに報告して指示を仰いでください。
+## 基本
 
-- ゴールから外れる提案をしないでください。
-- ゴールに進む提案を必ずしてください。
-- クラウド作業の開始前に `bash scripts/codex/doctor.sh` を実行し、最終行が「要確認」なら作業を始めず理由を報告してください。
-  - 手元の PC(NodeTerm の `~/lh-work` の作業ツリー)では `DOCTOR_LOCAL=1 bash scripts/codex/doctor.sh` で実行する。Cloudflare の遮断検査は Codex のクラウド砂場向けで、手元では必ず「要確認」になるため。`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は lane の作業に不要で、未設定が正しい。最終行が「合格」なら着手してよい(2026-09-06、司令塔の判断。台帳 #216)。
-- 回答には必ず「次のタスクはこれ」「今の進捗を全体像から整理するとこれ」を含めてください。
-- 私が大学生だと思って、言語化してください。
-- LINE Harness Proxy から担当者として1対1返信する場合は、`X-Line-Harness-Source: manual` を必ず付けてください。予約通知などの自動送信には付けないでください。
-- Google Meetの個別相談を確定・変更した場合は、カレンダー更新だけで終えず、`POST /api/meet-consultations` にGoogle Calendar event ID・LINE friend ID・日時・Meet URLを登録してください。前日・1時間前のLINEリマインドを必須セットにします。キャンセル時は `DELETE /api/meet-consultations/:externalEventId` も実行してください。
+- 親リポジトリ `nen-petfood-eccube` は参照だけ許可する。明示依頼がない限り変更せず、変更が必要なら報告して指示を待つ。
+- ゴール外の提案は避け、ゴールへ進む次の行動を示す。回答には必ず「次のタスクはこれ」「今の進捗を全体像から整理するとこれ」を含め、大学生にも分かる言葉で短く説明する。
+- クラウド作業前は `bash scripts/codex/doctor.sh`、NodeTerm の `~/lh-work` では `DOCTOR_LOCAL=1 bash scripts/codex/doctor.sh` を実行する。最終行が「合格」なら着手し、「要確認」なら理由を報告して止める。手元では Cloudflare 検査を省き、lane作業に不要な `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は未設定でよい（2026-09-06、台帳 #216）。
+- LINE Harness Proxy から担当者として1対1返信するときは `X-Line-Harness-Source: manual` を付ける。予約通知など自動送信には付けない。
+- Google Meetの個別相談を確定・変更したら、Calendar更新に加えて `POST /api/meet-consultations` へGoogle Calendar event ID・LINE friend ID・日時・Meet URLを登録し、前日・1時間前のLINEリマインドを設定する。キャンセル時は `DELETE /api/meet-consultations/:externalEventId` も実行する。
 
-## SlackとCodexの共同開発運用
+## 読む文書
 
-- GitHubのIssue・仕様書・Pull Requestを正本とし、Slackは作業状況と会話を見えるようにする場所とします。
-- SlackでCodexを動かすには、本文で実際の `@Codex` メンションを使ってください。「Codexさんに確認します」という通常文だけでは起動しません。
-- `#line-harness-アイデア` で `@Codex` がない間は、ケンタとマサトの検討中の会話です。仕様やコードを自動で変更してはいけません。
-- `@Codex このスレッドを正本化して` と依頼されたら、目的・決まったこと・未決定・影響範囲・受け入れ条件を整理し、GitHub Issueまたは仕様書を作成・更新して正本にします。そのURLを元のSlackスレッドに返します。
-- `@Codex 正本化して実装へ進めて` まで明記された場合だけ、正本化の後に専用ブランチ・テスト・PR作成へ進みます。マージ、DB更新、コード配備は既存の承認ゲートを省略しません。
-- PR、エラー、アイデアは1件1親メッセージとし、経過はすべてそのスレッドに返します。指令塔には、判断待ち・競合・完了だけを流します。
-- `#line-harness-要対応` には未完了タスクだけを表示します。`作業中`、`確認待ち`、`完了` の状態を使い、完了時は一覧から消して元スレッドへ履歴を残します。
-- 要対応メッセージの `TASK-ID` を新しいCodexチャットの先頭へ貼った場合は、同じタスクと元Slackスレッドを引き継ぎます。PR番号または専用ブランチが同じ場合も同じタスクとして扱います。
-- LINE Harnessの管理画面またはWorkerが未処理エラーを自動検知した場合は、`#line-harness-エラー報告` と `#line-harness-要対応` へ報告します。顧客本文、URLのクエリ、秘密値は報告へ含めません。
-- Slackに顧客の個人情報、秘密値、トークン、パスワードを転記してはいけません。
-- Slackで受けた依頼の完了報告は、`docs/slack-report-to-claude.md` の書式に従ってください。実装の説明・変更ファイル一覧・テストの中身は書かず、そこに定めた項目だけを書きます。
+- プロジェクト文書の一律必読はこのファイルだけ。ほかは作業内容に関係する箇所を `rg` で探して読む。
+- 現在の事実・判断基準: `docs/brain/Memory.md`
+- 過去の修正指示・再発防止: `docs/brain/rules/corrections.md`、`docs/brain/rules/mistakes.md`
+- V6担当指示・並列計画: `docs/v6-directives.md`、`docs/v6-parallel-plan.md`
+- 利用者から訂正・要望を受けたら `corrections.md` に日付・指摘・今後の3行を追記する。同じ失敗を2回指摘されたら `mistakes.md` にも追記する。`Memory.md` の「進行中」が実態と違えば直す。
 
-## 機能追加依頼の標準自動フロー
+## SlackとCodex
 
-利用者が「これを作って」「この機能を追加して」と結果だけを依頼した場合は、Gitや検証反映について追加指示を待たず、次を一連の作業として進めてください。
-対象環境の指定がない通常の機能追加は、開発および検証環境を対象とし、本番は対象外として扱ってください。
+- 正本はGitHub Issue・仕様書・PR。Slackは状況と会話の共有場所。
+- Slackでは本文の実 `@Codex` メンションだけを依頼と扱う。`#line-harness-アイデア` でメンションがない会話から仕様・コードを変更しない。
+- `@Codex このスレッドを正本化して`: 目的・決定・未決定・影響範囲・受け入れ条件をIssueか仕様書へ反映し、URLを元スレッドへ返す。
+- 実装へ進むのは `@Codex 正本化して実装へ進めて` まで明記された場合だけ。承認ゲートは省略しない。
+- PR・エラー・アイデアは1件1親メッセージとし、経過は同じスレッドへ返す。指令塔には判断待ち・競合・完了だけを流す。
+- `#line-harness-要対応` は未完了だけを `作業中` / `確認待ち` / `完了` で管理し、完了時は一覧から消して元スレッドへ履歴を残す。
+- 新しいCodexタスクの先頭に同じ `TASK-ID` があれば元タスクとSlackスレッドを引き継ぐ。同じPR番号・専用ブランチも同一タスクと扱う。
+- 未処理エラーは `#line-harness-エラー報告` と `#line-harness-要対応` へ報告する。顧客本文、URLクエリ、個人情報、秘密値、トークン、パスワードはSlackへ載せない。
+- Slack依頼の完了報告は `docs/slack-report-to-claude.md` の項目だけを書く。実装説明・変更ファイル・テスト内容は書かない。
 
-1. 親・LINE両作業ツリーの開始前確認
-2. 最新 `codex/development` から専用ブランチを作成して実装
-3. テスト、型検査、ビルド、差分検査後に内容別でコミット
-4. GitHubへpushし、`codex/development` 宛てPRを作成。競合、失敗中の必須チェック、秘密情報、意図しない設定変更がなければ統合し、ローカルも同期
-5. 必要な場合だけ、クリーン確認、バックアップ、dry-run、DB更新、コード配備、反映後確認を順番に実施
+## 機能追加の標準フロー
 
-- 所有者不明の変更、重大な仕様選択、テスト失敗、競合、秘密情報、環境不一致がある場合は停止し、理由と必要な判断を報告してください。
-- 事前警告と明示的承認が必要なDB更新・環境変更などは、承認を得る段階だけ停止してください。それ以前の安全な工程は自動的に進めてください。
-- 文書変更などDB更新・配備が不要なタスクでは不要な工程を実行しないでください。本番統合・本番配備はこの自動フローに含めません。
-- `GitHub PR Slack Sync` は参考チェックです。失敗をActionsの警告として残して再照合しますが、PRの統合を止める必須ゲートにはしません。
+結果だけを依頼された通常の機能追加は開発・検証環境を対象とし、本番を除外する。追加指示を待たず次を進める。
 
-## Claude / Codex のファイル所有
+1. 親・LINE両作業ツリーを確認する。
+2. 最新 `codex/development` から `codex/担当者名-作業内容` ブランチを作り実装する。
+3. テスト・型検査・ビルド・差分検査後、内容別にコミットする。
+4. pushして `codex/development` 宛てPRを作る。競合、必須チェック失敗、秘密情報、意図しない設定変更がなければ既定の統合手順へ進み、ローカルも同期する。
+5. 必要な場合だけ、クリーン確認、backup、dry-run、DB更新、コード配備、反映確認を順に行う。
 
-| 担当 | 所有する領域 |
+所有者不明の変更、重大な仕様選択、テスト失敗、競合、秘密情報、環境不一致では停止して必要な判断を報告する。明示承認が必要なDB・環境変更は承認段階だけ止め、それ以前の安全な工程は進める。文書だけならDB更新・配備は行わない。本番統合・配備は含めない。`GitHub PR Slack Sync` は参考チェックで、失敗はActionsの警告として残して再照合するが、PR統合は止めない。
+
+## ファイル所有
+
+| 担当 | 所有領域 |
 | --- | --- |
 | Claude | `docs/v6-requirements/`、`scripts/visual-qa/`、`docs/design-qa/`、`docs/design-reference/`、`apps/web/src/components/shared/`、Pencil |
 | Codex | `apps/worker/src/routes/`、`apps/worker/src/services/`、`packages/db/`、`.github/`、`apps/web/src/lib/api.ts` の分割 |
 
-- 相手の所有領域を変更するときは、作業前にSlackの対象スレッドで宣言してください。
+相手の領域を変える前にSlackの対象スレッドで宣言する。
 
-## `codex/development` 同時更新防止ゲート
+## 同時更新防止
 
-- `codex/development` への直接コミット・直接pushは禁止し、専用ブランチからのPull Requestだけで更新してください。
-- テスト開始前にフォークの最新 `codex/development` を取得して専用ブランチへ取り込み、そのコミットSHAを記録してください。履歴改変やforce pushは使わないでください。
-- PRマージ直前に再取得し、記録したSHAと最新の `codex/development` を比較してください。
-- SHAが変わっていた場合は共同開発者の更新を専用ブランチへ取り込み、影響するテスト、型検査、ビルド、差分検査をやり直してください。古いテスト結果のままマージしてはいけません。
-- 更新後のブランチをpushし、PRが `CLEAN` / `MERGEABLE` で、失敗中・保留中の必須チェックと意図しない差分がないことを確認してください。
-- マージ操作の直前にもPRのbaseが変わっていないことを確認し、変わっていれば同じ手順を繰り返してください。
-- マージ後は最新 `codex/development` をローカルへ同期し、クリーン状態と必要なスモークテストを確認してからDB更新・コード配備へ進んでください。
-- 同じ箇所を変更する別PR、未解決の競合、同時統合中の共同開発者が判明した場合は統合を止め、順番を調整してください。
+- `codex/development` へ直接commit・pushせず、専用ブランチのPRだけで更新する。履歴改変・force pushは禁止。
+- テスト直前に最新 `origin/codex/development` を専用ブランチへ取り込み、そのSHAを記録する。
+- PRマージ直前とマージ操作直前にbase SHAを再取得する。変化していれば取り込み、影響するテスト・型検査・ビルド・差分検査をやり直してpushする。
+- PRが `CLEAN` / `MERGEABLE`、必須チェックに失敗・保留なし、意図しない差分なしを確認する。同じ箇所の別PR、未解決競合、同時統合があれば止めて順番を調整する。
+- マージ後は最新 `codex/development` を同期し、クリーン状態と必要なsmoke testを確認してからDB更新・配備へ進む。
 
-## DBマイグレーションの採番規則
+## DBマイグレーション
 
-- 新しいマイグレーションは `<番号>_<内容>.sql` とし、`999` までは3桁でゼロ埋めします。`1000` 以降は4桁以上のまま使い、文字列ではなく数値として新旧を判断してください。
-- 作成前とpush直前に、最新 `origin/codex/development` の `packages/db/migrations/` と、公開中PRが追加する同フォルダのファイルを確認してください。その両方で使われていない最大番号の次を選びます。
-- 同じ番号が見つかった場合はpushせず、まだ共有・適用していない自分のファイルだけを未使用番号へ変更します。共有済み・適用済みのマイグレーションは改名・書き換えしません。
-- SQLiteの表作り直しは `-- migration-policy: table-rebuild` を必ず書き、一時表を `<表名>_new` または `<表名>_next` とします。印のない `DROP TABLE` / `RENAME TO` は通しません。
+- 名前は `<番号>_<内容>.sql`。`999` までは3桁ゼロ埋め、`1000` 以降はそのまま使い、番号は数値比較する。
+- 作成前とpush直前に、最新baseと公開PRの `packages/db/migrations/` を調べ、未使用の最大番号+1を選ぶ。
+- 重複時はpushせず、未共有・未適用の自分のファイルだけを改番する。共有・適用済みファイルは改名・変更しない。
+- SQLiteの表再作成には `-- migration-policy: table-rebuild` を書き、一時表を `<表名>_new` または `<表名>_next` とする。印のない `DROP TABLE` / `RENAME TO` は禁止。
 
-## 作業ツリーをクリーンに保つ必須ゲート
+## 作業ツリー
 
-- 利用者が「次のタスク」とだけ指示した場合も、この確認を省略しないでください。
-- 作業開始前、コミット直前・直後、検証・本番DB更新直前、コード配備直前、作業完了時に `git status --short --branch` を確認してください。
-- 親のECプロジェクト内で作業している場合は、親リポジトリとこのLINEリポジトリを別々に確認してください。
-- 作業開始時に既存の変更や未追跡ファイルがあれば、所有者と用途を確認するまで変更・削除・コミットしないでください。
-- 実装は `codex/担当者名-作業内容` の専用ブランチで行い、変更を内容別にコミットしてください。
-- テスト、ビルド、文書生成、dry-run後に生じた変更も再確認してください。必要な成果物はコミットし、ローカル専用物は内容を確認して `.gitignore` に追加してください。見かけ上クリーンにするための削除は禁止です。
-- `git stash` を未整理変更の隠蔽やデプロイ準備の代用にしないでください。
-- DB更新とコード配備は別工程にし、各工程の直前に、作業ツリーがクリーンでローカルHEADがGitHubの対象ブランチと完全一致することを確認してください。
-- `git status --short` に追跡済み変更、ステージ済み変更、未追跡ファイルが1件でも表示される場合、DB更新・コード配備を開始しないでください。
-- 作業完了時に変更が残っていれば完了扱いにせず、残ったパス、理由、対応案、DB更新・配備の実施有無を報告してください。
+- 開始前、commit直前・直後、DB更新直前、配備直前、完了時に `git status --short --branch` を確認する。「次のタスク」だけの指示でも省略しない。親EC内なら親とLINEを別々に確認する。
+- 開始時に既存変更・未追跡ファイルがあれば、所有者と用途が分かるまで変更・削除・commitしない。ユーザーの変更を戻さない。
+- 生成・テスト・build・dry-run後も再確認し、必要な成果物はcommit、ローカル専用物は内容確認後に `.gitignore` へ追加する。削除や `git stash` で見かけだけ整えない。
+- DB更新と配備は別工程。各直前にツリーが完全にクリーンで、HEADがGitHub対象ブランチと一致することを確認する。変更が1件でもあれば実行しない。
+- 完了時に変更が残れば、残ったpath・理由・対応案・DB更新/配備の実施有無を報告し、完了扱いにしない。
 
-## 反映履歴に必ず1行足す（毎回）
+## 反映履歴
 
-- **PRを出すときは必ず `docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md` を1ファイル作ってください。** 例外はありません。
-- PR作成前はPR番号を省いた仮のファイル名で構いません。採番後にファイル名と本文へPR番号を足してpushしてください。
-- 既存の `docs/release-log/unreleased.md` は残しますが、新しい行は追加しないでください。
-- 書く場所は `## 追加` / `## 変更` / `## 修正` のどれか。この3つ以外の見出しは作らないでください。
-- 行の形は `- 内容 @担当 #PR番号 YYYY-MM-DD HH:MM`。順番は問わず、どれも省略できます。
-  - `@担当` は `kenta` / `masato` のように書きます
-  - PR番号は採番後に足して構いません
-  - **日時は日本時間**。画面に「何月何日何時」で出るので、入れてください
-- **運用者に伝わる言葉で書いてください。** テーブル名・関数名・ファイル名は書きません。
-  - 悪い例: `friend_scenarios.status を見るようにした`
-  - 良い例: `予約した絞り込み配信が全員に届いていたのを直した`
-- 中身は管理画面の **運用状態 → 更新履歴 → 変更内容** にそのまま出ます。読む人は画面を触っている人です。
-- 書き方の詳細は `docs/release-log/README.md`、設計の背景は `docs/change-log-design.md` にあります。
-- リリース時は `docs/release-log/unreleased/` の各PRファイルを、`docs/release-log/README.md` の手順でバージョン別の履歴へまとめてください。
+- PRごとに `docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md` を1つ作る。PR前は番号なしの仮名でよく、採番後にファイル名と本文へ番号を足してpushする。`docs/release-log/unreleased.md` には追記しない。
+- 見出しは `## 追加` / `## 変更` / `## 修正` のどれか。行は `- 内容 @担当 #PR番号 YYYY-MM-DD HH:MM`（各要素は省略可、日時は日本時間、担当は `kenta` / `masato` など）。管理画面の更新履歴へそのまま出るため、運用者向けの言葉を使い、テーブル名・関数名・ファイル名は書かない。
+- 詳細は `docs/release-log/README.md` と `docs/change-log-design.md`。リリース時はREADMEの手順でPR別ファイルを版別履歴へまとめる。
 
-## 管理画面のデザイン設計ルール
+## V6管理画面
 
-- 管理画面のデザインの正本は **Pencil の ★V6 260画面** です。V5は2026-08-26に廃止しました。判断に迷ったら `docs/v6-requirements/v6-canonical-design-decision.md` を見てください。
-- 画面を作る前に `docs/v6-common-rules.md` を読んでください。画面の骨組み、使う共通部品、仕様書の書きかたがここにあります。正本の順位は「Pencilの★V6 → この文書 → `apps/web/src/components/shared/` → 契約テスト」で、上が勝ちます。
-- 機能ごとの要件は `docs/v6-requirements/` にあります。索引は `v6-requirements-master-index.md`、実装の順番とPR分割は `v6-implementation-roadmap.md` です。
-- 機能を作るときは、その機能の要件定義（`docs/v6-requirements/v6-<番号>-...-requirements-draft.md`）を最初に読み、そこで決められた動作と合格条件を満たしてください。32本すべて2026-08-26に完了しています。要件と実装が食い違うときは、実装ではなく要件を先に直します。
-- V6画面の実装は、Pencil MCPで取得した実ノードID、対象状態の一覧、1920pxの設計画像、同じ状態・同じ横幅の実装画像がそろうまで開始・完了扱いにしないでください。画面名や「4-1-A」のような仮名をノードIDの代わりにしてはいけません。
-- `data-design`、見出し・ボタン名の文字列テスト、機能テスト、ビルド成功は視覚一致の証拠ではありません。設計画像と実装画像を横に並べ、位置・寸法・文字・色・余白・枠・角丸・影・全状態を目視比較してください。
-- 既存の共通部品は、V6と見た目が一致すると画像比較で確認できた場合だけ再利用してください。機能を残すことと、古い表示構造を残すことを混同しないでください。
-- 設計を変えるときはPencilを先に直してください。コードだけ直すと、次に絵を見た人が元に戻します。
-- PRでV6完了を名乗る場合は、`.github/PULL_REQUEST_TEMPLATE.md` のVisual Parity欄を埋めてください。実ノードや比較証拠が無い画面は `blocked` / `unverified` と記録し、検証済みに変更してはいけません。
-- V3/V4の積み残しに手を入れるときだけ、`docs/pendev-v4-implementation-runbook.md` の手順に従ってください。**新しい画面をV3/V4基準で作らないでください。**
-- 管理画面のPC表示は、原則として横スクロールを使わず主要情報と操作を1画面内で確認できる構成にしてください。
-- 一覧の名前、コード、見出し、ボタンなどの短い文字列は、単語の途中で改行しないでください。狭い列では1行のまま省略表示し、`title` などで全文を確認できるようにします。
-- 列数が多い場合は、文字を無理に折り返さず、重複列の削除、短い見出し、関連情報の統合、列幅・余白・文字サイズの調整、重要度の低い情報のレスポンシブ非表示を先に検討してください。
-- PCの確認基準は幅1440pxと1920pxとし、主要な一覧画面でページ全体または表だけの横スクロールが発生しないことを確認してください。
-- スマートフォン、長いURL・秘密値の詳細表示、比較上すべての列が必須の表など、情報欠落を避ける必要がある場合だけ横スクロールまたは安全な折り返しを許可します。
-- 詳細な判断基準は `docs/admin-ui-design-guidelines.md` に従ってください。
+- 正本順位は Pencil **★V6 260画面** → `docs/v6-common-rules.md` → `apps/web/src/components/shared/` → 契約テスト。V5は2026-08-26に廃止。判断は `docs/v6-requirements/v6-canonical-design-decision.md` に従う。
+- 実装前に `docs/v6-common-rules.md`、`docs/v6-requirements/v6-requirements-master-index.md` が指す該当要件、`v6-implementation-roadmap.md` を読む。要件と実装が違えば要件を先に直す。
+- 開始・完了には Pencil MCPの実Node ID、全対象状態、1920px設計画像、同じ状態・幅の実装画像が必要。仮名はNode IDの代わりにならない。`data-design`、文字列/機能テスト、build成功だけでは視覚一致の証拠にならない。
+- 設計画像と実装画像を目視比較し、位置・寸法・文字・色・余白・枠・角丸・影・全状態を確認する。共通部品は画像一致を確認できた場合だけ再利用し、機能を残すことと旧表示構造を残すことを混同しない。設計変更はPencilを先に行う。
+- V6完了PRは `.github/PULL_REQUEST_TEMPLATE.md` のVisual Parityを埋める。実Node・比較証拠がなければ `blocked` / `unverified` とし、検証済みにしない。
+- V3/V4積み残しだけ `docs/pendev-v4-implementation-runbook.md` を使う。新画面へV3/V4を使わない。
+- PCは1440px・1920pxで主要情報と操作を横スクロールなしにする。短い文字列は途中改行せず、狭ければ1行省略＋`title`。列が多ければ重複削除、見出し短縮、情報統合、列幅・余白・文字調整、低優先情報のresponsive非表示を先に検討する。
+- スマホ、長いURL/秘密値の詳細、欠落できない比較表だけ横スクロールまたは安全な折返しを許可する。詳細は `docs/admin-ui-design-guidelines.md`。
 
-## 古い要件定義は読まない
+## 要件の正本
 
-- 要件の正本は `docs/v6-requirements/v6-requirements-master-index.md` が指す 34 本と、その §5 の横断契約だけです。それ以外を要件として読まないでください。
-- `docs/archive/` 配下は V2〜V5 世代の廃止文書です。開かない・引用しない・実装の根拠にしないでください。git 履歴の確認だけに使います。
-- `docs/lstep-feature-parity-matrix.md` と `docs/lstep-gap-analysis.md` は 2026-08-15 時点の調査で、半分が既に実装済みと判明しています。「無い機能」の一覧として使わず、比較の根拠には `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使ってください。
-- `docs/design-reference/` と `docs/design-qa/` の `-v2` `-v3` `-v4` `-v5` が付くフォルダは旧設計の画像です。設計一致の比較には `-v6` だけを使ってください。
-- `docs/pendev-v4-implementation-runbook.md` は V3/V4 の積み残しにだけ使い、新しい画面の根拠にしないでください。
-- `docs/v6-requirements/v6-32-feature-requirements-progress.md` の実装・画像確認の状況は廃止済みです。実装の進捗は `docs/design-qa/v6-progress-ledger.md` を見てください。
-
-## 起動時の必読(全エージェント共通)
-
-- 新しいセッションを始めたら、回答の前にこの順で読んでください: `AGENTS.md` → `docs/brain/Memory.md`(この仕事の事実と判断基準) → `docs/brain/rules/corrections.md`(受けた修正指示。恒久的に守る) → `docs/brain/rules/mistakes.md`(やらかしと再発防止) → 自分の担当の指示書(`docs/v6-directives.md`、`docs/v6-parallel-plan.md`)。
-- 利用者に訂正・要望を言われたら、その場で `docs/brain/rules/corrections.md` に 3 行(日付 / 指摘 / 今後)で追記してください。同じ失敗を 2 回指摘されたら `docs/brain/rules/mistakes.md` に追記してください。
-- `docs/brain/Memory.md` の「進行中」が実態とずれていたら、気づいた人が直してください。
+- 要件として読むのは `docs/v6-requirements/v6-requirements-master-index.md` が指す34本と§5の横断契約だけ。
+- `docs/archive/` は廃止したV2〜V5文書。開かず、引用・実装根拠にしない。git履歴確認だけに使う。
+- `docs/lstep-feature-parity-matrix.md` と `docs/lstep-gap-analysis.md` は2026-08-15時点の調査で、約半分が実装済みと後に判明したため「ない機能」の根拠にしない。比較は `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使う。
+- `docs/design-reference/` と `docs/design-qa/` は `-v6` だけを設計比較に使う。`-v2`〜`-v5` は旧設計。
+- 実装進捗は `docs/design-qa/v6-progress-ledger.md` を使い、廃止済み `docs/v6-requirements/v6-32-feature-requirements-progress.md` の実装・画像状況を使わない。
