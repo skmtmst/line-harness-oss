@@ -1,5 +1,5 @@
 # 21-1-F NENコラム・一覧の状態-loading
-# /nen-campaigns
+# /nen-campaigns?tab=columns
 
 画
 画面確認アカウント
@@ -47,6 +47,8 @@ Ver. 0.0.0-dev
 
 設定
 
+はじめの設定
+LINEアカウント
 ログインユーザー
 機能設定
 運用状態

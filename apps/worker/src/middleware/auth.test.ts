@@ -16,6 +16,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'mileage-key') return { id: 'mileage-1', name: 'Mileage Staff', role: 'staff', permission_keys: '["/mileage"]' };
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
+    if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return {
@@ -109,6 +110,8 @@ function app() {
   }
   a.get('/api/mileage/history', (c) => c.json({ success: true }));
   a.get('/api/action-scores/rules', (c) => c.json({ success: true }));
+  a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
+  a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
   return a;
 }
 
@@ -408,6 +411,16 @@ describe('staff feature permissions', () => {
   test('automation permission protects execution results', async () => {
     expect((await app().request('/api/automation-runs', bearer('automations-key'), crossSiteEnv())).status).toBe(200);
     expect((await app().request('/api/automation-runs', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test('booking permission protects phone customer reads and writes', async () => {
+    for (const method of ['GET', 'POST']) {
+      const path = '/api/booking/admin/customers';
+      expect((await app().request(path, { ...bearer('booking-key'), method }, crossSiteEnv())).status)
+        .toBe(200);
+      expect((await app().request(path, { ...bearer('friends-key'), method }, crossSiteEnv())).status)
+        .toBe(403);
+    }
   });
 
   test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(

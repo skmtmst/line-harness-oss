@@ -7,6 +7,8 @@ import { Hono } from 'hono';
 // args is the meaningful assertion.
 const dbMocks = {
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(),
+  getLineAccountsByIds: vi.fn(),
   getLineAccountListStats: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
@@ -108,6 +110,12 @@ beforeEach(() => {
   dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
+  dbMocks.getLineAccountScopeEntries.mockImplementation(async () =>
+    dbMocks.getLineAccounts());
+  dbMocks.getLineAccountsByIds.mockImplementation(async (_db, ids: string[]) => {
+    const rows = await dbMocks.getLineAccounts();
+    return rows.filter((row: { id: string }) => ids.includes(row.id));
+  });
   dbMocks.getLineAccountListStats.mockResolvedValue({
     'acc-1': { friendCount: 12, activeScenarios: 3, messagesThisMonth: 8 },
   });
@@ -296,6 +304,7 @@ describe('GET /api/line-accounts/:id/credential-health', () => {
       error: 'LINE account not found',
     });
     expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
+    expect(dbMocks.getLineAccountById).not.toHaveBeenCalled();
   });
 
   test.each(['admin', 'staff'] as const)('rejects %s with 403', async (role) => {
@@ -502,6 +511,30 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
     expect(res.status).toBe(200);
     expect(batch).toHaveBeenCalledTimes(1);
     expect(batch.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  test('担当外の同一統括アカウントを含めて循環を拒否する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'account-a', parent_line_account_id: 'unassigned' },
+      { ...fakeAccount, id: 'unassigned', parent_line_account_id: 'account-b' },
+      { ...fakeAccount, id: 'account-b', parent_line_account_id: null },
+    ]);
+    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['account-a', 'account-b']);
+    const batch = vi.fn().mockResolvedValue([]);
+    const app = setupApp('admin', Object.assign(makeDbStub(), { batch }));
+
+    const res = await app.request('/api/line-accounts/hierarchy', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        relationships: [{ id: 'account-b', parentLineAccountId: 'account-a' }],
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/循環/) });
+    expect(batch).not.toHaveBeenCalled();
   });
 });
 

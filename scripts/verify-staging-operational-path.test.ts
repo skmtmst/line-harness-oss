@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
+  countVerificationLeftovers,
   createD1Query,
+  findSyntheticFriendReferences,
   insertSyntheticDeliveryRows,
   readVerificationTarget,
 } from './verify-staging-operational-path.js';
@@ -60,6 +62,75 @@ describe('staging operational verification safety', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  test('reports only safe D1 failure metadata after retries', async () => {
+    const target = readVerificationTarget(stagingConfig);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
+      success: false,
+      errors: [{ code: 7500, message: 'FOREIGN KEY constraint failed: secret-row-id' }],
+    }), { status: 200 }));
+
+    const failure = createD1Query(target, 'masked-token')('DELETE FROM friends');
+    await expect(failure).rejects.toThrow('http=200, provider=7500, category=foreign-key-constraint');
+    await expect(failure).rejects.not.toThrow('secret-row-id');
+  });
+
+  test('finds aggregate references to synthetic friends without returning row values', async () => {
+    const queryMock = vi.fn(async (sql: string, _params?: unknown[]): Promise<unknown[]> => {
+      if (sql.includes('sqlite_schema')) {
+        return [{ name: 'friend_scenarios' }, { name: 'bookings' }];
+      }
+      if (sql.includes('foreign_key_list("friend_scenarios")')) {
+        return [{ table: 'friends', from: 'friend_id' }];
+      }
+      if (sql.includes('foreign_key_list("bookings")')) {
+        return [{ table: 'friends', from: 'friend_id' }];
+      }
+      return [{ count: sql.includes('friend_scenarios') ? 41 : 0 }];
+    });
+    const query = async <T>(sql: string, params?: unknown[]): Promise<T[]> => (
+      await queryMock(sql, params)
+    ) as T[];
+
+    await expect(findSyntheticFriendReferences(query, 'verify-b88-line-run-%'))
+      .resolves.toEqual(['friend_scenarios.friend_id=41']);
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('line_user_id LIKE ?'), ['verify-b88-line-run-%']);
+  });
+
+  test('counts each cleanup target separately and skips a notification rule that was never created', async () => {
+    const queryMock = vi.fn(async (sql: string, _params?: unknown[]): Promise<Array<{ count: number }>> => [
+      { count: sql.includes('FROM friends ') ? 41 : 0 },
+    ]);
+    const query = async <T>(sql: string, params?: unknown[]): Promise<T[]> => (
+      await queryMock(sql, params)
+    ) as T[];
+
+    await expect(countVerificationLeftovers(query, {
+      sessionHash: 'hash',
+      scenarioId: 'verify-b88-scenario-run',
+      lineUserIdPattern: 'verify-b88-line-run-%',
+      notificationRuleId: null,
+    })).resolves.toEqual({
+      total: 41,
+      counts: { admin_sessions: 0, scenarios: 0, friends: 41, friend_scenarios: 0 },
+    });
+    expect(queryMock).toHaveBeenCalledTimes(4);
+    expect(queryMock.mock.calls.some(([sql]) => sql.includes('notification_rules'))).toBe(false);
+  });
+
+  test('names the cleanup table when an individual leftover count fails', async () => {
+    const query = async <T>(sql: string): Promise<T[]> => {
+      if (sql.includes('FROM friends ')) throw new Error('provider failure');
+      return [{ count: 0 }] as T[];
+    };
+
+    await expect(countVerificationLeftovers(query, {
+      sessionHash: 'hash',
+      scenarioId: 'verify-b88-scenario-run',
+      lineUserIdPattern: 'verify-b88-line-%',
+      notificationRuleId: null,
+    })).rejects.toThrow('friends: provider failure');
+  });
+
   test('inserts 41 delivery rows in bounded batches instead of one request per row', async () => {
     const calls: Array<{ sql: string; params: unknown[] }> = [];
     const query = async <T>(sql: string, params: unknown[] = []): Promise<T[]> => {
@@ -93,6 +164,8 @@ describe('staging operational verification safety', () => {
     expect(script).toContain("DELETE FROM admin_sessions WHERE token_hash = ?");
     expect(script).toContain("DELETE FROM notification_rules WHERE id = ?");
     expect(script).toContain("DELETE FROM admin_sessions WHERE expires_at <= ?");
+    expect(script).toContain("const SYNTHETIC_FRIEND_PATTERN = 'verify-b88-line-%'");
+    expect(script).not.toContain('verify-b88-line-${runId}-%');
     expect(script).toContain("lineMessagesSent: 0");
     expect(script).not.toMatch(/console\.(?:log|error)\([^\n]*(?:sessionToken|apiToken|staff_id|line_account_id)/);
   });

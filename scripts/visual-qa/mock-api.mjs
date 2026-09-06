@@ -63,7 +63,7 @@ import {
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
-  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_TEMPLATES,
+  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
@@ -782,9 +782,14 @@ const SHAPES = {
         unusedItems: METRIC(79), automaticRuns: METRIC(214), manualSends: METRIC(12), estimatedHoursSaved: METRIC(1),
       },
       categories: [
-        { key: 'tags', label: 'タグ', href: '/tags', created: METRIC(101), inUse: METRIC(22), unused: METRIC(79), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-24') },
         { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
         { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
+        { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: METRIC(8, 'partial', '回答実績から確認できるフォームのみです'), inUse: METRIC(5, 'partial', '回答実績から確認できるフォームのみです'), unused: METRIC(3, 'partial', '回答実績から確認できるフォームのみです'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-29', 'partial', '回答実績から確認できるフォームのみです') },
+        { key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus', created: METRIC(4), inUse: METRIC(2), unused: METRIC(2), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-30') },
+        { key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: METRIC(101, 'partial', '旧共通項目を含みます'), inUse: METRIC(22, 'partial', '旧共通項目を含みます'), unused: METRIC(79, 'partial', '旧共通項目を含みます'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-24', 'partial', '旧共通項目を含みます') },
+        { key: 'inflow_conversion', label: '流入リンク・成果地点', href: '/inflow-links', created: METRIC(16), inUse: METRIC(9), unused: METRIC(7), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-31') },
+        { key: 'automations', label: 'オートメーション・共通アクション', href: '/automations', created: METRIC(7), inUse: METRIC(3), unused: METRIC(4), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-01') },
+        { key: 'media_vars', label: '登録メディア・共通情報', href: '/contents', created: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), inUse: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), unused: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません') },
       ],
     },
   },
@@ -840,7 +845,7 @@ const SHAPES = {
     sidebarOrder: null,
     sidebarItemOrder: null,
     parentChildMode: false,
-    specializedFeatureKeys: [],
+    specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications'],
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
@@ -1524,6 +1529,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
   if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
   if (pathname === '/api/automations') return { success: true, data: AUTOMATIONS }
+  if (pathname === '/api/automation-runs') return { success: true, data: AUTOMATION_RUNS }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/nen-members/photos') return { success: true, data: NEN_PHOTOS }

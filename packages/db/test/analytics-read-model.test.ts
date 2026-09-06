@@ -401,4 +401,41 @@ describe('V6分析イベントと日別投影', () => {
     expect(sqlite.prepare(`SELECT message_id FROM analytics_url_exposure_queue`).all())
       .toEqual([{ message_id: 'kept-message' }]);
   });
+
+  it('保持期限削除は全テーブル合計の上限で止まり、残りを次回に削除する', async () => {
+    const eventInsert = sqlite.prepare(`
+      INSERT INTO analytics_events (
+        id, line_account_id, event_type, source_kind, source_id,
+        occurred_at, idempotency_key
+      ) VALUES (?, 'account-a', 'friend_add', 'test', ?, '2025-01-01T00:00:00.000Z', ?)
+    `);
+    for (let index = 1; index <= 3; index++) {
+      eventInsert.run(`old-event-${index}`, `old-${index}`, `old-${index}`);
+    }
+    const metricInsert = sqlite.prepare(`
+      INSERT INTO analytics_daily_metrics (
+        line_account_id, metric_date, metric_key, data_cutoff_at
+      ) VALUES ('account-a', '2024-01-01', ?, '2026-08-26T00:00:00.000Z')
+    `);
+    metricInsert.run('old-metric-1');
+    metricInsert.run('old-metric-2');
+
+    const first = await purgeExpiredAnalyticsReadData(
+      db,
+      new Date('2026-08-26T00:00:00.000Z'),
+      4,
+    );
+    expect(Object.values(first).reduce((sum, value) => sum + value, 0)).toBe(4);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM analytics_daily_metrics`).get())
+      .toEqual({ count: 1 });
+
+    const second = await purgeExpiredAnalyticsReadData(
+      db,
+      new Date('2026-08-26T00:00:00.000Z'),
+      4,
+    );
+    expect(Object.values(second).reduce((sum, value) => sum + value, 0)).toBe(1);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM analytics_daily_metrics`).get())
+      .toEqual({ count: 0 });
+  });
 });
