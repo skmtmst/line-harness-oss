@@ -74,6 +74,7 @@ export * from './field-migrations';
 export * from './support-marks';
 export * from './saved-searches';
 export * from './media';
+export * from './media-uploads';
 export * from './common-vars';
 export * from './site-tracking';
 export * from './funnels';

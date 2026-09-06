@@ -879,6 +879,12 @@ export default function BroadcastForm({
     送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
   */
   const audienceCount = preflight?.audienceCount ?? null
+  /*
+   * 対象画面の人数も、事前確認まで済んだら同じ確定値を使う。
+   * `segments/count` だけが失敗しても `preflight` が数え終えているなら、
+   * 本文の3枚と右側要約で「1,213人 / —人」と食い違わせない。
+   */
+  const audienceDisplayCount = audienceCount ?? targetCount
   const targetModeLabel = TARGET_MODES.find((mode) => mode.value === targetMode)?.label ?? '未設定'
   /*
     除外の人数。**数としての口がまだ無い。**
@@ -1089,7 +1095,7 @@ export default function BroadcastForm({
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-bold text-accent">送信対象</p>
               <p className="text-2xl font-black text-accent">
-                {counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '—'}
+                {counting && audienceDisplayCount === null ? '…' : audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
                 <span className="ml-1 text-sm">人</span>
               </p>
             </div>
@@ -1590,7 +1596,7 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{targetModeLabel} {targetCount === null ? '—' : `${targetCount.toLocaleString('ja-JP')}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{targetModeLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
                 <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
               </dl>
