@@ -37,4 +37,30 @@ describe('V6 予約管理の時間台帳', () => {
     ]) expect(CREATE).toContain(text)
     expect(CREATE).toContain('顧客台帳の受け皿ができるまで登録できません')
   })
+
+  test('予約詳細は予約・履歴・顧客・当日の注意を一画面で確認できる', () => {
+    expect(PAGE).toContain('data-design-node="TnDbq"')
+    for (const text of [
+      '予約の中身',
+      'この方のこれまで',
+      'この予約で動いたこと',
+      'お客様とペット',
+      '当日 気をつけること',
+      '時間や担当を変える',
+    ]) expect(PAGE).toContain(text)
+    expect(PAGE).toContain('取得できない値は、この画面で推測して表示しません。')
+  })
+
+  test('確認・完了・競合はV6の左右構造と次の操作を持つ', () => {
+    for (const text of [
+      'お客様に送るもの',
+      '送る前に、文面をそのまま確かめられます。',
+      '入れた予約',
+      'このあと自動で動くもの',
+      '続けてもう1件入れる',
+      '空いている時間',
+      'ほかの担当なら入れられます',
+    ]) expect(CREATE).toContain(text)
+    expect(CREATE).toContain('slot.date === date && slot.start !== time')
+  })
 })
