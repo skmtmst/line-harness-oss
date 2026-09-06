@@ -484,7 +484,7 @@ export default function NewProxyBookingPage() {
             <aside data-design="Right" className="space-y-4">
               <Card title="空いている時間" note={`${selectedStaff.display_name}の ${date || '選択日'} で、続けて取れるところです。`}>
                 <div className="space-y-2">
-                  {slots.filter((slot) => slot.start !== time).slice(0, 3).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setError('') }}>この時間に変える</Button></div>)}
+                  {slots.filter((slot) => slot.date === date && slot.start !== time).slice(0, 3).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setError('') }}>この時間に変える</Button></div>)}
                 </div>
               </Card>
               <Card title="ほかの担当なら入れられます"><p className="text-ink-faint text-xs">担当別の空きは、入力へ戻って確認してください。</p></Card>

@@ -61,5 +61,6 @@ describe('V6 予約管理の時間台帳', () => {
       '空いている時間',
       'ほかの担当なら入れられます',
     ]) expect(CREATE).toContain(text)
+    expect(CREATE).toContain('slot.date === date && slot.start !== time')
   })
 })
