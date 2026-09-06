@@ -232,19 +232,47 @@ export default function LineNotificationsPage() {
       const [settingRes, overviewRes, definitionRes, metricRes] = await Promise.all([
         api.ecCommerce.settings(), api.ecCommerce.overview(selectedAccountId ?? undefined),
         selectedAccountId
-          ? api.lineNotifications.definitions(selectedAccountId).catch(() => null)
+          ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
           : Promise.resolve(null),
         selectedAccountId
-          ? api.lineNotifications.metrics(selectedAccountId).catch(() => null)
+          ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
           : Promise.resolve(null),
       ])
       if (generation !== loadGeneration.current) return
       if (!settingRes.success || !overviewRes.success) throw new Error('load failed')
-      setSettings(settingRes.data)
+      const loadedDefinitions = definitionRes?.success ? definitionRes.data : []
+      const loadedDefinitionByEvent = new Map(loadedDefinitions.map((definition) => [definition.sourceEventType, definition]))
+      const mergedSettings = settingRes.data.map((setting) => {
+        const definition = loadedDefinitionByEvent.get(setting.eventType)
+        if (!definition) return setting
+        const draftText = (key: string, fallback: string): string => typeof definition.draft[key] === 'string' ? definition.draft[key] as string : fallback
+        const draftFields = Array.isArray(definition.draft.fixedFields)
+          ? definition.draft.fixedFields.filter((value): value is string => typeof value === 'string')
+          : setting.fixedFields
+        return {
+          ...setting,
+          isEnabled: definition.status === 'published',
+          title: draftText('title', definition.name),
+          introText: draftText('introText', setting.introText),
+          outroText: draftText('outroText', setting.outroText),
+          buttonLabel: draftText('buttonLabel', setting.buttonLabel),
+          buttonUrl: draftText('buttonUrl', setting.buttonUrl),
+          imageUrl: draftText('imageUrl', setting.imageUrl),
+          fixedFields: draftFields,
+          updatedAt: definition.updatedAt,
+        }
+      })
+      setSettings(mergedSettings)
       setOverview(overviewRes.data)
-      setDefinitions(definitionRes?.success ? definitionRes.data : [])
+      setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
-      setExpanded((current) => settingRes.data.some((setting) => setting.eventType === current) ? current : null)
+      setExpanded((current) => mergedSettings.some((setting) => setting.eventType === current) ? current : null)
       setLoadState('ready')
     } catch (error) {
       if (generation === loadGeneration.current) {
