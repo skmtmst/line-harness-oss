@@ -56,4 +56,40 @@ describe('複数吹き出しのテスト送信', () => {
     ).all() as Array<{ message_type: string; content: string }>;
     expect(logs).toHaveLength(2);
   });
+
+  it('予約済みの内容も予約状態を変えずにテスト送信できる', async () => {
+    const { db, raw } = createTestD1();
+    raw.prepare(
+      `INSERT INTO line_accounts
+        (id, channel_id, name, channel_access_token, channel_secret, is_active)
+       VALUES ('account-1', 'channel-1', '本店', 'token', 'secret', 1)`,
+    ).run();
+    insertFriend(raw, 'friend-1', { line_account_id: 'account-1', display_name: '田中' });
+    raw.prepare(
+      `INSERT INTO account_settings (id, line_account_id, key, value)
+       VALUES ('setting-1', 'account-1', 'test_recipients', '["friend-1"]')`,
+    ).run();
+    raw.prepare(
+      `INSERT INTO broadcasts
+        (id, title, message_type, message_content, target_type, status,
+         scheduled_at, line_account_id, track_links, created_at)
+       VALUES ('broadcast-1', '予約済み試験', 'text', '予約内容', 'all', 'scheduled',
+         '2026-08-24T01:00:00.000Z', 'account-1', 0, '2026-01-01T00:00:00.000')`,
+    ).run();
+
+    const app = new Hono<{ Bindings: { DB: D1Database; WORKER_URL: string } }>();
+    app.use('*', async (c, next) => {
+      c.env = { DB: db, WORKER_URL: 'https://worker.test' };
+      c.set('staff' as never, { id: 'owner', name: 'Owner', role: 'owner', readOnly: false } as never);
+      await next();
+    });
+    app.route('/', broadcasts);
+
+    const response = await app.request('/api/broadcasts/broadcast-1/test-send', { method: 'POST' });
+    expect(response.status).toBe(200);
+    expect(line.pushMessage).toHaveBeenCalledTimes(1);
+    expect(raw.prepare(`SELECT status FROM broadcasts WHERE id = 'broadcast-1'`).get()).toMatchObject({
+      status: 'scheduled',
+    });
+  });
 });
