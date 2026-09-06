@@ -169,37 +169,37 @@ export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 「今日やること」の札は 対応が必要な受信 **5件**（LINE 1・メール 4／最長 6日7時間50分）／写真審査 **1件**（確認待ち1・ポイント付与あり）／今日の予約 **0件**（次回 09:00）／出荷予定 **0件**（EC通知から算出）。**数えて0のものは `0件`** で出し、空の札には「出荷予定はまだありません。ECから注文や定期便の通知を受け取ると、ここに並びます。」と**次に何が起きれば埋まるか**を書く。壊れ値・内部語は0件、1440・1920とも横スクロール0。**設計との突き合わせは、通知パネルの実データがつながってから**（#419 がその接続。パネルは押して開く形なので、この行では開いていない）', verdictSource: 'dashboard-v6/vUXKb.txt',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ未接続。** 2026-09-03の1440/1920px画像と最新コードの差分を確認し、カード構成・文言・横スクロール0は設計どおり。自動変更など取得口のない値は `—` のため最終一致にしない。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/vUXKb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/ZN0ov.txt',
+    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** テキスト差0。パネル幅540px、見出しの副文、札型タブ、カードの配置説明、4枠警告、5枚目ON時の自動OFF、「ダッシュボードに反映」まで設計に合わせた。2026-09-03の1440/1920px画像と最新コード差分で確認。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/ZN0ov.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/JN6mQ.txt',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 再照合。構造一致・データ待ち。** ダイアログ820px、QR枠280px、小300px、PNG/JPG/SVGの順、2行リンク欄、主ボタンとヒント枠を設計に合わせた。文字比較の差は、取得口が返さない `https://lin.ee/nen-official` と、閉じた選択肢の「中/小」のみ。短縮URLを決め打ちせず、データ待ちとする。現在コミットの画像はPlaywrightのOS権限で取得できず、2026-09-03画像と差分照合で判定。', verdictSource: 'dashboard-v6/JN6mQ.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/NjK9q.txt',
+    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** 表示件数の選択口、1〜5 / 5件、前へ・1・次へのページ送りを確認。テキスト差0、2026-09-03の1440/1920px画像で横スクロール0。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/NjK9q.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '表示件数' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
   {
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#23 「5件表示」→「5件」／#24 並び順を「優先度が高い順」に統一／#25 有効友だちを398人にそろえた（接続状態カードと推移表の全行42）／#26 「使用 197 / 上限 200通」＋「残り 3通（1.5%）」／#27 プルダウンの選択肢を共通部品 `Gfsb4` へ／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）。設計画像は `docs/design-reference/dashboard-v6/` を撮り直した。**実装との突き合わせはこれから。** **#419 `c84baa63` で撮った。** 壊れ値・内部語は0件、1440・1920とも横スクロール0。設計との突き合わせは通知パネルの実データがつながってから', verdictSource: 'dashboard-v6/Alekb.txt',
+    verdict: 'match', verdictNote: '**2026-09-04 再照合で一致。** 通知API接続後のパネル構造・文言を確認し、テキスト差0。2026-09-03の1440/1920px画像で横スクロール0。現在コミットの画像はPlaywrightのOS権限で取得できず、旧画像と差分照合で判定。', verdictSource: 'dashboard-v6/Alekb.txt + 2026-09-03 1440/1920px screenshots + 2026-09-04 static diff audit',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
-    verdictHead: '7b509106',
+    verdictHead: '145c497d1',
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
