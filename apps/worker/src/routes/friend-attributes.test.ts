@@ -4,10 +4,18 @@ import type { Env } from '../index.js';
 
 const marks = {
   getSupportMarksWithUsage: vi.fn(),
+  getSupportMarkArchiveImpact: vi.fn(),
   getSupportMarkById: vi.fn(),
   createSupportMark: vi.fn(),
+  createSupportMarkWithAutomationRules: vi.fn(),
   updateSupportMark: vi.fn(),
   replaceAndArchiveSupportMark: vi.fn(),
+  archiveSupportMarkWithReplacement: vi.fn(),
+  SupportMarkArchiveError: class SupportMarkArchiveError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   getDefaultSupportMark: vi.fn(),
   setFriendSupportMark: vi.fn(),
   setFriendSupportMarkBulk: vi.fn(),
@@ -52,9 +60,11 @@ const supportMarkAutomation = {
     'message_received', 'manual_reply_sent', 'staff_assigned', 'response_overdue', 'condition_matched',
   ],
   listSupportMarkAutomationRules: vi.fn(),
+  listSupportMarkAutomationRulesForAccount: vi.fn(),
   createSupportMarkAutomationRule: vi.fn(),
   updateSupportMarkAutomationRule: vi.fn(),
   archiveSupportMarkAutomationRule: vi.fn(),
+  validateSupportMarkAutomationRuleInput: vi.fn(),
 };
 const segmentQuery = {
   buildSegmentWhere: vi.fn(),
@@ -88,11 +98,17 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
 }
 const env = { DB: {} as D1Database };
 
-function req(path: string, method: string, body?: unknown, role?: 'owner' | 'admin' | 'staff') {
+function req(
+  path: string,
+  method: string,
+  body?: unknown,
+  role?: 'owner' | 'admin' | 'staff',
+  headers: Record<string, string> = {},
+) {
   return makeApp(role).fetch(
     new Request(`https://example.com${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,
@@ -111,6 +127,10 @@ const MARK = {
   updated_by: 'u-1',
   updated_at: '2026-08-16',
   archived_at: null,
+  version: 1,
+  updated_at: '2026-08-16',
+  created_by: 'u-1',
+  updated_by: 'u-1',
   tenant_id: 'tenant-1',
   line_account_id: 'account-1',
   is_inherited: 0,
@@ -149,14 +169,39 @@ beforeEach(() => {
     saved_searches: 3,
     automations: 1,
   }]);
+  marks.getSupportMarkArchiveImpact.mockResolvedValue({
+    mark: {
+      ...MARK,
+      id: 'm-2',
+      is_default: 0,
+      friend_count: 5,
+      broadcasts: 0,
+      scenarios: 0,
+      auto_replies: 0,
+      saved_searches: 0,
+      automations: 0,
+    },
+    revision: 'm-2:1:5:0:0:0:0:0',
+    canArchive: true,
+    checkedAt: '2026-09-07T03:00:00+09:00',
+  });
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
+  marks.createSupportMarkWithAutomationRules.mockResolvedValue(MARK);
   marks.updateSupportMark.mockResolvedValue(MARK);
   marks.getDefaultSupportMark.mockResolvedValue(MARK);
   marks.replaceAndArchiveSupportMark.mockResolvedValue(0);
+  marks.archiveSupportMarkWithReplacement.mockResolvedValue({
+    archived: true,
+    markId: 'm-2',
+    replacementMarkId: 'm-1',
+    replacedFriendCount: 5,
+    version: 2,
+  });
   marks.setFriendSupportMark.mockResolvedValue(true);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
   supportMarkAutomation.listSupportMarkAutomationRules.mockResolvedValue([]);
+  supportMarkAutomation.listSupportMarkAutomationRulesForAccount.mockResolvedValue([]);
   supportMarkAutomation.createSupportMarkAutomationRule.mockResolvedValue({
     id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
     condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
@@ -243,6 +288,92 @@ describe('対応マーク', () => {
       tenantId: 'tenant-1',
       lineAccountId: 'account-1',
     });
+  });
+
+  it('一覧に自動変更・表示先・版を実データから返す', async () => {
+    supportMarkAutomation.listSupportMarkAutomationRulesForAccount.mockResolvedValue([{
+      id: 'rule-1', name: '担当割当', markId: 'm-1', event: 'staff_assigned',
+      condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
+      version: 1, updatedAt: '2026-09-07',
+    }]);
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [{
+        id: 'm-1', version: 1,
+        displayTargets: ['inbox', 'friend_list', 'friend_detail'],
+        automationRules: [{ id: 'rule-1', event: 'staff_assigned' }],
+      }],
+    });
+  });
+
+  it('マークと自動変更ルールを一度の複合作成へ渡す', async () => {
+    const automationRules = [{
+      name: '期限超過で要確認', event: 'response_overdue', condition: null,
+      priority: 100, manualProtectionMinutes: 60, isActive: true,
+    }];
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', {
+      name: '要確認', color: '#EF4B55', displayOrder: 2, automationRules,
+    });
+    expect(res.status).toBe(201);
+    expect(marks.createSupportMarkWithAutomationRules).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      expect.objectContaining({ name: '要確認', color: '#EF4B55', displayOrder: 2 }),
+      'u-1',
+      automationRules,
+    );
+  });
+
+  it('スタッフは複合作成できない', async () => {
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '要確認' },
+      'staff',
+    );
+    expect(res.status).toBe(403);
+    expect(marks.createSupportMarkWithAutomationRules).not.toHaveBeenCalled();
+  });
+
+  it('保管前に置換人数・使用先・確認版を返す', async () => {
+    const res = await req('/api/support-marks/m-2/archive-impact?lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        friendCount: 5,
+        canArchive: true,
+        impactRevision: 'm-2:1:5:0:0:0:0:0',
+        expectedVersion: 1,
+      },
+    });
+  });
+
+  it('確認版と冪等キーを指定して置換・保管する', async () => {
+    const res = await req(
+      '/api/support-marks/m-2/archive?lineAccountId=account-1',
+      'POST',
+      { replacementMarkId: 'm-1', expectedVersion: 1, impactRevision: 'impact-1' },
+      'owner',
+      { 'Idempotency-Key': 'archive-request-1' },
+    );
+    expect(res.status).toBe(200);
+    expect(marks.archiveSupportMarkWithReplacement).toHaveBeenCalledWith(
+      env.DB,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      {
+        markId: 'm-2', replacementMarkId: 'm-1', expectedVersion: 1,
+        impactRevision: 'impact-1', idempotencyKey: 'archive-request-1', actorId: 'u-1',
+      },
+    );
+  });
+
+  it('冪等キーなしの保管は実行しない', async () => {
+    const res = await req('/api/support-marks/m-2/archive?lineAccountId=account-1', 'POST', {
+      replacementMarkId: 'm-1', expectedVersion: 1, impactRevision: 'impact-1',
+    });
+    expect(res.status).toBe(400);
+    expect(marks.archiveSupportMarkWithReplacement).not.toHaveBeenCalled();
   });
 
   it('色の形が違えば弾く', async () => {

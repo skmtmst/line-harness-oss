@@ -1,10 +1,13 @@
 import { Hono, type Context } from 'hono';
 import {
   getSupportMarksWithUsage,
+  getSupportMarkArchiveImpact,
   getSupportMarkById,
-  createSupportMark,
+  createSupportMarkWithAutomationRules,
   updateSupportMark,
   replaceAndArchiveSupportMark,
+  archiveSupportMarkWithReplacement,
+  SupportMarkArchiveError,
   getDefaultSupportMark,
   setFriendSupportMark,
   setFriendSupportMarkBulk,
@@ -56,8 +59,10 @@ import {
   archiveSupportMarkAutomationRule,
   createSupportMarkAutomationRule,
   listSupportMarkAutomationRules,
+  listSupportMarkAutomationRulesForAccount,
   SUPPORT_MARK_RULE_EVENTS,
   updateSupportMarkAutomationRule,
+  validateSupportMarkAutomationRuleInput,
   type SaveSupportMarkAutomationRule,
   type SupportMarkRuleEvent,
 } from '../services/support-mark-automation.js';
@@ -71,7 +76,12 @@ import { buildSegmentWhere, type SegmentCondition } from '../services/segment-qu
  */
 const friendAttributes = new Hono<Env>();
 
-function serializeMark(row: SupportMark) {
+const SUPPORT_MARK_DISPLAY_TARGETS = ['inbox', 'friend_list', 'friend_detail'] as const;
+
+function serializeMark(
+  row: SupportMark,
+  automationRules: Awaited<ReturnType<typeof listSupportMarkAutomationRulesForAccount>> = [],
+) {
   return {
     id: row.id,
     name: row.name,
@@ -80,7 +90,11 @@ function serializeMark(row: SupportMark) {
     autoOnInbound: Boolean(row.auto_on_inbound),
     displayOrder: row.display_order,
     createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
+    version: Number(row.version ?? 1),
     isInherited: Boolean(row.is_inherited),
+    automationRules,
+    displayTargets: SUPPORT_MARK_DISPLAY_TARGETS,
   };
 }
 
@@ -367,9 +381,16 @@ friendAttributes.get('/api/support-marks', async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
-    const marks = await getSupportMarksWithUsage(c.env.DB, scope);
+    const [marks, rules] = await Promise.all([
+      getSupportMarksWithUsage(c.env.DB, scope),
+      listSupportMarkAutomationRulesForAccount(c.env.DB, scope),
+    ]);
+    const rulesByMark = new Map<string, typeof rules>();
+    for (const rule of rules) {
+      rulesByMark.set(rule.markId, [...(rulesByMark.get(rule.markId) ?? []), rule]);
+    }
     const withCounts = marks.map((mark) => ({
-        ...serializeMark(mark),
+        ...serializeMark(mark, rulesByMark.get(mark.id) ?? []),
         friendCount: Number(mark.friend_count),
         usedIn: {
           broadcasts: Number(mark.broadcasts),
@@ -396,14 +417,35 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
       return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
     }
-    const mark = await createSupportMark(c.env.DB, scope, {
+    const displayOrder = Number(body.displayOrder ?? 0);
+    if (!Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 10_000) {
+      return c.json({ success: false, error: '並び順は0〜10000の整数で指定してください' }, 400);
+    }
+    const automationValues = body.automationRules ?? [];
+    if (!Array.isArray(automationValues) || automationValues.length > 20) {
+      return c.json({ success: false, error: '自動変更ルールは20件以内で指定してください' }, 400);
+    }
+    const automationRules = automationValues.map((value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? supportMarkRuleInput(value as Record<string, unknown>)
+        : null);
+    if (automationRules.some((rule) => rule === null)) {
+      return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 400);
+    }
+    try {
+      for (const rule of automationRules) validateSupportMarkAutomationRuleInput(rule!);
+    } catch {
+      return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
+    }
+    const mark = await createSupportMarkWithAutomationRules(c.env.DB, scope, {
       name,
       color: body.color ? String(body.color) : undefined,
       isDefault: body.isDefault === true,
       autoOnInbound: body.autoOnInbound === true,
-      displayOrder: Number(body.displayOrder ?? 0),
-    });
-    return c.json({ success: true, data: serializeMark(mark) }, 201);
+      displayOrder,
+    }, c.get('staff').id, automationRules as SaveSupportMarkAutomationRule[]);
+    const createdRules = await listSupportMarkAutomationRules(c.env.DB, scope, mark.id) ?? [];
+    return c.json({ success: true, data: serializeMark(mark, createdRules) }, 201);
   } catch (err) {
     console.error('POST /api/support-marks error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -454,6 +496,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
       isDefault: body.isDefault === undefined ? undefined : body.isDefault === true,
       autoOnInbound: body.autoOnInbound === undefined ? undefined : body.autoOnInbound === true,
       displayOrder: body.displayOrder === undefined ? undefined : Number(body.displayOrder),
+      actorId: c.get('staff').id,
     });
     return c.json({ success: true, data: serializeMark(mark!) });
   } catch (err) {
@@ -568,6 +611,92 @@ friendAttributes.delete(
     } catch (err) {
       console.error('DELETE /api/support-mark-rules/:ruleId error:', err);
       return c.json({ success: false, error: '自動変更ルールを停止できませんでした' }, 500);
+    }
+  },
+);
+
+friendAttributes.get(
+  '/api/support-marks/:id/archive-impact',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      const impact = await getSupportMarkArchiveImpact(c.env.DB, scope, c.req.param('id'));
+      if (!impact) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
+      const [rules, marks] = await Promise.all([
+        listSupportMarkAutomationRules(c.env.DB, scope, impact.mark.id),
+        getSupportMarksWithUsage(c.env.DB, scope),
+      ]);
+      return c.json({
+        success: true,
+        data: {
+          mark: serializeMark(impact.mark, rules ?? []),
+          ...serializeMarkImpact(impact.mark),
+          automationRules: rules ?? [],
+          displayTargets: SUPPORT_MARK_DISPLAY_TARGETS,
+          replacementOptions: marks
+            .filter((mark) => mark.id !== impact.mark.id && mark.is_inherited !== 1)
+            .map((mark) => serializeMark(mark)),
+          canArchive: impact.canArchive,
+          impactRevision: impact.revision,
+          checkedAt: impact.checkedAt,
+          expectedVersion: Number(impact.mark.version ?? 1),
+        },
+      });
+    } catch (err) {
+      console.error('GET /api/support-marks/:id/archive-impact error:', err);
+      return c.json({ success: false, error: '保管の影響を確認できませんでした' }, 500);
+    }
+  },
+);
+
+friendAttributes.post(
+  '/api/support-marks/:id/archive',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+      if (!idempotencyKey || idempotencyKey.length > 128) {
+        return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+      }
+      const body = await c.req.json<Record<string, unknown>>();
+      const replacementMarkId = typeof body.replacementMarkId === 'string'
+        ? body.replacementMarkId.trim()
+        : '';
+      const impactRevision = typeof body.impactRevision === 'string'
+        ? body.impactRevision.trim()
+        : '';
+      const expectedVersion = Number(body.expectedVersion);
+      if (!replacementMarkId || !impactRevision
+        || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        return c.json({ success: false, error: '置換先・確認版・現在版を指定してください' }, 400);
+      }
+      const result = await archiveSupportMarkWithReplacement(c.env.DB, scope, {
+        markId: c.req.param('id'),
+        replacementMarkId,
+        expectedVersion,
+        impactRevision,
+        idempotencyKey,
+        actorId: c.get('staff').id,
+      });
+      const replacement = await getSupportMarkById(c.env.DB, replacementMarkId, scope);
+      return c.json({
+        success: true,
+        data: {
+          ...result,
+          replacementMark: replacement ? serializeMark(replacement) : null,
+        },
+      });
+    } catch (err) {
+      if (err instanceof SupportMarkArchiveError) {
+        const status = err.code === 'not_found' ? 404 : 409;
+        return c.json({ success: false, code: err.code, error: err.message }, status);
+      }
+      console.error('POST /api/support-marks/:id/archive error:', err);
+      return c.json({ success: false, error: '対応マークを保管できませんでした' }, 500);
     }
   },
 );

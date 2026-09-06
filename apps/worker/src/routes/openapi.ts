@@ -50,6 +50,14 @@ const spec = {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string' },
           color: { type: 'string' },
+          lineAccountId: { type: 'string' },
+          description: { type: ['string', 'null'] },
+          manualAssignmentAllowed: { type: 'boolean' },
+          reapplyPolicy: { type: 'string', enum: ['first_only', 'every_time'] },
+          linkedEnabled: { type: 'boolean' },
+          status: { type: 'string', enum: ['active', 'archived'] },
+          version: { type: 'integer', minimum: 1 },
+          updatedAt: { type: 'string', format: 'date-time' },
           createdAt: { type: 'string', format: 'date-time' },
           cleanupReasons: {
             type: 'array',
@@ -86,6 +94,48 @@ const spec = {
           },
           blockingReferenceCount: { type: 'integer', minimum: 0 },
           canDelete: { type: 'boolean' },
+        },
+      },
+      TagDependencyImpact: {
+        type: 'object',
+        required: [
+          'tag', 'friendCount', 'references', 'linkedActions', 'pendingRunCount',
+          'mileageImpact', 'canArchive', 'canDelete', 'checkedAt', 'revision',
+        ],
+        properties: {
+          tag: {
+            type: 'object',
+            required: ['id', 'name', 'version', 'status'],
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              version: { type: 'integer', minimum: 1 },
+              status: { type: 'string', enum: ['active', 'archived'] },
+            },
+          },
+          friendCount: { type: 'integer', minimum: 0 },
+          references: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['kind', 'name', 'href', 'state', 'count'],
+              properties: {
+                kind: { type: 'string' },
+                name: { type: 'string' },
+                href: { type: 'string' },
+                state: { type: 'string' },
+                count: { type: 'integer', minimum: 1 },
+                definitionVersion: { type: ['integer', 'null'] },
+              },
+            },
+          },
+          linkedActions: { type: 'array', items: { type: 'object' } },
+          pendingRunCount: { type: 'integer', minimum: 0 },
+          mileageImpact: { type: 'object' },
+          canArchive: { type: 'boolean' },
+          canDelete: { type: 'boolean' },
+          checkedAt: { type: 'string', format: 'date-time' },
+          revision: { type: 'string' },
         },
       },
       TagCsvImportRow: {
@@ -296,9 +346,9 @@ const spec = {
       get: { tags: ['Tags'], summary: 'タグ一覧取得', responses: { '200': { description: 'All tags' } } },
       post: {
         tags: ['Tags'],
-        summary: 'タグ作成',
-        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, color: { type: 'string' } }, required: ['name'] } } } },
-        responses: { '201': { description: 'Tag created' } },
+        summary: 'タグと連動アクション下書きを作成',
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string' }, name: { type: 'string', minLength: 1, maxLength: 80 }, description: { type: ['string', 'null'] }, groupId: { type: ['string', 'null'] }, isStarred: { type: 'boolean' }, manualAssignmentAllowed: { type: 'boolean' }, reapplyPolicy: { type: 'string', enum: ['first_only', 'every_time'] }, linkedEnabled: { type: 'boolean' }, mileage: { type: 'object' }, automationDraft: { type: 'object' }, applyToExisting: { type: 'boolean', const: false } }, required: ['lineAccountId', 'name', 'reapplyPolicy', 'linkedEnabled', 'mileage'] } } } },
+        responses: { '201': { description: 'Tag and common-action draft created' }, '404': { description: 'Account or folder not found' }, '409': { description: 'Normalized name conflict' } },
       },
     },
     '/api/tags/import/preview': {
@@ -354,6 +404,23 @@ const spec = {
       },
     },
     '/api/tags/{id}': {
+      get: {
+        tags: ['Tags'],
+        summary: 'タグ設定と連動アクションを取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'withActions', in: 'query', schema: { type: 'integer', enum: [1] } },
+        ],
+        responses: { '200': { description: 'Tag definition' }, '404': { description: 'Not found in account scope' } },
+      },
+      patch: {
+        tags: ['Tags'],
+        summary: 'タグ設定と同じ共通アクション下書きを連動更新',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'expectedVersion'], properties: { lineAccountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 }, automationId: { type: ['string', 'null'] }, automationDraftVersion: { type: ['string', 'null'] }, actions: { type: 'array' }, applyToExisting: { type: 'boolean', default: false } } } } } },
+        responses: { '200': { description: 'Updated' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Tag or action draft version conflict' } },
+      },
       delete: {
         tags: ['Tags'],
         summary: 'タグ削除',
@@ -390,6 +457,32 @@ const spec = {
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Tag not found' },
         },
+      },
+    },
+    '/api/tags/{id}/dependencies': {
+      get: {
+        tags: ['Tags'],
+        summary: 'タグの参照先・連動・待機実行・マイル影響を確認',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Tag dependency impact', content: { 'application/json': { schema: { $ref: '#/components/schemas/TagDependencyImpact' } } } },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/common-actions/resources': {
+      get: {
+        tags: ['Common actions'],
+        summary: 'きっかけ別の処理schemaと選択肢を取得',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'trigger', in: 'query', schema: { type: 'string', enum: ['tag.added'] } },
+        ],
+        responses: { '200': { description: '13 action schemas and scoped resources' }, '422': { description: 'Unsupported trigger' } },
       },
     },
     // ── Scenarios ────────────────────────────────────────────────────────────
