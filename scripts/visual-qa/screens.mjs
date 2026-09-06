@@ -4086,7 +4086,7 @@ for (const screen of SCREENS) {
   const issue368Review = ISSUE_368_REVIEW[screen.node]
   if (screen.feature === 13 && issue368Review) {
     screen.verdict = issue368Review.verdict
-    screen.verdictNote = `**2026-09-07 Issue #368で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue368Review.note}`
+    screen.verdictNote = `**2026-09-07 Issue #368 / PR #1134で実API接続後に再判定。** 3104/8791で1440px・1920pxを撮影し、全画像で横はみ出し0。Pencil 1920pxと実装1920pxを目視比較した。${issue368Review.note}`
     screen.verdictSource = issue368Review.source
     delete screen.verdictHead
   }
