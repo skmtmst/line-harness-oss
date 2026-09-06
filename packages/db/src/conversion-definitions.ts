@@ -345,6 +345,47 @@ export type AddConversionDefinitionUsageInput = {
   staffId: string;
 };
 
+async function getCurrentMatchingUsage(
+  db: D1Database,
+  input: AddConversionDefinitionUsageInput,
+): Promise<UsageRow | null> {
+  return db.prepare(`SELECT u.* FROM conversion_definition_usages u
+    JOIN conversion_points cp ON cp.id = u.conversion_point_id
+    WHERE u.conversion_point_id = ? AND u.line_account_id = ? AND u.ref_kind = ? AND u.ref_id = ?
+      AND COALESCE(u.ref_version_id, '') = COALESCE(?, '')
+      AND cp.version = ? AND cp.status = 'active'
+      AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)`)
+    .bind(
+      input.conversionPointId,
+      input.lineAccountId,
+      input.refKind,
+      input.refId,
+      input.refVersionId ?? null,
+      input.expectedVersion,
+      input.lineAccountId,
+    )
+    .first<UsageRow>();
+}
+
+async function throwLatestUsageConflict(
+  db: D1Database,
+  input: AddConversionDefinitionUsageInput,
+): Promise<never> {
+  const latest = await db.prepare('SELECT version, status, line_account_id FROM conversion_points WHERE id = ?')
+    .bind(input.conversionPointId)
+    .first<{ version: number; status: ConversionDefinitionStatus; line_account_id: string | null }>();
+  if (!latest || (latest.line_account_id !== null && latest.line_account_id !== input.lineAccountId)) {
+    throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
+  }
+  if (latest.status !== 'active') {
+    throw new ConversionDefinitionError('definition_stopped', '停止中の成果地点には利用先を追加できません', 409);
+  }
+  if (Number(latest.version) !== input.expectedVersion) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  throw new Error('conversion_definition_usage_insert_failed');
+}
+
 export async function addConversionDefinitionUsage(
   db: D1Database,
   input: AddConversionDefinitionUsageInput,
@@ -362,60 +403,46 @@ export async function addConversionDefinitionUsage(
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
 
-  const existing = await db.prepare(`SELECT u.* FROM conversion_definition_usages u
-    JOIN conversion_points cp ON cp.id = u.conversion_point_id
-    WHERE u.conversion_point_id = ? AND u.line_account_id = ? AND u.ref_kind = ? AND u.ref_id = ?
-      AND COALESCE(u.ref_version_id, '') = COALESCE(?, '')
-      AND cp.version = ? AND cp.status = 'active'
-      AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)`)
-    .bind(
-      input.conversionPointId,
-      input.lineAccountId,
-      input.refKind,
-      input.refId,
-      input.refVersionId ?? null,
-      input.expectedVersion,
-      input.lineAccountId,
-    )
-    .first<UsageRow>();
+  const existing = await getCurrentMatchingUsage(db, input);
   if (existing) {
     return { created: false, usage: serializeUsage(existing), currentVersion: Number(point.version) };
   }
 
   const id = crypto.randomUUID();
   const now = jstNow();
-  const result = await db.prepare(`INSERT INTO conversion_definition_usages
-      (id, conversion_point_id, definition_version, line_account_id, ref_kind, ref_id,
-       ref_version_id, created_by, created_at, updated_at)
-    SELECT ?, cp.id, cp.version, ?, ?, ?, ?, ?, ?, ?
-      FROM conversion_points cp
-     WHERE cp.id = ? AND cp.version = ? AND cp.status = 'active'
-       AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)`)
-    .bind(
-      id,
-      input.lineAccountId,
-      input.refKind,
-      input.refId,
-      input.refVersionId ?? null,
-      input.staffId,
-      now,
-      now,
-      input.conversionPointId,
-      input.expectedVersion,
-      input.lineAccountId,
-    )
-    .run();
+  let result: D1Result<unknown>;
+  try {
+    result = await db.prepare(`INSERT INTO conversion_definition_usages
+        (id, conversion_point_id, definition_version, line_account_id, ref_kind, ref_id,
+         ref_version_id, created_by, created_at, updated_at)
+      SELECT ?, cp.id, cp.version, ?, ?, ?, ?, ?, ?, ?
+        FROM conversion_points cp
+       WHERE cp.id = ? AND cp.version = ? AND cp.status = 'active'
+         AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)`)
+      .bind(
+        id,
+        input.lineAccountId,
+        input.refKind,
+        input.refId,
+        input.refVersionId ?? null,
+        input.staffId,
+        now,
+        now,
+        input.conversionPointId,
+        input.expectedVersion,
+        input.lineAccountId,
+      )
+      .run();
+  } catch (error) {
+    if (!(error instanceof Error) || !/UNIQUE constraint failed/i.test(error.message)) throw error;
+    const winner = await getCurrentMatchingUsage(db, input);
+    if (winner) {
+      return { created: false, usage: serializeUsage(winner), currentVersion: input.expectedVersion };
+    }
+    return throwLatestUsageConflict(db, input);
+  }
   if ((result.meta.changes ?? 0) === 0) {
-    const latest = await db.prepare('SELECT version, status, line_account_id FROM conversion_points WHERE id = ?')
-      .bind(input.conversionPointId)
-      .first<{ version: number; status: ConversionDefinitionStatus; line_account_id: string | null }>();
-    if (!latest || (latest.line_account_id !== null && latest.line_account_id !== input.lineAccountId)) {
-      throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
-    }
-    if (latest.status !== 'active') {
-      throw new ConversionDefinitionError('definition_stopped', '停止中の成果地点には利用先を追加できません', 409);
-    }
-    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+    return throwLatestUsageConflict(db, input);
   }
   const usage = await db.prepare('SELECT * FROM conversion_definition_usages WHERE id = ?')
     .bind(id)
