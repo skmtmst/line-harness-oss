@@ -92,6 +92,10 @@ function BroadcastList() {
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
@@ -128,11 +132,54 @@ function BroadcastList() {
   }
 
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('broadcast')
-    if (res.success) setFolders(res.data)
+    setFolderError('')
+    try {
+      const res = await api.folders.list('broadcast')
+      if (res.success) setFolders(res.data)
+      else setFolderError('フォルダを読み込めませんでした。')
+    } catch {
+      setFolderError('フォルダを読み込めませんでした。')
+    }
   }, [])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
+
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    const target = folders[index]
+    const neighbor = folders[index + direction]
+    if (!target || !neighbor || folderBusy) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const targetResult = await api.folders.update(target.id, { displayOrder: neighbor.displayOrder })
+      if (!targetResult.success) throw new Error(targetResult.error)
+      const neighborResult = await api.folders.update(neighbor.id, { displayOrder: target.displayOrder })
+      if (!neighborResult.success) throw new Error(neighborResult.error)
+      await loadFolders()
+    } catch {
+      setFolderError('並び順を変えられませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!deletingFolder || folderBusy) return
+    const targetId = deletingFolder.id
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(targetId)
+      if (!res.success) throw new Error(res.error)
+      setDeletingFolder(null)
+      if (folderFilter === targetId) setFolderFilter('')
+      await loadFolders()
+    } catch {
+      setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -269,6 +316,17 @@ function BroadcastList() {
         />
       )}
 
+      {editingFolder && (
+        <FolderAddDialog
+          kind="broadcast"
+          folder={editingFolder}
+          note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
+          placeholder="例: 01_キャンペーン"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void loadFolders() }}
+        />
+      )}
+
       <div data-design="KPIs">
       <BroadcastKpis />
       </div>
@@ -283,11 +341,18 @@ function BroadcastList() {
               onSelect={setFolderFilter}
               rows={[
                 { id: '', label: 'すべて', count: broadcasts.length },
-                ...folders.map((f) => ({
+                ...folders.map((f, index) => ({
                   id: f.id,
                   label: f.name,
                   count: broadcasts.filter((b) => b.folderId === f.id).length,
                   color: f.color,
+                  // 中央の行なら、上へ／下へを含む設計の5操作を全部撮れる。
+                  qaOpen: index === 1 ? 'xkRDb' : undefined,
+                  onEdit: () => setEditingFolder(f),
+                  onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
+                  onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+                  onDelete: () => setDeletingFolder(f),
+                  deleteNote: '削除しても、中の配信は未分類に残ります。',
                 })),
                 {
                   id: UNFILED,
@@ -299,6 +364,7 @@ function BroadcastList() {
               <p className="text-ink-faint text-xs leading-relaxed">
                 フォルダを消しても、入っていた配信は未分類として残ります。
               </p>
+              {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
             </FolderPanel>
 
             <div>
@@ -630,6 +696,24 @@ function BroadcastList() {
             </div>
           </div>
       </div>
+
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
+          deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
+        }件です。`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onConfirm={() => void removeFolder()}
+        onCancel={() => {
+          if (folderBusy) return
+          setDeletingFolder(null)
+          setFolderError('')
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
