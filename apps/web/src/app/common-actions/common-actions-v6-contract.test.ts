@@ -29,7 +29,8 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('共通アクションはまだありません')
     expect(LIST).toContain('共通アクションを読み込めませんでした')
     expect(LIST).toContain('中身を見る')
-    expect(LIST).toContain('複製して下書きを作る')
+    expect(LIST).toContain('使われている場所')
+    expect(LIST).toContain('公開する')
     expect(LIST).toContain('/common-actions/versions?id=')
     expect(LIST).not.toContain('準備中')
   })
@@ -52,9 +53,22 @@ describe('V6共通アクションの画面契約', () => {
     expect(VERSIONS).toContain('実行中・待機中の処理は変えず')
     expect(VERSIONS).toContain('<Dialog')
     expect(VERSIONS).toContain('versionChangeSummary')
-    expect(VERSIONS).toContain('この30日の実行失敗: —（未接続。版ごとの実行結果を集計する口が必要です）')
+    expect(VERSIONS).toContain('summary?.executionCountThisMonth')
+    expect(VERSIONS).toContain('summary?.failureCountThisMonth')
+    expect(VERSIONS).toContain('このアクションを実行中')
+    expect(VERSIONS).toContain('待ち時間の途中')
     expect(VERSIONS).not.toContain('内容を取得できません')
     expect(VERSIONS).not.toContain('確認できません')
+  })
+
+  it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
+    expect(LIST).toContain('executionCountThisMonth')
+    expect(LIST).toContain('failureCountThisMonth')
+    expect(LIST).toContain('api.commonActions.csvUrl(selectedAccountId)')
+    expect(LIST).toContain('古い版あり')
+    expect(LIST).toContain('limit: PAGE_SIZE')
+    expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
+    expect(LIST).toContain("aria-label=\"ページ送り\"")
   })
 
   it('閲覧権限と編集権限を画面でも分ける', () => {
