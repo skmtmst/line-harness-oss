@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -22,6 +23,7 @@ import {
   webhookLabel,
   type AccountFilter,
 } from './account-list-view'
+import AccountMigration from './migration'
 
 /**
  * LINEアカウントの一覧。設計 ★V6 33-1（`QT91v`）。
@@ -30,6 +32,7 @@ import {
  * LINE公式アカウントの設定は別のもの（要件 §5-3）。転送をやめて画面にする。
  */
 export default function AccountsPage() {
+  const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
@@ -62,6 +65,8 @@ export default function AccountsPage() {
   const activeCount = accounts.filter((a) => a.isActive).length
   const inactiveCount = accounts.filter((a) => !a.isActive).length
   const problemCount = accounts.filter(hasConnectionProblem).length
+
+  if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
   return (
     <div data-design-node="QT91v">
