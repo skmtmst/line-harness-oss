@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -127,6 +128,7 @@ const DAILY_CAPS = [
 
 export default function NewMileageRulePage() {
   usePageTitle('たまる決めごとをつくる')
+  const { selectedAccountId } = useAccount()
   const [name, setName] = useState('予約してくれたら 300 マイル')
   const [eventType, setEventType] = useState<string>('booking_created')
   const [source, setSource] = useState('')
@@ -138,6 +140,9 @@ export default function NewMileageRulePage() {
   const [beneficiary, setBeneficiary] = useState<'actor' | 'referrer'>('actor')
   const [validFrom, setValidFrom] = useState('')
   const [validUntil, setValidUntil] = useState('')
+  const [expiresAfterDays, setExpiresAfterDays] = useState('365')
+  const [reverseOnCancellation, setReverseOnCancellation] = useState(true)
+  const [targetTagId, setTargetTagId] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
 
@@ -154,6 +159,10 @@ export default function NewMileageRulePage() {
   const selected = EVENT_TYPES.find((t) => t.value === eventType) ?? EVENT_TYPES[0]
   const value = Number(amount)
   const validAmount = Number.isInteger(value) && value >= 1
+  const expiryDays = expiresAfterDays === '' ? null : Number(expiresAfterDays)
+  const cancellationEvent = eventType === 'booking_created'
+    ? 'booking_cancelled'
+    : eventType === 'purchase_completed' ? 'order_cancelled' : null
 
   /** 倍率つきのタグ。優先度がいちばん高い1枚だけが効く。 */
   const multiplierTags = useMemo(
@@ -179,6 +188,10 @@ export default function NewMileageRulePage() {
       validate={() => {
         if (!name.trim()) return 'ルール名を入力してください'
         if (!validAmount) return '付与マイルは1以上の整数で入力してください'
+        if (!selectedAccountId) return 'LINEアカウントを選択してください'
+        if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
+          return '有効期限は1〜3650日で入力してください'
+        }
         if (validFrom && validUntil && validFrom > validUntil) {
           return '終了日は開始日より後にしてください'
         }
@@ -202,6 +215,29 @@ export default function NewMileageRulePage() {
           validUntil: validUntil || null,
         })
         if (!res.success) throw new Error(res.error)
+        const draftResponse = await api.mileage.saveEarningRuleDraft(res.data.id, {
+          accountId: selectedAccountId!,
+          expectedVersion: 0,
+          draft: {
+            name: name.trim(),
+            eventType,
+            source: source || null,
+            amount: value,
+            initialStatus,
+            validFrom: validFrom || null,
+            validUntil: validUntil || null,
+            expiresAfterDays: expiryDays,
+            cancellationEventTypes: reverseOnCancellation && cancellationEvent ? [cancellationEvent] : [],
+            targetConditions: targetTagId
+              ? { operator: 'AND', rules: [{ type: 'tag_exists', value: targetTagId }] }
+              : null,
+            sortOrder: 0,
+          },
+        })
+        if (!draftResponse.success) {
+          await api.mileage.updateRule(res.data.id, { isActive: false }).catch(() => undefined)
+          throw new Error(draftResponse.error)
+        }
         // 作成は常に動く状態で入る。止めた状態で作りたいときだけ、続けて止める。
         if (!isActive) {
           await api.mileage.updateRule(res.data.id, { isActive: false })
@@ -265,13 +301,13 @@ export default function NewMileageRulePage() {
             <p className="mt-3 text-xs text-ink-faint">通知の送信口は未接続です。保存しても、この文はまだ自動送信されません。</p>
           </AsideCard>
 
-          <AsideCard title="まだ接続されていない設定">
+          <AsideCard title="この下書きに保存する設定">
             <ul className="space-y-2 text-xs leading-relaxed text-ink-secondary">
               <li>・付いてからの有効期限</li>
               <li>・予約取消や返品で、付けた分を引く決めごと</li>
-              <li>・タグなど15軸を使った対象条件</li>
+              <li>・タグで絞る対象条件</li>
             </ul>
-            <p className="mt-3 text-xs text-ink-faint">保存口が追加されるまで、選べるようには見せません。</p>
+            <p className="mt-3 text-xs text-ink-faint">公開中の版は直接書き換えず、V6の下書きとして保存します。</p>
           </AsideCard>
 
           <AsideCard title="気をつけること">
@@ -445,6 +481,44 @@ export default function NewMileageRulePage() {
               aria-label="終了日"
             />
           </div>
+        </Field>
+
+        <Field label="付いたマイルの有効期限" htmlFor="sc-expiry" note="空欄なら、この決めごとで付いた分は期限なしです。">
+          <div className="flex items-center gap-2">
+            <input
+              id="sc-expiry"
+              type="number"
+              min={1}
+              max={3650}
+              value={expiresAfterDays}
+              onChange={(e) => setExpiresAfterDays(e.target.value)}
+              className={`${inputClass} max-w-32 tabular-nums`}
+            />
+            <span className="whitespace-nowrap text-sm text-ink-secondary">日後</span>
+          </div>
+        </Field>
+
+        {cancellationEvent ? (
+          <label className="flex items-start gap-2 rounded-control border border-hairline p-3 text-sm text-ink-secondary">
+            <input type="checkbox" checked={reverseOnCancellation} onChange={(e) => setReverseOnCancellation(e.target.checked)} className="mt-0.5" />
+            <span>
+              取り消されたら、付けたぶんを引く
+              <span className="mt-1 block text-xs text-ink-faint">{eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。</span>
+            </span>
+          </label>
+        ) : null}
+
+        <Field label="だれに付けるか（条件）" htmlFor="sc-target-tag" note="タグを選ばない場合は全員が対象です。">
+          <SelectField
+            id="sc-target-tag"
+            value={targetTagId}
+            onChange={(e) => setTargetTagId(e.target.value)}
+            options={[
+              { value: '', label: '条件を付けない（全員）' },
+              ...tags.map((tag) => ({ value: tag.id, label: `タグ「${tag.name}」が付いている人` })),
+            ]}
+            className={inputClass}
+          />
         </Field>
 
         <label className="text-ink-secondary flex items-start gap-2 text-sm">

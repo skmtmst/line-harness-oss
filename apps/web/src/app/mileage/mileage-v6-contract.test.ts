@@ -96,6 +96,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
 
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
     expect(NEW_RULE).toContain('api.mileage.createRule')
+    expect(NEW_RULE).toContain('api.mileage.saveEarningRuleDraft')
+    expect(NEW_RULE).toContain('expiresAfterDays: expiryDays')
+    expect(NEW_RULE).toContain('cancellationEventTypes:')
+    expect(NEW_RULE).toContain("type: 'tag_exists'")
     expect(NEW_RULE).toContain("parent={['マイル', '/mileage?tab=earning-rules']}")
     expect(NEW_RULE).not.toContain('api.scoring.create')
   })
