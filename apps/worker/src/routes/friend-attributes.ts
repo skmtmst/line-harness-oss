@@ -395,6 +395,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
       isDefault: body.isDefault === undefined ? undefined : body.isDefault === true,
       autoOnInbound: body.autoOnInbound === undefined ? undefined : body.autoOnInbound === true,
       displayOrder: body.displayOrder === undefined ? undefined : Number(body.displayOrder),
+      actorId: c.get('staff').id,
     });
     return c.json({ success: true, data: serializeMark(mark!) });
   } catch (err) {
