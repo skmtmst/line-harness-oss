@@ -4,7 +4,7 @@ import { usageSummaryDetail } from '../usage-summary'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, ApiError, type CommonActionDetail } from '@/lib/api'
+import { api, ApiError, type CommonActionDetail, type CommonActionVersion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import NoteBar from '@/components/shared/note-bar'
@@ -20,6 +20,25 @@ const ACTION_LABELS: Record<string, string> = {
   resume_scenario: 'シナリオを再開する', send_message: 'LINEメッセージを送る',
   send_webhook: '外部サービスへ送る', switch_rich_menu: 'リッチメニューを切り替える',
   remove_rich_menu: 'リッチメニューを外す', wait: '待つ', common_action: '別の共通アクションを呼ぶ',
+}
+
+function versionChangeSummary(version: CommonActionVersion, versions: CommonActionVersion[]): string {
+  const previous = versions
+    .filter((item) => item.versionNumber < version.versionNumber)
+    .sort((left, right) => right.versionNumber - left.versionNumber)[0]
+  if (!previous) return 'はじめて公開した'
+  if (previous.actions.length !== version.actions.length) {
+    return `処理を${previous.actions.length}個から${version.actions.length}個にした`
+  }
+  const changedIndex = version.actions.findIndex((action, index) => {
+    const oldAction = previous.actions[index]
+    return !oldAction || JSON.stringify(oldAction) !== JSON.stringify(action)
+  })
+  if (changedIndex >= 0) {
+    const label = ACTION_LABELS[version.actions[changedIndex].type] ?? '処理'
+    return `「${label}」の内容を変えた`
+  }
+  return '内容の変更はありません'
 }
 
 function CommonActionVersionsInner() {
@@ -152,16 +171,19 @@ function CommonActionVersionsInner() {
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
+            <p className="text-ink-faint mt-1 text-xs">この30日の実行失敗: —（未接続。版ごとの実行結果を集計する口が必要です）</p>
           </div>
         </div>
         <DataTable>
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '14%' }}>版</Th>
-                <Th style={{ width: '18%' }}>状態</Th>
-                <Th style={{ width: '18%' }}>中の処理</Th>
-                <Th style={{ width: '28%' }}>公開日時</Th>
-                <Th style={{ width: '22%' }}>操作</Th>
+                <Th style={{ width: '8%' }}>版</Th>
+                <Th style={{ width: '14%' }}>状態</Th>
+                <Th style={{ width: '15%' }}>作成者</Th>
+                <Th style={{ width: '23%' }}>変更内容</Th>
+                <Th style={{ width: '12%' }}>中の処理</Th>
+                <Th style={{ width: '14%' }}>公開日時</Th>
+                <Th style={{ width: '14%' }}>操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -173,6 +195,8 @@ function CommonActionVersionsInner() {
                       {version.status === 'published' ? '公開済み' : '下書き'}
                     </StatusBadge>
                   </Td>
+                  <Td className="text-ink-secondary"><span className="block max-w-32 truncate" title={version.createdBy ?? '未取得'}>{version.createdBy || '未取得'}</span></Td>
+                  <Td className="text-ink-secondary"><span className="block max-w-56 truncate" title={versionChangeSummary(version, detail.versions)}>{versionChangeSummary(version, detail.versions)}</span></Td>
                   <Td className="text-ink-secondary">{version.actions.length}個の処理</Td>
                   <Td className="text-ink-secondary">{version.publishedAt ? new Date(version.publishedAt).toLocaleString('ja-JP') : '—'}</Td>
                   <ActionCell>
@@ -214,7 +238,7 @@ function CommonActionVersionsInner() {
         <h2 className="text-ink font-semibold">使われている場所</h2>
         <p className="text-ink-faint mt-1 text-sm">実行中・待機中の処理は、切り替えても開始時の版のまま完了します。</p>
         {detail.bindings.length === 0 ? (
-          <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだ呼ばれている場所はありません。</div>
+          <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだどこからも呼ばれていません。</div>
         ) : (
           <DataTable className="mt-3">
               <thead>
@@ -237,8 +261,8 @@ function CommonActionVersionsInner() {
                       <span className="text-ink-secondary">v{binding.versionNumber}</span>
                       {binding.hasNewerVersion ? <StatusBadge tone="warning" size="compact" className="ml-2">新版あり</StatusBadge> : null}
                     </Td>
-                    <Td className="text-ink-secondary">{binding.runningCount ?? '—'}</Td>
-                    <Td className="text-ink-secondary">{binding.waitingCount ?? '—'}</Td>
+                    <Td className="text-ink-secondary" title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? '—'}</Td>
+                    <Td className="text-ink-secondary" title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</Td>
                     <ActionCell>
                       {canManage && binding.hasNewerVersion && published ? (
                         <button
@@ -279,16 +303,16 @@ function CommonActionVersionsInner() {
           <section className="border-hairline rounded-control border p-3">
             <p className="text-ink-faint text-xs">現在の版</p>
             <p className="text-ink mt-1 font-semibold">v{pendingBinding?.versionNumber ?? '—'}・{pendingVersion?.actions.length ?? '—'}個の処理</p>
-            <p className="text-ink-secondary mt-2 text-sm">{pendingVersion?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '内容を取得できません'}</p>
+            <p className="text-ink-secondary mt-2 text-sm">{pendingVersion?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '未取得'}</p>
           </section>
           <section className="border-action rounded-control border p-3">
             <p className="text-ink-faint text-xs">更新後</p>
             <p className="text-ink mt-1 font-semibold">v{published?.versionNumber ?? '—'}・{published?.actions.length ?? '—'}個の処理</p>
-            <p className="text-ink-secondary mt-2 text-sm">{published?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '内容を取得できません'}</p>
+            <p className="text-ink-secondary mt-2 text-sm">{published?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '未取得'}</p>
           </section>
         </div>
         <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-sm">
-          影響：実行中 {pendingBinding?.runningCount ?? '確認できません'}件、待機中 {pendingBinding?.waitingCount ?? '確認できません'}件は現在の版のまま完了します。
+          影響：実行中 {pendingBinding?.runningCount ?? '—'}件、待機中 {pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。未取得の件数は、実行集計の接続後に表示します。
         </p>
       </Dialog>
     </div>
