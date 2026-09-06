@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const OVERVIEWS = readFileSync(join(HERE, 'webhook-overviews.tsx'), 'utf8')
 
 /** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
 function fnBody(src: string, decl: string): string {
@@ -106,7 +107,9 @@ describe('Webhookの削除確認', () => {
   })
 
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    expect(PAGE).toContain("onClick={() => askDelete('incoming', wh.id, wh.name)}")
-    expect(PAGE).toContain("onClick={() => askDelete('outgoing', wh.id, wh.name)}")
+    expect(PAGE).toContain("onDelete={(wh) => askDelete('incoming', wh.id, wh.name)}")
+    expect(PAGE).toContain("onDelete={(wh) => askDelete('outgoing', wh.id, wh.name)}")
+    expect(OVERVIEWS).toContain('onClick={() => onDelete(selected)}')
+    expect(OVERVIEWS).toContain('onClick={() => onDelete(item)}')
   })
 })

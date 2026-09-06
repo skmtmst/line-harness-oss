@@ -93,6 +93,26 @@ describe('webinarApi notifications', () => {
   })
 })
 
+describe('webinarApi list data', () => {
+  it('一覧とフォルダ集計を選択中のLINE公式アカウントへ絞る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: [] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await webinarApi.list('account/1')
+    await webinarApi.folders('account/1')
+
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'https://worker.example.com/api/webinars?account_id=account%2F1',
+    )
+    expect(fetchSpy.mock.calls[1]?.[0]).toBe(
+      'https://worker.example.com/api/folders?kind=webinar&account_id=account%2F1',
+    )
+  })
+})
+
 describe('api.affiliates.paymentSummaries', () => {
   it('選択中のLINE公式アカウントを必ずクエリへ含める', async () => {
     const fetchSpy = vi.fn(async () => new Response(
