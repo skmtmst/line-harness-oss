@@ -904,7 +904,7 @@ export const SCREENS = [
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
     verdictNote: '**2026-09-07 S2 #73。** 正本 `M1EXwB.png` の操作列に合わせ、削除をアイコン化し、「…」から配信予定と実行履歴を選べるようにした。通常・メニュー展開を1440/1920で撮影し、横はみ出し0。予定は実行台帳の公開状態 `planned` へ接続し、固定件数を作らない。head `a828e5afc3`。',
-    verdictSource: 'reminders-v6/M1EXwB.png + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
+    verdictSource: 'reminders-v6/M1EXwB.txt + reminders-v6/M1EXwB-{1440,1920}.png + reminders-v6/M1EXwB-planned-menu-{1440,1920}.png',
     verdictHead: 'a828e5afc3', route: '/reminders',
     variants: [{ suffix: '-planned-menu', steps: [{ click: '未返信3日後フォローのその他操作', after: 500 }] }], },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
@@ -979,7 +979,7 @@ export const SCREENS = [
     },
     verdict: 'match',
     verdictNote: '**2026-09-07 S2 #73。** 正本 `GC4St.png` と同じ実行台帳の骨格を保ち、`?status=planned` では公開APIの `planned` だけを表示する。予定と履歴を相互に切り替えられ、予定画面には過去の送信エラー警告を混ぜない。通常・読込中・0件・取得失敗・予定を1440/1920で撮影し、横はみ出し0。固定件数なし。head `a828e5afc3`。',
-    verdictSource: 'reminders-v6/GC4St.png + reminders-v6/GC4St-{normal,loading,empty,error,planned}-{1440,1920}.png',
+    verdictSource: 'reminders-v6/GC4St.txt + reminders-v6/GC4St-{normal,loading,empty,error,planned}-{1440,1920}.png',
     verdictHead: 'a828e5afc3',
   },
   {
