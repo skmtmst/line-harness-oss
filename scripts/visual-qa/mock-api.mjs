@@ -116,6 +116,65 @@ const ACCOUNT = {
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 
+/** 機能9。設計の一覧・5段編集・削除確認を同じ1組の設定で撮る。 */
+const FRIEND_ADD_RULE = {
+  id: 'rule-referral',
+  accountId: 'visual-qa-account',
+  friendKind: 'first_time',
+  name: '紹介キャンペーンの初回案内',
+  folderName: '紹介',
+  priority: 3,
+  isFallback: false,
+  status: 'published',
+  versionId: 'rule-referral-v1',
+  versionNumber: 1,
+  versionStatus: 'published',
+  lastTestStatus: 'succeeded',
+  lastTestedAt: '2026-01-13T10:00:00+09:00',
+  publishedAt: '2026-01-13T10:01:00+09:00',
+  matchedLast7Days: 9,
+  definition: {
+    routeIds: ['route-referral'],
+    scenarioId: 'scenario-welcome',
+    messageType: 'text',
+    messageText: 'ご登録ありがとうございます。ご希望の内容をお選びください。',
+    timing: 'immediate',
+    actions: [
+      { type: 'add_tag', label: 'タグ「新規友だち」を付ける', targetId: 'tag-new' },
+      { type: 'start_scenario', label: 'シナリオ「新規登録7日間フォロー」を開始する', targetId: 'scenario-welcome' },
+    ],
+    friendCondition: '紹介キャンペーンから来た人へ特典を案内する。',
+    activeFrom: null,
+    activeUntil: null,
+  },
+  routeNames: ['紹介キャンペーン'],
+  scenarioName: '新規登録7日間フォロー',
+}
+
+const FRIEND_ADD_RULE_OPTIONS = {
+  routes: [
+    { id: 'route-shop', name: '店頭QRコード', kind: 'QR' },
+    { id: 'route-instagram', name: 'Instagramプロフィール', kind: '広告' },
+    { id: 'route-referral', name: '紹介キャンペーン', kind: '紹介' },
+  ],
+  scenarios: [
+    { id: 'scenario-welcome', name: '新規登録7日間フォロー' },
+    { id: 'scenario-common', name: '共通のあいさつ' },
+  ],
+  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }],
+}
+
+const FRIEND_ADD_RULES = {
+  items: [
+    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。' } },
+    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagramプロフィール'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], messageText: '資料をダウンロードできます。' } },
+    FRIEND_ADD_RULE,
+    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。' } },
+  ],
+  summary: { rules: 4, active: 3, recentAdds: 86, captured: 74, unknownRoute: 12, delivered: 84, failed: 2 },
+  options: FRIEND_ADD_RULE_OPTIONS,
+}
+
 /** 期間の端。**時計を読まない**（読むと画像が毎回変わる）。 */
 const FIXED_FROM = '2026-01-01'
 const FIXED_TO = '2026-01-13'
@@ -624,6 +683,15 @@ function visualQaWriteBody(method, pathname) {
       priority: 2,
     }
   }
+  if (method === 'POST' && pathname === '/api/friend-add-rules/test') {
+    return {
+      stateChanged: false, ruleId: FRIEND_ADD_RULE.id, matched: true,
+      reasons: ['この設定が優先順位どおりに選ばれます。'],
+      scenarioId: FRIEND_ADD_RULE.definition.scenarioId,
+      message: FRIEND_ADD_RULE.definition.messageText,
+      actions: FRIEND_ADD_RULE.definition.actions,
+    }
+  }
   if (method === 'POST' && pathname === '/api/broadcasts/preflight') {
     return {
       audienceCount: 624,
@@ -771,6 +839,12 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
     return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+  }
+  if (pathname === '/api/friend-add-rules') {
+    return { success: true, data: FRIEND_ADD_RULES }
+  }
+  if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
+    return { success: true, data: { rule: FRIEND_ADD_RULE, options: FRIEND_ADD_RULE_OPTIONS } }
   }
   if (pathname === '/api/identity-candidates/detect') {
     return {
@@ -1037,6 +1111,61 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  /*
+    流入元の詳細。可変部分を配列の既定値へ落とすと、1件取得まで `[]` になり、
+    `route.createdAt.slice(...)` で詳細画面全体が落ちる。画面確認用の同じ1件から
+    詳細・段階・参照元を組み立て、一覧と右側で別のリンクを見せない。
+  */
+  const entryRouteFunnel = /^\/api\/entry-routes\/([^/]+)\/funnel$/.exec(pathname)
+  if (entryRouteFunnel) {
+    return {
+      success: true,
+      data: { click_count: 486, friend_add_count: 86, form_submission_count: 24, cv_count: 11 },
+    }
+  }
+  const entryRouteSources = /^\/api\/entry-routes\/([^/]+)\/sources$/.exec(pathname)
+  if (entryRouteSources) {
+    return {
+      success: true,
+      data: [
+        { label: 'instagram.com', count: 312 },
+        { label: 'lin.ee', count: 96 },
+        { label: '直接アクセス', count: 78 },
+      ],
+    }
+  }
+  const entryRouteDetail = /^\/api\/entry-routes\/([^/]+)$/.exec(pathname)
+  if (entryRouteDetail) {
+    const entryRoute = ENTRY_ROUTES.find((item) => item.id === entryRouteDetail[1])
+    return entryRoute
+      ? { success: true, data: entryRoute }
+      : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/analytics/ref-summary') {
+    return {
+      success: true,
+      data: {
+        routes: ENTRY_ROUTES.map((entryRoute, index) => ({
+          refCode: entryRoute.refCode,
+          name: entryRoute.name,
+          friendCount: index === 0 ? 86 : 0,
+          clickCount: index === 0 ? 486 : 0,
+          latestAt: index === 0 ? '2026-08-25T14:16:00.000Z' : null,
+        })),
+      },
+    }
+  }
+  if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        friends: [
+          { id: 'friend-inflow-1', displayName: '木村 亮', trackedAt: '2026-08-25T14:16:00.000Z' },
+          { id: 'friend-inflow-2', displayName: '佐藤 美咲', trackedAt: '2026-08-24T10:32:00.000Z' },
+        ],
+      },
+    }
+  }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
 

@@ -12,6 +12,8 @@ describe('V6 25-1-C 見本から下書きを作る', () => {
     expect(PAGE).toContain('<AutomationTemplateGallery accountId={selectedAccountId}')
     expect(GALLERY).toContain('data-design-node="WjYAC"')
     expect(GALLERY).toContain('api.automations.templates(accountId)')
+    expect(GALLERY).toContain('aria-label="きっかけで絞り込む"')
+    expect(GALLERY).toContain("item.triggerLabel === triggerFilter")
     expect(GALLERY).not.toContain('誕生日クーポン')
   })
 

@@ -77,6 +77,51 @@ describe('previewFriendAddRoutingDefinition', () => {
   });
 });
 
+describe('V6の流入経路別ルール', () => {
+  function setupRule(routeIds: string[], options: { fallback?: boolean; scenarioId?: string | null; priority?: number } = {}) {
+    const { db, raw } = createTestD1()
+    raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+                 VALUES ('acc-v6', 'テスト', 'c', 's', 't')`).run()
+    insertFriend(raw, 'friend-v6', { line_account_id: 'acc-v6', unfollow_count: 0 })
+    raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+                 VALUES ('scenario-v6', 'ようこそ', 'friend_add', 1, 'acc-v6')`).run()
+    const ruleId = options.fallback ? 'rule-fallback' : 'rule-route'
+    const versionId = `${ruleId}-v1`
+    raw.prepare(`INSERT INTO friend_add_rules
+      (id, line_account_id, friend_kind, name, priority, is_unknown_route_fallback, status, current_version_id)
+      VALUES (?, 'acc-v6', 'first_time', ?, ?, ?, 'published', ?)`).run(
+      ruleId, ruleId, options.priority ?? 1, options.fallback ? 1 : 0, versionId,
+    )
+    raw.prepare(`INSERT INTO friend_add_rule_versions
+      (id, rule_id, version_number, definition_snapshot, status)
+      VALUES (?, ?, 1, ?, 'published')`).run(versionId, ruleId, JSON.stringify({
+      routeIds,
+      scenarioId: options.scenarioId === undefined ? 'scenario-v6' : options.scenarioId,
+      messageType: 'scenario', messageText: '', timing: 'scenario', actions: [],
+      friendCondition: '', activeFrom: null, activeUntil: null,
+    }))
+    return { db, raw, ruleId, versionId }
+  }
+
+  test('確定した流入リンクに合う公開版を1件だけ選ぶ', async () => {
+    const { db, ruleId, versionId } = setupRule(['route-known'])
+    const result = await applyFriendAddRouting(
+      db, 'acc-v6', { id: 'friend-v6', unfollow_count: 0 }, undefined, { entryRouteId: 'route-known' },
+    )
+    expect(result).toMatchObject({ routed: true, ruleId, ruleVersionId: versionId, suppressed: false })
+    expect(result.enrollments).toHaveLength(1)
+  })
+
+  test('経路を確定できないときは削除できない受け皿を選び、未設定なら安全に抑止する', async () => {
+    const { db, ruleId, versionId } = setupRule([], { fallback: true, scenarioId: null, priority: 9999 })
+    const result = await applyFriendAddRouting(
+      db, 'acc-v6', { id: 'friend-v6', unfollow_count: 0 }, undefined, { entryRouteId: null },
+    )
+    expect(result).toMatchObject({ routed: true, ruleId, ruleVersionId: versionId, suppressed: true })
+    expect(result.enrollments).toEqual([])
+  })
+})
+
 describe('normalizeRouting', () => {
   test('空の入力は既定に落ちる', () => {
     expect(normalizeRouting({})).toEqual(FRIEND_ADD_ROUTING_DEFAULT);

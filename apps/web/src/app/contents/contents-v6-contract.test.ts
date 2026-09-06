@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const UPLOAD = readFileSync(new URL('./media-upload-dialog.tsx', import.meta.url), 'utf8')
+const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url), 'utf8')
+const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
 
@@ -52,8 +55,8 @@ describe('V6 登録メディア一覧の契約', () => {
   it('無い保存容量のバーを作らず、繋がっていないと言う', () => {
     // 設計は使用量のバー（220×5）と実績（53×5）を描いているが、
     // `/api/media` は保存容量も上限も返さない。作り物の帯は出さない。
-    expect(PAGE).toContain('保存容量')
-    expect(PAGE).toContain('まだ繋がっていません。保存容量が接続されると表示されます。')
+    expect(PAGE).toContain('使っている容量')
+    expect(PAGE).toContain('容量集計APIが接続されると、使用量と上限を表示します。')
     // 作り物の帯を出さない。幅を持つ帯は `style={{ width` でしか描けない。
     expect(PAGE).not.toContain('style={{ width')
   })
@@ -67,8 +70,10 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('設計の実測どおりの高さと文字にする', () => {
-    // アップロード: 高さ40・角丸8・左右14・13px/700。
-    expect(PAGE).toContain('rounded-control inline-flex h-10 cursor-pointer items-center px-3.5 text-label font-bold')
+    // アップロードは一覧へ常設せず、全面のモーダルで開く。
+    expect(PAGE).toContain('setUploadOpen(true)')
+    expect(UPLOAD).toContain('designNode="eXAJP"')
+    expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
     // 検索: 幅420まで。表示切替: 枠40・各44。
     expect(PAGE).toContain('min-w-64 max-w-[420px] flex-1')
     expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
@@ -78,6 +83,28 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('truncate text-caption font-bold')
     expect(PAGE).toContain('text-ink-faint text-nano font-semibold tabular-nums')
     expect(PAGE).toContain('text-nano font-bold tabular-nums')
+  })
+
+  it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {
+    expect(PAGE).toContain("api.folders.list('media')")
+    expect(PAGE).toContain("api.folders.create({ kind: 'media', name })")
+    expect(PAGE).toContain('folderFilter === UNGROUPED ? item.folderId === null')
+    expect(PAGE).toContain('<FolderPanel')
+  })
+
+  it('詳細では取得済みメタデータと使用先を表示し、無い版APIを利用不可と明記する', () => {
+    expect(PAGE).toContain('<MediaDetailDialog')
+    expect(DETAIL).toContain('designNode="voJtX"')
+    expect(DETAIL).toContain('api.media.deleteImpact')
+    expect(DETAIL).toContain('名前を保ったまま新しい版を追加するAPIは、まだ接続されていません。')
+  })
+
+  it('既存メディアへの一括差し替えは影響確認後の版を渡して実行する', () => {
+    expect(PAGE).toContain('<MediaReplacementDialog')
+    expect(REPLACEMENT).toContain('api.media.replacementImpact')
+    expect(REPLACEMENT).toContain('api.media.replaceUsages')
+    expect(REPLACEMENT).toContain('expectedRevision: impact.revision')
+    expect(REPLACEMENT).toContain('disabled={busy || !impact?.canReplace}')
   })
 
   it('使用中メディアの強制削除口を持たない', () => {

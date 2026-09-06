@@ -2037,6 +2037,69 @@ export interface AccountHandoverDecision {
   decided_at: string
 }
 
+export type FriendAddRuleKind = 'first_time' | 'returning'
+export type FriendAddRuleStatus = 'draft' | 'published' | 'stopped' | 'archived'
+export type FriendAddRuleAction = {
+  type: 'add_tag' | 'remove_tag' | 'start_scenario'
+  label: string
+  targetId?: string
+}
+export type FriendAddRuleDefinition = {
+  routeIds: string[]
+  scenarioId: string | null
+  messageType: 'text' | 'template' | 'form' | 'scenario'
+  messageText: string
+  timing: 'immediate' | 'scenario'
+  actions: FriendAddRuleAction[]
+  friendCondition: string
+  activeFrom: string | null
+  activeUntil: string | null
+  returningMode?: 'none' | 'same' | 'other'
+  startPosition?: 'beginning' | 'resume'
+}
+export type FriendAddRule = {
+  id: string
+  accountId: string
+  friendKind: FriendAddRuleKind
+  name: string
+  folderName: string | null
+  priority: number
+  isFallback: boolean
+  status: FriendAddRuleStatus
+  versionId: string | null
+  versionNumber: number | null
+  versionStatus: 'draft' | 'published' | 'retired' | null
+  lastTestStatus: 'succeeded' | 'failed' | null
+  lastTestedAt: string | null
+  publishedAt: string | null
+  matchedLast7Days: number | null
+  definition: FriendAddRuleDefinition
+  routeNames: string[]
+  scenarioName: string | null
+}
+export type FriendAddRuleOptions = {
+  routes: Array<{ id: string; name: string; kind: string }>
+  scenarios: Array<{ id: string; name: string }>
+  tags: Array<{ id: string; name: string }>
+}
+export type FriendAddRuleListData = {
+  items: FriendAddRule[]
+  summary: {
+    rules: number
+    active: number
+    recentAdds: number | null
+    captured: number | null
+    unknownRoute: number | null
+    delivered: number | null
+    failed: number | null
+  }
+  options: FriendAddRuleOptions
+}
+export type FriendAddRuleInput = Pick<FriendAddRule, 'friendKind' | 'name' | 'folderName' | 'priority'> & {
+  accountId: string
+  definition: FriendAddRuleDefinition
+}
+
 export const api = {
   system: {
     health: () =>
@@ -4504,6 +4567,60 @@ export const api = {
       if (params?.routingStatus) query.set('routing_status', params.routingStatus)
       return fetchApi<ApiResponse<FriendAddEventList>>(`/api/friend-add-routing/events?${query}`)
     },
+  },
+  friendAddRules: {
+    list: (accountId: string, kind: FriendAddRuleKind) =>
+      fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?account_id=${encodeURIComponent(accountId)}&kind=${kind}`),
+    get: (accountId: string, ruleId: string) =>
+      fetchApi<ApiResponse<{ rule: FriendAddRule; options: FriendAddRuleOptions }>>(
+        `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    createDraft: (input: FriendAddRuleInput, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string }>>('/api/friend-add-rules/drafts', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(input),
+      }),
+    saveDraft: (ruleId: string, input: FriendAddRuleInput, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; versionId: string }>>(
+        `/api/friend-add-rules/${encodeURIComponent(ruleId)}/draft`,
+        { method: 'PUT', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(input) },
+      ),
+    validate: (accountId: string, ruleId: string) =>
+      fetchApi<ApiResponse<{
+        canPublish: boolean
+        checks: Array<{ status: 'passed' | 'failed'; label: string }>
+      }>>(`/api/friend-add-rules/${encodeURIComponent(ruleId)}/validate?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+      }),
+    test: (accountId: string, ruleId: string) =>
+      fetchApi<ApiResponse<{
+        stateChanged: false
+        ruleId: string
+        matched: boolean
+        reasons: string[]
+        scenarioId: string | null
+        message: string | null
+        actions: FriendAddRuleAction[]
+      }>>('/api/friend-add-rules/test', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, ruleId }),
+      }),
+    publish: (accountId: string, ruleId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; versionNumber: number; publishedAt: string }>>(
+        `/api/friend-add-rules/${encodeURIComponent(ruleId)}/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
+    stop: (accountId: string, ruleId: string) =>
+      fetchApi<{ success: boolean }>(
+        `/api/friend-add-rules/${encodeURIComponent(ruleId)}/stop?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      ),
+    archive: (accountId: string, ruleId: string) =>
+      fetchApi<{ success: boolean }>(
+        `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
   },
   nenCampaigns: {
     overview: (accountId: string) => fetchApi<ApiResponse<{

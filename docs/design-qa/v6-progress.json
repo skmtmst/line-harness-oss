@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 237,
-  "unimplemented": 17,
+  "compared": 250,
+  "unimplemented": 12,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 18,
-  "match": 8,
-  "structureMatchDataPending": 39,
-  "needsFix": 121,
-  "unjudged": 83,
-  "remaining": 260,
+  "missing": 10,
+  "match": 24,
+  "structureMatchDataPending": 47,
+  "needsFix": 174,
+  "unjudged": 11,
+  "remaining": 244,
   "features": [
     {
       "feature": 1,
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 3,
       "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 13,
+      "needsFix": 14,
+      "unjudged": 0,
       "remaining": 15,
       "capturedAt": [
         {
@@ -159,8 +159,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 10,
+      "needsFix": 10,
+      "unjudged": 0,
       "remaining": 12,
       "capturedAt": [
         {
@@ -256,8 +256,8 @@
       "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 15,
+      "needsFix": 17,
+      "unjudged": 0,
       "remaining": 17,
       "capturedAt": [
         {
@@ -417,8 +417,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 14,
+      "needsFix": 14,
+      "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
         {
@@ -766,11 +766,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 10,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 1,
       "capturedAt": [
         {
           "pr": 429,
@@ -864,6 +864,24 @@
             "GC4St"
           ],
           "note": "Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ"
+        },
+        {
+          "pr": 927,
+          "head": "eb41ad0d",
+          "on": "2026-09-06",
+          "screens": [
+            "M1EXwB",
+            "uJP22",
+            "J64xI",
+            "s7T2dz",
+            "JCz6J",
+            "W98zZQ",
+            "s6Vvp",
+            "PSmHo",
+            "Y0Sn3",
+            "dC0yg"
+          ],
+          "note": "★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。"
         }
       ]
     },
@@ -941,14 +959,14 @@
       "feature": 9,
       "name": "友だち追加時の配信",
       "total": 10,
-      "compared": 6,
-      "unimplemented": 4,
+      "compared": 10,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
+      "needsFix": 10,
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
@@ -1431,14 +1449,14 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 5,
+      "compared": 4,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 1,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 4,
+      "structureMatchDataPending": 3,
+      "needsFix": 2,
       "unjudged": 0,
       "remaining": 5,
       "capturedAt": [
@@ -1496,14 +1514,14 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 1,
-      "unimplemented": 3,
+      "compared": 7,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 5,
+      "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 3,
+      "needsFix": 4,
       "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
@@ -1731,15 +1749,15 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 0,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 9,
+      "missing": 2,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 9,
+      "structureMatchDataPending": 4,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": [
         {
@@ -1821,15 +1839,15 @@
       "feature": 19,
       "name": "コンバージョン",
       "total": 4,
-      "compared": 4,
+      "compared": 1,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 3,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 2,
-      "unjudged": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -1859,11 +1877,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 7,
+      "match": 5,
+      "structureMatchDataPending": 3,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 9,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 445,
@@ -1910,6 +1928,22 @@
             "dfwD4"
           ],
           "note": "#676・#677 が入った木で撮り直した。**それまで機能20は9枚とも「画面を表示できませんでした」で1枚も撮れていなかった。**原因は実装ではなく撮影側で、`/api/analytics/friends`・`reactions`・`routes`・`usage` の口がモックに無く、既定の器 `{items,total,page,limit}` が返って `overview.metrics` で投げていた。契約どおりの形を返すようにして7 Node が撮れた。`Fh2Qj`（ファネル）はまだ撮れない。"
+        },
+        {
+          "pr": 924,
+          "head": "bd8f0482",
+          "on": "2026-09-06",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "Fh2Qj",
+            "dfwD4"
+          ],
+          "note": "台帳 #233。PR headの同じ実装を1440px・1920pxで撮影し、22枚すべて横スクロール0。設計との比較は一致5枚、構造一致・データ未接続3枚。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。"
         }
       ]
     },
@@ -1924,8 +1958,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -1995,8 +2029,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 0,
-      "unjudged": 1,
+      "needsFix": 1,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2062,8 +2096,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 1,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 6,
       "capturedAt": [
         {
@@ -2117,11 +2151,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 5,
-      "needsFix": 2,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 8,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 502,
@@ -2242,8 +2276,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 4,
+      "needsFix": 7,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -2301,8 +2335,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 2,
-      "needsFix": 1,
-      "unjudged": 1,
+      "needsFix": 2,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2411,8 +2445,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 2,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -2534,34 +2568,6 @@
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
     },
     {
-      "feature": 9,
-      "node": "s9gAx",
-      "name": "9-1-A 基本設定",
-      "gap": "drop",
-      "gapNote": "設定はアカウントに1枚。名前もフォルダも優先順位も要らない"
-    },
-    {
-      "feature": 9,
-      "node": "W1wzCa",
-      "name": "9-1-B 流入条件",
-      "gap": "drop",
-      "gapNote": "実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記"
-    },
-    {
-      "feature": 9,
-      "node": "K0Dbr2",
-      "name": "9-1-C 初回案内",
-      "gap": "drop",
-      "gapNote": "最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**"
-    },
-    {
-      "feature": 9,
-      "node": "Q3qP1r",
-      "name": "9-1-I 削除確認",
-      "gap": "drop",
-      "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
-    },
-    {
       "feature": 13,
       "node": "ava2n",
       "name": "13-1-B フォームのデザイン設定",
@@ -2574,13 +2580,6 @@
       "name": "13-1-E フォームの削除確認",
       "gap": "api",
       "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
-    {
-      "feature": 16,
-      "node": "njLGA",
-      "name": "16-1-C 支払い",
-      "gap": "build",
-      "gapNote": "締め（あと何日で金額が固定されるか）・支払予定日・振込用CSV・振込先・人ごとの金額を出す画面。口は `/api/affiliate-payments` が既に在るので、画面を作れば足りる"
     },
     {
       "feature": 16,
