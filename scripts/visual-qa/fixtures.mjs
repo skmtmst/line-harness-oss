@@ -149,6 +149,11 @@ export const TAGS = (() => {
   if (vipRow) Object.assign(vipRow, { id: 'tag-vip', name: 'VIP' })
   const purchaseRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase' && row.id !== 'tag-0')
   if (purchaseRow) Object.assign(purchaseRow, { id: 'tag-purchase', name: '購入者' })
+  // 機能5の配信対象・送信後アクション。埋め草2件を差し替え、総数とフォルダ件数は保つ。
+  const scenarioTargetRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-member' && row.id !== 'tag-vip')
+  if (scenarioTargetRow) Object.assign(scenarioTargetRow, { id: 'tag-first-guide', name: '初回案内' })
+  const scenarioCompleteRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-member' && row.id !== 'tag-first-guide')
+  if (scenarioCompleteRow) Object.assign(scenarioCompleteRow, { id: 'tag-first-guide-complete', name: '初回案内済み' })
   /*
     整理候補の理由を付ける。**設計の絵に合わせて 未使用24・整理候補26。**
 
@@ -239,16 +244,93 @@ export const FRIEND_SCENARIOS = [
   deliveryMode: String(deliveryMode),
   allowConcurrent: true,
   displayOrder: index,
-  folderId: null,
+  folderId: [
+    'scenario-folder-onboarding',
+    'scenario-folder-purchase',
+    'scenario-folder-booking',
+    'scenario-folder-onboarding',
+    'scenario-folder-purchase',
+  ][index] ?? null,
   audienceCondition: null,
   onCompleteMode: String(onCompleteMode),
   onCompleteScenarioId: null,
   subscriberCount: Number(subscriberCount),
   completedCount: Number(completedCount),
-  stepCount: 3,
+  stepCount: index === 0 ? 4 : 3,
   createdAt: `${day}T00:00:00.000Z`,
   updatedAt: `${day}T00:00:00.000Z`,
 }))
+
+/** シナリオ一覧 `TC1b1` の3分類。中身の件数は FRIEND_SCENARIOS から数える。 */
+export const SCENARIO_FOLDERS = [
+  ['scenario-folder-onboarding', '初回案内', '#2563EB'],
+  ['scenario-folder-purchase', '購入後', '#10B981'],
+  ['scenario-folder-booking', '予約フォロー', '#F59E0B'],
+].map(([id, name, color], index) => ({
+  id: String(id),
+  kind: 'scenario',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  color: String(color),
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
+/**
+ * 友だち追加時配信の実行結果 `P2J0Te`。4行は直近の例、summary は直近28日。
+ * 実在する友だち・秘密値は含めず、設計に置かれた固定名だけを使う。
+ */
+export const FRIEND_ADD_EVENTS = {
+  items: [
+    {
+      id: 'friend-add-event-1', friendId: 'visual-friend-add-1',
+      displayName: 'Kenta Kawano', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: false,
+      attributionStatus: 'captured', refCode: 'store-qr',
+      entryRouteId: 'entry-route-store', entryRouteName: '店頭QR',
+      routingStatus: 'completed', occurredAt: '2026-09-07T01:32:00.000Z',
+      processedAt: '2026-09-07T01:32:01.000Z',
+    },
+    {
+      id: 'friend-add-event-2', friendId: 'visual-friend-add-2',
+      displayName: 'Masato S.', pictureUrl: null,
+      kind: 'returning', isUnblockedHint: true,
+      attributionStatus: 'unavailable', refCode: null,
+      entryRouteId: null, entryRouteName: null,
+      routingStatus: 'completed', occurredAt: '2026-09-07T01:28:00.000Z',
+      processedAt: '2026-09-07T01:28:01.000Z',
+    },
+    {
+      id: 'friend-add-event-3', friendId: 'visual-friend-add-3',
+      displayName: '菅野 亮', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: false,
+      attributionStatus: 'captured', refCode: 'referral-campaign',
+      entryRouteId: 'entry-route-referral', entryRouteName: '紹介キャンペーン',
+      routingStatus: 'pending', occurredAt: '2026-09-07T01:21:00.000Z',
+      processedAt: null,
+    },
+    {
+      id: 'friend-add-event-4', friendId: 'visual-friend-add-4',
+      displayName: '山田 太郎', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: null,
+      attributionStatus: 'unavailable', refCode: null,
+      entryRouteId: null, entryRouteName: null,
+      routingStatus: 'failed', occurredAt: '2026-09-07T01:14:00.000Z',
+      processedAt: '2026-09-07T01:14:02.000Z',
+    },
+  ],
+  summary: {
+    total: 214,
+    firstTime: 176,
+    returning: 38,
+    captured: 198,
+    unavailable: 16,
+    pending: 8,
+    failed: 3,
+  },
+  nextCursor: null,
+}
 
 /**
  * 友だち追加時配信を公開する2画面（`ec9vg` / `quhg6`）の固定データ。
@@ -1373,10 +1455,12 @@ export const TEMPLATES = (() => {
     for (let i = 0; i < count; i += 1) {
       rows.push({
         id: `template-${n}`,
-        name: `${label}のひな形 ${i + 1}`,
+        name: n === 0 ? '7日間フォロー完了のお知らせ' : `${label}のひな形 ${i + 1}`,
         category: 'text',
         messageType: 'text',
-        messageContent: `${label}のご連絡です。内容をご確認ください。`,
+        messageContent: n === 0
+          ? '7日間のご案内は以上です。ご不明な点はいつでもご返信ください。'
+          : `${label}のご連絡です。内容をご確認ください。`,
         folderId,
         monthlySendCount: sendCounts[n][0],
         totalSendCount: sendCounts[n][1],
@@ -1898,34 +1982,94 @@ export const IDENTITY_CANDIDATE_DETECTION = {
 }
 
 /**
- * シナリオの通。設計 `bV5Vs`（5-1-C シナリオ編集）の3通。
+ * シナリオの通。設計 `bV5Vs`（5-1-C シナリオ編集）の4通。
  *
  * **`steps` を配列で返さないと画面ごと落ちる**（`scenario.steps` を回す）。
  * 空の一覧の形で返していたあいだ、シナリオを開くたびに「もう一度試す」
  * だけの画面になっていた。
  */
 export const SCENARIO_STEPS = [
-  [1, 0, 'ご登録ありがとうございます。まずはこちらをご覧ください。'],
-  [2, 1440, '使い方のご案内です。よくある質問もまとめました。'],
-  [3, 4320, 'ご不明な点はありませんか。お気軽にご返信ください。'],
-].map(([stepOrder, delayMinutes, messageContent], index) => ({
-  id: `step-${index}`,
-  scenarioId: 'scenario-0',
-  stepOrder: Number(stepOrder),
-  delayMinutes: Number(delayMinutes),
-  offsetDays: null,
-  offsetMinutes: null,
-  deliveryTime: null,
-  templateId: null,
-  onReachTagId: null,
-  afterSend: 'continue',
-  messageType: 'text',
-  messageContent: String(messageContent),
-  targetCondition: null,
-  question: null,
-  isDraft: false,
-  createdAt: '2026-08-16T00:00:00.000Z',
-}))
+  {
+    id: 'step-0', scenarioId: 'scenario-0', stepOrder: 1, delayMinutes: 0,
+    offsetDays: 0, offsetMinutes: null, deliveryTime: '10:00', templateId: null,
+    onReachTagId: null, afterSend: 'continue', messageType: 'text',
+    messageContent: 'ご登録ありがとうございます。7日間で使い方をご案内します。',
+    targetCondition: null, question: null, isDraft: false,
+    createdAt: '2026-08-16T00:00:00.000Z',
+  },
+  {
+    id: 'step-1', scenarioId: 'scenario-0', stepOrder: 2, delayMinutes: 1440,
+    offsetDays: 1, offsetMinutes: null, deliveryTime: '20:00', templateId: null,
+    onReachTagId: null, afterSend: 'continue', messageType: 'image',
+    messageContent: '最初に確認してほしい3つのポイント',
+    targetCondition: {
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: 'tag-first-guide' }],
+      groups: [],
+    },
+    question: null, isDraft: false,
+    createdAt: '2026-08-16T00:00:00.000Z',
+  },
+  {
+    id: 'step-2', scenarioId: 'scenario-0', stepOrder: 3, delayMinutes: 4320,
+    offsetDays: 3, offsetMinutes: null, deliveryTime: '20:00', templateId: null,
+    onReachTagId: null, afterSend: 'pause', messageType: 'text',
+    messageContent: '使い方で迷っていることはありますか？',
+    targetCondition: {
+      operator: 'AND',
+      rules: [
+        { type: 'tag_exists', value: 'tag-first-guide' },
+        { type: 'registered_at', value: { from: '2026-08-01', to: '' } },
+      ],
+      groups: [],
+    },
+    question: {
+      text: '使い方で迷っていることはありますか？',
+      tapMode: 'single',
+      choices: [
+        { label: 'はい', behavior: 'none' },
+        { label: 'いいえ', behavior: 'none' },
+      ],
+    },
+    isDraft: false, createdAt: '2026-08-16T00:00:00.000Z',
+  },
+  {
+    id: 'step-3', scenarioId: 'scenario-0', stepOrder: 4, delayMinutes: 10080,
+    offsetDays: 7, offsetMinutes: null, deliveryTime: '20:00', templateId: 'template-0',
+    onReachTagId: null, afterSend: 'pause', messageType: 'text',
+    messageContent: '7日間フォロー完了のお知らせ',
+    targetCondition: null, question: null, isDraft: false,
+    createdAt: '2026-08-16T00:00:00.000Z',
+  },
+]
+
+/** `hz9ti` の設定済み3動作。現行 ScenarioAction の5種だけで完全な値を返す。 */
+export const SCENARIO_ACTIONS = [
+  {
+    id: 'scenario-action-1', scenarioId: 'scenario-0', hook: 'step_sent',
+    stepId: 'step-0', choiceIndex: null, sortOrder: 0, actionType: 'tag',
+    config: { op: 'add', tagIds: ['tag-first-guide-complete'] },
+    condition: null, repeatOnRefire: true, complete: true,
+  },
+  {
+    id: 'scenario-action-2', scenarioId: 'scenario-0', hook: 'step_sent',
+    stepId: 'step-0', choiceIndex: null, sortOrder: 1, actionType: 'support_mark',
+    config: { markId: 'mark-in-progress' },
+    condition: {
+      operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-first-guide-complete' }], groups: [],
+    },
+    repeatOnRefire: true, complete: true,
+  },
+  {
+    id: 'scenario-action-3', scenarioId: 'scenario-0', hook: 'step_sent',
+    stepId: 'step-0', choiceIndex: null, sortOrder: 2, actionType: 'scenario',
+    config: { op: 'start', scenarioId: 'scenario-1', restart: 'from_start', rememberPrevious: true },
+    condition: {
+      operator: 'AND', rules: [{ type: 'registered_at', value: { from: '2026-08-01', to: '' } }], groups: [],
+    },
+    repeatOnRefire: false, complete: true,
+  },
+]
 
 /**
  * シナリオの到達率。設計 `bV5Vs` の通ごとの数。
@@ -1940,8 +2084,8 @@ export const SCENARIO_STATS = {
   paused: 0,
   steps: SCENARIO_STEPS.map((step, index) => ({
     stepOrder: step.stepOrder,
-    reachedCount: [428, 381, 312][index] ?? 0,
-    reachedRate: [1, 0.89, 0.73][index] ?? 0,
+    reachedCount: [428, 412, 386, 351][index] ?? 0,
+    reachRate: [0.96, 0.92, 0.86, 0.78][index] ?? 0,
   })),
 }
 
