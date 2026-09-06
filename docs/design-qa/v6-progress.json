@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 7,
-  "match": 58,
-  "structureMatchDataPending": 44,
-  "needsFix": 155,
+  "match": 60,
+  "structureMatchDataPending": 49,
+  "needsFix": 148,
   "unjudged": 3,
-  "remaining": 210,
+  "remaining": 208,
   "features": [
     {
       "feature": 1,
@@ -651,11 +651,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 14,
+      "match": 2,
+      "structureMatchDataPending": 5,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 13,
       "capturedAt": [
         {
           "pr": 543,
@@ -814,6 +814,27 @@
             "TmHjF"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`TmHjF`（一覧の状態）が今回は撮れた。**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。"
+        },
+        {
+          "pr": 979,
+          "head": "3c6e4ec948",
+          "on": "2026-09-06",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "u6gHt",
+            "EGMb1",
+            "sqFXf",
+            "TmHjF"
+          ],
+          "note": "Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。"
         }
       ]
     },
@@ -1520,8 +1541,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [

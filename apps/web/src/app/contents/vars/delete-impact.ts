@@ -14,13 +14,11 @@ export const NOT_AVAILABLE = '—（未取得）'
 /**
  * 差し込みキーの見せ方。
  *
- * **一覧と同じ `{{var.キー}}` の形にする。** 一覧では
- * `{{var.shop_hours}}` と出しているので、確認だけ `{shop_hours}` に
- * すると、どちらを打てばよいのか分からない（設計は `{会社名}` と
- * 書いているが、実装が本文で使っている形はこちら）。
+ * V6 は内部の互換キー（`{{var.shop_hours}}`）を運用者へ見せず、
+ * 表示名を使った `{営業時間}` の形にそろえる。
  */
-export function placeholderText(varKey: string): string {
-  return `{{var.${varKey}}}`
+export function placeholderText(name: string): string {
+  return `{${name}}`
 }
 
 /**
@@ -30,7 +28,7 @@ export function placeholderText(varKey: string): string {
  */
 export function usageText(impact: CommonVarDeleteImpact): string {
   if (impact.total === 0) return 'どこにも差し込まれていません。'
-  return `${placeholderText(impact.variable.varKey)} は ${impact.total.toLocaleString('ja-JP')}か所で差し込まれています。`
+  return `${placeholderText(impact.variable.name)} は ${impact.total.toLocaleString('ja-JP')}か所で差し込まれています。`
 }
 
 /**
@@ -42,7 +40,7 @@ export function usageText(impact: CommonVarDeleteImpact): string {
 export function consequenceText(impact: CommonVarDeleteImpact): string | null {
   if (impact.total === 0) return null
   return `削除すると、その${impact.total.toLocaleString('ja-JP')}か所の `
-    + `${placeholderText(impact.variable.varKey)} は空欄のまま送られます。`
+    + `${placeholderText(impact.variable.name)} は空欄のまま送られます。`
 }
 
 /**
@@ -85,7 +83,7 @@ export function canDelete(input: {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
-  return input.typedKey.trim() === placeholderText(impact.variable.varKey)
+  return input.typedKey.trim() === placeholderText(impact.variable.name)
 }
 
 /** 押せない理由。**押せないボタンを黙って出さない。** */
@@ -99,8 +97,8 @@ export function blockedReason(input: {
     return `${impact.blockingTotal.toLocaleString('ja-JP')}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
-  if (input.typedKey.trim() !== placeholderText(impact.variable.varKey)) {
-    return `確認のため ${placeholderText(impact.variable.varKey)} を入力してください。`
+  if (input.typedKey.trim() !== placeholderText(impact.variable.name)) {
+    return `確認のため ${placeholderText(impact.variable.name)} を入力してください。`
   }
   return null
 }
