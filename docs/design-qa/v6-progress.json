@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 42,
-  "match": 103,
-  "structureMatchDataPending": 123,
-  "needsFix": 37,
+  "match": 108,
+  "structureMatchDataPending": 126,
+  "needsFix": 29,
   "unjudged": 5,
-  "remaining": 165,
+  "remaining": 160,
   "features": [
     {
       "feature": 1,
@@ -1128,12 +1128,28 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 8,
+      "match": 3,
+      "structureMatchDataPending": 7,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 7,
       "capturedAt": [
+        {
+          "pr": 1079,
+          "head": "f13421d869",
+          "on": "2026-09-07",
+          "screens": [
+            "uLQQc",
+            "s9gAx",
+            "W1wzCa",
+            "K0Dbr2",
+            "txMO9",
+            "U3SI5",
+            "P2J0Te",
+            "Q3qP1r"
+          ],
+          "note": "Issue #290。固定ポート3105/8792で対象8画面を1440/1920px撮影し、P2J0Teは正常・読込・空・失敗も比較。機能9全体48枚で横はみ出し0。固定データの正常4件と集計を表示し、現APIで取得不能な値は未取得と明記して要修正を0にした。"
+        },
         {
           "pr": 1010,
           "head": "3d6b7e7e8",
@@ -1200,12 +1216,31 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 12,
+      "match": 3,
+      "structureMatchDataPending": 10,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 12,
+      "remaining": 10,
       "capturedAt": [
+        {
+          "pr": 1081,
+          "head": "a55f719b9b",
+          "on": "2026-09-07",
+          "screens": [
+            "ZC13r",
+            "PV1Vh",
+            "d3rFGD",
+            "Ho8z4",
+            "Xjk8q",
+            "GB0NR",
+            "D6yO7e",
+            "TimXl",
+            "Q8sHa",
+            "yxyzQ",
+            "zCQXe"
+          ],
+          "note": "Issue #324。一覧API PR #1071 と固定データを列車92まで取り込んだ枝で、対象11画面を3102/8789・1440/1920pxで再撮影し、全画像で横はみ出し0。一覧2画面を一致へ更新し、残る9画面は未提供APIを判定注記へ個別に残した。"
+        },
         {
           "pr": 1070,
           "head": "a325ab485",

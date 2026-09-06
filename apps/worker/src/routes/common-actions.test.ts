@@ -88,4 +88,28 @@ describe('V6共通アクションAPI', () => {
       `SELECT line_account_id, status FROM common_actions`,
     ).get()).toEqual({ line_account_id: 'account-1', status: 'draft' });
   });
+
+  it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-2', '別統括', 'account-2')`,
+    ).run();
+    const response = await setupApp(testDb.db, admin).request(
+      '/api/common-actions/resources?lineAccountId=account-1&trigger=tag.added',
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      data: {
+        trigger: string;
+        actionTypes: Array<{ id: string; schema: { type: string } }>;
+        tags: Array<{ id: string }>;
+      };
+    };
+    expect(body.data.trigger).toBe('tag.added');
+    expect(body.data.actionTypes).toHaveLength(13);
+    expect(body.data.actionTypes.every((item) => item.schema.type === 'object')).toBe(true);
+    expect(body.data.tags).toEqual([{ id: 'tag-1', name: '会員' }]);
+  });
 });

@@ -9,7 +9,7 @@ import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError, api, webinarApi, type Webinar, type WebinarOverview } from '@/lib/api'
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarOverview } from '@/lib/api'
 import { overviewCards } from './overview-view'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
@@ -54,18 +54,7 @@ function scheduleSummary(w: Webinar): string {
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft'
 
-type WebinarListRow = Webinar & {
-  registrationCount?: number | null
-  viewerCount?: number | null
-  folderName?: string | null
-  publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
-  publicationStartsAt?: string | null
-  publicationEndsAt?: string | null
-}
-
 const WEBINAR_FOLDERS = ['商品説明', '導入事例', 'セミナー', 'アーカイブ'] as const
-
-type WebinarFolderRow = { id: string; name: string; count?: number | null }
 
 function measuredCount(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
@@ -84,7 +73,7 @@ function compactPublicationDate(value: string | null | undefined, withTime = fal
   return `${month}/${day} ${time}`
 }
 
-function publicationSummary(webinar: WebinarListRow): string {
+function publicationSummary(webinar: WebinarListItem): string {
   if (webinar.publicationState === 'always') return '常時公開'
   if (webinar.publicationState === 'scheduled') return compactPublicationDate(webinar.publicationStartsAt, true) ?? '—'
   if (webinar.publicationState === 'ended') return '公開終了'
@@ -97,7 +86,7 @@ function publicationSummary(webinar: WebinarListRow): string {
   return scheduleSummary(webinar)
 }
 
-function displayStatus(webinar: WebinarListRow): string {
+function displayStatus(webinar: WebinarListItem): string {
   if (webinar.publicationState === 'scheduled') return '公開予定'
   if (webinar.publicationState === 'ended') return '非公開'
   return STATUS_LABEL[webinar.status]
@@ -107,7 +96,8 @@ export default function WebinarsPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const requestGeneration = useRef(0)
   const overviewRequestGeneration = useRef(0)
-  const [items, setItems] = useState<Webinar[]>([])
+  const folderRequestGeneration = useRef(0)
+  const [items, setItems] = useState<WebinarListItem[]>([])
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [overview, setOverview] = useState<WebinarOverview | null>(null)
   const [loadedOverviewAccountId, setLoadedOverviewAccountId] = useState<string | null>(null)
@@ -119,12 +109,12 @@ export default function WebinarsPage() {
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
-  const [archiveTarget, setArchiveTarget] = useState<Webinar | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
-  const [folders, setFolders] = useState<WebinarFolderRow[]>([])
+  const [folders, setFolders] = useState<WebinarFolder[]>([])
 
-  const visibleItems = (loadedAccountId === selectedAccountId ? items : []) as WebinarListRow[]
+  const visibleItems = loadedAccountId === selectedAccountId ? items : []
   const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
   const visibleOverviewFailure = loadedOverviewAccountId === selectedAccountId ? overviewFailure : null
 
@@ -193,10 +183,19 @@ export default function WebinarsPage() {
   }, [refreshOverview])
 
   useEffect(() => {
-    api.folders.list('webinar')
-      .then((response) => setFolders(response.success ? response.data as WebinarFolderRow[] : []))
-      .catch(() => setFolders([]))
-  }, [])
+    const generation = ++folderRequestGeneration.current
+    setFolders([])
+    if (!selectedAccountId) return
+    webinarApi.folders(selectedAccountId)
+      .then((response) => {
+        if (folderRequestGeneration.current === generation) {
+          setFolders(response.success ? response.data : [])
+        }
+      })
+      .catch(() => {
+        if (folderRequestGeneration.current === generation) setFolders([])
+      })
+  }, [selectedAccountId])
 
   /** 数を出してよいのは、読めたときだけ。 */
   const hasListData = !accountLoading && !loading && loadFailure === null && Boolean(selectedAccountId)
@@ -286,7 +285,7 @@ export default function WebinarsPage() {
           <aside className="border-hairline bg-canvas rounded-card border p-4" aria-label="ウェビナーのフォルダ">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-ink text-sm font-bold">フォルダ</h2>
-              <span className="text-ink-faint text-xs">未接続</span>
+              <span className="text-ink-faint text-xs">{folders.length > 0 ? `${folders.length + 1}件` : '—'}</span>
             </div>
             <button type="button" className="bg-accent-soft text-accent mt-3 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-xs font-semibold">
               <span>すべて</span><span>{hasListData ? visibleItems.length : '—'}</span>
@@ -297,12 +296,11 @@ export default function WebinarsPage() {
                 return (
                 <li key={folder} className="text-ink-secondary flex items-center justify-between rounded-control px-3 py-2 text-xs">
                   <span className="flex min-w-0 items-center gap-2"><span className={`h-2 w-2 rounded-full ${['bg-blue-500', 'bg-amber-400', 'bg-violet-500', 'bg-indigo-500'][index]}`} /><span className="truncate">{folder}</span></span>
-                  <span className="text-ink-faint">{typeof measuredFolder?.count === 'number' ? measuredFolder.count : '—'}</span>
+                  <span className="text-ink-faint">{measuredFolder?.count ?? '—'}</span>
                 </li>
                 )
               })}
             </ul>
-            <p className="text-ink-faint mt-4 text-[11px] leading-relaxed">フォルダ名と件数は一覧APIへの接続後に表示します。</p>
           </aside>
 
           <section className="min-w-0">
@@ -372,15 +370,15 @@ export default function WebinarsPage() {
       >
         {archiveTarget ? (
           <div className="space-y-3" data-design-node="LKuAQ">
-            <section className="border-hairline rounded-control border p-3"><p className="text-ink-faint text-xs">アーカイブする対象</p><p className="text-ink mt-1 font-bold">{archiveTarget.title}</p><p className="text-ink-secondary mt-1 text-xs">申込者 {measuredCount((archiveTarget as WebinarListRow).registrationCount)}</p></section>
+            <section className="border-hairline rounded-control border p-3"><p className="text-ink-faint text-xs">アーカイブする対象</p><p className="text-ink mt-1 font-bold">{archiveTarget.title}</p><p className="text-ink-secondary mt-1 text-xs">申込者 {measuredCount(archiveTarget.registrationCount)}</p></section>
             <section className="border-hairline rounded-control border p-3"><p className="text-ink text-sm font-bold">アーカイブしたあと</p><dl className="divide-hairline mt-2 divide-y text-xs"><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">公開ページ</dt><dd className="text-ink text-right">公開URLが無効になります</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">分析結果</dt><dd className="text-ink text-right">視聴履歴とCTAの結果は消えません</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">復元</dt><dd className="text-ink text-right">あとから戻せます</dd></div></dl></section>
             <div className="grid gap-3 sm:grid-cols-2">
               <section className="border-hairline rounded-control border p-3">
                 <p className="text-ink text-sm font-bold">設定サマリー</p>
                 <dl className="divide-hairline mt-2 divide-y text-xs">
                   <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{STATUS_LABEL[archiveTarget.status]}</dd></div>
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">申込</dt><dd className="text-ink font-semibold">{measuredCount((archiveTarget as WebinarListRow).registrationCount)}</dd></div>
-                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">視聴</dt><dd className="text-ink font-semibold">{measuredCount((archiveTarget as WebinarListRow).viewerCount)}</dd></div>
+                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">申込</dt><dd className="text-ink font-semibold">{measuredCount(archiveTarget.registrationCount)}</dd></div>
+                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">視聴</dt><dd className="text-ink font-semibold">{measuredCount(archiveTarget.viewerCount)}</dd></div>
                 </dl>
               </section>
               <section className="bg-accent-soft rounded-control p-3">
