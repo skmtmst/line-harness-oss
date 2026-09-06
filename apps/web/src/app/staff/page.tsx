@@ -1,11 +1,13 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
+import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NotificationSwitch from '@/components/ui/notification-switch'
@@ -13,9 +15,9 @@ import { ApiError, api } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 import { isActiveAdministrator, staffActionPolicy } from './staff-actions'
 
-type AuditRow = { id: string; adminUserId: string | null; userName: string; action: string; screen: string | null; connectionSource: string | null; createdAt: string }
+type AuditRow = { id: string; adminUserId: string | null; userName: string; action: string; screen: string | null; connectionSource: string | null; result?: string; createdAt: string }
 type Channel = { email: boolean; line: boolean }
-const ROLE_LABEL: Record<string, string> = { owner: '管理者', admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
+const ROLE_LABEL: Record<string, string> = { owner: '管理者', admin: '管理者', staff: '運用', viewer: '見るだけ' }
 const NOTIFICATIONS = [
   ['operations', '運用状態のエラー', '異常を検知したとき'], ['emergency', '緊急停止・復旧', '停止または復旧したとき'],
   ['security', 'ログイン・権限変更', 'ログインや権限が変わったとき'], ['updates', 'システム更新', '更新が完了したとき'],
@@ -23,13 +25,24 @@ const NOTIFICATIONS = [
 const PERMISSIONS = [
   ['/', 'ダッシュボード'], ['/chats', '受信箱'], ['/friends', '友だち'], ['/tags', '友だち属性'], ['/scenarios', 'シナリオ配信'], ['/broadcasts', '一斉配信'], ['/reminders', 'リマインダ'], ['/auto-replies', '自動応答'], ['/templates', 'テンプレート'], ['/rich-menus', 'リッチメニュー'], ['/form-submissions', '回答フォーム'], ['/contents/vars', '共通情報'], ['/contents', '登録メディア一覧'], ['/analytics', '分析'], ['/automations', 'オートメーション'], ['/webhooks', '外部連携'], ['/booking/bookings', '予約管理'], ['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査'],
 ] as const
-const STAFF_TABS = [
-  { key: 'members', label: 'ログインユーザー' },
-  { key: 'audit', label: '入った記録' },
+const STAFF_TAB_KEYS = [
+  { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },
+  { key: 'audit', label: '入った記録' }, { key: 'roles', label: '権限のかたまり' },
 ] as const
+
+const LIST_SORT_OPTIONS = [
+  { value: 'recent', label: '最後に入った日が新しい順' },
+  { value: 'name', label: '名前順' },
+]
 
 function messageOf(error: unknown): string { return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました' }
 function Kpi({ label, value, unit, note }: { label: string; value: string; unit?: string; note: string }) { return <div className="flex h-[105px] flex-col gap-[5px] rounded-[18px] border border-hairline bg-canvas p-[15px]"><p className="text-xs font-semibold leading-[1.45] text-ink-faint">{label}</p><div className="flex h-[29px] items-start gap-1"><p className="text-xl font-bold leading-[1.45] tabular-nums text-ink">{value}</p>{unit && <span className="mt-3 text-xs font-medium leading-[1.45] text-ink-faint">{unit}</span>}</div><p className="text-[11px] leading-[1.45] text-ink-faint">{note}</p></div> }
+function auditActionLabel(action: string): string { return ({ login: 'ログイン', logout: 'ログアウト', fail: 'ログイン失敗', view_personal: '個人情報を表示', export: 'CSVを書き出し', settings_changed: '設定変更', broadcast_sent: '一斉配信', delete: '削除' } as Record<string, string>)[action] ?? '操作記録' }
+function formatStaffDate(value: string | undefined): string { if (!value) return 'まだ入っていません'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '日時を取得できませんでした' : date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+function permissionSummary(member: StaffMember): string { if (member.role === 'owner' || member.role === 'admin') return 'すべての画面'; if (member.permissionKeys.length === 0) return member.role === 'viewer' ? '閲覧できる画面は未設定' : '表示する機能は未設定'; const labels = member.permissionKeys.map((key) => PERMISSIONS.find(([path]) => path === key)?.[1] ?? '').filter(Boolean); return labels.length > 0 ? labels.join('・') : `${member.permissionKeys.length}機能` }
+function csvCell(value: string): string { const safe = /^[=+\-@]/.test(value) ? `'${value}` : value; return `"${safe.replaceAll('"', '""')}"` }
+function downloadAuditCsv(rows: AuditRow[]): void { const body = [['日時', 'ユーザー', '操作', '画面', '接続元'], ...rows.map((row) => [row.createdAt, row.userName, auditActionLabel(row.action), row.screen ?? '', row.connectionSource ?? ''])].map((line) => line.map(csvCell).join(',')).join('\r\n'); const url = URL.createObjectURL(new Blob([`\uFEFF${body}`], { type: 'text/csv;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'login-audit.csv'; anchor.click(); URL.revokeObjectURL(url) }
+function RowActionButton({ label, onClick }: { label: string; onClick: () => void }) { return <Button onClick={onClick}>{label}</Button> }
 function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>{children}</div></div> }
 
 function LoginHistoryNote({ count, loading, failed = false }: { count: number | null; loading: boolean; failed?: boolean }) {
@@ -109,22 +122,39 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 }
 
 function StaffPageHost() {
-  const tab = useMergedTab(STAFF_TABS, 'tab', 'members')
-  const [members, setMembers] = useState<StaffMember[]>([]), [accountNames, setAccountNames] = useState<Record<string, string>>({}), [me, setMe] = useState<StaffMember | null>(null), [audits, setAudits] = useState<AuditRow[]>([]), [query, setQuery] = useState(''), [roleFilter, setRoleFilter] = useState('all'), [statusFilter, setStatusFilter] = useState('all'), [loading, setLoading] = useState(true), [error, setError] = useState('')
+  const tab = useMergedTab(STAFF_TAB_KEYS, 'tab', 'members')
+  const [members, setMembers] = useState<StaffMember[]>([]), [accountNames, setAccountNames] = useState<Record<string, string>>({}), [me, setMe] = useState<StaffMember | null>(null), [audits, setAudits] = useState<AuditRow[]>([]), [query, setQuery] = useState(''), [roleFilter, setRoleFilter] = useState('all'), [sort, setSort] = useState('recent'), [loading, setLoading] = useState(true), [error, setError] = useState('')
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null)
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const administrator = me?.role === 'admin' || me?.role === 'owner'
-  const load = useCallback(async () => { setLoading(true); setError(''); try { const [staffResult, meResult, accountsResult] = await Promise.all([api.staff.list(), api.staff.me(), api.lineAccounts.list()]); if (staffResult.success) setMembers(staffResult.data); if (accountsResult.success) setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name]))); if (meResult.success) { setMe(meResult.data); if (meResult.data.role === 'admin' || meResult.data.role === 'owner') { const auditResult = await api.loginAudit.list({ limit: 200 }); if (auditResult.success) setAudits(auditResult.data) } } } catch (caught) { setError(messageOf(caught)) } finally { setLoading(false) } }, [])
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const [staffResult, meResult, accountsResult] = await Promise.all([api.staff.list(), api.staff.me(), api.lineAccounts.list()]); if (staffResult.success) setMembers(staffResult.data); if (accountsResult.success) setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name]))); if (meResult.success) { setMe(meResult.data); if (meResult.data.role === 'admin' || meResult.data.role === 'owner') { const auditResult = await api.loginAudit.list({ limit: 200 }); if (auditResult.success) setAudits(auditResult.data) } } } catch { setError('ログインユーザーを読み込めませんでした。時間をおいて、もう一度お試しください。') } finally { setLoading(false) } }, [])
   useEffect(() => { void load() }, [load])
-  const shown = useMemo(() => members.filter((member) => {
+  const activeMembers = members.filter((member) => member.isActive && member.inviteStatus === 'active')
+  const invitedMembers = members.filter((member) => member.inviteStatus !== 'active')
+  const latestAuditByUser = new Map<string, AuditRow>()
+  const latestLoginByUser = new Map<string, AuditRow>()
+  for (const audit of audits) {
+    if (!audit.adminUserId) continue
+    if (!latestAuditByUser.has(audit.adminUserId)) latestAuditByUser.set(audit.adminUserId, audit)
+    if (audit.action === 'login' && !latestLoginByUser.has(audit.adminUserId)) latestLoginByUser.set(audit.adminUserId, audit)
+  }
+  const roleBundleCount = new Set(activeMembers.map((member) => ROLE_LABEL[member.role])).size
+  const staffTabs = [
+    { key: 'members', label: `いまいる人 ${activeMembers.length}` },
+    { key: 'invited', label: `招待中 ${invitedMembers.length}` },
+    { key: 'audit', label: '入った記録' },
+    { key: 'roles', label: `権限のかたまり ${roleBundleCount}` },
+  ]
+  const tabMembers = tab === 'invited' ? invitedMembers : activeMembers
+  const shown = tabMembers.filter((member) => {
     const matchesQuery = `${member.name} ${member.email ?? ''}`.toLowerCase().includes(query.toLowerCase())
     const matchesRole = roleFilter === 'all' || (roleFilter === 'admin' ? member.role === 'admin' || member.role === 'owner' : member.role === roleFilter)
-    const matchesStatus = statusFilter === 'all' || (statusFilter === 'active' ? member.isActive : !member.isActive)
-    return matchesQuery && matchesRole && matchesStatus
-  }), [members, query, roleFilter, statusFilter])
+    return matchesQuery && matchesRole
+  }).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ja') : (latestLoginByUser.get(b.id)?.createdAt ?? '').localeCompare(latestLoginByUser.get(a.id)?.createdAt ?? ''))
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
-  const missing = members.filter((member) => member.isActive && !member.twoFactorEnabled).length, loginAudits = audits.filter((row) => row.action === 'login')
+  const missing = activeMembers.filter((member) => !member.twoFactorEnabled).length
+  const mfaEnabled = activeMembers.filter((member) => member.twoFactorEnabled).length
   const canEdit = (member: StaffMember) => Boolean(administrator || (me?.role === 'staff' && me.id === member.id))
   const openTwoFactor = (member: StaffMember) => { if (member.twoFactorEnabled) { setDisableError(''); setDisablingTarget(member) } else setSettingTwoFactor(member) }
   /**
@@ -133,13 +163,20 @@ function StaffPageHost() {
    * 処理中は受け付けない。失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
   const runDisableTwoFactor = async () => { if (!disablingTarget || disablingTwoFactor) return; setDisablingTwoFactor(true); setDisableError(''); try { const res = await api.staff.disableTwoFactor(disablingTarget.id); if (!res.success) throw new Error(res.error); setDisablingTarget(null); await load() } catch { setDisableError('二段階認証を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setDisablingTwoFactor(false) } }
-  return <div data-design-node="e3jz3"><div className="mb-4"><MergedTabs basePath="/staff" tabs={STAFF_TABS} active={tab} defaultKey="members" actions={administrator && tab === 'members' ? <Link href="/staff/new" className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent">ユーザーを追加</Link> : null} /></div>
+   const tabAction = administrator && tab === 'audit'
+     ? <Button onClick={() => downloadAuditCsv(audits)} disabled={audits.length === 0}>CSVで書き出す</Button>
+    : administrator && tab !== 'audit' ? <Link href="/staff/new" className="cursor-pointer rounded-control bg-accent-deep px-4 py-2 text-sm font-medium text-on-accent">人を追加する</Link> : null
+  return <div data-design-node="e3jz3"><div className="mb-4"><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     {tab === 'audit' ? <div data-design-node="jwVlo"><LoginAudit /></div> : <>
-    {missing > 0 && <div className="mb-4 flex items-center rounded-card bg-warning-bg px-4 py-3 text-sm"><p>🔑　二段階認証が未設定のユーザーが <b>{missing}人</b> います</p></div>}
-    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="管理スタッフ" value={`${members.length}`} unit="人" note={`管理者 ${members.filter((m) => m.role === 'admin' || m.role === 'owner').length}・その他 ${members.filter((m) => m.role !== 'admin' && m.role !== 'owner').length}`} /><Kpi label="二要素認証" value={`${members.filter((m) => m.twoFactorEnabled).length} / ${members.length}`} note={`未設定 ${missing}人`} /><Kpi label="この30日のログイン" value={`${loginAudits.length}`} unit="回" note={`失敗 ${audits.filter((row) => row.action === 'fail').length}`} /><Kpi label="最終ログイン" value={loginAudits[0]?.createdAt ? new Date(loginAudits[0].createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '—'} note={loginAudits[0]?.userName ?? '記録なし'} /></div>
-    {error && <p className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-    <div id="staff-list" className="min-h-[540px] rounded-card border border-hairline bg-canvas"><div className="flex flex-wrap gap-3 border-b border-hairline p-4"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・メールで検索" className="min-w-64 flex-1 rounded-control border border-hairline px-3 py-2 text-sm outline-none focus:border-accent" /><Select aria-label="役割で絞り込む" value={roleFilter} onChange={setRoleFilter} options={[{ value: 'all', label: 'すべての役割' }, { value: 'admin', label: '管理者' }, { value: 'staff', label: 'スタッフ' }, { value: 'viewer', label: '閲覧のみ' }]} /><Select aria-label="利用状態で絞り込む" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: 'すべての利用状態' }, { value: 'active', label: '有効' }, { value: 'inactive', label: '無効' }]} /></div>
-      <div><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">ユーザー</Th><Th className="w-1/8">役割</Th><Th className="w-1/5">担当範囲</Th><Th className="w-1/8">LINE連携</Th><Th className="w-1/8">二段階認証</Th><Th className="w-1/12">利用状態</Th><Th className="w-1/12" align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">読み込み中…</td></tr> : shown.length === 0 ? <tr><td colSpan={7} className="p-10 text-center text-ink-faint">条件に合うユーザーはいません。</td></tr> : shown.map((member) => <tr key={member.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={member.name}>{member.name}</p><p className="truncate text-xs text-ink-faint" title={member.email ?? ''}>{member.email ?? '—'}</p></td><td className="px-3 py-3"><span className="whitespace-nowrap rounded-pill bg-info-bg px-2 py-1 text-xs text-accent">{ROLE_LABEL[member.role]}</span></td><td className="truncate px-3 py-3 text-xs" title={member.accountScope !== 'accounts' ? '全店舗' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明な店舗').join('、')}>{member.accountScope !== 'accounts' ? '全店舗' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明な店舗').join('、')}</td><td className="px-3 py-3"><span className={`whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.lineLinked ? 'bg-accent-soft text-success' : 'bg-warning-bg text-warning'}`}>{member.lineLinked ? '連携済み' : '未連携'}</span></td><td className="px-3 py-3">{canEdit(member) ? <button onClick={() => openTwoFactor(member)} className={`cursor-pointer whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.twoFactorEnabled ? 'bg-accent-soft text-success' : 'bg-canvas-sunken text-warning hover:bg-warning-bg'}`}>{member.twoFactorEnabled ? '設定済み' : '未設定'}</button> : <span className="whitespace-nowrap rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">{member.twoFactorEnabled ? '設定済み' : '未設定'}</span>}</td><td className="px-3 py-3"><span className={`whitespace-nowrap rounded-pill px-2 py-1 text-xs ${member.isActive ? 'bg-accent-soft text-success' : 'bg-danger-bg text-danger'}`}>{member.isActive ? '有効' : '無効'}</span></td><td className="px-3 py-3 text-right">{canEdit(member) ? <button onClick={() => setEditing(member)} className="cursor-pointer whitespace-nowrap rounded-control border border-accent px-3 py-1.5 text-xs font-medium text-success hover:bg-accent-soft">範囲を編集</button> : <span className="text-xs text-ink-faint">不可</span>}</td></tr>)}</tbody></table></div><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">編集では、役割・見せる機能・LINE連携・通知設定・利用状態を変更できます。</p></div>
+    {missing > 0 && <div className="mb-4 flex items-center rounded-control bg-warning-bg px-4 py-3 text-sm"><p>🔑　二段階認証が未設定のユーザーが <b>{missing}人</b> います。高い権限の人から設定してください。</p></div>}
+    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={`${activeMembers.length}`} unit="人" note={`管理者 ${activeMembers.filter((member) => member.role === 'admin' || member.role === 'owner').length}・運用 ${activeMembers.filter((member) => member.role === 'staff').length}・見るだけ ${activeMembers.filter((member) => member.role === 'viewer').length}`} /><Kpi label="招待して返事がない" value={`${invitedMembers.length}`} unit="人" note={`期限切れ ${invitedMembers.filter((member) => member.inviteStatus === 'expired').length}人`} /><Kpi label="90日 入っていない" value="—" note="最終ログイン集計API待ち" /><Kpi label="2段階の確認" value={`${mfaEnabled} / ${activeMembers.length}`} unit="人" note="管理者は必ず入れてください" /></div>
+    <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</div>
+    {error && <div className="mb-4 flex items-center justify-between gap-4 rounded-control bg-danger-bg p-3 text-sm text-danger"><p>{error}</p><Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button></div>}
+    {tab === 'roles' && <p className="mb-4 rounded-control border border-hairline bg-canvas px-4 py-3 text-sm text-ink-secondary">権限のかたまりは、管理者・運用・見るだけの3種類です。個別の見せる機能は「中身を見る」から確認できます。</p>}
+    <div className="mb-3 flex flex-wrap items-center gap-3"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="人の名前・メールで検索" className="min-w-64 flex-1 rounded-control border border-hairline px-3 py-2 text-sm outline-none focus:border-accent" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
+    <div className="mb-3"><Tabs items={[{ label: 'すべて', count: tabMembers.length, current: roleFilter === 'all', onClick: () => setRoleFilter('all') }, { label: '管理者', count: tabMembers.filter((member) => member.role === 'admin' || member.role === 'owner').length, current: roleFilter === 'admin', onClick: () => setRoleFilter('admin') }, { label: '運用', count: tabMembers.filter((member) => member.role === 'staff').length, current: roleFilter === 'staff', onClick: () => setRoleFilter('staff') }, { label: '見るだけ', count: tabMembers.filter((member) => member.role === 'viewer').length, current: roleFilter === 'viewer', onClick: () => setRoleFilter('viewer') }]} /></div>
+     <div id="staff-list" className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">人</Th><Th>役わり</Th><Th className="w-1/5">見せる範囲</Th><Th>最後に入った</Th><Th>2段階の確認</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading ? <tr><td colSpan={6} className="p-10 text-center text-ink-faint">ログインユーザーを読み込んでいます…</td></tr> : shown.length === 0 ? <tr><td colSpan={6} className="p-10 text-center text-ink-faint">条件に合うログインユーザーはいません。条件を変えてお試しください。</td></tr> : shown.map((member) => { const latestLogin = latestLoginByUser.get(member.id), latestAudit = latestAuditByUser.get(member.id); const scope = permissionSummary(member); const twoFactorLabel = member.twoFactorEnabled ? '入れています' : member.inviteStatus === 'active' ? '入れていません' : '—'; return <tr key={member.id} className="hover:bg-canvas-sunken"><td className="min-w-0 px-3 py-3"><p className="truncate font-semibold" title={member.name}>{member.name}</p><p className="truncate text-xs text-ink-faint" title={member.email ?? ''}>{member.email ?? 'メール未登録'}</p></td><td className="px-3 py-3"><span className={`whitespace-nowrap font-semibold ${member.role === 'owner' || member.role === 'admin' ? 'text-success' : 'text-ink-secondary'}`}>{ROLE_LABEL[member.role]}</span></td><td className="px-3 py-3"><p className="truncate text-xs font-medium" title={scope}>{scope}</p><p className="mt-1 truncate text-xs text-ink-faint" title={member.accountScope !== 'accounts' ? 'すべてのLINEアカウント' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明なLINEアカウント').join('、')}>{member.accountScope !== 'accounts' ? 'すべてのLINEアカウント' : (member.scopedLineAccountIds ?? []).map((id) => accountNames[id] ?? '不明なLINEアカウント').join('、')}</p></td><td className="px-3 py-3"><p className="whitespace-nowrap text-ink-secondary">{formatStaffDate(latestLogin?.createdAt)}</p><p className="mt-1 truncate text-xs text-ink-faint" title={latestAudit ? auditActionLabel(latestAudit.action) : '操作記録なし'}>{latestAudit ? `最後の操作：${auditActionLabel(latestAudit.action)}` : '操作記録なし'}</p></td><td className="px-3 py-3">{canEdit(member) ? <Button onClick={() => openTwoFactor(member)}>{twoFactorLabel}</Button> : <span className="whitespace-nowrap text-xs text-ink-faint">{twoFactorLabel}</span>}</td><td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-1">{canEdit(member) ? <><RowActionButton label="中身を見る" onClick={() => setEditing(member)} /><RowActionButton label="この人を外す" onClick={() => setEditing(member)} /></> : <span className="text-xs text-ink-faint">操作できません</span>}</div></td></tr> })}</tbody></table><p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs text-ink-secondary">編集では、役割・見せる機能・LINE連携・通知設定・利用状態を変更できます。変更の履歴は「入った記録」で確認できます。</p></div>
+    {!loading && !error && <p className="mt-3 text-xs text-ink-faint">ログインユーザー {shown.length}人を表示</p>}
     {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}{settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}</>}
     {/* 設定し直せる操作なので赤にしない。赤は本当に戻せない操作のために空けておく。 */}
     <ConfirmDialog
