@@ -217,7 +217,7 @@ export default function SavedViewDialog({
             <label className="flex items-center justify-between gap-4">
               <span>
                 <span className="text-ink block text-xs font-medium">よく使うに追加</span>
-                <span className="text-ink-faint mt-0.5 block text-[11px]">保存した検索一覧の上部に表示します</span>
+                <span className="text-ink-faint text-micro mt-0.5 block">保存した検索一覧の上部に表示します</span>
               </span>
               <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
                 <input type="checkbox" checked={favorite} onChange={(event) => setFavorite(event.target.checked)} aria-label="よく使うに追加" className="peer sr-only" />
