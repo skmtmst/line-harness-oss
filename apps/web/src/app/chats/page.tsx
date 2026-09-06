@@ -24,7 +24,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star } from 'lucide-react'
+import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
 
 interface Chat {
   id: string
@@ -429,6 +429,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [savedViewName, setSavedViewName] = useState('')
   const [savedViewError, setSavedViewError] = useState('')
   const [savingView, setSavingView] = useState(false)
+  const [savedViewSuccess, setSavedViewSuccess] = useState(false)
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   /*
@@ -717,6 +718,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       }
       setSavedViewName('')
       await loadSavedViews()
+      setSaveDialogOpen(false)
+      setSavedViewsOpen(true)
+      setSavedViewSuccess(true)
       return { success: true }
     } catch {
       // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
@@ -1215,6 +1219,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     ?? null
   return (
     <div className="space-y-3">
+      {savedViewSuccess ? (
+        <div
+          role="status"
+          style={{ minWidth: 520 }}
+          className="bg-accent-soft text-accent-deep border-accent fixed top-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-control border px-4 py-3 text-sm font-bold shadow-float"
+        >
+          <CheckCircle2 aria-hidden="true" size={18} />
+          保存した検索を作成しました
+          <button
+            type="button"
+            onClick={() => setSavedViewSuccess(false)}
+            aria-label="保存完了のお知らせを閉じる"
+            className="hover:bg-accent/10 ml-auto rounded-control p-1"
+          >
+            <X aria-hidden="true" size={16} />
+          </button>
+        </div>
+      ) : null}
       {/* Error */}
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -1340,7 +1362,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 名前と「保存する条件」を並べて見せてから保存させる。
               */}
               <div className="border-hairline mt-3 border-t pt-3">
-                <Button variant="primary" type="button" onClick={() => setSaveDialogOpen(true)}>
+                <Button variant="primary" type="button" onClick={() => {
+                  setSavedViewSuccess(false)
+                  setSaveDialogOpen(true)
+                }}>
                   現在の条件を保存
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
