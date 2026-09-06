@@ -96,4 +96,8 @@ describe('V6 対応マークの自動変更ルール（GMvBd）の配線', () =>
     expect(PANEL).toContain('inExecutionOrder(res.data)')
     expect(PANEL).toContain('{MULTI_MATCH_NOTE}')
   })
+
+  it('きっかけと変更先を同じ行で確認できる', () => {
+    expect(PANEL).toContain('「{markName}」に変更')
+  })
 })

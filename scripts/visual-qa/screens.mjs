@@ -110,7 +110,7 @@ const AFFILIATE = { feature: 16, dir: 'affiliates-v6', mode: 'page' }
  */
 const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/mileage?tab=balances', mode: 'page' }
 
-/** 流入と計測。`/inflow-links?tab=` の3タブ（流入経路／サイトスクリプト／広告連携）。 */
+/** 流入と計測。`/inflow-links?tab=` の4タブ（流入経路／サイトスクリプト／広告連携／広告とのつなぎ）。 */
 const INFLOW = { feature: 18, dir: 'inflow-v6', mode: 'page' }
 
 /** コンバージョン。成果地点とレポートは `/conversions?tab=` の2タブ。 */
@@ -2657,9 +2657,9 @@ export const SCREENS = [
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
     dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 色の並びと読み上げを設計・要件へ寄せて撮り直した（board#141）。** ルート `/tags/folders/new`。1440・1920とも横スクロール0。 **直したところ**：(1) 色を**緑始まり**にした（`#06C755` が先頭）。V6 の基調色は `--color-accent`（#06c755）で、設計 `byqIW` も緑始まり。**青始まりだと、既定で選ばれる色が基調色から外れる。** 一覧での表示の丸も緑になった。(2) **色に名前を付けた**（緑・青・水色・紫・ピンク・赤・黄・グレー）。前は読み上げが「色 #3B82F6」で、**色が見えない人には16進数しか届かなかった**（要件 04 §13「すべての色選択に名前またはラベルを付ける」）。選択中は枠と✓の両方で示し、色だけに頼らない（同 §13「色だけで区別しない」）。 **P1 まだ窓になっていない。** 要件 04 §4 のルート表は「タグフォルダ｜**タグ一覧内のオーバーレイ**」だが、実装は `/tags/folders/new` の別ページ。設計の窓は追加と編集で同じものを使い、「フォルダを削除」も並ぶ。いまは追加と編集が1つになっていない。 **P2 実装だけに「作成する場所（タグ／友だち情報欄）」がある。** 出どころを調べたところ、要件ではなく **V2 の `87c37b840`「友だち詳細の上に情報欄のタブを出す」** で入ったもので、`friend_fields.folder_id` として実在し、友だち詳細のタブに使われている。**外すと動いているものが壊れる**ので、要件 §7 に足すかを board#141 で人へ返した。',
+    verdictNote: '**2026-09-06 board#218 で一覧内オーバーレイへ変更した。** ルート `/tags/folders/new`。1440・1920とも横スクロール0。タグ一覧を背景に残し、追加・編集を同じ部品で扱い、編集時は「フォルダを削除」を左端へ出した。色は8色すべてに日本語名と選択中の✓があり、色だけで区別しない。**判定は needs_fix のまま。** Pencil取得元に `byqIW.html` が無く、同じ1920pxの設計画像を生成できないため、厳密な画像比較を完了できない。また、新規時の「作成する場所（タグ／友だち情報欄）」は実在する `friend_fields.folder_id` の操作で、正本要件への追記判断が残る。設計画像が用意され、要件でこの操作の扱いが決まった後に再判定する。',
     verdictSource: 'friend-attributes-v6/byqIW.txt',
-    verdictHead: '807937c87',
+    verdictHead: '2ee148462',
   },
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
@@ -2704,9 +2704,9 @@ export const SCREENS = [
       },
     ],
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 自動変更ルールを同じ面に載せて撮った（board#34）。前は6状態とも撮れていなかった。** ルート `/tags/marks/edit?id=mark-hold`。通常・読込中・0件・取得失敗・権限不足・版競合の**7枚すべて**を1440・1920で撮った（14枚、はみ出し0）。 **設計 `GMvBd` は「基本情報」と同じ面に「自動変更ルール」を置く。** 別画面にすると「このマークがいつ付くのか」を見るのに行き来する。実装もその並びにした。 出ている中身：「受信・返信・担当割当・期限超過などをきっかけに、「保留」へ自動で変えられます。」「同時にいくつも当てはまったときは、上から順に見て最初に合った1本だけが動きます。」＋実行順の番号つきで2本（担当者が決まったとき・優先順位100・手動変更のあと1時間／返信の期限を過ぎたとき・優先順位50・**保護しない**）。**0は「保護しない」と書き、未取得の `—` と別にしている。** **撮れなかった原因はモックの欠けだった**（board#105）。対応マーク3件（「保留」を含む）と自動変更ルール2件を固定データに足して撮れるようにした。**止めているルールを1件混ぜている**——全部動いていると「動いています／止めています」の描き分けを一度も確かめられない。 **P1 API がまだ本流に無い**（skmtmst/line-harness-oss#758）。**404 を「取得失敗」に混ぜず「まだ接続されていません」と本文で断り、追加の口も押せなくした**（§5-5）。#758 が入るまで一致にしない。 **P2 設計との残る差**：設計はルール行に「担当者を割り当てたとき」「このマークに変更」と**変更先のマーク**まで書くが、実装はきっかけと優先順位まで。',
+    verdictNote: '**2026-09-06 board#218 で設計の3列構造へ変更した。** ルート `/tags/marks/edit?id=mark-hold`。基本情報・自動変更ルール・使用先を横一列にし、ルール行へ「きっかけ・変更先マーク・優先順位・手動変更後の保護時間」を表示した。旧判定のAPI未接続は #758 の本流取り込みで解消済み。通常・読込中・0件・取得失敗・権限不足・版競合の7状態を1440・1920で撮影し、14枚すべて横スクロール0。**判定は needs_fix のまま。** 設計画像は追加状態、撮影ルートは保存済みルールを確認する編集状態で、同じ状態同士の厳密比較になっていない。さらに設計の使用先文言（友だち一覧・ダッシュボード等）と正本要件の実機能（シナリオ・自動応答等）が一致していないため、Pencil側に編集状態を追加し文言を正本要件へ揃えた後に再判定する。',
     verdictSource: 'friend-attributes-v6/GMvBd.txt',
-    verdictHead: '30448b92',
+    verdictHead: '2ee148462',
   },
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
@@ -2830,6 +2830,77 @@ export const SCREENS = [
     verdictSource: 'settings-v6/f9oUm.txt', verdictHead: '4c5708ace',
   },
 ]
+
+/*
+ * board #231 の機能18再監査。
+ *
+ * 画面実装は更新したが、macOS のブラウザ起動制限と利用者側のローカル画面
+ * アクセス拒否により、同じ幅の実装画像を撮れなかった。古い画像を根拠に
+ * 合格へ上げないため、9画面とも未判定に戻す。未接続のAPIも画面ごとに分ける。
+ */
+const FEATURE_18_AUDIT = {
+  Q4bkTg: {
+    route: '/inflow-links?tab=links',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 4タブ、フォルダ、実際に動く4種の絞り込み、並び順、CSV、ページ送りを実装した。取得できない集計は0にしない。macOSのブラウザ起動制限に加え、アプリ内ブラウザのローカル画面アクセスが利用者側で拒否されたため、1440px・1920pxの実装画像は未取得。設計との差は画像で再確認する必要がある。',
+    verdictSource: 'inflow-v6/Q4bkTg.txt + 実装コード（画像未確認）',
+  },
+  IhSBB: {
+    route: '/inflow-links?tab=script',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 貼るコード、受信確認、できること、WordPress・Shopify・制作会社向けの貼り方、届いたページの集計を実装し、押せない「準備中」操作を外した。設計のドメイン別許可・停止・不明ドメイン警告はドメイン管理APIが未接続のため表示できず、画面内に接続条件を明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/IhSBB.txt + 実装コード（画像未確認）',
+  },
+  v0HaI: {
+    route: '/inflow-links?tab=ads',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で広告実績を独立画面へ分けたが、画像未確認。** 接続済み媒体は既存APIから表示し、広告費・友だち単価・成果単価は広告実績の取込APIが無いため0円を作らず `—` と接続条件を表示する。媒体・キャンペーン・広告グループ別の実績は同API接続後の課題。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/v0HaI.txt + 実装コード（画像未確認）',
+  },
+  TEVk8: {
+    route: '/inflow-links/new',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で作成画面を更新したが、画像未確認。** V6作成画面の寸法、流入元名・REF、友だち追加時の動き、追加先、4段階の流れ、注意3点、発行後に詳細へ進む動線を実装した。短いURLとQR画像は発行APIが未対応のため作り物を出さず、接続後に詳細へ出ることを明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/TEVk8.txt + 実装コード（画像未確認）',
+  },
+  JupxW: {
+    route: '/inflow-links/detail?ref=summer-ig',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で詳細画面を更新したが、画像未確認。** 既存の流入別友だちAPIを接続し、友だち名・来た日時・友だち詳細への導線を追加した。設計にある最初に見たページ、友だちごとの状態・成果・マイルは現行APIが返さないため表示していない。押せないQR保存操作は外した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/JupxW.txt + 実装コード（画像未確認）',
+  },
+  UIaM7: {
+    route: '/inflow-links/detail?ref=summer-ig',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231でも画像未確認。** 対象名、消える設定、残る過去記録、取り消せないこと、失敗時の再試行案内は既存の画面内確認窓で維持した。設計が求める使用先の一覧・別リンクへの差し替え・アーカイブは影響確認APIが無いため未実装。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/UIaM7.txt + 実装コード（画像未確認）',
+  },
+  BMmxU: {
+    route: '/inflow-links?tab=links',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で状態の契約を維持したが、画像未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、帯の未取得値を0にしないことは契約テストで確認した。normal/loading/empty/errorの1440px・1920px画像は今回取得できていないため、見た目は未判定。',
+    verdictSource: 'inflow-v6/BMmxU.txt + 契約テスト（画像未確認）',
+  },
+  BuVDB: {
+    route: '/inflow-links?tab=connections',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で「広告とのつなぎ」を広告実績から分離したが、画像未確認。** Meta・Google・X・TikTokのクリック目印、接続状態、成果を返す仕組み、個人情報を送らない注意を表示する。接続設定と成果名の対応付けはAPI未接続のため、操作や架空の行を出さず接続条件を明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/BuVDB.txt + 実装コード（画像未確認）',
+  },
+  Im2b1: {
+    route: '/inflow-links?tab=connections&view=history',
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #231で送信履歴を独立表示したが、画像未確認。** 送れた・待っている・断られた件数、検索、状態絞り込み、CSV、履歴表を既存ログAPIから表示する。試行回数・次回試行日時・まとめて再試行は再試行APIが無いため操作を作らず、接続条件を明記した。1440px・1920pxの実装画像は未取得。',
+    verdictSource: 'inflow-v6/Im2b1.txt + 実装コード（画像未確認）',
+  },
+}
+
+for (const screen of SCREENS) {
+  if (screen.feature === 18 && FEATURE_18_AUDIT[screen.node]) {
+    Object.assign(screen, FEATURE_18_AUDIT[screen.node])
+    delete screen.verdictHead
+  }
+}
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
 export const DESIGN_SIZE = {
