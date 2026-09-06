@@ -1,4 +1,4 @@
-# 27-1-E 代理予約・登録完了
+# 27-1-F 代理予約・予約枠の重なりと入力エラー-recovered
 # /booking/bookings/new
 
 画
