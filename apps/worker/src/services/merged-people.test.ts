@@ -3,7 +3,9 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import {
   getMergedPerson,
+  listMergedPeople,
   mergedPersonAccountIds,
+  unlinkMergedPersonFriend,
   updateMergedPerson,
   updateMergedPersonDeliveryPriorities,
 } from './merged-people.js';
@@ -200,6 +202,46 @@ describe('merged person detail contract', () => {
     expect(cleared.deliveryPriorities).toEqual([]);
     await expect(updateMergedPersonDeliveryPriorities(db, actor, 'user-a', {
       expectedRevision: 2, priorities: [],
+    })).rejects.toMatchObject({ code: 'STALE_PERSON', status: 409 });
+  });
+
+  it('lists only people whose every linked account is visible', async () => {
+    const { db } = seed();
+    const hidden = await listMergedPeople(
+      db, DEFAULT_TENANT_ID, ['account-a'], 20, 0,
+    );
+    expect(hidden).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
+
+    const visible = await listMergedPeople(
+      db, DEFAULT_TENANT_ID, ['account-a', 'account-b'], 20, 0,
+    );
+    expect(visible.total).toBe(1);
+    expect(visible.items[0]).toMatchObject({
+      id: 'user-a', linkedFriendCount: 2,
+      lineAccounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }],
+    });
+  });
+
+  it('unlinks one friend without deleting the friend or history and rejects stale revisions', async () => {
+    const { db, raw } = seed();
+    const unlinked = await unlinkMergedPersonFriend(db, actor, 'user-a', 'friend-a', {
+      expectedRevision: 1,
+      reason: '本人から別人だと確認しました',
+    });
+    expect(unlinked).toMatchObject({ personId: 'user-a', friendId: 'friend-a', revision: 2 });
+    expect(raw.prepare("SELECT user_id FROM friends WHERE id = 'friend-a'").get())
+      .toEqual({ user_id: null });
+    expect(raw.prepare("SELECT COUNT(*) AS count FROM friends WHERE id = 'friend-a'").get())
+      .toEqual({ count: 1 });
+    expect(raw.prepare(
+      "SELECT COUNT(*) AS count FROM identity_events WHERE event_type = 'unlink'",
+    ).get()).toEqual({ count: 1 });
+    expect(raw.prepare(
+      "SELECT COUNT(*) AS count FROM friend_identity_links WHERE friend_id = 'friend-a' AND unlinked_at IS NOT NULL",
+    ).get()).toEqual({ count: 1 });
+    await expect(unlinkMergedPersonFriend(db, actor, 'user-a', 'friend-b', {
+      expectedRevision: 1,
+      reason: '古い画面からの解除です',
     })).rejects.toMatchObject({ code: 'STALE_PERSON', status: 409 });
   });
 });

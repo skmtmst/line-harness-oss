@@ -71,7 +71,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.countChoiceUsage.mockResolvedValue(new Map());
   mocks.countFormSubmissionsByFriend.mockResolvedValue(0);
+  mocks.enrollFriendInReminder.mockResolvedValue(undefined);
+  mocks.enrollFriendInScenario.mockResolvedValue(undefined);
   mocks.getFriendFieldById.mockResolvedValue({ id: 'ff-1', ec_is_master: 0 });
+  mocks.setFriendFieldValue.mockResolvedValue(undefined);
 });
 
 describe('受け付けてよいかの判定', () => {
@@ -416,9 +419,32 @@ describe('回答を配る', () => {
         friendId: 'f1',
         answers: { pet: ['犬', '猫'], full_name: '山田' },
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({
+      destinationWrites: { attempted: 1, succeeded: 1, failed: 0 },
+    });
 
     expect(mocks.setFriendFieldValue).toHaveBeenCalled();
+  });
+
+  test('友だち情報欄への書き込み失敗を回答単位で数える', async () => {
+    mocks.setFriendFieldValue.mockRejectedValueOnce(new Error('write failed'));
+    const layout = layoutWith([
+      input({
+        name: 'full_name',
+        label: 'お名前',
+        destinations: { friendFieldIds: ['ff-1'] },
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    await expect(applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { full_name: '山田' },
+    })).resolves.toEqual({
+      destinationWrites: { attempted: 1, succeeded: 0, failed: 1 },
+    });
   });
 
   test('テキストではないテンプレートは送らない', async () => {

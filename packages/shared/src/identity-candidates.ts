@@ -118,6 +118,12 @@ export interface DecideIdentityCandidateRequest {
   expectedVersion: number;
   decision: IdentityCandidateDecision;
   reason: string;
+  /** 友だち同士を結び付けるとき、どの値を採用したかも同じ監査単位で保存する。 */
+  profileSelections?: Array<{
+    fieldKey: string;
+    sourceFriendId: string;
+    updateMode: "auto" | "fixed";
+  }>;
   /** EC照合だけで使用する。指定が無ければ過去イベントへ副作用を起こさない。 */
   reprocess?: {
     mode: IdentityReprocessMode;

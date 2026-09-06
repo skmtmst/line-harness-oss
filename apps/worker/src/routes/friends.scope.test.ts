@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   getFriendById: vi.fn(),
   getFriendTagsByFriendIds: vi.fn(),
   getSavedSearchById: vi.fn(),
+  getSavedSearches: vi.fn(),
+  createSavedSearch: vi.fn(),
+  countSavedSearches: vi.fn(),
+  getSavedSearchMatchPreview: vi.fn(),
   recordSavedSearchUsage: vi.fn(),
   pushMessage: vi.fn(),
 }));
@@ -20,7 +24,13 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   getFriendById: mocks.getFriendById,
   getFriendTagsByFriendIds: mocks.getFriendTagsByFriendIds,
   getSavedSearchById: mocks.getSavedSearchById,
+  getSavedSearches: mocks.getSavedSearches,
+  createSavedSearch: mocks.createSavedSearch,
+  countSavedSearches: mocks.countSavedSearches,
   recordSavedSearchUsage: mocks.recordSavedSearchUsage,
+}));
+vi.mock('../services/saved-search-insights.js', () => ({
+  getSavedSearchMatchPreview: mocks.getSavedSearchMatchPreview,
 }));
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class { pushMessage = mocks.pushMessage; },
@@ -33,6 +43,7 @@ function createApp(
   friendRows: Array<Record<string, unknown>> = [],
   firstForSql?: (sql: string) => Record<string, unknown> | null | undefined,
   role: 'owner' | 'admin' | 'staff' = 'owner',
+  allForSql?: (sql: string) => Array<Record<string, unknown>> | undefined,
 ) {
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
@@ -44,9 +55,15 @@ function createApp(
           prepared.push(entry);
           const statement = {
             bind(...binds: unknown[]) { entry.binds = binds; return statement; },
-            first: vi.fn(async () => firstForSql?.(sql) ?? ({ count: 0, total: 0, active: 0, blocked_by_them: 0, hidden_by_us: 0, unanswered: 0, resolved: 0 })),
+            first: vi.fn(async () => {
+              const custom = firstForSql?.(sql);
+              if (custom !== undefined) return custom;
+              if (sql.includes('SELECT id FROM saved_searches')) return null;
+              return { count: 0, total: 0, active: 0, blocked_by_them: 0, hidden_by_us: 0, unanswered: 0, resolved: 0 };
+            }),
             all: vi.fn(async () => ({
-              results: sql.includes('FROM friends f') && sql.includes('LIMIT ? OFFSET ?') ? friendRows : [],
+              results: allForSql?.(sql)
+                ?? (sql.includes('FROM friends f') && sql.includes('LIMIT ? OFFSET ?') ? friendRows : []),
             })),
             run: vi.fn(async () => ({})),
           };
@@ -71,6 +88,17 @@ beforeEach(() => {
   mocks.getScope.mockResolvedValue({ allowedAccountIds: ['own'], canSeeUnassigned: false, ids: ['own'], accounts: [] });
   mocks.getFriendById.mockResolvedValue({ id: 'friend', line_account_id: 'other', metadata: '{}', line_user_id: 'U-test' });
   mocks.getSavedSearchById.mockResolvedValue(null);
+  mocks.getSavedSearches.mockResolvedValue([]);
+  mocks.countSavedSearches.mockResolvedValue(0);
+  mocks.createSavedSearch.mockResolvedValue({
+    id: 'saved-1', name: '要確認', scope: 'friends', condition_format: 'search_v1',
+    conditions_json: JSON.stringify({ all: [{ kind: 'name', op: 'contains', value: '田中' }] }),
+    created_by: 'staff', line_account_id: 'own', is_shared: 0, display_order: 0,
+    created_at: '2026-09-07', updated_at: '2026-09-07', revision: 1,
+  });
+  mocks.getSavedSearchMatchPreview.mockResolvedValue({
+    total: 1, byChannel: { line: 1, mail: 0 }, calculatedAt: '2026-09-07', error: null,
+  });
   mocks.getFriendTagsByFriendIds.mockResolvedValue(new Map());
   mocks.canAccess.mockResolvedValue(false);
 });
@@ -157,6 +185,85 @@ describe('A-8 friends tenant scope', () => {
     expect(mocks.getFriendTagsByFriendIds).not.toHaveBeenCalled();
     expect(prepared.filter(({ sql }) => sql.includes('friend_tags'))).toHaveLength(0);
     expect(prepared.length).toBeLessThan(10);
+  });
+
+  test('direct conditions compile AND and OR before count and pagination', async () => {
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const conditions = encodeURIComponent(JSON.stringify({
+      all: [{ kind: 'memo', op: 'contains', value: '折返し' }],
+      any: [
+        { kind: 'event_booking', op: 'exists', value: 'event-a' },
+        { kind: 'reminder', op: 'exists', value: 'reminder-a' },
+      ],
+    }));
+    const response = await createApp(prepared).request(
+      `/api/friends?includeTags=false&conditions=${conditions}`,
+    );
+    expect(response.status).toBe(200);
+    const sql = prepared.map((entry) => entry.sql).join('\n');
+    expect(sql).toContain('f.private_memo LIKE ?');
+    expect(sql).toContain('event_bookings');
+    expect(sql).toContain('friend_reminders');
+    expect(sql).toContain(' OR ');
+  });
+
+  test('saved views cover empty, normal, forbidden, and failed states', async () => {
+    const empty = await createApp([]).request('/api/friends/saved-views?lineAccountId=own');
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({ success: true, data: { items: [], total: 0 } });
+
+    const created = await createApp([]).request('/api/friends/saved-views?lineAccountId=own', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: '要確認',
+        conditions: { all: [{ kind: 'name', op: 'contains', value: '田中' }] },
+      }),
+    });
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({
+      success: true, data: { id: 'saved-1', match: { total: 1 } },
+    });
+
+    const forbidden = await createApp([]).request(
+      '/api/friends/saved-views?lineAccountId=other',
+    );
+    expect(forbidden.status).toBe(404);
+
+    mocks.getSavedSearches.mockRejectedValueOnce(new Error('D1 unavailable'));
+    const failed = await createApp([]).request('/api/friends/saved-views?lineAccountId=own');
+    expect(failed.status).toBe(500);
+  });
+
+  test('timeline returns account columns, empty cursors, authorization, and failures', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const normal = await createApp([], [], undefined, 'owner', (sql) =>
+      sql.includes('FROM (') ? [{
+        id: 'message-1', event_type: 'message_received', summary: 'メッセージを受信しました',
+        source_kind: 'message', source_id: 'message-1', occurred_at: '2026-09-07T01:00:00Z',
+        line_account_id: 'own', line_account_name: '本店',
+      }] : undefined)
+      .request('/api/friends/friend/timeline');
+    expect(normal.status).toBe(200);
+    expect(await normal.json()).toMatchObject({
+      success: true,
+      data: { items: [{ lineAccount: { id: 'own', name: '本店' } }], nextCursor: null },
+    });
+
+    const empty = await createApp([]).request('/api/friends/friend/timeline');
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toMatchObject({ data: { items: [], nextCursor: null } });
+
+    mocks.canAccess.mockResolvedValue(false);
+    const forbidden = await createApp([]).request('/api/friends/friend/timeline');
+    expect(forbidden.status).toBe(404);
+
+    mocks.canAccess.mockResolvedValue(true);
+    const failed = await createApp([], [], undefined, 'owner', (sql) => {
+      if (sql.includes('FROM (')) throw new Error('D1 unavailable');
+      return undefined;
+    }).request('/api/friends/friend/timeline');
+    expect(failed.status).toBe(500);
   });
 
   test('200人のタグを1回の一括問い合わせで取得する', async () => {
