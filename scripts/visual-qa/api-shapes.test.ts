@@ -17,6 +17,8 @@ import { MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR } from '
 import { DUPLICATE_STATS, USERS_GROUPED } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL } from './fixtures.mjs';
+// @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
+import { CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS } from './fixtures.mjs';
 
 describe('画面確認モックの口の形', () => {
   const paths: Set<string> = readArrayGetPaths();
@@ -76,6 +78,33 @@ describe('オートメーションの画面確認データ', () => {
     expect(COMMON_ACTION_DETAIL.versions).toHaveLength(4);
     expect(COMMON_ACTION_DETAIL.bindings).toHaveLength(5);
     expect(COMMON_ACTION_DETAIL.bindings.filter((item: { hasNewerVersion: boolean }) => item.hasNewerVersion)).toHaveLength(1);
+  });
+});
+
+describe('成果地点の画面確認データ', () => {
+  it('一覧と現期間・前期間の集計が同じ成果地点を使う', () => {
+    const pointIds = CONVERSION_POINTS.map((point: { id: string }) => point.id);
+    expect(CONVERSION_REPORT_CURRENT.map((row: { conversionPointId: string }) => row.conversionPointId)).toEqual(pointIds);
+    expect(CONVERSION_REPORT_PREVIOUS.map((row: { conversionPointId: string }) => row.conversionPointId)).toEqual(pointIds);
+  });
+
+  it('設計比較に使う件数と金額を固定する', () => {
+    const total = (rows: Array<{ totalCount: number; totalValue: number }>) => rows.reduce(
+      (sum, row) => ({ count: sum.count + row.totalCount, value: sum.value + row.totalValue }),
+      { count: 0, value: 0 },
+    );
+    expect(total(CONVERSION_REPORT_CURRENT)).toEqual({ count: 486, value: 1284000 });
+    expect(total(CONVERSION_REPORT_PREVIOUS)).toEqual({ count: 412, value: 1092000 });
+  });
+
+  it('新規作成の購入欄に、注文確定の既存実績を表示できる', () => {
+    const purchase = CONVERSION_POINTS.find((point: { eventType: string }) => (
+      point.eventType === 'ec_order_confirmed'
+    ));
+    const report = CONVERSION_REPORT_CURRENT.find((row: { conversionPointId: string }) => (
+      row.conversionPointId === purchase?.id
+    ));
+    expect(report).toMatchObject({ totalCount: 386, totalValue: 612400 });
   });
 });
 
