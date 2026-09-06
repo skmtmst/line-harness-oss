@@ -698,7 +698,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 配信名・フォルダ・社内メモ、配信方法3択、実APIから読む最近の配信、設定要約とLINEプレビューを正本配置へ追加。社内メモと途中下書きを保存するAPI契約がないため、構造一致・データ未接続。設計画像なし（`zZ9fA.txt` と照合）。',
     verdictSource: 'broadcasts-v6/zZ9fA.txt + broadcasts-v6/zZ9fA-{1440,1920}.png',
-    verdictHead: '521374645', route: NEW_BC,
+    verdictHead: '4a69f0e4e', route: NEW_BC,
     steps: [
       { fill: 'input[placeholder="例：8月キャンペーンのお知らせ"]', selector: true, text: '8月キャンペーンのお知らせ' },
       { fill: '社内メモ', text: '8月の売上目標に向けた告知。反応が薄ければ 8/28 に再送する。' },
@@ -725,7 +725,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 9種の送信形式、差し込み、文字数、ボタン・URL・PDFの設定面、メッセージ追加、配信後アクション、LINEプレビューを正本配置へ追加。現在の配信保存APIはボタンと配信後アクションを受け取らないため、誤って保存できる表示にはせず構造一致・データ未接続。設計画像なし（`XQfMD.txt` と照合）。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
-    verdictHead: '521374645', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message&templateId=template-11`,
 
   },
   {
@@ -738,7 +738,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** フォルダ・実テンプレート一覧と、選択後の確認事項を持つ重なり窓を正本どおり分離。撮影用固定データは正本のテンプレート名・利用回数を返さないため、構造一致・データ未接続。設計画像なし（`p97Tf.txt` と照合）。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
-    verdictHead: '521374645', route: `${NEW_BC}?step=message`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message`,
     mode: 'viewport', height: 1080, steps: [
       { click: 'テンプレートから選ぶ' },
       { click: '未分類のひな形 1', after: 700 },
@@ -784,7 +784,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 対象・日時・テスト送信・送信枠・LINEプレビューの確認面と、実APIの事前確認を読む重なり窓を追加。月間送信枠の残数はAPIが返さないため、固定値を作らず構造一致・データ未接続。設計画像なし（`vW4Es.txt` と照合）。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
-    verdictHead: '521374645', route: `${NEW_BC}?step=confirm&templateId=template-11`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=confirm&templateId=template-11`,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -811,7 +811,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 最終確認を画面本体へ戻し、管理名・対象・日時・メッセージ・開封計測・配信後とLINEプレビューを正本配置へ追加。配信後アクションと途中下書きの保存APIがないため、固定値を作らず構造一致・データ未接続。設計画像なし（`FpgxH.txt` と照合）。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
-    verdictHead: '521374645',
+    verdictHead: '4a69f0e4e',
     route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
     steps: [
       { wait: 1800 },
@@ -828,7 +828,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 5段の完了帯、予約日時を含む完了文、4項目の要約、次にできる操作を正本配置へ調整。開始・完了・エラーをSlackへ通知するAPIがないため、その1文は虚偽表示せず構造一致・データ未接続。設計画像なし（`bPF0s.txt` と照合）。',
     verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
-    verdictHead: '521374645',
+    verdictHead: '4a69f0e4e',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -858,7 +858,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 条件編集を重なり窓へ分離し、現在条件・条件1・標準15軸・この画面だけの6軸・AND/OR案内を追加。既存APIが受け取れない条件軸は選択不能にして明記したため、構造一致・データ未接続。設計画像なし（`sqFXf.txt` と照合）。',
     verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-{1440,1920}.png',
-    verdictHead: '521374645', route: `${NEW_BC}?step=audience`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=audience`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [
@@ -871,7 +871,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** KPI、作成操作、フォルダ、検索・絞り込み、6列一覧を正本順へ調整し、設計にない上部テンプレート操作を除去。保存した検索とページ送りのAPIがないため、固定表示せず構造一致・データ未接続。設計画像なし（`xkRDb.txt` と照合）。', route: '/broadcasts',
     verdictSource: 'broadcasts-v6/xkRDb.txt + broadcasts-v6/xkRDb-1440.png + broadcasts-v6/xkRDb-1920.png + broadcasts-v6/xkRDb-add-1440.png + broadcasts-v6/xkRDb-add-1920.png',
-    verdictHead: '521374645',
+    verdictHead: '4a69f0e4e',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
