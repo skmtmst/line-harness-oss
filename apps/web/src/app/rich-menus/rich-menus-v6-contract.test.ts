@@ -49,6 +49,20 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain("'一覧を取得できませんでした'")
   })
 
+  it('一覧APIの月間タップ数とのべ人数を表示し、部分集計だと明記する', () => {
+    expect(PAGE).toContain('g.monthlyStats.taps.toLocaleString')
+    expect(PAGE).toContain('g.monthlyStats.uniqueAudience.value.toLocaleString')
+    expect(PAGE).toContain('（記録開始後）')
+  })
+
+  it('LINEから読んだ面ごとの動きを取り込み前に表示する', () => {
+    expect(PAGE).toContain('selected.areas.slice(0, 6)')
+    expect(PAGE).toContain('externalActionText(area.action)')
+    expect(PAGE).toContain('URLを開く（${action.url}）')
+    expect(PAGE).toContain('メッセージを送る「${action.text}」')
+    expect(PAGE).toContain('未対応の動き')
+  })
+
   it('GO8RQどおり実際に友だちへ出す優先順を既定表示にする', () => {
     expect(PAGE).toContain("useState<SortKey>('priority')")
     expect(PAGE).toContain('出す順番（自分で決めた順）')
