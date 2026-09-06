@@ -3011,6 +3011,11 @@ const FEATURE_16_REVIEW = {
     verdictHead: '9a4c4d520',
     variants: [{ suffix: '-detail', steps: [{ click: '見る', nth: 0, after: 500 }] }],
   },
+  njLGA: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07、Issue #307 で通常・読込中・0件・取得失敗を再撮影し、構造一致・データ未接続。** 3102/8789 で4状態を1440px・1920pxの両方で撮り、10枚すべて横はみ出し0。通常は5人の支払い確定前報酬、保留額、支払い条件の覚書と行ごとの確定操作を表示し、0件と取得失敗も混同しない。前回 #212 の「通常と0件が取得失敗になる」は解消した。残る差は、支払結果・締め日・支払日・振込先を返すAPIが無いこと。Pencilの「今年払った合計」「次の締め」「次の支払日」「振込先」「過去の支払い」「振込用CSV」は値を作らず、未接続の理由を表示する。**接続条件:** 支払台帳・締め設定・振込先APIが入ったら、設計の4指標、状態札、6列表、締め・明細・CSV操作を接続して同じ4状態を再撮影する。',
+    verdictSource: 'affiliates-v6/njLGA.txt + njLGA-{normal,loading,empty,error}.txt + njLGA-{normal,loading,empty,error}-{1440,1920}.png',
+  },
   xqT1Z: {
     verdict: 'match',
     verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。主欄を3区画、右欄を成果時動作・関連先・注意へ整理し、友だち候補API、名前・メール・コード、報酬方式、保留・支払サイクル、末尾4桁だけを扱う振込先の接続条件を設計画像と目視比較した。',
