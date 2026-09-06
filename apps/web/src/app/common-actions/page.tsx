@@ -101,7 +101,18 @@ export default function CommonActionsPage() {
     actions: summaryItems.reduce((sum, item) => sum + item.actionCount, 0),
     bindings: summaryItems.reduce((sum, item) => sum + item.bindingCount, 0),
     outdated: summaryItems.reduce((sum, item) => sum + item.oldVersionBindingCount, 0),
+    outdatedItems: summaryItems.filter((item) => item.oldVersionBindingCount > 0).length,
+    published: summaryItems.filter((item) => item.status === 'published').length,
+    executions: summaryItems.reduce((sum, item) => sum + item.executionCountThisMonth, 0),
+    failures: summaryItems.reduce((sum, item) => sum + item.failureCountThisMonth, 0),
   }), [summaryItems])
+
+  const filterCount = (value: Filter): number => {
+    if (value === 'all') return summaryItems.length
+    if (value === 'old_version') return totals.outdatedItems
+    if (value === 'unused') return summaryItems.filter((item) => item.bindingCount === 0).length
+    return summaryItems.filter((item) => item.status === value).length
+  }
 
   return (
     <div data-design-node="xOpDs">
@@ -129,18 +140,19 @@ export default function CommonActionsPage() {
       ]} className="mb-4" />
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : summaryItems.length} unit="" detail="公開中と下書き" loading={loading} />
-        <SummaryCard variant="v6" title="中の処理" value={loading ? null : totals.actions} unit="" detail="表示中の合計" loading={loading} />
-        <SummaryCard variant="v6" title="呼び出し場所" value={loading ? null : totals.bindings} unit="" detail="固定している利用先" loading={loading} />
-        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdated} unit="" detail="新しい版へ更新できます" loading={loading} badge={totals.outdated > 0 ? '要確認' : undefined} />
+        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : summaryItems.length} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
+        <SummaryCard variant="v6" title="呼び出し元" value={loading ? null : totals.bindings} unit="" detail="5機能から" loading={loading} />
+        <SummaryCard variant="v6" title="今月 動いた回数" value={loading ? null : totals.executions} unit="" detail={loading ? '' : `失敗 ${totals.failures}`} loading={loading} />
+        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdatedItems} unit="" detail={loading ? '' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={totals.outdatedItems > 0 ? '要確認' : undefined} />
       </div>
 
       <NoteBar>
-        公開しても利用先の内容は自動で変わりません。利用先ごとに、確認してから新しい版へ更新します。この30日の実行と失敗は未接続のため、集計口の接続後に表示します。
+        ここを直すと、呼び出している機能すべてに効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
       </NoteBar>
 
       <div className="my-3 flex flex-wrap items-center gap-2">
         {canManage ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : null}
+        {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
         <SearchField
           value={query}
           onChange={setQuery}
@@ -167,7 +179,7 @@ export default function CommonActionsPage() {
               : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
           >
             <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => setFilter(option.value)} />
-            {option.label}
+            {option.label} {filterCount(option.value)}
           </label>
         ))}
       </div>
@@ -196,7 +208,7 @@ export default function CommonActionsPage() {
               </TableHeadRow>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {items.slice(0, 6).map((item) => (
                 <Tr key={item.id}>
                   <NameCell name={<span className="truncate" title={item.name}>{item.name}</span>} sub={<span className="truncate" title={item.description ?? undefined}>{item.description || '説明はありません'}</span>} />
                   <Td>
@@ -234,6 +246,12 @@ export default function CommonActionsPage() {
             </tbody>
         </DataTable>
       )}
+      {!loading && !error && items.length > 0 ? (
+        <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">
+          <span>{items.length}件中 1〜{Math.min(6, items.length)}件</span>
+          <span>前へ　<strong className="text-action">1</strong>　2　3　…　次へ</span>
+        </div>
+      ) : null}
     </div>
   )
 }

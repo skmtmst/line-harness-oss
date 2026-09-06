@@ -676,7 +676,20 @@ export type CommonActionSummary = {
   actionCount: number;
   bindingCount: number;
   oldVersionBindingCount: number;
+  executionCountThisMonth: number;
+  failureCountThisMonth: number;
+  lastRunAt: string | null;
   updatedAt: string;
+};
+
+export type AutomationListItem = Automation & {
+  triggerConfig: Record<string, unknown>;
+  status: 'draft' | 'active' | 'stopped';
+  versionId: string;
+  version: number;
+  executionCount30d: number;
+  failureCount30d: number;
+  lastRunAt: string | null;
 };
 
 export type AnalyticsMetricState =
@@ -5337,7 +5350,10 @@ export const api = {
   automations: {
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
-      return fetchApi<ApiResponse<Automation[]>>('/api/automations' + query)
+      return fetchApi<ApiResponse<AutomationListItem[]> & {
+        summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
+        freshness?: 'available'
+      }>('/api/automations' + query)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Automation & { logs?: AutomationLog[] }>>(`/api/automations/${id}`),
@@ -5404,12 +5420,21 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      limit?: number;
+      offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
-      return fetchApi<ApiResponse<CommonActionSummary[]>>(`/api/common-actions?${query}`);
+      if (params.limit !== undefined) query.set('limit', String(params.limit));
+      if (params.offset !== undefined) query.set('offset', String(params.offset));
+      return fetchApi<ApiResponse<CommonActionSummary[]> & {
+        pagination?: { total: number; limit: number | null; offset: number }
+        freshness?: 'available'
+      }>(`/api/common-actions?${query}`);
     },
+    csvUrl: (accountId: string) =>
+      `${API_URL}/api/common-actions?account_id=${encodeURIComponent(accountId)}&format=csv`,
     get: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonActionDetail>>(
         `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,

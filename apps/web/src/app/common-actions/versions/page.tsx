@@ -4,7 +4,7 @@ import { usageSummaryDetail } from '../usage-summary'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, ApiError, type CommonActionDetail, type CommonActionVersion } from '@/lib/api'
+import { api, ApiError, type CommonActionDetail, type CommonActionSummary, type CommonActionVersion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import NoteBar from '@/components/shared/note-bar'
@@ -47,6 +47,7 @@ function CommonActionVersionsInner() {
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
+  const [summary, setSummary] = useState<CommonActionSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState('')
   const [error, setError] = useState('')
@@ -60,11 +61,17 @@ function CommonActionVersionsInner() {
     }
     setLoading(true)
     setError('')
+    setSummary(null)
     try {
-      const response = await api.commonActions.get(id, selectedAccountId)
+      const [response, listResponse] = await Promise.all([
+        api.commonActions.get(id, selectedAccountId),
+        api.commonActions.list({ accountId: selectedAccountId }),
+      ])
       if (response.success) setDetail(response.data)
       else setError(response.error)
+      setSummary(listResponse.success ? listResponse.data.find((item) => item.id === id) ?? null : null)
     } catch (caught) {
+      setSummary(null)
       setError(caught instanceof Error ? caught.message : '版と利用先を読み込めませんでした')
     } finally {
       setLoading(false)
@@ -153,11 +160,12 @@ function CommonActionVersionsInner() {
         )}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="現在の公開版" value={published?.versionNumber ?? null} unit="" detail={published ? `v${published.versionNumber}を利用できます` : 'まだ公開していません'} />
-        <SummaryCard variant="v6" title="版の数" value={detail.versions.length} unit="" detail="下書きを含む" />
-        <SummaryCard variant="v6" title="使われている場所" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
-        <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="確認して更新します" />
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <SummaryCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
+        <SummaryCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
+        <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="実行記録から集計" />
+        <SummaryCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="部分成功を含む" />
+        <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
       <NoteBar>
@@ -171,7 +179,7 @@ function CommonActionVersionsInner() {
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
-            <p className="text-ink-faint mt-1 text-xs">この30日の実行失敗: —（未接続。版ごとの実行結果を集計する口が必要です）</p>
+            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {summary?.executionCountThisMonth.toLocaleString('ja-JP') ?? '—'}回・失敗 {summary?.failureCountThisMonth.toLocaleString('ja-JP') ?? '—'}回</p>
           </div>
         </div>
         <DataTable>
@@ -232,6 +240,23 @@ function CommonActionVersionsInner() {
               ))}
             </tbody>
         </DataTable>
+      </section>
+
+      <section className="mt-6 grid gap-3 sm:grid-cols-2">
+        <SummaryCard
+          variant="v6"
+          title="このアクションを実行中"
+          value={detail.bindings.reduce((sum, binding) => sum + (binding.runningCount ?? 0), 0)}
+          unit="件"
+          detail="始まったときの版のまま最後まで進みます"
+        />
+        <SummaryCard
+          variant="v6"
+          title="待ち時間の途中"
+          value={detail.bindings.reduce((sum, binding) => sum + (binding.waitingCount ?? 0), 0)}
+          unit="件"
+          detail="設定した待ち時間の途中です"
+        />
       </section>
 
       <section className="mt-6">
