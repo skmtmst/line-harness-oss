@@ -13,6 +13,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import { TextInput } from '@/components/shared/form-controls'
 
 /**
  * たまる決めごとをつくる（設計 V6 17-1-D / BmoGY）。
@@ -485,14 +486,14 @@ export default function NewMileageRulePage() {
 
         <Field label="付いたマイルの有効期限" htmlFor="sc-expiry" note="空欄なら、この決めごとで付いた分は期限なしです。">
           <div className="flex items-center gap-2">
-            <input
+            <TextInput
               id="sc-expiry"
               type="number"
               min={1}
               max={3650}
               value={expiresAfterDays}
               onChange={(e) => setExpiresAfterDays(e.target.value)}
-              className={`${inputClass} max-w-32 tabular-nums`}
+              className="max-w-32 tabular-nums"
             />
             <span className="whitespace-nowrap text-sm text-ink-secondary">日後</span>
           </div>
@@ -517,7 +518,7 @@ export default function NewMileageRulePage() {
               { value: '', label: '条件を付けない（全員）' },
               ...tags.map((tag) => ({ value: tag.id, label: `タグ「${tag.name}」が付いている人` })),
             ]}
-            className={inputClass}
+            className="w-full"
           />
         </Field>
 
