@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Header from '@/components/layout/header'
 import EventWizard from '@/components/events/event-wizard'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -30,9 +29,6 @@ function NewEventPageInner() {
 
   return (
     <>
-      <div data-design="Head">
-        <Header description="3つの段階に分けて登録します" />
-      </div>
       <EventWizard accountId={selectedAccountId} eventId={eventId} step={step} />
     </>
   )

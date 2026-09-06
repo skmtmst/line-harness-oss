@@ -91,6 +91,7 @@ const fakeAccount = {
   archived_reason: null,
   country: null,
   role: null,
+  official_profile_url: null,
   display_order: 0,
   token_expires_at: null,
   created_at: '2026-05-08T00:00:00.000',
@@ -661,6 +662,39 @@ describe('GET /api/line-accounts/summary', () => {
 });
 
 describe('PATCH /api/line-accounts/:id', () => {
+  test('stores a lin.ee official profile URL and returns it', async () => {
+    dbMocks.updateLineAccountFields.mockResolvedValue({
+      ...fakeAccount,
+      official_profile_url: 'https://lin.ee/nen-official',
+    });
+
+    const res = await setupApp('admin').request('/api/line-accounts/acc-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ officialProfileUrl: 'https://lin.ee/nen-official' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateLineAccountFields.mock.calls[0][2]).toMatchObject({
+      officialProfileUrl: 'https://lin.ee/nen-official',
+    });
+    await expect(res.json()).resolves.toMatchObject({
+      data: { officialProfileUrl: 'https://lin.ee/nen-official' },
+    });
+  });
+
+  test('rejects a profile URL outside lin.ee without updating data', async () => {
+    const res = await setupApp('admin').request('/api/line-accounts/acc-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ officialProfileUrl: 'https://example.com/not-line' }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateLineAccountFields).not.toHaveBeenCalled();
+    expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+  });
+
   test('updates loginChannelId / loginChannelSecret / liffId via metadata path', async () => {
     dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
     dbMocks.updateLineAccountFields.mockResolvedValue({

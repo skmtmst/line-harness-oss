@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import SelectField from '@/components/shared/select-field'
 import { daysUntilEvent, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -51,11 +52,13 @@ function formatShortJpDate(iso: string | null): string {
 }
 
 export default function EventsListPage() {
+  usePageTitle('イベント予約')
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
+  const [sort, setSort] = useState<'soon' | 'name'>('soon')
   const [page, setPage] = useState(1)
   const loadRequestRef = useRef(0)
 
@@ -98,17 +101,27 @@ export default function EventsListPage() {
   const attention = useMemo(() => summarizeEventAttention(items), [items])
   const nearest = attention.upcoming[0]
   const nearestLow = attention.lowApplications[0]
+  const unpublishedCount = items.filter((event) => event.is_published !== 1).length
+  const endedCount = items.filter(
+    (event) => event.next_slot_starts_at && new Date(event.next_slot_starts_at).getTime() < Date.now(),
+  ).length
 
   const filtered = useMemo(() => {
     const q = query.trim()
-    return items.filter((e) => {
+    const matches = items.filter((e) => {
       if (q && !e.name.includes(q)) return false
       if (filter === 'open' && e.is_published !== 1) return false
       if (filter === 'pending' && e.pending_count === 0) return false
       if (filter === 'full' && !isFull(e)) return false
       return true
     })
-  }, [items, query, filter])
+    return matches.sort((a, b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
+      if (!a.next_slot_starts_at) return 1
+      if (!b.next_slot_starts_at) return -1
+      return a.next_slot_starts_at.localeCompare(b.next_slot_starts_at)
+    })
+  }, [items, query, filter, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const current = Math.min(page, pageCount)
@@ -122,39 +135,36 @@ export default function EventsListPage() {
   return (
     <div>
       <div data-design="Head">
-        <Header
-          title="イベント予約"
-          description="開催するイベントの申込を管理します。定員と承認制の設定ができます。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <button
-            disabled
-            title="並び替えは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            並び替え
-          </button>
-          <button
-            disabled
-            title="フォルダ分けは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            フォルダを追加
-          </button>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <nav className="text-ink-faint text-xs">
+            <span className="text-accent font-medium">予約</span>
+            <span className="mx-1.5">/</span>
+            <span>イベント予約</span>
+          </nav>
           <Link
             href="/events/new"
             className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
           >
-            イベントを作成
+            イベントをつくる
           </Link>
         </div>
+        <p className="text-ink-faint mb-4 text-sm">
+          開催するイベントの申込を管理します。定員と承認制の設定ができます。
+          マニュアル・フォルダを追加・保存した条件は、接続後にここから使えます。
+        </p>
+      </div>
+
+      <div className="border-hairline mb-4 flex flex-wrap gap-6 border-b">
+        <span className="border-accent text-accent border-b-2 px-1 pb-3 text-sm font-semibold">
+          これからの回 {dataReady ? attention.upcoming.length : '—'}
+        </span>
+        <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">
+          受付前 {dataReady ? unpublishedCount : '—'}
+        </span>
+        <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">
+          終わった回 {dataReady ? endedCount : '—'}
+        </span>
+        <span className="text-ink-secondary px-1 pb-3 text-sm font-medium">申込者</span>
       </div>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -216,25 +226,28 @@ export default function EventsListPage() {
           aria-label="イベント名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <label className="text-ink-faint flex items-center gap-2 text-xs whitespace-nowrap">
+          並び順
+          <SelectField
+            value={sort}
+            onChange={(event) => setSort(event.target.value as 'soon' | 'name')}
+            aria-label="イベントの並び順"
+            options={[
+              { value: 'soon', label: '日付が近い順' },
+              { value: 'name', label: 'イベント名順' },
+            ]}
+          />
+        </label>
         {/*
           **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
           「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
           ようになるのか読む人には分からない。
         */}
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
         {/*
           **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
           「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
           ようになるのか読む人には分からない。
         */}
-        <button
-          disabled
-          title="保存した条件は準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-        >
-          保存した条件
-        </button>
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
@@ -298,9 +311,10 @@ export default function EventsListPage() {
                   <Th className="text-right">承認待ち</Th>
                   <Th>申込条件</Th>
                   <Th>状態</Th>
+                  <Th className="text-right">操作</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-hairline divide-y">
                 {shown.map((e) => (
                   <tr key={e.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm">
@@ -364,6 +378,20 @@ export default function EventsListPage() {
                           受付中
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm whitespace-nowrap">
+                      <Link
+                        href={'/events/edit?id=' + e.id}
+                        className="border-hairline text-ink-secondary rounded-control mr-2 border px-3 py-1.5 text-xs font-medium"
+                      >
+                        中身を見る
+                      </Link>
+                      <Link
+                        href={'/events/bookings?id=' + e.id}
+                        className="border-accent text-accent rounded-control border px-3 py-1.5 text-xs font-medium"
+                      >
+                        申込者を見る
+                      </Link>
                     </td>
                   </tr>
                 ))}
