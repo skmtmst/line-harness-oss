@@ -76,10 +76,10 @@ export function changeCounts(impact: CommonVarDeleteImpact | CommonVarChangeImpa
 export function changeSummaryText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string {
   const { immediate } = changeCounts(impact)
   if (immediate === 0) {
-    return `${placeholderText(impact.variable.varKey)} はどこにも差し込まれていません。`
+    return `${placeholderText(impact.variable.name)} はどこにも差し込まれていません。`
       + '保存しても、いま変わる場所はありません。'
   }
-  return `保存すると、${placeholderText(impact.variable.varKey)} を差し込んでいる `
+  return `保存すると、${placeholderText(impact.variable.name)} を差し込んでいる `
     + `${immediate.toLocaleString('ja-JP')}か所がすぐ変わります。`
 }
 

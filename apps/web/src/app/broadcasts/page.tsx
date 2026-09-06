@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
@@ -62,6 +62,7 @@ type BroadcastTab = 'single' | 'dedup' | 'all'
 const UNFILED = '__unfiled__'
 
 function BroadcastList() {
+  usePageTitle('一斉配信')
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -266,46 +267,6 @@ function BroadcastList() {
 
   return (
     <div>
-      {/* 設計 `V2 4-2 一斉配信` */}
-      <div data-design="Head">
-      <Header
-        title="一斉配信"
-        description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
-        action={(
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-            <button
-              type="button"
-              onClick={() => setFolderDialogOpen(true)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              フォルダを追加
-            </button>
-            <button
-              type="button"
-              onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              テンプレートから配信
-            </button>
-            <button
-              onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
-              className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
-            >
-              + 新規配信
-            </button>
-          </div>
-        )}
-      />
-      </div>
-
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -329,6 +290,39 @@ function BroadcastList() {
 
       <div data-design="KPIs">
       <BroadcastKpis />
+      </div>
+
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled
+          title="マニュアルは準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+        >
+          マニュアル
+        </button>
+        <button
+          type="button"
+          onClick={() => setFolderDialogOpen(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          フォルダを追加
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          テンプレートから配信
+        </button>
+        <button
+          type="button"
+          aria-label="新規配信を作成"
+          onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+        >
+          配信を作成
+        </button>
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
