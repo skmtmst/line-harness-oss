@@ -108,6 +108,7 @@ export default function NewAutomationPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [existingAutomations, setExistingAutomations] = useState<Automation[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -131,8 +132,33 @@ export default function NewAutomationPage() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    api.automations.list({})
+      .then((response) => {
+        if (!cancelled && response.success) setExistingAutomations(response.data)
+      })
+      .catch(() => {
+        if (!cancelled) setExistingAutomations([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
+  const hasSameTrigger = existingAutomations.some((item) => item.eventType === selectedEvent.value)
+  const targetSummary = usesKeyword && keyword.trim()
+    ? `「${keyword.trim()}」を含む内容を送った人に`
+    : 'きっかけに当てはまった人に'
+  const actionSummary = actions.map((row) => {
+    if (row.type === 'add_tag') {
+      const tagName = tags.find((tag) => tag.id === row.tagId)?.name
+      return tagName ? `タグ「${tagName}」を付ける` : '選んだタグを付ける'
+    }
+    return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
+  }).join('、')
 
   const updateAction = (key: number, patch: Partial<ActionDraft>) =>
     setActions((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
@@ -275,6 +301,9 @@ export default function NewAutomationPage() {
                 </div>
               </div>
             ) : null}
+            <p>
+              条件を足す（15の軸から選べます）: 共通の条件編集を接続後に利用できます。現在は上の条件だけで動きます。
+            </p>
           </Step>
 
           <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
@@ -356,6 +385,9 @@ export default function NewAutomationPage() {
                       </div>
                     </div>
                   )}
+                  <p>
+                    失敗したとき: 現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
+                  </p>
                 </div>
               ))}
             </div>
@@ -386,9 +418,13 @@ export default function NewAutomationPage() {
 
         <div data-design="Right" className={styles.stack}>
           <section className={styles.sideCard}>
-            <h2 className={styles.sideTitle}>このルールでできること</h2>
+            <h2 className={styles.sideTitle}>いまの決めごとを文章にすると</h2>
+            <p>
+              {selectedEvent.label}、{targetSummary}{actionSummary || '処理を実行します'}。
+            </p>
             <p className={styles.sideMissingNote}>
-              「こうなったら、こうする」を決めておくと、あとは自動で動きます。
+              「こうなったら、こうする」を決めておくと、あとは自動で動きます。<br />
+              この文章のとおりに動きます。おかしいと感じたら、上の3つを見直してください。
             </p>
           </section>
 
@@ -411,12 +447,14 @@ export default function NewAutomationPage() {
           <CareCard
             items={[
               {
-                head: '作ったルールはすぐ動きます',
-                note: '下書きのまま止めておく口がまだありません。保存する前に文面とタグを確かめてください。',
+                head: 'この画面から作ると有効になります',
+                note: '下書き保存の口は未接続です。作成前に文面とタグを確かめてください。',
               },
               {
                 head: '同じきっかけのルールは両方動きます',
-                note: '一覧で、同じきっかけのルールが他にないか確かめてください。',
+                note: hasSameTrigger
+                  ? '同じきっかけのルールが他にもあります。一覧で確かめてください。'
+                  : '一覧で、同じきっかけのルールが他にないか確かめてください。',
               },
               {
                 head: '作る前に起きたことにはさかのぼりません',
@@ -445,7 +483,7 @@ export default function NewAutomationPage() {
               disabled={saving || Boolean(blockedReason)}
               onClick={() => void save(true)}
             >
-              保存して続けて作る
+              有効にして続けて作る
             </button>
             <button
               type="button"
@@ -453,7 +491,7 @@ export default function NewAutomationPage() {
               disabled={saving || Boolean(blockedReason)}
               onClick={() => void save(false)}
             >
-              {saving ? '保存中...' : '保存'}
+              {saving ? '作成中...' : '作成して有効にする'}
             </button>
           </>
         }

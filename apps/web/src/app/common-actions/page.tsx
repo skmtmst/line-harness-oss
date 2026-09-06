@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Copy, ExternalLink, RefreshCw } from 'lucide-react'
+import { ExternalLink, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -11,6 +11,7 @@ import PageHeader from '@/components/shared/page-header'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
+import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -43,6 +44,8 @@ export default function CommonActionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [duplicating, setDuplicating] = useState('')
+  const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
+  const [templateCount, setTemplateCount] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -54,13 +57,20 @@ export default function CommonActionsPage() {
     setLoading(true)
     setError('')
     try {
-      const [summaryResponse, response] = await Promise.all([
+      const [summaryResponse, response, automationsResponse, templatesResponse] = await Promise.all([
         api.commonActions.list({ accountId: selectedAccountId }),
         api.commonActions.list({ accountId: selectedAccountId, status: filter, query: deferredQuery }),
+        api.automations.list({ accountId: selectedAccountId }).catch(() => null),
+        api.automations.templates(selectedAccountId).catch(() => null),
       ])
       if (summaryResponse.success) setSummaryItems(summaryResponse.data)
       if (response.success) setItems(response.data)
       else setError(response.error)
+      setAutomationCounts(automationsResponse?.success ? {
+        active: automationsResponse.data.filter((item) => item.isActive).length,
+        stopped: automationsResponse.data.filter((item) => !item.isActive).length,
+      } : null)
+      setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '共通アクションを読み込めませんでした')
     } finally {
@@ -111,7 +121,10 @@ export default function CommonActionsPage() {
       />
 
       <Tabs items={[
-        { label: 'オートメーション', href: '/automations' },
+        { label: '動いているもの', count: automationCounts?.active, href: '/automations' },
+        { label: '止めているもの', count: automationCounts?.stopped, href: '/automations?tab=stopped' },
+        { label: '動いた記録', href: '/automations/runs' },
+        { label: '見本', count: templateCount ?? undefined, href: '/automations?tab=templates' },
         { label: '共通アクション', count: summaryItems.length, current: true },
       ]} className="mb-4" />
 
@@ -123,7 +136,7 @@ export default function CommonActionsPage() {
       </div>
 
       <NoteBar>
-        公開しても利用先の内容は自動で変わりません。利用先ごとに、確認してから新しい版へ更新します。
+        公開しても利用先の内容は自動で変わりません。利用先ごとに、確認してから新しい版へ更新します。この30日の実行と失敗は未接続のため、集計口の接続後に表示します。
       </NoteBar>
 
       <div className="my-3 flex flex-wrap items-center gap-2">
@@ -160,28 +173,16 @@ export default function CommonActionsPage() {
       </div>
 
       {error ? (
-        <div className="border-danger bg-danger-bg text-danger rounded-card border p-5" role="alert">
-          <p className="font-semibold">共通アクションを読み込めませんでした</p>
-          <p className="mt-1 text-sm">{error}</p>
-          <button type="button" className="mt-3 underline" onClick={() => void load()}>もう一度読み込む</button>
-        </div>
+        <ListState kind="error" title="共通アクションを読み込めませんでした" description={error} onRetry={() => void load()} />
       ) : loading ? (
-        <div className="border-hairline rounded-card border bg-canvas p-8 text-center text-sm text-ink-faint" aria-busy="true">
-          共通アクションを読み込んでいます
-        </div>
+        <ListState kind="loading" title="共通アクションを読み込んでいます" />
       ) : items.length === 0 ? (
-        <div className="border-hairline rounded-card border bg-canvas p-10 text-center">
-          <Copy className="text-ink-faint mx-auto" aria-hidden />
-          <h2 className="text-ink mt-3 text-base font-semibold">
-            {query || filter !== 'all' ? '条件に合う共通アクションはありません' : '共通アクションはまだありません'}
-          </h2>
-          <p className="text-ink-faint mt-2 text-sm">
-            {query || filter !== 'all' ? '検索語や絞り込みを変えてください。' : 'よく使う処理をまとめると、設定の重複を減らせます。'}
-          </p>
-          {canManage && !query && filter === 'all' ? (
-            <Button href="/common-actions/new" variant="primary" className="mt-4">共通アクションをつくる</Button>
-          ) : null}
-        </div>
+        <ListState
+          kind="empty"
+          title={query || filter !== 'all' ? '条件に合う共通アクションはありません' : '共通アクションはまだありません'}
+          description={query || filter !== 'all' ? '検索語や絞り込みを変えてください。' : 'よく使う処理をまとめると、設定の重複を減らせます。'}
+          action={canManage && !query && filter === 'all' ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : undefined}
+        />
       ) : (
         <DataTable>
             <thead className="bg-canvas-sunken text-ink-faint text-xs">
