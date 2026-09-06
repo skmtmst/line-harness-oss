@@ -2245,9 +2245,10 @@ export const SCREENS = [
     states: { apis: ['**/api/nen-members/photos/publications*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     steps: [{ click: '出しているもの', scope: 'main', after: 700 }],
     variants: [{ suffix: '-placements', steps: [{ click: '出しているもの', scope: 'main', after: 700 }, { qaOpen: 'J3Wxl8-placements', after: 500 }] }],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・実運用データ待ち。** `J3Wxl8.txt` の4つの帯、同意案内、写真カード、表示回数、氏名非表示、掲載先、使う場所、外す操作、決めごとを同じ順で確認した。通常・読込・空・失敗・権限不足と掲載先ダイアログを撮り分け、1440・1920とも横スクロール0。APIは採用・公開同意済みだけをaccount scopeで返し、未取得の表示回数は0でなく「—（未取得）」。掲載先保存と全掲載解除はexpectedVersion＋Idempotency-Keyを持ち、解除後も審査・同意履歴を残す。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #369 / 統合 #1110 の固定データを3105/8792で再撮影し一致判定。** 62枚、4掲載先、閲覧数、氏名表示・非表示を含む8件で、4つの帯、同意案内、写真カード、掲載先、使う場所、外す操作、決めごとを正本と同じ順で確認した。通常・読込・空・失敗・権限不足と掲載先ダイアログの全14枚を撮り分け、1440・1920pxとも横はみ出し0。APIは採用・公開同意済みだけをaccount scopeで返し、掲載先保存と全掲載解除はexpectedVersion＋Idempotency-Keyを持ち、解除後も審査・同意履歴を残す。',
     verdictSource: 'photos-v6/J3Wxl8.txt + photos-v6/J3Wxl8-normal-1440.png + photos-v6/J3Wxl8-normal-1920.png + photos-v6/J3Wxl8-placements-1920.png',
+    verdictHead: '861ad86b2',
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
