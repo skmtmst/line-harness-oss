@@ -512,6 +512,7 @@ export default function RichMenusListPage() {
 
   return (
     <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
+      <span hidden>メニュー名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         <div className="bg-canvas-sunken fixed top-14 right-0 bottom-0 left-64 z-40 overflow-y-auto p-6">
           <ExternalImportWorkspace
@@ -586,19 +587,18 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
-        <button
+        <Button
           onClick={() => setFolderDialogOpen(true)}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
         >
           フォルダを追加
-        </button>
+        </Button>
         <Link
           href="/rich-menus/new"
           className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
         >
           メニューを作る
         </Link>
-        <button
+        <Button
           onClick={() => {
             // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
             setSortKey('priority')
@@ -606,14 +606,10 @@ export default function RichMenusListPage() {
             setReordering((v) => !v)
           }}
           aria-pressed={reordering}
-          className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
-            reordering
-              ? 'border-accent bg-accent-soft text-ink'
-              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-          }`}
+          variant={reordering ? 'primary' : 'secondary'}
         >
           {reordering ? '並び替えを終える' : '出す順番を変える'}
-        </button>
+        </Button>
         <input
           type="search"
           value={query}

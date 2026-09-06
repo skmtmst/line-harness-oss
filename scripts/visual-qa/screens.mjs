@@ -1486,18 +1486,18 @@ export const SCREENS = [
   */
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー',
     mode: 'viewport', height: 1080,
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。1440・1920で撮った（はみ出し0）。**優先順位の説明（設計「上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、いちばん上の1つだけが出ます。」）が無い。** 実装だけにある帯が3行（「LINE 公式アカウントの現状」「LINE 上に登録されているメニュー」「LINE 公式アカウントにはまだ rich menu が登録されていません。」）で、**最後の1行に内部語 `rich menu` が出ている。** 取得元 `rich-menus-v6/GO8RQ.txt`',
-    verdictHead: '49e1341c', },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・ユニーク人数の集計口待ち。設計画像と実装画像を同じ比較入力で見比べ、フォルダ、作成・並べ替え・検索・表示件数、保存した検索、優先順位の説明、一覧6列と操作を確認した。今月のタップ回数は実データだが、のべ人数を返す口が無いため設計の8,140人などを作らず「のべ人数は未取得」と表示する。1440・1920とも横スクロール0。取得元 `rich-menus-v6/GO8RQ.txt` と同Node画像。',
+    verdictHead: 'd28de92b0', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200,
     steps: [
       { fill: 'メニュー名', text: '通常メニュー（会員向け）' },
       { fill: 'メニューを開くボタンの文字', text: 'メニュー' },
     ],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/new`。**3段のステッパー（STEP 1〜3）が無い。** 面の分け方の記号（A〜F）、トークの下に出る文字の説明（14字まで）、寸法（大 2500 × 1686px／小 2500 × 843px）、LINEプレビュー、公開前の注意（「面 F のアクションが未設定です。」）が無い。言い方も設計と違う（設計「上下2面」／実装「上下2分割」）。取得元 `rich-menus-v6/XtfO3.txt`',
-    verdictHead: '49e1341c', route: '/rich-menus/new', },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・下書き保存後の編集口待ち。設計画像と実装画像を同じ比較入力で見比べ、3段の進み方、名称・フォルダ・14字までのボタン文字、大小の寸法、切替タブ、A〜Fの7レイアウト、LINEプレビュー、面Fの未設定警告を確認した。画像と開閉状態は新規作成時に存在しないIDへ書かず、下書き保存後の編集画面で登録する旨を表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/XtfO3.txt` と同Node画像。',
+    verdictHead: 'd28de92b0', route: '/rich-menus/new', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
@@ -1538,9 +1538,9 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む',
     mode: 'viewport', height: 1080,
     steps: [{ qaOpen: 'TL7tp' }],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/connections`（管理画面の外のメニューを取り込む）。**「LINEから読み直す」と、面ごとの動きの一覧（設計「A：URLを開く（https://example.co.jp/menu）」など）が無い。** 取り込まずに消したときの注意（「お客さまのメニューがすぐ消えます」）も無い。内部語 `rich menu` が帯に出る。取得元 `rich-menus-v6/TL7tp.txt`',
-    verdictHead: '49e1341c', },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・面ごとの動きを読むAPI待ち。設計画像と実装画像を同じ比較入力で見比べ、LINEからの読み直し、管理外メニューの選択、6面プレビュー、取り込み後にできること、表示を変えない説明、削除時の注意、取り込み操作を確認した。LINEから面ごとのURLや送信文を返す口が無いため例示値を作らず、接続後に確認できる内容を本文に明記した。1440・1920とも横スクロール0。取得元 `rich-menus-v6/TL7tp.txt` と同Node画像。',
+    verdictHead: 'd28de92b0', },
   {
     /*
       **#575 で `ConfirmDialog` につながった。**管理画面のメニューと、
@@ -1557,9 +1557,9 @@ export const SCREENS = [
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
     mode: 'viewport', height: 1080,
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**失敗のとき「公開中 —・一覧を取得できませんでした」と、未取得の `—` と失敗の文が同じ行に並ぶ。** 設計の優先順位の説明も無い。取得元 `rich-menus-v6/RW5Tb-*.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 #225 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、共通の操作列・優先順位の説明・保存した検索・フォルダを残したまま、読込中「読み込んでいます」、0件「まだリッチメニューがありません」、失敗「表示できませんでした」を別状態で確認した。未取得の集計帯は表示せず、実値0と取得失敗を混ぜていない。通常・読込中・0件・取得失敗を1440・1920で撮影し、全画像で横スクロール0。取得元 `rich-menus-v6/RW5Tb*.txt` と同Node画像。',
+    verdictHead: 'd28de92b0',
     states: { apis: ['**/api/rich-menu-groups*', '**/api/rich-menu-groups/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
 
   },

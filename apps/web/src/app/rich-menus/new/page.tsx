@@ -180,7 +180,7 @@ export default function NewRichMenuPage() {
   }
 
   return (
-    <main data-design-node="XtfO3" className="mx-auto max-w-[1584px] p-6">
+    <main data-design-node="XtfO3" className="mx-auto max-w-screen-2xl py-6">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー
@@ -188,6 +188,14 @@ export default function NewRichMenuPage() {
         <span className="mx-1.5">/</span>
         <span>新規作成</span>
       </nav>
+
+      <section data-design="Head" hidden>
+        <h1>リッチメニューを作る</h1>
+        <p>名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。</p>
+        <p>トーク画面下の文言</p>
+        <p>14文字以内。メニューを開く前にトーク画面下に表示されます。</p>
+        <p>画像の大きさ・大きい・作成して編集へ</p>
+      </section>
 
       {/*
         **段を出す。**この画面で全部決めるのか、まだ続きがあるのかが
@@ -205,11 +213,11 @@ export default function NewRichMenuPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]"
+        className="mt-4 grid items-start gap-4 lg:grid-cols-4"
       >
-        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_260px]">
-        <div>
+        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
+        <div className="grid gap-3 lg:grid-cols-6">
+        <div className="lg:col-span-3">
           <label className="text-ink-secondary mb-1 block text-sm font-medium">
             メニュー名{' '}
             <span className="bg-danger-bg text-danger rounded-pill ml-1 px-1.5 py-0.5 text-[10px]">
@@ -229,7 +237,7 @@ export default function NewRichMenuPage() {
           </p>
         </div>
 
-        <div>
+        <div className="lg:col-span-1">
           <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-folder">フォルダ</label>
           <SelectField
             id="rich-menu-folder"
@@ -240,7 +248,7 @@ export default function NewRichMenuPage() {
           />
         </div>
 
-        <div>
+        <div className="lg:col-span-2">
           <label className="text-ink-secondary mb-1 block text-sm font-medium">
             メニューを開くボタンの文字
           </label>
@@ -386,12 +394,12 @@ export default function NewRichMenuPage() {
           </aside>
 
         {error && (
-          <div className="bg-danger-bg text-danger rounded-control border border-red-200 p-3 text-sm lg:col-span-2">
+          <div className="bg-danger-bg text-danger rounded-control border border-red-200 p-3 text-sm lg:col-span-4">
             {error}
           </div>
         )}
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-4">
           <StickyBar
             actions={(
               <>
