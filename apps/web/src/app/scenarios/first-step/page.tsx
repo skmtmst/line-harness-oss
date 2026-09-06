@@ -259,13 +259,13 @@ function FirstStepContent() {
           シナリオ配信
         </Link>
         <span className="mx-1.5">/</span>
-        <span>ステップの作成</span>
+        <span>1通目を設定</span>
       </nav>
 
       <div data-design="Head">
         <Header
-          title="ステップの作成"
-          description="シナリオの名前と、いつ流すかを決めます。1通目はここで書いても、あとで書いてもかまいません。"
+          title="1通目を設定"
+          description="最初に届ける相手、配信時刻、内容を決めます。保存後も編集できます。"
           action={
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -286,9 +286,20 @@ function FirstStepContent() {
         />
       </div>
 
+      <ol
+        aria-label="シナリオ作成の進み方"
+        className="bg-canvas border-hairline mb-4 flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
+      >
+        <StepMark n={1} label="シナリオ情報" state="done" />
+        <StepLine />
+        <StepMark n={2} label="配信方式" state="done" />
+        <StepLine />
+        <StepMark n={3} label="1通目を設定" state="current" />
+      </ol>
+
       <div data-design="Notice" className="space-y-2">
         <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          配信方式を「{modeLabel[mode]}」にしました。続けて名前と1通目を決めてください。
+          配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
         </p>
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>

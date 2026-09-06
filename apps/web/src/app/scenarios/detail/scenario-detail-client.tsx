@@ -214,11 +214,14 @@ function SettingCard({
   label,
   action,
   onAction,
+  qaOpen,
   children,
 }: {
   label: string
   action?: string
   onAction?: () => void
+  /** 画面確認で、同じ文言の別ボタンを誤って押さないための安定した入口。 */
+  qaOpen?: string
   children: React.ReactNode
 }) {
   return (
@@ -228,6 +231,7 @@ function SettingCard({
         {action && onAction && (
           <button
             type="button"
+            data-qa-open={qaOpen}
             onClick={onAction}
             className="text-accent shrink-0 text-xs hover:underline"
           >
@@ -1391,7 +1395,7 @@ export default function ScenarioDetailClient({
             配信を開始しました。条件を満たした友だちから順に配信します。
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
-            開始後の結果を見る
+            開始履歴を確認
           </Link>
         </div>
       ) : null}
@@ -1584,12 +1588,16 @@ export default function ScenarioDetailClient({
                 <p className="text-ink-faint mt-0.5 text-xs">作ったあとは変えられません</p>
               </SettingCard>
 
-              <SettingCard label="状態" action="変更" onAction={() => setEditing(true)}>
-                <p className={`text-sm font-bold ${scenario.isActive ? 'text-ink' : 'text-warning'}`}>
-                  {scenario.isActive ? '配信可' : '一時停止中'}
+              <SettingCard label="状態" action={showStarted ? '停止・変更' : '変更'} onAction={() => setEditing(true)}>
+                <p className={`text-sm font-bold ${showStarted || scenario.isActive ? 'text-success' : 'text-warning'}`}>
+                  {showStarted ? '配信中' : scenario.isActive ? '配信可' : '一時停止中'}
                 </p>
                 <p className="text-ink-faint mt-0.5 text-xs">
-                  {scenario.isActive ? '配信を一時停止する' : '配信を再開する'}
+                  {showStarted
+                    ? '開始日時はこの画面では取得できません'
+                    : scenario.isActive
+                      ? '配信を一時停止する'
+                      : '配信を再開する'}
                 </p>
               </SettingCard>
 
@@ -1604,7 +1612,7 @@ export default function ScenarioDetailClient({
               {/* 設計（bV5Vs）はこの札に「設定」の入口を出し、押すと開始条件の
                   面（EvVO5）が開く。値そのものを押す形だけだと、読むだけの札と
                   見分けが付かない。 */}
-              <SettingCard label="開始のきっかけ" action="設定" onAction={() => setTriggerOpen(true)}>
+              <SettingCard label="開始のきっかけ" action="設定" qaOpen="EvVO5" onAction={() => setTriggerOpen(true)}>
                 <button type="button" onClick={() => setTriggerOpen(true)} className="text-left">
                   <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
                     {triggerCount === null
