@@ -1436,37 +1436,12 @@ export const SCREENS = [
     steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
   {
-    /*
-      **#493（head `62ddaebe`）でフォルダ操作が入った。** それまでは左の
-      縦帯がテンプレートの `category` から自動で生えているだけで、
-      `/api/folders` を一度も呼んでいなかった。いまは
-      `api.folders.list('template', accountId)` を読み、
-      作る・名前を変える・消す・並べ替える・移す・「よく使う」の
-      切替まで通っている。
-    */
-    /*
-      **「…」を押さないと中身が写らない。** 開く前の絵を設計と並べても
-      何も比べていない。ボタンの読み上げ名は `フォルダ「◯◯」を操作`
-      （`components/shared/folder-panel.tsx:122`、PR #493 head `62ddaebe`）。
-      **この部品は #493 にしか無い。** いまの画面確認サーバ（`6db5ad7f`）の
-      木には入っていないので、撮るには #493 の木でサーバを起こす。
-    */
     ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「フォルダ『お問い合わせ』を操作」が0件で、設計の名称変更・移動・削除メニューを開けない。固定データには対象フォルダがあるため画面側の未接続。**推奨修正**：テンプレート一覧を共通のフォルダ操作へ接続する。取得元 `templates-v6/CzndJ.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** `/templates` の「予約」フォルダ操作を割当ポート3104/8791で1440・1920px撮影し、Pencil `CzndJ` と同時に目視比較した（はみ出し0）。名前変更・色変更・上へ・下へ・削除の5操作と「削除しても、中のテンプレートは未分類に残ります。」が同じ開いたメニュー内にそろう。以前の撮影失敗は読み上げ名の誤記で、画面側は共通フォルダ操作へ接続済みだった。取得元 `templates-v6/CzndJ-1440.png`・`CzndJ-1920.png`・`CzndJ.txt`。',
+    verdictSource: 'templates-v6/CzndJ-1440.png + templates-v6/CzndJ-1920.png + templates-v6/CzndJ.txt',
+    verdictHead: '279e9fdfb',
     mode: 'viewport', height: 1080,
-    /*
-      **撮れない理由は固定データではなく実装。**
-      固定データ `TEMPLATE_FOLDERS` は「お問い合わせ／予約／EC」を持ち、
-      モックも `/api/folders?kind=template` で返している。だが
-      `/templates` は**その口を叩いておらず**、テンプレートの
-      `category`（`general` など）から自前でフォルダ列を組み立てている
-      （`templates/page.tsx` の `categoryCounts`）。設計 `CzndJ` は
-      共通部品「フォルダ操作メニュー」を持つが、実装のフォルダは
-      名前を持たない分類なので、開く相手がそもそも無い。
-      **撮るには実装をフォルダの口へつなぐ必要がある。**
-    */
     steps: [{ click: 'フォルダ「予約」の操作' }],
   },
   {
