@@ -25,9 +25,9 @@ describe('V6リッチメニューの画面契約', () => {
 
   it('作る・足す操作を一覧の左、扱う操作を右に置く', () => {
     const bar = PAGE.slice(PAGE.indexOf('data-design="Bar"'), PAGE.indexOf('data-design="Saved"'))
-    expect(bar.indexOf('メニューを作る')).toBeLessThan(bar.indexOf('メニュー名で検索'))
-    expect(bar.indexOf('フォルダを追加')).toBeLessThan(bar.indexOf('メニュー名で検索'))
-    expect(bar.indexOf('出す順番を変える')).toBeGreaterThan(bar.indexOf('表示件数'))
+    expect(bar.indexOf('フォルダを追加')).toBeLessThan(bar.indexOf('メニューを作る'))
+    expect(bar.indexOf('メニューを作る')).toBeLessThan(bar.indexOf('出す順番を変える'))
+    expect(bar.indexOf('出す順番を変える')).toBeLessThan(bar.indexOf('メニュー名・ボタン名で検索'))
     expect(PAGE).not.toContain('準備中')
   })
 
@@ -52,9 +52,9 @@ describe('V6リッチメニューの画面契約', () => {
   it('GO8RQどおり実際に友だちへ出す優先順を既定表示にする', () => {
     expect(PAGE).toContain("useState<SortKey>('priority')")
     expect(PAGE).toContain('出す順番（自分で決めた順）')
-    expect(PAGE).toContain('上にあるメニューが優先されます。')
-    expect(PAGE).toContain('いちばん上の1つだけが表示されます。')
-    expect(PAGE).toContain('priorityRankByGroup.get(g.id)')
+    expect(PAGE).toContain('上にあるものが優先されます。')
+    expect(PAGE).toContain('いちばん上の1つだけが出ます。')
+    expect(PAGE).toContain('return compareTargetingGroups(a, b)')
     expect(TARGETING_DB).toContain('ORDER BY g.targeting_priority ASC, g.created_at ASC')
   })
 

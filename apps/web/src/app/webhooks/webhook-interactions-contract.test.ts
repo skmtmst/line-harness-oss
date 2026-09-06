@@ -10,6 +10,7 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   it('実ノードと実ルートを接続する', () => {
     expect(PAGE).toContain('data-design-node="KNG00"')
     expect(HOST).toContain("{ key: 'interactions', label: 'やり取りの記録' }")
+    expect(HOST).toContain("{ key: 'outgoing', label: 'こちらから送る 6' }")
     expect(HOST).toContain("tab === 'interactions' && <WebhookInteractions />")
     expect(API).toContain('/api/webhooks/interactions?')
   })
@@ -19,11 +20,13 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('value={data.summary.averageDurationMs == null ? null')
-    expect(PAGE).toContain("data.summary.averageDurationMs == null ? '未取得'")
+    expect(PAGE).toContain("if (averageDurationMs == null) return '未取得'")
   })
 
   it('URL・シークレット・本文を画面へ出さず、内部エラーも表示しない', () => {
     expect(PAGE).toContain('接続先URL、シークレット、本文は安全のため表示しません。')
+    expect(PAGE).toContain('title={item.triggerSummary}>{item.triggerSummary}')
+    expect(PAGE).toContain('安全のため本文と接続情報は一覧に表示しません')
     expect(PAGE).not.toContain('API error:')
     expect(PAGE).not.toContain('Failed to fetch')
     expect(PAGE).not.toContain('requestBodyJson')

@@ -16,7 +16,8 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import { ActionCell, DataTable, Td, Tr } from '@/components/shared/table'
 
 import styles from './webhook-interactions.module.css'
 
@@ -57,6 +58,26 @@ function formatJst(value: string): string {
 
 function directionLabel(direction: WebhookInteraction['direction']): string {
   return direction === 'outgoing' ? 'こちらから送った' : 'こちらで受け取った'
+}
+
+function failureDetail(items: WebhookInteraction[], failed: number): string {
+  if (failed === 0) return '失敗はありません'
+  const visibleFailures = items.filter((item) => item.status === 'failed')
+  if (visibleFailures.length === 0) return '送り直せます'
+
+  const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
+  const sameDestination = firstDestination
+    && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
+  if (!sameDestination) return '送り直せます'
+
+  return `すべて${firstDestination}。送り直せます`
+}
+
+function durationDetail(items: WebhookInteraction[], averageDurationMs: number | null): string {
+  if (averageDurationMs == null) return '未取得'
+  const durations = items.flatMap((item) => item.durationMs == null ? [] : [item.durationMs])
+  if (durations.length === 0) return '送受信の処理時間'
+  return `いちばん遅くて ${Math.round(Math.max(...durations) / 100) / 10}秒`
 }
 
 export default function WebhookInteractions() {
@@ -232,8 +253,8 @@ export default function WebhookInteractions() {
           <div className={styles.cards}>
             <SummaryCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
             <SummaryCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`${successRate.toLocaleString('ja-JP')}%`} />
-            <SummaryCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={data.summary.failed > 0 ? '送り直せます' : '失敗はありません'} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
-            <SummaryCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={data.summary.averageDurationMs == null ? '未取得' : '送受信の処理時間'} />
+            <SummaryCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
+            <SummaryCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs)} />
           </div>
 
           <NoteBar>送った・受け取ったやり取りの記録です。失敗したものはここからやり直せます。</NoteBar>
@@ -271,7 +292,7 @@ export default function WebhookInteractions() {
                   <Tr key={item.id}>
                     <Td><div className={styles.primary}>{formatJst(item.startedAt)} ／ {directionLabel(item.direction)}</div><div className={styles.secondary} title={eventLabel(item)}>{eventLabel(item)}</div></Td>
                     <Td><div className={`${styles.primary} ${item.status === 'failed' ? styles.danger : ''}`} title={item.webhookName}>{item.webhookName}</div></Td>
-                    <Td><div className={styles.primary}>{item.direction === 'outgoing' ? '外部サービスへ渡す内容' : '外部サービスから届いた内容'}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
+                    <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
                     <Td><StatusBadge tone={item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
                     <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
                     <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
