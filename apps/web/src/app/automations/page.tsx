@@ -11,6 +11,7 @@ import AutomationTemplateGallery from '@/components/automations/automation-templ
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import FilterChip from '@/components/shared/filter-chip'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -426,10 +427,15 @@ export default function AutomationsPage() {
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
         <div className="flex flex-wrap gap-2">
+          <Button href="/common-actions">共通アクションを見る</Button>
           <Button href="/automations?tab=templates">見本から作る</Button>
           <Button href="/automations/new" variant="primary">ルールを作成</Button>
+          <Button href="/support">マニュアル</Button>
         </div>
       </div>
+
+      <p className="mb-4 text-sm text-ink-faint">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+      <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -441,7 +447,7 @@ export default function AutomationsPage() {
           <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">この30日に動いた</p>
+          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
@@ -467,7 +473,7 @@ export default function AutomationsPage() {
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="名前・きっかけ・することで検索"
-          className="h-10 w-full max-w-[460px] rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
+          className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
         />
         <div className="flex gap-2">
           <SelectField
@@ -497,14 +503,13 @@ export default function AutomationsPage() {
             ['active', `動いている ${activeCount ?? '—'}`],
             ['stopped', `止めている ${stoppedCount ?? '—'}`],
           ] as const).map(([value, label]) => (
-            <button
+            <FilterChip
               key={value}
-              type="button"
-              onClick={() => setStatusFilter(value)}
-              className={`h-9 rounded-full border px-4 text-sm font-semibold ${statusFilter === value ? 'border-accent bg-success-bg text-accent-deep' : 'border-hairline bg-canvas text-ink-secondary'}`}
+              selected={statusFilter === value}
+              onChange={() => setStatusFilter(value)}
             >
               {label}
-            </button>
+            </FilterChip>
           ))}
           <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint" title="オートメーション別の失敗集計は未接続です">失敗あり —</span>
           <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint" title="最終実行日時は未接続です">30日 動いていない —</span>
@@ -623,11 +628,11 @@ export default function AutomationsPage() {
         />
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
-          <div className="grid grid-cols-[minmax(180px,1.35fr)_minmax(150px,1fr)_minmax(200px,1.35fr)_100px_118px_184px] gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
+          <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
           {visibleAutomations.slice(0, 6).map((automation) => (
-            <div key={automation.id} className="grid min-h-[58px] grid-cols-[minmax(180px,1.35fr)_minmax(150px,1fr)_minmax(200px,1.35fr)_100px_118px_184px] items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
+            <div key={automation.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-ink" title={automation.name}>{automation.name}</p>
                 <p className="truncate text-xs text-ink-faint" title={eventTypeLabelMap[automation.eventType]}>{eventTypeLabelMap[automation.eventType]}</p>
@@ -637,8 +642,8 @@ export default function AutomationsPage() {
               <div><span className="text-ink-faint">—</span><span className="block text-[11px] text-ink-faint">未接続</span></div>
               <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
               <div className="flex justify-end gap-2">
-                <button type="button" disabled className="h-9 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-faint" title="詳細画面は未接続です">中身を見る</button>
-                <button type="button" onClick={() => void handleToggleActive(automation)} className="h-9 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary">止める・動かす</button>
+                <Button disabled className="whitespace-nowrap" title="詳細画面は未接続です">中身を見る</Button>
+                <Button onClick={() => void handleToggleActive(automation)} className="whitespace-nowrap">止める・動かす</Button>
               </div>
             </div>
           ))}

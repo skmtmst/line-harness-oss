@@ -8,6 +8,7 @@ import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
 import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import FilterChip from '@/components/shared/filter-chip'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled'
 
@@ -109,8 +110,8 @@ export default function AutomationRunsPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         <div className="text-right">
-          <button type="button" disabled className="h-10 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-faint">CSVで書き出す</button>
-          <p className="mt-1 text-[11px] text-ink-faint">CSV書き出しは未接続</p>
+          <Button disabled>CSVで書き出す</Button>
+          <p className="mt-1 text-xs text-ink-faint">CSV書き出しは未接続</p>
         </div>
       </div>
       <div className="mb-4"><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
@@ -127,7 +128,7 @@ export default function AutomationRunsPage() {
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-[460px] rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info" />
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info" />
         <div className="flex gap-2">
           <SelectField aria-label="表示期間" value="30" onChange={() => undefined} options={[{ value: '30', label: 'この30日' }]} className="h-10 min-w-32" />
           <SelectField aria-label="表示件数" value="20" onChange={() => undefined} options={[{ value: '20', label: '20件表示' }]} className="h-10 min-w-32" />
@@ -141,7 +142,7 @@ export default function AutomationRunsPage() {
           ['skipped', `条件に外れた ${data?.summary.skipped.toLocaleString('ja-JP') ?? '—'}`],
           ['problems', `失敗 ${data?.summary.failed.toLocaleString('ja-JP') ?? '—'}`],
         ] as const).map(([value, label]) => (
-          <button key={value} type="button" onClick={() => setResultFilter(value)} className={`h-9 rounded-full border px-4 text-sm font-semibold ${resultFilter === value ? 'border-accent bg-success-bg text-accent-deep' : 'border-hairline bg-canvas text-ink-secondary'}`}>{label}</button>
+          <FilterChip key={value} selected={resultFilter === value} onChange={() => setResultFilter(value)}>{label}</FilterChip>
         ))}
       </div>
 
@@ -153,17 +154,17 @@ export default function AutomationRunsPage() {
         <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
-          <div className="grid grid-cols-[minmax(190px,1.15fr)_minmax(180px,1fr)_150px_minmax(220px,1.35fr)_110px_112px] gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
+          <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>いつ・だれに</span><span>オートメーション</span><span>結果</span><span>したこと</span><span>かかった時間</span><span aria-hidden />
           </div>
           {data.items.map((run) => (
-            <div key={run.id} className="grid min-h-[58px] grid-cols-[minmax(190px,1.15fr)_minmax(180px,1fr)_150px_minmax(220px,1.35fr)_110px_112px] items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
+            <div key={run.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0"><p className="truncate font-semibold text-ink">{formatOccurredAt(run.occurredAt)} ／ {run.subject ?? '友だち名なし'}</p><p className="truncate text-xs text-ink-faint">{run.accountLabel ?? 'アカウント名なし'}</p></div>
               <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
               <span className={run.status === 'permanent_failed' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
               <p className="truncate text-ink-secondary" title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p>
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
-              <button type="button" disabled className="h-9 rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-faint" title="実行詳細の画面は未接続です">中身を見る</button>
+              <Button disabled title="実行詳細の画面は未接続です">中身を見る</Button>
             </div>
           ))}
           <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">記録 {data.pagination.total.toLocaleString('ja-JP')}件中 1〜{data.items.length}件を表示</div>

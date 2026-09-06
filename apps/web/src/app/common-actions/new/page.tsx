@@ -101,8 +101,8 @@ export default function NewCommonActionPage() {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-ink-faint">オートメーション ＞ 共通アクション ＞ つくる</p>
         <div className="text-right">
-          <button type="button" disabled className="h-10 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-faint">1人で試す</button>
-          <p className="mt-1 text-[11px] text-ink-faint">テスト実行は未接続</p>
+          <Button disabled>1人で試す</Button>
+          <p className="mt-1 text-xs text-ink-faint">テスト実行は未接続</p>
         </div>
       </div>
 
@@ -158,7 +158,7 @@ export default function NewCommonActionPage() {
             <ul className="mt-3 space-y-2 text-sm">
               <li><a href="/automations" className="font-semibold text-info">オートメーション</a><span className="float-right text-ink-faint">きっかけを決めて呼ぶ</span></li>
               <li><a href="/scenarios" className="font-semibold text-info">シナリオ配信</a><span className="float-right text-ink-faint">送信後に呼ぶ</span></li>
-              <li><a href="/forms" className="font-semibold text-info">回答フォーム</a><span className="float-right text-ink-faint">送信後に呼ぶ</span></li>
+              <li><a href="/form-submissions" className="font-semibold text-info">回答フォーム</a><span className="float-right text-ink-faint">送信後に呼ぶ</span></li>
               <li><a href="/auto-replies" className="font-semibold text-info">自動応答</a><span className="float-right text-ink-faint">返信後に呼ぶ</span></li>
               <li><a href="/rich-menus" className="font-semibold text-info">リッチメニュー</a><span className="float-right text-ink-faint">押されたときに呼ぶ</span></li>
             </ul>

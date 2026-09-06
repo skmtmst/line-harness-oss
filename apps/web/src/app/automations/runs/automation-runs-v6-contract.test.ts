@@ -37,7 +37,8 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).not.toContain('もう一度やる')
     expect(PAGE).toContain('CSV書き出しは未接続')
     expect(PAGE).toContain('実行詳細の画面は未接続です')
-    expect(PAGE).toContain('type="button" disabled')
+    expect(PAGE).toContain('<Button disabled>CSVで書き出す</Button>')
+    expect(PAGE).toContain('<Button disabled title="実行詳細の画面は未接続です">')
   })
 
   it('壊れた応答を描画せず取得失敗へ倒す', () => {
