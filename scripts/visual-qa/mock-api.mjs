@@ -224,6 +224,22 @@ const DASHBOARD_TREND = [
 }))
 
 /**
+ * 指標カード用の7日推移。設計 `vUXKb` は全日とも有効友だち398人で、
+ * 8/13だけ登録1人・流入元「検索」1人。旧グラフ用の active=4 は流用しない。
+ */
+const DASHBOARD_METRIC_TREND = [
+  ['2026-08-13', 1, 0, 398, [{ name: '検索', count: 1 }]],
+  ['2026-08-14', 0, 0, 398, []],
+  ['2026-08-15', 0, 0, 398, []],
+  ['2026-08-16', 0, 0, 398, []],
+  ['2026-08-17', 0, 0, 398, []],
+  ['2026-08-18', 0, 0, 398, []],
+  ['2026-08-19', 0, 0, 398, []],
+].map(([date, added, blocked, active, sources]) => ({
+  date, added, blocked, active, estimated: false, sources,
+}))
+
+/**
  * 表示するカードと並び。設計 `vUXKb` の右カラムに合わせる。
  * 既定では出ない「友だちの状態」も、設計の絵では出ているので出す。
  */
@@ -270,6 +286,37 @@ const DASHBOARD_OVERVIEW = {
     inflowTop: [],
     funnelAlerts: 0,
     automationFailures: 0,
+  },
+  // PR #1016 の未取得判別契約。値だけでなく、基準時刻と期間も本番APIとそろえる。
+  metrics: {
+    activeFriends: {
+      value: 398,
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'latest',
+    },
+    monthlyQuota: {
+      value: { used: 3, limit: 200, remaining: 197 },
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'this-month',
+    },
+    friendTrend: {
+      value: DASHBOARD_METRIC_TREND,
+      state: 'estimated',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'last7-fixed',
+    },
+    officialProfileUrl: {
+      value: 'https://lin.ee/nen-official',
+      state: 'available',
+      reason: null,
+      asOf: `${FIXED_TO}T00:00:00.000Z`,
+      period: 'latest',
+    },
   },
 }
 
@@ -737,6 +784,29 @@ const SHAPES = {
         { key: 'tags', label: 'タグ', href: '/tags', created: METRIC(101), inUse: METRIC(22), unused: METRIC(79), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-24') },
         { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
         { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
+      ],
+    },
+  },
+  /*
+    分析・定期レポート作成。予約が0件でも、選択肢は本物と同じ器で返す。
+    これが無いと保存済み分析と受信者を選べず、設計 `URqOA` を撮れない。
+  */
+  '/api/analytics/report-schedules': {
+    items: [],
+    options: {
+      timeZone: 'Asia/Tokyo',
+      savedAnalyses: [
+        { id: 'saved-route', name: '経路別の成果', kind: 'cross' },
+      ],
+      recipients: [
+        {
+          id: 'staff-owner', name: '佐々木 亮太', role: 'admin',
+          email: 'sasaki@example.com', lineLinked: true,
+        },
+        {
+          id: 'staff-operator', name: '山本 京子', role: 'staff',
+          email: 'yamamoto@example.com', lineLinked: true,
+        },
       ],
     },
   },
