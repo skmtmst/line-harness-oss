@@ -1296,10 +1296,10 @@ export const SCREENS = [
     設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
-  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`。**内部値がそのまま画面に出ている**——種類の欄とフォルダのチップが `text`（`W7LBc.txt:77,95`）。**壊れ値も出ている**——「undefined件で使用」が全行（同97ほか、4ファイル計80か所）。設計の種類別の件数（メッセージ64／カルーセル24／…）と使われている場所の表示が無い。**フォルダの状態（`-folder-inquiry` `-folder-unfiled`）と3状態は撮れていない**——モックの `/api/folders?type=template` が空。取得元 `templates-v6/W7LBc.txt`',
-    verdictHead: '49e1341c', /*
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', mode: 'viewport', height: 1080,
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で構造一致・集計未接続。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダ、各1440/1920pxで撮影（はみ出し0）。設計の6種類タブ、質問タブ、フォルダ、検索、保存した検索、表示件数、5つの絞り込み、一覧列がそろい、内部値 `text` と `undefined件で使用` は0件。送信数だけはテンプレート別集計APIが無いため `—` と接続条件を案内しており、設計の実数にはできない。取得元 `templates-v6/W7LBc.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a', /*
       **#493 の受入条件5つを1回で撮る。**
       口はフォルダだけ差し替える——**テンプレートの一覧は正常のまま**にして、
       「フォルダが取れなくても一覧は残る」を確かめるため。
@@ -1315,18 +1315,18 @@ export const SCREENS = [
     ], },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`。**LINEプレビューと、本文に入れたURLの扱いの表が無い。** 差し込みの但し書き（設計「は差し込みです。差し込んだ結果が4,500文字を超えると、自動で分けて送ります。」）も無い。内部語「Flex」「内容 / JSON *」が出ている。取得元 `templates-v6/GFlD7.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'テンプレートを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** `/templates/edit?visual=1` を1440/1920pxで撮影（はみ出し0）。テンプレート名・フォルダ・種類・差し込み・本文、差し込み後のLINEプレビュー、URLの扱い3列をPencilと目視比較した。`Flex` と `内容 / JSON` は画面から除き、4,500文字超過時の分割も明記した。取得元 `templates-v6/GFlD7.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
+    route: '/templates/edit?visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/carousel`。**言い方が設計と違う**——設計「パネル 1〜5」に対し実装は「カード 1」「＋ カードを追加（1/9）」。設計の推奨寸法（横1024 × 縦678px）、パネルごとの選択肢（最大3つ）、LINEプレビューが無い。取得元 `templates-v6/FRkls.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** `/templates/carousel?visual=1` を1440/1920pxで撮影（はみ出し0）。「パネル」表記、5/10枚、推奨1024×678px、最大3つの選択肢、パネル2編集、横スクロールするLINEプレビューをPencilと目視比較した。取得元 `templates-v6/FRkls.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
+    route: '/templates/carousel?visual=1', mode: 'viewport', height: 1080,
 
   },
   {
@@ -1336,34 +1336,34 @@ export const SCREENS = [
       **使用先は 0 と言わず「保存後にシナリオから選べます」**（`:214`）。
     */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 構造一致・データ未接続。ルート `/templates/questions/new`。1440・1920で撮った（はみ出し0）。**設計の見出し（「質問文（この文のあとにボタンが2つ出ます）」「選択肢 1」「選択肢 2」）と言い方が違うだけで、聞く中身は同じ。** タグの選び口に固定データのタグが並ぶ。取得元 `templates-v6/NNDMR.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で再判定。** `/templates/questions/new` を1440/1920pxで撮影（はみ出し0）。右のLINEプレビューと回答の保存先はあるが、設計の1画面内に収まる2選択肢に対し、実装は全タグを2回展開して約3画面分の縦長になる。質問編集は `components/shared` 所有でs2は変更禁止のため据え置く。**推奨修正**：s0側でタグ選択を閉じた選択UIにし、質問文・2選択肢・返信を1920×1080内にそろえる。取得元 `templates-v6/NNDMR.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
     route: '/templates/questions/new', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（リッチメッセージ）。**面の分け方（A〜F、上下2面・左右2面・上1・下2）を選ぶ形が無く、LINEプレビューも無い。** 設計の寸法の但し書き（「上下に分けるときは 1040 × 520px も可」）も無い。取得元 `templates-v6/j9ixI.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** リッチメッセージ作成を1440/1920pxで撮影（はみ出し0）。A〜Fの6分割候補、上1・下2の選択、1040×1040/520px案内、面別アクション、未設定警告、LINEプレビュー、リッチメニューとの差をPencilと目視比較した。取得元 `templates-v6/j9ixI.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
+    route: '/templates/edit?kind=rich_message&visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（クーポン）。**使われたときのアクション（設計「タグ「夏CP利用」を付ける ／ マイルを 100 付与 ／ 対応マークを「来店あり」に」）とLINEプレビューが無い。** 成果への繋がりの説明も無い。取得元 `templates-v6/hsBtl.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** クーポン作成を1440/1920pxで撮影（はみ出し0）。期間・回数・公開対象・抽選率・上限、利用時のタグ/マイル/対応マーク、LINEプレビュー、公開後の数と成果への接続をPencilと目視比較した。取得元 `templates-v6/hsBtl.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
+    route: '/templates/edit?kind=coupon&visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（リサーチ）。**LINEプレビューと、リサーチと回答フォームの使い分けの説明が無い。** 回答後のアクション（お礼メッセージ／タグ／マイル）も無い。取得元 `templates-v6/J3GxEZ.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** リサーチ作成を1440/1920pxで撮影（はみ出し0）。受付期間・対象、3問、質問1の3選択肢、回答後のお礼/タグ/マイル、LINEプレビュー、回答フォームとの使い分けをPencilと目視比較した。取得元 `templates-v6/J3GxEZ.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
+    route: '/templates/edit?kind=research&visual=1', mode: 'page',
 
   },
   {
@@ -1376,10 +1376,10 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`（削除確認）。**消す前に「どこで使われているか」を出していない**——設計は「このテンプレートは 3か所で使われています」「削除すると、この3か所では文面が空になり、配信が止まります。」を出す。内部値 `text` と「undefined件で使用」も同じ面に出る。取得元 `templates-v6/M9cij.txt`',
-    verdictHead: '49e1341c',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で再判定。** 1440/1920pxで未使用テンプレートの削除確認を撮影（はみ出し0）。内部値と壊れ値は解消し、未使用だけ削除できる安全な確認になった。一方、Pencilは使用中3か所の強制削除を描くが、機能11要件 §4-9/§11 は参照中の削除停止と強制削除除外を明記して矛盾するため、危険な画面へ変更しない。**推奨修正**：Claude所有のPencilを安全要件に合わせて未使用削除の画面へ直し、再撮影する。取得元 `templates-v6/M9cij.txt` と同Nodeの実装画像。',
+    verdictHead: '98abf756a',
     mode: 'viewport', height: 1080,
-    steps: [{ click: '削除', scope: 'main' }],
+    steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
   {
     /*
@@ -1416,10 +1416,10 @@ export const SCREENS = [
     steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
   },
   {
-    ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**設計の種類別の件数（メッセージ64／カルーセル24／…）が無い。** 内部値 `text` と「undefined件で使用」も出る。取得元 `templates-v6/NKyoA-*.txt`',
-    verdictHead: '49e1341c',
+    ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）', mode: 'viewport', height: 1080,
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 / PR #944 で一致。** 一覧の通常・読込・空・取得失敗を各1440/1920pxで撮影（はみ出し0）。6種類の件数、フォルダ件数、空状態の作成案内、読込案内、失敗時の再読込を同じ一覧枠でPencilと目視比較した。内部値 `text` と `undefined件で使用` は0件。取得元 `templates-v6/NKyoA.txt` と同Nodeの状態別実装画像。',
+    verdictHead: '98abf756a',
     states: { apis: ['**/api/templates*', '**/api/templates/**', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
 
   },
@@ -3065,6 +3065,42 @@ const FEATURE_19_AUDIT = {
   },
 }
 
+// Issue #234（機能21）の実装後監査。
+// 設計画像と実装構造は照合したが、ChromiumがMachPort権限で起動できず、
+// 更新後の1440px・1920px画像は未取得。一致判定には上げない。
+const FEATURE_21_AUDIT = {
+  VLMGH: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI4枚、7段の購入後フロー、配信一覧、プレビュー、動作切替、テスト送信を設計順に配置した。この30日の送信・反応・成果は集計APIが無いため、0を作らず接続条件を表示する。ChromiumがMachPort権限で起動できず1440px・1920px画像を取得できなかったため、司令塔の指示どおり判定を上げず `needs_fix` を維持する。',
+    verdictSource: 'nen-v6/VLMGH.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  DEX0k: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI、検索、状態別絞り込み、コラム一覧、配信結果への導線、紹介文編集、予約操作を設計順に配置した。対象人数と読了集計はAPI未接続のため条件を本文に表示する。ChromiumのMachPort権限で2幅画像を取得できず、構造一致・データ未接続を維持する。',
+    verdictSource: 'nen-v6/DEX0k.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  q4lajm: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** 誕生日3日前10:00の設定、ペット一覧、飼い主・誕生日・次の配信、LINEプレビュー、誕生日未登録数を設計と同じ役割で配置した。開封とクーポン利用は集計APIが無いため接続条件を表示する。ChromiumのMachPort権限で2幅画像を取得できず、司令塔の指示どおり判定を上げず `needs_fix` を維持する。',
+    verdictSource: 'nen-v6/q4lajm.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  WeXbL: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で構造を更新したが、更新後画像は未確認。** KPI、検索、状態絞り込み、日時・宛先・配信・状態・きっかけ・反応の表を設計順に配置し、日時は日本時間で表示する。きっかけと反応の記録はAPI未接続。ChromiumのMachPort権限で2幅画像を取得できず、構造一致・データ未接続を維持する。',
+    verdictSource: 'nen-v6/WeXbL.txt + apps/web/src/app/nen-campaigns/nen-overview.tsx（更新後画像未確認）',
+  },
+  ymXJK: {
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で不足を画面内に明示したが、要修正を維持。** 題名・分類・記事リンク・画像・概要・公開日時・届く形のプレビューは実装済み。記事本文は外部サイトを正本とする。配信対象人数・読了後タグ・前のコラムの複製・自分へのテスト送信はAPIが無く、接続条件を本文または無効ボタンの説明に出した。ChromiumのMachPort権限で2幅画像も取得できていない。**接続条件:** 対象人数、読了イベント、タグ付け、複製、テスト送信APIを接続して再撮影する。',
+    verdictSource: 'nen-v6/ymXJK.txt + apps/web/src/app/nen-campaigns/columns/new/page.tsx（更新後画像未確認）',
+  },
+  i9sQP: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #234 / PR #949 / UI HEAD 1b9d5bae9で状態構造を確認したが、更新後画像は未確認。** 読込中・0件・取得失敗を `ListState` で分け、取得失敗を0件として表示しない。コラムの固定データと集計APIが未接続で、ChromiumのMachPort権限により2幅画像を取得できないため、構造一致・データ未接続を維持する。',
+    verdictSource: 'nen-v6/i9sQP.txt + apps/web/src/app/nen-campaigns/page.tsx（更新後画像未確認）',
+  },
+}
+
 /**
  * board #210。2026-09-06 に latest development（f4296e63）を 8792/3103 で起動し、
  * 機能2〜5の未判定56 Nodeを設計1920pxと実装1440/1920pxで見比べた結果。
@@ -3235,6 +3271,10 @@ for (const screen of SCREENS) {
   }
   if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_19_AUDIT[screen.node])
+    delete screen.verdictHead
+  }
+  if (screen.feature === 21 && FEATURE_21_AUDIT[screen.node]) {
+    Object.assign(screen, FEATURE_21_AUDIT[screen.node])
     delete screen.verdictHead
   }
 }
@@ -3409,6 +3449,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '96ed41b6', on: '2026-09-01', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Q8sHa'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   11: [
+    { pr: 944, head: '98abf756a', on: '2026-09-06', screens: ['W7LBc', 'GFlD7', 'FRkls', 'NNDMR', 'j9ixI', 'hsBtl', 'J3GxEZ', 'M9cij', 'NKyoA'], note: '割当ポート3104/8791で通常・状態別を含む36枚を撮影。対象9画面は一致6、構造一致・集計未接続1、要修正2。横はみ出し0' },
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
   { pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' },
