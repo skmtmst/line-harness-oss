@@ -119,8 +119,11 @@ const initialForm: CreateFormState = {
   これまで画面にタブが無く、`?tab=` を付けても一覧が出るだけだった。
 */
 const MERGED_TABS = [
-  { key: 'rules', label: 'オートメーション' },
+  { key: 'active', label: '動いているもの' },
+  { key: 'stopped', label: '止めているもの' },
+  { key: 'runs', label: '動いた記録', href: '/automations/runs' },
   { key: 'templates', label: '見本' },
+  { key: 'common-actions', label: '共通アクション', href: '/common-actions' },
 ]
 
 export default function AutomationsPage() {
@@ -145,6 +148,10 @@ export default function AutomationsPage() {
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [working, setWorking] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [automaticRuns, setAutomaticRuns] = useState<number | null>(null)
+  const [estimatedHoursSaved, setEstimatedHoursSaved] = useState<number | null>(null)
+  const [templateCount, setTemplateCount] = useState<number | null>(null)
+  const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
   const loadRequestRef = useRef(0)
@@ -154,7 +161,18 @@ export default function AutomationsPage() {
     setLoadStatus('loading')
     setError('')
     try {
-      const res = await api.automations.list({ accountId: selectedAccountId || undefined })
+      const [res, usageResponse, templatesResponse, commonActionsResponse] = await Promise.all([
+        api.automations.list({ accountId: selectedAccountId || undefined }),
+        selectedAccountId
+          ? api.analytics.usageOverview(selectedAccountId).catch(() => null)
+          : Promise.resolve(null),
+        selectedAccountId
+          ? api.automations.templates(selectedAccountId).catch(() => null)
+          : Promise.resolve(null),
+        selectedAccountId
+          ? api.commonActions.list({ accountId: selectedAccountId }).catch(() => null)
+          : Promise.resolve(null),
+      ])
       if (requestId !== loadRequestRef.current) return
       if (res.success) {
         setAutomations(res.data)
@@ -163,10 +181,19 @@ export default function AutomationsPage() {
         setAutomations([])
         setLoadStatus('error')
       }
+      const usage = usageResponse?.success ? usageResponse.data.data.summary : null
+      setAutomaticRuns(usage?.automaticRuns.value ?? null)
+      setEstimatedHoursSaved(usage?.estimatedHoursSaved.value ?? null)
+      setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
+      setCommonActionCount(commonActionsResponse?.success ? commonActionsResponse.data.length : null)
     } catch {
       if (requestId !== loadRequestRef.current) return
       setAutomations([])
       setLoadStatus('error')
+      setAutomaticRuns(null)
+      setEstimatedHoursSaved(null)
+      setTemplateCount(null)
+      setCommonActionCount(null)
     }
   }, [selectedAccountId])
 
@@ -287,20 +314,50 @@ export default function AutomationsPage() {
   }
 
   if (tab === 'templates') {
+    const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null
+    const stoppedCount = loadStatus === 'ready' ? automations.filter((item) => !item.isActive).length : null
+    const tabs = MERGED_TABS.map((item) => ({
+      ...item,
+      label: item.key === 'active'
+        ? `動いているもの ${activeCount ?? '—'}`
+        : item.key === 'stopped'
+          ? `止めているもの ${stoppedCount ?? '—'}`
+          : item.key === 'templates'
+            ? `見本 ${templateCount ?? '—'}`
+            : item.key === 'common-actions'
+              ? `共通アクション ${commonActionCount ?? '—'}`
+              : item.label,
+    }))
     return (
       <div>
         <div className="mb-4">
-          <MergedTabs basePath="/automations" paramName="tab" tabs={MERGED_TABS} active={tab} />
+          <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
         </div>
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
       </div>
     )
   }
 
+  const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null
+  const stoppedCount = loadStatus === 'ready' ? automations.filter((item) => !item.isActive).length : null
+  const tabs = MERGED_TABS.map((item) => ({
+    ...item,
+    label: item.key === 'active'
+      ? `動いているもの ${activeCount ?? '—'}`
+      : item.key === 'stopped'
+        ? `止めているもの ${stoppedCount ?? '—'}`
+        : item.key === 'templates'
+          ? `見本 ${templateCount ?? '—'}`
+          : item.key === 'common-actions'
+            ? `共通アクション ${commonActionCount ?? '—'}`
+            : item.label,
+  }))
+  const visibleAutomations = automations.filter((item) => tab === 'stopped' ? !item.isActive : item.isActive)
+
   return (
     <div>
       <div className="mb-4">
-        <MergedTabs basePath="/automations" paramName="tab" tabs={MERGED_TABS} active={tab} />
+        <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
       <div data-design="Head">
         <Header
@@ -309,9 +366,8 @@ export default function AutomationsPage() {
           action={
             <div className="flex flex-wrap gap-2">
               <Button href="/common-actions">共通アクションを見る</Button>
-              <Button variant="primary" onClick={() => setShowCreate(true)}>
-                ルールを作成
-              </Button>
+              <Button href="/automations?tab=templates">見本から作る</Button>
+              <Button href="/automations/new" variant="primary">ルールを作成</Button>
               <Button href="/support">マニュアル</Button>
             </div>
           }
@@ -320,30 +376,27 @@ export default function AutomationsPage() {
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ルール</p>
+          <p className="text-ink-faint text-xs">動いているもの</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {loadStatus === 'ready' ? automations.length : '—'}
-            {loadStatus === 'ready' ? <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span> : null}
+            {activeCount ?? '—'}
+            {activeCount !== null ? <span className="text-ink-faint ml-0.5 text-xs font-normal">本</span> : null}
           </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            稼働中 {loadStatus === 'ready' ? automations.filter((a) => a.isActive).length : '—'}
-          </p>
-        </div>
-        {/* 実行の記録を残していない。何回動いたか、失敗したかが分からない。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の実行</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+          <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">失敗</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
+          <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">手動実行</p>
+          <p className="text-ink-faint text-xs">失敗した</p>
           <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">友だち一覧から</p>
+          <p className="text-ink-faint mt-0.5 text-xs">未接続: 失敗回数の集計口が必要です</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">手動実行・減らせた手作業</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
+          <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </div>
 
@@ -448,13 +501,16 @@ export default function AutomationsPage() {
           description="登録したルールは消えていません。再読み込みしても直らない場合はエラー報告へ。"
           action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
-      ) : automations.length === 0 && !showCreate ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">オートメーションがありません。「新規ルール」から作成してください。</p>
-        </div>
+      ) : visibleAutomations.length === 0 && !showCreate ? (
+        <ListState
+          kind="empty"
+          title={tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。'}
+          description="きっかけ・だれに・することの3つを決めると動きます。"
+          action={tab === 'active' ? <Button href="/automations/new" variant="primary">オートメーションをつくる</Button> : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {automations.map((automation) => (
+          {visibleAutomations.map((automation) => (
             <div
               key={automation.id}
               className="bg-canvas rounded-card border border-hairline p-5 hover:shadow-md transition-shadow"

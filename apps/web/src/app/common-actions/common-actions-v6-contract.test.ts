@@ -40,6 +40,9 @@ describe('V6共通アクションの画面契約', () => {
     expect(EDITOR).toContain('処理を追加')
     expect(EDITOR).not.toContain('actionsJson')
     expect(CREATE).not.toContain('<main className=')
+    expect(EDITOR).toContain('テンプレート「{selected.name}」')
+    expect(EDITOR).toContain('版: —（未取得。テンプレートの版を返す口が接続されると表示します）')
+    expect(CREATE).toContain('すでに呼び出している場所はいまの版のまま動きます')
   })
 
   it('利用版の変更前に差分と進行中への影響を確認する', () => {
@@ -48,6 +51,10 @@ describe('V6共通アクションの画面契約', () => {
     expect(VERSIONS).toContain('更新後')
     expect(VERSIONS).toContain('実行中・待機中の処理は変えず')
     expect(VERSIONS).toContain('<Dialog')
+    expect(VERSIONS).toContain('versionChangeSummary')
+    expect(VERSIONS).toContain('この30日の実行失敗: —（未接続。版ごとの実行結果を集計する口が必要です）')
+    expect(VERSIONS).not.toContain('内容を取得できません')
+    expect(VERSIONS).not.toContain('確認できません')
   })
 
   it('閲覧権限と編集権限を画面でも分ける', () => {

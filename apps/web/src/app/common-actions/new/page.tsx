@@ -147,7 +147,7 @@ export default function NewCommonActionPage() {
           <section className="border-warning bg-warning-bg rounded-card border p-5">
             <h2 className="text-ink font-semibold">気をつけること</h2>
             <p className="text-ink-secondary mt-2 text-sm leading-6">
-              新しい版を公開しても、すでに使っている場所は自動で切り替わりません。動いている処理の中身を途中で変えないためです。
+              下書きです。公開しても、すでに呼び出している場所はいまの版のまま動きます。利用先ごとに新しい版へ更新してください。
             </p>
           </section>
         </aside>
