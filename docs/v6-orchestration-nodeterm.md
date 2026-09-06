@@ -123,6 +123,7 @@ review 列の PR を順に確認する: base が最新か、必須ゲート成�
 **手順(司令塔)**:
 1. 最新の codex/development から `codex/kenta-train-<月日>-<連番>` を切る。
 2. 対象 PR の枝を番号の古い順に `git merge` する。競合した PR は取り込まず(`git merge --abort`)、次の列車へ回す。
+   - ただし競合が **生成物の台帳 3 ファイル**(`docs/design-qa/v6-progress-ledger.md`・`v6-progress.html`・`v6-progress.json`)だけなら、片方を採って `node scripts/visual-qa/ledger.mjs` で再生成し、そのまま列車に載せる(判定 PR 同士はほぼこれ)。`screens.mjs` や画面コードが競合したときだけ、列車が入った後に lane へ取り込み依頼を書く。
 3. 反映履歴に列車の PR 番号入りのファイルを 1 つ足し、統合 PR を出す(題名「統合 PR N: ゲート合格済み M 本をまとめて取り込む」、本文に含めた PR と外した PR)。
 4. ゲート 1 回。成功したら squash でマージし、含めた PR を「統合 #N に含めた」とコメントして閉じ、台帳は題名の (PR #番号) で突き合わせて完了にする。
 5. ゲートが落ちたら、最後に足した PR を外して列車を作り直す(落ちた PR は lane に理由を書いて戻す)。
