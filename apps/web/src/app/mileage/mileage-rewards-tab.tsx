@@ -119,6 +119,8 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
 
   const summary = overview?.summary
   const rewards = overview?.rewards ?? []
+  const reachMetrics = Array.isArray(overview?.reachMetrics) ? overview.reachMetrics : []
+  const rankBenefits = Array.isArray(overview?.rankBenefits) ? overview.rankBenefits : []
 
   /** 数が出せないときは、数え方の説明ではなく理由を出す。 */
   const reason = status === 'loading' ? STATE_TEXT.loading
@@ -202,11 +204,17 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
       {actionError ? <div className="mb-4 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{actionError}</div> : null}
 
       <section aria-label="ランクごとの使い道" className="mb-4 grid gap-3 md:grid-cols-3">
-        {['ブロンズ', 'シルバー', 'ゴールド'].map((rank) => (
-          <div key={rank} className="rounded-card border border-hairline bg-canvas p-4">
-            <p className="font-bold text-ink">{rank}</p>
-            <p className="mt-1 text-sm text-ink-faint">必要マイルと対象人数は未取得</p>
-            <p className="mt-3 text-xs text-ink-secondary">ランク条件の取得口が接続されると、交換できる使い道をここに表示します。</p>
+        {rankBenefits.length === 0 ? (
+          <div className="rounded-card border border-hairline bg-canvas p-4 md:col-span-3">
+            <p className="font-bold text-ink">ランクの使い道はまだありません</p>
+            <p className="mt-1 text-sm text-ink-faint">ランクを上げる使い道を公開すると、必要マイルと届く人数がここに表示されます。</p>
+          </div>
+        ) : rankBenefits.map((rank) => (
+          <div key={rank.rewardId} className="rounded-card border border-hairline bg-canvas p-4">
+            <p className="truncate font-bold text-ink" title={rank.rewardName}>{rank.rewardName}</p>
+            <p className="mt-1 text-sm font-semibold text-ink-secondary">{rank.requiredMiles.toLocaleString('ja-JP')} マイルから</p>
+            <p className="mt-3 text-xs text-ink-secondary">今すぐ届く人 {rank.reachableFriendCount.toLocaleString('ja-JP')}人</p>
+            <p className="mt-1 text-xs text-ink-faint">交換済み {rank.redeemedFriendCount.toLocaleString('ja-JP')}人</p>
           </div>
         ))}
       </section>
@@ -229,12 +237,14 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                 : rewards.length === 0 ? <tr><td colSpan={6} className="p-0"><ListState kind="empty" title="いまのところ特典なし" description="ここに1つ足すと動きが変わります。交換するとクーポンやタグが自動で渡ります。" /></td></tr>
                   : rewards.map((reward) => {
                     const stock = stockText(reward)
+                    const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
                     return (
                       <Tr key={reward.id}>
                         <Td>
                           <p className="text-ink font-semibold">{reward.name}</p>
                           {reward.description && <p className="text-ink-faint text-xs">{reward.description}</p>}
                           {stock && <p className="text-ink-faint text-xs">{stock}</p>}
+                          {reach && <p className="mt-1 text-xs text-ink-faint">今すぐ交換できる人 {reach.reachableFriendCount.toLocaleString('ja-JP')}人</p>}
                         </Td>
                         <Td align="right" className="tabular-nums">{miles(reward.currentVersion?.requiredMiles)}</Td>
                         <Td>{KIND_LABEL[reward.rewardKind]}</Td>

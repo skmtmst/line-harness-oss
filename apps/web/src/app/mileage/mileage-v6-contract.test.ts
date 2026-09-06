@@ -62,13 +62,15 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).not.toContain('<option value="all">全アカウント横断</option>')
   })
 
-  it('一覧の読込・空・失敗を言い分け、失効値を取得済みに見せない', () => {
+  it('一覧の読込・空・失敗を言い分け、失効値をV6の口から表示する', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('まだ決めごとがありません')
     expect(PAGE).toContain('もうすぐ消えるマイル')
-    expect(PAGE).toContain('badge="未取得"')
+    expect(PAGE).toContain('summary?.expiringMiles30d')
+    expect(PAGE).toContain('member.expiringMiles30d')
+    expect(API).toContain('/api/mileage/friends?')
     expect(PAGE).not.toContain('該当するユーザーがいません')
   })
 
@@ -83,9 +85,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).toContain('setAdjustmentOpen(true)')
   })
 
-  it('既存の更新APIから決めごとの停止と再開を操作できる', () => {
-    expect(PAGE).toContain("updateRule(rule, { isActive: !rule.isActive })")
-    expect(PAGE).toContain("rule.isActive ? '決めごとを停止' : '決めごとを再開'")
+  it('V6の一覧契約を読み、既存の更新APIから停止と再開を操作できる', () => {
+    expect(PAGE).toContain('api.mileage.earningRulesV6')
+    expect(PAGE).toContain("updateRule(rule.id, { isActive: rule.published.status !== 'published' })")
+    expect(PAGE).toContain("rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'")
     // 2026-09-02: 一覧をカード格子から設計の表へ移し、状態を共通Chipで出す。
     // 言い方は変えていない。
     expect(PAGE).toContain('<Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>')
@@ -113,9 +116,13 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(API).toContain("'X-Confirm-Irreversible': 'mileage-adjustment'")
   })
 
-  it('未接続の通知と失効を実行済みに見せない', () => {
-    expect(ADJUSTMENT).toContain('送信・失効台帳が接続されるまで実行しません')
-    expect(ADJUSTMENT).not.toContain('「マイルが付きました」と届きます')
+  it('手動増減の通知と失効を実APIへ渡す', () => {
+    expect(ADJUSTMENT).toContain('友だちに知らせる')
+    expect(ADJUSTMENT).toContain('この分の有効期限')
+    expect(ADJUSTMENT).toContain('expiresAt:')
+    expect(ADJUSTMENT).toContain('notifyFriend,')
+    expect(API).toContain('expiresAt?: string')
+    expect(API).toContain('notifyFriend?: boolean')
     expect(ADJUSTMENT).toContain('変更後の残高が0未満になる操作は実行しません')
     expect(ADJUSTMENT).not.toContain('API error:')
   })
