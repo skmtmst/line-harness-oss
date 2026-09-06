@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 11,
-  "match": 103,
-  "structureMatchDataPending": 120,
-  "needsFix": 40,
+  "match": 105,
+  "structureMatchDataPending": 121,
+  "needsFix": 37,
   "unjudged": 5,
-  "remaining": 165,
+  "remaining": 163,
   "features": [
     {
       "feature": 1,
@@ -1200,11 +1200,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 12,
+      "match": 3,
+      "structureMatchDataPending": 10,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 12,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 1070,
@@ -1675,11 +1675,22 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 3,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 1075,
+          "head": "24313778e",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "yPkWe"
+          ],
+          "note": "Issue #295。共通情報3画面を3104/8791で1440・1920px撮影し、★V6設計と同じ比較入力で確認。全画像で横はみ出し0。3画面とも、存在しないAPI値を作らず理由つきの構造一致・データ未接続へ更新した。"
+        },
         {
           "pr": 548,
           "head": "d4a85ad4",
