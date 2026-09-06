@@ -18,12 +18,12 @@
     "@line-harness/sdk": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240620.0",
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/node": "^22.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.5.0",
-    "wrangler": "^3.60.0",
+    "wrangler": "4.105.0",
     "zod": "^3.24.4"
   }
 }
