@@ -2,15 +2,15 @@
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
   "compared": 236,
-  "unimplemented": 10,
+  "unimplemented": 8,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 26,
-  "match": 57,
+  "missing": 28,
+  "match": 58,
   "structureMatchDataPending": 46,
   "needsFix": 153,
-  "unjudged": 2,
-  "remaining": 211,
+  "unjudged": 3,
+  "remaining": 210,
   "features": [
     {
       "feature": 1,
@@ -163,15 +163,15 @@
       "name": "友だち",
       "total": 12,
       "compared": 0,
-      "unimplemented": 2,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 10,
-      "match": 2,
+      "missing": 12,
+      "match": 3,
       "structureMatchDataPending": 3,
       "needsFix": 5,
-      "unjudged": 0,
-      "remaining": 10,
+      "unjudged": 1,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 520,
@@ -270,6 +270,16 @@
             "w8W4Eh"
           ],
           "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
+        },
+        {
+          "pr": 975,
+          "head": "bdf6abfa7",
+          "on": "2026-09-06",
+          "screens": [
+            "vtBCu",
+            "ux7of"
+          ],
+          "note": "Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。"
         }
       ]
     },
@@ -2690,13 +2700,6 @@
   ],
   "gaps": [
     {
-      "feature": 3,
-      "node": "vtBCu",
-      "name": "3-4 UID移行",
-      "gap": "api",
-      "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
       "feature": 16,
       "node": "QX70l",
       "name": "16-1-G アフィリエイターを削除する確認",
@@ -2751,13 +2754,6 @@
       "name": "25-1-B オートメーションが動いた記録",
       "gap": "pending",
       "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
-    },
-    {
-      "feature": 3,
-      "node": "ux7of",
-      "name": "3-4-A UID・顧客データ移行／CSV",
-      "gap": "api",
-      "gapNote": "取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束"
     }
   ]
 }
