@@ -136,7 +136,7 @@ export default function SavedViewDialog({
                 value={name}
                 onChange={(event) => { setName(event.target.value); setError('') }}
                 maxLength={NAME_LIMIT}
-                placeholder="例：未対応・期限超過"
+                placeholder="検索名を入力してください"
                 /*
                   **空のあいだも枠を赤くする。** 設計 `AuSDY`（2-16）は
                   未入力の欄を赤い枠で描く。押してから赤くするのでは、
@@ -197,7 +197,7 @@ export default function SavedViewDialog({
                 /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
                 className="rounded-control bg-accent-deep text-on-accent px-5 py-2 text-sm font-bold disabled:opacity-40"
               >
-                {saving ? '保存中' : 'この条件を保存'}
+                {saving ? '保存中' : '検索条件を保存'}
               </button>
             </>
           )}
