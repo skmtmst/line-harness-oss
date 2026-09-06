@@ -8,12 +8,14 @@ const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.
 describe('機能設定の添付デザイン', () => {
   it('見出し操作と必須・通常スイッチの表示を保つ', () => {
     expect(source).not.toContain('適用先：この契約全体')
+    expect(source).toContain('並びを変える')
     expect(source).toContain('初期値に戻す')
-    expect(source).toContain('グループごと切替')
+    expect(source).toContain('機能設定を保存')
+    expect(source).toContain('まとめて切替')
     expect(source).toContain('上へ移動')
     expect(source).toContain('下へ移動')
     expect(source).toContain('function LockIcon()')
-    expect(source).toContain("item.required ? '必須' : enabled ? 'オン' : 'オフ'")
+    expect(source).toContain('item.required && <span')
     expect(source).toContain('disabled={item.required}')
     expect(source).toContain('absolute left-0.5 top-0.5')
   })
@@ -44,9 +46,18 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('この印はメニューに表示されません')
     expect(source).toContain('項目が非表示になります')
     // 別に並べ直さない。保存前と保存後で姿が変わらないようにする。
-    expect(source).toContain('<SidebarPreview groups={groups} features={features} />')
+    expect(source).toContain('ordering && <SidebarPreview groups={groups} features={features} />')
     expect(source).not.toContain('PREVIEW_SECTIONS')
     expect(source).not.toContain('サイドメニューの見え方</h2>')
     expect(source).not.toContain('保存前</span>')
+  })
+
+  it('通常表示は設計どおり3列に分け、使っている数を分析APIから出す', () => {
+    expect(source).toContain("['basic', 'delivery', 'contents']")
+    expect(source).toContain("['results', 'automation', 'booking', 'specialized']")
+    expect(source).toContain("['settings', 'restaurant-test']")
+    expect(source).toContain('api.analytics.usageOverview(selectedAccountId)')
+    expect(source).toContain('利用中 {inUse.toLocaleString')
+    expect(source).toContain('利用数は未取得')
   })
 })
