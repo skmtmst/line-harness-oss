@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 257,
-  "unimplemented": 10,
+  "compared": 239,
+  "unimplemented": 8,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 5,
-  "match": 57,
-  "structureMatchDataPending": 46,
-  "needsFix": 153,
-  "unjudged": 2,
-  "remaining": 211,
+  "missing": 25,
+  "match": 60,
+  "structureMatchDataPending": 52,
+  "needsFix": 145,
+  "unjudged": 3,
+  "remaining": 208,
   "features": [
     {
       "feature": 1,
@@ -162,16 +162,16 @@
       "feature": 3,
       "name": "友だち",
       "total": 12,
-      "compared": 10,
-      "unimplemented": 2,
+      "compared": 0,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
-      "match": 2,
+      "missing": 12,
+      "match": 3,
       "structureMatchDataPending": 3,
       "needsFix": 5,
-      "unjudged": 0,
-      "remaining": 10,
+      "unjudged": 1,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 520,
@@ -270,6 +270,16 @@
             "w8W4Eh"
           ],
           "note": "Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。"
+        },
+        {
+          "pr": 975,
+          "head": "bdf6abfa7",
+          "on": "2026-09-06",
+          "screens": [
+            "vtBCu",
+            "ux7of"
+          ],
+          "note": "Issue #246。UID移行とCSV移行を本物のAPIへ接続し、1440/1920pxで撮影。vtBCuは設計画像と一致、ux7ofは設計画像なしのため本文照合で未判定。両画面とも横はみ出し0、壊れ値0。"
         }
       ]
     },
@@ -641,11 +651,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 14,
+      "match": 2,
+      "structureMatchDataPending": 5,
+      "needsFix": 8,
       "unjudged": 0,
-      "remaining": 15,
+      "remaining": 13,
       "capturedAt": [
         {
           "pr": 543,
@@ -804,6 +814,27 @@
             "TmHjF"
           ],
           "note": "最新 development `7d830282` で撮った。第1群5本（#666 #667 #668 #670 #674）と第2群4本（#660 #661 #664 #665）が入った木。撮影は内蔵SSDのクローン（外付けは障害のため使わない）。`TmHjF`（一覧の状態）が今回は撮れた。**24枚（12 Node）撮れた。** はじめ `h0kahp`・`vW4Es`・`FpgxH` が `locator.fill` の時間切れで撮れなかったが、原因は実装ではなく**撮る側**だった——`capture-screens.mjs` の `fill` が必ず `getByLabel` を通しており、台帳が `selector: true`（CSS選択子）で書いた10件を1つも拾えていなかった。両方を読むように直して撮れた。`cPk8A`・`sqFXf` は「詳細条件で絞り込んで配信する」が見つからず撮れない。"
+        },
+        {
+          "pr": 979,
+          "head": "3c6e4ec948",
+          "on": "2026-09-06",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "cPk8A",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "h0kahp",
+            "vW4Es",
+            "FpgxH",
+            "u6gHt",
+            "EGMb1",
+            "sqFXf",
+            "TmHjF"
+          ],
+          "note": "Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。"
         }
       ]
     },
@@ -1510,8 +1541,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 0,
-      "needsFix": 4,
+      "structureMatchDataPending": 1,
+      "needsFix": 3,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -1861,11 +1892,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 9,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 2,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
@@ -1974,8 +2005,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 1,
-      "needsFix": 3,
+      "structureMatchDataPending": 2,
+      "needsFix": 2,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -2080,11 +2111,11 @@
       "feature": 21,
       "name": "NEN配信",
       "total": 7,
-      "compared": 7,
+      "compared": 1,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 6,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 4,
@@ -2690,13 +2721,6 @@
   ],
   "gaps": [
     {
-      "feature": 3,
-      "node": "vtBCu",
-      "name": "3-4 UID移行",
-      "gap": "api",
-      "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
       "feature": 16,
       "node": "QX70l",
       "name": "16-1-G アフィリエイターを削除する確認",
@@ -2751,13 +2775,6 @@
       "name": "25-1-B オートメーションが動いた記録",
       "gap": "pending",
       "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
-    },
-    {
-      "feature": 3,
-      "node": "ux7of",
-      "name": "3-4-A UID・顧客データ移行／CSV",
-      "gap": "api",
-      "gapNote": "取り込みの記録と突き合わせの結果を持つ口が要る。`vtBCu`（3-4 UID移行）と同じ束"
     }
   ]
 }

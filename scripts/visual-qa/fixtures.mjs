@@ -2223,12 +2223,34 @@ export const MILEAGE_RULES = [
   どこからも使われていない 2」の内訳が撮れる6件。
 */
 export const CONVERSION_POINTS = [
-  { id: 'cp-1', name: 'ECの注文が確定したとき', eventType: 'ec_order_confirmed', value: 12800, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
-  { id: 'cp-2', name: 'ECの定期が確定したとき', eventType: 'ec_subscription_confirmed', value: 24000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
-  { id: 'cp-3', name: 'サイトの /download を見たとき', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
-  { id: 'cp-4', name: '体験の申し込み', eventType: 'form_submitted', value: 3000, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
-  { /* どこからも使われていない1件。 */ id: 'cp-5', name: '資料請求', eventType: 'form_submitted', value: 1500, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
-  { /* 止めている1件。 */ id: 'cp-6', name: '春の来店（終了）', eventType: 'manual', value: 800, measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: null, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+  { id: 'cp-1', name: '商品を買った', eventType: 'ec_order_confirmed', value: 1587, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-2', name: '体験申込フォームの送信', eventType: 'form_submitted', value: 12000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-3', name: '予約が入った', eventType: 'reservation_confirmed', value: 1816, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'cp-4', name: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', value: 8217, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
+  { id: 'cp-5', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', value: null, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
+  { /* どこからも使われていない1件。 */ id: 'cp-6', name: '資料をダウンロードした', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+]
+
+/*
+  成果地点レポート。現期間486件・1,284,000円、直前期間412件・
+  1,092,000円を固定し、一覧・レポート・作成前の同種集計が同じ数字を読む。
+*/
+export const CONVERSION_REPORT_CURRENT = [
+  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 386, totalValue: 612400 },
+  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 42, totalValue: 504000 },
+  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 38, totalValue: 69000 },
+  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 12, totalValue: 98600 },
+  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 8, totalValue: 0 },
+  { conversionPointId: 'cp-6', conversionPointName: '資料をダウンロードした', eventType: 'url_reach', totalCount: 0, totalValue: 0 },
+]
+
+export const CONVERSION_REPORT_PREVIOUS = [
+  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 341, totalValue: 630000 },
+  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 26, totalValue: 312000 },
+  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 33, totalValue: 60000 },
+  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 12, totalValue: 90000 },
+  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 0, totalValue: 0 },
+  { conversionPointId: 'cp-6', conversionPointName: '資料をダウンロードした', eventType: 'url_reach', totalCount: 0, totalValue: 0 },
 ]
 
 /*

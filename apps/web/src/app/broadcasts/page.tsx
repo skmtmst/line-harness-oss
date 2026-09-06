@@ -1,11 +1,11 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
@@ -62,6 +62,7 @@ type BroadcastTab = 'single' | 'dedup' | 'all'
 const UNFILED = '__unfiled__'
 
 function BroadcastList() {
+  usePageTitle('一斉配信')
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -236,8 +237,6 @@ function BroadcastList() {
 
   // タブで分類: 1アカウントへの配信 (multi-account-dedup 以外) と 複数アカウントの重複除外配信 を分ける。
   // 全件タブは未フィルタ。サイドバー account context のフィルタは API 側で済んでる。
-  const dedupCount = broadcasts.filter((b) => b.targetType === 'multi-account-dedup').length
-  const singleCount = broadcasts.length - dedupCount
   const visibleBroadcasts = broadcasts.filter((b) => {
     // タイトルは手元で絞る。打つたびに取り直すと重い。
     if (titleQuery.trim() && !b.title.toLowerCase().includes(titleQuery.trim().toLowerCase())) {
@@ -266,46 +265,6 @@ function BroadcastList() {
 
   return (
     <div>
-      {/* 設計 `V2 4-2 一斉配信` */}
-      <div data-design="Head">
-      <Header
-        title="一斉配信"
-        description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
-        action={(
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-            <button
-              type="button"
-              onClick={() => setFolderDialogOpen(true)}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              フォルダを追加
-            </button>
-            <button
-              type="button"
-              onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              テンプレートから配信
-            </button>
-            <button
-              onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
-              className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
-            >
-              + 新規配信
-            </button>
-          </div>
-        )}
-      />
-      </div>
-
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -328,7 +287,40 @@ function BroadcastList() {
       )}
 
       <div data-design="KPIs">
-      <BroadcastKpis />
+      <BroadcastKpis unavailable={loading || Boolean(error) || forbidden || (!loading && broadcasts.length === 0)} />
+      </div>
+
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled
+          title="マニュアルは準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+        >
+          マニュアル
+        </button>
+        <button
+          type="button"
+          onClick={() => setFolderDialogOpen(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          フォルダを追加
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+        >
+          テンプレートから配信
+        </button>
+        <button
+          type="button"
+          aria-label="新規配信を作成"
+          onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+        >
+          配信を作成
+        </button>
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
@@ -448,6 +440,33 @@ function BroadcastList() {
             ))}
           </div>
 
+          {!loading && broadcasts.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-ink-faint text-xs">送る範囲</span>
+              {([
+                { id: 'all', label: 'すべて' },
+                { id: 'single', label: '1つのアカウントだけに送る' },
+                { id: 'dedup', label: '複数アカウントで同じ人を2回数えない' },
+              ] as const).map((tab) => (
+                <label
+                  key={tab.id}
+                  className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${activeTab === tab.id ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}
+                >
+                  <input
+                    type="radio"
+                    name="broadcast-range"
+                    value={tab.id}
+                    checked={activeTab === tab.id}
+                    onChange={() => setActiveTab(tab.id)}
+                    className="sr-only"
+                  />
+                  <span className="inline-flex min-w-[20px] items-center justify-center">{tab.label}</span>
+                </label>
+              ))}
+              {activeTab === 'dedup' && <span className="text-xs text-ink-faint">同じ人が2つのアカウントの友だちでも、1回だけ送ります</span>}
+            </div>
+          )}
+
       {/* 読み込み失敗の帯。**権限不足のときは出さない**（下で別の1枚を出す）。 */}
       {error && !forbidden && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -463,33 +482,6 @@ function BroadcastList() {
           onCancel={() => setShowCreate(false)}
           openTemplatePickerInitially={openTemplatePicker}
         />
-      )}
-
-      {/* Tabs */}
-      {!loading && broadcasts.length > 0 && (
-        <div className="mb-4 flex gap-1 border-b border-hairline">
-          {([
-            { id: 'all', label: '全部', count: broadcasts.length },
-            { id: 'single', label: '1アカウント配信', count: singleCount },
-            { id: 'dedup', label: '複数アカウント重複除外', count: dedupCount },
-          ] as const).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-accent text-ink'
-                  : 'border-transparent text-ink-faint hover:text-ink-secondary'
-              }`}
-              style={activeTab === tab.id ? { borderColor: 'var(--color-accent)' } : undefined}
-            >
-              {tab.label}
-              <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0 rounded-full bg-canvas-sunken text-xs text-ink-secondary min-w-[20px]">
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
       )}
 
       {/* Loading */}
@@ -724,11 +716,7 @@ function BroadcastList() {
           名前で分かるので、種類を足すと読む語が増えるだけになる。
         */
         title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
-        description={
-          deleteTarget?.status === 'scheduled'
-            ? '予約が取り消され、この配信は送られなくなります。下書きの中身も一緒に消えます。すでに送った配信の記録は残ります。この操作は取り消せません。'
-            : '下書きの中身が消えます。まだ送っていないので、友だちには何も届きません。この操作は取り消せません。'
-        }
+        description="削除すると配信設定と確認画面から消えます。予約中の配信は中止され、この操作は取り消せません。"
         confirmLabel="削除する"
         destructive
         busy={deleting}
@@ -739,20 +727,7 @@ function BroadcastList() {
           setDeleteTarget(null)
           setDeleteError('')
         }}
-      >
-        {deleteTarget && (
-          <dl className="text-xs text-ink-secondary space-y-1">
-            <div className="flex gap-2">
-              <dt className="text-ink-faint shrink-0">配信日時</dt>
-              <dd className="min-w-0">{formatDatetime(deleteTarget.scheduledAt)}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="text-ink-faint shrink-0">送り先</dt>
-              <dd className="min-w-0">{audienceSummary(deleteTarget, getTagName)}</dd>
-            </div>
-          </dl>
-        )}
-      </ConfirmDialog>
+      />
     </div>
   )
 }

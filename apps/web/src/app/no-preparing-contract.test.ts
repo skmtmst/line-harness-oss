@@ -88,7 +88,6 @@ const DESIGN_WORDS: Record<string, number> = {
  *   絞り込みの「30日以上の絞り込みは準備中」と、行き先の決まっていない「マニュアル」。
  */
 const REMAINING: Record<string, number> = {
-  'app/accounts/migration.tsx': 2,
   'app/booking/bookings/detail/page.tsx': 4,
   'app/booking/bookings/page.tsx': 5,
   'app/booking/menus/staff/page.tsx': 1,
@@ -120,7 +119,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(145)  // 2026-09-06: 回答フォームの回答専用画面を加えた実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(146)  // 2026-09-06: UID・顧客データ移行画面を加えた実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
