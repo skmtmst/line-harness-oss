@@ -47,6 +47,8 @@ Ver. 0.0.0-dev
 
 設定
 
+はじめの設定
+LINEアカウント
 ログインユーザー
 機能設定
 運用状態
@@ -167,9 +169,12 @@ Kenta Kawano (Obama)
 
 担当：
 Kenta
-未割り当て
-Masato
+K
 Kenta
+M
+Masato
+－
+未割り当て
 対応中
 顧客情報を閉じる
 2026/08/13

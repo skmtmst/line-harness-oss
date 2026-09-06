@@ -23,6 +23,7 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import { MoreAction } from '@/components/shared/row-actions'
 import { Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star } from 'lucide-react'
 
 interface Chat {
@@ -108,6 +109,8 @@ type InboxSavedView = {
   conditions: InboxSavedViewConditions
   createdBy: string | null
   isShared: boolean
+  /** 保存条件を現在の受信箱へ当てた件数。未接続は null。 */
+  matchCount?: number | null
 }
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
@@ -421,6 +424,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [debouncedNameQuery, setDebouncedNameQuery] = useState('')
   const [savedViews, setSavedViews] = useState<InboxSavedView[]>([])
   const [savedViewsOpen, setSavedViewsOpen] = useState(false)
+  const [savedViewMenuId, setSavedViewMenuId] = useState<string | null>(null)
   const [savedViewName, setSavedViewName] = useState('')
   const [savedViewError, setSavedViewError] = useState('')
   const [savingView, setSavingView] = useState(false)
@@ -441,6 +445,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     `null` は「まだ読めていない」。**実値0とは別。**
   */
   const [assigneeUnread, setAssigneeUnread] = useState<InboxStats['assigneeUnread'] | null>(null)
+  const [assigneeUnreadStatus, setAssigneeUnreadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /*
    * 友だち詳細を出すか。既定は閉じる。
    *
@@ -1083,6 +1088,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       読み終わるまで残すと、別のアカウントの未読数を見たまま担当者を選ぶ。
     */
     setAssigneeUnread(null)
+    setAssigneeUnreadStatus('loading')
     ;(async () => {
       try {
         /*
@@ -1095,12 +1101,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         /* 失敗の返事を成功として読まない。`—` のままにする。 */
         if (!res.success) throw new Error('failed')
         setAssigneeUnread(res.data.assigneeUnread)
+        setAssigneeUnreadStatus('ready')
       } catch {
         /*
           **集計の失敗を0件と扱わない。** `null` のままにして数だけ `—` にする。
           担当者一覧そのものは `/api/operators` の結果を保つ。
         */
-        if (!cancelled) setAssigneeUnread(null)
+        if (!cancelled) {
+          setAssigneeUnread(null)
+          setAssigneeUnreadStatus('error')
+        }
       }
     })()
     return () => {
@@ -1282,21 +1292,42 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!selectedAccountId) return
-                        await api.chats.savedViews.delete(view.id, selectedAccountId)
-                        await loadSavedViews()
-                      }}
-                      className="text-danger hover:bg-danger-bg shrink-0 rounded px-1.5 py-1 text-xs"
-                      aria-label={`${view.name}を削除`}
-                    >
-                      削除
-                    </button>
+                    <span className="text-ink-secondary shrink-0 text-xs tabular-nums">
+                      {typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'}
+                    </span>
+                    <div className="relative shrink-0">
+                      <MoreAction
+                        label={`${view.name}の操作`}
+                        aria-expanded={savedViewMenuId === view.id}
+                        data-qa-open={view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined}
+                        onClick={() => setSavedViewMenuId((current) => current === view.id ? null : view.id)}
+                      />
+                      {savedViewMenuId === view.id ? (
+                        <div className="border-hairline bg-canvas absolute top-full right-0 z-50 mt-1 w-40 rounded-control border p-1 shadow-lg" role="menu">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={async () => {
+                              if (!selectedAccountId) return
+                              await api.chats.savedViews.delete(view.id, selectedAccountId)
+                              setSavedViewMenuId(null)
+                              await loadSavedViews()
+                            }}
+                            className="text-danger hover:bg-status-danger-soft w-full rounded-mini px-2.5 py-2 text-left text-xs"
+                          >
+                            保存した検索を削除
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
+              {savedViews.some((view) => typeof view.matchCount !== 'number') ? (
+                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                  該当件数は、保存した条件ごとの集計が接続されると表示されます。「—件」は0件ではありません。
+                </p>
+              ) : null}
               {/*
                 前はここに名前の入力欄と保存ボタンが直接並んでいた。
                 **何を保存しようとしているのかが書いていない**ので、絞り込みを
@@ -1305,7 +1336,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               */}
               <div className="border-hairline mt-3 border-t pt-3">
                 <Button variant="primary" type="button" onClick={() => setSaveDialogOpen(true)}>
-                  この条件を保存
+                  現在の条件を保存
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
@@ -1392,6 +1423,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   label="担当者"
                   ariaLabel="担当者で絞り込む"
                   unreadOf={unreadLookup(assigneeUnread)}
+                  unreadUnavailable={assigneeUnreadStatus === 'error'}
                 />
               </span>
             </label>
