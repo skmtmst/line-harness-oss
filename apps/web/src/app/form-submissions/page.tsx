@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
-import { api } from '@/lib/api'
+import { api, type FormDeleteImpact } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
@@ -33,6 +33,8 @@ interface Form {
   layout: FormLayout
   onSubmitTagId: string | null
   isActive: boolean
+  status: 'active' | 'archived'
+  revision: number
   submitCount?: number
   createdAt: string
   lastSubmittedAt: string | null
@@ -137,7 +139,10 @@ export default function FormSubmissionsPage() {
   const [savingName, setSavingName] = useState(false)
   const [renameError, setRenameError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
+  const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [stopping, setStopping] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -274,18 +279,36 @@ export default function FormSubmissionsPage() {
     }
   }
 
-  const openDelete = (form: Form) => {
+  const openDelete = async (form: Form) => {
     setDeleteTarget(form)
+    setDeleteImpact(null)
+    setDeleteImpactLoading(true)
     setDeleteError('')
+    if (!selectedAccountId) {
+      setDeleteImpactLoading(false)
+      setDeleteError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const result = await api.forms.deleteImpact(form.id, selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      setDeleteImpact(result.data)
+    } catch {
+      setDeleteError('アーカイブしたときの影響を確認できませんでした。もう一度開き直してください。')
+    } finally {
+      setDeleteImpactLoading(false)
+    }
   }
 
   const removeForm = async () => {
-    if (!deleteTarget || deleting || !selectedAccountId) return
+    if (!deleteTarget || !deleteImpact || deleting || stopping || !selectedAccountId) return
     const targetId = deleteTarget.id
     setDeleting(true)
     setDeleteError('')
     try {
-      const result = await api.forms.remove(targetId, selectedAccountId)
+      const result = deleteImpact.canDelete
+        ? await api.forms.remove(targetId, selectedAccountId, deleteImpact.revision)
+        : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
       if (!result.success) throw new Error('delete_failed')
       setForms((current) => current.filter((form) => form.id !== targetId))
       if (selectedFormId === targetId) {
@@ -297,9 +320,28 @@ export default function FormSubmissionsPage() {
       }
       setDeleteTarget(null)
     } catch {
-      setDeleteError('この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      setDeleteError('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const stopAccepting = async () => {
+    if (!deleteTarget || stopping || deleting || !selectedAccountId) return
+    setStopping(true)
+    setDeleteError('')
+    try {
+      const result = await api.forms.update(deleteTarget.id, selectedAccountId, { isActive: false })
+      if (!result.success) throw new Error(result.error)
+      setForms((current) => current.map((form) => (
+        form.id === deleteTarget.id ? { ...form, isActive: false } : form
+      )))
+      setDeleteTarget(null)
+      setDeleteImpact(null)
+    } catch {
+      setDeleteError('回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setStopping(false)
     }
   }
 
@@ -528,6 +570,16 @@ export default function FormSubmissionsPage() {
                   </button>
 
                   <div className="absolute right-3 top-3 flex items-center gap-1">
+                    <Link
+                      href={`/form-submissions/${encodeURIComponent(form.id)}/responses`}
+                      className="text-ink-faint hover:bg-accent-soft hover:text-accent rounded-md p-1 opacity-60 transition group-hover:opacity-100"
+                      aria-label={`${normalizedName}の集まった回答を見る`}
+                      title="集まった回答を見る"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    </Link>
                     <button
                       type="button"
                       onClick={() => openRename(form)}
@@ -541,7 +593,7 @@ export default function FormSubmissionsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => openDelete(form)}
+                      onClick={() => void openDelete(form)}
                       className="text-ink-faint hover:bg-danger-bg hover:text-danger rounded-md p-1 opacity-60 transition group-hover:opacity-100"
                       aria-label={`${normalizedName}を削除`}
                       title="回答フォームを削除"
@@ -802,19 +854,72 @@ export default function FormSubmissionsPage() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={deleteTarget ? `「${displayFormName(deleteTarget.name)}」を削除しますか？` : '回答フォームを削除しますか？'}
-        description="フォームの質問・公開設定・集まった回答を削除します。回答から友だち情報欄やタグへ反映済みの内容は残ります。この操作は元に戻せません。"
-        confirmLabel="削除する"
-        destructive
-        busy={deleting}
+        designNode="gBp2J"
+        title={deleteTarget
+          ? `「${displayFormName(deleteTarget.name)}」を${deleteImpact?.canDelete ? '削除' : 'アーカイブ'}しますか？`
+          : '回答フォームをアーカイブしますか？'}
+        description={deleteImpact?.canDelete
+          ? '未公開で回答も利用先もないため、フォームを完全に削除できます。この操作は元に戻せません。'
+          : '公開中・回答あり・利用中のフォームは削除せず、回答と利用先を残してアーカイブします。公開URLは開けなくなります。'}
+        confirmLabel={deleteImpact?.canDelete ? '削除する' : 'アーカイブする'}
+        destructive={deleteImpact?.canDelete ?? false}
+        busy={deleting || stopping || deleteImpactLoading}
         error={deleteError}
         onCancel={() => {
-          if (deleting) return
+          if (deleting || stopping) return
           setDeleteTarget(null)
+          setDeleteImpact(null)
           setDeleteError('')
         }}
-        onConfirm={() => void removeForm()}
-      />
+        onConfirm={deleteImpact && deleteImpact.recommendedAction !== 'none'
+          ? () => void removeForm()
+          : undefined}
+      >
+        {deleteImpactLoading ? (
+          <p className="text-ink-faint text-sm">公開状態・回答数・利用中の場所を確認しています。</p>
+        ) : deleteImpact ? (
+          <div className="space-y-3 text-sm">
+            <dl className="bg-canvas-sunken grid grid-cols-2 gap-2 rounded-control p-3">
+              <div><dt className="text-ink-faint text-xs">公開状態</dt><dd className="text-ink mt-1 font-medium">{deleteImpact.form.isActive ? '公開中' : '受付停止中'}</dd></div>
+              <div><dt className="text-ink-faint text-xs">集まった回答</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.submissionCount.toLocaleString('ja-JP')}件</dd></div>
+              <div><dt className="text-ink-faint text-xs">利用中の場所</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.referenceCount.toLocaleString('ja-JP')}か所</dd></div>
+              <div><dt className="text-ink-faint text-xs">開かれた回数</dt><dd className="text-ink mt-1 font-medium tabular-nums">{deleteImpact.openCount.toLocaleString('ja-JP')}回</dd></div>
+            </dl>
+            {deleteImpact.answerUrl && (
+              <div>
+                <p className="text-ink-faint text-xs">開けなくなる公開URL</p>
+                <p className="text-ink mt-1 break-all text-xs">{deleteImpact.answerUrl}</p>
+              </div>
+            )}
+            {deleteImpact.references.length > 0 && (
+              <div>
+                <p className="text-ink-faint text-xs">先に差し替える利用先</p>
+                <ul className="text-ink-secondary mt-1 space-y-1 text-xs">
+                  {deleteImpact.references.map((reference, index) => (
+                    <li key={`${reference.kind}-${reference.href ?? index}`}>
+                      ・{reference.name ?? '名前を確認できない利用先'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!deleteImpact.canDelete && deleteImpact.form.isActive && (
+              <div className="border-hairline rounded-control border p-3">
+                <p className="text-ink text-xs font-medium">受付だけ止める（おすすめ）</p>
+                <p className="text-ink-faint mt-1 text-xs">一覧と回答を残したまま、新しい回答だけを止めます。</p>
+                <Button className="mt-3" onClick={() => void stopAccepting()} disabled={stopping || deleting}>
+                  {stopping ? '停止中' : '受付だけ止める'}
+                </Button>
+              </div>
+            )}
+            {deleteImpact.submissionCount > 0 && (
+              <Button href={`/form-submissions/${encodeURIComponent(deleteImpact.form.id)}/responses`}>
+                回答をCSVで書き出す画面へ
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   )
 }

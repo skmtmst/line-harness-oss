@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const DESIGN_SETTINGS = readFileSync(join(HERE, 'edit', 'form-design-settings.tsx'), 'utf8')
+const RESPONSES_PAGE = readFileSync(join(HERE, '[id]', 'responses', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6回答フォーム一覧', () => {
@@ -55,5 +58,44 @@ describe('V6回答フォーム一覧', () => {
     expect(PAGE).toContain('account_id=${encodeURIComponent(selectedAccountId)}')
     expect(PAGE).toContain('LINE公式アカウントを選んでください')
     expect(API).toContain('createDraft: (accountId: string')
+  })
+})
+
+describe('V6回答フォームの未実装3画面', () => {
+  it('ava2n は押せるデザイン設定で、5色・書体・角丸・背景とSNS表示を保存する', () => {
+    expect(EDIT_PAGE).toContain("params.get('tab') === 'design'")
+    expect(EDIT_PAGE).toContain('<FormDesignSettings')
+    expect(EDIT_PAGE).not.toContain('title="準備中です"')
+    for (const label of ['メイン', 'サブ', 'アクセント', 'エラー', '文字', '文字の書体', '角の丸み', '背景画像']) {
+      expect(DESIGN_SETTINGS).toContain(label)
+    }
+    expect(EDIT_PAGE).toContain('ogTitle: ogTitle.trim() || null')
+    expect(EDIT_PAGE).toContain('ogDescription: ogDescription.trim() || null')
+    expect(EDIT_PAGE).toContain('ogImageUrl: ogImageUrl.trim() || null')
+  })
+
+  it('v9tYhl は専用ルートで通常・読込・空・失敗を言い分ける', () => {
+    expect(RESPONSES_PAGE).toContain('data-design-node="v9tYhl"')
+    expect(RESPONSES_PAGE).toContain('kind="loading"')
+    expect(RESPONSES_PAGE).toContain('kind="error"')
+    expect(RESPONSES_PAGE).toContain('まだ回答がありません')
+    expect(RESPONSES_PAGE).toContain('条件に合う回答はありません')
+    expect(RESPONSES_PAGE).toContain('onRetry={() => void load(page, pageSize)}')
+  })
+
+  it('回答はアカウントを限定してAPI側ページングし、全ページをCSVへ集める', () => {
+    expect(RESPONSES_PAGE).toContain('submissions?page=${nextPage}&limit=${nextLimit}&${account}')
+    expect(RESPONSES_PAGE).toContain('submissions?page=${currentPage}&limit=50&account_id=')
+    expect(RESPONSES_PAGE).toContain('while (all.length < expected')
+    expect(RESPONSES_PAGE).toContain('<Pagination')
+    expect(RESPONSES_PAGE).toContain('<TableHeadRow>')
+    expect(RESPONSES_PAGE).toContain('<Th')
+  })
+
+  it('取得口が無い指標を0件にせずダッシュと理由で出す', () => {
+    expect(RESPONSES_PAGE).toContain('value="—" note="開いた実人数の集計口がありません"')
+    expect(RESPONSES_PAGE).toContain('回答単位の書き込み結果は未取得です')
+    expect(RESPONSES_PAGE).toContain('回答単位の版は未取得')
+    expect(RESPONSES_PAGE).toContain('回答単位の結果は未取得')
   })
 })
