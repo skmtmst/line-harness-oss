@@ -19,6 +19,7 @@ import {
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
+import StepTrail from '@/components/shared/step-trail'
 
 export interface AutoReplyDraft {
   id?: string
@@ -144,6 +145,8 @@ interface Props {
   templates: Array<{ id: string; name: string; messageType: string; messageContent: string }>
   onClose: () => void
   onSaved: () => void
+  /** URLから開く編集画面では、設計どおりページ内に広く表示する。 */
+  page?: boolean
 }
 
 type ResponseMode = 'silent' | 'template' | 'inline-text' | 'inline-flex' | 'inline-image'
@@ -156,7 +159,7 @@ function detectMode(d: AutoReplyDraft): ResponseMode {
   return 'inline-text'
 }
 
-export default function EditDialog({ draft, templates, onClose, onSaved }: Props) {
+export default function EditDialog({ draft, templates, onClose, onSaved, page = false }: Props) {
   const [keyword, setKeyword] = useState(draft.keyword)
   const [matchType, setMatchType] = useState<'exact' | 'contains'>(draft.matchType)
   const [mode, setMode] = useState<ResponseMode>(detectMode(draft))
@@ -323,8 +326,21 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className={page ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'}>
+      {page && (
+        <StepTrail
+          label="自動応答を作る進み方"
+          items={[
+            { label: '基本設定', state: 'current' },
+            { label: 'どんなときに動くか', state: 'todo' },
+            { label: '何を返すか', state: 'todo' },
+            { label: '優先順位', state: 'todo' },
+            { label: '確認', state: 'todo' },
+          ]}
+        />
+      )}
+      <div className={page ? 'grid items-start gap-4 xl:grid-cols-4' : ''}>
+      <div className={page ? 'bg-canvas rounded-card border-hairline w-full border xl:col-span-3' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}>
         <div className="px-5 py-4 border-b">
           <h3 className="text-base font-semibold">{draft.id ? '自動応答編集' : '自動応答を作る'}</h3>
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">
@@ -477,6 +493,9 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">
             <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
+            <p className="text-ink-faint text-xs">
+              複数のキーワードは、下の「すべて必須／どれか1つ」でつなぎ方を決めます。
+            </p>
 
             <div>
               <p className="text-ink-faint mb-1.5 text-xs">応答する曜日</p>
@@ -680,6 +699,18 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               <p className="text-ink-faint mt-1 text-[11px]">
                 条件を入れないと、全員に応答します。
               </p>
+              <div className="bg-canvas-sunken mt-3 rounded-control p-3 text-xs">
+                <p className="text-ink font-medium">この条件に当たった受信</p>
+                <p className="text-ink-faint mt-1">
+                  過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。
+                </p>
+                <p className="text-ink-faint mt-2">
+                  標準互換15軸：名前・個別メモ・ステータスメッセージ・友だち登録日・タグ・友だち情報・シナリオ・イベント予約・カレンダー予約・共通情報・リマインダ・回答フォーム・最終反応日・その他・対応マーク
+                </p>
+                <p className="text-ink-faint mt-1">
+                  この画面だけの6軸：担当者・流入経路・配信状況・予約状況・購入履歴・ブロック状態
+                </p>
+              </div>
             </div>
           </div>
           <div>
@@ -690,8 +721,8 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 { key: 'silent', label: '返信しない' },
                 { key: 'template', label: 'テンプレートから' },
                 { key: 'inline-text', label: 'この画面に直接書く' },
-                { key: 'inline-flex', label: 'Flex（JSONを直接書く）' },
-                { key: 'inline-image', label: '画像（JSONを直接書く）' },
+                { key: 'inline-flex', label: 'カードを直接作る' },
+                { key: 'inline-image', label: '画像を直接選ぶ' },
               ] as const).map(({ key, label }) => (
                 <button
                   key={key}
@@ -713,7 +744,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               >
                 <option value="">-- 選択 --</option>
                 {flexTemplates.length > 0 && (
-                  <optgroup label="Flex">
+                  <optgroup label="カード">
                     {flexTemplates.map((t) => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
@@ -744,7 +775,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           {(mode === 'inline-text' || mode === 'inline-flex') && (
             <div>
               <label className="block text-xs text-gray-600 mb-1">
-                {mode === 'inline-flex' ? 'Flex JSON' : 'テキスト'}
+                {mode === 'inline-flex' ? 'カードの内容' : 'テキスト'}
               </label>
               <textarea
                 rows={mode === 'inline-flex' ? 8 : 4}
@@ -849,6 +880,34 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
             </>
           )}
         />
+      </div>
+      {page && (
+        <aside className="space-y-3 xl:sticky xl:top-4">
+          <div className="bg-canvas rounded-card border-hairline border p-4">
+            <h3 className="text-ink text-sm font-semibold">設定内容</h3>
+            <dl className="divide-hairline mt-3 divide-y text-xs">
+              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-medium">{isActive ? '有効' : '停止中'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">一致方法</dt><dd className="text-ink font-medium">{respondToAll ? 'すべて' : matchType === 'exact' ? '完全一致' : '部分一致'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">キーワード</dt><dd className="text-ink max-w-40 truncate font-medium" title={keyword}>{respondToAll ? '指定なし' : keyword || '未入力'}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">優先順位</dt><dd className="text-ink font-medium">{priority || '未入力'}</dd></div>
+            </dl>
+          </div>
+          <div className="overflow-hidden rounded-card border border-blue-200 bg-blue-300">
+            <p className="py-4 text-center text-sm font-semibold text-white">LINEプレビュー</p>
+            <div className="mx-4 mb-4 rounded-card bg-white p-4 text-sm leading-relaxed text-ink">
+              {mode === 'silent'
+                ? '返信はせず、設定したアクションだけを実行します。'
+                : responseContent || '返信内容を入力すると、ここに表示されます。'}
+            </div>
+          </div>
+          <div className="bg-canvas rounded-card border-hairline border p-4 text-xs">
+            <p className="text-ink font-semibold">動作の確認</p>
+            <p className="text-ink-faint mt-2 leading-relaxed">
+              保存後に「競合を確認」へ進むと、同時に当たるルールと実際に優先されるルールを確認できます。
+            </p>
+          </div>
+        </aside>
+      )}
       </div>
     </div>
   )
