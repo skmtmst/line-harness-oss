@@ -46,5 +46,6 @@ describe('受信箱の担当者候補', () => {
   it('未読数を取得できない理由と次の行動を本文に出す', () => {
     expect(DROPDOWN).toContain('未読の数をいま数えられません')
     expect(DROPDOWN).toContain('0件とは違います。少し待ってからもう一度開いてください。')
+    expect(DROPDOWN).toContain('border-warning bg-warning-bg')
   })
 })
