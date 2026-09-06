@@ -270,6 +270,61 @@ describe('api.friendAddRouting draft/test/publish contract', () => {
   })
 })
 
+describe('api.friendAddRules V6 data contract', () => {
+  it('一覧・競合・実行結果を選択中アカウントとカーソルへ結びつける', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: { items: [], summary: {}, nextCursor: null } }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.friendAddRules.list('account 1', 'first_time', { status: 'published', cursor: 'next/cursor', limit: 20 })
+    await api.friendAddRules.conflicts('account 1', 'first_time')
+    await api.friendAddRules.runs('account 1', { status: 'failed', ruleId: 'rule/1', cursor: 'run/cursor', limit: 20 })
+
+    expect(spy.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example.com/api/friend-add-rules?account_id=account+1&kind=first_time&status=published&cursor=next%2Fcursor&limit=20',
+      'https://worker.example.com/api/friend-add-rules/conflicts?account_id=account%201&kind=first_time',
+      'https://worker.example.com/api/friend-add-runs?account_id=account+1&status=failed&rule_id=rule%2F1&cursor=run%2Fcursor&limit=20',
+    ])
+  })
+
+  it('フォルダ作成と公開に操作識別キーを付ける', async () => {
+    const spy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: {} }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', spy)
+
+    await api.friendAddRules.createFolder('account-1', '店頭', 'folder-key-00000001')
+    await api.friendAddRules.publish('account-1', 'rule/1', 'publish-key-00000001')
+    await api.friendAddRules.stop('account-1', 'rule/1', 7)
+
+    expect(spy.mock.calls[0]).toEqual([
+      'https://worker.example.com/api/friend-add-rules/folders',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ accountId: 'account-1', name: '店頭' }),
+        headers: expect.objectContaining({ 'Idempotency-Key': 'folder-key-00000001' }),
+      }),
+    ])
+    expect(spy.mock.calls[1]?.[0]).toBe(
+      'https://worker.example.com/api/friend-add-rules/rule%2F1/publish?account_id=account-1',
+    )
+    expect(spy.mock.calls[1]?.[1]?.headers).toEqual(expect.objectContaining({
+      'Idempotency-Key': 'publish-key-00000001',
+    }))
+    expect(spy.mock.calls[2]?.[0]).toBe(
+      'https://worker.example.com/api/friend-add-rules/rule%2F1/stop?account_id=account-1',
+    )
+    expect(spy.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ version: 7 }),
+      headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+    }))
+  })
+})
+
 describe('api.actionScores rule contract', () => {
   const configuration = {
     rules: [{

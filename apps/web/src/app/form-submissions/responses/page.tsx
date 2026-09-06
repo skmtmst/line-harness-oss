@@ -12,6 +12,13 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { fetchApi } from '@/lib/api'
+import {
+  completedDestinationWrites,
+  destinationWriteText,
+  nextVisitPeople,
+  type DestinationWrite,
+  type FormSubmissionSummary,
+} from './response-summary'
 
 type Submission = {
   id: string
@@ -19,6 +26,7 @@ type Submission = {
   friendId: string | null
   friendName: string | null
   data: Record<string, unknown> | string
+  destinationWrite: DestinationWrite
   createdAt: string
 }
 
@@ -27,6 +35,7 @@ type SubmissionPage = {
   total: number
   page: number
   limit: number
+  summary?: FormSubmissionSummary
 }
 
 type FormDetail = {
@@ -85,6 +94,7 @@ function FormResponsesInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [form, setForm] = useState<FormDetail | null>(null)
   const [items, setItems] = useState<Submission[]>([])
+  const [summary, setSummary] = useState<FormSubmissionSummary | null>(null)
   const [total, setTotal] = useState<number | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -114,6 +124,7 @@ function FormResponsesInner() {
       if (!formResult.success || !responseResult.success) throw new Error('load_failed')
       setForm(formResult.data)
       setItems(responseResult.data.items.map(normalizedSubmission))
+      setSummary(responseResult.data.summary ?? null)
       setTotal(responseResult.data.total)
       setPage(responseResult.data.page)
       setPageSize(responseResult.data.limit)
@@ -121,6 +132,7 @@ function FormResponsesInner() {
     } catch {
       setError('集まった回答を読み込めませんでした。')
       setItems([])
+      setSummary(null)
       setTotal(null)
     } finally {
       setLoading(false)
@@ -198,6 +210,10 @@ function FormResponsesInner() {
   if (!form) return <ListState kind="empty" title="回答フォームが見つかりません" />
 
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
+  const destinationWriteCount = completedDestinationWrites(summary)
+  const failedDestinationWrites = summary?.destinationWrites.failed ?? null
+  const nextVisitSummary = summary?.dateFields.find((field) => field.key === 'next_visit')
+  const nextVisitCount = nextVisitPeople(summary)
 
   return (
     <div data-design-node="v9tYhl">
@@ -225,9 +241,21 @@ function FormResponsesInner() {
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="回答" value={total === null ? '—' : `${total.toLocaleString('ja-JP')}件`} note="現在保存されている回答" />
-        <Kpi label="開いた人のうち答えた割合" value="—" note="開いた実人数の集計口がありません" />
-        <Kpi label="友だち情報欄への書き込み" value="—" note="回答単位の書き込み結果は未取得です" />
-        <Kpi label="次回の予定が入った人" value="—" note="日付項目を全件集計する口がありません" />
+        <Kpi
+          label="開いた人のうち答えた割合"
+          value={summary?.completionRate == null ? '—' : `${summary.completionRate.toLocaleString('ja-JP')}%`}
+          note={summary ? `${summary.startedUnique.toLocaleString('ja-JP')}人が開いて、${summary.submitted.toLocaleString('ja-JP')}人が答えた` : '開始数の集計を取得できませんでした'}
+        />
+        <Kpi
+          label="友だち情報欄への書き込み"
+          value={destinationWriteCount == null ? '—' : `${destinationWriteCount.toLocaleString('ja-JP')}件`}
+          note={failedDestinationWrites == null ? '書き込み結果を取得できませんでした' : failedDestinationWrites > 0 ? `${failedDestinationWrites.toLocaleString('ja-JP')}件は欄が消えていて書けていません` : 'すべて書き込み済みです'}
+        />
+        <Kpi
+          label="次回の予定が入った人"
+          value={nextVisitCount == null ? '—' : `${nextVisitCount.toLocaleString('ja-JP')}人`}
+          note={nextVisitSummary ? `${nextVisitSummary.label}を全回答から集計` : summary ? '日付の回答を全回答から集計' : '日付項目の集計を取得できませんでした'}
+        />
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -308,7 +336,8 @@ function ResponseDetail({ item, fieldKeys, labels, onClose }: { item: Submission
           <Detail label="答えた日時" value={new Date(item.createdAt).toLocaleString('ja-JP')} />
           <Detail label="フォームの版" value="—（回答単位の版は未取得）" />
           {fieldKeys.map((key) => <Detail key={key} label={labels[key] ?? key} value={valueText((item.data as Record<string, unknown>)[key])} />)}
-          <Detail label="アクション結果" value="—（回答単位の結果は未取得）" />
+          <Detail label="友だち情報欄への書き込み" value={destinationWriteText(item.destinationWrite)} />
+          <Detail label="アクション結果" value="—（回答後アクションの結果は未取得）" />
           <Detail label="Webhook結果" value="—（回答単位の結果は未取得）" />
         </dl>
         {item.friendId && <Button className="mt-6" href={`/chats?friend=${encodeURIComponent(item.friendId)}`}>友だち詳細を開く</Button>}
