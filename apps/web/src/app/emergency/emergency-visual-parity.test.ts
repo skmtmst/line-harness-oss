@@ -46,16 +46,16 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).not.toContain('全UI確認（仮表示）')
   })
 
-  it('実データを使う6つのチェック項目を常に表示する', () => {
+  it('サーバーが保存した6つのチェック項目を常に表示する', () => {
     for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化']) {
       expect(source).toContain(`label: '${label}'`)
     }
     expect(source).not.toContain("label: '定期処理'")
     expect(source).toContain('6項目を常に表示し、確認内容と最新結果を示します')
-    expect(source).toContain('api.health.getHealth')
-    expect(source).toContain('api.system.health')
-    expect(source).toContain('api.webhooks.incoming.list')
-    expect(source).toContain('api.broadcasts.list')
+    expect(source).toContain('api.operations.health')
+    expect(source).toContain('api.operations.runHealth')
+    expect(source).toContain('result?.observedAt')
+    expect(source).not.toContain('api.health.getHealth')
   })
 
   it('3つの概要カードと上部の主要操作を表示する', () => {
@@ -77,6 +77,9 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).toContain('api.operations.stop')
     expect(source).toContain('api.operations.restore')
     expect(source).toContain('api.operations.history')
+    expect(source).toContain('api.operations.stepUp')
+    expect(source).toContain('認証アプリの6桁コード')
+    expect(source).toContain("item.historyKind === 'deployment'")
     expect(source).toContain("'auto_reply_dispatch'")
     expect(source).not.toContain('nen_emergency_snapshot_v1')
     expect(source).not.toContain('NEXT_PUBLIC_ADMIN_API_KEY')

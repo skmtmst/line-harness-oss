@@ -16,7 +16,7 @@ import { MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR } from '
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { DUPLICATE_STATS, USERS_GROUPED } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
-import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL } from './fixtures.mjs';
+import { AUTOMATIONS, AUTOMATION_TEMPLATES, COMMON_ACTION_DETAIL, COMMON_ACTIONS } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS } from './fixtures.mjs';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
@@ -79,6 +79,20 @@ describe('オートメーションの画面確認データ', () => {
     expect(AUTOMATIONS.filter((item: { isActive: boolean }) => item.isActive)).toHaveLength(14);
     expect(AUTOMATIONS.filter((item: { isActive: boolean }) => !item.isActive)).toHaveLength(4);
     expect(AUTOMATION_TEMPLATES).toHaveLength(12);
+  });
+
+  it('一覧の30日実績を設計と同じ合計で返す', () => {
+    expect(AUTOMATIONS.reduce((sum: number, item: { executionCount30d: number }) => sum + item.executionCount30d, 0)).toBe(8_420);
+    expect(AUTOMATIONS.reduce((sum: number, item: { failureCount30d: number }) => sum + item.failureCount30d, 0)).toBe(6);
+    expect(AUTOMATIONS.filter((item: { executionCount30d: number }) => item.executionCount30d === 0)).toHaveLength(3);
+  });
+
+  it('共通アクションの件数・呼び出し元・今月実績を設計と同じ合計で返す', () => {
+    expect(COMMON_ACTIONS).toHaveLength(14);
+    expect(COMMON_ACTIONS.filter((item: { status: string }) => item.status === 'published')).toHaveLength(11);
+    expect(COMMON_ACTIONS.reduce((sum: number, item: { bindingCount: number }) => sum + item.bindingCount, 0)).toBe(38);
+    expect(COMMON_ACTIONS.reduce((sum: number, item: { executionCountThisMonth: number }) => sum + item.executionCountThisMonth, 0)).toBe(2_847);
+    expect(COMMON_ACTIONS.reduce((sum: number, item: { failureCountThisMonth: number }) => sum + item.failureCountThisMonth, 0)).toBe(6);
   });
 
   it('共通アクションの公開4版と5つの利用先を同じ契約で返す', () => {

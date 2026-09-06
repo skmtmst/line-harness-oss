@@ -15,6 +15,13 @@ const mocks = {
   setConversionApproval: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
   syncAffiliateConversionMileage: vi.fn(),
+  listConversionDefinitions: vi.fn(),
+  getConversionDefinitionDetail: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
+  getConversionDefinitionReport: vi.fn(),
+  listConversionDefinitionsForExport: vi.fn(),
+  ConversionDefinitionError: class ConversionDefinitionError extends Error {},
+  CONVERSION_DEFINITION_USAGE_KINDS: [],
 };
 vi.mock('@line-crm/db', () => mocks);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval: vi.fn() }));
@@ -63,6 +70,7 @@ const POINT = {
   count_repeat: 1,
   attribution_days: null,
   line_account_id: null,
+  version: 1,
   status: 'active' as const,
   stopped_at: null,
   updated_at: '2026-08-15',

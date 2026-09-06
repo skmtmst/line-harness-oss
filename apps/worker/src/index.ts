@@ -68,6 +68,7 @@ import { inbox } from './routes/inbox.js';
 import { openapi } from './routes/openapi.js';
 import { liffRoutes } from './routes/liff.js';
 import { affiliateSelfRoutes } from './routes/affiliate-self.js';
+import { affiliatePayouts } from './routes/affiliate-payouts.js';
 // Round 3 ルート
 import { webhooks } from './routes/webhooks.js';
 import { calendar } from './routes/calendar.js';
@@ -301,6 +302,7 @@ export const ADMIN_REQUEST_HEADERS = [
   'X-Filename',
   'Idempotency-Key',
   'X-Confirm-Irreversible',
+  'x-step-up-token',
 ] as const;
 
 // CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
@@ -350,6 +352,7 @@ app.route('/', inbox);
 app.route('/', openapi);
 app.route('/', liffRoutes);
 app.route('/', affiliateSelfRoutes);
+app.route('/', affiliatePayouts);
 
 // Mount route groups — Round 3
 app.route('/', webhooks);
