@@ -395,11 +395,13 @@ export default function EditDialog({
               : draft.id ? '自動応答編集' : '自動応答を作る'}
           </h3>
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-            {step === 'basic'
-              ? '名前と管理方法を決めて、反応条件へ進みます。'
-              : step === 'trigger'
-                ? '受信した言葉・曜日・時間帯・相手を組み合わせます。'
-                : '返信内容と、応答した後に行う処理を設定します。'}
+            {page
+              ? step === 'basic'
+                ? '名前と管理方法を決めて、反応条件へ進みます。'
+                : step === 'trigger'
+                  ? '受信した言葉・曜日・時間帯・相手を組み合わせます。'
+                  : '返信内容と、応答した後に行う処理を設定します。'
+              : '受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。'}
           </p>
         </div>
         <div className="p-5 space-y-4">
@@ -518,13 +520,13 @@ export default function EditDialog({
                   <div><h2 className="text-ink text-lg font-bold">ひな形から作る</h2><p className="text-ink-faint mt-1 text-xs">よく使う組み合わせです。選ぶと条件と返信がまとめて入ります。</p></div>
                   <Button href="/templates">ひな形を管理</Button>
                 </div>
-                <div className="mt-4 divide-y divide-hairline rounded-tile border border-hairline">
+                <div className="mt-4 divide-y divide-hairline rounded-card border border-hairline">
                   {[
                     ['営業時間外の自動返信', '毎日 21:00〜09:00 に受信', 'テキスト返信＋担当者へ通知'],
                     ['予約変更の受付', '「予約変更」「日程変更」を含む', 'テンプレート送信＋対応マーク'],
                     ['よくある質問への回答', '「営業時間」「場所」「料金」を含む', '回答テンプレート＋タグ付与'],
                   ].map(([name, when, reply]) => (
-                    <div key={name} className="grid items-center gap-3 px-4 py-3 text-sm lg:grid-cols-[1fr_1fr_1fr_auto]">
+                    <div key={name} className="grid items-center gap-3 px-4 py-3 text-sm lg:grid-cols-4">
                       <strong>{name}</strong><span className="text-ink-secondary">{when}</span><span className="text-ink-secondary">{reply}</span>
                       <Button type="button" onClick={() => { setRuleName(name); moveTo('trigger') }}>このひな形を使う</Button>
                     </div>
@@ -812,7 +814,7 @@ export default function EditDialog({
                 <select disabled className="border-hairline rounded-control w-full border bg-canvas-sunken px-3 py-2 text-sm">
                   <option>LINE</option>
                 </select>
-                <span className="text-ink-faint mt-1 block text-[11px]">現在のAPIは受信元の選択を保存しません。</span>
+                <span className="text-ink-faint mt-1 block text-xs">現在のAPIは受信元の選択を保存しません。</span>
               </label>
             )}
 
@@ -895,7 +897,7 @@ export default function EditDialog({
                     label="この応答を返す友だち"
                     showCount={false}
                   />
-                  <p className="text-ink-faint mt-1 text-[11px]">条件を入れないと、全員に応答します。</p>
+                  <p className="text-ink-faint mt-1 text-xs">条件を入れないと、全員に応答します。</p>
                   <div className="bg-canvas-sunken mt-3 rounded-control p-3 text-xs">
                     <p className="text-ink font-medium">この条件に当たった受信</p>
                     <p className="text-ink-faint mt-1">過去28日の受信に、この条件をあてはめた結果です。これから来る受信の件数ではありません。</p>
@@ -1072,7 +1074,7 @@ export default function EditDialog({
               <label className="block">
                 <span className="text-ink-secondary text-xs">返信を待つ時間</span>
                 <span className="text-ink-faint mt-1 block text-sm">すぐに返信</span>
-                <span className="text-ink-faint mt-1 block text-[11px]">現在のAPIは遅延秒数を保存しません。</span>
+                <span className="text-ink-faint mt-1 block text-xs">現在のAPIは遅延秒数を保存しません。</span>
               </label>
               <label className="block">
                 <span className="text-ink-secondary text-xs">同じ人への連続返信</span>
@@ -1092,7 +1094,7 @@ export default function EditDialog({
               <div className="md:col-span-2">
                 <p className="text-ink-secondary text-xs">条件に当たらなかった場合</p>
                 <p className="text-ink-faint mt-1 text-sm">何もしない</p>
-                <p className="text-ink-faint mt-1 text-[11px]">現在のAPIは未一致時の別返信を保存しません。</p>
+                <p className="text-ink-faint mt-1 text-xs">現在のAPIは未一致時の別返信を保存しません。</p>
               </div>
             </div>
           )}

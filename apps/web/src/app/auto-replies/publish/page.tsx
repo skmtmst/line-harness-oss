@@ -39,7 +39,7 @@ type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 type FriendLoadState = 'loading' | 'ready' | 'error'
 
 const PAGE_TITLES: Record<PublishStage, string> = {
-  conflicts: '自動応答・競合と優先順位',
+  conflicts: '自動応答ルール・競合確認',
   test: '自動応答をテスト',
   confirm: '自動応答ルール・最終確認',
   done: '自動応答・有効化完了',
@@ -351,7 +351,7 @@ function AutoReplyPublishInner() {
           <div className={"arp-columns"}>
             <div className={"arp-mainColumn"}>
               <section className={"arp-panel"}>
-                <PanelHeading title="競合と優先順位" description="同じメッセージに複数ルールが一致する場合の動作を確認します。" />
+                <PanelHeading title="競合・優先順位" description="同じメッセージに複数ルールが一致する場合の動作を確認します。" />
                 {conflicts.length > 0 ? (
                   <div className={"arp-conflictNotice"}>
                     <AlertTriangle aria-hidden="true" />

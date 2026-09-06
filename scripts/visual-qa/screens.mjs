@@ -1036,33 +1036,37 @@ export const SCREENS = [
     verdictHead: '235d99f10', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、右の設定内容、LINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。1440/1920pxとも横はみ出し0。ただし設計は基本設定だけを1画面に収めるのに対し、実装は条件・返信・後続処理まで同じ長い面に並ぶため要修正を維持する。取得元 `auto-replies-v6/K7vg2.txt` と同Node画像。',
-    verdictHead: '235d99f10',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 基本設定だけを独立した段に分け、ルール名・フォルダ・優先順位、反応条件要約、ひな形3件、右の設定内容・LINEプレビュー、固定操作帯を設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは社内メモを保存せず、競合件数も基本設定の取得口に無いため、その2値は未接続表示。',
+    verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + K7vg2.txt',
+    verdictHead: '1a0b0291e',
     route: '/auto-replies/edit?id=ar-2&step=basic',
 
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、複数キーワードの接続説明、過去28日の注意、標準互換15軸／この画面だけの6軸を追加し、1440/1920pxとも横はみ出し0。ただし設計の条件専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/nzWIX.txt` と同Node画像。',
-    verdictHead: '235d99f10',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 反応条件だけを独立した段に分け、複数キーワードのOR/AND、一致方法、曜日・時間帯・受信元、友だち条件、右の判定要約と過去28日欄を設計順に配置した。友だち条件は「条件を編集」で実際の条件ビルダーを開ける。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。固定データはキーワード1件で、現行APIは受信元と過去28日の該当件数を返さないためデータ待ち。',
+    verdictSource: 'auto-replies-v6/nzWIX.png + docs/design-qa/auto-replies-v6/nzWIX-{1440,1920}.png + nzWIX.txt',
+    verdictHead: '1a0b0291e',
     route: '/auto-replies/edit?id=ar-2&step=trigger',
 
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示とLINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。返信と後続処理は保存契約へ接続済みで、1440/1920pxとも横はみ出し0。ただし設計の返信専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/ivDoe.txt` と同Node画像。',
-    verdictHead: '235d99f10',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 返信と後続処理だけを独立した段に分け、返し方、テンプレート/本文、差し込み項目、配信後アクション、待ち時間・連続返信・未一致時、右の返信要約とLINEプレビューを設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは返信遅延と未一致時の別動作を保存しないため、画面では作り物を保存せず未接続理由を表示。',
+    verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + ivDoe.txt',
+    verdictHead: '1a0b0291e',
     route: '/auto-replies/edit?id=ar-2&step=response',
 
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 読込・失敗・権限不足は3104/8791で1440/1920px撮影し、横はみ出し0。通常状態は撮影用モックに下書きと競合の固定データが無く「下書きを表示できませんでした」になるため、設計の競合順位・勝者・判定例と比較できず要修正を維持する。`scripts/visual-qa/mock-api.mjs` はClaude所有なので変更していない。取得元 `auto-replies-v6/U9hzqH*.txt`。',
-    verdictHead: '235d99f10',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で一致。** 下書き1件と競合2件を優先順位3段として表示し、勝者、停止/対象外、競合警告、一致後の動作、ループ防止、右の判定例・運用監視・LINEプレビュー、固定操作帯を設計順に配置した。通常・読込・空・失敗・権限不足を3106/8793で各1440/1920px撮影し、同Node画像と横並び比較、全12枚で横はみ出し0。競合2件の確認後だけテストへ進める既存の安全ゲートも維持。',
+    verdictSource: 'auto-replies-v6/U9hzqH.png + docs/design-qa/auto-replies-v6/U9hzqH*.png + U9hzqH*.txt',
+    verdictHead: '1a0b0291e',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 重なりの確認。最初に開く段 */
     /*
