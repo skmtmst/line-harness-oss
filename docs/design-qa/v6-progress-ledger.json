@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 42,
-  "match": 109,
-  "structureMatchDataPending": 130,
-  "needsFix": 24,
+  "match": 113,
+  "structureMatchDataPending": 131,
+  "needsFix": 19,
   "unjudged": 5,
-  "remaining": 159,
+  "remaining": 155,
   "features": [
     {
       "feature": 1,
@@ -498,12 +498,27 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 4,
-      "structureMatchDataPending": 10,
+      "match": 6,
+      "structureMatchDataPending": 8,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 10,
+      "remaining": 8,
       "capturedAt": [
+        {
+          "pr": 1084,
+          "head": "31c2fddcc",
+          "on": "2026-09-07",
+          "screens": [
+            "TC1b1",
+            "kk8dz",
+            "bV5Vs",
+            "r6Gzsu",
+            "hz9ti",
+            "RUxNf",
+            "g2UNV"
+          ],
+          "note": "Issue #325。#1073の固定データを含む木を3104/8791で1440・1920px撮影し、設計1920pxと同じ状態で横並び比較した。全14枚で横はみ出し0。固定データで差が解消した2画面を一致へ更新し、残る5画面は不足する固定値またはAPI契約を理由に残した。"
+        },
         {
           "pr": 1069,
           "head": "9294bdeeb",
@@ -1047,12 +1062,25 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 5,
-      "structureMatchDataPending": 1,
-      "needsFix": 5,
+      "match": 7,
+      "structureMatchDataPending": 4,
+      "needsFix": 0,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 1082,
+          "head": "c1355bb54",
+          "on": "2026-09-07",
+          "screens": [
+            "K7vg2",
+            "nzWIX",
+            "ivDoe",
+            "U9hzqH",
+            "t7UtYQ"
+          ],
+          "note": "Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。"
+        },
         {
           "pr": 955,
           "head": "564c91d0fe",
