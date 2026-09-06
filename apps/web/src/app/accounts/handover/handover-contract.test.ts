@@ -15,7 +15,7 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 /**
  * LINEアカウントの乗り換え・引き継ぎ（設計 ★V6 33-4 `nx3XW`）。
  *
- * **口がまだ無い**（台帳 #133）。流れを描いて止める。
+ * 実 API の事前確認結果を読み、合計が一致した値だけを表示する。
  */
 describe('V6 33-4 乗り換え・引き継ぎ', () => {
   it('設計の5段を持つ', () => {
@@ -48,9 +48,11 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     expect(totalsMatch(counts, null)).toBe(false)
   })
 
-  it('人数を作らない', () => {
-    // 事前確認の口がまだ無い。**0 と書くと「1人もいない」と読まれる。**
-    expect(PAGE).toContain('<p className="text-ink mt-1 text-2xl font-semibold">—</p>')
+  it('固定値を画面で作らず、APIの人数を合計確認して表示する', () => {
+    expect(PAGE).toContain('api.accountHandovers.listForAccount(id)')
+    expect(PAGE).toContain('api.accountHandovers.get(current.id)')
+    expect(PAGE).toContain('totalsMatch(handover.counts, handover.counts.sourceTotal)')
+    expect(PAGE).toContain("countsAreComplete ? `${handover.counts?.[bucket.key].toLocaleString('ja-JP')}人` : '—'")
   })
 
   it('事前確認では元のアカウントが変わらないと書く', () => {
@@ -58,10 +60,10 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     expect(PAGE).toContain('ここで止めても、元のアカウントは何も変わりません')
   })
 
-  it('できない口を置かず、理由を書く', () => {
-    // `v6-common-rules.md` §7-10「出す＝使える」。
-    expect(PAGE).toContain('まだ始められません')
-    expect(PAGE).toContain('引き継ぎコードを出す仕組みと、事前確認の突合が、まだ繋がっていません。')
+  it('事前確認をやり直す操作を実APIへつなぐ', () => {
+    expect(PAGE).toContain('api.accountHandovers.preview(handover.id')
+    expect(PAGE).toContain('事前確認をやり直す')
+    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0}')
   })
 
   it('プロバイダーが違うときの断りを持つ', () => {

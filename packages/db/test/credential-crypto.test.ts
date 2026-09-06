@@ -244,7 +244,7 @@ describe('LINE credential AES-GCM encryption', () => {
                 channel_secret: String(insertValues[4]),
                 channel_access_token_encrypted: String(insertValues[5]),
                 channel_secret_encrypted: String(insertValues[6]),
-                tenant_id: String(insertValues[21]),
+                tenant_id: String(insertValues[24]),
               });
             }
             return null;
@@ -271,7 +271,7 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(insertValues[7]).toEqual(expect.any(String));
     expect(insertValues[8]).toEqual(expect.any(String));
     expect(insertValues[9]).toBeNull();
-    expect(insertValues[21]).toBe(DEFAULT_TENANT_ID);
+    expect(insertValues[24]).toBe(DEFAULT_TENANT_ID);
     expect(created.tenant_id).toBe(DEFAULT_TENANT_ID);
     expect(created.channel_access_token).toBe('token-value');
     expect(created.channel_secret).toBe('secret-value');
