@@ -11,7 +11,9 @@ const { appendFriendToTrackedLinks, autoTrackContent, decorateForFriendPush } = 
   './auto-track.js'
 );
 
-const DB = {} as D1Database;
+const ledgerRun = vi.fn(async () => ({ success: true }));
+const ledgerBind = vi.fn(() => ({ run: ledgerRun }));
+const DB = { prepare: vi.fn(() => ({ bind: ledgerBind })) } as unknown as D1Database;
 const WORKER = 'https://worker.example.com';
 const SHORT = 'https://go.example.com';
 const FRIEND = 'friend-uuid-1';
@@ -173,6 +175,30 @@ describe('autoTrackContent (flex)', () => {
       DB,
       expect.objectContaining({ lineAccountId: 'acc-1' }),
     );
+  });
+
+  test('uses a broadcast-scoped link and records it for per-link insight', async () => {
+    dbMocks.getOrCreateAutoTrackedLink.mockResolvedValue({ id: 'tracked-1', short_code: 'Code1' });
+    const content = flex({
+      type: 'button',
+      action: { type: 'uri', uri: 'https://example.com/lp' },
+    });
+    await autoTrackContent(DB, 'flex', content, WORKER, {
+      lineAccountId: 'acc-1',
+      broadcastId: 'broadcast-1',
+    });
+
+    expect(dbMocks.getOrCreateAutoTrackedLink).toHaveBeenCalledWith(
+      DB,
+      expect.objectContaining({ dedupScope: 'broadcast:broadcast-1' }),
+    );
+    expect(ledgerBind).toHaveBeenCalledWith(
+      'broadcast-1',
+      'tracked-1',
+      'example.com',
+      expect.any(String),
+    );
+    expect(ledgerRun).toHaveBeenCalledOnce();
   });
 });
 

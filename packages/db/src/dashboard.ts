@@ -937,9 +937,47 @@ export interface BroadcastStats {
  * 開封率は broadcast_insights から。LINEは20人未満の配信だと開封数を返さない
  * ので、その配信は平均から外す。0として混ぜると平均が不当に下がる。
  */
-export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats> {
+type BroadcastStatsScope = {
+  allowedAccountIds: readonly string[];
+  canSeeUnassigned: boolean;
+};
+
+function broadcastStatsFilter(
+  accountId: string | undefined,
+  scope: BroadcastStatsScope | undefined,
+  alias = '',
+): { sql: string; binds: string[] } {
+  const column = `${alias}line_account_id`;
+  const targetType = `${alias}target_type`;
+  const accountIds = `${alias}account_ids`;
+  if (accountId) {
+    return {
+      sql: ` AND (${column} = ? OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value = ?)))`,
+      binds: [accountId, accountId],
+    };
+  }
+  if (!scope) return { sql: '', binds: [] };
+
+  const conditions: string[] = [];
+  const binds: string[] = [];
+  if (scope.allowedAccountIds.length > 0) {
+    const placeholders = scope.allowedAccountIds.map(() => '?').join(', ');
+    conditions.push(`(${column} IN (${placeholders}) OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value IN (${placeholders}))))`);
+    binds.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+  }
+  if (scope.canSeeUnassigned) conditions.push(`(${column} IS NULL AND ${accountIds} IS NULL)`);
+  return { sql: ` AND (${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'})`, binds };
+}
+
+export async function getBroadcastStats(
+  db: D1Database,
+  accountId?: string,
+  scope?: BroadcastStatsScope,
+): Promise<BroadcastStats> {
   const monthStart = jstDate(0).slice(0, 7);
   const since = jstDate(-27);
+  const accountFilter = broadcastStatsFilter(accountId, scope);
+  const insightAccountFilter = broadcastStatsFilter(accountId, scope, 'b.');
 
   const [counts, reach] = await Promise.all([
     db
@@ -947,9 +985,9 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
         `SELECT
            SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
            SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled
-         FROM broadcasts`,
+         FROM broadcasts WHERE 1 = 1${accountFilter.sql}`,
       )
-      .bind(monthStart)
+      .bind(monthStart, ...accountFilter.binds)
       .first<{ this_month: number; scheduled: number }>(),
     db
       .prepare(
@@ -957,9 +995,9 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
            COALESCE(SUM(success_count), 0) AS delivered,
            COALESCE(SUM(total_count - success_count), 0) AS failed
          FROM broadcasts
-          WHERE status = 'sent' AND created_at >= ?`,
+          WHERE status = 'sent' AND created_at >= ?${accountFilter.sql}`,
       )
-      .bind(since)
+      .bind(since, ...accountFilter.binds)
       .first<{ delivered: number; failed: number }>(),
   ]);
 
@@ -970,9 +1008,11 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
         // open_rate は取り込み時に計算済み。ここで割り直すと、
         // 分母の取り方が2か所に分かれて食い違う。
         `SELECT AVG(open_rate) * 100 AS rate
-           FROM broadcast_insights
-          WHERE delivered >= 20 AND open_rate IS NOT NULL`,
+           FROM broadcast_insights bi
+           JOIN broadcasts b ON b.id = bi.broadcast_id
+          WHERE delivered >= 20 AND open_rate IS NOT NULL${insightAccountFilter.sql}`,
       )
+      .bind(...insightAccountFilter.binds)
       .first<{ rate: number | null }>();
     openRate = row?.rate === null || row?.rate === undefined ? null : Math.round(row.rate * 10) / 10;
   } catch {
