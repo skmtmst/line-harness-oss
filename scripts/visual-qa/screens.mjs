@@ -1035,7 +1035,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、右の設定内容、LINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。1440/1920pxとも横はみ出し0。ただし設計は基本設定だけを1画面に収めるのに対し、実装は条件・返信・後続処理まで同じ長い面に並ぶため要修正を維持する。取得元 `auto-replies-v6/K7vg2.txt` と同Node画像。',
     verdictHead: '235d99f10',
-    route: '/auto-replies/edit?id=ar-2',
+    route: '/auto-replies/edit?id=ar-2&step=basic',
 
   },
   {
@@ -1043,7 +1043,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、複数キーワードの接続説明、過去28日の注意、標準互換15軸／この画面だけの6軸を追加し、1440/1920pxとも横はみ出し0。ただし設計の条件専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/nzWIX.txt` と同Node画像。',
     verdictHead: '235d99f10',
-    route: '/auto-replies/edit?id=ar-2',
+    route: '/auto-replies/edit?id=ar-2&step=trigger',
 
   },
   {
@@ -1051,7 +1051,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示とLINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。返信と後続処理は保存契約へ接続済みで、1440/1920pxとも横はみ出し0。ただし設計の返信専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/ivDoe.txt` と同Node画像。',
     verdictHead: '235d99f10',
-    route: '/auto-replies/edit?id=ar-2',
+    route: '/auto-replies/edit?id=ar-2&step=response',
 
   },
   {
