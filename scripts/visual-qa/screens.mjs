@@ -2273,32 +2273,32 @@ export const SCREENS = [
   // ── 機能24 LINE通知 ─────────────────────────────────────
   /*
     設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
-    送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
+    送れなかったもの4／記録）。顧客一覧・編集・失敗対応・記録を同じ機能内で管理する。
   */
   { ...LINE_NOTIFY, node: 'festr',
     /* 通常・0件・取得失敗・権限不足を分けて撮る。 */
     states: {
       apis: ['**/api/ec-commerce/overview**', '**/api/ec-commerce/settings**'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
-    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧を設計と同じ1ページ6件に区切り、表示件数とページ送りを同じ段へ追加。4つの集計帯、4条件の絞り込み、行のきっかけ・当日数・状態を維持し、通常・0件・取得失敗・権限不足を1440・1920で再撮影、全10枚で横はみ出し0。個人の開封は正本要件により表示しない。直近30日の種類別数、LINE上で表示された人数、月間枠、種類別の失敗理由を返すAPIが無いため、値は作らず構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/festr.txt + festr-normal-1920.png', verdictHead: '8e7c374991' },
+    }, name: '24-1 LINE通知', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の通知定義・30日集計APIを接続し、一覧へ種類別の受付数と「LINE上で表示」を追加した。個人の開封は作らず、LINE集計が取得不能なら「— 未取得」、待ちなら「集計待ち」とする。通常・0件・取得失敗・権限不足を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定データには新しい通知定義・集計応答が無く、撮影では公開版と集計値を実証できないため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/festr-{normal,empty,error,forbidden}.txt + festr-normal-1920.png', verdictHead: '864e7ec3c' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 一覧内の長い折りたたみを、クリック後に「いつ送るか／送るもの／差込項目／ボタン／未達時の決めごと」と右側プレビュー・注意・接続先、下部追従保存を並べる編集専用レイアウトへ変更。1440・1920で横はみ出し0。公開版を直接変えない下書き版・公開版・テスト受信者・取引メール代替のAPIがまだ無いため、存在しない公開操作は作らず、現行設定で安全に扱える範囲だけを表示した。構造一致・データ未接続とする。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の通知定義APIへ接続し、公開版番号、編集下書き、楽観ロックつき下書き保存、公開、停止を実装した。公開済み版を直接変更せず、公開前の下書きと分離する。1440/1920の2枚で横はみ出し0。#1077の固定データには新しい通知定義が無いため、撮影では従来設定の編集表示へ安全に戻っており、版操作を画像で実証できない。テスト送信専用の新APIも未実装のため、構造一致・データ待ちを維持する。', verdictSource: 'line-notify-v6/Q55bb.txt + Q55bb-1920.png',
     mode: 'viewport', height: 1136, /*
       **押し口は「内容を編集」。** 「発送した」は行の名前で、押せる役を持っていない
       （`role: 'text'` は ARIA に無く0件になる）。設計の並び順で3番目なので `nth: 2`。
     */
     steps: [{ click: '内容を編集', nth: 2, after: 800 }],
-    verdictHead: '8e7c374991',
+    verdictHead: '864e7ec3c',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     route: '/line-notifications?tab=failures', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 届かなかった／送信対象外／メール結果／未対応の集計帯、検索、状態絞り込み、その日のうちに代替連絡する案内、受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。現行APIにはメール結果・試行履歴・次回試行・対応者／対応済みが無く、安全な再試行APIも無い。通常行の固定データも無いためS0へ #264 で依頼済み。存在しない値と操作は作らず、構造一致・データ未接続とする。',
-    verdictSource: 'line-notify-v6/X8JCA5.txt + X8JCA5-normal-1920.png',
-    verdictHead: '8e7c374991',
+    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の送信台帳APIへ直結し、試行回数・次回再試行予定を表示する。Workerが一時失敗として `retryAvailable` を返した行だけ、送信記録の版番号を添えて安全に再試行でき、競合時は最新記録の再読込を案内する。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約で再試行可否・版・試行履歴を持たず、再試行可能行を画像で実証できないため、構造一致・データ待ちを維持する。',
+    verdictSource: 'line-notify-v6/X8JCA5-{normal,loading,empty,error}.txt + X8JCA5-normal-1920.png',
+    verdictHead: '864e7ec3c',
   },
   {
     /*
@@ -2310,9 +2310,9 @@ export const SCREENS = [
     route: '/line-notifications?tab=history', mode: 'page',
     states: { apis: ['**/api/ec-commerce/notification-runs?**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #291 head `8e7c374991` で設計と再比較。** 記録数／LINE API受付／短縮URLクリック／失敗の集計帯、検索、クリック・失敗の絞り込み、受付日時・理由・受信箱導線を確認。通常・読込・空・失敗を1440・1920で撮影し、全10枚で横はみ出し0。個人の到達・既読は正本要件により表示せず、安全な再送口も無いため出していない。期間集計・CSV出力権限・版・試行履歴のAPIと通常行の固定データが無く、S0へ #264 で依頼済み。構造一致・データ未接続とする。',
-    verdictSource: 'line-notify-v6/Se65i.txt + Se65i-normal-1920.png',
-    verdictHead: '8e7c374991',
+    verdictNote: '**2026-09-07 Issue #331 / UI HEAD `864e7ec3c` を3102/8789で再判定。** 統合96の送信台帳からLINE API受付、失敗、送信対象外、試行回数、次回再試行、短縮URLクリック、通知版を読む契約へ更新した。個人の到達・既読は正本要件どおり表示しない。通常・読込・空・失敗を1440/1920で撮影し、全10枚で横はみ出し0。#1077の固定行は旧契約でクリック・通知版・試行履歴が未接続のため、その値を画像で実証できず、構造一致・データ待ちを維持する。',
+    verdictSource: 'line-notify-v6/Se65i-{normal,loading,empty,error}.txt + Se65i-normal-1920.png',
+    verdictHead: '864e7ec3c',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
