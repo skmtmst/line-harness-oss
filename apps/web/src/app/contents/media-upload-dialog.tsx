@@ -178,7 +178,7 @@ export default function MediaUploadDialog({
         />
 
         <div className="bg-info-bg text-info rounded-control p-3 text-xs leading-5">
-          <p className="font-bold">この仕組みで登録できる大きさ</p>
+          <p className="font-bold">LINEで送れる大きさ（超えると入れられません）</p>
           {LIMITS.map((limit) => <p key={limit.label}>{limit.label} {limit.note}</p>)}
           <p className="mt-2 font-semibold">中身の形式とファイル名の拡張子が食い違うものは保存できません。</p>
           <p className="font-semibold">公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>

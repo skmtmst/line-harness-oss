@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { api, type AffiliatePaymentSummary } from '@/lib/api'
+import { AffiliatePaymentConfirmDialog } from './action-dialogs'
 
 type PaymentFilter = 'all' | 'approved' | 'held' | 'cycle_missing'
 
@@ -31,6 +32,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<PaymentFilter>('all')
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,12 +59,12 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
   useEffect(() => { void load() }, [load])
 
   const summary = useMemo(() => {
-    const approvedReward = items.reduce((sum, item) => sum + item.approvedReward, 0)
+    const approvedReward = items.reduce((sum, item) => sum + item.unsettledReward, 0)
     const heldReward = items.reduce((sum, item) => sum + item.heldReward, 0)
     const unknownHold = items.reduce((sum, item) => sum + item.holdStatusUnknown, 0)
     return {
       approvedReward,
-      approvedPeople: items.filter((item) => item.approvedConversions > 0).length,
+      approvedPeople: items.filter((item) => item.unsettledConversions > 0).length,
       heldReward,
       unknownHold,
       cycleConfigured: items.filter((item) => Boolean(item.payoutCycle?.trim())).length,
@@ -85,15 +87,15 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
   const summaryUnavailable = error && !loading
 
   return (
-    <div className="space-y-4" data-payment-ledger="not-connected">
+    <div className="space-y-4" data-payment-ledger="settlement-connected">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          title="承認済み報酬の合計"
+          title="支払い確定前の報酬"
           value={summaryUnavailable ? null : summary.approvedReward}
           unit="円"
           detail={summaryUnavailable
             ? '読み込めませんでした'
-            : `${summary.approvedPeople.toLocaleString('ja-JP')}人分・支払済みかは未取得`}
+            : `${summary.approvedPeople.toLocaleString('ja-JP')}人分・確定済みを除く`}
           loading={loading}
         />
         <KpiCard
@@ -126,11 +128,18 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
       </div>
 
       <div className="rounded-control border border-info bg-info-bg px-4 py-3 text-sm text-info">
-        支払済みの記録がまだ無いため、ここでは「未払い残高」や「今年払った合計」を表示しません。承認済み成果から確認できる合計だけを表示しています。
+        支払結果の記録がまだ無いため、ここでは「今年払った合計」を表示しません。支払い確定前と確定済みは追記台帳で分けています。
       </div>
       <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm text-warning">
-        振込先と締め処理は未接続です。この画面から支払いの確定や振込用CSVの作成はできません。現在の紹介者データは、すべてのLINEアカウントで共通です。
+        振込先・締め日・振込用CSVは未接続です。支払いの確定では、承認済み成果と金額だけを固定します。振込そのものは行いません。
       </div>
+
+      <AffiliatePaymentConfirmDialog
+        target={confirmTarget}
+        accountId={accountId}
+        onClose={() => setConfirmTarget(null)}
+        onConfirmed={() => { void load() }}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <input
@@ -182,19 +191,20 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           <thead>
             <TableHeadRow>
               <Th style={{ width: '25%' }}>払う相手</Th>
-              <Th style={{ width: '16%' }} align="right">承認済みの合計</Th>
+              <Th style={{ width: '16%' }} align="right">支払い確定前</Th>
               <Th style={{ width: '12%' }} align="right">中身</Th>
               <Th style={{ width: '17%' }}>保留</Th>
               <Th style={{ width: '18%' }}>支払い条件の覚書</Th>
-              <Th style={{ width: '12%' }}>振込先</Th>
+              <Th style={{ width: '10%' }}>振込先</Th>
+              <Th style={{ width: '12%' }} align="center">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
             {shown.map((item) => (
               <Tr key={item.affiliateId}>
                 <NameCell name={item.affiliateName} sub={`コード ${item.code}`} />
-                <Td align="right" className="font-semibold tabular-nums">{yen(item.approvedReward)}</Td>
-                <Td align="right" className="tabular-nums">承認済み {item.approvedConversions.toLocaleString('ja-JP')}件</Td>
+                <Td align="right" className="font-semibold tabular-nums">{yen(item.unsettledReward)}</Td>
+                <Td align="right" className="tabular-nums">確定前 {item.unsettledConversions.toLocaleString('ja-JP')}件</Td>
                 <Td>
                   <span className="block font-medium tabular-nums">{yen(item.heldReward)}・{item.heldConversions.toLocaleString('ja-JP')}件</span>
                   <span className="text-ink-faint mt-0.5 block text-xs">{holdDetail(item)}</span>
@@ -207,6 +217,15 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
                 <Td>
                   <span className="text-ink-faint block">—</span>
                   <span className="text-ink-faint block text-xs">未接続</span>
+                </Td>
+                <Td align="center">
+                  <Button
+                    aria-label={`${item.affiliateName}の支払いを確定する`}
+                    onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}
+                    disabled={item.unsettledConversions === 0}
+                  >
+                    この人を確定
+                  </Button>
                 </Td>
               </Tr>
             ))}

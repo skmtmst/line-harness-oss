@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 245,
-  "unimplemented": 8,
+  "compared": 247,
+  "unimplemented": 6,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 19,
-  "match": 65,
-  "structureMatchDataPending": 50,
+  "match": 66,
+  "structureMatchDataPending": 51,
   "needsFix": 142,
   "unjudged": 3,
-  "remaining": 203,
+  "remaining": 202,
   "features": [
     {
       "feature": 1,
@@ -1610,11 +1610,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 0,
-      "structureMatchDataPending": 3,
+      "match": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 2,
       "unjudged": 0,
-      "remaining": 5,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 559,
@@ -1670,13 +1670,13 @@
       "feature": 16,
       "name": "成果とアフィリエイト",
       "total": 9,
-      "compared": 7,
-      "unimplemented": 2,
+      "compared": 9,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 5,
-      "structureMatchDataPending": 1,
+      "structureMatchDataPending": 3,
       "needsFix": 1,
       "unjudged": 0,
       "remaining": 4,
@@ -2748,20 +2748,6 @@
     }
   ],
   "gaps": [
-    {
-      "feature": 16,
-      "node": "QX70l",
-      "name": "16-1-G アフィリエイターを削除する確認",
-      "gap": "drop",
-      "gapNote": "物理削除確認はV6から除外する。紹介者は停止・アーカイブし、過去成果・承認・未払い・支払い記録を保持する。個人情報削除は識別情報の匿名化として別要件にする"
-    },
-    {
-      "feature": 16,
-      "node": "GqFTV",
-      "name": "16-1-H 支払いを確定する",
-      "gap": "api",
-      "gapNote": "同上（締める操作）"
-    },
     {
       "feature": 20,
       "node": "URqOA",
