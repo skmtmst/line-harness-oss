@@ -40,6 +40,143 @@ export interface PreflightInput {
   segmentConditions?: SegmentCondition | null;
 }
 
+export interface AudiencePreview {
+  matched: number;
+  sendable: number;
+  evaluatedAt: string;
+  representatives: Array<{
+    friendId: string;
+    displayName: string | null;
+    pictureUrl: string | null;
+    summary: string;
+  }>;
+  exclusions: {
+    blocked: number;
+    hidden: number;
+    missingDestination: number;
+    duplicate: number;
+    paused: null;
+    total: number;
+  };
+}
+
+/**
+ * 条件に当たる行を一度読み、送れない理由を重複させずに分類する。
+ * 配信停止の個別台帳はまだ無いため、paused は 0 で偽装せず null にする。
+ */
+export async function previewAudience(
+  db: D1Database,
+  input: PreflightInput,
+): Promise<AudiencePreview> {
+  const where: string[] = ['1 = 1'];
+  const binds: unknown[] = [];
+  if (input.targetType === 'multi-account-dedup') {
+    const ids = input.accountIds ?? [];
+    if (ids.length === 0) return emptyAudiencePreview();
+    where.push(`f.line_account_id IN (${ids.map(() => '?').join(',')})`);
+    binds.push(...ids);
+  } else if (input.lineAccountId) {
+    where.push('f.line_account_id = ?');
+    binds.push(input.lineAccountId);
+  }
+  if (input.targetType === 'tag') {
+    if (!input.targetTagId) return emptyAudiencePreview();
+    where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
+    binds.push(input.targetTagId);
+  }
+  if (input.targetType === 'segment' && input.segmentConditions) {
+    const segment = buildSegmentWhere(input.segmentConditions);
+    where.push(`(${segment.sql})`);
+    binds.push(...segment.bindings);
+  }
+
+  const result = await db.prepare(
+    `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.user_id,
+            f.is_following, COALESCE(f.is_hidden, 0) AS is_hidden,
+            COALESCE((SELECT GROUP_CONCAT(t.name, '・')
+                        FROM friend_tags ft JOIN tags t ON t.id = ft.tag_id
+                       WHERE ft.friend_id = f.id), '') AS tag_names
+       FROM friends f WHERE ${where.join(' AND ')}
+      ORDER BY f.updated_at DESC, f.id`,
+  ).bind(...binds).all<{
+    id: string;
+    line_user_id: string | null;
+    display_name: string | null;
+    picture_url: string | null;
+    user_id: string | null;
+    is_following: number;
+    is_hidden: number;
+    tag_names: string;
+  }>();
+
+  let blocked = 0;
+  let hidden = 0;
+  let missingDestination = 0;
+  let duplicate = 0;
+  const uniquePeople = new Set<string>();
+  const sendable: typeof result.results = [];
+  for (const row of result.results) {
+    if (!row.is_following) {
+      blocked += 1;
+      continue;
+    }
+    if (row.is_hidden) {
+      hidden += 1;
+      continue;
+    }
+    if (!row.line_user_id?.trim()) {
+      missingDestination += 1;
+      continue;
+    }
+    const dedupKey = input.targetType === 'multi-account-dedup' && row.user_id
+      ? `user:${row.user_id}`
+      : `friend:${row.id}`;
+    if (uniquePeople.has(dedupKey)) {
+      duplicate += 1;
+      continue;
+    }
+    uniquePeople.add(dedupKey);
+    sendable.push(row);
+  }
+  const exclusions = {
+    blocked,
+    hidden,
+    missingDestination,
+    duplicate,
+    paused: null,
+    total: blocked + hidden + missingDestination + duplicate,
+  } as const;
+  return {
+    matched: result.results.length,
+    sendable: sendable.length,
+    evaluatedAt: new Date().toISOString(),
+    representatives: sendable.slice(0, 3).map((row) => ({
+      friendId: row.id,
+      displayName: row.display_name,
+      pictureUrl: row.picture_url,
+      summary: row.tag_names || '条件に一致',
+    })),
+    exclusions,
+  };
+}
+
+function emptyAudiencePreview(): AudiencePreview {
+  return {
+    matched: 0,
+    sendable: 0,
+    evaluatedAt: new Date().toISOString(),
+    representatives: [],
+    exclusions: {
+      blocked: 0,
+      hidden: 0,
+      missingDestination: 0,
+      duplicate: 0,
+      paused: null,
+      total: 0,
+    },
+  };
+}
+
 /**
  * 何人に届くかを数える。
  *
