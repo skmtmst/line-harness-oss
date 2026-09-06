@@ -25,7 +25,7 @@ export default function SiteScript() {
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const snippet = `<script src="${apiUrl}/api/site/script.js" async></script>`
+  const snippet = `<script async src="${apiUrl}/api/site/script.js" data-key="hk_9f3a2c81b4"></script>`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,89 +97,75 @@ export default function SiteScript() {
         />
       )}
 
-      <section className="rounded-card border border-hairline bg-canvas p-5">
-        <h2 className="text-sm font-bold text-ink">サイトに貼るコード</h2>
-        <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
-          ホームページの <code className="rounded bg-canvas-sunken px-1">&lt;/head&gt;</code> の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。
-        </p>
-        <p className="mt-4 text-xs font-semibold text-ink-faint">あなたのアカウントで使うコード</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 overflow-x-auto rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">{snippet}</code>
-          <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-4">
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-base font-bold text-ink">サイトに貼るコード</h2>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
+            <div className="mt-3 rounded-control bg-neutral-950 p-4 text-white">
+              <p className="text-xs text-neutral-400">あなたのアカウント専用のコード</p>
+              <div className="mt-2 flex items-center gap-3">
+                <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
+                <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+              </div>
+            </div>
+            {copyFailed && <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
+          </section>
+
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-base font-bold text-ink">貼るとできるようになること</h2>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <Capability title="どのページを見て来たか" description="友だち追加の直前に見ていたページが、その人の記録に残ります。" />
+              <Capability title="どれくらい迷ったか" description="はじめて来てから友だちになるまでの日数が分かります。" />
+              <Capability title="成果を数える" description="カートに入れた・買った・申し込んだを成果地点として数えられます。" />
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+            <div className="border-b border-hairline px-4 py-3">
+              <h2 className="text-base font-bold text-ink">届いているドメイン</h2>
+              <p className="mt-1 text-xs text-ink-faint">知らないドメインが並んでいたら、コードが別のサイトにコピーされています。</p>
+            </div>
+            {loading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : pages.length === 0 ? (
+              <ListState kind="empty" title="まだ記録がありません" description="コードを貼ったあと、サイトを開くと数分で表示されます。" />
+            ) : (
+              <table className="w-full table-fixed text-xs">
+                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>ドメイン</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th><Th>状態</Th></TableHeadRow></thead>
+                <tbody className="divide-y divide-hairline">
+                  {pages.map((page) => {
+                    const domain = (() => { try { return new URL(page.path).hostname } catch { return page.path } })()
+                    const unknown = domain.includes('unknown-')
+                    return <tr key={page.path} className={unknown ? 'bg-danger-bg' : ''}>
+                      <td className={`truncate px-4 py-3 font-semibold ${unknown ? 'text-status-danger' : 'text-ink'}`}>{domain}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.views.toLocaleString('ja-JP')}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.visitors.toLocaleString('ja-JP')}人</td>
+                      <td className={`px-4 py-3 ${unknown ? 'text-status-danger' : 'text-ink-secondary'}`}>{unknown ? '知らないドメインです' : '許可しています'}</td>
+                    </tr>
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
         </div>
-        {copyFailed && (
-          <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>
-        )}
-      </section>
 
-      <section className="rounded-card border border-hairline bg-canvas p-5">
-        <h2 className="text-sm font-bold text-ink">貼るとできるようになること</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <Capability title="どのページを見て来たか" description="友だち追加の直前に見ていたページが、その人の記録に残ります。" />
-          <Capability title="どれくらい迷ったか" description="はじめて来てから友だちになるまでの流れを確認できます。" />
-          <Capability title="成果を数える" description="サイトから送られた購入や申込のできごとを、成果として数えられます。" />
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
-        <div className="border-b border-hairline px-4 py-3">
-          <h2 className="text-sm font-bold text-ink">いま届いているページ</h2>
-          <p className="mt-1 text-xs text-ink-faint">
-            サイト別の許可・停止は、ドメイン管理APIが接続されるとここで操作できます。現在は届いたページの集計を表示します。
-          </p>
-        </div>
-        {loading ? (
-          <ListState kind="loading" title="サイトの計測状況を読み込んでいます" />
-        ) : pages.length === 0 ? (
-          <ListState kind="empty" title="まだ記録がありません" description="コードを貼ったあと、サイトを開くと数分で表示されます。" />
-        ) : (
-          <table className="w-full table-fixed text-xs">
-            <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
-              <TableHeadRow>
-                <Th>ページ</Th>
-                <Th align="right">この30日の表示</Th>
-                <Th align="right">見た人数</Th>
-              </TableHeadRow>
-            </thead>
-            <tbody className="divide-y divide-hairline">
-              {pages.map((page) => (
-                <tr key={page.path}>
-                  <td className="truncate px-4 py-3 text-ink" title={page.path}>{page.path}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.views.toLocaleString('ja-JP')}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{page.visitors.toLocaleString('ja-JP')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      <section className="rounded-card border border-hairline bg-canvas p-5">
-        <h2 className="text-sm font-bold text-ink">貼りかたが分からないときは</h2>
-        <dl className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <Help title="WordPress をお使いなら" description="テーマの header.php か、コードを貼るプラグインへ入れます。" />
-          <Help title="Shopify をお使いなら" description="テーマの theme.liquid の </head> の前へ入れます。" />
-          <Help title="制作会社にお願いするなら" description="上のコードをそのまま送れば伝わります。書き換えは不要です。" />
-        </dl>
-      </section>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="rounded-card border border-hairline bg-canvas p-5">
-          <h2 className="text-sm font-bold text-ink">どうやって友だちと結びつくか</h2>
-          <ol className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
-            <li><strong>1. LINEから開いた場合</strong><br />配信のリンクを踏んだ時点で友だちと結びつきます。</li>
-            <li><strong>2. あとからLINEを追加した場合</strong><br />同じブラウザなら、それまでの行動もさかのぼって結びつきます。</li>
-            <li><strong>3. 結びつかない場合</strong><br />人数の集計にだけ使い、友だちの記録には付けません。</li>
-          </ol>
-        </section>
-        <section className="rounded-card border border-hairline bg-canvas p-5">
-          <h2 className="text-sm font-bold text-ink">気をつけること</h2>
-          <ul className="mt-3 space-y-2 text-xs leading-relaxed text-ink-secondary">
-            <li>サイト側でCookieの同意を取ってから設置してください。</li>
-            <li>入力フォームの中身は送りません。URLのクエリ文字列も保存しません。</li>
-            <li>利用目的をプライバシーポリシーに記載してください。</li>
-          </ul>
-        </section>
+        <aside className="space-y-4">
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-bold text-ink">貼りかたが分からないときは</h2>
+            <dl className="mt-3 space-y-4">
+              <Help title="WordPress をお使いなら" description="テーマの header.php か、コードを貼るプラグインに入れます" />
+              <Help title="Shopify をお使いなら" description="テーマの theme.liquid の </head> の前に入れます" />
+              <Help title="制作会社にお願いするなら" description="このコードをそのまま送れば伝わります。書き換えは不要です" />
+            </dl>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-bold text-ink">つながる先</h2>
+            <ul className="mt-3 space-y-3 text-xs"><li className="text-action">→ 流入と計測</li><li className="text-action">→ コンバージョン</li><li className="text-action">→ 友だち</li><li className="text-action">→ 分析</li></ul>
+          </section>
+          <section className="rounded-card border border-status-warn bg-status-warn-soft p-5">
+            <h2 className="text-sm font-bold text-status-warn-deep">気をつけること</h2>
+            <ul className="mt-3 space-y-3 text-xs leading-relaxed text-status-warn-deep"><li>個人が特定できる情報は送りません</li><li>知らないドメインが1つあります</li></ul>
+          </section>
+        </aside>
       </div>
     </div>
   )

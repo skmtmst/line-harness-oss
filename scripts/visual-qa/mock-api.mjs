@@ -54,7 +54,9 @@ import {
   TAGS, TAG_GROUPS, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, STAFF_MEMBERS, LOGIN_AUDIT,
+  OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
+  STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES, CONVERSION_POINTS,
@@ -1027,6 +1029,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  if (pathname === '/api/entry-route-genres') {
+    return { success: true, data: ['SNS', '紹介', '店頭', '広告', 'メール', '紙'].map((name, index) => ({ id: `erg-${index + 1}`, name, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' })) }
+  }
+  if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
+  if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  const adPlatformLogs = /^\/api\/ad-platforms\/([^/]+)\/logs$/.exec(pathname)
+  if (adPlatformLogs) {
+    return { success: true, data: AD_CONVERSION_LOGS.filter((log) => log.adPlatformId === adPlatformLogs[1]) }
+  }
   /*
     流入元の詳細。可変部分を配列の既定値へ落とすと、1件取得まで `[]` になり、
     `route.createdAt.slice(...)` で詳細画面全体が落ちる。画面確認用の同じ1件から
@@ -1036,7 +1048,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (entryRouteFunnel) {
     return {
       success: true,
-      data: { click_count: 486, friend_add_count: 86, form_submission_count: 24, cv_count: 11 },
+      data: { click_count: 1240, friend_add_count: 86, form_submission_count: 36, cv_count: 12 },
     }
   }
   const entryRouteSources = /^\/api\/entry-routes\/([^/]+)\/sources$/.exec(pathname)
@@ -1058,26 +1070,18 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/analytics/ref-summary') {
-    return {
-      success: true,
-      data: {
-        routes: ENTRY_ROUTES.map((entryRoute, index) => ({
-          refCode: entryRoute.refCode,
-          name: entryRoute.name,
-          friendCount: index === 0 ? 86 : 0,
-          clickCount: index === 0 ? 486 : 0,
-          latestAt: index === 0 ? '2026-08-25T14:16:00.000Z' : null,
-        })),
-      },
-    }
+    return { success: true, data: INFLOW_SUMMARY }
   }
   if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
     return {
       success: true,
       data: {
         friends: [
-          { id: 'friend-inflow-1', displayName: '木村 亮', trackedAt: '2026-08-25T14:16:00.000Z' },
-          { id: 'friend-inflow-2', displayName: '佐藤 美咲', trackedAt: '2026-08-24T10:32:00.000Z' },
+          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', firstPage: '/summer-campaign', currentStatus: 'やりとり中', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', firstPage: '/summer-campaign', currentStatus: 'シナリオ2通目', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', firstPage: '/profile', currentStatus: '体験を申し込んだ', conversion: '¥3,000 の成果', miles: 600 },
+          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', firstPage: '/summer-campaign', currentStatus: 'ブロックされました', conversion: 'まだありません', miles: 100 },
+          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', firstPage: '/summer-campaign', currentStatus: '読んでいない', conversion: 'まだありません', miles: 100 },
         ],
       },
     }

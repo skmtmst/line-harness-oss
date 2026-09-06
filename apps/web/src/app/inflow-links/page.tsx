@@ -5,7 +5,6 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
-import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
@@ -54,6 +53,9 @@ interface RefSummaryData {
   totalFriends: number
   friendsWithRef: number
   friendsWithoutRef: number
+  routeTotal?: number
+  totalClicks?: number
+  averageAddRate?: number
 }
 
 function isRefSummaryData(value: unknown): value is RefSummaryData {
@@ -118,10 +120,10 @@ const PAGE_SIZE_OPTIONS = [
 ]
 
 const MERGED_TABS = [
-  { key: 'links', label: '流入経路' },
+  { key: 'links', label: '流入経路 24' },
   { key: 'script', label: 'サイトスクリプト' },
-  { key: 'ads', label: '広告連携' },
-  { key: 'connections', label: '広告とのつなぎ' },
+  { key: 'ads', label: '広告連携 3' },
+  { key: 'connections', label: '広告とのつなぎ 5' },
 ]
 
 function InflowLinksPageInner() {
@@ -468,14 +470,17 @@ function InflowLinksPageInner() {
   const hasUncategorized = accountFilteredRows.some((row) => !row.genre)
   useEffect(() => {
     const selectable = [
+      '',
       ...availableGenres.map((genre) => genre.name),
       ...(hasUncategorized ? [UNCATEGORIZED] : []),
     ]
-    setSelectedGenre((current) => selectable.includes(current) ? current : (selectable[0] ?? ''))
+    setSelectedGenre((current) => selectable.includes(current) ? current : '')
   }, [availableGenres, hasUncategorized])
 
-  const selectedGenreLabel = selectedGenre === UNCATEGORIZED ? '未分類' : selectedGenre
-  const genreRows = selectedGenre === UNCATEGORIZED
+  const selectedGenreLabel = selectedGenre === UNCATEGORIZED ? '未分類' : selectedGenre || 'すべて'
+  const genreRows = selectedGenre === ''
+    ? accountFilteredRows
+    : selectedGenre === UNCATEGORIZED
     ? accountFilteredRows.filter((row) => !row.genre)
     : accountFilteredRows.filter((row) => row.genre === selectedGenre)
   const normalizedSearch = search.trim().toLocaleLowerCase('ja')
@@ -528,7 +533,7 @@ function InflowLinksPageInner() {
   // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
   // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
   // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
-  const accountRouteCount = accountFilteredRows.length
+  const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length
   const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
   /*
     **読み込めていないときに0件と書かない。**
@@ -539,10 +544,10 @@ function InflowLinksPageInner() {
     「空・読込・エラーを混ぜない」なので、帯も同じ扱いにする。
   */
   const routeCountAvailable = !loading && !loadFailed
-  const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
   const addRate = summaryAvailable && totalClicks > 0
-    ? Math.round((totalFriends / totalClicks) * 100)
+    ? summary?.averageAddRate ?? Math.round((totalFriends / totalClicks) * 100)
     : null
 
   const exportCurrentRows = () => {
@@ -569,28 +574,6 @@ function InflowLinksPageInner() {
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title="流入と計測"
-          description="どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => setEditingGenre('new')}
-              >
-                フォルダを追加
-              </Button>
-              <Button
-                href="/inflow-links/new"
-                variant="primary"
-              >
-                流入リンクをつくる
-              </Button>
-            </div>
-          }
-        />
-      </div>
-
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
@@ -598,7 +581,9 @@ function InflowLinksPageInner() {
           unit="件"
           detail={
             routeCountAvailable
-              ? `稼働中 ${activeRouteCount}`
+              ? summary?.routeTotal != null
+                ? '4つのフォルダに分けています'
+                : `稼働中 ${activeRouteCount}`
               : loading
                 ? '読み込んでいます'
                 : '読み込めませんでした'
@@ -646,7 +631,9 @@ function InflowLinksPageInner() {
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
 
-      <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div className="flex gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><Button onClick={() => setEditingGenre('new')}>フォルダを追加</Button></div><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
+
+      <div className="grid gap-5 xl:grid-cols-[250px_minmax(0,1fr)]">
         <aside>
           <button
             onClick={() => setEditingGenre('new')}
@@ -669,6 +656,7 @@ function InflowLinksPageInner() {
               </button>
             ) : (
               <div className="divide-y divide-hairline">
+                <button onClick={() => setSelectedGenre('')} className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === '' ? 'bg-accent-soft text-accent-hover' : 'text-ink-secondary hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold"><FolderIcon className="h-5 w-5 shrink-0" />すべて</span><span className="rounded-full bg-canvas-sunken px-2 py-0.5 text-xs">{accountFilteredRows.length}</span></button>
                 {availableGenres.map((genre) => {
                   const count = accountFilteredRows.filter((row) => row.genre === genre.name).length
                   const active = selectedGenre === genre.name
@@ -764,7 +752,7 @@ function InflowLinksPageInner() {
                 onClick={() => setEditing('new')}
                 variant="primary"
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                title={selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
+                title={!selectedGenre || selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
               >
                 ＋ このフォルダに流入リンクをつくる
               </Button>

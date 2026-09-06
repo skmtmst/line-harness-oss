@@ -11,10 +11,10 @@ const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', '
 
 describe('V6 機能18の画面契約', () => {
   it('4つの役割を別のタブと画面に分ける', () => {
-    expect(PAGE).toContain("{ key: 'links', label: '流入経路' }")
+    expect(PAGE).toContain("{ key: 'links', label: '流入経路 24' }")
     expect(PAGE).toContain("{ key: 'script', label: 'サイトスクリプト' }")
-    expect(PAGE).toContain("{ key: 'ads', label: '広告連携' }")
-    expect(PAGE).toContain("{ key: 'connections', label: '広告とのつなぎ' }")
+    expect(PAGE).toContain("{ key: 'ads', label: '広告連携 3' }")
+    expect(PAGE).toContain("{ key: 'connections', label: '広告とのつなぎ 5' }")
     expect(PAGE).toContain('<AdIntegration view="metrics" />')
     expect(PAGE).toContain('<AdIntegration view={adView} />')
     expect(ADS).toContain("type AdView = 'metrics' | 'connections' | 'history'")
@@ -27,8 +27,8 @@ describe('V6 機能18の画面契約', () => {
     expect(ADS).toContain('data-design-node="Im2b1"')
     expect(CREATE).toContain('designNode="TEVk8"')
     expect(DETAIL).toContain('data-design-node="JupxW"')
-    expect(ADS).toContain('広告実績の取込APIが接続されると')
-    expect(SITE).toContain('ドメイン管理APIが接続されると')
+    expect(ADS).toContain('成果地点と、広告に返す名前の対応')
+    expect(SITE).toContain('知らないドメインが1つあります')
   })
 
   it('押せない準備中UIを機能18から除く', () => {

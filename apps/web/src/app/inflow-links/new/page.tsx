@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import QRCode from 'qrcode'
 import type { Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
@@ -50,6 +51,7 @@ export default function NewInflowLinkPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -79,6 +81,12 @@ export default function NewInflowLinkPage() {
   }, [])
 
   const validRef = REF_PATTERN.test(refCode)
+  const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+  const issuedUrl = `${workerBase}/r/${refCode || 'summer-ig'}`
+  const shortUrl = `${workerBase}/s/${(refCode || 'summer-ig').slice(0, 6)}`
+  useEffect(() => {
+    void QRCode.toDataURL(issuedUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then(setQrDataUrl)
+  }, [issuedUrl])
 
   return (
     <CreatePage
@@ -133,6 +141,25 @@ export default function NewInflowLinkPage() {
       }
     >
       <FormSection step={1} label="どこに置くリンクですか">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_1fr_0.8fr]">
+        <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
+          <input
+            id="ir-name"
+            type="text"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (!refTouched) setRefCode(suggestRef(e.target.value))
+            }}
+            placeholder="例：夏のInstagram投稿"
+            className={inputClass}
+          />
+        </Field>
+
+        <Field label="REF（URLに入る文字）" htmlFor="ir-ref" required note="あとから変えられません。配ったURLが使えなくなるためです。">
+          <input id="ir-ref" type="text" value={refCode} onChange={(e) => { setRefTouched(true); setRefCode(e.target.value) }} placeholder="summer-ig" className={`${inputClass} font-mono`} />
+        </Field>
+
         <Field label="フォルダ" htmlFor="ir-genre" note="選んだフォルダの中に追加されます。">
           <input
             id="ir-genre"
@@ -143,48 +170,25 @@ export default function NewInflowLinkPage() {
             className={inputClass}
           />
         </Field>
-
-        <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
-          <input
-            id="ir-name"
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value)
-              if (!refTouched) setRefCode(suggestRef(e.target.value))
-            }}
-            placeholder="例：Instagramプロフィール"
-            className={inputClass}
-          />
-        </Field>
-
-        <Field
-          label="REF（URLに入る文字）"
-          htmlFor="ir-ref"
-          required
-          note={
-            <>
-              URLの末尾に使います。半角英小文字・数字・ハイフンで2〜64文字。
-              <br />
-              <strong>あとから変えられません。</strong>配ったURLが使えなくなるためです。
-            </>
-          }
-        >
-          <input
-            id="ir-ref"
-            type="text"
-            value={refCode}
-            onChange={(e) => {
-              setRefTouched(true)
-              setRefCode(e.target.value)
-            }}
-            placeholder="ig-profile"
-            className={`${inputClass} font-mono`}
-          />
-        </Field>
+        </div>
       </FormSection>
 
-      <FormSection step={2} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
+      <FormSection step={2} label="発行されるURL">
+        <p className="text-xs text-ink-faint">この2つは同じ場所に飛びます。紙にはQRコード、Webにはリンクを使ってください。</p>
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_120px] gap-4">
+          <div className="space-y-2">
+            <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{issuedUrl}</span></div>
+            <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{shortUrl}</span><span className="ml-2 text-xs text-ink-faint">短いほうは文字数の少ない場所（SMS・印刷）向け</span></div>
+          </div>
+          <div className="text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- Workerが撮影用QRを生成する */}
+            {qrDataUrl && <img src={qrDataUrl} alt="発行されるURLのQRコード" className="mx-auto h-24 w-24 rounded-control border border-hairline bg-canvas p-1" />}
+            <span className="mt-1 block text-xs text-ink-faint">画像で保存</span>
+          </div>
+        </div>
+      </FormSection>
+
+      <FormSection step={3} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
         <Field
           label="タグを自動で付ける"
           htmlFor="ir-tag"
@@ -283,7 +287,7 @@ export default function NewInflowLinkPage() {
         </label>
       </FormSection>
 
-      <FormSection step={3} label="どのLINEアカウントに入れるか">
+      <FormSection step={4} label="どのLINEアカウントに入れるか">
         <Field
           label="入れるアカウント"
           htmlFor="ir-pool"
@@ -306,11 +310,6 @@ export default function NewInflowLinkPage() {
         </p>
       </FormSection>
 
-      <FormSection step={4} label="発行されるURL">
-        <p className="rounded-control bg-canvas-sunken px-3 py-3 text-xs leading-relaxed text-ink-faint">
-          発行に成功すると、通常のURLを詳細画面でコピーできます。短いURLとQR画像は、発行APIが対応したあとに同じ詳細画面へ表示します。
-        </p>
-      </FormSection>
     </CreatePage>
   )
 }
