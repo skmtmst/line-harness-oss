@@ -3657,7 +3657,7 @@ for (const screen of SCREENS) {
     screen.verdict = issue294Review.verdict
     screen.verdictNote = `**2026-09-07 Issue #294で修正・再判定。** ${issue294Review.note}`
     screen.verdictSource = issue294Review.source
-    screen.verdictHead = '766e312f6'
+    screen.verdictHead = '9294bdeeb'
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
