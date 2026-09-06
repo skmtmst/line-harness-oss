@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 type AdView = 'metrics' | 'connections' | 'history'
 
@@ -183,13 +184,13 @@ export default function AdIntegration({ view }: { view: AdView }) {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <table className="w-full table-fixed text-xs">
               <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
-                <tr>
-                  <th className="w-[24%] px-4 py-3 text-left font-semibold">いつ・何の成果</th>
-                  <th className="w-[18%] px-4 py-3 text-left font-semibold">媒体</th>
-                  <th className="w-[18%] px-4 py-3 text-left font-semibold">クリックの種類</th>
-                  <th className="w-[18%] px-4 py-3 text-left font-semibold">状態</th>
-                  <th className="w-[22%] px-4 py-3 text-left font-semibold">次の予定</th>
-                </tr>
+                <TableHeadRow>
+                  <Th>いつ・何の成果</Th>
+                  <Th>媒体</Th>
+                  <Th>クリックの種類</Th>
+                  <Th>状態</Th>
+                  <Th>次の予定</Th>
+                </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-hairline">
                 {visibleLogs.map((log) => {

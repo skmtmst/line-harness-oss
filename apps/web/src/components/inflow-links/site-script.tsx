@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 type PageRow = { path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -22,6 +23,7 @@ export default function SiteScript() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
   const snippet = `<script src="${apiUrl}/api/site/script.js" async></script>`
 
@@ -52,9 +54,10 @@ export default function SiteScript() {
     try {
       await navigator.clipboard.writeText(snippet)
       setCopied(true)
+      setCopyFailed(false)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      window.prompt('このコードをコピーしてください:', snippet)
+      setCopyFailed(true)
     }
   }
 
@@ -104,6 +107,9 @@ export default function SiteScript() {
           <code className="min-w-0 flex-1 overflow-x-auto rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">{snippet}</code>
           <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
         </div>
+        {copyFailed && (
+          <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>
+        )}
       </section>
 
       <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -129,11 +135,11 @@ export default function SiteScript() {
         ) : (
           <table className="w-full table-fixed text-xs">
             <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
-              <tr>
-                <th className="w-[60%] px-4 py-3 text-left font-semibold">ページ</th>
-                <th className="w-[20%] px-4 py-3 text-right font-semibold">この30日の表示</th>
-                <th className="w-[20%] px-4 py-3 text-right font-semibold">見た人数</th>
-              </tr>
+              <TableHeadRow>
+                <Th>ページ</Th>
+                <Th align="right">この30日の表示</Th>
+                <Th align="right">見た人数</Th>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
               {pages.map((page) => (

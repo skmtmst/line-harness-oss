@@ -20,6 +20,7 @@ import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -784,22 +785,16 @@ function InflowLinksPageInner() {
               ['no-friends', `友だち追加なし ${genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length}`],
               ['unconfigured', `動きが未設定 ${genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length}`],
             ] as Array<[RouteFilter, string]>).map(([value, label]) => (
-              <button
+              <FilterChip
                 key={value}
-                type="button"
-                aria-pressed={filter === value}
-                onClick={() => {
+                selected={filter === value}
+                onChange={() => {
                   setFilter(value)
                   setPage(1)
                 }}
-                className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  filter === value
-                    ? 'border-accent-deep bg-accent-soft text-accent-deep'
-                    : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-                }`}
               >
                 {label}
-              </button>
+              </FilterChip>
             ))}
           </div>
 

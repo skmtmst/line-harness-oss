@@ -318,7 +318,7 @@ export default function NewInflowLinkPage() {
 function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
   return (
     <li className="flex gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-on-accent">{step}</span>
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{step}</span>
       <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
     </li>
   )

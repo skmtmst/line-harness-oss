@@ -7,6 +7,7 @@ import { api, fetchApi } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import type {
   EntryRoute,
   EntryRouteFunnel,
@@ -320,11 +321,11 @@ function InflowLinkDetailPageContent() {
                 ) : (
                   <table className="mt-3 w-full table-fixed text-xs">
                     <thead className="border-b border-hairline text-ink-faint">
-                      <tr>
-                        <th className="w-[45%] py-2 text-left font-semibold">友だち</th>
-                        <th className="w-[35%] py-2 text-left font-semibold">いつ来たか</th>
-                        <th className="w-[20%] py-2 text-right font-semibold">確認</th>
-                      </tr>
+                      <TableHeadRow>
+                        <Th>友だち</Th>
+                        <Th>いつ来たか</Th>
+                        <Th align="right">確認</Th>
+                      </TableHeadRow>
                     </thead>
                     <tbody className="divide-y divide-hairline">
                       {friends.slice(0, 20).map((friend) => (
