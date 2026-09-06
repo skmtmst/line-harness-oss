@@ -807,6 +807,154 @@ export const RICH_MENU_DELETE_IMPACT_ERROR = {
 }
 
 /**
+ * 機能12の5画面を実APIと同じ器で確認する固定データ。
+ *
+ * `rmg-1` は3枚を行き来できるが、「予約する」だけ入口へ戻れない。
+ * `rmg-2` は切替ボタンを持たない。設計 `DIUbO` / `NXdDk` の通常状態を
+ * 同じ取得口で描き分けられるようにしている。
+ */
+const richMenuArea = (id, label, targetPageId, boundsX) => ({
+  id,
+  boundsX,
+  boundsY: 0,
+  boundsWidth: 833,
+  boundsHeight: 260,
+  actionType: 'richmenuswitch',
+  actionData: { targetPageId },
+  intent: 'switch',
+  label,
+  tagIds: [],
+  scoreChange: null,
+  templateId: null,
+  formId: null,
+  trackedLinkId: null,
+})
+
+const richMenuPage = (id, orderIndex, name, areas = []) => ({
+  id,
+  orderIndex,
+  name,
+  aliasId: `visual-${id}`,
+  lineRichmenuId: `line-${id}`,
+  imageR2Key: null,
+  imageContentType: null,
+  areas,
+})
+
+const RICH_MENU_BASE = {
+  accountId: 'visual-qa-account',
+  chatBarText: 'メニューを開く',
+  size: 'large',
+  isDefaultForAll: false,
+  status: 'published',
+  publishingAt: null,
+  targetingPriority: 1,
+  targetingEnabled: true,
+  folderId: 'rich-menu-folder-members',
+  displayOrder: 1,
+  thumbnailR2Key: null,
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-20T00:00:00.000Z',
+}
+
+export const RICH_MENU_GROUPS = [
+  {
+    ...RICH_MENU_BASE,
+    id: 'rich-menu-target',
+    name: '通常メニュー（会員向け）',
+    isDefaultForAll: true,
+    targetingPriority: 0,
+    targetingEnabled: false,
+    targetingCondition: null,
+    displayOrder: 0,
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-1',
+    name: '会員ランク上位',
+    targetingCondition: JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'tag_exists', value: 'tag-0' }],
+    }),
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-2',
+    name: '初回来店ガイド',
+    status: 'draft',
+    targetingPriority: 3,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: 'rich-menu-folder-store',
+    displayOrder: 3,
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rich-menu-safe',
+    name: '未使用の下書き',
+    status: 'draft',
+    targetingPriority: 4,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: null,
+    displayOrder: 4,
+  },
+]
+
+export const RICH_MENU_GROUP_DETAILS = {
+  'rmg-1': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-1'),
+    defaultPageId: 'rmg-1-top',
+    pages: [
+      richMenuPage('rmg-1-top', 0, 'トップ', [
+        richMenuArea('rmg-1-top-product', '商品を見る', 'rmg-1-product', 0),
+        richMenuArea('rmg-1-top-booking', '予約する', 'rmg-1-booking', 833),
+      ]),
+      richMenuPage('rmg-1-product', 1, '商品を見る', [
+        richMenuArea('rmg-1-product-top', 'トップ', 'rmg-1-top', 0),
+        richMenuArea('rmg-1-product-booking', '予約する', 'rmg-1-booking', 1666),
+      ]),
+      richMenuPage('rmg-1-booking', 2, '予約する', [
+        richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
+      ]),
+    ],
+  },
+  'rmg-2': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-2'),
+    defaultPageId: 'rmg-2-top',
+    pages: [richMenuPage('rmg-2-top', 0, 'トップ')],
+  },
+}
+
+export const RICH_MENU_EXTERNAL = {
+  currentDefault: 'line-rich-menu-external',
+  lineMenus: [
+    {
+      richMenuId: 'line-rich-menu-external',
+      name: 'LINE公式マネージャーで作成',
+      chatBarText: 'メニュー',
+      size: { width: 2500, height: 1686 },
+      areasCount: 6,
+      isCurrentDefault: true,
+      adminManaged: false,
+      adminInfo: null,
+    },
+  ],
+}
+
+export const RICH_MENU_TAP_STATS = {
+  from: '2026-08-01',
+  to: '2026-08-31',
+  byArea: [],
+  byGroup: [
+    { groupId: 'rich-menu-target', taps: 12480 },
+    { groupId: 'rmg-1', taps: 3210 },
+    { groupId: 'rmg-2', taps: 0 },
+  ],
+  total: 15690,
+}
+
+/**
  * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうち、LINEの3件。
  *
  * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
