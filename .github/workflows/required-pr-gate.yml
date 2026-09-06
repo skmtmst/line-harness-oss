@@ -1,19 +1,8 @@
 name: Required PR gate
 
-# This workflow intentionally runs for every pull request. Path-filtered
-# workflows are useful for speed, but they cannot be made a universal
-# branch-protection requirement because GitHub reports no check at all when
-# their path filter does not match.
-#
-# The branch filter used to be `codex/development` and `main`. Stacked pull
-# requests — the ones whose base is another feature branch — therefore never
-# ran this gate at all. #57 added 24 admin screens and landed with zero status
-# checks, because its base was another feature branch rather than an
-# integration branch. A 15-deep stack could reach `codex/development` with
-# only its final pull request ever checked.
-#
-# There is no branch filter now: every pull request runs it, whatever it
-# targets.
+# This workflow intentionally runs for every pull request. The final
+# `required-pr-gate` job is the one stable branch-protection check; the
+# expensive suites run in parallel behind it.
 
 on:
   pull_request:
@@ -22,23 +11,42 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: required-pr-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  required-pr-gate:
+  changes:
+    name: Classify and validate the change
     runs-on: ubuntu-latest
+    outputs:
+      full_suite: ${{ steps.scope.outputs.full_suite }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Select the required test scope
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "full_suite=true" >> "$GITHUB_OUTPUT"
+            echo "PR差分がない手動実行のため、全検査を行います。"
+            exit 0
+          fi
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install the committed dependency graph
-        run: pnpm install --frozen-lockfile
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" \
+            | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
+            echo "full_suite=true" >> "$GITHUB_OUTPUT"
+            echo "コードまたは設定の変更があるため、全検査を行います。"
+          else
+            echo "full_suite=false" >> "$GITHUB_OUTPUT"
+            echo "文書・ワークフローだけの変更のため、高速検査を行います。"
+          fi
 
       - name: Reject whitespace errors in the PR diff
         env:
@@ -53,10 +61,6 @@ jobs:
 
       # 反映履歴は「あとでまとめて書く」と必ず薄くなる。変更した本人が
       # 変更した直後に書くのが一番正確なので、PRの時点で見る。
-      #
-      # 落とすが、逃げ道は残す。急ぎの修正が出せなくなるほうが困るので、
-      # PRのタイトルか本文に [skip release-log] があれば通す。
-      # 文書だけ・ワークフローだけの変更も対象外にする。
       - name: Require a release-log entry
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -83,8 +87,6 @@ jobs:
             exit 0
           fi
 
-          # 旧来の共有ファイルへ新しい履歴行を足すと、同時作業のたびに競合する。
-          # ファイル自体は過去分として残すが、新規行はPRごとのファイルだけに書く。
           legacy_added=$(git diff "$BASE_SHA...$HEAD_SHA" \
             -- docs/release-log/unreleased.md \
             | grep '^+[-*] ' || true)
@@ -95,7 +97,6 @@ jobs:
             exit 1
           fi
 
-          # 変更したPR別ファイルは、見出しを「追加・変更・修正」に限定する。
           release_files=$(git diff --diff-filter=AM --name-only "$BASE_SHA...$HEAD_SHA" \
             -- 'docs/release-log/unreleased/*.md')
           while IFS= read -r release_file; do
@@ -115,47 +116,21 @@ jobs:
           $release_files
           EOF
 
-          # 文書とワークフローだけの変更は対象外。
           if ! printf '%s\n' "$changed" | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
             echo "文書・ワークフローだけの変更のため、反映履歴の確認を飛ばしました。"
             exit 0
           fi
 
-          # 新しい反映履歴はPRごとのファイルだけから拾う。
-          #
-          #   docs/release-log/unreleased/<番号>-<担当>-<何の話か>.md
-          #
-          # 1ファイルに全員が書き足す形だと、**全員が同じ場所（`## 追加` の
-          # 直後）に行を差し込むので、PRのたびに必ずぶつかる。** 一晩で9本の
-          # PRが全部ここで止まった。1本ずつ別のファイルにすれば起きない。
           added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" \
             -- 'docs/release-log/unreleased/*.md' \
             | grep '^+[-*] ' || true)
           added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
           if [ "$added" -gt 0 ]; then
             echo "反映履歴に $added 行足されています。"
-
-            # このPRの番号が入った行が1行でもあるか。
-            #
-            # 行を書く時点ではPR番号がまだ無いので、書き忘れやすい。書式では
-            # 任意なので、抜けていても組み立ては通る。**通ってしまうから抜ける。**
-            # 管理画面の「更新履歴」に番号が出ず、どの変更か辿れなくなる。
-            # 実際、一晩で19行が番号なしのまま入った。
-            #
-            # **「全部の行に入っているか」では見ない。** 過去の行を直すPRでは、
-            # 他のPRの番号が付いた行が差分に出る（それが直した中身なので）。
-            # 全部を求めると、そういうPRが通らなくなる。実際にこの仕組みを
-            # 入れたPR自身が引っかかった。
             own=$(printf '%s\n' "$added_lines" | grep -c "#${PR_NUMBER}\b" || true)
             if [ "$own" -eq 0 ]; then
               echo "::error::反映履歴に、このPRの番号 #${PR_NUMBER} が入った行がありません。"
-              echo ""
-              echo "  管理画面の 運用状態 → 更新履歴 で、どの変更か辿れなくなります。"
-              echo "  足した行のどれかに #${PR_NUMBER} を入れてください（順序は問いません）:"
-              echo ""
-              echo "    - 変更した内容 @kenta #${PR_NUMBER} $(date -u +%Y-%m-%d) HH:MM"
-              echo ""
-              echo "  いま足されている行:"
+              echo "足した行のどれかに #${PR_NUMBER} を入れてください。"
               printf '%s\n' "$added_lines" | sed 's/^+/    /'
               exit 1
             fi
@@ -164,37 +139,8 @@ jobs:
           fi
 
           echo "::error::反映履歴に1行も足されていません。"
-          echo ""
-          echo "  変更した内容を、運用者に伝わる言葉で1行書いてください。"
-          echo "  管理画面の 運用状態 → 更新履歴 → 変更内容 にそのまま出ます。"
-          echo ""
-          echo "    ## 修正"
-          echo "    - 予約した絞り込み配信が全員に届いていたのを直した @kenta #151"
-          echo ""
-          echo "  書き方: docs/release-log/README.md"
-          echo "  急ぎで飛ばしたいときは、PRのタイトルか本文に [skip release-log] を入れてください。"
+          echo "docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md に1行書いてください。"
           exit 1
-
-      - name: Build shared packages
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-crm/line-sdk
-          --filter @line-crm/db
-          --filter @line-harness/update-engine
-          build
-
-      - name: Check the generated bootstrap schema
-        run: pnpm --filter @line-crm/db check:bootstrap
-
-      - name: Test repository scripts
-        run: pnpm test:scripts
-
-      - name: Typecheck repository scripts
-        run: |
-          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
-          pnpm exec tsc -p scripts/tsconfig.json \
-            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
 
       - name: Check shell syntax
         run: |
@@ -254,20 +200,86 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
 
+  repository-checks:
+    name: Repository and shared checks
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build shared packages
+        run: >-
+          pnpm
+          --filter @line-crm/shared
+          --filter @line-crm/line-sdk
+          --filter @line-crm/db
+          --filter @line-harness/update-engine
+          build
+      - run: pnpm --filter @line-crm/db check:bootstrap
+      - run: pnpm test:scripts
+      - name: Typecheck repository scripts
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
+          pnpm exec tsc -p scripts/tsconfig.json \
+            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
       - name: Test shared
         run: |
           pnpm --filter @line-crm/shared typecheck
           pnpm --filter @line-crm/shared test
-          # 日付・時刻を扱うものが入っているので、日本時間以外でも通ることを見る。
-          # 実行環境の時計に引きずられる書き方は、JST で走らせている限り
-          # 気づけない（深夜0時前後で1日ずれる、曜日が変わる、など）。
           TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
+      - run: pnpm --filter liff typecheck
 
-      - name: Typecheck and test Worker
-        run: |
-          pnpm --filter worker typecheck
-          pnpm --filter worker test
+  worker-checks:
+    name: Worker typecheck and tests
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Worker dependencies
+        run: >-
+          pnpm
+          --filter @line-crm/shared
+          --filter @line-crm/line-sdk
+          --filter @line-crm/db
+          --filter @line-harness/update-engine
+          build
+      - run: pnpm --filter worker typecheck
+      - run: pnpm --filter worker test
 
+  worker-build:
+    name: Worker build
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Worker dependencies
+        run: >-
+          pnpm
+          --filter @line-crm/shared
+          --filter @line-crm/line-sdk
+          --filter @line-crm/db
+          --filter @line-harness/update-engine
+          build
       - name: Build Worker
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
@@ -275,15 +287,99 @@ jobs:
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
         run: pnpm --filter worker build
 
-      - name: Test and build Admin
-        env:
-          NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
-        run: |
-          pnpm --filter web exec next lint --report-unused-disable-directives-severity error
-          pnpm --filter web typecheck
-          pnpm --filter web test
-          pnpm --filter web build
-          pnpm --filter web verify:design
+  web-checks:
+    name: Admin lint, typecheck and tests
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Admin dependencies
+        run: >-
+          pnpm
+          --filter @line-crm/shared
+          --filter @line-harness/update-engine
+          build
+      - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
+      - run: pnpm --filter web typecheck
+      - run: pnpm --filter web test
 
-      - name: Typecheck LIFF
-        run: pnpm --filter liff typecheck
+  web-build:
+    name: Admin build and design verification
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.[jt]s', 'apps/web/**/*.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-
+      - run: pnpm install --frozen-lockfile
+      - name: Build Admin dependencies
+        run: >-
+          pnpm
+          --filter @line-crm/shared
+          --filter @line-harness/update-engine
+          build
+      - run: pnpm --filter web build
+      - run: pnpm --filter web verify:design
+
+  required-pr-gate:
+    name: required-pr-gate
+    needs:
+      - changes
+      - repository-checks
+      - worker-checks
+      - worker-build
+      - web-checks
+      - web-build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every selected check to pass
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          REPOSITORY_RESULT: ${{ needs.repository-checks.result }}
+          WORKER_CHECKS_RESULT: ${{ needs.worker-checks.result }}
+          WORKER_BUILD_RESULT: ${{ needs.worker-build.result }}
+          WEB_CHECKS_RESULT: ${{ needs.web-checks.result }}
+          WEB_BUILD_RESULT: ${{ needs.web-build.result }}
+        run: |
+          failed=0
+          for result in \
+            "$CHANGES_RESULT" \
+            "$REPOSITORY_RESULT" \
+            "$WORKER_CHECKS_RESULT" \
+            "$WORKER_BUILD_RESULT" \
+            "$WEB_CHECKS_RESULT" \
+            "$WEB_BUILD_RESULT"; do
+            case "$result" in
+              success|skipped) ;;
+              *) failed=1 ;;
+            esac
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::選択された検査に失敗または中断があります。"
+            exit 1
+          fi
+
+          echo "required-pr-gate: 合格"
