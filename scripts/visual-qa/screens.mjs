@@ -975,10 +975,10 @@ export const SCREENS = [
       apis: ['**/api/reminders/*/runs*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 画面を本流へ載せ、初めて撮れた（board#74）。前は `unimplemented` で、実装は未マージの枝の中にあった。** ルート `/reminders/detail?id=reminder-1`。通常・読込中・0件・取得失敗の**5枚すべて**を1440・1920で撮った（10枚、はみ出し0）。 **API と DB は既に本流にあった**（`GET /api/reminders/:id/runs`、`POST /api/reminder-runs/:runId/retry`、migration 269）。無かったのは画面と web 側の口だけ。 **要件 §3-7 の10項目がすべて出ている**：友だち／通知／結果／予定／実行／試行／理由・次の動き／**LINE要求ID**／操作。LINE要求IDは旧実装ではCSVにしか無く、**問い合わせのときに画面から写せなかった**ので列に足した。 **取れないものを0で埋めていない**：まだ始まっていない行の実行時刻は `—`、既読は `—`（LINEは友だち単位の既読を返さない）、要求IDが無い行も `—`。友だちが消えている行は「削除済みの友だち」。 **再試行できるかは Worker が決める**（`canRetry`）。画面で条件を作らない。再試行待ちと送信失敗にだけ「この通知を再試行」が出る。 **P1 設計と突き合わせられない**——`docs/design-reference/reminders-v6/` に `GC4St.txt` が無く、**この画面だけ設計の書き出しから漏れている**。要件 §3-7 を根拠に作った。書き出しは lane:pen へ渡す。 P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）は未確認。',
-    verdictSource: 'reminders-v6/GC4St.txt',
-    verdictHead: 'aa4c913b',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #248。** 正本 `GC4St.png` / `GC4St.txt` と同じく、4KPI、通知実績、最近の実行、稼働状況、エラー時だけ出る要確認、LINEプレビュー、下部操作の骨格へ統一した。要件 §3-7 の予定・実行・試行・理由・次回再試行・LINE要求IDは、正本の4列表を崩さないよう関連するセルの補足行にまとめた。取得失敗時の集計値と停止予定、未実行時刻、要求IDなしを0で埋めず `—` とした。API/DBは既存の `GET /api/reminders/:id/runs`、冪等な再試行口、migration 269を使用。通常・読込中・0件・取得失敗を1440/1920で撮影（10枚）、横はみ出し0。PR実装 head `ba2f2c77` を比較した。',
+    verdictSource: 'reminders-v6/GC4St.txt + reminders-v6/GC4St-normal-1440.png + reminders-v6/GC4St-normal-1920.png',
+    verdictHead: 'ba2f2c77',
   },
   {
     /*
@@ -1241,9 +1241,11 @@ export const SCREENS = [
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/webinars/new`。1440・1920で撮った（はみ出し0）。**5段のステッパー（STEP 1〜5、うち STEP 3 は「CTA・フォーム」）とLINEプレビューが無い。** 実装だけにある行が2つ（「URL・動画ファイルの詳細設定」「従来CTAボタンの設定」）。取得元 `webinars-v6/lvaY5.txt`',
-    verdictHead: '49e1341c', route: '/webinars/new', },
+    mode: 'viewport', height: 1080,
+    steps: [{ fill: 'ウェビナー名', text: 'NEN活用スタートセミナー' }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #223 で再照合。** 構造一致・フォルダと開催形式の保存口待ち。設計画像と実装画像を同じ比較入力で見比べ、基本設定→動画→CTA・フォーム→通知→確認の5段、ウェビナー名、開催形式、設定サマリー、LINEプレビュー、テスト送信・公開ページ、下書き保存と次段への操作を確認した。現行APIにフォルダと開催形式の項目が無いため作り物を保存せず、下書き保存後に設定する旨を画面に明記した。1440・1920とも横スクロール0。取得元 `webinars-v6/lvaY5.txt` と同Node画像。',
+    verdictHead: '98e104b7c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
     verdict: 'needs_fix',
@@ -3729,6 +3731,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 1011, head: '98e104b7c', on: '2026-09-06', screens: ['lvaY5'], note: 'Issue #223。3102/8789で1440・1920を撮影し、両方とも横スクロール0。5段・設定サマリー・LINEプレビューへ整え、構造一致／保存API待ちへ更新した。' },
     { pr: 962, head: '9b8f7451', on: '2026-09-06', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: 'Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認' },
     { pr: 917, head: 'c5e1095e', on: '2026-09-06', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: '#251 の11画面を実データへ接続して1440・1920pxで撮影。最終判定はlane確認待ちのため未判定のまま' },
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
