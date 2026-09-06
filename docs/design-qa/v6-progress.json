@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 30,
-  "match": 80,
-  "structureMatchDataPending": 61,
-  "needsFix": 121,
+  "match": 81,
+  "structureMatchDataPending": 62,
+  "needsFix": 119,
   "unjudged": 5,
-  "remaining": 188,
+  "remaining": 187,
   "features": [
     {
       "feature": 1,
@@ -1832,11 +1832,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 8,
-      "needsFix": 3,
+      "match": 1,
+      "structureMatchDataPending": 9,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 11,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 549,
@@ -1973,6 +1973,16 @@
             "s6MBc"
           ],
           "note": "Issue #230 のS3第2段。Pencilの実ノードと同じ状態を1440・1920で横に並べて確認した。全対象で横スクロール0。絵は版に残さず `.txt` と判定注記を証拠にする。"
+        },
+        {
+          "pr": 1041,
+          "head": "16e2331cb",
+          "on": "2026-09-07",
+          "screens": [
+            "s98Vfw",
+            "s6MBc"
+          ],
+          "note": "Issue #230 の残件2画面。3104/8791で通常と全状態を1440・1920px撮影し、正本と同じ入力で左右比較した。全12枚で横はみ出し0。s6MBcは一致、s98Vfwは未接続API値を作らず構造一致・データ未接続。"
         }
       ]
     },
