@@ -19,14 +19,15 @@ const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.
 
 describe('V6 23-1 EC連携の読み込み', () => {
   it('一覧が配列であることを確かめてから state に入れる', () => {
-    expect(source).toContain('Array.isArray(eventRes.data)')
-    expect(source).toContain('Array.isArray(settingRes.data)')
+    expect(source).toContain('Array.isArray(eventsResponse.data)')
+    expect(source).toContain("typeof overviewResponse.data === 'object'")
+    expect(source).toContain('!Array.isArray(overviewResponse.data)')
   })
 
   it('形の確認は setEvents より前に置く', () => {
     // 後ろに置くと、確かめる前に非配列が state に入って描画が落ちる。
-    const guard = source.indexOf('Array.isArray(eventRes.data)')
-    const assign = source.indexOf('setEvents(eventRes.data)')
+    const guard = source.indexOf('Array.isArray(eventsResponse.data)')
+    const assign = source.indexOf('setEvents(eventsResponse.data)')
     expect(guard).toBeGreaterThan(-1)
     expect(assign).toBeGreaterThan(-1)
     expect(guard).toBeLessThan(assign)

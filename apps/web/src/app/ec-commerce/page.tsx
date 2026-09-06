@@ -58,7 +58,10 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         api.ecCommerce.overview(accountId),
         api.ecCommerce.events({ lineAccountId: accountId, limit: 20 }),
       ])
-      if (!overviewResponse.success || !eventsResponse.success || !Array.isArray(eventsResponse.data)) {
+      const hasOverview = typeof overviewResponse.data === 'object'
+        && overviewResponse.data !== null
+        && !Array.isArray(overviewResponse.data)
+      if (!overviewResponse.success || !eventsResponse.success || !hasOverview || !Array.isArray(eventsResponse.data)) {
         throw new Error('invalid_ec_response')
       }
       setOverview(overviewResponse.data)
@@ -75,7 +78,11 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     return (
       <ListState
         kind={state}
-        title={state === 'empty' && !accountId ? 'LINEアカウントを選択してください' : undefined}
+        title={state === 'error'
+          ? 'ECデータ連携の情報を読み込めませんでした'
+          : state === 'empty' && !accountId
+            ? 'LINEアカウントを選択してください'
+            : undefined}
         description={state === 'empty' && !accountId ? '左のメニュー上部で、確認するLINEアカウントを選びます。' : undefined}
         onRetry={state === 'error' ? () => void load() : undefined}
       />
@@ -115,7 +122,7 @@ function EcCommercePageInner() {
   const { selectedAccountId } = useAccount()
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-design="Head">
       <PageHeader
         breadcrumb={[{ label: '専用機能' }, { label: 'EC連携' }]}
         title="EC連携"
