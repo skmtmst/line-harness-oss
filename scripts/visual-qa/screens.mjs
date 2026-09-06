@@ -1225,15 +1225,15 @@ export const SCREENS = [
 
   // ── 機能10 ウェビナー ───────────────────────────────────
   /*
-    設計は5段のウィザード（基本設定→動画→CTA・フォーム→通知→確認）。
-    実装は作成が1枚、編集が4つのタブ。**「通知・リマインド」の段だけが
-    まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
+    設計の5段（基本設定→動画→CTA・フォーム→通知→確認）を、URLから
+    直接同じ状態で開ける。作成・編集の保存口に無い値は作らず、
+    固定データと実APIの接続条件を画面ごとの判定に残す。
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で通常・空・失敗・権限不足を1440/1920px撮影（横はみ出し0）。Pencil画像と比べ、4指標・検索・一覧はあるが、フォルダ・ページ送りがなく、申込/視聴が行で `—`、公開期間と操作も設計と異なるため要修正。取得元 `webinars-v6/ZC13r.png`、`ZC13r-1920.png`、`ZC13r*.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 / 固定データ PR #1060 `e5ec51323` で再判定。** 4指標、作成操作、フォルダ、検索・絞り込み、6列表、ページ送りを設計順にそろえ、通常・空・失敗・権限不足を3102/8789で1440/1920px撮影。全10枚で横はみ出し0。5行の申込・視聴・公開状態・公開期間は固定データで確認した。実API #312 が未統合で、フォルダ合計18件と各行値を本番データで返せないため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/ZC13r.png + ZC13r-1920.png + ZC13r*.txt',
-    verdictHead: '9b8f7451',
+    verdictHead: 'a571acc25',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1256,51 +1256,51 @@ export const SCREENS = [
     verdictHead: '98e104b7c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。Pencil画像は動画名・再生時間・公開期間・視聴条件を1画面に要約するが、実装は基本情報・配信枠・従来CTAの長い編集フォームで、見出し・配置・操作が一致しないため要修正。取得元 `webinars-v6/PV1Vh.png`、`PV1Vh-1920.png`、`PV1Vh.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 5段、動画名・再生時間、公開設定、設定サマリー、LINEプレビュー、固定操作帯を設計と同じ役割・順序へ変更。3102/8789の1440/1920pxで横はみ出し0。公開期間は固定データ PR #1060 の値を表示するが、視聴条件を返す実API #312 が未統合のため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/PV1Vh.png + PV1Vh-1920.png + PV1Vh.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=video`,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=video`,
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。Pencil画像は表示時刻・ボタン文言・申込フォーム・完了アクションを要約するが、実装は未選択のフォーム欄と編集用入力を直接並べ、設定サマリーとLINEプレビューも無いため要修正。取得元 `webinars-v6/d3rFGD.png`、`d3rFGD-1920.png`、`d3rFGD.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** CTAの表示時刻・文言、申込フォーム、完了アクション、設定サマリー、LINEプレビューを設計順へ変更し、詳細編集は折りたたみに分離。3102/8789の1440/1920pxで横はみ出し0。回答フォームの入力項目と完了アクション詳細を返す契約が無く、取得済み値だけで要約しているため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/d3rFGD.png + d3rFGD-1920.png + d3rFGD.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=cta`,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=cta`,
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。通知件数と申込直後・前日・開始前・開始時・見逃し後の設定は実データで表示されるが、Pencil画像の2つの要約カード、右の設定サマリー、LINEプレビューとは寸法・構成が異なるため要修正。取得元 `webinars-v6/Ho8z4.png`、`Ho8z4-1920.png`、`Ho8z4.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 事前案内と当日・見逃し案内の2カード、設定サマリー、LINEプレビュー、固定操作帯を設計順へ変更。通知設定APIの申込直後・前日・開始前・開始時・見逃し後を実値表示し、3102/8789の2幅で横はみ出し0。通知本文とテスト結果を返す口が無いため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/Ho8z4.png + Ho8z4-1920.png + Ho8z4.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=notifications`,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=notifications`,
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。視聴完了・CTAクリック・未視聴の後続処理は保存できるが、Pencil画像の完了メッセージ、LINEプレビュー、実行時点、再取得時の選択がなく、`tagId`・`scenarioId` の内部入力も残るため要修正。取得元 `webinars-v6/Xjk8q.png`、`Xjk8q-1920.png`、`Xjk8q.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 完了メッセージ、実行時点、1回だけ、保存済み通知・アクション、結果未取得時の選択、設定サマリー、LINEプレビューを設計順へ変更。詳細編集は折りたたみ内へ移し、通常面から内部ID入力を外した。3102/8789の2幅で横はみ出し0。送信テンプレート本文と再取得方針の保存契約が無いため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/Xjk8q.png + Xjk8q-1920.png + Xjk8q.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=actions`,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=actions`,
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。タイトル・動画・公開状態は実データで確認でき、LIFF未設定理由も表示するが、Pencil画像の公開期間・対象・申込フォーム要約、右の設定サマリー、LINEプレビューがなく要修正。取得元 `webinars-v6/GB0NR.png`、`GB0NR-1920.png`、`GB0NR.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 公開ページ、表示内容、公開期間・対象の設定サマリー、LINEプレビューを設計の2列構造へ変更。公開中かつ所属アカウントのLIFF設定済みの場合だけ公開ページを開く。3102/8789の2幅で横はみ出し0。撮影アカウントのLIFF IDと申込フォーム詳細が未接続のため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/GB0NR.png + GB0NR-1920.png + GB0NR.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=preview`,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=preview`,
     mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。必要項目の合否とタイトル・URL・動画長・配信枠は確認できるが、Pencil画像の4チェック、公開期間・対象・CTA/フォーム・アクション・通知重複、右の設定サマリーとLINEプレビューがなく要修正。取得元 `webinars-v6/D6yO7e.png`、`D6yO7e-1920.png`、`D6yO7e.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 公開前4チェック、ウェビナー名・公開期間・対象・CTA/フォーム・アクションの最終確認、設定サマリー、LINEプレビューを設計順へ変更。3102/8789の2幅で横はみ出し0。公開ページ・通知テスト結果と通知重複の検査APIが未接続のため、その項目を未接続と明示した構造一致。',
     verdictSource: 'webinars-v6/D6yO7e.png + D6yO7e-1920.png + D6yO7e.txt',
-    verdictHead: '9b8f7451',
+    verdictHead: 'a571acc25',
     route: '/webinars/edit?id=webinar-1&pane=review', mode: 'page',
 
   },
@@ -1312,42 +1312,42 @@ export const SCREENS = [
     */
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
     route: '/webinars/published?id=webinar-1', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は公開済み・URL・長さ・申込数だけで、設計の5段完了表示、詳細な設定要約、Slack通知、次にできることが不足する。**推奨修正**：設計の完了サマリーへ合わせ、LIFF未設定時の理由表示は維持する。取得元 `webinars-v6/TimXl.txt` と同Node画像。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 5段完了、公開結果、設定要約、運用者通知、参加状況、次にできること、監視中を設計の左右構造へ変更。正本の誤記は要件どおり「公開しました」「申込・配信条件に合う友だち」に直した。3102/8789の2幅で横はみ出し0。停止・通知テスト・複製・監視結果とLIFF IDが未接続のため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/TimXl.txt',
-    verdictHead: '350f9636a',
+    verdictHead: 'a571acc25',
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。4指標・参加者4人・CSV操作は表示されるが、Pencil画像の実行結果・時刻・状態札、右の稼働状況・要分析・担当者視聴完了、参加状況内訳がなく要修正。取得元 `webinars-v6/Q8sHa.png`、`Q8sHa-1920.png`、`Q8sHa.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 4指標、参加者ごとの視聴・実行結果・状態・時刻、参加状況内訳、稼働状況、要分析、担当者視聴完了を設計の左右構造へ変更。分析APIの4人を表示し、3102/8789の2幅で横はみ出し0。担当者連携状態と実行エラーの詳細を返す口が無いため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/Q8sHa.png + Q8sHa-1920.png + Q8sHa.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。申込・参加率・90%以上視聴・フォーム送信・ファネルを実データで表示するが、Pencil画像の概要/視聴/離脱/CTA/申込タブ、右の設定サマリーとLINEプレビュー、CSV操作とは別構成で要修正。取得元 `webinars-v6/yxyzQ.png`、`yxyzQ-1920.png`、`yxyzQ.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 で再判定。** 概要・視聴・離脱・CTA・申込、視聴結果、視聴行動、設定サマリー、LINEプレビュー、CSVを設計の2列構造へ変更。申込・再生・完了・CTAは分析APIの実値を表示し、3102/8789の2幅で横はみ出し0。視聴区間配列が空で最大離脱と最も視聴された区間を出せないため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/yxyzQ.png + yxyzQ-1920.png + yxyzQ.txt',
-    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
+    verdictHead: 'a571acc25', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'LKuAQ', name: '10-1-K アーカイブ確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 撮影手順を5行目「旧機能説明会」に直し、3104/8791で1440/1920px撮影（横はみ出し0）。設計画像は無いため同Nodeの設計本文と文字照合。対象名・一覧から外れること・履歴保持・取消/実行はあるが、設計の申込者数、公開URL無効化、復元可能、設定サマリー、LINEプレビューがなく要修正。取得元 `webinars-v6/LKuAQ.txt`。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 / 固定データ PR #1060 `e5ec51323` で一致。** 設計画像なしのため正本 `LKuAQ.txt` と文字・構造照合。旧機能説明会、申込85人、視聴99人、公開URL無効化、履歴保持、復元、設定サマリー、LINEプレビュー、取消・実行を表示した。3102/8789の1440/1920pxで横はみ出し0。',
     verdictSource: 'webinars-v6/LKuAQ.txt + LKuAQ-1920.png',
-    verdictHead: '9b8f7451',
+    verdictHead: 'a571acc25',
     route: '/webinars', mode: 'viewport', height: 1080,
     steps: [{ click: 'アーカイブ', nth: 4 }],
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で通常・読込・空・失敗を1440/1920px撮影（横はみ出し0）。各状態は区別でき、未取得を0にしないが、Pencil画像にあるフォルダ、ページ送り、状態中も維持する一覧枠がなく、通常状態も `ZC13r` と同じ差が残るため要修正。取得元 `webinars-v6/zCQXe.png`、`zCQXe-1920.png`、`zCQXe*.txt`。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #289 / UI HEAD a571acc25 / 固定データ PR #1060 `e5ec51323` で再判定。** 通常・読込中・0件・取得失敗を同じKPI・フォルダ・一覧枠で分け、取得失敗を0件と混同しない。3102/8789の全8枚で横はみ出し0。通常時の5行は設計値を表示したが、実API #312 が未統合でフォルダ合計・行集計を本番データから返せないため構造一致・データ未接続。',
     verdictSource: 'webinars-v6/zCQXe.png + zCQXe-1920.png + zCQXe*.txt',
-    verdictHead: '9b8f7451',
+    verdictHead: 'a571acc25',
     states: { apis: ['**/api/webinars?*', '**/api/webinars/overview?*'], kinds: ['loading', 'empty', 'error'] },
 
   },
@@ -3814,6 +3814,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 0, head: 'a571acc25', on: '2026-09-07', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'TimXl', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: 'Issue #289。UI HEAD a571acc25 と固定データ PR #1060 head e5ec51323 を3102/8789で通常・全状態、1440/1920pxの38枚に撮影。全画像で横はみ出し0。一致1、構造一致・データ未接続11。' },
     { pr: 1011, head: '98e104b7c', on: '2026-09-06', screens: ['lvaY5'], note: 'Issue #223。3102/8789で1440・1920を撮影し、両方とも横スクロール0。5段・設定サマリー・LINEプレビューへ整え、構造一致／保存API待ちへ更新した。' },
     { pr: 962, head: '9b8f7451', on: '2026-09-06', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: 'Issue #211。割当ポート3104/8791で11画面を1440・1920px撮影し、設計画像または同Nodeの設計本文と照合。11画面を要修正と判定し、横はみ出し0を確認' },
     { pr: 917, head: 'c5e1095e', on: '2026-09-06', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: '#251 の11画面を実データへ接続して1440・1920pxで撮影。最終判定はlane確認待ちのため未判定のまま' },
