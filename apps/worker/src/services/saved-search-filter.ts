@@ -11,6 +11,41 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function existence(
+  condition: SavedSearchCondition,
+  sql: string,
+  binds: unknown[] = [],
+): CompiledCondition | string {
+  if (['exists', 'has', 'eq'].includes(condition.op)) return { sql: `EXISTS (${sql})`, binds };
+  if (['not_exists', 'not_has', 'ne'].includes(condition.op)) {
+    return { sql: `NOT EXISTS (${sql})`, binds };
+  }
+  return '存在確認で使えない比較方法が指定されています';
+}
+
+function dateCondition(
+  condition: SavedSearchCondition,
+  columnSql: string,
+  label: string,
+): CompiledCondition | string {
+  if (condition.op === 'between' && condition.value && typeof condition.value === 'object') {
+    const range = condition.value as { from?: unknown; to?: unknown };
+    const from = text(range.from);
+    const to = text(range.to);
+    if (!from && !to) return `${label}の範囲がありません`;
+    const clauses: string[] = [];
+    const binds: unknown[] = [];
+    if (from) { clauses.push(`${columnSql} >= ?`); binds.push(from); }
+    if (to) { clauses.push(`${columnSql} <= ?`); binds.push(`${to}T23:59:59.999`); }
+    return { sql: `(${clauses.join(' AND ')})`, binds };
+  }
+  const value = text(condition.value);
+  if (!value) return `${label}の条件に値がありません`;
+  if (condition.op === 'after') return { sql: `${columnSql} >= ?`, binds: [value] };
+  if (condition.op === 'before') return { sql: `${columnSql} <= ?`, binds: [`${value}T23:59:59.999`] };
+  return `${label}で使えない比較方法が指定されています`;
+}
+
 function compileCondition(condition: SavedSearchCondition): CompiledCondition | string {
   const value = text(condition.value);
   switch (condition.kind) {
@@ -65,6 +100,18 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
       if (condition.op !== 'eq') return '対応マークで使えない比較方法が指定されています';
       return { sql: 'f.support_mark_id = ?', binds: [value] };
 
+    case 'assignee':
+      if (!value) return '担当者の条件に値がありません';
+      if (condition.op !== 'eq' && condition.op !== 'ne') {
+        return '担当者で使えない比較方法が指定されています';
+      }
+      return {
+        sql: `${condition.op === 'ne' ? 'NOT ' : ''}EXISTS (
+          SELECT 1 FROM chats sac WHERE sac.friend_id = f.id AND sac.operator_id = ?
+        )`,
+        binds: [value],
+      };
+
     case 'chat_status':
       if (!value || !['unread', 'in_progress', 'on_hold', 'resolved'].includes(value)) {
         return '対応状態の条件が正しくありません';
@@ -93,28 +140,69 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
         binds: [value],
       };
 
-    case 'created_at': {
-      if (condition.op === 'between' && condition.value && typeof condition.value === 'object') {
-        const range = condition.value as { from?: unknown; to?: unknown };
-        const from = text(range.from);
-        const to = text(range.to);
-        if (!from && !to) return '友だち追加日の範囲がありません';
-        const clauses: string[] = [];
-        const binds: unknown[] = [];
-        if (from) { clauses.push('f.created_at >= ?'); binds.push(from); }
-        if (to) { clauses.push('f.created_at <= ?'); binds.push(`${to}T23:59:59.999`); }
-        return { sql: `(${clauses.join(' AND ')})`, binds };
-      }
-      if (!value) return '友だち追加日の条件に値がありません';
-      if (condition.op === 'after') return { sql: 'f.created_at >= ?', binds: [value] };
-      if (condition.op === 'before') return { sql: 'f.created_at <= ?', binds: [`${value}T23:59:59.999`] };
-      return '友だち追加日で使えない比較方法が指定されています';
+    case 'event_booking': {
+      const sql = `SELECT 1 FROM event_bookings seb
+        WHERE seb.friend_id = f.id${value ? ' AND seb.event_id = ?' : ''}`;
+      return existence(condition, sql, value ? [value] : []);
     }
 
-    case 'form':
-      return '回答フォームの条件は、回答と友だちを結ぶ口が未接続です';
-    case 'purchase':
-      return '購入履歴の条件は、購入と友だちを結ぶ口が未接続です';
+    case 'calendar_booking': {
+      const sql = `SELECT 1 FROM calendar_bookings scb
+        WHERE scb.friend_id = f.id${value ? ' AND scb.status = ?' : ''}
+        UNION ALL
+        SELECT 1 FROM bookings sb
+        WHERE sb.friend_id = f.id${value ? ' AND sb.status = ?' : ''}`;
+      return existence(condition, sql, value ? [value, value] : []);
+    }
+
+    case 'form': {
+      const formId = text(condition.formId) ?? value;
+      const sql = `SELECT 1 FROM form_submissions sfsu
+        WHERE sfsu.friend_id = f.id${formId ? ' AND sfsu.form_id = ?' : ''}`;
+      return existence(condition, sql, formId ? [formId] : []);
+    }
+
+    case 'last_activity':
+      return dateCondition(
+        condition,
+        `(SELECT MAX(sml.created_at) FROM messages_log sml
+          WHERE sml.friend_id = f.id AND (sml.delivery_type IS NULL OR sml.delivery_type != 'test'))`,
+        '最終反応日',
+      );
+
+    case 'reminder': {
+      const sql = `SELECT 1 FROM friend_reminders sfr
+        WHERE sfr.friend_id = f.id${value ? ' AND sfr.reminder_id = ?' : ''}`;
+      return existence(condition, sql, value ? [value] : []);
+    }
+
+    case 'memo':
+      if (condition.op === 'exists') return { sql: "COALESCE(TRIM(f.private_memo), '') != ''", binds: [] };
+      if (condition.op === 'not_exists') return { sql: "COALESCE(TRIM(f.private_memo), '') = ''", binds: [] };
+      if (!value) return '個別メモの条件に値がありません';
+      if (condition.op === 'eq') return { sql: 'f.private_memo = ?', binds: [value] };
+      if (condition.op === 'contains') return { sql: 'f.private_memo LIKE ?', binds: [`%${value}%`] };
+      return '個別メモで使えない比較方法が指定されています';
+
+    case 'created_at': {
+      return dateCondition(condition, 'f.created_at', '友だち追加日');
+    }
+
+    case 'purchase': {
+      const sql = `SELECT 1 FROM ec_events see
+        WHERE see.friend_id = f.id AND see.event_type LIKE 'ec.order.%'
+          ${value ? 'AND see.event_type = ?' : ''}`;
+      return existence(condition, sql, value ? [value] : []);
+    }
+
+    case 'common_event': {
+      if (!value) return '共通イベントの条件に種類がありません';
+      return existence(
+        condition,
+        'SELECT 1 FROM analytics_events sae WHERE sae.friend_id = f.id AND sae.event_type = ?',
+        [value],
+      );
+    }
   }
 }
 

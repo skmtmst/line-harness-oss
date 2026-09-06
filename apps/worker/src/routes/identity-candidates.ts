@@ -18,6 +18,7 @@ import {
 } from '../services/identity-candidates.js';
 import { detectFriendDuplicateCandidates } from '../services/friend-duplicate-candidates.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { getFriendProfileCandidates } from '../services/friend-profile-candidates.js';
 
 const KINDS = new Set<IdentityCandidateKind>(['friend_duplicate', 'ec_member']);
 const STATUSES = new Set<IdentityCandidateStatus>([
@@ -74,12 +75,46 @@ function parseDecisionBody(value: unknown): DecideIdentityCandidateRequest {
       to: typeof value.reprocess.to === 'string' ? value.reprocess.to : null,
     };
   }
+  let profileSelections: DecideIdentityCandidateRequest['profileSelections'];
+  if (value.profileSelections !== undefined) {
+    if (!Array.isArray(value.profileSelections) || value.profileSelections.length > 100) {
+      throw new IdentityCandidateError(422, 'INVALID_PROFILE_SELECTIONS', 'プロフィールの採用値を確認できません');
+    }
+    profileSelections = value.profileSelections.map((raw) => {
+      if (!isRecord(raw)
+          || typeof raw.fieldKey !== 'string'
+          || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/.test(raw.fieldKey)
+          || typeof raw.sourceFriendId !== 'string'
+          || (raw.updateMode !== 'auto' && raw.updateMode !== 'fixed')) {
+        throw new IdentityCandidateError(422, 'INVALID_PROFILE_SELECTION', 'プロフィールの採用値を確認できません');
+      }
+      return {
+        fieldKey: raw.fieldKey,
+        sourceFriendId: raw.sourceFriendId,
+        updateMode: raw.updateMode,
+      };
+    });
+  }
   return {
     expectedVersion: Number(value.expectedVersion),
     decision: value.decision,
     reason: value.reason,
     ...(reprocess ? { reprocess } : {}),
+    ...(profileSelections ? { profileSelections } : {}),
   };
+}
+
+async function friendDuplicateDetail(c: Context<Env>, id: string) {
+  const data = await getIdentityCandidate(c.env.DB, tenantId(c), id);
+  if (data.kind !== 'friend_duplicate') {
+    throw new IdentityCandidateError(404, 'CANDIDATE_NOT_FOUND', '重複候補が見つかりません');
+  }
+  const accountIds = await candidateAccountIds(c.env.DB, tenantId(c), data.id);
+  if (!await canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds)) {
+    throw new IdentityCandidateError(404, 'CANDIDATE_NOT_FOUND', '重複候補が見つかりません');
+  }
+  const candidates = await getFriendProfileCandidates(c.env.DB, [data.left.id, data.right.id]);
+  return { ...data, ...candidates };
 }
 
 function parseUndoBody(value: unknown): UndoIdentityCandidateRequest {
@@ -220,3 +255,35 @@ identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner'
     return errorResponse(c, error);
   }
 });
+
+identityCandidates.get(
+  '/api/friends/duplicates/:id',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      return c.json({ success: true, data: await friendDuplicateDetail(c, c.req.param('id')) });
+    } catch (error) {
+      return errorResponse(c, error);
+    }
+  },
+);
+
+identityCandidates.patch(
+  '/api/friends/duplicates/:id',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const current = await friendDuplicateDetail(c, c.req.param('id'));
+      const staff = getStaff(c)!;
+      await decideIdentityCandidate(
+        c.env.DB,
+        { id: staff.id, name: staff.name, tenantId: tenantId(c) },
+        current.id,
+        parseDecisionBody(await safeBody(c)),
+      );
+      return c.json({ success: true, data: await friendDuplicateDetail(c, current.id) });
+    } catch (error) {
+      return errorResponse(c, error);
+    }
+  },
+);

@@ -31,9 +31,14 @@ const detectorMocks = vi.hoisted(() => ({
   detectFriendDuplicateCandidates: vi.fn(),
 }));
 
+const profileMocks = vi.hoisted(() => ({
+  getFriendProfileCandidates: vi.fn(),
+}));
+
 vi.mock('../services/identity-candidates.js', () => identityMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
 vi.mock('../services/friend-duplicate-candidates.js', () => detectorMocks);
+vi.mock('../services/friend-profile-candidates.js', () => profileMocks);
 
 const { identityCandidates } = await import('./identity-candidates.js');
 
@@ -91,6 +96,10 @@ beforeEach(() => {
   });
   detectorMocks.detectFriendDuplicateCandidates.mockResolvedValue({
     processed: 1, hasMore: false, nextCursor: null,
+  });
+  profileMocks.getFriendProfileCandidates.mockResolvedValue({
+    profileCandidates: [{ fieldKey: 'display_name', fieldLabel: 'LINE表示名', options: [] }],
+    tagCandidates: [],
   });
 });
 
@@ -200,5 +209,50 @@ describe('identity candidate HTTP contract', () => {
     });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ success: false, code: 'STALE_CANDIDATE' });
+  });
+
+  it('exposes the friends duplicate URL with candidate values and saves selected sources', async () => {
+    const detailResponse = await harness().request('/api/friends/duplicates/candidate-a');
+    expect(detailResponse.status).toBe(200);
+    expect(await detailResponse.json()).toMatchObject({
+      success: true,
+      data: { id: 'candidate-a', profileCandidates: [{ fieldKey: 'display_name' }] },
+    });
+
+    const patchResponse = await harness().request('/api/friends/duplicates/candidate-a', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion: 1,
+        decision: 'linked',
+        reason: '本人へ確認済みです',
+        profileSelections: [{
+          fieldKey: 'display_name', sourceFriendId: 'friend-a', updateMode: 'fixed',
+        }],
+      }),
+    });
+    expect(patchResponse.status).toBe(200);
+    expect(identityMocks.decideIdentityCandidate).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: 'staff-a', name: '担当者', tenantId: 'tenant-a' },
+      'candidate-a',
+      expect.objectContaining({
+        expectedVersion: 1,
+        profileSelections: [{
+          fieldKey: 'display_name', sourceFriendId: 'friend-a', updateMode: 'fixed',
+        }],
+      }),
+    );
+  });
+
+  it('returns empty-safe errors for wrong kinds and forbidden accounts', async () => {
+    identityMocks.getIdentityCandidate.mockResolvedValueOnce({ ...candidate, kind: 'ec_member' });
+    const wrongKind = await harness().request('/api/friends/duplicates/candidate-a');
+    expect(wrongKind.status).toBe(404);
+
+    accessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const forbidden = await harness().request('/api/friends/duplicates/candidate-a');
+    expect(forbidden.status).toBe(404);
+    expect(profileMocks.getFriendProfileCandidates).not.toHaveBeenCalled();
   });
 });
