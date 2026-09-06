@@ -46,7 +46,7 @@ import MessageKindFields, {
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
-import { broadcastSteps } from '@/components/broadcasts/broadcast-steps'
+import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -57,6 +57,11 @@ interface BroadcastFormProps {
   initialTemplateId?: string | null
   initialContentTemplateId?: string | null
   initialCondition?: SegmentCondition | null
+  initialScheduledDate?: string
+  initialScheduledTime?: string
+  /** 正本の `?step=`。未指定は一覧内の従来フォームとして全節を表示する。 */
+  currentStep?: BroadcastStepKey | null
+  onStepChange?: (step: BroadcastStepKey) => void
 }
 
 /*
@@ -327,6 +332,10 @@ export default function BroadcastForm({
   initialTemplateId = null,
   initialContentTemplateId = null,
   initialCondition = null,
+  initialScheduledDate = '',
+  initialScheduledTime = '10:00',
+  currentStep = null,
+  onStepChange,
 }: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
   /*
@@ -378,9 +387,9 @@ export default function BroadcastForm({
   // 何分かけて配るか。0（既定）は一気に送る。
   const [spreadMinutes, setSpreadMinutes] = useState('30')
   // 送る時間。設計は「今すぐ / 日時を指定 / 友だちごとの最適な時間」の3つ。
-  const [sendMode, setSendMode] = useState<'now' | 'scheduled' | 'optimal'>('now')
-  const [scheduledDate, setScheduledDate] = useState('')
-  const [scheduledTime, setScheduledTime] = useState('10:00')
+  const [sendMode, setSendMode] = useState<'now' | 'scheduled' | 'optimal'>(initialScheduledDate ? 'scheduled' : 'now')
+  const [scheduledDate, setScheduledDate] = useState(initialScheduledDate)
+  const [scheduledTime, setScheduledTime] = useState(initialScheduledTime)
   const [saving, setSaving] = useState(false)
   /*
     最終確認（設計 `FpgxH`）。**「配信を予約する」で直に送らない。**
@@ -388,6 +397,9 @@ export default function BroadcastForm({
     何人に何をいつ送るのかを読み合わせる場所が無かった。
   */
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [testDialogOpen, setTestDialogOpen] = useState(false)
+  const [testRecipients, setTestRecipients] = useState<Array<{ id: string; displayName: string; pictureUrl: string | null }>>([])
+  const [testRecipientState, setTestRecipientState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [testSending, setTestSending] = useState(false)
   const [testResult, setTestResult] = useState('')
   const [previewConfirmed, setPreviewConfirmed] = useState(false)
@@ -634,6 +646,27 @@ export default function BroadcastForm({
     }
   }
 
+  /**
+   * テスト送信の前に、実際に登録されている送信先を読み合わせる。
+   * 送信先を固定名で描くと、別アカウントでもその人へ届くように誤解される。
+   */
+  const openTestDialog = async () => {
+    const validationError = validate()
+    if (validationError) { setError(validationError); return }
+    setTestDialogOpen(true)
+    setTestRecipientState('loading')
+    setTestRecipients([])
+    try {
+      if (!selectedAccountId) throw new Error('account is not selected')
+      const res = await api.accountSettings.getTestRecipients(selectedAccountId)
+      const recipients = res.success && Array.isArray(res.data) ? res.data : []
+      setTestRecipients(recipients)
+      setTestRecipientState(res.success ? 'ready' : 'error')
+    } catch {
+      setTestRecipientState('error')
+    }
+  }
+
   /*
     最終確認に並べる値。**どれも固定値で作らない。**
 
@@ -684,12 +717,22 @@ export default function BroadcastForm({
    * 0人であることは配信前チェックと最終確認が別に止める。ここで赤くすると
    * 数え終わる前は毎回「未入力」に見えて、進み表示として読めなくなる。
    */
-  const steps = broadcastSteps({
+  const progressSteps = broadcastSteps({
     basicDone: title.trim().length > 0 && title.trim().length <= TITLE_MAX,
     audienceDone: !audienceError(targetMode, { scenarioId, tagId, condition }),
     messageDone: !bubblesError(bubbles),
     scheduleDone: sendMode === 'now' || (sendMode === 'scheduled' && Boolean(scheduledDate) && Boolean(scheduledTime)),
   })
+  const stepOrder: BroadcastStepKey[] = ['basic', 'audience', 'message', 'schedule', 'confirm']
+  const currentStepIndex = currentStep ? stepOrder.indexOf(currentStep) : -1
+  const steps = currentStep
+    ? progressSteps.map((step, index) => ({
+        ...step,
+        state: index < currentStepIndex ? 'done' as const : index === currentStepIndex ? 'current' as const : 'todo' as const,
+      }))
+    : progressSteps
+  const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
+  const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
 
   const canConfirm = audienceCount !== null && audienceCount > 0
 
@@ -718,7 +761,11 @@ export default function BroadcastForm({
     <BroadcastStepRail steps={steps} />
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
-        <section id="broadcast-step-basic" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-ink">基本設定</h3>
+            <p className="mt-1 text-sm text-ink-faint">管理名と保存先を設定します。</p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
             <label className="block">
               <span className="flex flex-wrap items-baseline justify-between gap-2">
@@ -743,7 +790,7 @@ export default function BroadcastForm({
             </label>
           </div>
         </section>
-        <section id="broadcast-step-audience" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             {/*
               番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
@@ -752,7 +799,10 @@ export default function BroadcastForm({
               間の節を見落としたと読まれる。** 設計 `zZ9fA` の段は
               基本設定 → 対象者 → メッセージ → 送信設定 → 確認。
             */}
-            <p className="text-sm font-bold text-ink">2. 送る相手</p>
+            <div>
+              <h3 className="text-lg font-bold text-ink">配信対象</h3>
+              <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
+            </div>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-bold text-accent">送信対象</p>
               <p className="text-2xl font-black text-accent">
@@ -854,6 +904,7 @@ export default function BroadcastForm({
             <ConditionBuilder value={condition} onChange={setCondition} showCount={false} />
           </div>}
         </section>
+        <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             {/*
@@ -862,7 +913,10 @@ export default function BroadcastForm({
               基本設定 → 対象者 → メッセージ → 送信設定 の順なので、
               並べ替えではなく番号のほうを直す。
             */}
-            <p className="text-ink text-sm font-bold">3. 送る内容</p>
+            <div>
+              <h3 className="text-lg font-bold text-ink">メッセージを作成</h3>
+              <p className="mt-1 text-sm text-ink-faint">LINEで送る内容と、計測方法を設定します。</p>
+            </div>
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
@@ -977,8 +1031,10 @@ export default function BroadcastForm({
           </p>
         )}
         {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-        <section id="broadcast-step-schedule" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
-          <p className="text-ink mb-3 text-sm font-bold">4. 送る時間</p>
+        </div>
+        <section id="broadcast-step-schedule" className={`${shows('schedule') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
+          <h3 className="text-lg font-bold text-ink">送信設定</h3>
+          <p className="mb-4 mt-1 text-sm text-ink-faint">配信する日時と、LINEの集計方法を設定します。</p>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
               type="button"
@@ -1078,9 +1134,15 @@ export default function BroadcastForm({
         0 なら一気に送ります。途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
       </p>
           </div>
+          <div className="border-hairline mt-4 border-t pt-4">
+            <p className="text-sm font-bold text-ink">開封・クリックの集計</p>
+            <p className="mt-1 text-xs text-ink-faint">
+              LINEの月間集計上限を使います（今月の使用数はまだ取得できません / 1,000 種類）。
+            </p>
+          </div>
         </section>
 
-    <section id="broadcast-step-confirm" className="border-hairline mb-3 rounded-card border bg-canvas p-5">
+    <section id="broadcast-step-confirm" className={`${shows('confirm') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink text-sm font-bold">配信前チェック</p>
         {preflight && (
@@ -1195,7 +1257,7 @@ export default function BroadcastForm({
       右の点検欄（`preflight`）は宛先と本文が決まるまで出ないので、
       **こちらは常に出す。**
     */}
-    {lengthNotice.tone === 'error' && (
+    {shows('message') && lengthNotice.tone === 'error' && (
       <div className="border-danger-bg bg-danger-bg rounded-card mb-3 border p-3">
         <p className="text-danger text-sm font-bold">{lengthNotice.title}</p>
         <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
@@ -1213,36 +1275,82 @@ export default function BroadcastForm({
         本番前に自分の目で見え方を確かめるためのもので、作らずに送る道を
         別に用意すると、同じ組み立てが2か所に増える。
       */}
-      <button
+      {(shows('message') || shows('confirm')) && <button
         disabled={testSending || saving || lengthNotice.tone === 'error'}
         title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
-        onClick={() => void handleTestSend()}
+        onClick={() => void openTestDialog()}
         className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50"
       >
         {testSending ? '送信中…' : 'テスト送信'}
-      </button>
+      </button>}
       {/*
         **予約のときだけ確認を挟む。** 下書き保存は誰にも届かないので、
         段を増やすと手間が増えるだけになる。
       */}
-      <button
-        disabled={saving || lengthNotice.tone === 'error'}
-        title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
-        onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}
-        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
-      >
-        {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
-      </button>
+      {currentStep && currentStep !== 'confirm' ? (
+        <button
+          type="button"
+          onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold"
+        >
+          {currentStep === 'basic' ? '対象設定へ'
+            : currentStep === 'audience' ? 'メッセージ設定へ'
+              : currentStep === 'message' ? '送信設定へ'
+                : '配信前チェックへ'}
+        </button>
+      ) : (
+        <button
+          disabled={saving || lengthNotice.tone === 'error'}
+          title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}
+          onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
+        >
+          {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
+        </button>
+      )}
       </>
     )} />
       </div>
-      <aside className="xl:sticky xl:top-6 xl:h-fit"><h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3><p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
+      <aside className="xl:sticky xl:top-6 xl:h-fit">
+        {currentStep === 'audience' ? (
+          <div className="space-y-4">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-sm font-bold text-ink">設定内容</h3>
+              <dl className="mt-3 space-y-3 text-sm">
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{targetModeLabel} {targetCount === null ? '—' : `${targetCount.toLocaleString('ja-JP')}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
+                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
+              </dl>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-sm font-bold text-ink">対象の確認ポイント</h3>
+              <p className="mt-2 text-xs text-ink-faint">送信できない友だちを事前に除外します。</p>
+              <ul className="mt-3 space-y-2 text-xs text-ink-secondary"><li>✓ ブロック・非表示を除外</li><li>✓ 同一人物の重複を除外</li><li>✓ 配信停止中を除外</li></ul>
+            </section>
+          </div>
+        ) : (
+        <>
+        <h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3>
+        {currentStep === 'basic' ? (
+          <div className="rounded-card border border-hairline bg-canvas p-5">
+            <p className="text-sm font-bold text-ink">配信日時は STEP 4 で設定します</p>
+            <p className="mt-4 text-sm font-bold text-ink">メッセージは STEP 3</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">で作成します。テンプレートや過去の配信を選ぶと、ここに内容が入ります。</p>
+            <p className="mt-5 text-sm font-bold text-ink">テスト送信</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">テスト送信と表示確認は、STEP 3 でメッセージを作ると使えます。</p>
+          </div>
+        ) : (
+        <>
+        <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
     {sendMode === 'scheduled' && scheduledDate && (
       <p className="text-ink-faint mt-1 text-center text-xs">
         {scheduledDate.replace(/-/g, '/')} {scheduledTime} から{' '}
         {Number(spreadMinutes) > 0 ? `${spreadMinutes}分かけて配信` : '一度に配信'}
       </p>
-    )}</aside>
+    )}</>)}
+        </>
+        )}
+      </aside>
     </div>
 
     {/*
@@ -1342,5 +1450,37 @@ export default function BroadcastForm({
         ) : null}
       </ConfirmDialog>
     </div>
+
+    <ConfirmDialog
+      open={testDialogOpen}
+      title="テスト送信"
+      description="本番配信前に、実際のLINEアカウントで表示を確認します。"
+      confirmLabel={testSending ? '送信中…' : '選んだ担当者へ送信'}
+      cancelLabel="戻る"
+      busy={testSending}
+      onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
+      onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => void handleTestSend() : undefined}
+    >
+      <div className="space-y-3">
+        <p className="text-xs font-bold text-ink-secondary">送り先の担当者</p>
+        {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
+        {testRecipientState === 'error' && <p className="rounded-control bg-danger-bg p-3 text-sm text-danger">テスト送信先を読み込めませんでした。</p>}
+        {testRecipientState === 'ready' && testRecipients.length === 0 && (
+          <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-faint">
+            テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
+          </p>
+        )}
+        {testRecipients.map((recipient) => (
+          <label key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
+            <input type="checkbox" checked readOnly />
+            {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">{recipient.displayName.slice(0, 1)}</span>
+            )}
+            <span><span className="block text-sm font-bold text-ink">{recipient.displayName}</span><span className="block text-xs text-success">LINE連携済み</span></span>
+          </label>
+        ))}
+        {testResult && <p className="rounded-control bg-success-bg p-3 text-sm text-success">{testResult}</p>}
+      </div>
+    </ConfirmDialog>
   </div>
 }
