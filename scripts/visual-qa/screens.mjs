@@ -2591,7 +2591,7 @@ export const SCREENS = [
     states: { apis: ['**/api/staff', '**/api/login-audit*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #243 / UI HEAD b3a7eaf01 を3105/8792で再撮影。構造一致・集計データ待ち。** いまいる人・招待中・入った記録・権限のかたまりの4タブ、4指標、見せる範囲の案内、役割の札、並び順、設計順の6列をそろえた。二段階認証の未設定は上の注意で残し、役割・表示機能・LINE連携・通知・利用状態の編集も維持した。1440・1920pxとも横はみ出し0。残る差は90日未使用の正確な集計、一覧全員の最終ログイン、役割bundle総数を返すAPIで、現在の監査200件から推測せず未取得と明記したため一致にはしない。',
-    verdictSource: 'staff-v6/e3jz3.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 screenshots', verdictHead: 'b3a7eaf01',
+    verdictSource: 'staff-v6/e3jz3-1920.png + staff-v6/e3jz3-{normal,loading,empty,error,forbidden}.txt + Pencil node e3jz3', verdictHead: 'b3a7eaf01',
   },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
@@ -2607,7 +2607,7 @@ export const SCREENS = [
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
     states: { apis: ['**/api/login-audit*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #243 / UI HEAD b3a7eaf01 を3105/8792で再撮影。構造一致・共通監査API待ち。** 4指標、説明帯、検索、期間・表示件数、6つの絞り込み札、並び順、設計順の5列、CSV書き出し、取得範囲内のページ送りをそろえた。失敗・拒否は赤く表示し、通常・読込・空・失敗・権限不足を分ける。1440・1920pxとも横はみ出し0。残る差は全業務操作、総件数、対象詳細、変更前後、場所のrisk判定を返す共通監査APIで、現在のログイン監査5種類だけでは埋められない。未取得を作り値にしないため一致にはしない。',
-    verdictSource: 'staff-v6/jwVlo.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + 2026-09-07 screenshots', verdictHead: 'b3a7eaf01',
+    verdictSource: 'staff-v6/jwVlo-1920.png + staff-v6/jwVlo-{normal,loading,empty,error,forbidden}.txt + Pencil node jwVlo', verdictHead: 'b3a7eaf01',
   },
   { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `/staff/new` を開くとログイン画面になった。撮影の途中でモックが落ちたときと同じ症状なので、**モックを起こし直して撮り直す**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 人を招待する。段の作りは設計どおり。**#475 `15febf7f` で撮った。ルート `/staff/new`。段は 1 どなたを追加するか（名前・メールアドレス）→ 2 役割 → 3 最初に表示するLINEアカウント。**良い点**：役割を**できることの文で**説明する（管理者「すべての権限で設定・操作できます」／スタッフ「選択した機能だけを操作できます」／閲覧のみ「すべて閲覧できますが、操作はできません」）。「このアドレスに招待メールが届きます。」と**何が起きるかを書く**。3段目に「ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。」と、**この設定が何を縛らないか**まで書く。**P2 残る差**：設計 30-1-C は LINE連携での招待も選べるが、実装はメールだけ。担当範囲の割り当ても追加後の「範囲を編集」へ回している。内部語・壊れ値は0件、1440・1920とも横スクロール0。取得元：`staff-v6/I3ZSrU.txt` **推奨修正**：LINE連携での招待と、担当範囲の割り当てをこの段に足す。**役割を「できることの文」で説明する形はそのまま残す**（管理者／スタッフ／閲覧のみ）。', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '31293424' },
 
