@@ -6794,7 +6794,7 @@ function withAccount(path: string, accountId: string): string {
 
 export const bookingApi = {
   getSettings: (accountId: string) =>
-    fetchApi<BookingSettings>(withAccount('/api/booking/admin/settings', accountId)),
+    fetchApi<ApiResponse<BookingSettings>>(withAccount('/api/booking/admin/settings', accountId)),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),

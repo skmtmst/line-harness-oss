@@ -4,6 +4,7 @@ import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -61,10 +62,12 @@ function supportingDetail(
 }
 
 function businessHourSummary(settings: BookingSettings | null): { value: string; detail: string } {
-  if (!settings || settings.businessHours.length === 0) return { value: '—', detail: '受付枠で曜日ごとに確認' }
+  if (!settings || !Array.isArray(settings.businessHours) || settings.businessHours.length === 0) return { value: '—', detail: '受付枠で曜日ごとに確認' }
   const spans = settings.businessHours.flatMap((day) => {
     if (day.intervals.length === 0) return []
-    return [`${day.intervals[0].start}〜${day.intervals.at(-1)!.end}`]
+    const start = day.intervals[0].start.replace(/^0/, '')
+    const end = day.intervals.at(-1)!.end.replace(/^0/, '')
+    return [`${start}〜${end}`]
   })
   const counts = new Map<string, number>()
   for (const span of spans) counts.set(span, (counts.get(span) ?? 0) + 1)
@@ -84,7 +87,7 @@ function bookingWindowEnd(days: number): string {
 }
 
 function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuCount: (count: number | null) => void }) {
-  const { selectedAccountId, selectedAccount } = useAccount()
+  const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
@@ -104,10 +107,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
   const loadGenerationRef = useRef(0)
-  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const previewUrl = selectedAccount?.liffId
-    ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
-    : null
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -125,13 +124,14 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     setItems([])
     setSettings(null)
     try {
-      const [r, bookingSettings] = await Promise.all([
+      const [r, bookingSettingsResponse] = await Promise.all([
         bookingApi.listMenus(selectedAccountId),
         bookingApi.getSettings(selectedAccountId).catch(() => null),
       ])
       if (loadGenerationRef.current !== requestGeneration) return
-      setItems(r.menus)
-      setSettings(bookingSettings)
+      // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
+      setItems(Array.isArray(r.menus) ? r.menus : [])
+      setSettings(bookingSettingsResponse?.success ? bookingSettingsResponse.data : null)
     } catch (e) {
       if (loadGenerationRef.current !== requestGeneration) return
       setError(bookingErrorMessage(e, '読み込み'))
@@ -275,10 +275,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
 
   return (
     <div data-design-node="QSLEH">
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
-        {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
-      </div>
-
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="出しているメニュー"
@@ -376,9 +372,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {visible.map((m) => (
-                  <tr key={m.id} className="hover:bg-canvas-sunken">
+                  <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
-                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}
+                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
@@ -388,15 +384,14 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
-                      {m.buffer_after_minutes > 0 && (
-                        <span className="text-xs text-ink-faint ml-1">+{m.buffer_after_minutes}</span>
-                      )}
                     </td>
                     <td className={`px-4 py-3 text-sm text-right tabular-nums ${m.base_price === 0 ? 'text-accent font-semibold' : ''}`}>
                       {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {supportingLoadState !== 'ready' ? (
+                      {!m.is_active ? (
+                        <span className="text-warning text-xs">だれもいません</span>
+                      ) : supportingLoadState !== 'ready' ? (
                         <span className="text-ink-faint text-xs">—（未取得）</span>
                       ) : (menuStaff.get(m.id) ?? []).length === 0 ? (
                         // 担当が0人だと、公開していても予約フォームに枠が出ない。
@@ -763,9 +758,18 @@ function NumField({
 
 function MenusPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const { selectedAccount } = useAccount()
   const [menuCount, setMenuCount] = useState<number | null>(null)
+  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
+  const previewUrl = selectedAccount?.liffId
+    ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
+    : null
   return (
     <div>
+      <div data-design="Head" className="mb-5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+        <Breadcrumb items={[{ label: '予約' }, { label: '予約設定' }]} />
+        {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
+      </div>
       {/* 既存の2タブはこの画面の中で切り替わり、
           受付時間は別URLへ移動する。
           MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
@@ -775,7 +779,7 @@ function MenusPageHost() {
           href="/booking/menus?tab=menus"
           className={`rounded-t-md px-4 py-2 text-sm ${
             tab === 'menus'
-              ? 'border-accent text-ink border-b-2 font-medium'
+              ? 'border-accent text-accent border-b-2 font-medium'
               : 'text-ink-faint hover:text-ink-secondary'
           }`}
         >
