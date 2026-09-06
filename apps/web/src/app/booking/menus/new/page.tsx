@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api, bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   Field,
@@ -19,6 +20,7 @@ import CreatePage, {
  * 保存できてしまうのに予約が入らないという分かりにくい失敗をする。
  */
 export default function NewBookingMenuPage() {
+  usePageTitle('予約メニューをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [categoryLabel, setCategoryLabel] = useState('')
@@ -79,10 +81,10 @@ export default function NewBookingMenuPage() {
   return (
     <CreatePage
       designNode="GhOb3"
-      title="メニューを追加する"
+      title="予約メニューをつくる"
       description="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
-      saveLabel="メニューを追加"
+      saveLabel={isActive ? 'つくって出す' : '下書きに保存'}
       showHeader={false}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
@@ -135,7 +137,7 @@ export default function NewBookingMenuPage() {
       }}
       aside={
         <>
-          <AsideCard title="予約画面での見え方" note="プレビュー">
+          <AsideCard title="メニューをえらぶ画面では こう見えます" note="プレビュー">
             <div className="border-hairline rounded-card border p-3">
               <p className="text-ink text-sm font-medium">{name || 'メニュー名'}</p>
               {description && (
