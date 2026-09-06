@@ -61,7 +61,7 @@ import {
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
-  MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
+  FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
   OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
@@ -1305,6 +1305,11 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       : IDENTITY_CANDIDATE_FRIEND
     return { success: true, data: candidate }
   }
+  const friendDuplicate = /^\/api\/friends\/duplicates\/([^/]+)$/.exec(pathname)
+  if (friendDuplicate) {
+    if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
+    return { success: true, data: IDENTITY_CANDIDATE_FRIEND }
+  }
   const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
   if (mergedPerson) {
     if (query.get('visualState') === 'error') return MERGED_PERSON_ERROR
@@ -1503,6 +1508,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: BROADCASTS, ...BROADCAST_LIST_META }
   }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
+  if (pathname === '/api/friends/saved-views') {
+    const id = query.get('id')
+    if (id) {
+      const item = FRIEND_SAVED_VIEWS.items.find((view) => view.id === id)
+      return item
+        ? { success: true, data: item }
+        : { success: false, error: '保存した検索が見つかりません' }
+    }
+    return { success: true, data: FRIEND_SAVED_VIEWS }
+  }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   if (pathname === '/api/support/inbox') {
@@ -2303,6 +2318,11 @@ const server = createServer((req, res) => {
             : BOOKING_PROXY_CREATE.unavailable
         res.writeHead(fixed.status).end(JSON.stringify(fixed.body))
       })
+      return
+    }
+    // 機能3の保存した検索。DBへは書かず、本番契約と同じ201と保存済みの器を返す。
+    if (method === 'POST' && url.pathname === '/api/friends/saved-views') {
+      res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_SAVED_VIEWS.items[0] }))
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname)
