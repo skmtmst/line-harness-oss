@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 25,
-  "match": 66,
-  "structureMatchDataPending": 53,
+  "match": 67,
+  "structureMatchDataPending": 52,
   "needsFix": 140,
   "unjudged": 3,
-  "remaining": 202,
+  "remaining": 201,
   "features": [
     {
       "feature": 1,
@@ -1610,12 +1610,25 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 1,
-      "match": 0,
-      "structureMatchDataPending": 3,
+      "match": 1,
+      "structureMatchDataPending": 2,
       "needsFix": 2,
       "unjudged": 0,
-      "remaining": 5,
+      "remaining": 4,
       "capturedAt": [
+        {
+          "pr": 997,
+          "head": "3eae16770",
+          "on": "2026-09-06",
+          "screens": [
+            "g89Tc",
+            "voJtX",
+            "eXAJP",
+            "YfTfJ",
+            "h8pBZr"
+          ],
+          "note": "Issue #228。10件・3フォルダ・使用先3件の固定データで、通常・詳細・登録・削除2状態・一覧4状態を1440pxと1920pxで再撮影。18枚すべて横はみ出し0。"
+        },
         {
           "pr": 559,
           "head": "7922c002",
