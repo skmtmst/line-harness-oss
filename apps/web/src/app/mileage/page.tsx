@@ -30,7 +30,7 @@ import {
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 20
 const TABS = [
   { key: 'balances', label: '友だちの残高' },
   { key: 'earning-rules', label: 'たまる決めごと' },
@@ -108,6 +108,7 @@ function MileagePageInner() {
   const [ruleFilters, setRuleFilters] = useState<RuleFilter[]>([])
   const [ruleSort, setRuleSort] = useState<RuleSort>('newest')
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
+  const [canAdjustMileage, setCanAdjustMileage] = useState(false)
   const overviewTotal = mileagePaginationTotal(overview)
 
   useEffect(() => {
@@ -186,6 +187,17 @@ function MileagePageInner() {
     })
     return () => { current = false }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    let current = true
+    void api.staff.me().then((response) => {
+      if (!current || !response.success) return
+      setCanAdjustMileage(response.data.role === 'owner' || response.data.role === 'admin')
+    }).catch(() => {
+      if (current) setCanAdjustMileage(false)
+    })
+    return () => { current = false }
+  }, [])
 
   const updateRule = async (rule: MileageRule, updates: Partial<MileageRule>) => {
     setSavingRuleId(rule.id)
@@ -323,10 +335,10 @@ function MileagePageInner() {
           badgeTone="neutral"
         />
       </div>
-      <div className="mb-4 rounded-control bg-accent-soft px-4 py-3 text-xs text-accent-hover">
+      <NoteBar className="mb-4">
         友だちごとにたまっているマイルです。どうやってたまるかは「たまる決めごと」、何と交換できるかは「使い道」で決めます。
-      </div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      </NoteBar>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <input
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
@@ -335,6 +347,22 @@ function MileagePageInner() {
         />
         <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
         <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">残高をCSVで書き出す</Button>
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2" aria-label="残高の絞り込み状況">
+        <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">
+          すべて {overviewTotal === null ? '—' : formatNumber(overviewTotal)}
+        </span>
+        {['ゴールド', 'シルバー', 'ブロンズ'].map((label) => (
+          <span key={label} className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-faint">
+            {label} — 未取得
+          </span>
+        ))}
+        <span className="rounded-full border border-status-warn bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">
+          消える予定 — 未取得
+        </span>
+        <span className="ml-auto rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
+          残高が多い順
+        </span>
       </div>
       </>}
 
@@ -486,14 +514,6 @@ function MileagePageInner() {
       {tab === 'score' && selectedAccountId ? <ActionScoreTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
       {tab === 'balances' && !loading && !loadError && <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <div>
-            <h2 className="text-sm font-semibold text-ink">友だちの残高</h2>
-            <p className="mt-1 text-xs text-ink-faint">同じ人が複数アカウントにいる場合は1人にまとめています。</p>
-          </div>
-          <span className="text-xs text-gray-400">{overviewTotal === null ? '—' : `${formatNumber(overviewTotal)}人`}</span>
-        </div>
-
         {members.length === 0 ? (
           <ListState
             kind="empty"
@@ -503,35 +523,24 @@ function MileagePageInner() {
         ) : (
           <div>
             <table className="w-full table-fixed">
-              <thead className="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="w-1/4 px-4 py-3">友だち</th>
-                  <th className="w-1/12 px-4 py-3">ランク</th>
-                  <th className="w-1/12 px-4 py-3 text-right">いまの残高</th>
-                  <th className="w-1/12 px-4 py-3 text-right">今月の増減</th>
-                  <th className="w-1/12 px-4 py-3">消える予定</th>
-                  <th className="w-1/6 px-4 py-3">最終行動</th>
-                  <th className="w-1/6 px-4 py-3 text-right">操作</th>
-                </tr>
+              <thead>
+                <TableHeadRow>
+                  <Th className="w-[32%]">友だち</Th>
+                  <Th className="w-[10%]">ランク</Th>
+                  <Th className="w-[10%]" align="right">いまの残高</Th>
+                  <Th className="w-[10%]" align="right">今月の増減</Th>
+                  <Th className="w-[12%]">消える予定</Th>
+                  <Th className="w-[12%]">最終行動</Th>
+                  <Th className="w-[14%]" align="right">操作</Th>
+                </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {members.map((member) => {
                   return (
                     <tr key={member.identityKey} className="hover:bg-gray-50/70">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          {member.pictureUrl ? (
-                            <img src={member.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
-                          ) : (
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
-                              {member.displayName.slice(0, 1)}
-                            </div>
-                          )}
-                          <div>
-                            <p className="max-w-48 truncate text-sm font-medium text-gray-900">{member.displayName}</p>
-                            <p className="truncate text-[11px] text-gray-400" title={member.accountNames.join('・')}>{member.accountNames.join('・') || 'LINEアカウント未取得'}</p>
-                          </div>
-                        </div>
+                      <td className="px-4 py-3">
+                        <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
+                        <p className="mt-1 truncate text-xs text-ink-faint" title={member.accountNames.join('・')}>{member.accountNames.join('・') || 'LINEアカウント未取得'}</p>
                       </td>
                       <td className="px-4 py-4 text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
                       <td className="px-4 py-4 text-right">
@@ -541,7 +550,12 @@ function MileagePageInner() {
                       <td className="px-4 py-4 text-right text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
                       <td className="px-4 py-4 text-sm text-ink-faint">—<span className="ml-1 text-xs">未取得</span></td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastActivityAt)}</td>
-                      <td className="px-4 py-4 text-right"><Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.primaryFriendId)}`}>明細を見る</Button></td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.primaryFriendId)}`}>明細を見る</Button>
+                          {canAdjustMileage ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.primaryFriendId)}&adjust=1`}>増やす・減らす</Button> : null}
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -552,7 +566,11 @@ function MileagePageInner() {
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
-            <span className="text-xs text-gray-500">{currentPage} / {totalPages}ページ</span>
+            <span className="text-xs text-gray-500">
+              {overviewTotal === null
+                ? '表示件数は未取得'
+                : `${formatNumber(overviewTotal)}人中 ${formatNumber(offset + 1)}〜${formatNumber(Math.min(offset + members.length, overviewTotal))}人を表示`}
+            </span>
             <Pagination
               page={currentPage}
               pageCount={totalPages}

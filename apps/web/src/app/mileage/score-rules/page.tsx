@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleHelp, FlaskConical, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, Trash2, WalletCards } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -23,6 +23,7 @@ import {
   type ActionScoreRuleConfiguration,
   type ActionScoreRuleTestResult,
 } from '@/lib/api'
+import styles from './score-rules.module.css'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -51,6 +52,28 @@ function eventValue(rule: ActionScoreRule) {
 function operationValue(rule: ActionScoreRule) {
   if (rule.operation === 'set') return 'set-zero'
   return rule.value < 0 ? 'subtract' : 'add'
+}
+
+function rulePointLabel(rule: ActionScoreRule) {
+  if (rule.operation === 'set') return '0にする'
+  return `${rule.value > 0 ? '+' : '−'}${Math.abs(rule.value)}`
+}
+
+function ruleFrequencyLabel(rule: ActionScoreRule) {
+  const label = FREQUENCY_OPTIONS.find((option) => option.value === rule.frequency.kind)?.label ?? '回数未設定'
+  if (!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)) return label
+  return rule.frequency.limit === 1 ? `${label.replace('ごと', '')}に1回まで` : `${label} ${rule.frequency.limit}回まで`
+}
+
+function RuleIcon({ eventType }: { eventType: string }) {
+  const className = 'h-4 w-4 shrink-0'
+  if (eventType === 'link_clicked') return <MousePointerClick className={className} aria-hidden="true" />
+  if (eventType === 'message_received') return <MessageCircle className={className} aria-hidden="true" />
+  if (eventType === 'form_submitted') return <ClipboardList className={className} aria-hidden="true" />
+  if (eventType === 'booking_created') return <CalendarCheck className={className} aria-hidden="true" />
+  if (eventType === 'purchase_completed') return <ShoppingBag className={className} aria-hidden="true" />
+  if (eventType === 'inactivity_30d') return <Clock3 className={className} aria-hidden="true" />
+  return <Ban className={className} aria-hidden="true" />
 }
 
 function localDateTime(value: string | null) {
@@ -111,6 +134,8 @@ export default function ActionScoreRulesPage() {
   const [busy, setBusy] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
+  const [editRuleIndex, setEditRuleIndex] = useState<number | null>(null)
+  const [testOpen, setTestOpen] = useState(false)
   const [testScore, setTestScore] = useState('30')
   const [testEvent, setTestEvent] = useState<string>(EVENT_OPTIONS[0].value)
   const [testResult, setTestResult] = useState<ActionScoreRuleTestResult | null>(null)
@@ -173,10 +198,12 @@ export default function ActionScoreRulesPage() {
   }
 
   const addRule = () => {
+    if (!bundle) return
     const id = `rule-${crypto.randomUUID()}`
-    setBundle((current) => current ? {
-      ...current,
-      rules: [...current.rules, {
+    const nextIndex = bundle.rules.length
+    setBundle({
+      ...bundle,
+      rules: [...bundle.rules, {
         id,
         name: '新しいルール',
         eventType: 'message_received',
@@ -189,7 +216,8 @@ export default function ActionScoreRulesPage() {
         validUntil: null,
         enabled: true,
       }],
-    } : current)
+    })
+    setEditRuleIndex(nextIndex)
     setNotice('')
   }
 
@@ -308,10 +336,10 @@ export default function ActionScoreRulesPage() {
   }, [configuration])
 
   return (
-    <main data-design-node="s6MBc" className="space-y-3.5 pb-24">
+    <main data-design-node="s6MBc" className={styles.page}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }, { label: 'ルール' }]} />
-        <Button href="#score-rule-test">1人で試す</Button>
+        <Button onClick={() => setTestOpen(true)}>1人で試す</Button>
       </div>
       {!selectedAccountId && !accountLoading ? (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="スコアのルールは、共通トップバーで選んだLINEアカウントごとに保存します。" />
@@ -322,190 +350,54 @@ export default function ActionScoreRulesPage() {
       ) : loadError ? (
         <ListState kind="error" title="スコアのルールを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>スコアのルールを再読み込み</Button>} />
       ) : bundle && configuration ? <>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-v6-card border border-hairline bg-canvas px-4 py-3 shadow-v6-card">
-          <div>
-            <p className="text-sm font-semibold text-v6-ink">{versionLabel}</p>
-            <p className="mt-1 text-xs text-v6-ink-faint">公開した版は書き換えません。変更は新版として作り、公開先を切り替えます。</p>
-          </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${configuration.status === 'published' ? 'bg-v6-accent-soft text-v6-accent-hover' : configuration.status === 'stopped' ? 'bg-v6-danger-bg text-v6-danger' : 'bg-v6-warning-bg text-v6-warning'}`}>
-            {configuration.status === 'published' ? '動いています' : configuration.status === 'stopped' ? '止めています' : '下書き'}
-          </span>
-        </div>
-
-        {/*
-          **1440px では表を目いっぱい使う。** 4分割のままだと表に 820px しか
-          回らず、`table-layout: fixed` の6列が等分されて
-          「こちらに返信し**た**」「メッセ…」が切れる。
-          右の柱は 1536px（`2xl`）から戻す。それより狭いときは下に3枚並べる。
-        */}
         <div className="grid gap-3 2xl:grid-cols-4">
-          <section className="rounded-v6-card border border-hairline bg-canvas shadow-v6-card 2xl:col-span-3">
-            <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold text-v6-ink">点数が変わる決めごと</p>
-                <p className="mt-1 text-xs text-v6-ink-faint">同じ元の記録は必ず1回だけ数えます。この安全設定は外せません。</p>
+          <div className="grid content-start gap-3 2xl:col-span-3">
+            <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-v6-ink">点をつける・引くこと</p>
+                <p className="mt-1 text-xs text-v6-ink-faint">上から順にあてはめます。同じことが2回起きたら、2回ぶん動きます。</p>
               </div>
-              {canEdit ? <Button onClick={addRule}><Plus className="h-4 w-4" aria-hidden="true" />ルールを追加</Button> : null}
-            </div>
-
-            {bundle.rules.length === 0 ? (
-              <ListState kind="empty" title="スコアのルールがありません" description="公開するには、動かすルールを1件以上追加してください。" action={canEdit ? <Button onClick={addRule}>ルールを追加</Button> : undefined} />
-            ) : (
-              <DataTable>
-                {/*
-                  **幅を決める。** `DataTable` は `table-layout: fixed` なので、
-                  決めないと6列が等分される。名前ときっかけがいちばん長いので、
-                  ほかを詰めて残りを回す。
-                */}
-                <thead><TableHeadRow>
-                  <Th className="w-24">動作</Th>
-                  <Th>名前・きっかけ</Th>
-                  <Th className="w-44">点数</Th>
-                  <Th className="w-52">回数</Th>
-                  <Th className="w-56">有効期間</Th>
-                  <Th align="right" className="w-20">操作</Th>
-                </TableHeadRow></thead>
-                <tbody>{bundle.rules.map((rule, index) => (
-                  <Tr key={rule.id}>
-                    <Td>
-                      {/*
-                        **見るだけの人にはスイッチを出さない。**
-                        共通の `Toggle` に「押せないが状態は見せる」入口は無く、
-                        `locked` は**オンに固定して描く**印なので、止めている
-                        ルールが「動いている」に見えてしまう。
-                        動かせない相手には、下の文字だけで状態を伝える。
-                      */}
-                      {canEdit ? (
-                        <Toggle checked={rule.enabled} label={`${rule.name}を動かす`} onChange={(enabled) => updateRule(index, { enabled })} />
-                      ) : null}
-                      <p className={`${canEdit ? 'mt-1 ' : ''}whitespace-nowrap text-xs text-v6-ink-faint`}>{rule.enabled ? '動かす' : '止める'}</p>
-                    </Td>
-                    <Td>
-                      <TextInput aria-label={`${index + 1}件目のルール名`} value={rule.name} disabled={!canEdit} onChange={(event) => updateRule(index, { name: event.target.value })} />
-                      <Select
-                        aria-label={`${rule.name}のきっかけ`}
-                        value={eventValue(rule)}
-                        disabled={!canEdit}
-                        onChange={(value) => {
-                          const [eventType, source] = value.split('|')
-                          updateRule(index, { eventType, source: source || null })
-                        }}
-                        options={[...EVENT_OPTIONS]}
-                        size="full"
-                        className="mt-2"
-                      />
-                    </Td>
-                    <Td>
-                      <Select
-                        aria-label={`${rule.name}の点数の変え方`}
-                        value={operationValue(rule)}
-                        disabled={!canEdit}
-                        onChange={(value) => updateRule(index, value === 'set-zero'
-                          ? { operation: 'set', value: 0 }
-                          : { operation: 'delta', value: value === 'subtract' ? -Math.max(1, Math.abs(rule.value)) : Math.max(1, Math.abs(rule.value)) })}
-                        options={[
-                          { value: 'add', label: '増やす' },
-                          { value: 'subtract', label: '減らす' },
-                          { value: 'set-zero', label: '0にする' },
-                        ]}
-                        size="full"
-                      />
-                      <TextInput
-                        className="mt-2 w-full"
-                        aria-label={`${rule.name}の点数`}
-                        type="number"
-                        min={rule.operation === 'set' ? 0 : 1}
-                        value={Math.abs(rule.value)}
-                        disabled={!canEdit || rule.operation === 'set'}
-                        onChange={(event) => {
-                          const amount = Math.abs(Number(event.target.value))
-                          updateRule(index, { value: operationValue(rule) === 'subtract' ? -amount : amount })
-                        }}
-                      />
-                    </Td>
-                    <Td>
-                      <Select
-                        aria-label={`${rule.name}の回数制限`}
-                        value={rule.frequency.kind}
-                        disabled={!canEdit}
-                        onChange={(value) => updateRule(index, { frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })}
-                        options={FREQUENCY_OPTIONS}
-                        size="full"
-                      />
-                      {['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind) ? (
-                        <TextInput
-                          className="mt-2 w-full"
-                          aria-label={`${rule.name}の上限回数`}
-                          type="number"
-                          min={1}
-                          max={1000}
-                          value={rule.frequency.limit}
-                          disabled={!canEdit}
-                          onChange={(event) => updateRule(index, { frequency: { ...rule.frequency, limit: Number(event.target.value) } })}
-                        />
-                      ) : null}
-                      <p className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs text-v6-accent-hover"><ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />同じ記録は1回だけ</p>
-                    </Td>
-                    <Td>
-                      <TextInput aria-label={`${rule.name}の開始日時`} type="datetime-local" value={localDateTime(rule.validFrom)} disabled={!canEdit} onChange={(event) => updateRule(index, { validFrom: utcDateTime(event.target.value) })} />
-                      <TextInput className="mt-2" aria-label={`${rule.name}の終了日時`} type="datetime-local" value={localDateTime(rule.validUntil)} disabled={!canEdit} onChange={(event) => updateRule(index, { validUntil: utcDateTime(event.target.value) })} />
-                    </Td>
-                    <ActionCell>
-                      {canEdit ? <button type="button" className="rounded-v6-control p-2 text-v6-danger hover:bg-v6-danger-bg" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : '見るだけ'}
-                    </ActionCell>
-                  </Tr>
-                ))}</tbody>
-              </DataTable>
-            )}
-          </section>
-
-          <aside className="grid gap-3 md:grid-cols-3 2xl:grid-cols-1">
-            <section id="score-rule-test" className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-              {/*
-                **呼び方は「帯」。** 行動スコアのタブ側は統一済みで、
-                この面だけ「層」に戻すと同じ機能の中で名前が2つになる。
-                「層」は人を分ける言い方にも聞こえる（§7 #48）。
-              */}
-              <p className="text-sm font-semibold text-v6-ink">スコアの帯</p>
-              <p className="mt-1 text-xs text-v6-ink-faint">一覧と配信の「低い・ふつう・高い」に使います。</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Field label="下限" htmlFor="score-min"><TextInput id="score-min" type="number" value={bundle.bands.min} disabled={!canEdit} onChange={(event) => updateBands({ min: Number(event.target.value) })} /></Field>
-                <Field label="上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
-                <Field label="ふつうの開始" htmlFor="score-normal"><TextInput id="score-normal" type="number" value={bundle.bands.normalMin} disabled={!canEdit} onChange={(event) => updateBands({ normalMin: Number(event.target.value) })} /></Field>
-                <Field label="高いの開始" htmlFor="score-high"><TextInput id="score-high" type="number" value={bundle.bands.highMin} disabled={!canEdit} onChange={(event) => updateBands({ highMin: Number(event.target.value) })} /></Field>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-1 text-center text-xs">
-                <span className="rounded-full bg-v6-surface-strong px-2 py-1 text-v6-ink-secondary">低い</span>
-                <span className="rounded-full bg-v6-warning-bg px-2 py-1 text-v6-warning">ふつう</span>
-                <span className="rounded-full bg-v6-accent-soft px-2 py-1 text-v6-accent-hover">高い</span>
-              </div>
-            </section>
-
-            <section className="rounded-v6-card border border-v6-warning/30 bg-v6-warning-bg p-4 text-xs text-v6-ink-secondary">
-              <p className="flex items-center gap-2 font-semibold text-v6-ink"><CircleHelp className="h-4 w-4" aria-hidden="true" />マイルとは別です</p>
-              {/*
-                **「マイルが減るのでは」に先に答える。** 交換できないこと、
-                残高が動かないことを言う。タブ側（`action-score-tab.tsx`）と
-                同じ文にそろえてある。
-              */}
-              <p className="mt-2"><strong className="text-v6-ink">スコアはマイルではありません。</strong>お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。対応や配信の順番を決める目安です。</p>
-              <p className="mt-2">LINEの既読は取得できないため、「メッセージを開いた」はルールにできません。</p>
+              {bundle.rules.length === 0 ? (
+                <ListState kind="empty" title="スコアのルールがありません" description="公開するには、動かすルールを1件以上追加してください。" action={canEdit ? <Button onClick={addRule}>できごとを足す</Button> : undefined} />
+              ) : (
+                <div className="grid gap-2">
+                  {bundle.rules.map((rule, index) => (
+                    <div key={rule.id} className={`grid min-h-10 grid-cols-12 items-center gap-3 rounded-control px-3 py-2 ${rule.enabled ? 'bg-surface-pearl' : 'bg-canvas-sunken text-ink-faint'}`}>
+                      <button type="button" disabled={!canEdit} className="col-span-6 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
+                        <span className={rule.value < 0 || rule.operation === 'set' ? 'text-status-warn-deep' : 'text-accent-hover'}><RuleIcon eventType={rule.eventType} /></span>
+                        <span className="truncate">{rule.name}</span>
+                        {canEdit ? <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" /> : null}
+                      </button>
+                      <span className={`col-span-2 text-right text-sm font-bold ${rule.value < 0 || rule.operation === 'set' ? 'text-status-warn-deep' : 'text-accent-hover'}`}>{rulePointLabel(rule)}</span>
+                      <span className="col-span-3 text-xs text-ink-secondary">{ruleFrequencyLabel(rule)}</span>
+                      {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-status-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {canEdit ? <Button className="mt-3" onClick={addRule}><Plus className="h-4 w-4" aria-hidden="true" />できごとを足す</Button> : null}
             </section>
 
             <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-              <p className="flex items-center gap-2 text-sm font-semibold text-v6-ink"><FlaskConical className="h-4 w-4" aria-hidden="true" />ルールをテスト</p>
-              <p className="mt-1 text-xs text-v6-ink-faint">友だちの点数や履歴は変えません。</p>
-              <div className="mt-3 space-y-3">
-                <Field label="テスト前の点数" htmlFor="test-score"><TextInput id="test-score" type="number" value={testScore} onChange={(event) => setTestScore(event.target.value)} /></Field>
-                <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={setTestEvent} options={[...EVENT_OPTIONS]} size="full" /></Field>
-                <Button onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button>
+              <p className="text-sm font-semibold text-v6-ink">帯の分けかた</p>
+              <p className="mt-1 text-xs text-v6-ink-faint">この分けかたで、配信の相手を選べます。</p>
+              <div className="mt-4 grid max-w-2xl grid-cols-3 gap-3">
+                <Field label="高い（以上）" htmlFor="score-high"><TextInput id="score-high" type="number" value={bundle.bands.highMin} disabled={!canEdit} onChange={(event) => updateBands({ highMin: Number(event.target.value) })} /></Field>
+                <Field label="ふつう（以上）" htmlFor="score-normal"><TextInput id="score-normal" type="number" value={bundle.bands.normalMin} disabled={!canEdit} onChange={(event) => updateBands({ normalMin: Number(event.target.value) })} /></Field>
+                <Field label="点の上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
               </div>
-              {testResult ? (
-                <div className="mt-3 rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft p-3 text-xs text-v6-ink-secondary" role="status">
-                  <p className="font-semibold text-v6-ink">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
-                  <p className="mt-1">合ったルール：{testResult.matched.length ? testResult.matched.map((item) => item.ruleName).join('、') : 'なし'}</p>
-                </div>
-              ) : null}
+            </section>
+          </div>
+
+          <aside className="grid content-start gap-3">
+            <section className="rounded-v6-card border border-status-warn bg-status-warn-soft p-4 text-xs text-status-warn-deep">
+              <p className="font-semibold">マイルとの違い</p>
+              <div className="mt-3 grid gap-3">
+                <div className="flex gap-2"><EyeOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>お客様には見えません</strong><br />顧客カルテにも出しません</p></div>
+                <div className="flex gap-2"><WalletCards className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>マイル残高は動きません</strong><br />点が下がっても、マイルは減りません</p></div>
+                <div className="flex gap-2"><RefreshCw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>過去の点数は書き換えません</strong><br />新しいできごとから新しいルールが動きます</p></div>
+                <div className="flex gap-2"><MailX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>「メッセージを開いた」は使えません</strong><br />LINEは既読を返さないため、ルールにできません</p></div>
+              </div>
             </section>
 
             <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
@@ -524,12 +416,69 @@ export default function ActionScoreRulesPage() {
         {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-v6-accent-hover" role="status">{notice}</p> : null}
         {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
 
-        <div className="sticky bottom-0 z-20 flex items-center justify-center gap-3 border-t border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
+        <div className={`${styles.footer} sticky bottom-0 z-20 grid min-h-16 grid-cols-4 items-center rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur`}>
+          <p className="text-xs text-v6-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
+          <div className="col-span-2 flex items-center justify-center gap-3">
           {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
-          <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きを保存</Button>
+          <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きに保存</Button>
           <Button variant="primary" onClick={() => void preparePublish()} disabled={!canEdit || busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button>
+          </div>
+          <span aria-hidden="true" />
         </div>
       </> : null}
+
+      <Dialog
+        open={testOpen}
+        title="1人でスコアのルールを試す"
+        description="友だちの点数や履歴は変えません。"
+        onCancel={() => !busy && setTestOpen(false)}
+        footer={<div className="flex justify-end gap-2"><Button onClick={() => setTestOpen(false)} disabled={busy}>閉じる</Button><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
+      >
+        <div className="grid gap-3">
+          <Field label="テスト前の点数" htmlFor="test-score"><TextInput id="test-score" type="number" value={testScore} onChange={(event) => setTestScore(event.target.value)} /></Field>
+          <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={setTestEvent} options={[...EVENT_OPTIONS]} size="full" /></Field>
+          {testResult ? (
+            <div className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft p-3 text-xs text-v6-ink-secondary" role="status">
+              <p className="font-semibold text-v6-ink">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
+              <p className="mt-1">合ったルール：{testResult.matched.length ? testResult.matched.map((item) => item.ruleName).join('、') : 'なし'}</p>
+            </div>
+          ) : null}
+        </div>
+      </Dialog>
+
+      {bundle && editRuleIndex !== null && bundle.rules[editRuleIndex] ? (() => {
+        const rule = bundle.rules[editRuleIndex]
+        return (
+          <Dialog
+            open
+            title="できごとの設定を直す"
+            description="保存するまでは、友だちの点数や履歴は変わりません。"
+            onCancel={() => setEditRuleIndex(null)}
+            footer={<div className="flex justify-end"><Button variant="primary" onClick={() => setEditRuleIndex(null)}>設定を反映</Button></div>}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name"><TextInput id="rule-name" value={rule.name} onChange={(event) => updateRule(editRuleIndex, { name: event.target.value })} /></Field></div>
+              <div className="sm:col-span-2"><Field label="きっかけ"><Select aria-label={`${rule.name}のきっかけ`} value={eventValue(rule)} onChange={(value) => {
+                const [eventType, source] = value.split('|')
+                const name = EVENT_OPTIONS.find((option) => option.value === value)?.label ?? rule.name
+                updateRule(editRuleIndex, { eventType, source: source || null, name })
+              }} options={[...EVENT_OPTIONS]} size="full" /></Field></div>
+              <Field label="点数の変え方"><Select aria-label={`${rule.name}の点数の変え方`} value={operationValue(rule)} onChange={(value) => updateRule(editRuleIndex, value === 'set-zero'
+                ? { operation: 'set', value: 0 }
+                : { operation: 'delta', value: value === 'subtract' ? -Math.max(1, Math.abs(rule.value)) : Math.max(1, Math.abs(rule.value)) })} options={[{ value: 'add', label: '増やす' }, { value: 'subtract', label: '減らす' }, { value: 'set-zero', label: '0にする' }]} size="full" /></Field>
+              <Field label="点数" htmlFor="rule-score"><TextInput id="rule-score" type="number" min={rule.operation === 'set' ? 0 : 1} value={Math.abs(rule.value)} disabled={rule.operation === 'set'} onChange={(event) => {
+                const amount = Math.abs(Number(event.target.value))
+                updateRule(editRuleIndex, { value: operationValue(rule) === 'subtract' ? -amount : amount })
+              }} /></Field>
+              <Field label="回数"><Select aria-label={`${rule.name}の回数制限`} value={rule.frequency.kind} onChange={(value) => updateRule(editRuleIndex, { frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })} options={FREQUENCY_OPTIONS} size="full" /></Field>
+              <Field label="上限回数" htmlFor="rule-limit"><TextInput id="rule-limit" type="number" min={1} max={1000} value={rule.frequency.limit} disabled={!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)} onChange={(event) => updateRule(editRuleIndex, { frequency: { ...rule.frequency, limit: Number(event.target.value) } })} /></Field>
+              <Field label="開始日時" htmlFor="rule-start"><TextInput id="rule-start" type="datetime-local" value={localDateTime(rule.validFrom)} onChange={(event) => updateRule(editRuleIndex, { validFrom: utcDateTime(event.target.value) })} /></Field>
+              <Field label="終了日時" htmlFor="rule-end"><TextInput id="rule-end" type="datetime-local" value={localDateTime(rule.validUntil)} onChange={(event) => updateRule(editRuleIndex, { validUntil: utcDateTime(event.target.value) })} /></Field>
+              <div className="sm:col-span-2"><Toggle checked={rule.enabled} label="このできごとを動かす" onChange={(enabled) => updateRule(editRuleIndex, { enabled })} /></div>
+            </div>
+          </Dialog>
+        )
+      })() : null}
 
       <ConfirmDialog
         open={confirmAction?.kind === 'publish'}

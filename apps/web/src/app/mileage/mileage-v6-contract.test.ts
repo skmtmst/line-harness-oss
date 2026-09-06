@@ -72,6 +72,17 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).not.toContain('該当するユーザーがいません')
   })
 
+  it('残高一覧を設計の20件表示・絞り込み札・2操作にそろえる', () => {
+    expect(PAGE).toContain('const PAGE_SIZE = 20')
+    for (const label of ['ゴールド', 'シルバー', 'ブロンズ', '消える予定', '残高が多い順']) {
+      expect(PAGE).toContain(label)
+    }
+    expect(PAGE).toContain('増やす・減らす')
+    expect(PAGE).toContain('&adjust=1')
+    expect(FRIEND_DETAIL).toContain("searchParams.get('adjust') === '1'")
+    expect(FRIEND_DETAIL).toContain('setAdjustmentOpen(true)')
+  })
+
   it('既存の更新APIから決めごとの停止と再開を操作できる', () => {
     expect(PAGE).toContain("updateRule(rule, { isActive: !rule.isActive })")
     expect(PAGE).toContain("rule.isActive ? '決めごとを停止' : '決めごとを再開'")
