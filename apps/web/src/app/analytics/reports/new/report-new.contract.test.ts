@@ -8,7 +8,7 @@ describe('V6 URqOA 定期レポート作成', () => {
   it('設計の入力・予告・関係先を持つ', () => {
     for (const text of [
       '何を入れますか', 'いつ送りますか', 'だれに送りますか', '知らせの決めごと',
-      'LINEでも同じ内容を送る', 'いますぐ1回だけ送ってみる', 'つくって動かす',
+      '宛先を足す', 'LINEでも同じ内容を送る', 'いますぐ1回だけ送ってみる', 'つくって動かす',
       'レポートが見ているもの', 'つながる先', '気をつけること',
     ]) expect(PAGE).toContain(text)
     expect(PAGE).toContain('data-design-node="URqOA"')
@@ -18,6 +18,9 @@ describe('V6 URqOA 定期レポート作成', () => {
     expect(PAGE).toContain('定期レポートを読み込んでいます')
     expect(PAGE).toContain('受け取るログインユーザーがいません')
     expect(PAGE).toContain('定期レポートの設定を読み込めませんでした')
+    expect(PAGE).toContain('<ListState kind="loading"')
+    expect(PAGE).toContain('<ListState kind="error"')
+    expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
     expect(PAGE).toContain('disabled={saving || !canManage}')
   })

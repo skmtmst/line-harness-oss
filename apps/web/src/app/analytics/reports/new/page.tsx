@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -42,7 +43,7 @@ export default function AnalyticsReportNewPage() {
   const [sendTime, setSendTime] = useState('09:00')
   const [periodDays, setPeriodDays] = useState('7')
   const [staffIds, setStaffIds] = useState<string[]>([])
-  const [email, setEmail] = useState('report@example.com')
+  const [emails, setEmails] = useState(['report@example.com'])
   const [lineEnabled, setLineEnabled] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(true)
 
@@ -92,11 +93,12 @@ export default function AnalyticsReportNewPage() {
     setSaving(true)
     setError('')
     setNotice('')
+    const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
     const recipients = [
       ...options.recipients.filter((item) => staffIds.includes(item.id)).map((item) => ({
         kind: 'staff' as const, staffId: item.id, label: item.name,
       })),
-      ...(email.trim() ? [{ kind: 'email' as const, email: email.trim(), label: email.trim() }] : []),
+      ...emailRecipients.map((email) => ({ kind: 'email' as const, email, label: email })),
     ]
     try {
       const response = await api.analytics.reportSchedules.create(selectedAccountId, {
@@ -104,7 +106,7 @@ export default function AnalyticsReportNewPage() {
         weekday: cadence === 'weekly' ? Number(weekday) : null,
         monthDay: cadence === 'monthly' ? Number(monthDay) : null,
         sendTime, timeZone: options.timeZone, periodDays: Number(periodDays), recipients,
-        channels: ['dashboard', ...(email.trim() ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])],
+        channels: ['dashboard', ...(emailRecipients.length ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])],
         alertRules: alertsEnabled ? [
           { metric: 'block_rate', operator: 'greater_than', threshold: 0.5, minimumSample: 20 },
           { metric: 'friend_adds', operator: 'decrease_percent', threshold: 20, minimumSample: 20 },
@@ -121,14 +123,16 @@ export default function AnalyticsReportNewPage() {
     }
   }
 
-  if (accountLoading || loading) return <div className="text-ink-secondary grid min-h-96 place-content-center justify-items-center gap-4">定期レポートを読み込んでいます</div>
-  if (!selectedAccountId) return <div className="text-ink-secondary grid min-h-96 place-content-center justify-items-center gap-4">LINE公式アカウントを選んでください</div>
-  if (error && !options) return <div className="text-ink-secondary grid min-h-96 place-content-center justify-items-center gap-4"><p>{error}</p><Button onClick={() => location.reload()}>もう一度読み込む</Button></div>
+  if (accountLoading || loading) return <ListState kind="loading" title="定期レポートを読み込んでいます" />
+  if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
+  if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => location.reload()} />
   if (!options || options.recipients.length === 0) return (
-    <div className="text-ink-secondary grid min-h-96 place-content-center justify-items-center gap-4">
-      <p>受け取るログインユーザーがいません。</p>
-      <Link href="/staff">ログインユーザーを確認する</Link>
-    </div>
+    <ListState
+      kind="empty"
+      title="受け取るログインユーザーがいません"
+      description="先に、受け取る人をログインユーザーへ追加してください。"
+      action={<Button href="/staff">ログインユーザーを確認する</Button>}
+    />
   )
 
   return (
@@ -194,7 +198,19 @@ export default function AnalyticsReportNewPage() {
                   <em className="text-ink-faint text-xs not-italic">{person.lineLinked ? 'LINE連携済み' : 'LINE未連携'}</em>
                 </label>
               ))}
-              <label className="text-ink-secondary mt-2 grid max-w-md gap-2 text-xs font-semibold">メールだけ<input className="border-hairline text-ink bg-canvas h-10 rounded-control border px-3 text-sm" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="report@example.com" /></label>
+              {emails.map((email, index) => (
+                <label className="text-ink-secondary mt-2 grid max-w-md gap-2 text-xs font-semibold" key={index}>
+                  メールだけ
+                  <input
+                    className="border-hairline text-ink bg-canvas h-10 rounded-control border px-3 text-sm"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                    placeholder="report@example.com"
+                  />
+                </label>
+              ))}
+              <Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button>
             </div>
             <label className="border-hairline mt-5 flex items-start gap-3 border-t pt-4">
               <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={lineEnabled} onChange={(event) => setLineEnabled(event.target.checked)} />
