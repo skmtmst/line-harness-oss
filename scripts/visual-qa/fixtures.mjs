@@ -1098,6 +1098,187 @@ export const NEN_JOBS = [
   nenJob('nen-job-7', 'column', '夏の水分補給、どれくらい？', '中村 彩', '2026-08-23T10:00:00+09:00', 'sent', 1, '2026-08-23T10:00:01+09:00', '毎週 月曜の予約', '開きました'),
 ]
 
+/*
+  機能21の新しい集計・履歴契約（PR #1117）。既存の設定・コラム・ペット・
+  配信jobと同じIDだけを使い、画面ごとに別の作り物が生まれないようにする。
+*/
+const NEN_METRICS_RANGE = {
+  days: 30,
+  from: '2026-07-26T15:00:00.000Z',
+  to: '2026-08-25T15:00:00.000Z',
+}
+
+const nenUnavailable = (reason) => ({ value: null, state: 'unavailable', reason })
+
+const NEN_FLOW_COUNTS = {
+  order_thanks: { planned: 486, sent: 486, failed: 0, skipped: 0, associatedConversions: 28 },
+  shipping_notice: { planned: 462, sent: 462, failed: 0, skipped: 0, associatedConversions: 22 },
+  arrival_check: { planned: 424, sent: 418, failed: 6, skipped: 0, associatedConversions: 18 },
+  care_check: { planned: 550, sent: 402, failed: 0, skipped: 148, associatedConversions: 20 },
+  review_request: { planned: 386, sent: 386, failed: 0, skipped: 0, associatedConversions: 28 },
+  cross_sell: { planned: 0, sent: 0, failed: 0, skipped: 0, associatedConversions: 0 },
+  birthday_coupon: { planned: 148, sent: 148, failed: 0, skipped: 0, associatedConversions: 12 },
+  column: { planned: 184, sent: 184, failed: 0, skipped: 0, associatedConversions: 14 },
+}
+
+export const NEN_FLOW_METRICS = {
+  range: NEN_METRICS_RANGE,
+  summary: { active: 6, paused: 2, planned: 2_640, sent: 2_486, associatedConversions: 142 },
+  flows: NEN_CAMPAIGN_SETTINGS.map((setting) => ({
+    campaignKey: setting.campaignKey,
+    label: setting.label,
+    category: setting.category,
+    isEnabled: setting.isEnabled,
+    ...NEN_FLOW_COUNTS[setting.campaignKey],
+    openRate: nenUnavailable('LINEはNEN配信の個人開封を提供していません'),
+    attribution: '送信後7日以内の関連成果であり、配信が原因とは断定しません',
+  })),
+}
+
+const NEN_COLUMN_RESULTS = {
+  'nen-column-tooth': { targeted: 1_248, sent: 1_248, opened: 976, rate: 0.782, conversions: 12 },
+  'nen-column-water': { targeted: 1_284, sent: 0, pending: 1_284, opened: null, rate: null, conversions: 0 },
+  'nen-column-food': { targeted: 1_196, sent: 1_196, opened: 854, rate: 0.714, conversions: 14 },
+  'nen-column-nail': { targeted: 1_180, sent: 1_180, opened: 812, rate: 0.688, conversions: 8 },
+  'nen-column-toilet': { targeted: 1_164, sent: 1_164, opened: 490, rate: 0.421, conversions: 1 },
+  'nen-column-rain': { targeted: 0, sent: 0, opened: null, rate: null, conversions: 0 },
+}
+
+export const NEN_COLUMN_METRICS = {
+  range: NEN_METRICS_RANGE,
+  summary: { total: 24, sent: 18, drafts: 5, scheduled: 1, unread: 1_656, associatedConversions: 38 },
+  columns: NEN_COLUMNS.map((column) => {
+    const result = NEN_COLUMN_RESULTS[column.id] ?? {
+      targeted: 0,
+      sent: 0,
+      opened: null,
+      rate: null,
+      conversions: 0,
+    }
+    const trackingAvailable = result.opened !== null
+    return {
+      id: column.id,
+      title: column.title,
+      category: column.category,
+      deliveryStatus: column.deliveryStatus,
+      publishedAt: column.publishedAt,
+      deliveryAt: column.deliveryAt,
+      period: { from: column.publishedAt ?? column.deliveryAt, to: column.publishedAt ?? column.deliveryAt },
+      targeted: result.targeted,
+      sent: result.sent,
+      pending: result.pending ?? 0,
+      failed: 0,
+      articleOpened: trackingAvailable
+        ? { value: result.opened, rate: result.rate, state: 'available', reason: null }
+        : { value: null, rate: null, state: 'unavailable', reason: 'この記事URLの計測台帳がありません' },
+      unread: trackingAvailable ? Math.max(result.sent - result.opened, 0) : null,
+      completionRate: nenUnavailable('記事のスクロール読了eventをまだ記録していません'),
+      associatedConversions: result.conversions,
+      attribution: '送信後7日以内の関連成果',
+    }
+  }),
+}
+
+const NEN_PET_DETAILS = {
+  'nen-pet-momo': { breed: 'トイプードル', deliveryCount: 6, lastSentAt: '2026-08-25T10:00:02+09:00', coupons: { issued: 2, used: 1 } },
+  'nen-pet-sora': { breed: '雑種', deliveryCount: 3, lastSentAt: '2026-08-25T10:00:02+09:00', coupons: { issued: 1, used: 1 } },
+  'nen-pet-komugi': { breed: '柴', deliveryCount: 9, lastSentAt: '2026-08-14T10:00:02+09:00', coupons: { issued: 3, used: 1 } },
+  'nen-pet-leo': { breed: 'ラブラドール', deliveryCount: 0, lastSentAt: null, coupons: { issued: 0, used: 0 } },
+  'nen-pet-purin': { breed: null, deliveryCount: 4, lastSentAt: '2026-08-05T10:00:02+09:00', coupons: { issued: 1, used: 0 } },
+}
+
+export const NEN_PET_METRICS = {
+  range: NEN_METRICS_RANGE,
+  summary: {
+    pets: 864,
+    birthdayRegistered: 822,
+    birthdayMissing: 42,
+    birthdayThisMonth: 72,
+    friends: 1_284,
+    friendsWithoutPet: 420,
+    birthdayOpenRate: nenUnavailable('LINEは誕生日配信の個人開封を提供していません'),
+    coupons: { issued: 73, used: 28, usageRate: 28 / 73 },
+  },
+  breeds: [
+    { name: 'トイプードル', count: 286 },
+    { name: '柴', count: 194 },
+    { name: '雑種', count: 172 },
+    { name: 'ラブラドール', count: 86 },
+    { name: '未登録', count: 126 },
+  ],
+  pets: NEN_PETS.map((pet) => {
+    const detail = NEN_PET_DETAILS[pet.id]
+    return {
+      id: pet.id,
+      name: pet.name,
+      animalType: pet.animalType,
+      breed: detail.breed,
+      birthday: pet.birthday,
+      friendId: pet.friendId,
+      ownerName: pet.ownerName,
+      ownerDeliveryHistory: { count: detail.deliveryCount, lastSentAt: detail.lastSentAt },
+      coupons: detail.coupons,
+    }
+  }),
+}
+
+const NEN_FRIEND_IDS = ['friend-2', 'friend-1', 'friend-6', 'friend-3', 'friend-7', 'friend-4', 'friend-5']
+const nenDeliveryReaction = () => nenUnavailable('この配信記録に対応する個人の反応は取得できません')
+
+export const NEN_DELIVERIES = {
+  range: NEN_METRICS_RANGE,
+  summary: { pending: 148, processing: 0, sent: 2_486, skipped: 0, failed: 6, cancelled: 0, retryRequired: 0 },
+  deliveries: NEN_JOBS.map((job, index) => ({
+    id: job.id,
+    campaignKey: job.campaignKey,
+    label: job.label,
+    friendId: NEN_FRIEND_IDS[index],
+    friendName: job.friendName,
+    lineAccountName: job.lineAccountName,
+    scheduledAt: job.scheduledAt,
+    sentAt: job.sentAt,
+    status: job.status,
+    attempts: job.attempts,
+    unmetReason: job.status === 'failed' ? '送信処理でエラーが起きました' : null,
+    reaction: nenDeliveryReaction(),
+    version: 1,
+    updatedAt: job.sentAt ?? job.scheduledAt,
+  })),
+  pagination: { total: 2_640, limit: 20, cursor: '0', nextCursor: '20' },
+}
+
+export const NEN_DELIVERY_DETAILS = Object.fromEntries(NEN_JOBS.map((job, index) => {
+  const setting = NEN_CAMPAIGN_SETTINGS.find((item) => item.campaignKey === job.campaignKey)
+  return [job.id, {
+    id: job.id,
+    campaignKey: job.campaignKey,
+    label: job.label,
+    friendId: NEN_FRIEND_IDS[index],
+    friendName: job.friendName,
+    lineAccountName: job.lineAccountName,
+    scheduledAt: job.scheduledAt,
+    sentAt: job.sentAt,
+    status: job.status,
+    attempts: job.attempts,
+    unmetReason: job.status === 'failed' ? '送信処理でエラーが起きました' : null,
+    trigger: job.triggerLabel,
+    content: setting ? {
+      title: setting.title,
+      bodyText: setting.bodyText,
+      buttonLabel: setting.buttonLabel,
+      buttonUrl: setting.buttonUrl,
+      imageUrl: setting.imageUrl,
+      state: 'available',
+      reason: null,
+    } : {
+      title: null, bodyText: null, buttonLabel: null, buttonUrl: null, imageUrl: null,
+      state: 'unavailable', reason: '予約時の配信内容が保存されていません',
+    },
+    version: 1,
+    updatedAt: job.sentAt ?? job.scheduledAt,
+  }]
+}))
+
 export const NEN_BIRTHDAY_COUPON = {
   isEnabled: true,
   codePrefix: 'NENBDAY',
@@ -1214,6 +1395,85 @@ export const COMMON_VAR_DELETE_IMPACT_EMPTY = {
 export const COMMON_VAR_DELETE_IMPACT_ERROR = {
   success: false,
   error: '使用先を確認できないため削除できません',
+}
+
+/** PR #1131 の詳細・差し替え契約。既存の会社名と使用先を共通で使う。 */
+const COMMON_VAR_SOURCE = COMMON_VARS.find((variable) => variable.id === COMMON_VAR_DELETE_IMPACT.variable.id)
+const COMMON_VAR_REPLACEMENT = COMMON_VARS.find((variable) => variable.id === 'common-var-hours')
+
+export const COMMON_VAR_DETAIL = {
+  ...COMMON_VAR_SOURCE,
+  memo: '契約書・請求書・お客さま案内で使う正式な会社名',
+  version: 3,
+  archivedAt: null,
+  usageByKind: COMMON_VAR_DELETE_IMPACT.byKind,
+  usages: COMMON_VAR_DELETE_IMPACT.items,
+  usagePage: {
+    total: COMMON_VAR_DELETE_IMPACT.total,
+    shown: COMMON_VAR_DELETE_IMPACT.items.length,
+    hasMore: COMMON_VAR_DELETE_IMPACT.total > COMMON_VAR_DELETE_IMPACT.items.length,
+    unavailableCount: COMMON_VAR_DELETE_IMPACT.unscopedFormTotal,
+  },
+  history: [
+    {
+      id: 'common-var-version-3', version: 3, name: '会社名', value: '株式会社NEN',
+      memo: '契約書・請求書・お客さま案内で使う正式な会社名',
+      changeReason: '登記上の表記に統一', actorId: 'staff-1', createdAt: '2026-08-01T10:12:00.000+09:00',
+    },
+    {
+      id: 'common-var-version-2', version: 2, name: '会社名', value: 'NEN', memo: '',
+      changeReason: '初回登録', actorId: 'staff-1', createdAt: '2025-11-20T16:40:00.000+09:00',
+    },
+  ],
+}
+
+export const COMMON_VAR_REPLACEMENT_CANDIDATES = {
+  source: {
+    id: COMMON_VAR_SOURCE.id,
+    name: COMMON_VAR_SOURCE.name,
+    type: COMMON_VAR_SOURCE.type,
+    version: COMMON_VAR_DETAIL.version,
+  },
+  candidates: COMMON_VARS
+    .filter((variable) => variable.id !== COMMON_VAR_SOURCE.id && variable.type === COMMON_VAR_SOURCE.type)
+    .map((variable) => ({
+      id: variable.id,
+      name: variable.name,
+      varKey: variable.varKey,
+      type: variable.type,
+      value: variable.value,
+      version: 1,
+    })),
+}
+
+export const COMMON_VAR_REPLACEMENT_PREVIEW = {
+  source: COMMON_VAR_REPLACEMENT_CANDIDATES.source,
+  replacement: {
+    id: COMMON_VAR_REPLACEMENT.id,
+    name: COMMON_VAR_REPLACEMENT.name,
+    type: COMMON_VAR_REPLACEMENT.type,
+    version: 1,
+  },
+  usageTotal: COMMON_VAR_DELETE_IMPACT.total,
+  replaceableTotal: COMMON_VAR_DELETE_IMPACT.blockingTotal,
+  blockedTotal: 0,
+  historicalTotal: COMMON_VAR_DELETE_IMPACT.historicalTotal,
+  unscopedFormTotal: COMMON_VAR_DELETE_IMPACT.unscopedFormTotal,
+  byKind: COMMON_VAR_DELETE_IMPACT.byKind,
+  canReplace: true,
+  revision: '8d8c3f91f498b423cd7c37562f0fd5b2e1676959e040bc6b126de36a537a6926',
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+}
+
+export const COMMON_VAR_REPLACEMENT_RESULT = {
+  runId: 'common-var-replace-run-1',
+  archivedVersion: COMMON_VAR_DETAIL.version + 1,
+  sourceId: COMMON_VAR_SOURCE.id,
+  replacementId: COMMON_VAR_REPLACEMENT.id,
+  replacedUsageCount: COMMON_VAR_REPLACEMENT_PREVIEW.replaceableTotal,
+  remainingUsageCount: 0,
+  verification: 'verified',
+  completedAt: '2026-09-07T10:01:00.000+09:00',
 }
 
 /**
@@ -2582,7 +2842,7 @@ export const BROADCAST_LIST_META = {
     drafts: 3,
     thisMonth: 12,
     delivered: 1842,
-    openRate: 0.694,
+    openRate: 69.4,
   },
   pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
 }

@@ -1,36 +1,92 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import {
+  api,
+  type AccountHandover,
+  type AccountHandoverDecision,
+} from '@/lib/api'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import PageHeader from '@/components/shared/page-header'
-import { DIFFERENT_PROVIDER_NOTE, HANDOVER_STEPS, MATCH_BUCKETS } from './handover-view'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import {
+  DIFFERENT_PROVIDER_NOTE,
+  HANDOVER_STEPS,
+  MATCH_BUCKETS,
+  totalsMatch,
+} from './handover-view'
 
-/**
- * LINEアカウントの乗り換え・引き継ぎ。設計 ★V6 33-4（`nx3XW`）。
- *
- * **口がまだ無い**（台帳 #133）。5 段の流れと、事前確認で何が出るかを
- * 描いたうえで、「まだ繋がっていません」と止める。**人数は作らない。**
- *
- * 流れを描くのは、運用者が「何が起きるか」を先に読めるようにするため。
- * 白紙にすると、何を待っているのかも分からない。
- */
+type HandoverDecisionView = AccountHandoverDecision & {
+  sourceName?: string
+  candidateName?: string | null
+  evidenceLabel?: string
+}
+
+type HandoverView = AccountHandover & {
+  decisions: HandoverDecisionView[]
+  unresolvedReviews: number | null
+}
+
+const statusStep: Record<AccountHandover['status'], number> = {
+  code_issued: 1,
+  linked: 2,
+  previewed: 3,
+  resolved: 4,
+  executing: 5,
+  completed: 5,
+  failed: 5,
+  cancelled: 1,
+}
+
+function formatMonthDayTime(value: string | null): string {
+  if (!value) return '未取得'
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
+  }).format(new Date(value))
+}
+
+/** LINEアカウントの乗り換え・引き継ぎ。設計 ★V6 33-4（`nx3XW`）。 */
 function Handover() {
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
   const [account, setAccount] = useState<LineAccount | null>(null)
+  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [handover, setHandover] = useState<HandoverView | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
+  const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
     try {
-      const res = await api.lineAccounts.get(id)
-      if (!res.success) { setStatus('error'); return }
-      setAccount(res.data)
+      const [accountRes, accountsRes, handoversRes] = await Promise.all([
+        api.lineAccounts.get(id),
+        api.lineAccounts.list(),
+        api.accountHandovers.listForAccount(id),
+      ])
+      if (!accountRes.success || !accountsRes.success || !handoversRes.success) {
+        setStatus('error')
+        return
+      }
+      setAccount(accountRes.data)
+      setAccounts(accountsRes.data)
+      const current = handoversRes.data[0]
+      if (!current) {
+        setHandover(null)
+        setStatus('ready')
+        return
+      }
+      const detailRes = await api.accountHandovers.get(current.id)
+      if (!detailRes.success) {
+        setStatus('error')
+        return
+      }
+      setHandover(detailRes.data as HandoverView)
       setStatus('ready')
     } catch {
       setStatus('error')
@@ -38,6 +94,38 @@ function Handover() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+  usePageTitle('乗り換え・引き継ぎ')
+
+  const destination = useMemo(
+    () => accounts.find((item) => item.id === handover?.toAccountId) ?? null,
+    [accounts, handover?.toAccountId],
+  )
+  const countsAreComplete = handover?.counts
+    ? totalsMatch(handover.counts, handover.counts.sourceTotal)
+    : false
+
+  const rerunPreview = async () => {
+    if (!handover?.counts || !countsAreComplete) return
+    setRefreshing(true)
+    try {
+      const { sourceTotal, auto, review, unmatched, lookalike } = handover.counts
+      const result = await api.accountHandovers.preview(handover.id, {
+        sourceFriendTotal: sourceTotal,
+        counts: { auto, review, unmatched, lookalike },
+      })
+      if (!result.success) return
+      const detail = await api.accountHandovers.get(handover.id)
+      if (detail.success) setHandover(detail.data as HandoverView)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const copyCode = async () => {
+    if (!handover?.code) return
+    await navigator.clipboard.writeText(handover.code)
+    setCopyState('copied')
+  }
 
   if (status === 'loading') return <ListState kind="loading" />
   if (status === 'error' || !account) {
@@ -48,90 +136,146 @@ function Handover() {
       />
     )
   }
+  if (!handover) {
+    return (
+      <ListState
+        kind="empty"
+        title="進行中の引き継ぎはありません"
+        description="引き継ぎコードを発行すると、事前確認の結果をここで確かめられます。"
+        action={<Button href={`/accounts/detail?id=${account.id}`}>アカウントの詳細へ戻る</Button>}
+      />
+    )
+  }
+
+  const currentStep = statusStep[handover.status]
 
   return (
     <div data-design-node="nx3XW">
-      <PageHeader
-        breadcrumb={[
+      <div data-design="Head" className="mb-4">
+        <Breadcrumb items={[
           { label: 'LINEアカウント', href: '/accounts' },
           { label: account.name, href: `/accounts/detail?id=${account.id}` },
           { label: '乗り換え' },
-        ]}
-        title="乗り換え・引き継ぎ"
-        description="別のLINEアカウントへ、友だちと設定を引き継ぎます。事前確認をしてから本実行します。"
-      />
+        ]} />
+      </div>
 
-      <section className="bg-canvas rounded-card border-hairline mt-4 border p-5">
-        <p className="text-ink text-sm font-bold">進みかた</p>
-        <ol className="mt-4 grid gap-2 lg:grid-cols-5">
-          {HANDOVER_STEPS.map((step) => (
-            <li key={step.order} className="border-hairline rounded-control flex items-center gap-3 border p-3">
-              <span className="bg-action-soft text-action flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums">
-                {step.order}
+      <ol className="grid gap-2 lg:grid-cols-5">
+        {HANDOVER_STEPS.map((step) => {
+          const completed = step.order < currentStep
+          const active = step.order === currentStep
+          return (
+            <li key={step.order} className="border-hairline bg-canvas rounded-control flex min-w-0 items-center gap-3 border p-3">
+              <span className={completed
+                ? 'bg-success text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
+                : active
+                  ? 'bg-action text-on-accent flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
+                  : 'bg-canvas-sunken text-ink-secondary flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'}>
+                {completed ? '✓' : step.order}
               </span>
-              <span className="text-ink text-xs font-medium leading-relaxed">{step.label}</span>
+              <span className="min-w-0">
+                <span className="text-ink-faint block text-xs font-bold">STEP {step.order}</span>
+                <span className="text-ink block text-xs font-medium leading-relaxed">{step.label}</span>
+              </span>
             </li>
-          ))}
-        </ol>
-      </section>
+          )
+        })}
+      </ol>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">乗り換え元と受け取り先</p>
-            <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <div className="bg-canvas-sunken rounded-control flex-1 p-4">
-                <p className="text-ink-faint text-xs">乗り換え元</p>
-                <p className="text-ink mt-1 text-sm font-bold">{account.name}</p>
-                <p className="text-ink-faint mt-1 text-xs">チャネル {account.channelId}</p>
-              </div>
-              <span className="text-ink-faint text-center text-lg" aria-hidden>→</span>
-              <div className="border-hairline rounded-control flex-1 border border-dashed p-4">
-                <p className="text-ink-faint text-xs">受け取り先</p>
-                <p className="text-ink mt-1 text-sm font-bold">まだ選ばれていません</p>
-                <p className="text-ink-faint mt-1 text-xs">引き継ぎコードを読むと表示します</p>
+            <p className="text-ink text-base font-bold">どこからどこへ</p>
+            <p className="text-ink-secondary mt-1 text-xs">引き継ぎコードで両方のアカウントをつなぎました。</p>
+            <div className="mt-3 overflow-hidden rounded-control border border-hairline">
+              <div
+                className="grid text-sm"
+                style={{ gridTemplateColumns: '7rem minmax(0, 1fr) minmax(0, 1fr)' }}
+              >
+                <div className="bg-canvas-sunken border-hairline border-b px-3 py-2 text-xs font-bold">アカウント</div>
+                <div className="border-hairline border-b border-l px-3 py-2">{account.name}（{account.channelId}）</div>
+                <div className="border-hairline border-b border-l px-3 py-2">{destination ? `${destination.name}（${destination.channelId}）` : '未取得'}</div>
+                <div className="bg-canvas-sunken px-3 py-2 text-xs font-bold">プロバイダー</div>
+                <div className="border-hairline border-l px-3 py-2">乗り換え元</div>
+                <div className="border-hairline border-l px-3 py-2">受け取り先</div>
               </div>
             </div>
-            <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-relaxed">
-              {DIFFERENT_PROVIDER_NOTE}
-            </p>
+            {handover.providerMatch === 'different' && (
+              <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-relaxed">
+                <p className="font-bold">プロバイダーが違うので、友だちのIDは自動でつなげません</p>
+                <p className="mt-1">{DIFFERENT_PROVIDER_NOTE.replace('プロバイダーが違うので、友だちのIDは自動でつなげません。', '')}</p>
+              </div>
+            )}
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">事前確認の結果</p>
+            <p className="text-ink text-base font-bold">事前確認の結果</p>
             <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-              事前確認をすると、元の友だちが次の4つに分かれます。
               本実行はしていません。ここで止めても、元のアカウントは何も変わりません。
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
               {MATCH_BUCKETS.map((bucket) => (
                 <div key={bucket.key} className="border-hairline rounded-card border p-4">
                   <p className="text-ink-faint text-xs">{bucket.label}</p>
-                  {/* **固定データが無いので人数を作らない。** */}
-                  <p className="text-ink mt-1 text-2xl font-semibold">—</p>
+                  <p className="text-ink mt-1 text-2xl font-semibold">
+                    {countsAreComplete ? `${handover.counts?.[bucket.key].toLocaleString('ja-JP')}人` : '—'}
+                  </p>
                   <p className="text-ink-faint mt-1 text-xs">{bucket.note}</p>
                 </div>
               ))}
             </div>
             <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
-              「要確認」を全部決めるまで本実行できません。決めた内容はあとから見返せます。
+              {countsAreComplete && handover.counts
+                ? `元の友だち ${handover.counts.sourceTotal}人 ＝ 自動で一致 ${handover.counts.auto} ＋ 要確認 ${handover.counts.review} ＋ 一致しない ${handover.counts.unmatched} ＋ 別人の可能性 ${handover.counts.lookalike}`
+                : '4区分の合計を確認できないため、人数は表示していません。'}
             </p>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <div className="border-hairline border-b px-5 py-4">
-              <p className="text-ink text-sm font-bold">要確認の友だち</p>
-              <p className="text-ink-secondary mt-1 text-xs">候補を見比べて、引き継ぐ・新しく作る・除外するを決めます。</p>
+              <p className="text-ink text-base font-bold">人が決める {handover.counts?.review ?? '—'}人</p>
+              <p className="text-ink-secondary mt-1 text-xs">「要確認」を全部決めるまで本実行できません。決めた内容はあとから見返せます。</p>
             </div>
-            <div className="px-5 py-8 text-center">
-              <p className="text-ink text-sm font-medium">事前確認の結果はまだありません</p>
-              <p className="text-ink-faint mt-1 text-xs">引き継ぎコードと突合データが届くと、ここに候補を表示します。</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-full text-left">
+                <thead>
+                  <TableHeadRow>
+                    <Th>元の友だち</Th>
+                    <Th>受け取り先の候補</Th>
+                    <Th>つないだ根拠</Th>
+                    <Th>どうする</Th>
+                  </TableHeadRow>
+                </thead>
+                <tbody className="divide-hairline divide-y">
+                  {handover.decisions.map((decision) => (
+                    <tr key={decision.id} className="text-sm">
+                      <td className="px-4 py-3 font-medium">{decision.sourceName ?? decision.from_friend_id}</td>
+                      <td className="px-4 py-3">{decision.candidateName ?? '候補なし'}</td>
+                      <td className="text-ink-secondary px-4 py-3 text-xs">{decision.evidenceLabel ?? decision.note ?? '未取得'}</td>
+                      <td className="px-4 py-3">
+                        <span className="border-hairline rounded-full border px-2 py-1 text-xs">
+                          {decision.decision === 'link' ? '同じ人' : decision.decision === 'new' ? '新しく作る' : '引き継がない'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            <p className="text-ink-secondary border-hairline border-t px-5 py-3 text-xs">
+              残り {handover.unresolvedReviews ?? '—'}人。名前と画像だけの一致では、自動で同じ人にしません。
+            </p>
           </section>
 
-          <div className="flex flex-wrap justify-between gap-2">
-            <Button href={`/accounts/detail?id=${account.id}`}>アカウントの詳細へ戻る</Button>
-            <Button type="button" variant="primary" disabled>本実行へ進む</Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()}>
+                {refreshing ? '確認中…' : '事前確認をやり直す'}
+              </Button>
+              <Button type="button" variant="primary" disabled={(handover.unresolvedReviews ?? 1) > 0}>
+                本実行へ進む
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -139,26 +283,32 @@ function Handover() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-bold">引き継ぎコード</p>
             <div className="bg-canvas-sunken rounded-control mt-3 p-4 text-center">
-              <p className="text-ink text-xl font-bold tracking-widest">— — — — — —</p>
-              <p className="text-ink-faint mt-2 text-xs">コードはまだ発行されていません</p>
+              <p className="text-ink text-xl font-bold tracking-wider">{handover.code}</p>
+              <Button type="button" className="mt-3" onClick={() => void copyCode()}>
+                {copyState === 'copied' ? 'コピーしました' : 'コピー'}
+              </Button>
             </div>
-          </section>
-
-          {/* 動かない理由は、押し口ではなく本文で伝える。 */}
-          <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">まだ始められません</p>
-            <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-              引き継ぎコードを出す仕組みと、事前確認の突合が、まだ繋がっていません。
-              接続されると、この画面から乗り換えを始められます。
+            <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
+              受け取り先のアカウントでこのコードを読むと、つながります。期限は発行から24時間です。
             </p>
+            <p className="text-ink-faint mt-2 text-xs">読み終わりました（{formatMonthDayTime(handover.linkedAt)}）。</p>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink text-sm font-bold">安全のために</p>
+            <p className="text-ink text-sm font-bold">戻せること</p>
             <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
-              <li>・事前確認だけでは元データを変えません。</li>
-              <li>・件数の合計が一致しなければ実行しません。</li>
-              <li>・実行後も照合結果と切り戻しの記録を残します。</li>
+              <li>・本実行しても、元のアカウントの友だち・履歴・配信は消しません。</li>
+              <li>・引き継いだ先の内容は、実行から30日以内なら戻せます。</li>
+              <li>・戻すときも、友だちのつなぎ方だけを元に戻します。</li>
+            </ul>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-bold">気をつけること</p>
+            <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
+              <li>・送信を止める設定と同意状態は、厳しいほうを引き継ぎます。</li>
+              <li>・名前と画像だけが似ている組は、自動では同じ人にしません。</li>
+              <li>・本実行の前に、控えと戻し先の目印を作ります。</li>
             </ul>
           </section>
         </aside>
@@ -168,7 +318,6 @@ function Handover() {
 }
 
 export default function HandoverPage() {
-  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
       <Handover />

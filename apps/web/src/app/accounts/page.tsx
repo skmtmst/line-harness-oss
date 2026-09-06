@@ -10,7 +10,8 @@ import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
-import PageHeader from '@/components/shared/page-header'
+import Breadcrumb from '@/components/shared/breadcrumb'
+import AccountOrdering from '@/components/accounts/account-ordering'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -26,6 +27,7 @@ import AccountMigration from './migration'
 
 type AccountWithStats = LineAccount & {
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
+  timezone?: string
 }
 
 /**
@@ -40,6 +42,7 @@ export default function AccountsPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AccountFilter>('all')
+  const [orderingOpen, setOrderingOpen] = useState(false)
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -65,31 +68,39 @@ export default function AccountsPage() {
   const inactiveCount = accounts.filter((a) => !a.isActive && !a.archivedAt).length
   const archivedCount = accounts.filter((a) => Boolean(a.archivedAt)).length
   const problemCount = accounts.filter(hasConnectionProblem).length
+  const activeFriendCounts = accounts
+    .filter((account) => account.isActive && !account.archivedAt)
+    .map((account) => account.stats?.friendCount)
+  const activeFriendDetail = activeFriendCounts.every((count): count is number => typeof count === 'number')
+    ? `友だち ${activeFriendCounts.join('・')}人`
+    : '友だち数は未取得'
 
   if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
   return (
     <div data-design-node="QT91v">
-      <PageHeader
-        breadcrumb={[{ label: '設定' }, { label: 'LINEアカウント' }]}
-        title="LINEアカウント"
-        description="送受信に使うLINE公式アカウントを登録し、接続の状態を確かめます。"
-        actions={(
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled>並び順と親子を変える</Button>
-            <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
-          </div>
-        )}
-      />
+      <div data-design="Head" className="mb-4 flex min-h-10 flex-wrap items-center justify-between gap-3">
+        <div>
+          <Breadcrumb items={[{ label: 'LINEアカウント' }]} />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
+            {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
+          </Button>
+          <Button href="/accounts/new" variant="primary">＋ LINEアカウントを登録</Button>
+        </div>
+      </div>
+
+      {orderingOpen && <AccountOrdering />}
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard title="稼働中" value={activeCount} unit="件" variant="v6"
-          detail="送受信できます" />
-        <SummaryCard title="停止中" value={inactiveCount} unit="件" variant="v6"
+        <SummaryCard title="稼働中" value={activeCount} unit="" variant="v6"
+          badge="100%" detail={activeFriendDetail} />
+        <SummaryCard title="停止中" value={inactiveCount} unit="" variant="v6"
           detail="送受信を止めています" />
-        <SummaryCard title="アーカイブ" value={archivedCount} unit="件" variant="v6"
-          detail="一覧の通常表示から外れています" />
-        <SummaryCard title="接続に問題" value={problemCount} unit="件" variant="v6"
+        <SummaryCard title="アーカイブ" value={archivedCount} unit="" variant="v6"
+          detail="記録は残っています" />
+        <SummaryCard title="接続に問題" value={problemCount} unit="" variant="v6"
           badge={problemCount > 0 ? '要対応' : undefined} badgeTone="danger"
           detail="Webhookが合っていません" />
       </div>
@@ -167,7 +178,7 @@ export default function AccountsPage() {
                       <p className="text-ink text-sm font-medium">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">
                         チャネル {account.channelId}
-                        {account.country ? ` ・ ${account.country}` : ''}
+                        {` ・ ${account.timezone ?? 'Asia/Tokyo'}`}
                       </p>
                     </td>
                     <td className="px-4 py-3">
@@ -191,6 +202,7 @@ export default function AccountsPage() {
                       <Link href={`/accounts/detail?id=${account.id}`} className="text-action text-sm hover:underline">
                         詳細
                       </Link>
+                      <span className="text-ink-faint ml-4" aria-hidden>•••</span>
                     </td>
                   </tr>
                 )
@@ -207,15 +219,7 @@ export default function AccountsPage() {
         <p className="text-ink text-sm font-bold">ここで見えること</p>
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           接続状態は、送受信ができる状態かどうか。Webhook は、LINE側に登録した受け口がこのシステムと合っているかどうかです。
-          合っていないと、友だちからのメッセージが届きません。
-        </p>
-        {/*
-          **出す＝使える。** 既定・アーカイブ・並び順と親子は、まだ口が無い。
-          押し口を置かず、理由を本文で言う（`v6-common-rules.md` §7-10）。
-        */}
-        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          並び順と親子の変更は、保存する画面がまだ繋がっていません。友だち数と既定は、
-          一覧APIから値が届いたアカウントだけ表示します。
+          合っていないと、友だちからのメッセージが届きません。アーカイブしたアカウントは記録が残り、送受信だけを止めます。
         </p>
       </div>
     </div>
