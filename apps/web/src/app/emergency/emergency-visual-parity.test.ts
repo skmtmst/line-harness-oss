@@ -18,10 +18,10 @@ describe('V6 機能32 運用状態の表示確認', () => {
     // （題は `sr-only` で残る）。見出しの文字階層はこの下の節から。
     expect(source).toContain('<PageHeader')
     expect(visible).not.toMatch(/<h1[\s>]/)
-    expect(source).toContain('text-base font-bold text-gray-900">チェック結果')
-    expect(source).toContain('text-base font-bold text-gray-900">緊急停止')
-    expect(source).toContain('text-base font-bold text-blue-900">復旧')
-    expect(source).toContain('text-base font-bold text-gray-900">止めた・戻した記録')
+    expect(source).toContain('text-base font-bold text-ink">チェック結果')
+    expect(source).toContain('text-base font-bold text-ink">緊急停止')
+    expect(source).toContain('text-base font-bold text-info">復旧')
+    expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
     expect(source).toContain('text-[11px] font-bold')
   })
 
@@ -56,7 +56,7 @@ describe('V6 機能32 運用状態の表示確認', () => {
     }
     expect(source).not.toContain('label="今月の配信残数"')
     expect(source).toContain('いますぐ確かめる')
-    expect(source).toContain('緊急コントロールへ')
+    expect(source).toContain('緊急停止を確認')
     expect(source).toContain('aria-label="判定の見方"')
   })
 
