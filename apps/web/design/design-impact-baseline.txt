@@ -106,6 +106,7 @@ shared-button-importer components/friend-fields/support-mark-rules-panel.tsx
 shared-button-importer components/friend-fields/tag-csv-import-dialog.tsx
 shared-button-importer components/friend-fields/tag-editor-v4.tsx
 shared-button-importer components/friend-fields/tags-page-v4.tsx
+shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friends/advanced-search-dialog.tsx
 shared-button-importer components/friends/bulk-run-dialog.tsx
 shared-button-importer components/hq/account-list.tsx
