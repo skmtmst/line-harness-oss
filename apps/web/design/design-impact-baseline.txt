@@ -71,6 +71,8 @@ shared-button-importer app/reminders/new/page.tsx
 shared-button-importer app/reminders/page.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
+shared-button-importer app/rich-menus/new/page.tsx
+shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx

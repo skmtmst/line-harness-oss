@@ -32,7 +32,6 @@ import {
 import {
   compareTargetingGroups,
   moveTargetingGroup,
-  orderTargetingGroups,
 } from './targeting-order'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
@@ -79,9 +78,11 @@ function richMenuError(error: unknown, action: RichMenuAction): string {
  * 定義した。数えられない言葉を画面に置くと、押しても何も起きない。
  */
 const SAVED_FILTERS: { key: string; label: string; note: string }[] = [
-  { key: 'used', label: 'よく使う', note: '今月1回以上押されたメニュー' },
-  { key: 'published', label: '公開中のみ', note: 'LINE に登録済みのメニュー' },
-  { key: 'draft', label: '下書きのみ', note: 'まだ LINE に登録していないメニュー' },
+  { key: '', label: 'すべて', note: 'すべてのメニュー' },
+  { key: 'published', label: '公開中', note: 'いまLINEで公開しているメニュー' },
+  { key: 'scheduled', label: '予約', note: '公開日時を予約したメニュー' },
+  { key: 'draft', label: '下書き', note: 'まだLINEで公開していないメニュー' },
+  { key: 'targeting', label: '条件で出し分け', note: '出す相手の条件を指定したメニュー' },
 ]
 
 type RichMenuGroupListItem = {
@@ -90,6 +91,7 @@ type RichMenuGroupListItem = {
   chatBarText: string
   size: 'large' | 'compact'
   status: 'draft' | 'published'
+  publishingAt: string | null
   isDefaultForAll: boolean
   targetingEnabled: boolean
   targetingCondition: string | null
@@ -479,8 +481,9 @@ export default function RichMenusListPage() {
   const inSaved = inFolder.filter((g) => {
     if (reordering) return true
     if (savedFilter === 'published') return g.status === 'published'
-    if (savedFilter === 'draft') return g.status === 'draft'
-    if (savedFilter === 'used') return (tapsByGroup.get(g.id) ?? 0) > 0
+    if (savedFilter === 'scheduled') return Boolean(g.publishingAt)
+    if (savedFilter === 'draft') return g.status === 'draft' && !g.publishingAt
+    if (savedFilter === 'targeting') return g.targetingEnabled && Boolean(g.targetingCondition)
     return true
   })
 
@@ -499,11 +502,6 @@ export default function RichMenusListPage() {
     }
   })
 
-  const priorityRankByGroup = new Map(
-    orderTargetingGroups(groups)
-      .map((group, index) => [group.id, index + 1]),
-  )
-
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const shownGroups = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -513,7 +511,7 @@ export default function RichMenusListPage() {
   }, [folderFilter, pageSize, query, savedFilter, sortKey])
 
   return (
-    <main data-design-node="GO8RQ" className="p-6 max-w-7xl mx-auto">
+    <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
       {showExternal && selectedAccount ? (
         <div className="bg-canvas-sunken fixed top-14 right-0 bottom-0 left-64 z-40 overflow-y-auto p-6">
           <ExternalImportWorkspace
@@ -588,36 +586,18 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
-        <Link
-          href="/rich-menus/new"
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-        >
-          メニューを作る
-        </Link>
         <button
           onClick={() => setFolderDialogOpen(true)}
           className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
         >
           フォルダを追加
         </button>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="メニュー名で検索"
-          aria-label="メニュー名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <SelectField
-          size="compact"
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          options={[{ value: '20', label: '20件' }, { value: '50', label: '50件' }, { value: '100', label: '100件' }]}
-        />
+        <Link
+          href="/rich-menus/new"
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+        >
+          メニューを作る
+        </Link>
         <button
           onClick={() => {
             // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
@@ -634,6 +614,24 @@ export default function RichMenusListPage() {
         >
           {reordering ? '並び替えを終える' : '出す順番を変える'}
         </button>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="メニュー名・ボタン名で検索"
+          aria-label="メニュー名・ボタン名で検索"
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
+        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+        <SelectField
+          size="compact"
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          aria-label="表示件数"
+          options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
+        />
       </div>
 
       <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
@@ -642,7 +640,7 @@ export default function RichMenusListPage() {
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+        <span className="text-ink-faint text-xs whitespace-nowrap">保存した検索</span>
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key
           return (
@@ -677,25 +675,6 @@ export default function RichMenusListPage() {
         </div>
       )}
 
-      {selectedAccount && loading && (
-        <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
-      )}
-
-      {selectedAccount && !loading && error && (
-        <ListState
-          kind="error"
-          title="表示できませんでした"
-          description="再読み込みしても直らないときは、エラー報告へお知らせください。"
-          onRetry={() => void reload()}
-        />
-      )}
-
-      {selectedAccount && !loading && externalError && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded mb-6">
-          {externalError}
-        </div>
-      )}
-
       {folderDialogOpen && (
         <FolderAddDialog
           kind="rich_menu"
@@ -706,19 +685,10 @@ export default function RichMenusListPage() {
         />
       )}
 
-      {selectedAccount && !loading && !error && shownGroups.length === 0 && (
-        <ListState
-          kind="empty"
-          title="まだリッチメニューがありません"
-          description="トークの下に出すメニューを作れます。"
-          action={<Button href="/rich-menus/new" variant="primary">メニューを作る</Button>}
-        />
-      )}
-
-      {selectedAccount && !loading && !error && (
+      {selectedAccount && (
         <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
           <FolderPanel
-            total={`${groups.length} 件`}
+            total={`${folders.length + 1}`}
             activeId={folderFilter}
             onSelect={setFolderFilter}
             rows={[
@@ -740,142 +710,100 @@ export default function RichMenusListPage() {
               フォルダを消しても、入っていたメニューは未分類として残ります。
             </p>
           </FolderPanel>
+          <div className="min-w-0">
+            {loading ? (
+              <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
+            ) : error ? (
+              <ListState
+                kind="error"
+                title="表示できませんでした"
+                description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+                onRetry={() => void reload()}
+              />
+            ) : shownGroups.length === 0 ? (
+              <ListState
+                kind="empty"
+                title="まだリッチメニューがありません"
+                description="トークの下に出すメニューを作れます。"
+                action={<Button href="/rich-menus/new" variant="primary">メニューを作る</Button>}
+              />
+            ) : (
+              <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
+                <table className="w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '17%' }} />
+                  </colgroup>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>メニュー</Th>
+                      <Th>状態</Th>
+                      <Th>誰に出るか</Th>
+                      <Th align="right">今月のタップ</Th>
+                      <Th>更新</Th>
+                      <Th>操作</Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody className="divide-hairline divide-y">
+                    {shownGroups.map((g) => (
+                      <tr key={g.id} className="h-[76px] align-middle">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {reordering ? (
+                              <div className="flex shrink-0 gap-1">
+                                <button type="button" onClick={() => void moveGroup(g, -1)} disabled={reorderBusy} aria-label={`${g.name}を上へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↑</button>
+                                <button type="button" onClick={() => void moveGroup(g, 1)} disabled={reorderBusy} aria-label={`${g.name}を下へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↓</button>
+                              </div>
+                            ) : null}
+                            <div className="min-w-0">
+                              <Link href={`/rich-menus/edit?id=${g.id}`} className="text-ink block truncate font-semibold hover:underline" title={g.name}>{g.name}</Link>
+                              <p className="text-ink-faint mt-1 truncate text-xs" title={g.chatBarText}>
+                                {g.size === 'large' ? '大 2500 × 1686px' : '小 2500 × 843px'}・ボタン「{g.chatBarText}」
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {g.publishingAt ? <span className="text-warning text-xs font-semibold">{new Date(g.publishingAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} に公開</span> : <StatusBadge status={g.status} />}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-ink-secondary">
+                          {g.isDefaultForAll ? 'すべての友だち（既定）' : g.targetingEnabled && g.targetingCondition ? '条件で出し分け' : g.status === 'draft' ? '公開前' : 'すべての友だち'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <p className="text-ink font-semibold tabular-nums">{tapStats ? `${(tapsByGroup.get(g.id) ?? 0).toLocaleString('ja-JP')}回` : '—'}</p>
+                          <p className="text-ink-faint mt-1 text-micro">のべ人数は未取得</p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
+                          {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                            {g.status === 'published' ? <button type="button" onClick={() => setApplyTo(g)} className="text-action font-semibold hover:underline">表示先</button> : null}
+                            <Link href={`/rich-menus/edit?id=${g.id}`} className="text-action font-semibold hover:underline">編集</Link>
+                            <Link href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`} className="text-ink-secondary hover:underline">切替のつながりを見る</Link>
+                            <button type="button" onClick={() => handleDelete(g)} data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'} className="text-danger hover:underline" title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}>削除</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {shownGroups.map((g) => (
-            <div
-              key={g.id}
-              className="bg-white border border-hairline rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col"
-            >
-              <Link
-                href={`/rich-menus/edit?id=${g.id}`}
-                className="flex-1 hover:bg-canvas-sunken rounded-t-lg overflow-hidden"
-              >
-                {/* thumbnail */}
-                <div
-                  className="w-full bg-canvas-sunken border-b border-hairline"
-                  style={{
-                    aspectRatio: g.size === 'large' ? '2500 / 1686' : '2500 / 843',
-                  }}
-                >
-                  {g.thumbnailR2Key ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={api.richMenuGroups.imageUrl(g.thumbnailR2Key)}
-                      alt={g.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-faint">
-                      画像未設定
-                    </div>
-                  )}
-                </div>
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-2 gap-2">
-                    <h2 className="font-semibold text-ink truncate">{g.name}</h2>
-                    <StatusBadge status={g.status} />
-                  </div>
-                  <p className="text-sm text-ink-faint truncate">
-                    トーク表示: <span className="text-ink-secondary">{g.chatBarText}</span>
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-                    <span className="whitespace-nowrap">
-                      出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
-                    </span>
-                    <span className="whitespace-nowrap">
-                      サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}
-                    </span>
-                    {tapStats && (
-                      <span className="whitespace-nowrap">
-                        今月 <span className="text-ink-secondary tabular-nums">
-                          {tapsByGroup.get(g.id) ?? 0}
-                        </span> 回
-                      </span>
-                    )}
-                    {g.targetingEnabled && g.targetingCondition && (
-                      <span className="text-accent font-medium whitespace-nowrap">条件で出し分け</span>
-                    )}
-                    {g.isDefaultForAll && (
-                      <span className="text-blue-600 font-medium whitespace-nowrap">
-                        ★ 全員のデフォルト
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-              {reordering && (
-                <div className="border-hairline bg-canvas-sunken flex items-center justify-between gap-2 border-t px-4 py-2">
-                  <span className="text-ink-faint text-[11px]">
-                    出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
-                  </span>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => void moveGroup(g, -1)}
-                      disabled={reorderBusy}
-                      className="border-hairline rounded-control hover:bg-canvas border px-2 py-0.5 text-xs disabled:opacity-40"
-                      aria-label="上へ"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => void moveGroup(g, 1)}
-                      disabled={reorderBusy}
-                      className="border-hairline rounded-control hover:bg-canvas border px-2 py-0.5 text-xs disabled:opacity-40"
-                      aria-label="下へ"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </div>
-              )}
-              <div className="border-t border-hairline px-4 py-2.5 flex justify-end gap-4 text-xs">
-                {g.status === 'published' && (
-                  <button
-                    onClick={() => setApplyTo(g)}
-                    className="text-accent font-medium hover:underline"
-                  >
-                    友だちに表示
-                  </button>
-                )}
-                <Link
-                  href={`/rich-menus/edit?id=${g.id}`}
-                  className="text-ink-secondary hover:underline"
-                >
-                  編集
-                </Link>
-                <Link
-                  href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`}
-                  className="text-ink-secondary hover:underline"
-                >
-                  切替のつながりを見る
-                </Link>
-                <button
-                  onClick={() => handleDelete(g)}
-                  data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'}
-                  className="text-ink-faint hover:text-red-600 hover:underline"
-                  title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
-                >
-                  削除
-                </button>
+            {!loading && !error && sorted.length > 0 ? (
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <p className="text-ink-faint text-xs">
+                  {sorted.length}件中 {(currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, sorted.length)}件を表示
+                </p>
+                <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
               </div>
-            </div>
-          ))}
+            ) : null}
           </div>
-        </div>
-      )}
-
-      {selectedAccount && !loading && !error && sorted.length > 0 && (
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <p className="text-ink-faint text-xs">
-            {(currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, sorted.length)}件 / 全{sorted.length}件
-          </p>
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            ariaLabel="リッチメニューのページ送り"
-          />
         </div>
       )}
 
@@ -1075,7 +1003,7 @@ function ExternalImportWorkspace({
   const areas = selected ? Array.from({ length: Math.min(selected.areasCount, 6) }, (_, index) => String.fromCharCode(65 + index)) : []
 
   return (
-    <div data-design-node="TL7tp" className="mx-auto max-w-7xl">
+    <div data-design-node="TL7tp" className="mx-auto max-w-[1584px]">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs">
           <button type="button" className="text-action hover:underline" onClick={onBack}>リッチメニュー</button>

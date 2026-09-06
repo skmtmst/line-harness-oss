@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import StepTrail from '@/components/shared/step-trail'
@@ -33,6 +32,26 @@ const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint
     hint: 'トークが隠れにくい。横に並べる形',
   },
 ]
+
+const LARGE_TEMPLATE_ORDER = [
+  'large-full',
+  'large-1x2-v',
+  'large-1x2-h',
+  'large-1plus2',
+  'large-2x2',
+  'large-2plus1',
+  'large-2x3',
+] as const
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  'large-full': '1面',
+  'large-1x2-v': '上下2面',
+  'large-1x2-h': '左右2面',
+  'large-1plus2': '上1・下2',
+  'large-2x2': '4面',
+  'large-2plus1': '上2・下1',
+  'large-2x3': '6面',
+}
 
 /**
  * 面の分けかたを図で見せる。
@@ -105,7 +124,13 @@ export default function NewRichMenuPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const shownTemplates = useMemo(() => TEMPLATES.filter((t) => t.size === size), [size])
+  const shownTemplates = useMemo(() => {
+    const bySize = TEMPLATES.filter((template) => template.size === size)
+    if (size === 'compact') return bySize
+    return LARGE_TEMPLATE_ORDER
+      .map((key) => bySize.find((template) => template.key === key))
+      .filter((template): template is RichMenuTemplate => Boolean(template))
+  }, [size])
   const tmpl = shownTemplates.find((t) => t.key === templateKey) ?? shownTemplates[0]
 
   useEffect(() => {
@@ -155,7 +180,7 @@ export default function NewRichMenuPage() {
   }
 
   return (
-    <main data-design-node="XtfO3" className="mx-auto max-w-4xl p-6">
+    <main data-design-node="XtfO3" className="mx-auto max-w-[1584px] p-6">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー
@@ -163,10 +188,6 @@ export default function NewRichMenuPage() {
         <span className="mx-1.5">/</span>
         <span>新規作成</span>
       </nav>
-
-      <div data-design="Head">
-        <Header />
-      </div>
 
       {/*
         **段を出す。**この画面で全部決めるのか、まだ続きがあるのかが
@@ -184,8 +205,10 @@ export default function NewRichMenuPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="border-hairline bg-canvas rounded-card mt-4 space-y-6 border p-6 shadow-sm"
+        className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]"
       >
+        <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_260px]">
         <div>
           <label className="text-ink-secondary mb-1 block text-sm font-medium">
             メニュー名{' '}
@@ -232,6 +255,7 @@ export default function NewRichMenuPage() {
           <p className="text-ink-faint mt-1 text-xs">
             トークの下に出る文字。14字まで
           </p>
+        </div>
         </div>
 
         <div>
@@ -285,13 +309,13 @@ export default function NewRichMenuPage() {
           <p className="text-ink-faint mb-3 text-xs">
             押せるところをいくつに分けるか。あとから編集画面で区切り直せます。
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
             {shownTemplates.map((t) => {
               const active = templateKey === t.key
               return (
                 <label
                   key={t.key}
-                  className={`rounded-card cursor-pointer border p-3 transition-colors ${
+                  className={`rounded-control cursor-pointer border p-2 transition-colors ${
                     active
                       ? 'border-accent bg-accent-soft'
                       : 'border-hairline hover:bg-canvas-sunken'
@@ -306,19 +330,28 @@ export default function NewRichMenuPage() {
                     className="sr-only"
                   />
                   <TemplatePreview template={t} />
-                  <div className="text-ink mt-2 text-xs font-medium">{t.label}</div>
-                  {t.description && (
-                    <p className="text-ink-faint mt-0.5 text-[11px] leading-snug">
-                      {t.description}
-                    </p>
-                  )}
+                  <div className="text-ink mt-1 text-center text-xs font-medium">{TEMPLATE_LABELS[t.key] ?? t.label}</div>
                 </label>
               )
             })}
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <section>
+            <h2 className="text-ink-secondary text-sm font-medium">トークを開いたとき</h2>
+            <p className="text-ink-faint mt-2 text-xs leading-5">
+              メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。
+            </p>
+          </section>
+          <section>
+            <h2 className="text-ink-secondary text-sm font-medium">画像</h2>
+            <Button href="/contents" className="mt-2">登録メディアから選ぶ</Button>
+            <p className="text-ink-faint mt-2 text-xs">2500 × 1686px ／ 1MBまで・JPG・PNG</p>
+            <p className="text-ink-faint mt-1 text-micro">選んだ画像は下書き保存後の編集画面で登録します。</p>
+          </section>
+        </div>
+
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">
             <h2 className="text-ink mb-3 text-sm font-bold">押した面ごとの動き</h2>
             <div className="space-y-2">
@@ -330,9 +363,15 @@ export default function NewRichMenuPage() {
                 </div>
               ))}
             </div>
-            <p className="text-danger mt-3 text-xs font-semibold">面ごとのアクションは作成後の編集画面で設定します。未設定の面は、押しても何も起きません。</p>
+            <p className="text-danger mt-3 text-xs font-semibold">
+              {tmpl.areas.length > 0
+                ? `面 ${String.fromCharCode(64 + tmpl.areas.length)} のアクションが未設定です。公開すると、その場所を押しても何も起きません。`
+                : '面を追加し、公開前にそれぞれのアクションを設定してください。'}
+            </p>
           </section>
-          <aside className="space-y-3">
+        </div>
+
+          <aside className="sticky top-20 space-y-3">
             <section className="bg-info rounded-card p-4 text-on-accent">
               <h2 className="mb-3 text-center text-sm font-bold">LINEプレビュー</h2>
               <p className="bg-canvas text-ink mb-1 rounded-t-control py-2 text-center text-xs">{chatBarText || 'メニュー'}</p>
@@ -345,28 +384,29 @@ export default function NewRichMenuPage() {
               <p>・切替メニューの移動先は、公開してからでないと動きません</p>
             </section>
           </aside>
-        </div>
 
         {error && (
-          <div className="bg-danger-bg text-danger rounded-control border border-red-200 p-3 text-sm">
+          <div className="bg-danger-bg text-danger rounded-control border border-red-200 p-3 text-sm lg:col-span-2">
             {error}
           </div>
         )}
 
-        <StickyBar
-          actions={(
-            <>
-              <Button href="/rich-menus">キャンセル</Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={submitting || !selectedAccount}
-              >
-                {submitting ? '作成中...' : '下書きに保存して次へ'}
-              </Button>
-            </>
-          )}
-        />
+        <div className="lg:col-span-2">
+          <StickyBar
+            actions={(
+              <>
+                <Button href="/rich-menus">キャンセル</Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={submitting || !selectedAccount}
+                >
+                  {submitting ? '作成中...' : '下書きに保存して次へ'}
+                </Button>
+              </>
+            )}
+          />
+        </div>
       </form>
     </main>
   )

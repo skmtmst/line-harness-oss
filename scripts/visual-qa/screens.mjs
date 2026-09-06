@@ -1485,10 +1485,16 @@ export const SCREENS = [
     突き合わせる形にする。
   */
   { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー',
+    mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。1440・1920で撮った（はみ出し0）。**優先順位の説明（設計「上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、いちばん上の1つだけが出ます。」）が無い。** 実装だけにある帯が3行（「LINE 公式アカウントの現状」「LINE 上に登録されているメニュー」「LINE 公式アカウントにはまだ rich menu が登録されていません。」）で、**最後の1行に内部語 `rich menu` が出ている。** 取得元 `rich-menus-v6/GO8RQ.txt`',
     verdictHead: '49e1341c', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
+    mode: 'viewport', height: 1200,
+    steps: [
+      { fill: 'メニュー名', text: '通常メニュー（会員向け）' },
+      { fill: 'メニューを開くボタンの文字', text: 'メニュー' },
+    ],
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/new`。**3段のステッパー（STEP 1〜3）が無い。** 面の分け方の記号（A〜F）、トークの下に出る文字の説明（14字まで）、寸法（大 2500 × 1686px／小 2500 × 843px）、LINEプレビュー、公開前の注意（「面 F のアクションが未設定です。」）が無い。言い方も設計と違う（設計「上下2面」／実装「上下2分割」）。取得元 `rich-menus-v6/XtfO3.txt`',
     verdictHead: '49e1341c', route: '/rich-menus/new', },
@@ -1530,6 +1536,8 @@ export const SCREENS = [
       { fill: '出しおわり', text: '2026-09-30T23:59' },
     ], },
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む',
+    mode: 'viewport', height: 1080,
+    steps: [{ qaOpen: 'TL7tp' }],
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/connections`（管理画面の外のメニューを取り込む）。**「LINEから読み直す」と、面ごとの動きの一覧（設計「A：URLを開く（https://example.co.jp/menu）」など）が無い。** 取り込まずに消したときの注意（「お客さまのメニューがすぐ消えます」）も無い。内部語 `rich menu` が帯に出る。取得元 `rich-menus-v6/TL7tp.txt`',
     verdictHead: '49e1341c', },
@@ -1548,6 +1556,7 @@ export const SCREENS = [
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
+    mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**失敗のとき「公開中 —・一覧を取得できませんでした」と、未取得の `—` と失敗の文が同じ行に並ぶ。** 設計の優先順位の説明も無い。取得元 `rich-menus-v6/RW5Tb-*.txt`',
     verdictHead: '49e1341c',
