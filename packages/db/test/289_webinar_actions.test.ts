@@ -49,6 +49,19 @@ describe('289 webinar actions and archive safety', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM webinar_actions').get()).toEqual({ count: 2 });
   });
 
+  test('全アクションを外した後に再追加しても版番号を巻き戻さない', async () => {
+    await replaceWebinarActions(db, 'webinar-1', [{
+      trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-1' },
+    }]);
+    await replaceWebinarActions(db, 'webinar-1', []);
+    const active = await replaceWebinarActions(db, 'webinar-1', [{
+      trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-2' },
+    }]);
+
+    expect(active[0]).toMatchObject({ version: 2, enabled: 1 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM webinar_actions').get()).toEqual({ count: 2 });
+  });
+
   test('実行キーの重複をDBで拒否する', () => {
     sqlite.prepare(`INSERT INTO friends (id) VALUES ('friend-1')`).run();
     sqlite.prepare(`INSERT INTO webinar_actions

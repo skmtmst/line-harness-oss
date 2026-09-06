@@ -1294,6 +1294,18 @@ describe('admin CRUD', () => {
     expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
   });
 
+  test('視聴後アクションは参照先IDが空の設定を拒否する', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    const res = await adminReq('/api/webinars/w1/actions', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: '  ' } }],
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
+  });
+
   test('参加者CSVは個人データを式として実行させず書き出す', async () => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
     dbMocks.getWebinarParticipantStats.mockResolvedValue([{

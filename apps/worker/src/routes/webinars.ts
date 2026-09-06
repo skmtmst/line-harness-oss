@@ -759,6 +759,17 @@ const WEBINAR_ACTION_TYPES = new Set<WebinarActionType>([
   'switch_rich_menu', 'remove_rich_menu',
 ]);
 
+function requiredWebinarActionConfigKey(type: WebinarActionType): string | null {
+  if (type === 'add_tag' || type === 'remove_tag') return 'tagId';
+  if (type === 'start_scenario' || type === 'stop_scenario' || type === 'resume_scenario') {
+    return 'scenarioId';
+  }
+  if (type === 'send_message') return 'templateId';
+  if (type === 'send_webhook') return 'webhookId';
+  if (type === 'switch_rich_menu') return 'richMenuPageId';
+  return null;
+}
+
 function serializeWebinarAction(row: Awaited<ReturnType<typeof getWebinarActions>>[number]) {
   let config: Record<string, unknown> = {};
   try { config = JSON.parse(row.config_json) as Record<string, unknown>; } catch { config = {}; }
@@ -781,10 +792,16 @@ function parseWebinarActions(value: unknown): WebinarActionInput[] | null {
     if (!['completed', 'cta_clicked', 'unviewed'].includes(String(row.trigger))) return null;
     if (!WEBINAR_ACTION_TYPES.has(row.actionType as WebinarActionType)) return null;
     if (!row.config || typeof row.config !== 'object' || Array.isArray(row.config)) return null;
+    const actionType = row.actionType as WebinarActionType;
+    const config = row.config as Record<string, unknown>;
+    const requiredKey = requiredWebinarActionConfigKey(actionType);
+    if (requiredKey && (typeof config[requiredKey] !== 'string' || !config[requiredKey].trim())) {
+      return null;
+    }
     parsed.push({
       trigger: row.trigger as WebinarActionInput['trigger'],
-      actionType: row.actionType as WebinarActionType,
-      config: row.config as Record<string, unknown>,
+      actionType,
+      config,
     });
   }
   return parsed;

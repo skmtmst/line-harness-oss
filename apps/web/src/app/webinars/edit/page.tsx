@@ -974,9 +974,13 @@ function WebinarActionsTab({ webinarId }: { webinarId: string }) {
           const referenceKey = actionReferenceKey(action.actionType)
           return (
             <div key={action.id ?? `${trigger}-${index}`} className="bg-canvas grid gap-3 p-4 md:grid-cols-[260px_minmax(0,1fr)_auto] md:items-center">
-              <select value={action.actionType} onChange={(event) => update(index, { actionType: event.target.value as WebinarAction['actionType'], config: {} })} className="border-hairline rounded-control border px-3 py-2 text-sm">
-                {Object.entries(ACTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              <SelectField
+                value={action.actionType}
+                onChange={(event) => update(index, { actionType: event.target.value as WebinarAction['actionType'], config: {} })}
+                aria-label="実行するアクション"
+                options={Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))}
+                className="border-hairline rounded-control border px-3 py-2 text-sm"
+              />
               {referenceKey ? <input value={String(action.config[referenceKey] ?? '')} onChange={(event) => update(index, { config: { [referenceKey]: event.target.value } })} placeholder={`${referenceKey}を入力`} className="border-hairline rounded-control border px-3 py-2 text-sm" /> : <span className="text-ink-faint text-xs">追加設定はありません</span>}
               <button type="button" onClick={() => remove(index)} className="text-danger text-sm">外す</button>
             </div>

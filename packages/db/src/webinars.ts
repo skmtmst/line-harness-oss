@@ -334,8 +334,13 @@ export async function replaceWebinarActions(
   actions: WebinarActionInput[],
 ): Promise<WebinarAction[]> {
   const now = jstNow();
-  const current = await getWebinarActions(db, webinarId);
-  const nextVersion = current.reduce((max, item) => Math.max(max, item.version), 0) + 1;
+  // 有効な行をすべて外した後でも版番号を巻き戻さない。旧版との UNIQUE
+  // 衝突を避けるだけでなく、実行履歴から設定変更の順序を追えるようにする。
+  const latest = await db
+    .prepare('SELECT COALESCE(MAX(version), 0) AS version FROM webinar_actions WHERE webinar_id = ?')
+    .bind(webinarId)
+    .first<{ version: number }>();
+  const nextVersion = Number(latest?.version ?? 0) + 1;
   const statements = [
     db.prepare('UPDATE webinar_actions SET enabled = 0, updated_at = ? WHERE webinar_id = ? AND enabled = 1')
       .bind(now, webinarId),
