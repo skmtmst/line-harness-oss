@@ -8,6 +8,7 @@ import {
   upsertManualLink,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 /**
  * マニュアルの正本表。設計 ★V6 34-4（`f9oUm`）。台帳 #134。
@@ -172,8 +173,9 @@ async function update(c: AppContext, pathKey?: string) {
   }
 }
 
-manualLinks.put('/api/manual-links', (c) => update(c));
-manualLinks.put('/api/manual-links/:key', (c) => update(c, c.req.param('key')));
+manualLinks.put('/api/manual-links', requireRole('owner', 'admin', 'staff'), (c) => update(c));
+manualLinks.put('/api/manual-links/:key', requireRole('owner', 'admin', 'staff'), (c) =>
+  update(c, c.req.param('key')));
 
 /**
  * いま全部を確かめる。
@@ -181,7 +183,7 @@ manualLinks.put('/api/manual-links/:key', (c) => update(c, c.req.param('key')));
  * **開けたかどうかを、確かめて初めて言う。** URL が入っているだけでは
  * 「開けます」と書かない。読めなかったものは `broken` にして手がかりを残す。
  */
-manualLinks.post('/api/manual-links/check', async (c) => {
+manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     if (!canOperate(c)) return forbidden(c);
     const rows = await listManualLinks(c.env.DB);
