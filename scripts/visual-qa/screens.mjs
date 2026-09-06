@@ -2602,7 +2602,7 @@ export const SCREENS = [
       /* 運営キャンセルは確定の行にしか出ないので、先に札を切り替える。 */
       { suffix: '-cancel', steps: [{ click: '確定', after: 800 }, { qaOpen: 'i5SN2j-cancel', after: 900 }] },
     ],
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #242 / PR #1015 / UI HEAD c31b32f90 を3105/8792で最終照合。構造一致・一部データ待ち。** イベント名を上部へ反映し、申込者・申込日時・予約枠・ペット・来店情報・状態と操作を1行で比較できる表へ整理した。キャンセル待ち人数も専用APIへ接続し、通常・読込・空・失敗と運営キャンセルを1440・1920pxで確認、横スクロール0。日時欠落は Invalid Date にせず未取得と表示する。実Workerは同伴ペット・初回来店を返さないため一致にはしない。拒否ダイアログは画面側に実装済みだが、Claude所有の撮影固定データに requested 行が無く今回だけ撮影不可。', verdictSource: 'events-v6/i5SN2j-normal.txt + i5SN2j-cancel.txt + 2026-09-06 screenshots', verdictHead: 'c31b32f90',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #371 / 統合 #1110 の固定データを3105/8792で再撮影し一致判定。** 承認待ちの申込者、申込日時、予約枠、同伴ペット、初回来店、状態と操作を1行で確認し、以前不足していた拒否ダイアログも撮影できた。通常・読込・空・失敗・拒否・運営キャンセルの全14枚を撮り分け、1440・1920pxとも横はみ出し0。日時欠落は Invalid Date にせず未取得と表示し、拒否理由は内部記録、運営キャンセルはLINE通知とリマインダ停止を事前確認できる。', verdictSource: 'events-v6/i5SN2j-normal.txt + events-v6/i5SN2j-reject.txt + events-v6/i5SN2j-cancel.txt + 2026-09-07 screenshots', verdictHead: '9889bca8b',
   },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
