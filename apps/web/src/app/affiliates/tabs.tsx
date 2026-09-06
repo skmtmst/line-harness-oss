@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
@@ -224,6 +224,13 @@ export function AffiliatorsTab() {
   const [rows, setRows] = useState<AffiliateListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [approvalItems, setApprovalItems] = useState<ConversionApprovalItem[]>([])
+  const [approvalState, setApprovalState] = useState<ConfirmedState>('loading')
+  const [query, setQuery] = useState('')
+  const [filters, setFilters] = useState<Array<'active' | 'inactive' | 'reward'>>([])
+  const [sort, setSort] = useState<'newest' | 'name' | 'reward'>('newest')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
 
   // ── selected affiliate (detail panel) ─────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -284,6 +291,26 @@ export function AffiliatorsTab() {
   }, [])
 
   useEffect(() => { void loadList() }, [loadList])
+
+  useEffect(() => {
+    let cancelled = false
+    setApprovalState('loading')
+    void Promise.all([
+      api.conversionApprovals.list({ status: 'pending', limit: 200 }),
+      api.conversionApprovals.list({ status: 'approved', limit: 200 }),
+    ]).then(([pending, approved]) => {
+      if (cancelled) return
+      if (!pending.success || !approved.success) {
+        setApprovalState('error')
+        return
+      }
+      setApprovalItems([...pending.data, ...approved.data])
+      setApprovalState('ready')
+    }).catch(() => {
+      if (!cancelled) setApprovalState('error')
+    })
+    return () => { cancelled = true }
+  }, [])
 
   // ── load detail (report v2 + links) ────────────────────────────────────────
   const loadDetail = useCallback(async (id: string) => {
@@ -354,19 +381,181 @@ export function AffiliatorsTab() {
     void loadJourneys(id)
   }, [selectedId, loadDetail, loadJourneys])
 
+  const shownRows = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('ja-JP')
+    return rows
+      .filter((row) => {
+        if (needle && !`${row.name} ${row.code}`.toLocaleLowerCase('ja-JP').includes(needle)) {
+          return false
+        }
+        if (filters.length === 0) return true
+        return filters.some((filter) => {
+          if (filter === 'active') return row.isActive
+          if (filter === 'inactive') return !row.isActive
+          return row.rewardAmount > 0
+        })
+      })
+      .toSorted((a, b) => {
+        if (sort === 'name') return a.name.localeCompare(b.name, 'ja-JP')
+        if (sort === 'reward') return b.rewardAmount - a.rewardAmount
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+  }, [filters, query, rows, sort])
+
+  const listPageCount = pageCountOf(shownRows.length, pageSize)
+  const currentPage = Math.min(page, listPageCount)
+  const pagedRows = pageOf(shownRows, currentPage, pageSize)
+  const approvedThisMonth = confirmedThisMonth(approvalItems)
+  const approvedTotals = confirmedTotals(approvedThisMonth)
+  const pendingItems = approvalItems.filter((item) => item.approvalStatus === 'pending')
+  const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
+  const funnel = {
+    clicks: rows.reduce((sum, row) => sum + row.totalClicks, 0),
+    friends: rows.reduce((sum, row) => sum + row.friendAdds, 0),
+    conversions: rows.reduce((sum, row) => sum + row.totalConversions, 0),
+    approved: approvedThisMonth.length,
+  }
+
+  const exportAffiliatesCsv = () => {
+    const header = ['名前', '紹介コード', '紹介リンク数', '友だち追加', '成果', '承認済み報酬']
+    const cells = shownRows.map((row) => [
+      row.name,
+      row.code,
+      row.linkCount,
+      row.friendAdds,
+      row.totalConversions,
+      Math.round(row.rewardAmount),
+    ])
+    const escape = (value: string | number) => {
+      const text = String(value)
+      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+    }
+    const csv = [header, ...cells].map((line) => line.map(escape).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `affiliates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div data-design-node="PouPn" data-affiliate-design="v6">
-      <div className="mb-4 flex justify-end">
-        <Button
-          variant="primary"
-          onClick={() => setCreateOpen(true)}
-        >
+      <NoteBar>
+        紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
+      </NoteBar>
+
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="今月の成果"
+          value={confirmedValue(approvalState, approvedTotals.count)}
+          unit={confirmedUnit(approvalState, '件')}
+          detail={confirmedDetail(approvalState, '今月に承認した成果')}
+          loading={approvalState === 'loading'}
+        />
+        <KpiCard
+          title="承認待ち"
+          value={confirmedValue(approvalState, pendingItems.length)}
+          unit={confirmedUnit(approvalState, '件')}
+          detail={confirmedDetail(approvalState, `合計 ${formatYen(pendingYen)}（直近最大200件）`)}
+          loading={approvalState === 'loading'}
+        />
+        <KpiCard
+          title="承認済み報酬の合計"
+          value={confirmedValue(approvalState, approvedTotals.yen)}
+          unit={confirmedUnit(approvalState, '円')}
+          detail={confirmedDetail(approvalState, '今月に承認した分。支払い済みかは含みません')}
+          loading={approvalState === 'loading'}
+        />
+        <KpiCard
+          title="未払い残高"
+          value={null}
+          unit=""
+          detail="支払い台帳が接続されると表示されます"
+        />
+      </div>
+
+      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-label="今月の成果の流れ">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-ink text-sm font-semibold">今月の成果の流れ</h3>
+          <span className="text-ink-faint text-xs">全期間の計測値と今月の承認数</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {[
+            ['クリック', funnel.clicks],
+            ['友だち追加', funnel.friends],
+            ['成果', funnel.conversions],
+            ['今月承認', funnel.approved],
+          ].map(([label, value]) => (
+            <div key={label} className="bg-canvas-sunken rounded-control px-3 py-2">
+              <p className="text-ink-faint text-xs">{label}</p>
+              <p className="text-ink mt-1 text-lg font-semibold tabular-nums">
+                {Number(value).toLocaleString('ja-JP')}件
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+        <SearchField
+          placeholder="名前・紹介コードで検索"
+          aria-label="名前・紹介コードで検索"
+          value={query}
+          onChange={(value) => { setQuery(value); setPage(1) }}
+          onClear={() => { setQuery(''); setPage(1) }}
+          className="w-full md:max-w-md"
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">並び順</span>
+        <Select
+          aria-label="紹介者の並び順"
+          value={sort}
+          options={[
+            { value: 'newest', label: '登録が新しい順' },
+            { value: 'name', label: '名前順' },
+            { value: 'reward', label: '報酬が多い順' },
+          ]}
+          onChange={(value) => { setSort(value as typeof sort); setPage(1) }}
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">表示</span>
+        <Select
+          aria-label="紹介者の表示件数"
+          value={String(pageSize)}
+          options={[20, 50, 100].map((n) => ({ value: String(n), label: `${n}件表示` }))}
+          onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
+          size="page-size"
+        />
+        <Button onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
+          CSVで書き出す
+        </Button>
+        <Button variant="primary" onClick={() => setCreateOpen(true)}>
           アフィリエイターを追加
         </Button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {([
+          ['active', '計測中'],
+          ['inactive', '停止中'],
+          ['reward', '報酬あり'],
+        ] as const).map(([filter, label]) => (
+          <FilterChip
+            key={filter}
+            selected={filters.includes(filter)}
+            onChange={(selected) => {
+              setFilters((current) => selected
+                ? [...current, filter]
+                : current.filter((value) => value !== filter))
+              setPage(1)
+            }}
+          >
+            {label}
+          </FilterChip>
+        ))}
       </div>
 
       {createOpen && (
@@ -392,59 +581,61 @@ export function AffiliatorsTab() {
           description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
           action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
         />
+      ) : shownRows.length === 0 ? (
+        <ListState
+          kind="empty"
+          title="絞り込みに合う紹介者がいません"
+          description="検索語を変えるか、絞り込みの札を外すと表示されます。"
+        />
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+          <table className="w-full min-w-[720px]">
             <thead>
               <TableHeadRow>
-                <Th>名前</Th>
-                <Th>コード</Th>
-                <Th align="center">友だち紐付</Th>
-                <Th align="right">リンク数</Th>
-                <Th align="right">クリック</Th>
+                <Th>名前・紹介コード</Th>
+                <Th align="right">紹介リンク</Th>
                 <Th align="right">友だち追加</Th>
-                <Th align="right">CV</Th>
-                <Th align="right">売上</Th>
+                <Th align="right">成果</Th>
                 <Th align="right">報酬</Th>
-                <Th>状態</Th>
+                <Th align="center">操作</Th>
               </TableHeadRow>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {rows.map((row) => {
+            <tbody className="divide-hairline divide-y">
+              {pagedRows.map((row) => {
                 const isExpanded = selectedId === row.id
                 return (
-                  <>
+                  <Fragment key={row.id}>
                     <tr
-                      key={row.id}
-                      className={`cursor-pointer transition-colors ${isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                      className={`cursor-pointer transition-colors ${isExpanded ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
                       onClick={() => handleRowClick(row.id)}
                     >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.name}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-blue-600">{row.code}</td>
-                      <td className="px-4 py-3 text-sm text-center">
-                        {row.friendId
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">あり</span>
-                          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">なし</span>
-                        }
+                      <td className="text-ink px-4 py-3 text-sm font-medium">
+                        <span className="block truncate" title={row.name}>{row.name}</span>
+                        <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{row.linkCount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{row.totalClicks.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">{row.friendAdds.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{row.totalConversions.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{formatYen(row.totalRevenue)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-600">{formatYen(row.rewardAmount)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {row.isActive
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">有効</span>
-                          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">無効</span>
-                        }
+                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                        {row.linkCount.toLocaleString()}本
+                      </td>
+                      <td className="text-action px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                        {row.friendAdds.toLocaleString()}人
+                      </td>
+                      <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                        {row.totalConversions.toLocaleString()}件
+                      </td>
+                      <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                        {formatYen(row.rewardAmount)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-action text-xs font-medium">
+                          {isExpanded ? '閉じる' : '成果を見る'}
+                        </span>
                       </td>
                     </tr>
 
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={10} className="px-6 py-5 bg-blue-50 border-t border-blue-100">
+                        <td colSpan={6} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
                           {detailLoading ? (
                             <p className="text-sm text-gray-400">読み込み中...</p>
                           ) : (
@@ -683,11 +874,22 @@ export function AffiliatorsTab() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && !error && rows.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-ink-faint text-xs font-semibold tabular-nums">
+            {shownRows.length === rows.length
+              ? `全 ${rows.length}件`
+              : `${shownRows.length}件 / 全 ${rows.length}件`}
+          </p>
+          <Pagination page={currentPage} pageCount={listPageCount} onPageChange={setPage} />
         </div>
       )}
     </div>
@@ -1218,17 +1420,25 @@ export function ApprovalQueue() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actioning, setActioning] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [sort, setSort] = useState<'oldest' | 'newest' | 'amount'>('oldest')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
 
-  const loadItems = useCallback(async (s: ApprovalStatus) => {
+  const loadItems = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.conversionApprovals.list({ status: s, limit: 200 })
-      if (res.success) {
-        setItems(res.data)
-      } else {
-        setError('読み込みに失敗しました')
-      }
+      const results = await Promise.all(
+        (['pending', 'approved', 'rejected'] as const).map((value) =>
+          api.conversionApprovals.list({ status: value, limit: 200 }),
+        ),
+      )
+      if (results.some((result) => !result.success)) throw new Error('読み込みに失敗しました')
+      setItems(results.flatMap((result) => result.data))
+      setSelected(new Set())
     } catch (e) {
       setError(e instanceof Error ? e.message : '読み込みエラー')
     } finally {
@@ -1236,7 +1446,7 @@ export function ApprovalQueue() {
     }
   }, [])
 
-  useEffect(() => { void loadItems(status) }, [status, loadItems])
+  useEffect(() => { void loadItems() }, [loadItems])
 
   const handleApprove = useCallback(async (eventId: string) => {
     if (actioning) return
@@ -1245,7 +1455,7 @@ export function ApprovalQueue() {
     try {
       const res = await api.conversionApprovals.approve(eventId)
       if (res.success) {
-        setItems((prev) => prev.filter((i) => i.eventId !== eventId))
+        await loadItems()
       } else {
         setError(res.error ?? '承認に失敗しました')
       }
@@ -1253,7 +1463,7 @@ export function ApprovalQueue() {
       setError(e instanceof Error ? e.message : '承認に失敗しました')
     }
     setActioning(null)
-  }, [actioning])
+  }, [actioning, loadItems])
 
   const handleReject = useCallback(async (eventId: string) => {
     if (actioning) return
@@ -1262,7 +1472,7 @@ export function ApprovalQueue() {
     try {
       const res = await api.conversionApprovals.reject(eventId)
       if (res.success) {
-        setItems((prev) => prev.filter((i) => i.eventId !== eventId))
+        await loadItems()
       } else {
         setError(res.error ?? '却下に失敗しました')
       }
@@ -1270,109 +1480,314 @@ export function ApprovalQueue() {
       setError(e instanceof Error ? e.message : '却下に失敗しました')
     }
     setActioning(null)
-  }, [actioning])
+  }, [actioning, loadItems])
+
+  const counts = {
+    pending: items.filter((item) => item.approvalStatus === 'pending').length,
+    approved: items.filter((item) => item.approvalStatus === 'approved').length,
+    rejected: items.filter((item) => item.approvalStatus === 'rejected').length,
+  }
+  const pendingItems = items.filter((item) => item.approvalStatus === 'pending')
+  const flaggedCount = pendingItems.filter((item) => item.duplicateFlag).length
+  const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
+  const averageWaitDays = pendingItems.length === 0
+    ? 0
+    : pendingItems.reduce((sum, item) => {
+      const createdAt = new Date(item.createdAt).getTime()
+      return sum + (Number.isFinite(createdAt) ? Math.max(0, Date.now() - createdAt) / 86_400_000 : 0)
+    }, 0) / pendingItems.length
+
+  const shownItems = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('ja-JP')
+    return items
+      .filter((item) => item.approvalStatus === status)
+      .filter((item) => !flaggedOnly || item.duplicateFlag)
+      .filter((item) => {
+        if (!needle) return true
+        return [item.friendName, item.affiliateName, item.offerName, item.conversionPointName]
+          .filter(Boolean)
+          .join(' ')
+          .toLocaleLowerCase('ja-JP')
+          .includes(needle)
+      })
+      .toSorted((a, b) => {
+        if (sort === 'amount') return (b.value ?? 0) - (a.value ?? 0)
+        const time = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        return sort === 'oldest' ? time : -time
+      })
+  }, [flaggedOnly, items, query, sort, status])
+
+  const approvalPageCount = pageCountOf(shownItems.length, pageSize)
+  const currentPage = Math.min(page, approvalPageCount)
+  const pagedItems = pageOf(shownItems, currentPage, pageSize)
+  const safePendingIds = pagedItems
+    .filter((item) => item.approvalStatus === 'pending' && !item.duplicateFlag)
+    .map((item) => item.eventId)
+  const allSafeSelected = safePendingIds.length > 0
+    && safePendingIds.every((eventId) => selected.has(eventId))
+
+  const handleBulkApprove = useCallback(async () => {
+    const eventIds = [...selected]
+    if (actioning || eventIds.length === 0) return
+    setActioning('bulk')
+    setError(null)
+    try {
+      const results = await Promise.all(eventIds.map((eventId) => api.conversionApprovals.approve(eventId)))
+      const failed = results.filter((result) => !result.success).length
+      await loadItems()
+      if (failed > 0) setError(`${failed}件を承認できませんでした。一覧を確認してください。`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'まとめて承認できませんでした')
+    } finally {
+      setActioning(null)
+    }
+  }, [actioning, loadItems, selected])
+
+  const exportApprovalsCsv = () => {
+    const header = ['日時', '友だち', 'アフィリエイター', '案件', '成果地点', '金額', '確認状態']
+    const lines = shownItems.map((item) => [
+      formatDateTime(item.createdAt),
+      personNameText(item.friendName),
+      item.affiliateName ?? '名前を取得できませんでした',
+      item.offerName ?? '未設定',
+      item.conversionPointName ?? '未設定',
+      item.value ?? '',
+      item.duplicateFlag ? '確認が必要' : '問題なし',
+    ])
+    const escape = (value: string | number) => {
+      const text = String(value)
+      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+    }
+    const csv = [header, ...lines].map((line) => line.map(escape).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
-    <div>
-      {/* Status filter tabs */}
-      <div className="flex gap-2 mb-4">
-        {(['pending', 'approved', 'rejected'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatus(s)}
-            className={`px-4 py-1.5 text-sm rounded-full font-medium transition-colors ${
-              status === s
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {s === 'pending' ? '承認待ち' : s === 'approved' ? '承認済み' : '却下済み'}
-          </button>
-        ))}
+    <div data-design-node="n5VVTb" data-approval-design="v6">
+      <NoteBar tone={flaggedCount > 0 ? 'warn' : 'info'}>
+        {flaggedCount > 0
+          ? `${flaggedCount}件は同じ友だちの重複が疑われます。内容を確認してから判断してください。`
+          : '成果を認めると報酬が確定します。確認が必要な成果は、まとめて承認の対象から外れます。'}
+      </NoteBar>
+
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="認めるのを待っている"
+          value={loading || error ? null : counts.pending}
+          unit={loading || error ? '' : '件'}
+          detail={loading ? '読み込んでいます' : error ? '読み込めませんでした' : `合計 ${formatYen(pendingYen)}`}
+          loading={loading}
+        />
+        <KpiCard
+          title="確認したほうがよい"
+          value={loading || error ? null : flaggedCount}
+          unit={loading || error ? '' : '件'}
+          detail="同じ友だちの重複が疑われる成果"
+          loading={loading}
+        />
+        <KpiCard
+          title="認めた成果"
+          value={loading || error ? null : counts.approved}
+          unit={loading || error ? '' : '件'}
+          detail="直近最大200件"
+          loading={loading}
+        />
+        <KpiCard
+          title="待たせている日数"
+          value={loading || error ? null : Math.round(averageWaitDays * 10) / 10}
+          unit={loading || error ? '' : '日'}
+          detail="承認待ちの平均"
+          loading={loading}
+        />
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+        <SearchField
+          placeholder="友だち・紹介者・案件・成果地点で検索"
+          aria-label="成果承認を検索"
+          value={query}
+          onChange={(value) => { setQuery(value); setPage(1); setSelected(new Set()) }}
+          onClear={() => { setQuery(''); setPage(1); setSelected(new Set()) }}
+          className="w-full md:max-w-lg"
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">並び順</span>
+        <Select
+          aria-label="成果承認の並び順"
+          value={sort}
+          options={[
+            { value: 'oldest', label: '古い順' },
+            { value: 'newest', label: '新しい順' },
+            { value: 'amount', label: '金額が高い順' },
+          ]}
+          onChange={(value) => { setSort(value as typeof sort); setPage(1); setSelected(new Set()) }}
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">表示</span>
+        <Select
+          aria-label="成果承認の表示件数"
+          value={String(pageSize)}
+          options={[20, 50, 100].map((n) => ({ value: String(n), label: `${n}件表示` }))}
+          onChange={(value) => { setPageSize(Number(value)); setPage(1); setSelected(new Set()) }}
+          size="page-size"
+        />
+        <Button onClick={exportApprovalsCsv} disabled={shownItems.length === 0} className="ml-auto">
+          CSVで書き出す
+        </Button>
+        {status === 'pending' && (
+          <Button
+            variant="primary"
+            onClick={() => { void handleBulkApprove() }}
+            disabled={selected.size === 0 || actioning !== null}
+          >
+            選んだ{selected.size}件を認める
+          </Button>
+        )}
+      </div>
 
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          {status === 'pending' ? '承認待ちの成果がありません' : `${status === 'approved' ? '承認済み' : '却下済み'}の成果がありません`}
-        </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(['pending', 'approved', 'rejected'] as const).map((s) => (
+          <FilterChip
+            key={s}
+            selected={status === s}
+            onChange={(selectedNow) => {
+              if (!selectedNow) return
+              setStatus(s)
+              setFlaggedOnly(false)
+              setPage(1)
+              setSelected(new Set())
+            }}
+          >
+            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'} {counts[s]}
+          </FilterChip>
+        ))}
+        {status === 'pending' && (
+          <FilterChip
+            selected={flaggedOnly}
+            onChange={(value) => { setFlaggedOnly(value); setPage(1); setSelected(new Set()) }}
+          >
+            確認したほうがよい {flaggedCount}
+          </FilterChip>
+        )}
+      </div>
+
+      {error ? (
+        <ListState
+          kind="error"
+          title="成果を読み込めませんでした"
+          description={error}
+          onRetry={() => void loadItems()}
+        />
+      ) : loading ? (
+        <ListState kind="loading" title="成果を読み込んでいます" />
+      ) : shownItems.length === 0 ? (
+        <ListState
+          kind="empty"
+          title="条件に合う成果がありません"
+          description="状態や検索語を変えると、ほかの成果を確認できます。"
+        />
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+          <table className="w-full min-w-[820px]">
             <thead>
               <TableHeadRow>
+                {status === 'pending' && (
+                  <Th align="center">
+                    <input
+                      type="checkbox"
+                      aria-label="このページの確認不要な成果をすべて選ぶ"
+                      checked={allSafeSelected}
+                      onChange={(event) => {
+                        setSelected((current) => {
+                          const next = new Set(current)
+                          for (const eventId of safePendingIds) {
+                            if (event.target.checked) next.add(eventId)
+                            else next.delete(eventId)
+                          }
+                          return next
+                        })
+                      }}
+                    />
+                  </Th>
+                )}
                 <Th>日時</Th>
-                <Th>友だち</Th>
-                <Th>アフィリエイター</Th>
+                <Th>友だち・紹介者</Th>
                 <Th>案件</Th>
-                <Th>CV ポイント</Th>
+                <Th>成果地点</Th>
                 <Th align="right">金額</Th>
-                <Th align="center">フラグ</Th>
+                <Th align="center">確認</Th>
                 {status === 'pending' && (
                   <Th align="center">操作</Th>
                 )}
               </TableHeadRow>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {items.map((item) => (
-                <tr key={item.eventId} className={item.duplicateFlag ? 'bg-amber-50' : ''}>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+            <tbody className="divide-hairline divide-y">
+              {pagedItems.map((item) => (
+                <tr key={item.eventId} className={item.duplicateFlag ? 'bg-warning-bg' : 'hover:bg-canvas-sunken'}>
+                  {status === 'pending' && (
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
+                        checked={selected.has(item.eventId)}
+                        disabled={item.duplicateFlag}
+                        title={item.duplicateFlag ? '確認が必要な成果はまとめて承認できません' : undefined}
+                        onChange={(event) => {
+                          setSelected((current) => {
+                            const next = new Set(current)
+                            if (event.target.checked) next.add(item.eventId)
+                            else next.delete(item.eventId)
+                            return next
+                          })
+                        }}
+                      />
+                    </td>
+                  )}
+                  <td className="text-ink-faint whitespace-nowrap px-4 py-3 text-xs">
                     {formatDateTime(item.createdAt)}
                   </td>
-                  <td className={`px-4 py-3 text-sm ${item.friendName ? 'text-gray-900' : 'text-gray-400 italic'}`}>
-                    {personNameText(item.friendName)}
+                  <td className="text-ink px-4 py-3 text-sm">
+                    <span className="block font-medium">{personNameText(item.friendName)}</span>
+                    <span className="text-ink-faint mt-0.5 block text-xs">
+                      紹介者：{item.affiliateName ?? '名前を取得できませんでした'}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    {item.affiliateName ?? '—'}
+                  <td className="text-ink-secondary px-4 py-3 text-sm">
+                    {item.offerName ?? '未設定'}
                   </td>
-                  <td className="px-4 py-3 text-sm">
-                    {item.offerName ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                        {item.offerName}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
+                  <td className="text-ink-secondary px-4 py-3 text-sm">
+                    {item.conversionPointName ?? '未設定'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    {item.conversionPointName ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                  <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                     {formatYenNullable(item.value)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {item.duplicateFlag ? (
-                      <span className="text-amber-500 text-base" title={DUPLICATE_FLAG_TITLE}>⚠</span>
+                      <span title={DUPLICATE_FLAG_TITLE}><Chip tone="warn">要確認</Chip></span>
                     ) : (
-                      <span className="text-gray-300">—</span>
+                      <Chip tone="ok">問題なし</Chip>
                     )}
                   </td>
                   {status === 'pending' && (
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button
+                        <Button
                           onClick={() => { void handleApprove(item.eventId) }}
-                          disabled={actioning === item.eventId}
-                          className="px-3 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md"
+                          disabled={actioning !== null}
+                          variant="primary"
                         >
-                          承認
-                        </button>
-                        <button
+                          認める
+                        </Button>
+                        <Button
                           onClick={() => { void handleReject(item.eventId) }}
-                          disabled={actioning === item.eventId}
-                          className="px-3 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 rounded-md"
+                          disabled={actioning !== null}
+                          title="却下理由はまだ保存できません"
                         >
                           却下
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   )}
@@ -1382,6 +1797,22 @@ export function ApprovalQueue() {
           </table>
         </div>
       )}
+
+      {!loading && !error && items.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-ink-faint text-xs font-semibold tabular-nums">
+            {shownItems.length}件 / 全 {counts[status]}件（各状態 最大200件）
+          </p>
+          <Pagination page={currentPage} pageCount={approvalPageCount} onPageChange={(value) => {
+            setPage(value)
+            setSelected(new Set())
+          }} />
+        </div>
+      )}
+
+      <p className="text-ink-faint mt-3 text-xs">
+        却下理由を保存するAPIはまだ接続されていません。現在は却下の状態だけが保存されます。
+      </p>
     </div>
   )
 }
@@ -1651,7 +2082,7 @@ export function OffersTab() {
           detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.count)}
         />
         <KpiCard
-          title="支払い予定"
+          title="確定した報酬の合計"
           value={confirmedValue(confirmedState, confirmed.yen)}
           unit={confirmedUnit(confirmedState, '円')}
           loading={confirmedState === 'loading'}
@@ -1660,7 +2091,7 @@ export function OffersTab() {
         <KpiCard
           title="付与予定マイル"
           value={confirmedValue(confirmedState, confirmed.miles)}
-          unit={confirmedUnit(confirmedState, 'mile')}
+          unit={confirmedUnit(confirmedState, 'マイル')}
           loading={confirmedState === 'loading'}
           detail={confirmedDetail(confirmedState, CONFIRMED_DETAIL.miles)}
         />
