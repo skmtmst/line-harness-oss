@@ -6,6 +6,7 @@ import {
   ensureFriendAddFallbackRules,
   getFriendAddRule,
   listFriendAddRules,
+  listFriendAddRulesPage,
   publishFriendAddRule,
   recordFriendAddRuleTest,
   saveFriendAddRuleDraft,
@@ -20,6 +21,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const friendAddRules = new Hono<Env>();
 const KINDS = new Set<FriendAddRuleKind>(['first_time', 'returning']);
+const RULE_STATUSES = new Set(['draft', 'published', 'stopped', 'archived']);
 const MESSAGE_TYPES = new Set(['text', 'template', 'form', 'scenario']);
 const TIMINGS = new Set(['immediate', 'scenario']);
 const ACTION_TYPES = new Set([
@@ -35,6 +37,7 @@ type RuleInput = {
   folderName?: string | null;
   priority?: number;
   definition?: Partial<FriendAddRuleDefinition>;
+  version?: number;
 };
 
 type RuleTestInput = {
@@ -74,6 +77,35 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
       return typeof type === 'string' && ACTION_TYPES.has(type);
     })
     : [];
+  const deliveryChoices = definition.deliveryChoices && typeof definition.deliveryChoices === 'object'
+    ? {
+        sendWelcomeMessage: definition.deliveryChoices.sendWelcomeMessage === true,
+        startScenario: definition.deliveryChoices.startScenario !== false,
+        runActions: definition.deliveryChoices.runActions !== false,
+      }
+    : {
+        sendWelcomeMessage: messageType !== 'scenario',
+        startScenario: true,
+        runActions: true,
+      };
+  const resendSuppressionHours = definition.resendSuppressionHours == null
+    ? 24
+    : Math.max(0, Math.min(720, Math.floor(Number(definition.resendSuppressionHours))));
+  const unknownRouteAction = definition.unknownRouteAction && typeof definition.unknownRouteAction === 'object'
+    ? {
+        sendCommonGuidance: definition.unknownRouteAction.sendCommonGuidance === true,
+        notifyStaff: definition.unknownRouteAction.notifyStaff === true,
+      }
+    : { sendCommonGuidance: true, notifyStaff: false };
+  const weekdays = Array.isArray(definition.weekdays)
+    ? [...new Set(definition.weekdays.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6))]
+    : [];
+  const timeWindows = Array.isArray(definition.timeWindows)
+    ? definition.timeWindows.filter((window): window is { start: string; end: string } => (
+        Boolean(window) && typeof window.start === 'string' && /^\d{2}:\d{2}$/.test(window.start)
+        && typeof window.end === 'string' && /^\d{2}:\d{2}$/.test(window.end)
+      ))
+    : [];
   return {
     routeIds: Array.isArray(definition.routeIds)
       ? definition.routeIds.filter((id): id is string => typeof id === 'string' && Boolean(id))
@@ -96,17 +128,27 @@ function normalizeDefinition(raw: Partial<FriendAddRuleDefinition> | undefined):
     startPosition: definition.startPosition === 'beginning' || definition.startPosition === 'resume'
       ? definition.startPosition
       : undefined,
+    deliveryChoices,
+    resendSuppressionHours,
+    unknownRouteAction,
+    weekdays,
+    timeWindows,
   };
 }
 
 async function loadOptions(db: D1Database, accountId: string) {
-  const [routeRows, scenarioRows, tagRows] = await Promise.all([
+  const [routeRows, scenarioRows, tagRows, folderRows] = await Promise.all([
     db.prepare(
       `SELECT id, name, COALESCE(genre, '未分類') AS kind
          FROM entry_routes
-        WHERE line_account_id = ? AND is_active = 1
+        WHERE is_active = 1 AND (
+          line_account_id = ? OR (
+            line_account_id IS NULL
+            AND tenant_id = (SELECT tenant_id FROM line_accounts WHERE id = ?)
+          )
+        )
         ORDER BY name ASC`,
-    ).bind(accountId).all<{ id: string; name: string; kind: string }>(),
+    ).bind(accountId, accountId).all<{ id: string; name: string; kind: string }>(),
     db.prepare(
       `SELECT id, name FROM scenarios
         WHERE line_account_id = ? AND is_active = 1
@@ -117,11 +159,16 @@ async function loadOptions(db: D1Database, accountId: string) {
         WHERE line_account_id = ?
         ORDER BY name ASC`,
     ).bind(accountId).all<{ id: string; name: string }>(),
+    db.prepare(
+      `SELECT id, name FROM friend_add_rule_folders
+        WHERE line_account_id = ? ORDER BY name ASC, id ASC`,
+    ).bind(accountId).all<{ id: string; name: string }>(),
   ]);
   return {
     routes: routeRows.results ?? [],
     scenarios: scenarioRows.results ?? [],
     tags: tagRows.results ?? [],
+    folders: folderRows.results ?? [],
   };
 }
 
@@ -143,6 +190,7 @@ function toRule(row: FriendAddRuleRow, routeNames: Map<string, string>, scenario
     lastTestedAt: row.last_tested_at,
     publishedAt: row.published_at,
     matchedLast7Days: row.matched_last_7_days,
+    version: row.lock_version,
     definition,
     routeNames: definition.routeIds.map((id) => routeNames.get(id) ?? '削除済みの流入リンク'),
     scenarioName: definition.scenarioId ? scenarioNames.get(definition.scenarioId) ?? '削除済みのシナリオ' : null,
@@ -167,8 +215,13 @@ async function validateReferences(
     const placeholders = definition.routeIds.map(() => '?').join(',');
     const rows = await db.prepare(
       `SELECT id FROM entry_routes
-        WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders})`,
-    ).bind(accountId, ...definition.routeIds).all<{ id: string }>();
+        WHERE is_active = 1 AND id IN (${placeholders}) AND (
+          line_account_id = ? OR (
+            line_account_id IS NULL
+            AND tenant_id = (SELECT tenant_id FROM line_accounts WHERE id = ?)
+          )
+        )`,
+    ).bind(...definition.routeIds, accountId, accountId).all<{ id: string }>();
     if ((rows.results ?? []).length !== new Set(definition.routeIds).size) {
       messages.push('このLINEアカウントで使えない流入リンクが含まれています。');
     }
@@ -242,16 +295,286 @@ async function ruleTestResponse(c: Context<Env>, accountId: string, ruleId: stri
   }, errors.length === 0 ? 200 : 400);
 }
 
+type RunCursor = { occurredAt: string; id: string };
+
+function parseRunCursor(value: string | undefined): RunCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(value)) as Partial<RunCursor>;
+    return typeof parsed.occurredAt === 'string' && typeof parsed.id === 'string'
+      ? { occurredAt: parsed.occurredAt, id: parsed.id }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function makeRunCursor(row: { occurred_at: string; id: string }): string {
+  return encodeURIComponent(JSON.stringify({ occurredAt: row.occurred_at, id: row.id }));
+}
+
+const RUN_STATUSES = new Set(['pending', 'completed', 'failed', 'suppressed']);
+
+friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = accountIdFrom(c);
+  const status = c.req.query('status');
+  const ruleId = c.req.query('rule_id');
+  const limit = Number(c.req.query('limit') ?? 20);
+  const cursorValue = c.req.query('cursor');
+  const cursor = parseRunCursor(cursorValue);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (status && !RUN_STATUSES.has(status)) return c.json({ success: false, error: 'status が正しくありません' }, 400);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) return c.json({ success: false, error: 'limit は1〜100で指定してください' }, 400);
+  if (cursorValue && !cursor) return c.json({ success: false, error: 'cursor が正しくありません' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const clauses = ['e.line_account_id = ?'];
+    const bindings: Array<string | number> = [accountId];
+    if (status) { clauses.push('e.routing_status = ?'); bindings.push(status); }
+    if (ruleId) { clauses.push('e.routing_rule_id = ?'); bindings.push(ruleId); }
+    const total = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM friend_add_events e WHERE ${clauses.join(' AND ')}`,
+    ).bind(...bindings).first<{ count: number }>();
+    if (cursor) {
+      clauses.push('(e.occurred_at < ? OR (e.occurred_at = ? AND e.id < ?))');
+      bindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
+    }
+    const [result, summary] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT e.id, e.friend_id, f.display_name, e.friend_kind, e.attribution_status,
+                e.entry_route_id, er.name AS entry_route_name, e.ref_code,
+                e.routing_status, e.error_code, e.occurred_at, e.processed_at,
+                r.id AS rule_id, r.name AS rule_name,
+                v.id AS version_id, v.version_number,
+                json_extract(v.definition_snapshot, '$.scenarioId') AS scenario_id,
+                s.name AS scenario_name,
+                e.scenario_enrollment_id AS enrollment_id,
+                e.delivery_count,
+                (SELECT COUNT(*) FROM friend_add_action_runs ar WHERE ar.event_id = e.id) AS action_count,
+                (SELECT COUNT(*) FROM friend_add_action_runs ar
+                  WHERE ar.event_id = e.id AND ar.status = 'failed') AS failed_action_count
+           FROM friend_add_events e
+           JOIN friends f ON f.id = e.friend_id AND f.line_account_id = e.line_account_id
+           LEFT JOIN entry_routes er ON er.id = e.entry_route_id
+           LEFT JOIN friend_add_rules r ON r.id = e.routing_rule_id AND r.line_account_id = e.line_account_id
+           LEFT JOIN friend_add_rule_versions v ON v.id = e.winning_rule_version_id AND v.rule_id = r.id
+           LEFT JOIN scenarios s ON s.id = json_extract(v.definition_snapshot, '$.scenarioId')
+          WHERE ${clauses.join(' AND ')}
+          ORDER BY e.occurred_at DESC, e.id DESC LIMIT ?`,
+      ).bind(...bindings, limit + 1).all<{
+        id: string; friend_id: string; display_name: string | null; friend_kind: string;
+        attribution_status: string; entry_route_id: string | null; entry_route_name: string | null;
+        ref_code: string | null; routing_status: string; error_code: string | null;
+        occurred_at: string; processed_at: string | null; rule_id: string | null;
+        rule_name: string | null; version_id: string | null; version_number: number | null;
+        scenario_id: string | null; scenario_name: string | null; enrollment_id: string | null;
+        delivery_count: number; action_count: number; failed_action_count: number;
+      }>(),
+      c.env.DB.prepare(
+        `SELECT COUNT(*) AS total_runs,
+                SUM(delivery_count) AS delivery_count,
+                SUM(CASE WHEN routing_status = 'failed' THEN 1 ELSE 0 END) AS failed_runs,
+                AVG(CASE WHEN first_delivery_sent_at IS NOT NULL
+                    THEN (julianday(first_delivery_sent_at) - julianday(occurred_at)) * 86400000 END) AS average_send_ms,
+                SUM(CASE WHEN scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts
+           FROM friend_add_events
+          WHERE line_account_id = ?`,
+      ).bind(accountId).first<{
+        total_runs: number; delivery_count: number | null; failed_runs: number | null;
+        average_send_ms: number | null; scenario_starts: number | null;
+      }>(),
+    ]);
+    const allRows = result.results ?? [];
+    const items = allRows.slice(0, limit);
+    return c.json({
+      success: true,
+      data: {
+        items: items.map((row) => ({
+          id: row.id,
+          receivedAt: row.occurred_at,
+          processedAt: row.processed_at,
+          friend: { id: row.friend_id, displayName: row.display_name },
+          friendKind: row.friend_kind,
+          attribution: {
+            status: row.attribution_status,
+            routeId: row.entry_route_id,
+            routeName: row.entry_route_name,
+            reason: row.ref_code,
+          },
+          rule: row.rule_id ? {
+            id: row.rule_id,
+            name: row.rule_name,
+            versionId: row.version_id,
+            versionNumber: row.version_number,
+          } : null,
+          scenario: row.scenario_id ? {
+            id: row.scenario_id,
+            name: row.scenario_name,
+            enrollmentId: row.enrollment_id,
+            started: row.enrollment_id !== null,
+          } : null,
+          actions: { total: row.action_count, failed: row.failed_action_count },
+          deliveryCount: row.delivery_count,
+          status: row.routing_status,
+          errorCode: row.error_code,
+        })),
+        total: total?.count ?? 0,
+        nextCursor: allRows.length > limit && items.length > 0 ? makeRunCursor(items[items.length - 1]) : null,
+        summary: {
+          totalRuns: summary?.total_runs ?? 0,
+          cumulativeDeliveries: summary?.delivery_count ?? 0,
+          scenarioStarts: summary?.scenario_starts ?? 0,
+          averageSendTimeMs: summary?.average_send_ms == null ? null : Math.max(0, Math.round(summary.average_send_ms)),
+          failed: summary?.failed_runs ?? 0,
+          staffHandoffs: { value: null, state: 'unavailable', reason: '担当者引き継ぎと実行イベントを結ぶ記録がありません' },
+        },
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/friend-add-runs error:', error);
+    return c.json({ success: false, error: '実行結果を取得できませんでした' }, 500);
+  }
+});
+
+friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const row = await c.env.DB.prepare(
+      `SELECT e.id, e.friend_id, f.display_name, e.friend_kind, e.attribution_status,
+              e.entry_route_id, er.name AS entry_route_name, e.ref_code,
+              e.routing_status, e.error_code, e.occurred_at, e.processed_at,
+              r.id AS rule_id, r.name AS rule_name,
+              v.id AS version_id, v.version_number, v.definition_snapshot
+         FROM friend_add_events e
+         JOIN friends f ON f.id = e.friend_id AND f.line_account_id = e.line_account_id
+         LEFT JOIN entry_routes er ON er.id = e.entry_route_id
+         LEFT JOIN friend_add_rules r ON r.id = e.routing_rule_id AND r.line_account_id = e.line_account_id
+         LEFT JOIN friend_add_rule_versions v ON v.id = e.winning_rule_version_id AND v.rule_id = r.id
+        WHERE e.id = ? AND e.line_account_id = ? LIMIT 1`,
+    ).bind(c.req.param('id'), accountId).first<{
+      id: string; friend_id: string; display_name: string | null; friend_kind: string;
+      attribution_status: string; entry_route_id: string | null; entry_route_name: string | null;
+      ref_code: string | null; routing_status: string; error_code: string | null;
+      occurred_at: string; processed_at: string | null; rule_id: string | null; rule_name: string | null;
+      version_id: string | null; version_number: number | null; definition_snapshot: string | null;
+    }>();
+    if (!row) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    const definition = row.definition_snapshot ? parseSnapshot(row.definition_snapshot) : null;
+    const actions = await c.env.DB.prepare(
+      `SELECT id, action_stable_id, status, attempt_count, next_retry_at, last_error_code,
+              created_at, updated_at
+         FROM friend_add_action_runs WHERE event_id = ? ORDER BY created_at ASC, id ASC`,
+    ).bind(row.id).all<{
+      id: string; action_stable_id: string; status: string; attempt_count: number;
+      next_retry_at: string | null; last_error_code: string | null; created_at: string; updated_at: string;
+    }>();
+    return c.json({
+      success: true,
+      data: {
+        id: row.id,
+        receivedAt: row.occurred_at,
+        processedAt: row.processed_at,
+        friend: { id: row.friend_id, displayName: row.display_name },
+        friendKind: row.friend_kind,
+        attribution: {
+          status: row.attribution_status,
+          routeId: row.entry_route_id,
+          routeName: row.entry_route_name,
+          reason: row.ref_code,
+        },
+        rule: row.rule_id ? {
+          id: row.rule_id,
+          name: row.rule_name,
+          versionId: row.version_id,
+          versionNumber: row.version_number,
+          definition,
+        } : null,
+        configuredActions: definition?.actions ?? [],
+        actionRuns: (actions.results ?? []).map((action) => ({
+          id: action.id,
+          stableId: action.action_stable_id,
+          status: action.status,
+          attemptCount: action.attempt_count,
+          nextRetryAt: action.next_retry_at,
+          errorCode: action.last_error_code,
+          startedAt: action.created_at,
+          updatedAt: action.updated_at,
+        })),
+        status: row.routing_status,
+        errorCode: row.error_code,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/friend-add-runs/:id error:', error);
+    return c.json({ success: false, error: '実行結果の詳細を取得できませんでした' }, 500);
+  }
+});
+
+friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; name?: string }>();
+  const accountId = accountIdFrom(c, body);
+  const name = body.name?.trim() ?? '';
+  const idempotencyKey = c.req.header('Idempotency-Key');
+  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+  if (!name || name.length > 60) return c.json({ success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400);
+  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
+    return c.json({ success: false, error: '保存には有効な冪等キーが必要です' }, 400);
+  }
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const replay = await c.env.DB.prepare(
+      `SELECT id, name, created_at FROM friend_add_rule_folders
+        WHERE line_account_id = ? AND create_idempotency_key = ? LIMIT 1`,
+    ).bind(accountId, idempotencyKey).first<{ id: string; name: string; created_at: string }>();
+    if (replay) {
+      return c.json({ success: true, data: { id: replay.id, name: replay.name, createdAt: replay.created_at } });
+    }
+    const id = crypto.randomUUID();
+    await c.env.DB.prepare(
+      `INSERT INTO friend_add_rule_folders
+        (id, line_account_id, name, create_idempotency_key, created_by_staff_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'),
+               strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))`,
+    ).bind(id, accountId, name, idempotencyKey, c.get('staff').id).run();
+    const created = await c.env.DB.prepare(
+      `SELECT id, name, created_at FROM friend_add_rule_folders
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(id, accountId).first<{ id: string; name: string; created_at: string }>();
+    return c.json({
+      success: true,
+      data: { id, name, createdAt: created?.created_at ?? null },
+    }, 201);
+  } catch (error) {
+    if (error instanceof Error && /unique/i.test(error.message)) {
+      return c.json({ success: false, code: 'DUPLICATE_FOLDER_NAME', error: '同じ名前のフォルダがあります' }, 409);
+    }
+    console.error('POST /api/friend-add-rules/folders error:', error);
+    return c.json({ success: false, error: 'フォルダを作成できませんでした' }, 500);
+  }
+});
+
 friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = accountIdFrom(c);
   const kind = c.req.query('kind') as FriendAddRuleKind | undefined;
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   if (!kind || !KINDS.has(kind)) return c.json({ success: false, error: 'kind が正しくありません' }, 400);
-  if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+  const status = c.req.query('status');
+  if (status && !RULE_STATUSES.has(status)) return c.json({ success: false, error: 'status が正しくありません' }, 400);
+  const limit = Number(c.req.query('limit') ?? 20);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) return c.json({ success: false, error: 'limit は1〜100で指定してください' }, 400);
   try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     await ensureFriendAddFallbackRules(c.env.DB, accountId);
-    const [rows, options, summary] = await Promise.all([
-      listFriendAddRules(c.env.DB, { lineAccountId: accountId, friendKind: kind }),
+    const [page, options, summary, ruleSummary] = await Promise.all([
+      listFriendAddRulesPage(c.env.DB, {
+        lineAccountId: accountId,
+        friendKind: kind,
+        status: status as FriendAddRuleRow['status'] | undefined,
+        cursor: c.req.query('cursor'),
+        limit,
+      }),
       loadOptions(c.env.DB, accountId),
       c.env.DB.prepare(
         `SELECT
@@ -265,16 +588,25 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
         recent_adds: number | null; captured: number | null; unknown_route: number | null;
         delivered: number | null; failed: number | null;
       }>(),
+      c.env.DB.prepare(
+        `SELECT COUNT(*) AS rules,
+                SUM(CASE WHEN status = 'published' AND is_unknown_route_fallback = 0 THEN 1 ELSE 0 END) AS active
+           FROM friend_add_rules
+          WHERE line_account_id = ? AND friend_kind = ? AND archived_at IS NULL`,
+      ).bind(accountId, kind).first<{ rules: number; active: number | null }>(),
     ]);
+    const rows = page.items;
     const routeNames = new Map(options.routes.map((route) => [route.id, route.name]));
     const scenarioNames = new Map(options.scenarios.map((scenario) => [scenario.id, scenario.name]));
     return c.json({
       success: true,
       data: {
         items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
+        total: page.total,
+        nextCursor: page.nextCursor,
         summary: {
-          rules: rows.length,
-          active: rows.filter((row) => row.status === 'published' && row.is_unknown_route_fallback === 0).length,
+          rules: ruleSummary?.rules ?? page.total,
+          active: ruleSummary?.active ?? 0,
           recentAdds: summary?.recent_adds ?? null,
           captured: summary?.captured ?? null,
           unknownRoute: summary?.unknown_route ?? null,
@@ -285,6 +617,9 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
       },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_CURSOR_INVALID') {
+      return c.json({ success: false, error: 'cursor が正しくありません' }, 400);
+    }
     console.error('GET /api/friend-add-rules error:', error);
     return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
   }
@@ -295,22 +630,80 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
   const kind = c.req.query('kind') as FriendAddRuleKind | undefined;
   if (!accountId || !kind || !KINDS.has(kind)) return c.json({ success: false, error: 'account_id と kind が必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
-  const rows = await listFriendAddRules(c.env.DB, { lineAccountId: accountId, friendKind: kind });
-  const conflicts: Array<{ code: string; ruleIds: string[]; message: string }> = [];
-  for (let left = 0; left < rows.length; left += 1) {
-    for (let right = left + 1; right < rows.length; right += 1) {
-      const a = rows[left];
-      const b = rows[right];
-      if (a.priority === b.priority) {
-        conflicts.push({ code: 'same_priority', ruleIds: [a.id, b.id], message: '同じ優先順位の設定があります。' });
-      }
-      const aRoutes = new Set(parseSnapshot(a.definition_snapshot).routeIds);
-      if (parseSnapshot(b.definition_snapshot).routeIds.some((id) => aRoutes.has(id))) {
-        conflicts.push({ code: 'same_route', ruleIds: [a.id, b.id], message: '同じ流入リンクを使う設定があります。優先順位が小さい設定だけが動きます。' });
+  try {
+    const [rows, countRows] = await Promise.all([
+      listFriendAddRules(c.env.DB, { lineAccountId: accountId, friendKind: kind }),
+      c.env.DB.prepare(
+        `SELECT routing_rule_id AS rule_id, COUNT(*) AS count
+           FROM friend_add_events
+          WHERE line_account_id = ? AND friend_kind = ? AND routing_rule_id IS NOT NULL
+            AND occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days')
+          GROUP BY routing_rule_id`,
+      ).bind(accountId, kind).all<{ rule_id: string; count: number }>(),
+    ]);
+    const matched = new Map((countRows.results ?? []).map((row) => [row.rule_id, row.count]));
+    const conflicts: Array<{
+      code: string;
+      ruleIds: string[];
+      message: string;
+      matchedLast28Days: Record<string, number>;
+    }> = [];
+    const pushConflict = (code: string, a: FriendAddRuleRow, b: FriendAddRuleRow, message: string) => {
+      conflicts.push({
+        code,
+        ruleIds: [a.id, b.id],
+        message,
+        matchedLast28Days: { [a.id]: matched.get(a.id) ?? 0, [b.id]: matched.get(b.id) ?? 0 },
+      });
+    };
+    for (let left = 0; left < rows.length; left += 1) {
+      for (let right = left + 1; right < rows.length; right += 1) {
+        const a = rows[left];
+        const b = rows[right];
+        const aDefinition = parseSnapshot(a.definition_snapshot);
+        const bDefinition = parseSnapshot(b.definition_snapshot);
+        if (a.priority === b.priority) {
+          pushConflict('same_priority', a, b, '同じ優先順位の設定があります。');
+        }
+        const aRoutes = new Set(aDefinition.routeIds);
+        if (bDefinition.routeIds.some((id) => aRoutes.has(id))) {
+          pushConflict('same_route', a, b, '同じ流入リンクを使う設定があります。優先順位が小さい設定だけが動きます。');
+        }
+        if (aDefinition.weekdays?.length && bDefinition.weekdays?.some((day) => aDefinition.weekdays?.includes(day))) {
+          pushConflict('overlapping_weekday', a, b, '同じ曜日に動く設定があります。');
+        }
+        if (aDefinition.timeWindows?.length && bDefinition.timeWindows?.some((rightWindow) => (
+          aDefinition.timeWindows?.some((leftWindow) => leftWindow.start < rightWindow.end && rightWindow.start < leftWindow.end)
+        ))) {
+          pushConflict('overlapping_time', a, b, '同じ時間帯に動く設定があります。');
+        }
+        if (aDefinition.friendCondition && aDefinition.friendCondition === bDefinition.friendCondition) {
+          pushConflict('same_friend_condition', a, b, '同じ友だち条件を使う設定があります。');
+        }
       }
     }
+    return c.json({
+      success: true,
+      data: {
+        conflicts,
+        rules: rows.map((row) => {
+          const definition = parseSnapshot(row.definition_snapshot);
+          return {
+            id: row.id,
+            name: row.name,
+            priority: row.priority,
+            weekdays: definition.weekdays ?? [],
+            timeWindows: definition.timeWindows ?? [],
+            friendCondition: definition.friendCondition || null,
+            matchedLast28Days: matched.get(row.id) ?? 0,
+          };
+        }),
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/friend-add-rules/conflicts error:', error);
+    return c.json({ success: false, error: '競合と優先順位を取得できませんでした' }, 500);
   }
-  return c.json({ success: true, data: { conflicts } });
 });
 
 friendAddRules.post('/api/friend-add-rules/test', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -353,6 +746,25 @@ friendAddRules.get('/api/friend-add-rules/:id', requireRole('owner', 'admin', 's
   const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
   if (!row) return c.json({ success: false, error: '設定が見つかりません' }, 404);
   const options = await loadOptions(c.env.DB, accountId);
+  const notificationSetting = await c.env.DB.prepare(
+    `SELECT value FROM account_settings
+      WHERE line_account_id = ? AND key IN ('friend_add_staff_notification', 'slack_notification')
+      ORDER BY CASE key WHEN 'friend_add_staff_notification' THEN 0 ELSE 1 END
+      LIMIT 1`,
+  ).bind(accountId).first<{ value: string }>();
+  let staffNotificationStatus: 'connected' | 'disconnected' | 'unconfigured' | null = 'unconfigured';
+  if (notificationSetting) {
+    try {
+      const setting = JSON.parse(notificationSetting.value) as { enabled?: unknown; webhookUrl?: unknown; channelId?: unknown };
+      staffNotificationStatus = setting.enabled === false
+        ? 'disconnected'
+        : (typeof setting.webhookUrl === 'string' && setting.webhookUrl) || (typeof setting.channelId === 'string' && setting.channelId)
+          ? 'connected'
+          : 'unconfigured';
+    } catch {
+      staffNotificationStatus = null;
+    }
+  }
   return c.json({
     success: true,
     data: {
@@ -362,6 +774,10 @@ friendAddRules.get('/api/friend-add-rules/:id', requireRole('owner', 'admin', 's
         new Map(options.scenarios.map((scenario) => [scenario.id, scenario.name])),
       ),
       options,
+      staffNotification: {
+        status: staffNotificationStatus,
+        reason: staffNotificationStatus === null ? '保存済みの通知設定を読み取れません' : null,
+      },
     },
   });
 });
@@ -381,16 +797,24 @@ friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admi
   const definition = normalizeDefinition(body.definition);
   const referenceErrors = await validateReferences(c.env.DB, accountId, definition);
   if (referenceErrors.length > 0) return c.json({ success: false, error: referenceErrors[0], details: referenceErrors }, 400);
-  const saved = await saveFriendAddRuleDraft(c.env.DB, {
-    lineAccountId: accountId,
-    ruleId: c.req.param('id'),
-    name: body.name!.trim(),
-    folderName: body.folderName?.trim() || null,
-    priority: body.priority!,
-    definition,
-    idempotencyKey,
-  });
-  return c.json({ success: true, data: { id: saved.id, versionId: saved.version_id } });
+  try {
+    const saved = await saveFriendAddRuleDraft(c.env.DB, {
+      lineAccountId: accountId,
+      ruleId: c.req.param('id'),
+      name: body.name!.trim(),
+      folderName: body.folderName?.trim() || null,
+      priority: body.priority!,
+      definition,
+      idempotencyKey,
+      expectedVersion: Number.isInteger(body.version) ? body.version! : current.lock_version,
+    });
+    return c.json({ success: true, data: { id: saved.id, versionId: saved.version_id, version: saved.lock_version } });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_VERSION_CONFLICT') {
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの画面で更新されています。最新の内容を読み直してください' }, 409);
+    }
+    throw error;
+  }
 });
 
 friendAddRules.post('/api/friend-add-rules/:id/validate', requireRole('owner', 'admin'), async (c) => {
@@ -448,8 +872,29 @@ friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admi
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return c.json({ success: false, error: '停止には有効な冪等キーが必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
-  await stopFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
-  return c.json({ success: true });
+  let body: { version?: number } = {};
+  try { body = await c.req.json<{ version?: number }>(); } catch { /* 従来クライアントは本文なし */ }
+  const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+  if (!current) return c.json({ success: false, error: '設定が見つかりません' }, 404);
+  try {
+    await stopFriendAddRule(c.env.DB, {
+      lineAccountId: accountId,
+      ruleId: c.req.param('id'),
+      staffId: c.get('staff').id,
+      idempotencyKey,
+      expectedVersion: Number.isInteger(body.version) ? body.version! : current.lock_version,
+    });
+    const stopped = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+    return c.json({ success: true, data: { version: stopped?.lock_version ?? current.lock_version } });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_VERSION_CONFLICT') {
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの画面で更新されています。最新の内容を読み直してください' }, 409);
+    }
+    if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_NOT_STOPPED') {
+      return c.json({ success: false, code: 'STATE_CONFLICT', error: 'この配信ルールは停止できる状態ではありません' }, 409);
+    }
+    throw error;
+  }
 });
 
 friendAddRules.delete('/api/friend-add-rules/:id', requireRole('owner', 'admin'), async (c) => {

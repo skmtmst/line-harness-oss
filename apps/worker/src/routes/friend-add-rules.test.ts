@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   ensureFriendAddFallbackRules: vi.fn(),
   getFriendAddRule: vi.fn(),
   listFriendAddRules: vi.fn(),
+  listFriendAddRulesPage: vi.fn(),
   publishFriendAddRule: vi.fn(),
   recordFriendAddRuleTest: vi.fn(),
   saveFriendAddRuleDraft: vi.fn(),
@@ -51,6 +52,7 @@ const rule = {
   version_id: 'version-1', version_number: 1, version_status: 'draft' as const,
   definition_snapshot: JSON.stringify(definition), last_test_status: null,
   last_tested_at: null, published_at: null, matched_last_7_days: null,
+  lock_version: 1,
 };
 
 function makeEnv() {
@@ -76,6 +78,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   access.getVisibleLineAccountScope.mockResolvedValue({ ids: ['account-1'] });
   db.listFriendAddRules.mockResolvedValue([rule]);
+  db.listFriendAddRulesPage.mockResolvedValue({ items: [rule], total: 1, nextCursor: null });
   db.getFriendAddRule.mockResolvedValue(rule);
   db.createFriendAddRuleDraft.mockResolvedValue(rule);
   db.publishFriendAddRule.mockResolvedValue({ ...rule, version_status: 'published', published_at: '2026-09-06T00:01:00' });
@@ -91,9 +94,9 @@ describe('friend add rules API', () => {
   test('一覧はLINEアカウントと判定する人で絞る', async () => {
     const response = await app.request('/api/friend-add-rules?account_id=account-1&kind=first_time', {}, makeEnv());
     expect(response.status).toBe(200);
-    expect(db.listFriendAddRules).toHaveBeenCalledWith(expect.anything(), {
+    expect(db.listFriendAddRulesPage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       lineAccountId: 'account-1', friendKind: 'first_time',
-    });
+    }));
     const body = await response.json() as { data: { items: Array<{ id: string }> } };
     expect(body.data.items).toEqual([expect.objectContaining({ id: 'rule-1' })]);
   });
