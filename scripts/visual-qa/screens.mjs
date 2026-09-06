@@ -975,10 +975,10 @@ export const SCREENS = [
       apis: ['**/api/reminders/*/runs*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 画面を本流へ載せ、初めて撮れた（board#74）。前は `unimplemented` で、実装は未マージの枝の中にあった。** ルート `/reminders/detail?id=reminder-1`。通常・読込中・0件・取得失敗の**5枚すべて**を1440・1920で撮った（10枚、はみ出し0）。 **API と DB は既に本流にあった**（`GET /api/reminders/:id/runs`、`POST /api/reminder-runs/:runId/retry`、migration 269）。無かったのは画面と web 側の口だけ。 **要件 §3-7 の10項目がすべて出ている**：友だち／通知／結果／予定／実行／試行／理由・次の動き／**LINE要求ID**／操作。LINE要求IDは旧実装ではCSVにしか無く、**問い合わせのときに画面から写せなかった**ので列に足した。 **取れないものを0で埋めていない**：まだ始まっていない行の実行時刻は `—`、既読は `—`（LINEは友だち単位の既読を返さない）、要求IDが無い行も `—`。友だちが消えている行は「削除済みの友だち」。 **再試行できるかは Worker が決める**（`canRetry`）。画面で条件を作らない。再試行待ちと送信失敗にだけ「この通知を再試行」が出る。 **P1 設計と突き合わせられない**——`docs/design-reference/reminders-v6/` に `GC4St.txt` が無く、**この画面だけ設計の書き出しから漏れている**。要件 §3-7 を根拠に作った。書き出しは lane:pen へ渡す。 P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）は未確認。',
-    verdictSource: 'reminders-v6/GC4St.txt',
-    verdictHead: 'aa4c913b',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #248。** 正本 `GC4St.png` / `GC4St.txt` と同じく、4KPI、通知実績、最近の実行、稼働状況、エラー時だけ出る要確認、LINEプレビュー、下部操作の骨格へ統一した。要件 §3-7 の予定・実行・試行・理由・次回再試行・LINE要求IDは、正本の4列表を崩さないよう関連するセルの補足行にまとめた。取得失敗時の集計値と停止予定、未実行時刻、要求IDなしを0で埋めず `—` とした。API/DBは既存の `GET /api/reminders/:id/runs`、冪等な再試行口、migration 269を使用。通常・読込中・0件・取得失敗を1440/1920で撮影（10枚）、横はみ出し0。PR実装 head `ba2f2c77` を比較した。',
+    verdictSource: 'reminders-v6/GC4St.txt + reminders-v6/GC4St-normal-1440.png + reminders-v6/GC4St-normal-1920.png',
+    verdictHead: 'ba2f2c77',
   },
   {
     /*
