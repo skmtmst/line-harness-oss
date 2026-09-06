@@ -1243,9 +1243,9 @@ export const SCREENS = [
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
     mode: 'viewport', height: 1080,
     steps: [{ fill: 'ウェビナー名', text: 'NEN活用スタートセミナー' }],
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/webinars/new`。1440・1920で撮った（はみ出し0）。**5段のステッパー（STEP 1〜5、うち STEP 3 は「CTA・フォーム」）とLINEプレビューが無い。** 実装だけにある行が2つ（「URL・動画ファイルの詳細設定」「従来CTAボタンの設定」）。取得元 `webinars-v6/lvaY5.txt`',
-    verdictHead: '49e1341c', route: '/webinars/new', },
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #223 で再照合。** 構造一致・フォルダと開催形式の保存口待ち。設計画像と実装画像を同じ比較入力で見比べ、基本設定→動画→CTA・フォーム→通知→確認の5段、ウェビナー名、開催形式、設定サマリー、LINEプレビュー、テスト送信・公開ページ、下書き保存と次段への操作を確認した。現行APIにフォルダと開催形式の項目が無いため作り物を保存せず、下書き保存後に設定する旨を画面に明記した。1440・1920とも横スクロール0。取得元 `webinars-v6/lvaY5.txt` と同Node画像。',
+    verdictHead: '98e104b7c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
     verdict: 'needs_fix',
