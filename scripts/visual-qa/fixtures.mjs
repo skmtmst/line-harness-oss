@@ -2563,8 +2563,130 @@ export const BROADCASTS = [
   successCount: Number(successCount),
   lineAccountId: 'visual-qa-account',
   folderId: ['bf-campaign', 'bf-ec', 'bf-campaign', 'bf-ec', null][index] ?? null,
+  measureOpens: true,
+  internalMemo: index === 1 ? '購入前に離脱した方へ、商品の選び方を案内する' : null,
+  draftStep: index === 1 ? 'audience' : null,
+  draftPayload: index === 1
+    ? { saveAsDraft: true, draftStep: 'audience', targetType: 'segment' }
+    : null,
+  messageOptions: index === 1 ? { buttons: [] } : null,
+  afterActionVersionId: index === 1 ? 'common-action-version-broadcast-tagged' : null,
+  version: 1,
   createdAt: '2026-08-16T00:00:00.000Z',
 }))
+
+/** 機能6の一覧が本番口と同じく、行・KPI・ページ情報を一度に読むための固定値。 */
+export const BROADCAST_LIST_META = {
+  kpis: {
+    scheduled: 4,
+    drafts: 3,
+    thisMonth: 12,
+    delivered: 1842,
+    openRate: 0.694,
+  },
+  pagination: { total: 24, limit: 20, cursor: 0, nextCursor: '20' },
+}
+
+/** 機能6 `sqFXf`。検索条件を保存済みの状態と、新規保存の固定結果。 */
+export const BROADCAST_SAVED_VIEWS = [
+  {
+    id: 'broadcast-view-reserved',
+    name: '予約中のみ',
+    filters: { statuses: ['scheduled'] },
+    sortKey: 'scheduled',
+    pageSize: 20,
+    createdBy: 'staff-owner',
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-24T00:00:00.000Z',
+    version: 1,
+  },
+  {
+    id: 'broadcast-view-low-open-rate',
+    name: '開封率が低い',
+    filters: { openRateMax: 0.5, statuses: ['sent'] },
+    sortKey: 'newest',
+    pageSize: 20,
+    createdBy: 'staff-owner',
+    createdAt: '2026-08-02T00:00:00.000Z',
+    updatedAt: '2026-08-20T00:00:00.000Z',
+    version: 1,
+  },
+]
+
+/** 機能6の対象確認。対象1,248人から35人を理由別に除き、1,213人へ送る。 */
+export const BROADCAST_PREFLIGHT = {
+  audienceCount: 1213,
+  hiddenExcluded: 12,
+  warnings: [
+    { level: 'info', message: '送信開始時に対象をもう一度数えます。' },
+    { level: 'warning', message: '同じ時刻に予約中の配信が1件あります。' },
+  ],
+  audience: {
+    matched: 1248,
+    sendable: 1213,
+    evaluatedAt: '2026-08-24T00:55:00.000Z',
+    representatives: [
+      { friendId: 'friend-1', displayName: 'Kenta Kawano', note: '予約・未対応' },
+      { friendId: 'friend-2', displayName: 'Masato S.', note: '予約・対応中' },
+      { friendId: 'friend-3', displayName: '菅野 亮', note: '予約・未対応' },
+    ],
+  },
+  exclusions: {
+    blocked: 8,
+    hidden: 12,
+    missingDestination: 3,
+    duplicate: 7,
+    paused: 5,
+    total: 35,
+  },
+  quota: {
+    monthlyUsed: 1842,
+    monthlyLimit: 5000,
+    remaining: 3158,
+    planned: 1213,
+    state: 'available',
+    reason: null,
+  },
+  concurrentBroadcasts: [
+    { id: 'broadcast-concurrent', title: '予約空き枠のご案内', scheduledAt: '2026-08-24T01:30:00.000Z' },
+  ],
+  conditionAxes: {
+    standard: [
+      ['name', '名前'], ['private_memo', '個別メモ'], ['status_message', 'ステータスメッセージ'],
+      ['registered_at', '友だち登録日'], ['tag', 'タグ'], ['friend_field', '友だち情報'],
+      ['scenario', 'シナリオ'], ['event_booking', 'イベント予約'], ['calendar_booking', 'カレンダー予約'],
+      ['common_var', '共通情報'], ['reminder', 'リマインダ'], ['form', '回答フォーム'],
+      ['last_reaction_at', '最終反応日'], ['other', 'その他'], ['support_mark', '対応マーク'],
+    ].map(([key, label]) => ({ key, label })),
+    broadcastOnly: [
+      ['assignee', '担当者'], ['inflow_route', '流入経路'], ['delivery_status', '配信状況'],
+      ['booking_status', '予約状況'], ['purchase_history', '購入履歴'], ['block_status', 'ブロック状態'],
+    ].map(([key, label]) => ({ key, label })),
+  },
+}
+
+/** 機能6の送信済み2件。LINE集計の母数とリンク別クリックを同じ返事に置く。 */
+export const BROADCAST_INSIGHTS = {
+  'broadcast-2': {
+    broadcastId: 'broadcast-2', delivered: 624, uniqueImpression: 444, uniqueClick: 96,
+    uniqueMediaPlayed: null, openRate: 0.712, clickRate: 0.154, status: 'ready',
+    fetchedAt: '2026-08-20T04:00:00.000Z',
+    opens: { count: 444, denominator: 624, rate: 0.712, asOf: '2026-08-20T04:00:00.000Z', state: 'available', reason: null },
+    links: [
+      { id: 'tracked-broadcast-2-1', label: '商品を見る', url: 'https://nen.example/products', clickCount: 112, uniqueClickCount: 82, clickRate: 0.131, lastClickedAt: '2026-08-20T03:52:00.000Z' },
+      { id: 'tracked-broadcast-2-2', label: '詳しく見る', url: 'https://nen.example/campaign', clickCount: 20, uniqueClickCount: 14, clickRate: 0.022, lastClickedAt: '2026-08-20T03:48:00.000Z' },
+    ],
+  },
+  'broadcast-3': {
+    broadcastId: 'broadcast-3', delivered: 203, uniqueImpression: 140, uniqueClick: 31,
+    uniqueMediaPlayed: null, openRate: 0.689, clickRate: 0.153, status: 'ready',
+    fetchedAt: '2026-08-18T10:30:00.000Z',
+    opens: { count: 140, denominator: 203, rate: 0.689, asOf: '2026-08-18T10:30:00.000Z', state: 'available', reason: null },
+    links: [
+      { id: 'tracked-broadcast-3-1', label: '空き枠を見る', url: 'https://nen.example/bookings', clickCount: 34, uniqueClickCount: 31, clickRate: 0.153, lastClickedAt: '2026-08-18T10:12:00.000Z' },
+    ],
+  },
+}
 
 /** 一斉配信のフォルダ操作 `xkRDb` を開くための固定データ。 */
 export const BROADCAST_FOLDERS = [
@@ -2787,6 +2909,7 @@ export const AUTO_REPLIES = [
     responseWeekdays: [0, 1, 2, 3, 4, 5, 6], respondToAll: true,
     actions: [{ actionType: 'support_mark' }],
     keywords: [], hits: { period: 214, total: 1893 },
+    actionExecutionCount: 86, conflictAttentionCount: 1,
     createdAt: '2026-03-04T00:00:00.000Z',
   },
   {
@@ -2795,7 +2918,8 @@ export const AUTO_REPLIES = [
     isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
     keywords: [{ word: '予約変更' }, { word: '日程変更' }, { word: 'キャンセル' }],
     actions: [{ actionType: 'support_mark' }],
-    hits: { period: 186, total: 942 }, createdAt: '2026-04-18T00:00:00.000Z',
+    hits: { period: 186, total: 942 }, actionExecutionCount: 64, conflictAttentionCount: 1,
+    createdAt: '2026-04-18T00:00:00.000Z',
   },
   {
     ...AR_BASE, id: 'ar-3', name: '商品についての質問', keyword: '商品', matchType: 'contains',
@@ -2803,7 +2927,8 @@ export const AUTO_REPLIES = [
     isActive: true, priority: 3, folderId: 'arf-inquiry',
     keywords: [{ word: '商品' }, { word: '価格' }, { word: '在庫' }, { word: 'サイズ' }, { word: '送料' }],
     actions: [{ actionType: 'tag' }],
-    hits: { period: 152, total: 733 }, createdAt: '2026-05-06T00:00:00.000Z',
+    hits: { period: 152, total: 733 }, actionExecutionCount: 64, conflictAttentionCount: 1,
+    createdAt: '2026-05-06T00:00:00.000Z',
   },
   {
     /* 下書き。**当たった回数は0。** 「一度も当たっていない」と
@@ -2812,14 +2937,16 @@ export const AUTO_REPLIES = [
     responseType: 'text', responseContent: 'キャンセルを承りました。',
     isActive: false, priority: 4, folderId: 'arf-booking',
     keywords: [{ word: 'キャンセル' }, { word: '取り消し' }],
-    actions: [], hits: { period: 0, total: 0 }, createdAt: '2026-08-12T00:00:00.000Z',
+    actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
+    createdAt: '2026-08-12T00:00:00.000Z',
   },
   {
     ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
     responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
     isActive: false, priority: 5, folderId: 'arf-keyword',
     keywords: [{ word: '営業時間' }],
-    actions: [], hits: { period: 0, total: 411 }, createdAt: '2026-01-20T00:00:00.000Z',
+    actions: [], hits: { period: 0, total: 411 }, actionExecutionCount: 0, conflictAttentionCount: 0,
+    createdAt: '2026-01-20T00:00:00.000Z',
   },
 ]
 
@@ -2914,7 +3041,35 @@ export const AUTO_REPLY_PUBLISH_DRAFT = {
     name: '予約問い合わせ',
     keywordMatchMode: 'any',
     folderId: 'arf-booking',
+    internalMemo: '日程変更の一次対応。担当者に引き継ぐ前の受け止めとして使う。',
+    replyDelaySeconds: 0,
+    unmatchedAction: { type: 'notify_operator' },
   },
+}
+
+/** 機能8の一覧・競合画面が読む横断集計。公開前の1件用競合とは分ける。 */
+export const AUTO_REPLY_CONFLICT_SUMMARY = {
+  conflicts: [
+    {
+      leftAutoReplyId: 'ar-1', rightAutoReplyId: 'ar-2', winnerAutoReplyId: 'ar-1',
+      certainty: 'possible', reason: '営業時間外は予約変更の言葉にも反応します。',
+    },
+    {
+      leftAutoReplyId: 'ar-2', rightAutoReplyId: 'ar-3', winnerAutoReplyId: 'ar-2',
+      certainty: 'possible', reason: '商品予約についての質問で条件が重なります。',
+    },
+    {
+      leftAutoReplyId: 'ar-1', rightAutoReplyId: 'ar-3', winnerAutoReplyId: 'ar-1',
+      certainty: 'possible', reason: '営業時間外の商品質問で条件が重なります。',
+    },
+  ],
+  conflictCount: 3,
+  receiveSourceCounts: [
+    { source: 'text', count: 5740 },
+    { source: 'image', count: 76 },
+    { source: 'sticker', count: 26 },
+  ],
+  matchedLast28Days: 682,
 }
 
 export const AUTO_REPLY_PUBLISH_CONFLICTS = [
@@ -3194,6 +3349,42 @@ export const MILEAGE_OVERVIEW = {
   pagination: { total: 1284, limit: 20, offset: 0 },
 }
 
+/**
+ * 機能17の新しい友だち別残高契約。
+ * 旧 `/overview` と違い、失効予定・今月の増減・財布の範囲を1行ずつ返す。
+ */
+export const MILEAGE_FRIENDS = {
+  summary: {
+    totalMembers: 1284,
+    withBalanceCount: 1284,
+    available: 486200,
+    pending: 300,
+    expiringMiles30d: 24600,
+  },
+  items: [
+    ['friend-1', '高橋 直人', 'gold', 8420, 0, 1200, 2100, 12400, 3980, '2026-08-25T00:12:00.000Z', 'LINE 本店'],
+    ['friend-2', '前田 さくら', 'gold', 6150, 300, 300, null, 9800, 3650, '2026-08-24T09:40:00.000Z', 'LINE 本店'],
+    ['friend-3', '木村 亮', 'silver', 3900, 0, 240, 900, 7200, 3300, '2026-08-24T05:02:00.000Z', 'LINE 二号店'],
+    ['friend-4', '佐藤 千尋', 'silver', 2480, 0, -1000, null, 5480, 3000, '2026-08-24T09:40:00.000Z', 'LINE 本店'],
+    ['friend-5', '大西 健一', 'bronze', 620, 0, 120, null, 920, 300, '2026-08-22T07:20:00.000Z', 'LINE 本店'],
+    ['friend-6', '石田 未来', 'bronze', 100, 0, 100, null, 100, 0, '2026-08-22T01:05:00.000Z', 'LINE 二号店'],
+  ].map(([
+    friendId, displayName, rank, available, pending, monthChange, expiringMiles30d,
+    lifetimeEarned, spent, lastChangedAt, accountName,
+  ], index) => ({
+    friendId, displayName, pictureUrl: null, rank,
+    rankReason: rank === 'gold' ? '5,000マイル以上' : rank === 'silver' ? '2,000マイル以上' : '2,000マイル未満',
+    monthChange, available, pending, expiringMiles30d, lifetimeEarned, spent, lastChangedAt,
+    walletScope: index < 2 ? 'verified_user' : 'friend',
+    lineAccount: {
+      id: accountName === 'LINE 二号店' ? 'visual-qa-account-2' : 'visual-qa-account',
+      name: accountName,
+    },
+  })),
+  pagination: { total: 1284, limit: 20, offset: 0 },
+  measuredAt: '2026-08-25T01:00:00.000Z',
+}
+
 /*
   たまる決めごと。設計 `N46cQ` の「すべて 9／動いている 7／止めている 2」。
   **止めているものを2本入れる。** 全部動いていると、その札が撮れない。
@@ -3223,6 +3414,81 @@ export const MILEAGE_RULES = [
   mileageRule('mr-8', '誕生日クーポンを受け取った', 'birthday', 500, {}, false),
   mileageRule('mr-9', '旧キャンペーン（終了）', 'campaign_2025', 1000, {}, false),
 ]
+
+const mileageEarningRule = ({
+  id, name, eventType, source, amount, initialStatus = 'available', granted,
+  excluded = 0, status = 'published', expiresAfterDays = 365,
+  cancellationEventTypes = [], targetConditions = null, sortOrder,
+}) => {
+  const definition = {
+    name, eventType, source, amount, initialStatus,
+    validFrom: null, validUntil: null, expiresAfterDays,
+    cancellationEventTypes, targetConditions, sortOrder,
+  }
+  return {
+    id,
+    published: {
+      name, eventType, source, amount, initialStatus,
+      validFrom: null, validUntil: null, status,
+      updatedAt: '2026-08-25T00:00:00.000Z',
+    },
+    draft: definition,
+    draftVersion: 3,
+    draftUpdatedAt: '2026-08-25T00:00:00.000Z',
+    metrics30d: { eligible: granted + excluded, granted, excluded },
+  }
+}
+
+/** 機能17の公開版・下書き版・直近30日集計を同じ行で返す新契約。 */
+export const MILEAGE_EARNING_RULES = {
+  items: [
+    mileageEarningRule({ id: 'mer-1', name: '友だち登録してくれた', eventType: 'friend_added', source: 'line', amount: 100, granted: 62, excluded: 3, sortOrder: 1 }),
+    mileageEarningRule({ id: 'mer-2', name: 'LINEでメッセージを送ってくれた', eventType: 'message_received', source: 'line', amount: 5, granted: 964, excluded: 12, sortOrder: 2 }),
+    mileageEarningRule({ id: 'mer-3', name: '紹介の成果が認められた', eventType: 'affiliate_conversion_approved', source: 'affiliate', amount: 500, granted: 7, excluded: 1, sortOrder: 3 }),
+    mileageEarningRule({ id: 'mer-4', name: '予約してくれた', eventType: 'booking_created', source: 'booking', amount: 300, granted: 8, cancellationEventTypes: ['booking_cancelled'], sortOrder: 4 }),
+    mileageEarningRule({ id: 'mer-5', name: '配信のリンクを押した', eventType: 'broadcast_link_clicked', source: 'broadcast', amount: 10, granted: 214, excluded: 9, sortOrder: 5 }),
+    mileageEarningRule({ id: 'mer-6', name: '回答フォームに答えた', eventType: 'form_submitted', source: 'form', amount: 100, granted: 18, excluded: 2, sortOrder: 6 }),
+    mileageEarningRule({ id: 'mer-7', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', source: 'webinar', amount: 200, granted: 8, sortOrder: 7 }),
+    mileageEarningRule({ id: 'mer-8', name: 'Instagramから戻ってきた', eventType: 'inflow_return', source: 'instagram', amount: 50, granted: 0, status: 'stopped', sortOrder: 8 }),
+    mileageEarningRule({ id: 'mer-9', name: '旧キャンペーン（終了）', eventType: 'campaign_2025', source: null, amount: 1000, granted: 0, status: 'stopped', expiresAfterDays: null, sortOrder: 9 }),
+  ],
+  pagination: { total: 9, limit: 20, offset: 0 },
+  unassignedLegacyCount: 0,
+  measuredAt: '2026-08-25T01:00:00.000Z',
+}
+
+/** 機能17の全体履歴。新契約の行に期間集計を添える。 */
+export const MILEAGE_HISTORY = {
+  items: [
+    ['ml-1', 'friend-1', '高橋 直人', 'grant', 'available', 100, '回答フォームに答えた', 'form', '夏のアンケート', 'automatic', null, '2026-08-25T00:12:00.000Z'],
+    ['ml-2', 'friend-4', '佐藤 千尋', 'spend', 'available', -1000, '使い道と交換した', 'reward', '500円ぶんのクーポン', 'automatic', null, '2026-08-24T09:40:00.000Z'],
+    ['ml-3', 'friend-3', '木村 亮', 'grant', 'available', 500, '紹介の成果が認められた', 'affiliate', '無料体験の申込', 'automatic', '佐々木', '2026-08-24T05:02:00.000Z'],
+    ['ml-4', 'friend-2', '前田 さくら', 'adjustment', 'available', 2000, '手で増やした', 'manual', null, 'manual', '山本', '2026-08-23T02:00:00.000Z'],
+    ['ml-5', 'friend-5', '大西 健一', 'reversal', 'available', -300, '予約が取り消された', 'booking', '予約 #B-204', 'automatic', null, '2026-08-22T07:20:00.000Z'],
+    ['ml-6', 'friend-6', '石田 未来', 'grant', 'available', 100, '友だち登録してくれた', 'line', null, 'automatic', null, '2026-08-22T01:05:00.000Z'],
+    ['ml-7', 'friend-1', '高橋 直人', 'grant', 'available', 10, '配信のリンクを押した', 'broadcast', '夏のご案内', 'automatic', null, '2026-08-21T11:31:00.000Z'],
+  ].map(([
+    id, primaryFriendId, displayName, entryType, status, amount, reason, source,
+    sourceReferenceId, mode, executedByStaffName, occurredAt,
+  ]) => ({
+    id, primaryFriendId, displayName, pictureUrl: null, entryType, status, amount, reason, source,
+    hasSourceEvent: sourceReferenceId !== null, sourceReferenceId,
+    ruleName: reason, mode, executedByStaffName, occurredAt,
+  })),
+  pagination: { total: 4180, limit: 20, offset: 0 },
+  summary: {
+    from: '2026-08-01',
+    to: '2026-08-25',
+    byType: [
+      { entryType: 'grant', count: 4122, amount: 32400 },
+      { entryType: 'spend', count: 55, amount: -18900 },
+      { entryType: 'reversal', count: 3, amount: -900 },
+    ],
+    totalAmount: 12600,
+    manualCount: 12,
+    measuredAt: '2026-08-25T01:00:00.000Z',
+  },
+}
 
 /*
   成果地点。設計 `ZrpKn` の「すべて 12／動いている 10／止めている 2／
@@ -3927,13 +4193,13 @@ function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
 export const MILEAGE_REWARDS = {
   rewards: [
     { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
-    { id: 'mr-2', name: '誕生月クーポン', description: '誕生月に使える 10%オフ', rewardKind: 'coupon', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1200, 200), exchangedThisMonth: 18, availableCodeCount: 168 },
-    { id: 'mr-3', name: '先行案内', description: '新商品を先にお知らせします', rewardKind: 'early_access', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(2000, null), exchangedThisMonth: 6, availableCodeCount: null },
-    { id: 'mr-4', name: 'ゴールドのタグ', description: 'タグ「ゴールド」が付きます', rewardKind: 'tag', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(5000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    { id: 'mr-2', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
+    { id: 'mr-4', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
     // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
-    { id: 'mr-5', name: 'お試しセット', description: null, rewardKind: 'coupon', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(800, 50), exchangedThisMonth: 0, availableCodeCount: null },
+    { id: 'mr-5', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
   ].map((reward) => ({
-    lineAccountId: 'acc-1', programId: 'mp-1', imageUrl: null,
+    lineAccountId: 'visual-qa-account', programId: 'mp-1', imageUrl: null,
     currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,
     createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-30T00:00:00.000Z',
     ...reward,
@@ -3945,6 +4211,31 @@ export const MILEAGE_REWARDS = {
     mostRedeemedRewardName: '送料無料',
     mostRedeemedRewardCount: 32,
   },
+  reachMetrics: [
+    { rewardId: 'mr-1', rewardName: '送料無料', rewardKind: 'coupon', requiredMiles: 500, reachableFriendCount: 1042, redeemedFriendCount: 32, exchangeRate: 32 / 1042 },
+    { rewardId: 'mr-2', rewardName: '500円ぶんのクーポン', rewardKind: 'coupon', requiredMiles: 1000, reachableFriendCount: 486, redeemedFriendCount: 18, exchangeRate: 18 / 486 },
+    { rewardId: 'mr-3', rewardName: '1,000円ぶんのクーポン', rewardKind: 'coupon', requiredMiles: 1800, reachableFriendCount: 398, redeemedFriendCount: 6, exchangeRate: 6 / 398 },
+    { rewardId: 'mr-4', rewardName: '新商品の先行案内', rewardKind: 'early_access', requiredMiles: 3000, reachableFriendCount: 172, redeemedFriendCount: 2, exchangeRate: 2 / 172 },
+    { rewardId: 'mr-5', rewardName: 'オリジナルトートバッグ', rewardKind: 'template', requiredMiles: 5000, reachableFriendCount: 86, redeemedFriendCount: 0, exchangeRate: 0 },
+  ],
+  rankBenefits: [
+    { rewardId: 'rank-bronze', rewardName: 'ブロンズ', rewardKind: 'rank', requiredMiles: 0, reachableFriendCount: 886, redeemedFriendCount: 0, exchangeRate: null },
+    { rewardId: 'rank-silver', rewardName: 'シルバー', rewardKind: 'rank', requiredMiles: 2000, reachableFriendCount: 312, redeemedFriendCount: 0, exchangeRate: null },
+    { rewardId: 'rank-gold', rewardName: 'ゴールド', rewardKind: 'rank', requiredMiles: 5000, reachableFriendCount: 86, redeemedFriendCount: 0, exchangeRate: null },
+  ],
+  measuredAt: '2026-08-25T01:00:00.000Z',
+}
+
+/** 機能9の最終確認と公開完了を描く、保存を伴わない固定応答。 */
+export const FRIEND_ADD_RULE_VALIDATE = {
+  canPublish: true,
+  checks: [{ status: 'passed', label: '配信内容と参照先を確認できました。' }],
+}
+
+export const FRIEND_ADD_RULE_PUBLISH = {
+  id: 'rule-referral',
+  versionNumber: 1,
+  publishedAt: '2026-01-13T10:01:00+09:00',
 }
 
 /*

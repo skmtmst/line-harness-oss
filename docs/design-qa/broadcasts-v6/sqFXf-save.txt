@@ -1,5 +1,5 @@
 # 6-1-L 対象条件を編集-save
-# /broadcasts/new?step=audience
+# /broadcasts/new?step=audience&scoreMin=20&scoreMax=80
 
 画
 画面確認アカウント
@@ -63,9 +63,14 @@ LINEアカウント
 運用状態
 一斉配信を作成・対象者
 LINEアカウント
-画
-画面確認アカウント
-画面確認アカウント
+然
+然-NEN- TEST
+然-NEN- TEST
+然-NEN- 本店
+然-NEN- 渋谷店
+旧キャンペーン
+2025年イベント
+旧テストアカウント
 統括
 画面確認
 ログアウト
