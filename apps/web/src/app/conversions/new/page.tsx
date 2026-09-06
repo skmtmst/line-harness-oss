@@ -189,7 +189,7 @@ export default function NewConversionPointPage() {
       aside={
         <>
           <section className="border-info bg-info-bg rounded-card border p-4">
-            <h2 className="text-info text-sm font-bold">この決めごとを過去30日にあてはめると</h2>
+            <h2 className="text-info text-sm font-bold">この決めごとをこの30日にあてはめると</h2>
             <div className="mt-3 flex items-end justify-between gap-4">
               <div>
                 <p className="text-info text-2xl font-bold tabular-nums">{sameKind.count.toLocaleString()}件</p>
@@ -233,20 +233,25 @@ export default function NewConversionPointPage() {
             const Icon = choice.icon
             const selected = triggerKind === choice.value
             return (
-              <button
+              <label
                 key={choice.value}
-                type="button"
-                disabled={!choice.connected}
-                aria-pressed={selected}
-                onClick={() => selectTrigger(choice)}
                 className={`rounded-card min-w-0 border p-3 text-left transition-colors ${
                   selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                } disabled:cursor-not-allowed disabled:opacity-55`}
+                } ${choice.connected ? 'cursor-pointer' : 'cursor-not-allowed opacity-55'}`}
               >
+                <input
+                  type="radio"
+                  name="conversion-trigger"
+                  value={choice.value}
+                  checked={selected}
+                  disabled={!choice.connected}
+                  onChange={() => selectTrigger(choice)}
+                  className="sr-only"
+                />
                 <Icon className={selected ? 'text-accent' : 'text-ink-faint'} size={18} aria-hidden />
                 <span className="text-ink mt-2 block text-xs font-bold">{choice.label}</span>
-                <span className="text-ink-faint mt-0.5 block text-[11px]">{choice.note}</span>
-              </button>
+                <span className="text-ink-faint text-micro mt-0.5 block">{choice.note}</span>
+              </label>
             )
           })}
         </div>
@@ -309,10 +314,10 @@ export default function NewConversionPointPage() {
         <div className="grid gap-2 sm:grid-cols-3">
           <ChoiceCard selected={countRepeat} title="何回でも数える" note="買うたびに計測します" onClick={() => setCountRepeat(true)} />
           <ChoiceCard selected={!countRepeat} title="1人1回だけ" note="はじめての人だけを数えます" onClick={() => setCountRepeat(false)} />
-          <button type="button" disabled className="border-hairline rounded-card cursor-not-allowed border p-3 text-left opacity-55">
+          <div aria-disabled="true" className="border-hairline rounded-card cursor-not-allowed border p-3 text-left opacity-55">
             <span className="text-ink block text-sm font-semibold">30日に1回まで</span>
             <span className="text-ink-faint block text-xs">期間内1回の保存契約は未接続です</span>
-          </button>
+          </div>
         </div>
       </FormSection>
 
