@@ -83,12 +83,18 @@ describe('friend add V6 event ledger', () => {
     })).toEqual({ refCode: 'current-link', entryRouteId: 'route-1' });
     await markFriendAddEventRouting(db, {
       eventId, lineAccountId: 'account-1', status: 'completed',
+      scenarioEnrollmentId: 'enrollment-1', deliveryCount: 1,
     });
 
     expect(sqlite.prepare(`SELECT ref_code FROM friends WHERE id = 'friend-1'`).get())
       .toEqual({ ref_code: 'first-touch' });
     expect(sqlite.prepare(`SELECT status, consumed_by_event_id FROM friend_add_attribution_candidates WHERE id = ?`).get(candidate.id))
       .toEqual({ status: 'consumed', consumed_by_event_id: eventId });
+    expect(sqlite.prepare(
+      `SELECT scenario_enrollment_id, delivery_count,
+              first_delivery_sent_at IS NOT NULL AS has_sent_at
+         FROM friend_add_events WHERE id = ?`,
+    ).get(eventId)).toEqual({ scenario_enrollment_id: 'enrollment-1', delivery_count: 1, has_sent_at: 1 });
   });
 
   test('取れなかったイベントは unavailable、後着候補は late のまま混同しない', async () => {
