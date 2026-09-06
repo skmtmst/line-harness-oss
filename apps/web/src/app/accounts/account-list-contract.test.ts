@@ -90,13 +90,14 @@ describe('V6 33-1 LINEアカウント一覧', () => {
     expect(parentName(account(), [])).toBe('—')
   })
 
-  it('APIで取れるアーカイブ件数を数え、取れない友だち数は作らない', () => {
+  it('APIで取れるアーカイブ件数・友だち数・既定を表示する', () => {
     /*
-      友だち数を返す口がこの一覧に無い。アーカイブは `archived_at` が
-      まだ無い（台帳 #128）。**0 と書くと「1件も無い」と読まれる。**
+      一覧APIの `stats` とライフサイクル値を使う。値が無い固定データでは
+      `—` のままにし、未取得を 0 と誤表示しない。
     */
     expect(PAGE).toContain('title="アーカイブ" value={archivedCount}')
-    expect(PAGE).not.toContain('friendCount')
+    expect(PAGE).toContain('account.stats.friendCount')
+    expect(PAGE).toContain('account.isDefault')
   })
 
   it('まだ動かない操作は、押し口を置かず理由を書く', () => {

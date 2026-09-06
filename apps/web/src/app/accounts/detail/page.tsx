@@ -102,8 +102,8 @@ function AccountDetail() {
       />
 
       {tab === 'overview' && (
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="space-y-4">
+        <div className="mt-4 grid gap-4 xl:grid-cols-4">
+          <div className="space-y-4 xl:col-span-3">
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>

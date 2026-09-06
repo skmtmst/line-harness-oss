@@ -75,18 +75,18 @@ function Handover() {
         </ol>
       </section>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="space-y-4">
+      <div className="mt-4 grid gap-4 xl:grid-cols-4">
+        <div className="space-y-4 xl:col-span-3">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-bold">乗り換え元と受け取り先</p>
-            <div className="mt-4 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
-              <div className="bg-canvas-sunken rounded-control p-4">
+            <div className="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <div className="bg-canvas-sunken rounded-control flex-1 p-4">
                 <p className="text-ink-faint text-xs">乗り換え元</p>
                 <p className="text-ink mt-1 text-sm font-bold">{account.name}</p>
                 <p className="text-ink-faint mt-1 text-xs">チャネル {account.channelId}</p>
               </div>
               <span className="text-ink-faint text-center text-lg" aria-hidden>→</span>
-              <div className="border-hairline rounded-control border border-dashed p-4">
+              <div className="border-hairline rounded-control flex-1 border border-dashed p-4">
                 <p className="text-ink-faint text-xs">受け取り先</p>
                 <p className="text-ink mt-1 text-sm font-bold">まだ選ばれていません</p>
                 <p className="text-ink-faint mt-1 text-xs">引き継ぎコードを読むと表示します</p>
@@ -139,7 +139,7 @@ function Handover() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-bold">引き継ぎコード</p>
             <div className="bg-canvas-sunken rounded-control mt-3 p-4 text-center">
-              <p className="text-ink text-xl font-bold tracking-[0.2em]">— — — — — —</p>
+              <p className="text-ink text-xl font-bold tracking-widest">— — — — — —</p>
               <p className="text-ink-faint mt-2 text-xs">コードはまだ発行されていません</p>
             </div>
           </section>

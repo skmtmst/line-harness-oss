@@ -24,6 +24,10 @@ import {
 } from './account-list-view'
 import AccountMigration from './migration'
 
+type AccountWithStats = LineAccount & {
+  stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
+}
+
 /**
  * LINEアカウントの一覧。設計 ★V6 33-1（`QT91v`）。
  *
@@ -32,7 +36,7 @@ import AccountMigration from './migration'
  */
 export default function AccountsPage() {
   const searchParams = useSearchParams()
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AccountFilter>('all')
@@ -56,11 +60,7 @@ export default function AccountsPage() {
     [accounts, filter, query],
   )
 
-  /*
-    帯の数。**取れないものは `—`。** 友だち数を返す口がこの一覧に無いので、
-    人数は数を作らず未取得として出す（`docs/v6-common-rules.md`
-    「取れない数字を 0 にしない」）。
-  */
+  // アーカイブは停止と重ねて数えず、4枚の帯を互いに読み違えないようにする。
   const activeCount = accounts.filter((a) => a.isActive && !a.archivedAt).length
   const inactiveCount = accounts.filter((a) => !a.isActive && !a.archivedAt).length
   const archivedCount = accounts.filter((a) => Boolean(a.archivedAt)).length
@@ -176,12 +176,14 @@ export default function AccountsPage() {
                     <td className="px-4 py-3">
                       <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
                     </td>
-                    {/*
-                      友だち数を返す口がこの一覧に無い。**0 と書かない。**
-                      数えて 0 だったことと、数えていないことは別。
-                    */}
-                    <td className="text-ink-faint px-4 py-3 text-sm">—</td>
-                    <td className="text-ink-faint px-4 py-3 text-sm">—</td>
+                    <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
+                      {account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {account.isDefault
+                        ? <StatusBadge tone="success">既定</StatusBadge>
+                        : <span className="text-ink-faint">—</span>}
+                    </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm">
                       {parentName(account, accounts)}
                     </td>
@@ -212,8 +214,8 @@ export default function AccountsPage() {
           押し口を置かず、理由を本文で言う（`v6-common-rules.md` §7-10）。
         */}
         <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          並び順と親子の変更は、保存する画面がまだ繋がっていません。友だち数と既定の表示は、
-          一覧APIから値が届いたときだけ表示します。
+          並び順と親子の変更は、保存する画面がまだ繋がっていません。友だち数と既定は、
+          一覧APIから値が届いたアカウントだけ表示します。
         </p>
       </div>
     </div>

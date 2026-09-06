@@ -103,6 +103,20 @@ export default function NewLineAccountPage() {
               <ReadOnlyField label="タイムゾーン" value="Asia/Tokyo" />
               <ReadOnlyField label="国・地域" value="登録後に設定できます" />
             </div>
+            <Field
+              label="役割メモ（任意）"
+              value=""
+              onChange={() => undefined}
+              placeholder="登録後に設定できます"
+              disabled
+            />
+            <Field
+              label="親アカウント（任意）"
+              value=""
+              onChange={() => undefined}
+              placeholder="登録後に並び順と一緒に設定できます"
+              disabled
+            />
           </SetupSection>
 
           <SetupSection
@@ -229,13 +243,22 @@ export default function NewLineAccountPage() {
               **確かめる前はURLを作らない。** 接続確認の返事に入っている
               URLだけを出す。想像で組み立てると、貼り間違いのもとになる。
             */}
-            <div className="bg-canvas-sunken rounded-control mt-3 p-3">
-              <p className="text-ink-faint text-[11px] font-medium">Webhook URL</p>
-              <p className="text-ink mt-1 break-all text-xs leading-relaxed">
-              {verify?.webhookUrl
-                ? verify.webhookUrl
-                : '「接続を確かめて保存」を押すと、貼り付けるURLがここに出ます。'}
-              </p>
+            <div className="mt-3 space-y-3">
+              <EndpointRow
+                label="Webhook URL"
+                value={verify?.webhookUrl ?? '接続確認後に表示します'}
+                help="LINE Developers → Messaging API"
+              />
+              <EndpointRow
+                label="Callback URL"
+                value="登録後に表示します"
+                help="LINE Login → Callback URL"
+              />
+              <EndpointRow
+                label="LIFF エンドポイント"
+                value="登録後に表示します"
+                help="LIFF → Endpoint URL"
+              />
             </div>
           </section>
 
@@ -307,6 +330,7 @@ function Field({
   placeholder,
   required = false,
   type = 'text',
+  disabled = false,
 }: {
   label: string
   value: string
@@ -314,6 +338,7 @@ function Field({
   placeholder?: string
   required?: boolean
   type?: 'text' | 'password'
+  disabled?: boolean
 }) {
   return (
     <label className="block">
@@ -326,9 +351,22 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
-        className="border-hairline rounded-control text-ink w-full border px-3 py-2 text-sm"
+        disabled={disabled}
+        className="border-hairline rounded-control text-ink w-full border px-3 py-2 text-sm disabled:bg-canvas-sunken disabled:text-ink-faint"
       />
     </label>
+  )
+}
+
+function EndpointRow({ label, value, help }: { label: string; value: string; help: string }) {
+  return (
+    <div>
+      <p className="text-ink-faint text-xs font-medium">{label}</p>
+      <p className="bg-canvas-sunken rounded-control text-ink mt-1 break-all px-3 py-2 text-xs leading-relaxed">
+        {value}
+      </p>
+      <p className="text-ink-faint mt-1 text-xs">{help}</p>
+    </div>
   )
 }
 
