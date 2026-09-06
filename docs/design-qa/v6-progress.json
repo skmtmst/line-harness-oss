@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 244,
+  "compared": 247,
   "unimplemented": 12,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 16,
+  "missing": 13,
   "match": 47,
   "structureMatchDataPending": 47,
   "needsFix": 162,
@@ -39,6 +39,16 @@
             "Alekb"
           ],
           "note": "ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）"
+        },
+        {
+          "pr": 0,
+          "head": "d69099cd9",
+          "on": "2026-09-06",
+          "screens": [
+            "vUXKb",
+            "JN6mQ"
+          ],
+          "note": "Issue #267。3102/8789で対象2画面を1440・1920px撮影し、Pencil設計と比較。両画面とも横はみ出し0。構造は一致し、設計値と公式プロフィール短縮URLを返すAPIがないためデータ未接続を維持した。"
         }
       ]
     },
@@ -1533,11 +1543,11 @@
       "feature": 15,
       "name": "登録メディア",
       "total": 5,
-      "compared": 4,
+      "compared": 5,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 2,
@@ -1833,11 +1843,11 @@
       "feature": 18,
       "name": "流入と計測",
       "total": 9,
-      "compared": 7,
+      "compared": 9,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 2,
+      "missing": 0,
       "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
