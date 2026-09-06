@@ -5,7 +5,7 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -366,10 +366,23 @@ export default function ScenarioDetailClient({
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const [stats, setStats] = useState<ScenarioStats | null>(null)
+  const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
+  const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   const [templates, setTemplates] = useState<TemplateOpt[]>([])
   const [tags, setTags] = useState<TagOpt[]>([])
 
   const deliveryMode: DeliveryMode = (scenario?.deliveryMode ?? 'relative') as DeliveryMode
+  const latestStartedAt = runs?.subscriptions[0]?.startedAt ?? null
+  const latestStartedLabel = latestStartedAt
+    ? new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(latestStartedAt))
+    : null
 
   const loadScenario = useCallback(async () => {
     setLoading(true)
@@ -453,6 +466,31 @@ export default function ScenarioDetailClient({
   useEffect(() => {
     if (id) reloadActionCounts()
   }, [id, reloadActionCounts])
+
+  /**
+   * 機能5 V6の開始前試算と運用記録。互いに独立した読取なので並列で取得する。
+   * 失敗時は旧集計を残し、0件とは表示しない。
+   */
+  useEffect(() => {
+    const lineAccountId = scenario?.lineAccountId
+    if (!id || !lineAccountId) {
+      setSimulation(null)
+      setRuns(null)
+      return
+    }
+    let cancelled = false
+    void Promise.all([
+      api.scenarios.simulate(id, lineAccountId).catch(() => null),
+      api.scenarios.runs(id, lineAccountId, { limit: 50 }).catch(() => null),
+    ]).then(([simulationResponse, runsResponse]) => {
+      if (cancelled) return
+      setSimulation(simulationResponse?.success ? simulationResponse.data : null)
+      setRuns(runsResponse?.success ? runsResponse.data : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id, scenario?.lineAccountId])
 
   useEffect(() => {
     if (!id) return
@@ -1412,7 +1450,10 @@ export default function ScenarioDetailClient({
           role="status"
         >
           <p className="font-semibold">
-            配信を開始しました。条件を満たした友だちから順に配信します。
+            配信を開始しました。
+            {simulation
+              ? `新規開始予定${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
+              : '条件を満たした友だちから順に配信します。'}
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
             開始履歴を確認
@@ -1577,7 +1618,9 @@ export default function ScenarioDetailClient({
                 </p>
                 <p className="text-ink-faint mt-0.5 text-xs">
                   {showStarted
-                    ? '開始日時はこの画面では取得できません'
+                    ? latestStartedLabel
+                      ? `${latestStartedLabel} 開始`
+                      : '開始日時を取得できませんでした'
                     : scenario.isActive
                       ? '配信を一時停止する'
                       : '配信を再開する'}
@@ -1615,7 +1658,11 @@ export default function ScenarioDetailClient({
                         : `${triggerCount} 件`}
                   </span>
                   <span className="text-ink-faint mt-0.5 block text-xs">
-                    {triggerCount === 0 ? 'アクションなどから開始できます' : '押すと足せます'}
+                    {simulation
+                      ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
+                      : triggerCount === 0
+                        ? 'アクションなどから開始できます'
+                        : '押すと足せます'}
                   </span>
                 </button>
                 <button
