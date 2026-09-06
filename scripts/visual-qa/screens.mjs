@@ -881,67 +881,66 @@ export const SCREENS = [
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
-  /*
-    設計は5段の作成ウィザード（基本設定→対象者→通知ステップ→送信設定→確認）。
-    実装は `/reminders/new` の1枚もので、段の縦帯も右の「設定内容」も無い。
-    **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
-  */
+  /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`。**設計の「今後7日」の帯が無い。** 実装は「稼働中 7」。行頭に掴んで動かす記号（`⠿`）が読み上げ名へ混じっている。取得元 `reminders-v6/M1EXwB.txt`',
-    verdictHead: '49e1341c', route: '/reminders', },
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 一覧を正本 `M1EXwB` の4KPI・フォルダ・検索/状態/基準日・6列表・ページ送りへ統一。通常と全状態を1440/1920で撮影し、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d', route: '/reminders', },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/new`。**5段のステッパー（STEP 1〜5）が無い。** LINEプレビューも無い。設計の道案内（「通知ステップは STEP 3 で設定します」「テスト送信と表示確認は、STEP 3 で通知を作ると使えます。」）も出ていない。取得元 `reminders-v6/uJP22.txt`',
-    verdictHead: '49e1341c', route: '/reminders/new', },
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `uJP22` の5段ステッパー、基本設定、基準日、ひな形、設定内容、LINEプレビュー、テスト案内を同じ配置で実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d', route: '/reminders/new',
+    steps: [
+      { fill: 'input[maxlength="60"]', selector: true, text: 'Google Meet相談の前日案内' },
+      { fill: 'textarea[placeholder="運用目的や注意点を入力"]', selector: true, text: 'Meet相談の無断キャンセルを減らす目的。前日・1時間前・当日の3回で運用する。' },
+    ], },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（通知ステップ編集）。**STEP 1〜5とLINEプレビューが無い。** 設計の「URLの扱い」（短縮する／しないの表）も無い。差し込みが `{{name}}` `{{meet_url}}` の生表記のままで、横断レビュー §7 の33番（差し込みチップに統一）が実装側に届いていない。取得元 `reminders-v6/J64xI.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `J64xI` の通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューを実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3',
 
   },
   {
     ...REMINDER, node: 's7T2dz', name: '7-1-C 対象と終了条件',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（対象と終了条件）。**STEP 1〜5が無い。** 設計の終了条件「基準日を過ぎて7日経過」と基準日の選び口「予約日時（Google Meet相談）」が出ていない。取得元 `reminders-v6/s7T2dz.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `s7T2dz` の対象条件・人数内訳、基準日、終了/停止条件4件、安全な運用を同じ構成で実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=target', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（配信予定プレビュー）。**STEP 1〜5・LINEプレビューが無く、期間の切り替え（今後7日／今後30日）も無い。** 取得元 `reminders-v6/JCz6J.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `JCz6J` の期間切替、配信予定表、重複/時間帯確認、設定内容、LINEプレビューを実装し、予定APIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=preview', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（テスト送信確認）。**STEP 1〜5とLINEプレビューが無い。** 設計は差し込みの置き換え表（`{{name}}`→Kenta、`{{meet_url}}`→meet.google.com/test-0000）を出すが、その表が無い。取得元 `reminders-v6/W98zZQ.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `W98zZQ` の送信先、差し込み値表、履歴、LINEプレビュー、画面内テスト確認窓を実装し、テストAPIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
+    steps: [{ click: 'テスト送信', after: 300 }],
 
   },
   {
     ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit`（最終確認）。**STEP 1〜5とLINEプレビューが無い。** 設計の要約（対象・基準日・通知の並び「前日・1時間前・当日」）が出ていない。取得元 `reminders-v6/s6Vvp.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `s6Vvp` の有効化前チェック、対象/基準日/通知順/停止条件の要約、LINEプレビュー、公開操作を実装し、検証/公開APIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders/edit?id=reminder-3&stage=confirm`。**`stage=confirm` が実装されていない**——開いても素の編集画面（「保存」「一覧へ戻る」）が出るだけで、設計の「この内容で公開」と有効化完了の面が無い。撮れていない。台帳Issue #92 が同じ話。',
-    verdictHead: '49e1341c',
-    route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
-    /* 公開を押した先。**確認から実際に進める。** */
-    steps: [{ click: 'この内容で公開', after: 1500 }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `PSmHo` の完了表示、配信設定、次にできること、監視項目、LINEプレビューを実装。完了URLを直接開いても下書き/予定/検証の値を取得する。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
+    route: '/reminders/edit?id=reminder-3&stage=done', mode: 'page',
 
   },
   {
@@ -969,13 +968,13 @@ export const SCREENS = [
       #514 は #498 を含むので、積み順を守って #514 の head で撮る。
     */
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`（削除確認）。**一部失敗（`-fail`）の絵が初めて撮れた**——変種が基本手順を二重に持っていたのを直した（`capture-screens.mjs` は `[...steps, ...variant.steps]` で繋ぐ）。窓は開いたまま「選択したリマインダを削除できませんでした。状態を読み直してから、もう一度お試しください。」が出て、やり直せる。内部の番号も英語も出ない。設計との差は題の文言（設計「「未返信3日後フォロー」を削除しますか？」）。取得元 `reminders-v6/Y0Sn3.txt` ＋ `Y0Sn3-fail.txt`',
-    verdictHead: '2f016fcd',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `Y0Sn3` と同じく対象名、消える予定、残る履歴、取消不可を示す画面内確認窓へ統一。一部失敗も窓を閉じず日本語で再操作できる。通常/失敗を1440/1920で撮影、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders',
     mode: 'viewport', height: 1080,
     /* 撮れない理由: 一覧の選択チェックに aria-label が無く押せない。撮るには実装側に目印が要る */
-    steps: [{ click: 'このページのリマインダをすべて選ぶ', role: 'checkbox' }, { click: '選択したリマインダを削除' }],
+    steps: [{ click: '未返信3日後フォローを削除' }],
     /* 失敗しても窓が閉じないか、文が画面の言葉かを見る。撮影用の口は405。 */
     /*
       **変種の手順は基本手順の続きとして足される**（`capture-screens.mjs` が
@@ -988,9 +987,9 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/reminders`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**設計の「今後7日」の帯が無い。** 失敗のとき「取得できませんでした」と出る。取得元 `reminders-v6/dC0yg-*.txt`',
-    verdictHead: '49e1341c', route: '/reminders',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `dC0yg` の通常・読込・空・取得失敗を、同じ4KPI/フォルダ/絞り込み/6列表の骨格で実装。全状態を1440/1920で撮影し、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
 
   },
@@ -1122,34 +1121,34 @@ export const SCREENS = [
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信',
     states: { apis: ['**/api/friend-add-rules*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・照合。** 一覧、4指標、フォルダ、優先順位、行操作を実APIへ接続し、通常・読込・空・失敗・権限不足を1440/1920pxで撮影（24枚中12枚、横はみ出し0）。Pencil画像と比べ、主要な配置と文言はそろった。**残る差**：設計のページ送りがなく、「フォルダを追加」は保存口がないため押せない。行の最初に送る内容も設計より要約されている。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・照合。** 一覧、4指標、フォルダ、優先順位、行操作を実APIへ接続し、共通の指標・タブ・検索・表・状態表示・アイコン操作へ載せ替えた。通常・読込・空・失敗・権限不足を1440/1920pxで再撮影（24枚中12枚、横はみ出し0）。Pencil画像と比べ、主要な配置と文言はそろった。**残る差**：設計のページ送りがなく、「フォルダを追加」は保存口がないため押せない。行の最初に送る内容も設計より要約されている。',
     verdictSource: 'friend-add-v6/uLQQc.png + uLQQc-1920.png + uLQQc*.txt', },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定', route: '/friend-add-settings?view=edit&id=rule-referral&step=basic',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** 5段表示、設定名、フォルダ、優先順位、社内メモ、設定サマリーを実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：設計テキストにあるフォルダ追加、流入条件の要約、直近7日の追加、二重送信、テスト送信がこの段にはない。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・テキスト照合。設計画像なし。** 5段表示、設定名、フォルダ、優先順位、社内メモ、設定サマリーを実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：設計テキストにあるフォルダ追加、流入条件の要約、直近7日の追加、二重送信、テスト送信がこの段にはない。',
     verdictSource: 'friend-add-v6/s9gAx.txt',
   },
   {
     ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件', route: '/friend-add-settings?view=edit&id=rule-referral&step=routes',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** 実在する流入リンクの複数選択、有効期間、優先判定を実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：曜日・時間帯・友だち条件・過去28日の当たり具合は、現在の保存・集計口にないため表示していない。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・テキスト照合。設計画像なし。** 実在する流入リンクの複数選択、有効期間、優先判定を実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：曜日・時間帯・友だち条件・過去28日の当たり具合は、現在の保存・集計口にないため表示していない。',
     verdictSource: 'friend-add-v6/W1wzCa.txt',
   },
   {
     ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内', route: '/friend-add-settings?view=edit&id=rule-referral&step=message',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** テキストとシナリオ、本文、登録直後/シナリオ準拠の送信時刻、LINEプレビューを実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：設計のテンプレート・回答フォーム・選択肢・24時間の再送制限・経路不明時の選択は未接続。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・テキスト照合。設計画像なし。** テキストとシナリオ、本文、登録直後/シナリオ準拠の送信時刻、LINEプレビューを実APIへ接続し、1440/1920pxで横はみ出し0。**残る差**：設計のテンプレート・回答フォーム・選択肢・24時間の再送制限・経路不明時の選択は未接続。',
     verdictSource: 'friend-add-v6/K0Dbr2.txt',
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', route: '/friend-add-settings?view=edit&id=rule-referral&step=actions&dialog=add', mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・照合。** 接続済みのタグ追加・タグ解除・シナリオ開始だけを選べる確認ダイアログにし、1440/1920pxで横はみ出し0。Pencil画像と比べ、5段表示、左右構成、確認文、戻る/追加操作はそろった。**残る差**：ダイアログの幅・位置と、背面のLINEプレビュー下の補助操作が設計と異なる。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・照合。** 接続済みのタグ追加・タグ解除・シナリオ開始だけを選べる共通ダイアログにし、1440/1920pxで横はみ出し0。Pencil画像と比べ、5段表示、左右構成、確認文、戻る/追加操作はそろった。**残る差**：ダイアログの幅・位置と、背面のLINEプレビュー下の補助操作が設計と異なる。',
     verdictSource: 'friend-add-v6/txMO9.png + txMO9-1920.png + txMO9.txt', },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト', route: '/friend-add-settings?view=edit&id=rule-referral&step=preview', mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・照合。** 5段表示、送信先、短縮テスト、実行順、LINEプレビュー、本番影響なしの試験を実APIへ接続し、1440/1920pxで横はみ出し0。Pencil画像と比べ、必要な情報と左右構成はそろった。**残る差**：設計は確認内容を2枚の大きな行で見せるが、実装はメッセージと2アクションを3行に分けている。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・照合。** 5段表示、送信先、短縮テスト、実行順、LINEプレビュー、本番影響なしの試験を実APIへ接続し、1440/1920pxで横はみ出し0。Pencil画像と比べ、必要な情報と左右構成はそろった。**残る差**：設計は確認内容を2枚の大きな行で見せるが、実装はメッセージと2アクションを3行に分けている。',
     verdictSource: 'friend-add-v6/U3SI5.png + U3SI5-1920.png + U3SI5.txt',
   },
   {
@@ -1185,7 +1184,7 @@ export const SCREENS = [
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
     route: '/friend-add-settings?delete=rule-referral', mode: 'viewport', height: 1080,
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #250 実装・撮影・テキスト照合。設計画像なし。** 対象名、削除後に経路不明の共通案内が動くこと、履歴を残すこと、取消不可、取消/削除操作を表示し、1440/1920pxで横はみ出し0。**残る差**：設計テキストにある一覧のページ送りが背面にない。',
+    verdictNote: '**2026-09-06 #932 列車ゲート修正後の再撮影・テキスト照合。設計画像なし。** 対象名、削除後に経路不明の共通案内が動くこと、履歴を残すこと、取消不可、取消/削除操作を表示し、1440/1920pxで横はみ出し0。**残る差**：設計テキストにある一覧のページ送りが背面にない。',
     verdictSource: 'friend-add-v6/Q3qP1r.txt',
   },
 
@@ -2969,64 +2968,72 @@ const FEATURE_17_REVIEW = {
 /*
  * board #231 の機能18再監査。
  *
- * 画面実装は更新したが、macOS のブラウザ起動制限と利用者側のローカル画面
- * アクセス拒否により、同じ幅の実装画像を撮れなかった。古い画像を根拠に
- * 合格へ上げないため、9画面とも未判定に戻す。未接続のAPIも画面ごとに分ける。
+ * PR #907 の画面実装を、1440px・1920pxと定義済みの全状態で撮影した。
+ * 設計画像と同じ幅で目視比較し、見た目の差と未接続APIを画面ごとに分ける。
  */
 const FEATURE_18_AUDIT = {
   Q4bkTg: {
     route: '/inflow-links?tab=links',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 4タブ、フォルダ、実際に動く4種の絞り込み、並び順、CSV、ページ送りを実装した。取得できない集計は0にしない。macOSのブラウザ起動制限に加え、アプリ内ブラウザのローカル画面アクセスが利用者側で拒否されたため、1440px・1920pxの実装画像は未取得。設計との差は画像で再確認する必要がある。',
-    verdictSource: 'inflow-v6/Q4bkTg.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。4タブ、4つの指標、説明帯、フォルダ、検索・絞り込み・並び順、CSV、一覧とページ送りは設計と同じ役割で並ぶ。撮影では流入元6件に対し、友だち追加・クリック・追加率は集計APIが無いため `—` と理由を表示し、一覧も1件だけ。**接続条件:** タブ件数、流入集計、一覧の追加数・クリック・最新追加を返すAPIを接続し、設計と同量の実データで再撮影する。',
+    verdictSource: 'inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png',
+    verdictHead: '87774763c',
   },
   IhSBB: {
     route: '/inflow-links?tab=script',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 貼るコード、受信確認、できること、WordPress・Shopify・制作会社向けの貼り方、届いたページの集計を実装し、押せない「準備中」操作を外した。設計のドメイン別許可・停止・不明ドメイン警告はドメイン管理APIが未接続のため表示できず、画面内に接続条件を明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/IhSBB.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。貼るコード、受信確認、できること、WordPress・Shopify・制作会社向け案内は出る。設計は主欄と右欄の2列で、届いた3ドメインと不明ドメイン警告を同時に見せるが、実装は縦1列で「まだ記録がありません」となり、つながる先も無い。**推奨修正:** 右欄の貼り方・つながる先・注意を設計位置へ戻す。ドメイン管理API接続後に許可・停止・不明警告を表示して再撮影する。',
+    verdictSource: 'inflow-v6/IhSBB.txt + IhSBB-1440.png + IhSBB-1920.png',
+    verdictHead: '87774763c',
   },
   v0HaI: {
     route: '/inflow-links?tab=ads',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で広告実績を独立画面へ分けたが、画像未確認。** 接続済み媒体は既存APIから表示し、広告費・友だち単価・成果単価は広告実績の取込APIが無いため0円を作らず `—` と接続条件を表示する。媒体・キャンペーン・広告グループ別の実績は同API接続後の課題。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/v0HaI.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。説明、4つの指標、広告アカウント、広告のまとまりの区画は設計と同じ順。広告実績と接続設定APIが無いため、接続数だけ実値0、広告費・友だち単価・成果単価は `—` と接続条件を表示し、架空の媒体行を出していない。**接続条件:** 媒体接続と広告実績APIを接続し、媒体・キャンペーン・広告グループの行を出して再撮影する。',
+    verdictSource: 'inflow-v6/v0HaI.txt + v0HaI-1440.png + v0HaI-1920.png',
+    verdictHead: '87774763c',
   },
   TEVk8: {
     route: '/inflow-links/new',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で作成画面を更新したが、画像未確認。** V6作成画面の寸法、流入元名・REF、友だち追加時の動き、追加先、4段階の流れ、注意3点、発行後に詳細へ進む動線を実装した。短いURLとQR画像は発行APIが未対応のため作り物を出さず、接続後に詳細へ出ることを明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/TEVk8.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。入力、友だち追加時の動き、追加先、発行後のURL案内、右欄の流れと注意は出るが、設計は入力を上段、発行URLとQRをその直下、動きをカードでまとめる2列構成。実装は4段の縦長フォームで、同じ位置・寸法になっていない。短いURLとQRは発行API未対応。**推奨修正:** 設計の主欄＋右欄と区画順へ再配置し、発行API接続後に通常URL・短縮URL・QRの状態を撮る。',
+    verdictSource: 'inflow-v6/TEVk8.txt + TEVk8-1440.png + TEVk8-1920.png',
+    verdictHead: '87774763c',
   },
   JupxW: {
     route: '/inflow-links/detail?ref=summer-ig',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で詳細画面を更新したが、画像未確認。** 既存の流入別友だちAPIを接続し、友だち名・来た日時・友だち詳細への導線を追加した。設計にある最初に見たページ、友だちごとの状態・成果・マイルは現行APIが返さないため表示していない。押せないQR保存操作は外した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/JupxW.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、要修正。** 撮影モックの1件取得を直して1440px・1920pxとも撮影、横はみ出し0。数値・段階・友だち・参照元・追加時の動作は表示できた。設計は上部4指標、横方向の成果段階、5列の友だち表と右欄を1画面に置くが、実装は左のリンク一覧と縦積みカードで別構成。最初に見たページ、状態、成果、マイルもAPIが返さず列が無い。**推奨修正:** 設計の主欄＋右欄へ再配置し、友だち詳細APIへ不足4項目を追加して再撮影する。',
+    verdictSource: 'inflow-v6/JupxW.txt + JupxW-1440.png + JupxW-1920.png',
+    verdictHead: '87774763c',
   },
   UIaM7: {
     route: '/inflow-links/detail?ref=summer-ig',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231でも画像未確認。** 対象名、消える設定、残る過去記録、取り消せないこと、失敗時の再試行案内は既存の画面内確認窓で維持した。設計が求める使用先の一覧・別リンクへの差し替え・アーカイブは影響確認APIが無いため未実装。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/UIaM7.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を通常・確認・失敗で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。対象名、消える設定、残る過去記録、取り消せないこと、失敗後の再試行案内は出る。設計は使用中のURL・86人・分析への影響を分け、受け付け停止・別リンクへ転送・削除の3択を示すが、実装は説明1つと削除だけ。**推奨修正:** 使用先と現在の流入を返す影響確認APIを追加し、停止・転送・削除を設計の確認窓へ並べる。',
+    verdictSource: 'inflow-v6/UIaM7-open.txt + UIaM7-open-1440.png + UIaM7-open-1920.png + UIaM7-fail.txt',
+    verdictHead: '87774763c',
   },
   BMmxU: {
     route: '/inflow-links?tab=links',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で状態の契約を維持したが、画像未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、帯の未取得値を0にしないことは契約テストで確認した。normal/loading/empty/errorの1440px・1920px画像は今回取得できていないため、見た目は未判定。',
-    verdictSource: 'inflow-v6/BMmxU.txt + 契約テスト（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を通常・読込中・0件・取得失敗で再撮影し、要修正。** 全4状態の1440px・1920pxで横はみ出し0。読込中は「読み込んでいます」、0件は最初のフォルダ作成、失敗は再読み込みを出し、指標も未取得を0にしない。ただし設計の状態見本は共通の操作・ページ送りを残した同じ枠で、実装は選択フォルダ欄まで0件表示へ切り替わり、失敗文言と操作名も一致しない。**推奨修正:** 状態部分以外の枠を通常画面と共通にし、設計の文言・操作位置へそろえる。',
+    verdictSource: 'inflow-v6/BMmxU-normal.txt + BMmxU-loading.txt + BMmxU-empty.txt + BMmxU-error.txt + BMmxU-error-1440.png + BMmxU-error-1920.png',
+    verdictHead: '87774763c',
   },
   BuVDB: {
     route: '/inflow-links?tab=connections',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で「広告とのつなぎ」を広告実績から分離したが、画像未確認。** Meta・Google・X・TikTokのクリック目印、接続状態、成果を返す仕組み、個人情報を送らない注意を表示する。接続設定と成果名の対応付けはAPI未接続のため、操作や架空の行を出さず接続条件を明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/BuVDB.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。4媒体とクリック目印、成果名の対応区画、返す仕組み、注意、送信履歴への導線を設計と同じ役割で表示する。接続設定・成果対応APIが無いため、全媒体を未接続として理由を出し、対応表に架空の行や押せない操作を出していない。**接続条件:** 媒体接続と成果対応APIを接続し、状態・対応名・返した件数・操作を実データで再撮影する。',
+    verdictSource: 'inflow-v6/BuVDB.txt + BuVDB-1440.png + BuVDB-1920.png',
+    verdictHead: '87774763c',
   },
   Im2b1: {
     route: '/inflow-links?tab=connections&view=history',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で送信履歴を独立表示したが、画像未確認。** 送れた・待っている・断られた件数、検索、状態絞り込み、CSV、履歴表を既存ログAPIから表示する。試行回数・次回試行日時・まとめて再試行は再試行APIが無いため操作を作らず、接続条件を明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/Im2b1.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。送った・待っている・断られた指標、説明、検索、状態絞り込み、CSV、履歴区画、戻る導線は設計と同じ役割で並ぶ。撮影APIは履歴0件のため表を比較できず、再試行成功の指標、試行回数、次回試行、まとめてやり直す操作も未接続理由を表示。**接続条件:** 送信履歴・再試行記録APIを接続し、成功・待機・失敗と再試行の行を同じ2幅で再撮影する。',
+    verdictSource: 'inflow-v6/Im2b1.txt + Im2b1-1440.png + Im2b1-1920.png',
+    verdictHead: '87774763c',
   },
 }
 
@@ -3357,6 +3364,7 @@ export const CAPTURED_AT = {
     { pr: 514, head: 'd064bded', on: '2026-08-30', screens: ['Y0Sn3'], note: '一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' },
       { pr: 613, head: 'a504fec0', on: '2026-08-31', screens: ['dC0yg', 's6Vvp', 'JCz6J', 'W98zZQ', 'M1EXwB', 'uJP22', 'J64xI', 'PSmHo', 'GC4St'], note: 'Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ' },
+    { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },

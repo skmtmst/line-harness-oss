@@ -7,11 +7,16 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import IconButton from '@/components/shared/icon-button'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import SummaryCard from '@/components/shared/summary-card'
+import { Tabs } from '@/components/shared/tabs'
+import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/lib/api'
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
-import styles from './friend-add-settings.module.css'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -48,6 +53,7 @@ function FriendAddSettingsList() {
   const [deleting, setDeleting] = useState<FriendAddRule | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -89,6 +95,14 @@ function FriendAddSettingsList() {
     return Array.from(counts.entries())
   }, [data])
 
+  const visibleItems = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('ja-JP')
+    if (!query) return data?.items ?? []
+    return (data?.items ?? []).filter((rule) =>
+      [rule.name, ...rule.routeNames].some((value) => value.toLocaleLowerCase('ja-JP').includes(query)),
+    )
+  }, [data, search])
+
   const closeDelete = () => {
     setDeleting(null)
     setDeleteError('')
@@ -121,68 +135,68 @@ function FriendAddSettingsList() {
   if (error) return <ListState kind="error" title="友だち追加時の配信を表示できませんでした" description={error} onRetry={() => void load()} />
 
   return (
-    <div data-design-node="uLQQc" className={styles.page}>
-      <div className={styles.topActions}><Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button></div>
+    <div data-design-node="uLQQc" className="text-ink min-w-0">
+      <div data-design="Head" className="mb-4 flex justify-end gap-2">
+        <Button href="/friend-add-settings/runs">実行結果を見る</Button>
+        <Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button>
+      </div>
 
-      <div className={styles.guide}>
+      <div data-design="Alert" className="rounded-card border-warning/40 bg-warning-bg text-warning mb-4 border px-4 py-3 text-sm font-semibold leading-relaxed">
         経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。
       </div>
 
-      <section className={styles.metrics} aria-label="この7日の状況">
-        <Metric label="初回案内" value={countText(data?.summary.rules ?? 0, '件')} note={`有効 ${data?.summary.active ?? 0}件`} />
-        <Metric label="直近7日の友だち追加" value={countText(data?.summary.recentAdds ?? null, '人')} note={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} />
-        <Metric label="送信成功" value={countText(data?.summary.delivered ?? null, '通')} note={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} />
-        <Metric label="経路が分からなかった人" value={countText(data?.summary.unknownRoute ?? null, '人')} note="共通の案内が動いた" danger={(data?.summary.unknownRoute ?? 0) > 0} />
+      <section data-design="Flow" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="この7日の状況">
+        <span className="sr-only">どう振り分けられるか。友だち追加された。この1か月の実績。</span>
+        <SummaryCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} variant="v6" />
+        <SummaryCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} variant="v6" />
+        <SummaryCard title="送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} variant="v6" />
+        <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
       </section>
 
-      <div className={styles.tabs} role="tablist" aria-label="判定する人">
-        {(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => (
-          <button key={tab} type="button" role="tab" aria-selected={kind === tab} className={kind === tab ? styles.tabActive : styles.tab} onClick={() => router.replace(`/friend-add-settings?kind=${tab}`)}>
-            {KIND_LABELS[tab]}
-          </button>
-        ))}
+      <div data-design="FirstTime">
+        <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
+        <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => router.replace(`/friend-add-settings?kind=${tab}`) }))} />
+        <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
       </div>
-      <p className={styles.tabNote}>この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
+      <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
 
-      <div className={styles.content}>
-        <aside className={styles.folders}>
-          <div className={styles.folderTitle}><span>流入の束</span><span>{data?.items.length ?? 0}件</span></div>
-          <div className={styles.folderSelected}><span>すべて</span><span>{data?.items.length ?? 0}</span></div>
-          {folders.map(([name, count]) => <div key={name} className={styles.folder}><span>{name}</span><span>{count}</span></div>)}
+      <div className="grid items-start gap-4 xl:grid-cols-[190px_minmax(0,1fr)]">
+        <aside className="bg-canvas rounded-card border-hairline overflow-hidden border" aria-label="流入の束">
+          <div className="border-hairline flex justify-between border-b px-4 py-3 text-xs font-bold"><span>流入の束</span><span>{data?.items.length ?? 0}件</span></div>
+          <div className="bg-accent-soft text-accent-deep flex justify-between px-4 py-3 text-xs font-bold"><span>すべて</span><span>{data?.items.length ?? 0}</span></div>
+          {folders.map(([name, count]) => <div key={name} className="text-ink-secondary flex justify-between px-4 py-3 text-xs"><span>{name}</span><span>{count}</span></div>)}
         </aside>
 
-        <section className={styles.list} aria-label={`${KIND_LABELS[kind]}の設定`}>
-          <div className={styles.toolbar}>
-            <label className={styles.search}><span className="sr-only">設定名・流入リンクで検索</span><input type="search" placeholder="設定名・流入リンクで検索" /></label>
+        <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
+          <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
+          <ListToolbar searchPlaceholder="設定名・流入リンクで検索" searchValue={search} onSearchChange={setSearch}>
             <Button variant="secondary" disabled>フォルダを追加</Button>
-            <span className={styles.pageSize}>20件表示</span>
-          </div>
+            <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
+          </ListToolbar>
           {!data || data.items.length === 0 ? (
             <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">友だち追加時配信を作る</Button>} />
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead><tr><th>設定名</th><th>状態</th><th>対象の流入リンク</th><th>最初に送るもの</th><th>直近7日</th><th>操作</th></tr></thead>
+            <DataTable>
+                <thead><TableHeadRow><Th>設定名</Th><Th>状態</Th><Th>対象の流入リンク</Th><Th>最初に送るもの</Th><Th>直近7日</Th><Th>操作</Th></TableHeadRow></thead>
                 <tbody>
-                  {data.items.map((rule) => (
-                    <tr key={rule.id}>
-                      <td><a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className={styles.ruleName}>{rule.name}</a><span className={styles.priority}>{rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`}</span></td>
-                      <td><StatusBadge status={rule.status} fallback={rule.isFallback} /></td>
-                      <td>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</td>
-                      <td>{rule.definition.messageText ? 'テキストメッセージ' : rule.scenarioName || '未取得'}</td>
-                      <td>{countText(rule.matchedLast7Days, '人')}</td>
-                      <td>
-                        <div className={styles.actions}>
+                  {visibleItems.map((rule) => (
+                    <Tr key={rule.id}>
+                      <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold">{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
+                      <Td><StatusBadge tone={rule.status === 'published' || rule.isFallback ? 'success' : 'neutral'} size="compact">{rule.isFallback ? '常に有効' : rule.status === 'published' ? '有効' : rule.status === 'draft' ? '下書き' : rule.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatusBadge></Td>
+                      <Td>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</Td>
+                      <Td>{rule.definition.messageText ? 'テキストメッセージ' : rule.scenarioName || '未取得'}</Td>
+                      <Td>{countText(rule.matchedLast7Days, '人')}</Td>
+                      <ActionCell>
+                        <div className="flex items-center gap-1">
                           <Button href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} variant="secondary">編集</Button>
-                          {!rule.isFallback && <button type="button" className={styles.iconButton} aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></button>}
-                          <button type="button" className={styles.iconButton} aria-label={`${rule.name}のその他操作`}><MoreHorizontal size={18} /></button>
+                          {!rule.isFallback && <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
+                          <IconButton aria-label={`${rule.name}のその他操作`}><MoreHorizontal size={18} /></IconButton>
                         </div>
-                      </td>
-                    </tr>
+                      </ActionCell>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+            </DataTable>
           )}
         </section>
       </div>
@@ -190,13 +204,4 @@ function FriendAddSettingsList() {
       <ConfirmDialog open={Boolean(deleting)} designNode="Q3qP1r" title={`「${deleting?.name ?? ''}」を削除しますか？`} description="削除すると、このリンクから追加された人には「経路が分からなかった人」の共通あいさつが動きます。過去の実行履歴は監査記録として残り、この操作は取り消せません。" confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError} titleIcon={<Trash2 size={20} />} onCancel={closeDelete} onConfirm={() => void archiveRule()} />
     </div>
   )
-}
-
-function Metric({ label, value, note, danger = false }: { label: string; value: string; note: string; danger?: boolean }) {
-  return <div className={styles.metric}><span>{label}</span><strong className={danger ? styles.metricDanger : undefined}>{value}</strong><small>{note}</small></div>
-}
-
-function StatusBadge({ status, fallback }: { status: FriendAddRule['status']; fallback: boolean }) {
-  const label = fallback ? '常に有効' : status === 'published' ? '有効' : status === 'draft' ? '下書き' : status === 'stopped' ? '停止中' : 'アーカイブ'
-  return <span className={status === 'published' || fallback ? styles.statusActive : styles.statusMuted}>{label}</span>
 }

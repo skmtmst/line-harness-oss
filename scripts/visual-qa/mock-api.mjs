@@ -1101,6 +1101,61 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (pathname === '/api/webhooks/incoming') return { success: true, data: INCOMING_WEBHOOKS }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
+  /*
+    流入元の詳細。可変部分を配列の既定値へ落とすと、1件取得まで `[]` になり、
+    `route.createdAt.slice(...)` で詳細画面全体が落ちる。画面確認用の同じ1件から
+    詳細・段階・参照元を組み立て、一覧と右側で別のリンクを見せない。
+  */
+  const entryRouteFunnel = /^\/api\/entry-routes\/([^/]+)\/funnel$/.exec(pathname)
+  if (entryRouteFunnel) {
+    return {
+      success: true,
+      data: { click_count: 486, friend_add_count: 86, form_submission_count: 24, cv_count: 11 },
+    }
+  }
+  const entryRouteSources = /^\/api\/entry-routes\/([^/]+)\/sources$/.exec(pathname)
+  if (entryRouteSources) {
+    return {
+      success: true,
+      data: [
+        { label: 'instagram.com', count: 312 },
+        { label: 'lin.ee', count: 96 },
+        { label: '直接アクセス', count: 78 },
+      ],
+    }
+  }
+  const entryRouteDetail = /^\/api\/entry-routes\/([^/]+)$/.exec(pathname)
+  if (entryRouteDetail) {
+    const entryRoute = ENTRY_ROUTES.find((item) => item.id === entryRouteDetail[1])
+    return entryRoute
+      ? { success: true, data: entryRoute }
+      : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/analytics/ref-summary') {
+    return {
+      success: true,
+      data: {
+        routes: ENTRY_ROUTES.map((entryRoute, index) => ({
+          refCode: entryRoute.refCode,
+          name: entryRoute.name,
+          friendCount: index === 0 ? 86 : 0,
+          clickCount: index === 0 ? 486 : 0,
+          latestAt: index === 0 ? '2026-08-25T14:16:00.000Z' : null,
+        })),
+      },
+    }
+  }
+  if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        friends: [
+          { id: 'friend-inflow-1', displayName: '木村 亮', trackedAt: '2026-08-25T14:16:00.000Z' },
+          { id: 'friend-inflow-2', displayName: '佐藤 美咲', trackedAt: '2026-08-24T10:32:00.000Z' },
+        ],
+      },
+    }
+  }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
 
