@@ -138,13 +138,7 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
-/*
- * 緊急停止の「止める前に何が止まるか」。
- *
- * ここに置いてあるのは**影響を見るぶんだけ**。止める・戻す口は
- * 段階的な本人確認のヘッダを送るが、worker 側の許可一覧にまだ無い
- * （`apps/worker/src/cors-headers.test.ts` が落ちる）。口が入ってから足す。
- */
+/** 緊急停止の対象、影響、停止状態をサーバーと共有する契約。 */
 export type OperationCapability =
   | 'broadcast_dispatch'
   | 'scenario_dispatch'
@@ -182,6 +176,37 @@ export type OperationControl = {
   actorId: string | null
   stoppedAt: string | null
   updatedAt: string | null
+}
+
+export type OperationControlSnapshot = {
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  capturedAt: string
+}
+
+export type OperationIncident = {
+  id: string
+  scopeKey: string
+  lineAccountId: string | null
+  status: 'preparing' | 'stopped' | 'resolved' | 'failed'
+  capabilities: OperationCapability[]
+  reason: string
+  detail: string | null
+  actorId: string
+  resolvedByActorId: string | null
+  controlVersion: number | null
+  beforeSnapshot: OperationControlSnapshot
+  stoppedSnapshot: OperationControlSnapshot | null
+  restoredSnapshot: OperationControlSnapshot | null
+  errorMessage: string | null
+  stoppedAt: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export type FormDeleteImpact = {
@@ -6161,7 +6186,7 @@ export const api = {
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
-  /** 緊急停止の影響（見るだけ）。止める・戻す口はまだ足していない。 */
+  /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
@@ -6173,6 +6198,32 @@ export const api = {
         calculatedAt: string
       }>>(`/api/operations/control/preview${query}`)
     },
+    history: (limit = 100) =>
+      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+    stop: (input: {
+      lineAccountId: string | null
+      capabilities: OperationCapability[]
+      reason: string
+      detail?: string | null
+      confirmation: '停止'
+      expectedVersion: number
+    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      '/api/operations/incidents',
+      {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        body: JSON.stringify(input),
+      },
+    ),
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+        `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          body: JSON.stringify(input),
+        },
+      ),
   },
   adPlatforms: {
     list: () =>
