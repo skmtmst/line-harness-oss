@@ -2325,8 +2325,8 @@ export const SCREENS = [
     見本12／共通アクション14）で、オートメーションと共通アクションが
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
-  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 18本（稼働14・停止4）と見本12件を実データで表示し、1440px・1920pxとも横はみ出し0。ただし設計は検索・5種の絞り込み・並び順・6行の一覧表で、実装は検索と絞り込みが無い14枚のカード。実行214回・削減1時間も設計の8,420回・70時間と異なり、失敗回数は未接続のため一致ではない。**推奨修正：一覧を設計の表へ組み直し、検索・状態絞り込み・期間・並び順を接続する。次に実行回数・失敗回数・削減時間の集計APIを接続する。**', verdictSource: 'automations-v6/gief7.txt', verdictHead: '44e671b2c' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 1440px・1920pxとも横はみ出し0。設計はきっかけ6択・条件チップ・見込み286人・処理2行を1画面で読めるが、実装は名前入力を独立段にし、きっかけを選択欄1つ、条件と見込み人数を未接続文、処理を縦長の編集カードで出している。**推奨修正：きっかけ6択と条件チップを共通条件部品へ接続し、見込み人数を表示する。処理を設計の行形式へ詰め、失敗時設定と白紙下書き保存APIを接続する。**', verdictSource: 'automations-v6/Rv8Jv.txt', verdictHead: '44e671b2c' },
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較。** 18本（稼働14・停止4）、4指標、説明帯、名前・きっかけ・処理の検索、状態絞り込み、期間、並び順、6行の一覧表へそろえた。1440px・1920pxとも横はみ出し0。オートメーション別の30日実行・失敗・最終実行日時と詳細画面はAPI未接続のため、値を作らず `—／未接続` とし、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/gief7.txt', verdictHead: '380cd6631' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影。** 3段の決めごと帯、接続済みきっかけのカード選択、名前、条件チップ、見込み人数枠、処理行、文章要約、関連導線、注意、追従操作を1画面へまとめ、1440px・1920pxで横はみ出し0。発火まで接続済みのきっかけは設計6種中4種、条件15軸・見込み人数・下書き・1人テストはAPI未接続のため、未接続選択肢や人数を作らず構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt', verdictHead: '380cd6631' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -2338,7 +2338,7 @@ export const SCREENS = [
       設計にはあるので、差として記録だけしておく。
     */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 で画面を実装。** 既存の `GET /api/automation-runs` から4指標・検索・結果絞り込み・実行一覧を読み、空・読込・失敗を区別する。撮影用の通常データを #264 へ依頼中のため、通常状態の画像比較は未完了。安全な再実行API・実行詳細画面・CSV書き出しも未接続なので、押せる操作は出していない。', verdictSource: 'automations-v6/DkPY0.txt', verdictHead: 'pending',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` で新規実装。** 既存の `GET /api/automation-runs` から4指標・検索・結果絞り込み・実行一覧を読み、通常・読込・空・失敗を区別する。1440px・1920pxの状態画像は横はみ出し0。通常状態の固定データは #264（実作業 #308 / PR #1051）へ依頼済みで列車待ち。安全な再実行API・実行詳細画面・CSV書き出しも未接続なので押せる操作を出さず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/DkPY0-error.txt + DkPY0-loading.txt + DkPY0-empty.txt', verdictHead: '380cd6631',
     route: '/automations/runs',
     states: {
       apis: ['**/api/automation-runs*'],
@@ -2353,10 +2353,10 @@ export const SCREENS = [
       id は入れない（選んだ人が自分の環境のものを選び直す）。
     */
     route: '/automations?tab=templates', mode: 'page',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 見本12件を実データで表示し、1440px・1920pxとも横はみ出し0。ただし設計は「見本から作る」の見出し、短い説明帯、3列×3段の密度で、実装は「オートメーション」の見出しと大きな絞り込み帯、3列×4段の長いカード一覧になっている。**推奨修正：見出しと説明帯を設計文へそろえ、最初の9件を設計のカード寸法で配置し、残り3件はページ送りまたは続きとして見せる。きっかけ絞り込みはカード密度を崩さない位置へ縮める。**',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影し、★V6設計と同じ1920pxで比較して一致を確認。** 見出し「見本から作る」、はじめから作る導線、5タブ、設計文の説明帯、実データ12件のうち先頭9件を3列×3段、きっかけ・すること・下書き作成導線で表示した。1440px・1920pxとも横はみ出し0。残り3件は続きとして扱い、カード密度を崩す絞り込み帯は通常面から外した。',
     verdictSource: 'automations-v6/WjYAC.txt',
-    verdictHead: '44e671b2c',
+    verdictHead: '380cd6631',
   },
   {
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
@@ -2367,7 +2367,7 @@ export const SCREENS = [
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4指標、説明帯、検索、5種の絞り込み、版・呼び出し元・操作を含む一覧表を表示し、1440px・1920pxとも横はみ出し0。設計の14件に対して取得APIは5件で、今月2,847回・失敗6回を返す集計口とCSVが無いため一致にはしない。**推奨修正：全14件を返す一覧契約と、この30日の実行・失敗集計APIを接続する。次にCSVとページ送りを接続し、設計の6行密度へそろえる。**', verdictSource: 'automations-v6/xOpDs.txt', verdictHead: '44e671b2c' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 1440px・1920pxとも横はみ出し0。設計は入力済みの名前・説明と5処理を行で一覧でき、版の決めごと・つながる先・注意を右欄へまとめる。実装は空の名前・説明と処理1件の大きな編集フォームで、公開・1人で試す・条件分岐・待ち時間の操作も無い。**推奨修正：見本または複製元のv4を初期値として受け取る契約を追加し、処理を設計の5行形式へそろえる。条件分岐・待ち時間・テスト・公開APIを接続し、版の決めごととつながる先を右欄へ出す。**', verdictSource: 'automations-v6/py5CG.txt', verdictHead: '44e671b2c' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影。** 名前・説明を横並び、処理を上から並べる編集面、失敗時設定、待ち時間、版の決めごと、5つの利用先、注意、追従保存を設計の2列構造へそろえ、1440px・1920pxとも横はみ出し0。新規作成は仕様どおり空の下書き＋処理1件で始める。設計例の入力済み5処理を再現する複製・見本の受け渡し、1人テスト、条件分岐、公開はAPI未接続のため押せる形にせず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/py5CG.txt', verdictHead: '380cd6631' },
   { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** v4〜v1の4版、利用先5件、古い版1件を実データで表示し、1440px・1920pxとも横はみ出し0。版履歴と利用先を読む役割は一致したが、設計の今月1,284回・失敗2回と動作途中14件の集計口が無く、実装は版履歴と利用先を別表にしているため一致にはしない。**推奨修正：版ごとの実行・失敗・実行中・待機中を返す集計APIを接続し、利用先と版ラベルを設計の1行形式へまとめる。**', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts', verdictHead: '44e671b2c' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────

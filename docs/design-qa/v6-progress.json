@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 242,
-  "unimplemented": 1,
+  "compared": 249,
+  "unimplemented": 0,
   "unconfirmed": 0,
   "elsewhere": 0,
-  "missing": 29,
-  "match": 81,
-  "structureMatchDataPending": 63,
-  "needsFix": 118,
+  "missing": 23,
+  "match": 82,
+  "structureMatchDataPending": 66,
+  "needsFix": 115,
   "unjudged": 5,
-  "remaining": 187,
+  "remaining": 186,
   "features": [
     {
       "feature": 1,
@@ -2209,11 +2209,11 @@
       "feature": 21,
       "name": "NEN配信",
       "total": 7,
-      "compared": 1,
+      "compared": 7,
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 6,
+      "missing": 0,
       "match": 0,
       "structureMatchDataPending": 3,
       "needsFix": 4,
@@ -2423,16 +2423,16 @@
       "feature": 25,
       "name": "オートメーション",
       "total": 8,
-      "compared": 7,
-      "unimplemented": 1,
+      "compared": 8,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 2,
-      "needsFix": 4,
+      "match": 2,
+      "structureMatchDataPending": 5,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 502,
@@ -2862,13 +2862,5 @@
       "capturedAt": null
     }
   ],
-  "gaps": [
-    {
-      "feature": 25,
-      "node": "DkPY0",
-      "name": "25-1-B オートメーションが動いた記録",
-      "gap": "pending",
-      "gapNote": "画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの"
-    }
-  ]
+  "gaps": []
 }
