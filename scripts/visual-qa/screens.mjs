@@ -1536,11 +1536,9 @@ export const SCREENS = [
     verdictHead: '49e1341c', route: FORM_EDIT, },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（drop）。デザイン設定は作らない方針。横断レビュー §7 の19番で設計から削除する話。', route: FORM_EDIT,
-    gap: 'drop',
-    gapNote: '**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」',
-    status: 'unimplemented',
-    why: '**確かめました（2026-08-28）。作らない決めです。** 「デザイン設定」は `disabled` を直接書いてあり（`form-submissions/edit/page.tsx:379-388`）、覚え書きに「フォームの見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」とあります。**V6から外す候補**',
+    verdict: 'unjudged',
+    verdictNote: '**#254 実装後の撮影待ち。** 5色の役割・書体・角丸・背景画像・SNS表示をフォーム定義へ保存し、左のプレビューとLINE回答画面へ反映する。**設計画像なし**のため `forms-v6/ava2n.txt` と画面本文を照合する。',
+    route: `${FORM_EDIT}&tab=design`,
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定',
@@ -1551,15 +1549,18 @@ export const SCREENS = [
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも一覧に「来店アンケート」が無く、設計の回答一覧・回答数・友だち情報・CSVへ到達できない。**推奨修正**：正常なフォーム一覧データを表示し、対象行から集まった回答を開けるようにする。取得元 `forms-v6/v9tYhl.txt` と撮影失敗ログ。', verdictHead: '350f9636a', steps: [{ click: '来店アンケート' }], },
+    verdict: 'unjudged',
+    verdictNote: '**#254 実装後の撮影待ち。** 専用ルートで実回答をAPI側ページングし、全回答CSV・詳細・表示中の集計を備える。取得口が無い割合・書き込み結果は0にせず `—` と理由を表示する。取得元 `forms-v6/v9tYhl.txt` と同Node画像。',
+    route: '/form-submissions/form-visit/responses',
+    states: {
+      apis: ['**/api/forms/form-visit', '**/api/forms/form-visit/submissions*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    }, },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（parts）。削除確認は共通の `ConfirmDialog` を当てるだけで作れる。',
-    gap: 'api',
-    gapNote: '確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要',
-    status: 'unimplemented',
-    why: '現行DELETEはフォーム本体とウェビナーCTAを物理削除する一方、回答は外部キーの実行環境により消えるか孤児化する。V6要件 §3-8 は、公開中・回答あり・利用中なら直接削除せず停止・保管へ移すよう要求しているため、一覧にDELETEとConfirmDialogだけを足さない',
+    verdict: 'unjudged',
+    verdictNote: '**#254 実装後の撮影待ち。** 影響確認APIの公開状態・回答数・利用先・開けなくなるURLを表示し、受付停止・アーカイブ・完全削除を条件で分ける。**設計画像なし**のため `forms-v6/gBp2J.txt` と画面本文を照合する。',
+    steps: [{ click: '来店アンケートを削除' }],
   },
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
