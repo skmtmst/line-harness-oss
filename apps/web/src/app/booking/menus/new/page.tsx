@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { bookingApi, type BookingStaff } from '@/lib/api'
+import { api, bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   Field,
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import Button from '@/components/shared/button'
 
 /**
  * メニューを追加する（設計 V2 8-2-1 / node swtmr）。
@@ -19,6 +21,7 @@ import CreatePage, {
  * 保存できてしまうのに予約が入らないという分かりにくい失敗をする。
  */
 export default function NewBookingMenuPage() {
+  usePageTitle('予約メニューをつくる')
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [categoryLabel, setCategoryLabel] = useState('')
@@ -33,6 +36,7 @@ export default function NewBookingMenuPage() {
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [staff, setStaff] = useState<BookingStaff[]>([])
+  const [bookingMileage, setBookingMileage] = useState<number | null>(null)
   /** チェックした担当。保存後に staff_menus へ流し込む。 */
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
 
@@ -52,6 +56,20 @@ export default function NewBookingMenuPage() {
     }
   }, [selectedAccountId])
 
+  useEffect(() => {
+    let alive = true
+    api.mileage.rules()
+      .then((response) => {
+        if (!alive || !response.success) return
+        const rule = response.data.find((item) => item.eventType === 'booking_created' && item.isActive)
+        setBookingMileage(rule?.amount ?? null)
+      })
+      .catch(() => {
+        if (alive) setBookingMileage(null)
+      })
+    return () => { alive = false }
+  }, [])
+
   function toggle(id: string) {
     setAssigned((cur) => {
       const next = new Set(cur)
@@ -64,10 +82,10 @@ export default function NewBookingMenuPage() {
   return (
     <CreatePage
       designNode="GhOb3"
-      title="メニューを追加する"
+      title="予約メニューをつくる"
       description="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
-      saveLabel="メニューを追加"
+      saveLabel={isActive ? 'つくって出す' : '下書きに保存'}
       showHeader={false}
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
@@ -120,7 +138,7 @@ export default function NewBookingMenuPage() {
       }}
       aside={
         <>
-          <AsideCard title="予約画面での見え方" note="プレビュー">
+          <AsideCard title="メニューをえらぶ画面では こう見えます" note="プレビュー">
             <div className="border-hairline rounded-card border p-3">
               <p className="text-ink text-sm font-medium">{name || 'メニュー名'}</p>
               {description && (
@@ -331,6 +349,31 @@ export default function NewBookingMenuPage() {
 
       <FormSection
         step={4}
+        label="予約を受けたときにすること"
+        note="現在つながっている自動処理を確認できます。"
+      >
+        <div className="space-y-2">
+          <ActionSummary
+            title="予約を受け付けたことを知らせる"
+            detail="日時・メニュー・場所を書いた案内をLINEへ送ります。"
+            status="自動"
+          />
+          <ActionSummary
+            title="前日・開始前に思い出してもらう"
+            detail="確定した予約は、前日と設定時間前のリマインダへ登録されます。"
+            status="自動"
+          />
+          <ActionSummary
+            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
+            detail={bookingMileage === null ? '「予約した」のマイル設定を取得できませんでした。' : 'たまる決めごと「予約してくれた」が適用されます。'}
+            status={bookingMileage === null ? '未取得' : `予約で ${bookingMileage.toLocaleString()}`}
+            href="/mileage/score-rules"
+          />
+        </div>
+      </FormSection>
+
+      <FormSection
+        step={5}
         label="予約時に質問を出す"
         note="犬種・体重など、当日必要な情報を先に聞けます。"
       >
@@ -362,5 +405,28 @@ export default function NewBookingMenuPage() {
         </label>
       </FormSection>
     </CreatePage>
+  )
+}
+
+function ActionSummary({ title, detail, status, href }: {
+  title: string
+  detail: string
+  status: string
+  href?: string
+}) {
+  const content = (
+    <>
+      <span className="min-w-0">
+        <span className="text-ink block text-sm font-medium">{title}</span>
+        <span className="text-ink-faint mt-0.5 block text-xs">{detail}</span>
+      </span>
+      <span className="bg-success-bg text-success rounded-pill ml-auto shrink-0 px-2 py-1 text-xs font-medium">{status}</span>
+    </>
+  )
+  return (
+    <div className="border-hairline flex items-center gap-3 rounded-control border p-3">
+      {content}
+      {href && <Button href={href}>設定を見る</Button>}
+    </div>
   )
 }

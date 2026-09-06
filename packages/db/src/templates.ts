@@ -311,6 +311,44 @@ export interface TemplateListScope {
   includeUnassigned: boolean;
 }
 
+export interface TemplateSendCounts {
+  thisMonth: number;
+  total: number;
+}
+
+/**
+ * テンプレートを使って実際に送った数を、一覧1回ぶんまとめて数える。
+ * 見えてよいテンプレートIDだけを受け取り、別アカウントの集計を返さない。
+ */
+export async function getTemplateSendCounts(
+  db: D1Database,
+  templateIds: string[],
+  nowJst = jstNow(),
+): Promise<Map<string, TemplateSendCounts>> {
+  if (templateIds.length === 0) return new Map();
+  const month = nowJst.slice(0, 7);
+  const placeholders = templateIds.map(() => '?').join(',');
+  const result = await db.prepare(
+    `SELECT template_id_at_send AS template_id,
+            COUNT(*) AS total_count,
+            SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS month_count
+      FROM messages_log
+      WHERE direction = 'outgoing'
+        AND COALESCE(delivery_type, '') != 'test'
+        AND template_id_at_send IN (${placeholders})
+      GROUP BY template_id_at_send`,
+  ).bind(month, ...templateIds).all<{
+    template_id: string;
+    total_count: number;
+    month_count: number;
+  }>();
+
+  return new Map((result.results ?? []).map((row) => [
+    row.template_id,
+    { thisMonth: Number(row.month_count ?? 0), total: Number(row.total_count ?? 0) },
+  ]));
+}
+
 /**
  * 一覧画面用に template + 使用数を返す。
  * - auto_replies は indexed lookup (1 SQL)

@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 272,
-  "compared": 240,
-  "unimplemented": 2,
+  "compared": 241,
+  "unimplemented": 1,
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 30,
-  "match": 73,
+  "match": 76,
   "structureMatchDataPending": 61,
-  "needsFix": 127,
+  "needsFix": 125,
   "unjudged": 5,
-  "remaining": 195,
+  "remaining": 192,
   "features": [
     {
       "feature": 1,
@@ -1285,12 +1285,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 7,
-      "structureMatchDataPending": 1,
-      "needsFix": 2,
+      "match": 9,
+      "structureMatchDataPending": 0,
+      "needsFix": 1,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 1,
       "capturedAt": [
+        {
+          "pr": 1024,
+          "head": "031081d69",
+          "on": "2026-09-07",
+          "screens": [
+            "W7LBc",
+            "NNDMR",
+            "M9cij"
+          ],
+          "note": "Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外"
+        },
         {
           "pr": 944,
           "head": "98abf756a",
@@ -2089,16 +2100,16 @@
       "feature": 20,
       "name": "分析",
       "total": 9,
-      "compared": 8,
-      "unimplemented": 1,
+      "compared": 9,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 8,
+      "match": 9,
       "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 1,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 445,
@@ -2576,8 +2587,8 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
-      "structureMatchDataPending": 2,
-      "needsFix": 2,
+      "structureMatchDataPending": 3,
+      "needsFix": 1,
       "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
@@ -2617,6 +2628,17 @@
             "tksPc"
           ],
           "note": "Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**"
+        },
+        {
+          "pr": 1022,
+          "head": "abae52d46",
+          "on": "2026-09-07",
+          "screens": [
+            "QSLEH",
+            "GhOb3",
+            "W6465r"
+          ],
+          "note": "Issue #241。予約設定の一覧・作成・一覧状態をV6構造へ直し、3105/8792で通常・読込・空・失敗を含む20枚を1440/1920px撮影。全画像で横はみ出し0。残るAPI差は各画面の判定注記へ記録した。"
         }
       ]
     },
@@ -2802,13 +2824,6 @@
     }
   ],
   "gaps": [
-    {
-      "feature": 20,
-      "node": "URqOA",
-      "name": "20-1-D 定期レポートをつくる",
-      "gap": "api",
-      "gapNote": "決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る"
-    },
     {
       "feature": 25,
       "node": "DkPY0",

@@ -51,8 +51,10 @@ describe('テンプレート一覧の状態と押し口', () => {
     expect(PAGE).toContain('{createBlocked}')
   })
 
-  it('繋がっていない送信数を「確認できます」と書かない', () => {
-    expect(PAGE).toContain('送信数はまだ繋がっていません')
-    expect(PAGE).not.toContain('使われている場所・送信数を確認できます')
+  it('実送信数は今月分を表示し、未取得を0にしない', () => {
+    expect(PAGE).toContain('今月 {formatCount(t.monthlySendCount)}通')
+    expect(PAGE).toContain('title={`累計 ${formatCount(t.totalSendCount)}通`}')
+    expect(PAGE).toContain('送信数を確認できません')
+    expect(PAGE).not.toContain('t.monthlySendCount ?? 0')
   })
 })
