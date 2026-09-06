@@ -1180,7 +1180,7 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
     verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
     verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
@@ -1190,7 +1190,7 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #222 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictNote: '**2026-09-06 Issue #222・PR #1010 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
     verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
     verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
@@ -3990,6 +3990,7 @@ export const CAPTURED_AT = {
     { pr: 600, head: '484c0cd8', on: '2026-08-31', screens: ['ELayY'], note: '同じ候補部品・状態部品・判定窓を使うECのほう。再処理の既定は「今後だけ」' },
   ],
   9: [
+    { pr: 1010, head: '3d6b7e7e8', on: '2026-09-06', screens: ['ec9vg', 'quhg6'], note: 'Issue #222。3104/8791で最終確認5状態と有効化完了を1440・1920px撮影し、設計本文に構造・文言を合わせた。現APIで取得不能・未接続の項目はデータ待ちとして明記' },
     { pr: 962, head: '9b8f7451', on: '2026-09-06', screens: ['uLQQc', 's9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5', 'Q3qP1r'], note: 'Issue #211。割当ポート3104/8791で7画面を1440・1920px再撮影し、設計画像または同Nodeの設計本文と再照合。7画面の要修正判定を具体化し、横はみ出し0を確認' },
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },
