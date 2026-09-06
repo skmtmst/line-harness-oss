@@ -1613,12 +1613,12 @@ export const SCREENS = [
   {
     ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix',
     verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 空のまま・期限つき・未使用の絞り込み、使用数順、20/50/100件表示、検索、CSV出力、空のまま使用中の警告、6列（共通情報／差し込みキー／中身／使われている場所／更新・次の変更／操作）を実装した。差し込みキーは内部表記を出さず `{営業時間}` 形式、使用数未取得は0件にせず `—（未取得）`。Playwrightで1440・1920を撮影し横はみ出し0。**要修正を維持**：現行APIに設計の説明文と種類別使用数が無く、固定データに空のまま使用中の行も無いため警告状態を画像比較できない。フォルダ行の「…」は共通 `FolderPanel` が未対応でS0所有のため触っていない。',
-    verdictSource: 'common-vars-v6/WuKzU.png + WuKzU-1440.png + WuKzU-1920.png + list-model.test.ts', verdictHead: '57477f85c',
+    verdictSource: 'common-vars-v6/WuKzU.txt + list-model.test.ts', verdictHead: '57477f85c',
   },
   {
     ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'needs_fix',
     verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 差し込みキーを内部表記から `{営業時間}` 形式へ変更し、使用数・送信済み件数・使用先・現在文を保存前から表示する状態を1440・1920で撮影した。横はみ出し0。**要修正を維持**：設計の2カラム構成、社内メモ、期限、追記型の変更履歴、右側の使用先一覧と変更後プレビューは、現行の詳細・版・期限APIが返さない。偽データでは埋めない。',
-    verdictSource: 'common-vars-v6/gBtaK.png + gBtaK-1440.png + gBtaK-1920.png', verdictHead: '57477f85c',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6-contract.test.ts', verdictHead: '57477f85c',
   },
   {
     /*
@@ -1644,7 +1644,7 @@ export const SCREENS = [
     ],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。構造一致・データ未接続。** 値を変えた後に「Nか所を1件ずつ見る」で専用の影響確認へ進み、4つの集計札、6列の変更前後表、CSV出力、6件ごとのページ送り、固定の保存欄を実装した。1440・1920で設計と並べて目視し、横はみ出し0。文字数超過があれば保存を止める。**データ未接続**：現行APIの状態は「使われています」という大分類なので、予約中・公開中を数える「すぐ効くもの」は偽の0件にせず `—件` と理由を表示する。設計どおりの15件・状態別固定データが無く、数値までの一致は未確認。',
-    verdictSource: 'common-vars-v6/uNBlA.png + uNBlA-1440.png + uNBlA-1920.png + impact-review.test.ts',
+    verdictSource: 'common-vars-v6/uNBlA-1920.png + common-vars-v6/uNBlA.txt + impact-review.test.ts',
     verdictHead: '57477f85c',
   },
   {
@@ -1663,7 +1663,7 @@ export const SCREENS = [
     ],
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。** 対象の差し込みキーを `{営業時間}` 形式で示し、使用中は影響先を見せて削除を止め、未使用なら確認キーを入力して削除できる安全側の2状態を1440・1920で撮影した。横はみ出し0。**要修正を維持**：設計の「別の共通情報に差し替えてから削除する」は、まとめて差し替えるAPIが未提供。押しても働かない操作や偽の候補は置かず、現行は物理削除を止める。',
-    verdictSource: 'common-vars-v6/yPkWe.png + yPkWe-1440.png + yPkWe-1920.png + yPkWe-deletable-1440.png + yPkWe-deletable-1920.png',
+    verdictSource: 'common-vars-v6/yPkWe-1440.png + common-vars-v6/yPkWe.txt + delete-impact.test.ts',
     verdictHead: '57477f85c',
 
   },
