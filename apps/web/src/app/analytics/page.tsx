@@ -27,6 +27,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { formatAnalyticsDateTime } from './analytics-time'
 import { canTidyUsage, summarizeMenuFeatures, usageObservation } from './analytics-usage'
+import AnalyticsExportButton from './analytics-export-button'
 
 const TABS = [
   { key: 'friends', label: '友だちの増減' },
@@ -67,6 +68,30 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
   return values.some((value) => value === null)
     ? null
     : values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+}
+
+const RANGES = [7, 30, 90]
+const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
+
+function RangePicker({ days, onChange }: { days: number; onChange: (days: number) => void }) {
+  return (
+    <div className="flex gap-1" aria-label="集計期間">
+      {RANGES.map((range) => (
+        <button
+          type="button"
+          key={range}
+          onClick={() => onChange(range)}
+          className={`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`}
+        >
+          {range}日
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function weekdayOf(date: string): string {
+  return WEEKDAY_JP[new Date(`${date}T00:00:00+09:00`).getDay()] ?? ''
 }
 
 function rangeFor(days: number): { from: string; to: string } {
@@ -172,6 +197,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   const [crossResultId, setCrossResultId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [crossDays, setCrossDays] = useState(30)
   const [audience, setAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
   const [picked, setPicked] = useState<{
     row: string
@@ -239,7 +265,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     setAudience(null)
     setCrossResult(null)
     const now = new Date()
-    const from = new Date(now.getTime() - 30 * 24 * 3600_000)
+    const from = new Date(now.getTime() - crossDays * 24 * 3600_000)
     const rowAxis: AnalyticsCrossAxis = { kind: rowKind }
     try {
       const response = await api.analytics.runCross(accountId, {
@@ -386,11 +412,12 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
 
   return (
     <div data-design-node="f5HsX" className="space-y-4">
-      <div className="flex justify-end"><Button onClick={exportCross} disabled={!crossResult} variant="secondary">CSVで書き出す</Button></div>
+      <div className="flex justify-end"><AnalyticsExportButton onClick={exportCross} disabled={!crossResult} /></div>
       <AnalyticsNotice>数えているのは、こちらで観測できたことだけです。LINEで開かれたかどうかは取れないため、この画面には出しません。</AnalyticsNotice>
+      <p className="text-sm text-ink-secondary">タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。</p>
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
-        <h3 className="text-ink mb-3 text-sm font-semibold">かけ合わせる軸</h3>
+        <h3 className="text-ink mb-3 text-sm font-semibold">何を掛け合わせるか</h3>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
@@ -413,12 +440,12 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             />
           </div>
           <Button onClick={() => void runCross()} disabled={loading || !fieldId} variant="primary">
-            {loading ? '集計中' : 'この30日を集計'}
+            {loading ? '集計中' : `この${crossDays}日を集計`}
           </Button>
         </div>
         <dl className="mt-3 grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
           <div><dt className="text-xs font-medium text-ink-secondary">数えるもの</dt><dd className="mt-1 text-sm text-ink">友だちの人数（重複なし）</dd></div>
-          <div><dt className="text-xs font-medium text-ink-secondary">期間</dt><dd className="mt-1 text-sm text-ink">この30日</dd></div>
+          <div><dt className="mb-1 text-xs font-medium text-ink-secondary">期間</dt><dd><RangePicker days={crossDays} onChange={setCrossDays} /></dd></div>
         </dl>
         <p className="text-ink-faint mt-2 text-xs">
           集計結果はその時点のデータで固定します。期間や軸を変えた場合は、新しい結果として集計します。
@@ -778,8 +805,9 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
 
   return (
     <div data-design-node="C2I7ry" className="space-y-4">
-      <div className="flex justify-end"><Button onClick={exportFunnel} disabled={!result} variant="secondary">CSVで書き出す</Button></div>
+      <div className="flex justify-end"><AnalyticsExportButton onClick={exportFunnel} disabled={!result} /></div>
       <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
+      <p className="text-sm text-ink-secondary">友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。</p>
 
       {creating ? (
         <FunnelForm
@@ -1372,7 +1400,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
         </div>
       )}
       <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
-      {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
+      {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{weekdayOf(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
     </section>
     <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
       <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この30日の実測です。</p></div>
@@ -1562,10 +1590,10 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
       <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
       <span className="text-xs text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
-      <Button onClick={exportRows} disabled={visibleLinks.length === 0} variant="secondary">CSVで書き出す</Button>
+      <AnalyticsExportButton onClick={exportRows} disabled={visibleLinks.length === 0} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>リンク名・URL</Th><Th>どこから</Th><Th align="right">押された回数</Th><Th align="right">押した人</Th><Th align="right">クリック率</Th><Th>状態</Th></TableHeadRow></thead>
+      <thead><TableHeadRow><Th>リンク名・リンク先URL</Th><Th>どこから</Th><Th align="right">押された回数</Th><Th align="right">押した人</Th><Th align="right">クリック率</Th><Th>状態</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{visibleLinks.length === 0 ? <tr><td colSpan={6} className="text-ink-faint p-8 text-center text-sm">条件に合うURLはありません</td></tr> : visibleLinks.map((item) => <tr key={item.trackedLinkId} className="text-sm"><td className="px-3 py-3"><p className="truncate font-medium" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs text-ink-faint" title={item.originalUrl}>{item.originalUrl}</p><p className="mt-1 truncate text-[11px] text-ink-faint">最初 {item.firstClickedAt ? <DateTimeMetricCell metric={item.firstClickedAt} /> : '—'} ／ 最後 {item.lastClickedAt ? <DateTimeMetricCell metric={item.lastClickedAt} /> : '—'}</p></td><td className="text-ink-secondary truncate px-3 py-3" title={item.usageLocations.join('、')}>{item.usageLocations.length ? item.usageLocations.join('、') : '—'}</td><td className="px-2 py-3 text-right"><MetricCell metric={item.clicks} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.knownClickPeople} /><p className="mt-1 text-xs text-ink-faint">届いた人数 <MetricCell metric={item.deliveredPeople} /></p></td><td className="px-2 py-3 text-right">{shownValue(item.clickRate) === null ? <span className="text-ink-faint" title={item.clickRate.reason ?? undefined}>—</span> : <span>{shownValue(item.clickRate)}%</span>}</td><td className="px-3 py-3"><Chip tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? '計測中' : '停止中'}</Chip>{(item.actions?.tagName || item.actions?.scenarioName) && <p className="mt-1 truncate text-xs text-ink-faint" title={[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('、')}>{[item.actions.tagName, item.actions.scenarioName].filter(Boolean).join('・')}</p>}</td></tr>)}</tbody>
     </table></div>
     <p className="text-ink-faint text-xs">{overview.clickRateDefinition}</p>
@@ -1681,7 +1709,7 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="saved-analysis-search" className="sr-only">分析名・作った人で探す</label>
         <input id="saved-analysis-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="分析名・作った人で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
-        <Button onClick={exportSaved} disabled={visibleItems.length === 0} variant="secondary">CSVで書き出す</Button>
+        <AnalyticsExportButton onClick={exportSaved} disabled={visibleItems.length === 0} />
       </div>
 
       {loading ? (
