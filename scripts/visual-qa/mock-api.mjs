@@ -69,7 +69,7 @@ import {
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
-  WEBINARS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
+  WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -1285,6 +1285,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
     return { success: true, data: MEDIA_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
+    return { success: true, data: WEBINAR_FOLDERS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {

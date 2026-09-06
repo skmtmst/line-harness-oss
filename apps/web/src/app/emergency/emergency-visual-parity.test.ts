@@ -19,10 +19,18 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).toContain('<PageHeader')
     expect(visible).not.toMatch(/<h1[\s>]/)
     expect(source).toContain('text-base font-bold text-ink">チェック結果')
-    expect(source).toContain('text-base font-bold text-ink">緊急停止')
-    expect(source).toContain('text-base font-bold text-info">復旧')
+    expect(source).toContain('text-base font-bold text-ink">何を止めますか')
+    expect(source).toContain('}>復旧</h2>')
     expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
     expect(source).toContain('text-[11px] font-bold')
+  })
+
+  it('緊急停止と更新履歴を設計の本文＋右欄へ分ける', () => {
+    expect(source).toContain('xl:w-96 xl:shrink-0')
+    for (const title of ['止めるとどうなるか', '止めたあとにすること', 'この記録でできること', 'つながる先', '気をつけること']) {
+      expect(source).toContain(`title="${title}"`)
+    }
+    expect(source).toContain('sticky bottom-0')
   })
 
   it('タブごとの説明をPenと同じ内容で表示する', () => {

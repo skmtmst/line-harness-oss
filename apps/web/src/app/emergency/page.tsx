@@ -118,6 +118,23 @@ function SummaryCard({ label, value, note }: { label: string; value: string; not
   )
 }
 
+function OperationSideCard({
+  title,
+  tone = 'plain',
+  children,
+}: {
+  title: string
+  tone?: 'plain' | 'warning'
+  children: ReactNode
+}) {
+  return (
+    <section className={`rounded-card border p-4 ${tone === 'warning' ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-secondary'}`}>
+      <h2 className="text-sm font-bold">{title}</h2>
+      <div className="mt-3 space-y-3 text-xs leading-relaxed">{children}</div>
+    </section>
+  )
+}
+
 /**
  * 運用状態の見出し。
  *
@@ -484,17 +501,54 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
-      <div className={`rounded-card border px-4 py-3 ${isStopped ? 'border-danger bg-danger-bg' : impactFailed ? 'border-hairline bg-canvas-sunken' : 'border-success bg-success-bg'}`}><p className={`text-base font-bold ${isStopped ? 'text-danger' : impactFailed ? 'text-ink-secondary' : 'text-success'}`}>{isStopped ? '緊急停止中' : impactFailed ? '停止状態を確認できません' : '通常運用中'}</p><p className="mt-1 text-xs text-ink-faint">{isStopped ? `${accountName}・${formatOperationDate(control?.stoppedAt ?? null)}から停止中` : impactFailed ? '取得できない状態では停止・復旧を実行できません。' : `緊急停止は実行されていません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>
       {message && <div className={`rounded-control px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}>{message.text}</div>}
-      <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
-        <div><h2 className="text-base font-bold text-ink">緊急停止</h2><p className="mt-1 text-xs text-ink-faint">停止対象を実行直前に取得します。</p></div>
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
-        <div className="border-hairline mt-5 overflow-hidden rounded-control border">{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
-        <div className="mt-5"><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-detail">補足（任意）</label><textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm" /></div>
-        <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
-      </section>
-      {isStopped && <section className="rounded-card border border-info bg-info-bg p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-info">復旧</h2><p className="mt-1 text-xs text-info">停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button></div></section>}
-      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-2xl overflow-hidden bg-canvas shadow-2xl"><div className="border-hairline border-b px-6 py-5"><h2 id="emergency-confirm-title" className="text-lg font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-xs text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div><div className="space-y-4 p-6"><div className={`rounded-control border p-4 text-sm ${confirmMode === 'stop' ? 'border-danger bg-danger-bg text-danger' : 'border-info bg-info-bg text-info'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactText(key)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></>}</div>{confirmMode === 'stop' && <div className="rounded-control bg-success-bg px-4 py-3 text-xs font-bold text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</div>}<div className="rounded-control bg-warning-bg px-4 py-3 text-xs font-semibold text-warning">ログインユーザーへのLINE・メール通知は、通知基盤の接続後に有効になります。現在は更新履歴へ記録します。</div><label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control min-h-11 w-full border px-3 text-sm" /></div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '実行中...' : confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div></div>}
+      <div className="flex flex-col items-start gap-4 xl:flex-row">
+        <div className="min-w-0 flex-1 space-y-4">
+          <section className={`border-hairline rounded-card overflow-hidden border bg-canvas ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className="border-hairline border-b px-4 py-4"><h2 className="text-base font-bold text-ink">何を止めますか</h2><p className="mt-1 text-xs text-ink-faint">停止前に、何本と何人に関わるかを実測で確認します。</p></div>
+            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
+          </section>
+
+          <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+            <h2 className="text-base font-bold text-ink">どのアカウントを、なぜ止めますか</h2>
+            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
+          </section>
+
+          <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped ? 'pointer-events-none opacity-50' : ''}`}>
+            <label className="text-base font-bold text-ink" htmlFor="emergency-detail">補足（任意）</label>
+            <textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-3 w-full border px-3 py-2 text-sm" />
+          </section>
+
+          <section className={`rounded-card border p-4 ${isStopped ? 'border-info bg-info-bg' : impactFailed ? 'border-warning bg-warning-bg' : 'border-info bg-info-bg'}`}>
+            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className={`text-base font-bold ${impactFailed ? 'text-warning' : 'text-info'}`}>復旧</h2><p className={`mt-1 text-xs ${impactFailed ? 'text-warning' : 'text-info'}`}>{isStopped ? '停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。' : impactFailed ? '停止状態を確認できないため、停止・復旧を実行できません。' : `いまは止めていません。復旧できるものはありません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>{isStopped && <button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button>}</div>
+          </section>
+        </div>
+
+        <aside className="w-full space-y-4 xl:w-96 xl:shrink-0">
+          <OperationSideCard title="止めるとどうなるか" tone="warning">
+            <p><strong>予約中の一斉配信は下書きに戻ります</strong><br />止めたあと、そのまま出ることはありません。</p>
+            <p><strong>シナリオ・リマインダは途中で止まります</strong><br />止めているあいだの時刻ぶんは、戻しても送りません。</p>
+            <p><strong>受信箱からの手の返信と予約の受付は止まりません</strong></p>
+          </OperationSideCard>
+          <OperationSideCard title="止めたあとにすること">
+            <p><strong>ログインユーザー全員へ知らせます</strong><br />通知基盤の接続後、LINEとメールへ停止した人と理由を届けます。</p>
+            <p><strong>更新履歴に残ります</strong><br />いつ・だれが・何を・なぜ止めたかを記録します。</p>
+            <p><strong>直したら復旧します</strong><br />止める前に動いていたものだけを戻します。</p>
+          </OperationSideCard>
+          <OperationSideCard title="つながる先">
+            <p><Link href="/emergency?tab=health" className="font-bold text-action">→ 健全性チェック</Link><br />止める前に、どこが変かを確認</p>
+            <p><Link href="/emergency?tab=history" className="font-bold text-action">→ 更新履歴</Link><br />止めた・戻した記録</p>
+            <p><Link href="/broadcasts" className="font-bold text-action">→ 一斉配信</Link><br />下書きに戻った配信</p>
+          </OperationSideCard>
+        </aside>
+      </div>
+
+      <div className="border-hairline rounded-card sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border bg-canvas px-4 py-3 shadow-lg">
+        <p className="text-xs font-semibold text-ink-faint">4つのうち{selectedTargets.length}つを選択 ／ {accountName} ／ 理由「{reason}」</p>
+        <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={running || isStopped} className="rounded-control min-h-10 px-4 text-xs font-bold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><button onClick={openStopConfirm} disabled={running || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
+      </div>
+
+      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-3xl overflow-hidden bg-canvas shadow-2xl"><div className="border-hairline flex items-start gap-3 border-b px-6 py-5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-bg font-bold text-danger">×</span><div><h2 id="emergency-confirm-title" className="text-lg font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-xs text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div></div><div className="space-y-4 p-6"><div className={`rounded-control border p-4 text-sm ${confirmMode === 'stop' ? 'border-danger bg-danger-bg text-danger' : 'border-info bg-info-bg text-info'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactText(key)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></>}</div>{confirmMode === 'stop' && <div className="rounded-control bg-success-bg px-4 py-3 text-xs font-bold text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</div>}<label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control min-h-11 w-full border px-3 text-sm" /></div><div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4"><p className="max-w-sm text-xs text-ink-faint">通知基盤の接続後は、ログインユーザー全員のLINEとメールへ停止を知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '実行中...' : confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div></div></div>}
     </div>
   )
 }
@@ -553,7 +607,7 @@ function HistoryPanel() {
   return (
     <div className="space-y-4" data-design="V3 Update history">
       <div className="flex flex-wrap justify-end gap-2">
-        <SelectField value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} className="border-hairline rounded-control min-h-9 border bg-canvas px-3 text-xs" />
+        <SelectField aria-label="表示期間" value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} className="border-hairline rounded-control min-h-9 border bg-canvas px-3 text-xs" />
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-bold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -563,14 +617,34 @@ function HistoryPanel() {
         <SummaryCard label="いまの版" value={currentVersion} note="反映済み" />
       </div>
       <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">止めた・戻した記録です。だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。</div>
-      <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-        <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p></div>
-        {state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[190px_1.2fr_1fr_1fr_110px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-bold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[190px_1.2fr_1fr_1fr_110px] md:items-center"><div><time className="text-sm font-bold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-bold text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-bold text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-bold ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
-      </section>
-      <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-        <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">システム更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい10件を表示します</p></div>
-        {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_minmax(0,1fr)_100px] md:items-center"><div><time className="text-xs font-bold text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-bold text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
-      </section>
+      <div className="flex flex-col items-start gap-4 xl:flex-row">
+        <div className="min-w-0 flex-1 space-y-4">
+          <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+            <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p></div>
+            {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-bold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-bold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-bold text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-bold text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-bold ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
+          </section>
+          <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+            <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">管理画面の更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい10件を表示します</p></div>
+            {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_90px] md:items-center"><div><time className="text-xs font-bold text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-bold text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
+          </section>
+        </div>
+        <aside className="w-full space-y-4 xl:w-96 xl:shrink-0">
+          <OperationSideCard title="この記録でできること">
+            <p><strong>「あの日 何が起きたか」をさかのぼれます</strong><br />止めた理由と、そのとき動いていたものが残ります。</p>
+            <p><strong>だれが止めたかが分かります</strong><br />名前・場所・端末をサーバーの記録で確認します。</p>
+            <p><strong>通常の管理者は消せません</strong></p>
+          </OperationSideCard>
+          <OperationSideCard title="つながる先">
+            <p><Link href="/emergency?tab=control" className="font-bold text-action">→ 緊急コントロール</Link><br />止める・戻す</p>
+            <p><Link href="/staff" className="font-bold text-action">→ ログインユーザー</Link><br />入った記録と担当者</p>
+            <p><Link href="/broadcasts" className="font-bold text-action">→ 一斉配信</Link><br />下書きに戻った配信</p>
+          </OperationSideCard>
+          <OperationSideCard title="気をつけること" tone="warning">
+            <p><strong>止めているあいだの配信は出ません</strong><br />戻しても、そのぶんはさかのぼって送りません。</p>
+            <p><strong>期限を過ぎた予約配信は戻りません</strong></p>
+          </OperationSideCard>
+        </aside>
+      </div>
     </div>
   )
 }
