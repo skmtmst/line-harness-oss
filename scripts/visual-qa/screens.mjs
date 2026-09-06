@@ -1446,28 +1446,15 @@ export const SCREENS = [
     */
     /*
       **「…」を押さないと中身が写らない。** 開く前の絵を設計と並べても
-      何も比べていない。ボタンの読み上げ名は `フォルダ「◯◯」を操作`
-      （`components/shared/folder-panel.tsx:122`、PR #493 head `62ddaebe`）。
-      **この部品は #493 にしか無い。** いまの画面確認サーバ（`6db5ad7f`）の
-      木には入っていないので、撮るには #493 の木でサーバを起こす。
+      何も比べていない。表示文言に依存しない `data-qa-open` で開く。
     */
     ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「フォルダ『お問い合わせ』を操作」が0件で、設計の名称変更・移動・削除メニューを開けない。固定データには対象フォルダがあるため画面側の未接続。**推奨修正**：テンプレート一覧を共通のフォルダ操作へ接続する。取得元 `templates-v6/CzndJ.txt` と撮影失敗ログ。',
-    verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #252 / UI HEAD `3fd0d57a9` で一致。** 版の外にある正本PNGと実装を同じ1920×1080・メニュー展開状態で横に並べ、フォルダ操作の文字・順序・余白・色・枠・角丸・影を確認した。`/templates` は `/api/folders?kind=template` の実データを読み、撮影用の実Node入口 `CzndJ` から真ん中のフォルダを開くため、名前を変更／色を変える／並び順を上へ／並び順を下へ／フォルダを削除と「削除しても、中のテンプレートは未分類に残ります。」が1枚にそろう。1440・1920とも横はみ出し0。周辺の名称・件数は撮影用固定データをそのまま表示し、設計見本の数値を作っていない。通常・読込・空・失敗・権限不足は `NKyoA` と画面契約テスト、フォルダ更新権限はWorker契約テストで確認済み。P0/P1/P2なし。P3として正本にある各項目の左アイコンは共通部品側の差として残す（s0範囲）。',
+    verdictSource: 'templates-v6/CzndJ.txt + templates-v6/CzndJ-1920.png + template-folder-contract.test.ts + templates-folder.test.ts',
+    verdictHead: '3fd0d57a9',
     mode: 'viewport', height: 1080,
-    /*
-      **撮れない理由は固定データではなく実装。**
-      固定データ `TEMPLATE_FOLDERS` は「お問い合わせ／予約／EC」を持ち、
-      モックも `/api/folders?kind=template` で返している。だが
-      `/templates` は**その口を叩いておらず**、テンプレートの
-      `category`（`general` など）から自前でフォルダ列を組み立てている
-      （`templates/page.tsx` の `categoryCounts`）。設計 `CzndJ` は
-      共通部品「フォルダ操作メニュー」を持つが、実装のフォルダは
-      名前を持たない分類なので、開く相手がそもそも無い。
-      **撮るには実装をフォルダの口へつなぐ必要がある。**
-    */
-    steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
+    steps: [{ qaOpen: 'CzndJ' }],
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）', mode: 'viewport', height: 1080,
