@@ -3138,6 +3138,31 @@ export const BOOKING_AVAILABILITY = {
 }
 
 /*
+  代理予約の登録結果。画面確認用なのでDB保存・通知は起こさない。
+  10:00は登録完了、14:00は同じ枠を別の予約が取った競合として返す。
+  本番の `POST /api/booking/admin/bookings` と同じHTTP状態・本文の形にする。
+*/
+export const BOOKING_PROXY_CREATE = {
+  success: {
+    status: 201,
+    body: {
+      booking_id: 'visual-qa-booking-1000',
+      status: 'confirmed',
+      calendar_sync: 'not_configured',
+      replayed: false,
+    },
+  },
+  conflict: {
+    status: 409,
+    body: { error: 'slot_conflict' },
+  },
+  unavailable: {
+    status: 422,
+    body: { error: 'slot_not_available' },
+  },
+}
+
+/*
   予約。設計 `TV2DI`（予約管理）の台帳そのまま。
 
   **LINEからと電話からを混ぜる。** 設計は「LINEから 9・電話 3」を色で分けて
