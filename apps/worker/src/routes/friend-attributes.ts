@@ -917,8 +917,10 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
       referenceCallCounts,
     ));
     const query = (c.req.query('query') ?? '').trim().toLocaleLowerCase('ja-JP');
-    const filtered = serialized.filter((item) => {
-      if (owner === 'me' && item.createdBy !== access.staffId) return false;
+    const ownerScoped = serialized.filter(
+      (item) => owner !== 'me' || item.createdBy === access.staffId,
+    );
+    const filtered = ownerScoped.filter((item) => {
       if (query && ![
         item.name,
         ...item.usedIn.map((reference) => reference.name),
@@ -931,11 +933,11 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
     });
     const page = filtered.slice(offset, offset + limit);
     const summary = {
-      total: serialized.length,
-      usedInBroadcasts: serialized.filter((item) =>
+      total: ownerScoped.length,
+      usedInBroadcasts: ownerScoped.filter((item) =>
         item.usedIn.some((reference) => reference.kind === 'broadcast')).length,
-      zeroMatches: serialized.filter((item) => item.matchCount === 0).length,
-      callsThisMonth: serialized.reduce((total, item) => total + item.callCountThisMonth, 0),
+      zeroMatches: ownerScoped.filter((item) => item.matchCount === 0).length,
+      callsThisMonth: ownerScoped.reduce((total, item) => total + item.callCountThisMonth, 0),
     };
     const pagination = {
       total: filtered.length,

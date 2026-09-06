@@ -814,6 +814,31 @@ describe('保存した検索', () => {
     });
   });
 
+  it('owner=me の集計へ他人の共有検索を混ぜない', async () => {
+    searches.getSavedSearches.mockResolvedValueOnce([
+      SEARCH,
+      { ...SEARCH, id: 's-2', created_by: 'u-2', is_shared: 1 },
+    ]);
+    savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValueOnce(new Map([
+      ['s-1', { matchCount: 7, matchCountError: null }],
+      ['s-2', { matchCount: 0, matchCountError: null }],
+    ]));
+    searches.getSavedSearchUsageCounts.mockResolvedValueOnce(new Map([
+      ['s-1', 4],
+      ['s-2', 9],
+    ]));
+    const res = await req(
+      '/api/saved-searches?lineAccountId=account-1&owner=me',
+      'GET',
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [{ id: 's-1' }],
+      summary: { total: 1, zeroMatches: 0, callsThisMonth: 4 },
+      pagination: { total: 1 },
+    });
+  });
+
   it('保存した検索が無い状態を0件の集計と空配列で返す', async () => {
     searches.getSavedSearches.mockResolvedValueOnce([]);
     savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValueOnce(new Map());
