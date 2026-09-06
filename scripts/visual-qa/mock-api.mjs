@@ -67,7 +67,8 @@ import {
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY,
-  BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR, BOOKING_REQUESTS,
+  BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
+  BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
@@ -2080,6 +2081,31 @@ const server = createServer((req, res) => {
           success: true,
           data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
         }))
+      })
+      return
+    }
+    /*
+      代理予約の登録完了と予約枠競合。**POSTだが保存も通知も起こさない。**
+      撮影手順の10:00だけ成功、14:00だけ競合にし、ほかの時刻を誤って
+      登録済みに見せない。本番と同じく成功は201、競合は409で返す。
+    */
+    if (method === 'POST' && url.pathname === '/api/booking/admin/bookings') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let startsAt = ''
+        try {
+          const parsed = JSON.parse(raw || '{}')
+          startsAt = typeof parsed.starts_at === 'string' ? parsed.starts_at : ''
+        } catch {
+          startsAt = ''
+        }
+        const fixed = startsAt === '2026-09-03T01:00:00.000Z'
+          ? BOOKING_PROXY_CREATE.success
+          : startsAt === '2026-09-03T05:00:00.000Z'
+            ? BOOKING_PROXY_CREATE.conflict
+            : BOOKING_PROXY_CREATE.unavailable
+        res.writeHead(fixed.status).end(JSON.stringify(fixed.body))
       })
       return
     }

@@ -1036,33 +1036,37 @@ export const SCREENS = [
     verdictHead: '235d99f10', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、右の設定内容、LINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。1440/1920pxとも横はみ出し0。ただし設計は基本設定だけを1画面に収めるのに対し、実装は条件・返信・後続処理まで同じ長い面に並ぶため要修正を維持する。取得元 `auto-replies-v6/K7vg2.txt` と同Node画像。',
-    verdictHead: '235d99f10',
-    route: '/auto-replies/edit?id=ar-2',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 基本設定だけを独立した段に分け、ルール名・フォルダ・優先順位、反応条件要約、ひな形3件、右の設定内容・LINEプレビュー、固定操作帯を設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは社内メモを保存せず、競合件数も基本設定の取得口に無いため、その2値は未接続表示。',
+    verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + K7vg2.txt',
+    verdictHead: '1a0b0291e',
+    route: '/auto-replies/edit?id=ar-2&step=basic',
 
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示、複数キーワードの接続説明、過去28日の注意、標準互換15軸／この画面だけの6軸を追加し、1440/1920pxとも横はみ出し0。ただし設計の条件専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/nzWIX.txt` と同Node画像。',
-    verdictHead: '235d99f10',
-    route: '/auto-replies/edit?id=ar-2',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 反応条件だけを独立した段に分け、複数キーワードのOR/AND、一致方法、曜日・時間帯・受信元、友だち条件、右の判定要約と過去28日欄を設計順に配置した。友だち条件は「条件を編集」で実際の条件ビルダーを開ける。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。固定データはキーワード1件で、現行APIは受信元と過去28日の該当件数を返さないためデータ待ち。',
+    verdictSource: 'auto-replies-v6/nzWIX.png + docs/design-qa/auto-replies-v6/nzWIX-{1440,1920}.png + nzWIX.txt',
+    verdictHead: '1a0b0291e',
+    route: '/auto-replies/edit?id=ar-2&step=trigger',
 
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 5段表示とLINEプレビューを追加し、内部語「JSON」「Flex」は画面から除いた。返信と後続処理は保存契約へ接続済みで、1440/1920pxとも横はみ出し0。ただし設計の返信専用段ではなく全入力が1枚に続くため要修正を維持する。取得元 `auto-replies-v6/ivDoe.txt` と同Node画像。',
-    verdictHead: '235d99f10',
-    route: '/auto-replies/edit?id=ar-2',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 返信と後続処理だけを独立した段に分け、返し方、テンプレート/本文、差し込み項目、配信後アクション、待ち時間・連続返信・未一致時、右の返信要約とLINEプレビューを設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは返信遅延と未一致時の別動作を保存しないため、画面では作り物を保存せず未接続理由を表示。',
+    verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + ivDoe.txt',
+    verdictHead: '1a0b0291e',
+    route: '/auto-replies/edit?id=ar-2&step=response',
 
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で再判定。** 読込・失敗・権限不足は3104/8791で1440/1920px撮影し、横はみ出し0。通常状態は撮影用モックに下書きと競合の固定データが無く「下書きを表示できませんでした」になるため、設計の競合順位・勝者・判定例と比較できず要修正を維持する。`scripts/visual-qa/mock-api.mjs` はClaude所有なので変更していない。取得元 `auto-replies-v6/U9hzqH*.txt`。',
-    verdictHead: '235d99f10',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で一致。** 下書き1件と競合2件を優先順位3段として表示し、勝者、停止/対象外、競合警告、一致後の動作、ループ防止、右の判定例・運用監視・LINEプレビュー、固定操作帯を設計順に配置した。通常・読込・空・失敗・権限不足を3106/8793で各1440/1920px撮影し、同Node画像と横並び比較、全12枚で横はみ出し0。競合2件の確認後だけテストへ進める既存の安全ゲートも維持。',
+    verdictSource: 'auto-replies-v6/U9hzqH.png + docs/design-qa/auto-replies-v6/U9hzqH*.png + U9hzqH*.txt',
+    verdictHead: '1a0b0291e',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 重なりの確認。最初に開く段 */
     /*
@@ -1111,7 +1115,7 @@ export const SCREENS = [
   {
     /*
       **PR #501（head `93edbe17`）で `/auto-replies/runs` が入った。**
-      口は `GET /api/auto-reply-runs?ruleId=`。1本にそろっている。
+      口は `GET /api/auto-reply-runs?rule_id=`。1本にそろっている。
 
       **見送りの行がいちばん大事。** 選んだルールが条件で見送られ、
       後ろのルールが動いても、この画面は「選んだルールは何もしなかった」
@@ -1119,9 +1123,9 @@ export const SCREENS = [
       固定データに2行入れてある。
     */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態でも件数がすべて「—件」で一覧が取得失敗となり、設計の実行履歴・見送り理由・右側の集計を確認できない。**推奨修正**：固定データを正常表示し、設計の4指標・履歴・ルール別集計を同じ配置で出す。取得元 `auto-replies-v6/t7UtYQ*.txt` と同Node画像。',
-    verdictSource: 'auto-replies-v6/t7UtYQ.txt', verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #292 / 固定データ PR #1077（統合 #1080・head `447da7646`）で一致。** 今月214回・累計1,842回・引継ぎ36件・エラー3件、最近の実行4行、きっかけ別3行、稼働状況、実行エラー、担当者引継ぎを実APIと同じ応答型で表示した。通常・読込・空・失敗を3106/8793で各1440/1920px撮影し、同Node画像と横並び比較、全10枚で横はみ出し0。見送り・成功・確認待ち・エラーの違いも0件や未取得へ潰していない。',
+    verdictSource: 'auto-replies-v6/t7UtYQ.png + docs/design-qa/auto-replies-v6/t7UtYQ*.png + t7UtYQ*.txt', verdictHead: '447da7646',
     route: '/auto-replies/runs?id=rule-a',
     states: {
       apis: ['**/api/auto-reply-runs*'],
@@ -2375,14 +2379,15 @@ export const SCREENS = [
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
     設計のタブは4本（こちらから送る6／こちらで受け取る3／やり取りの記録／見本14）。
-    実装は2本（受信 (Incoming)／送信 (Outgoing)）で、記録も見本も無い。
+    4タブと通常・空・読込・エラーの共通枠は接続済み。
+    接続別集計と受信本文の安全な見本は契約待ちのため、作り物を表示しない。
   */
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
     route: '/webhooks?tab=outgoing',
-    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブの名称・件数と送り先6本はそろい、1440px・1920pxとも横はみ出し0。ただし設計の4指標、説明帯、状態・期間の絞り込み、送信回数・直近結果・中身を見る導線が一覧に無く、URL・シークレット・作成日を中心にした管理用の表のまま。**推奨修正：やり取りAPIの集計を一覧へ接続し、送信回数・直近結果・再送導線を設計の列へまとめる。**', verdictSource: 'webhooks-v6/k3WxrO.txt', verdictHead: 'eb86ea2df1',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4指標、説明帯、検索、状態・並び順、6列の一覧、ページ送りを同じ順に置き、送信先6本・受信口3本・この30日1,486回・失敗6回・受信486回を実応答から表示した。1440px・1920pxとも横はみ出し0。接続別の回数・直近結果・再送対象を返すAPIは無いため、各行は「接続別集計待ち」とし、架空の回数や成功を出していない。**推奨修正：接続別集計APIに送信回数・直近結果・再送可否を足し、「中身を見る」「1回試してみる」へ接続する。**', verdictSource: 'webhooks-v6/k3WxrO.txt', verdictHead: 'd9eff7d7d',
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4タブと受け取り口3件、日本語だけの見出し、安全なシークレット状態はそろい、横はみ出し0。ただし設計は選択した受け取り口のURL・合言葉・対応付け・届いたデータの見本・差し込み項目・注意を1画面で確認する詳細面。実装は3件の一覧だけで、受信サンプルを返すAPIも無い。**推奨修正：受け取り口詳細と、本文をマスクした最新受信サンプルのAPIを用意し、一覧行から詳細へ進めるようにする。**', verdictSource: 'webhooks-v6/M0Gb7.txt', verdictHead: 'eb86ea2df1' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', route: '/webhooks?tab=incoming', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で受信タブとして撮影し、★V6設計と同じ1920pxで並べて確認。** 選んだ受け取り口のURL、合言葉、届いたらすること、届いたデータの見かた、ほか2件、用語・関連先・注意の右欄を設計と同じ2列構造へそろえた。1440px・1920pxとも横はみ出し0。人の照合方法・見つからない場合・実行処理・本文をマスクした最新受信サンプルを返す詳細APIが無いため、その4箇所はAPI待ちと明示し、架空のタグ・配信・本文は出していない。**推奨修正：受け取り口詳細APIに照合設定・実行処理・マスク済み最新受信・差し込み項目を追加して接続する。**', verdictSource: 'webhooks-v6/M0Gb7.txt', verdictHead: 'd9eff7d7d' },
     // ---- 2026-09-02 `a0bb3f44` で実装を読み直した ----
     // **「タブの言葉に内部の語が残る（受信 (Incoming)／送信 (Outgoing)）」は古い。**
     //   `webhook-operator-words-contract.test.ts:13-14` が `Incoming)` `Outgoing)` を
@@ -2410,8 +2415,8 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**2026-09-06 Issue #239 / PR #1005 / UI HEAD `eb86ea2df1` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて確認。** 3状態は分かれ、取得失敗で登録内容が消えていない説明と再読込を出し、全8枚で横はみ出し0。ただし設計は4指標・説明帯・絞り込み・ページ送りを残した同じ一覧枠の中で各状態を見せる。実装は状態部分だけになり、一覧の文脈が消える。**推奨修正：k3WxrOの集計・絞り込み・ページ送りを先に接続し、その共通枠の表領域だけを3状態へ差し替える。**',
-    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: 'eb86ea2df1',
+    verdict: 'match', verdictNote: '**2026-09-07 Issue #303 / UI HEAD `d9eff7d7d` を3107/8794で通常・読込中・0件・取得失敗まで再撮影し、★V6設計と同じ1920pxで並べて一致を確認。** 4指標、説明帯、検索・絞り込み・並び順、ページ位置を共通枠に残し、表領域だけを各状態へ差し替えた。0件は作成導線、取得失敗は「登録内容は消えていない」説明と再読込を表示する。全8枚で1440px・1920pxとも横はみ出し0。',
+    verdictSource: 'webhooks-v6/f8SBSh-loading.txt + f8SBSh-empty.txt + f8SBSh-error.txt', verdictHead: 'd9eff7d7d',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -3575,6 +3580,41 @@ const ISSUE_294_REVIEW = {
 }
 
 /**
+ * board #325。#315 / PR #1073 の固定データを含む development 31c2fddcc を
+ * 3104/8791 で起動し、#294 でデータ待ちにした7 Nodeを再判定した。
+ */
+const ISSUE_325_REVIEW = {
+  TC1b1: {
+    verdict: 'match',
+    note: '一致。#1073の固定応答から「初回案内・購入後・予約フォロー」3分類と未分類を表示し、案内、4指標、フォルダ、検索・絞り込み、5行の一覧、状態と行操作が設計と同じ役割・順序になった。1440/1920pxとも横はみ出し0。',
+  },
+  kk8dz: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・固定データ待ち。3段の現在地、配信対象、日時・種別・本文、LINEプレビュー、配信の流れ、設定サマリーは設計と同じ左右構成。#1073はこの画面の1通目本文を変更しておらず、設計の名前差し込みを含む例文は固定応答に無いため、実値を作らず既存本文を表示した。1440/1920pxとも横はみ出し0。',
+  },
+  bV5Vs: {
+    verdict: 'match',
+    note: '一致。#1073の固定応答から設計と同じ4通目「7日間フォロー完了のお知らせ」を表示し、開始前の注意、5枚の設定札、購読中・読了済・離脱、4行のステップ表、各操作、下部操作が設計と同じ役割・順序になった。1440/1920pxとも横はみ出し0。',
+  },
+  r6Gzsu: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。個別ステップ編集を背景に、条件面、AND/OR、15軸、条件追加、絞り込み要約、戻る・保存を表示。#1073は条件と対象人数を追加しておらず、固定ステップの条件は空で対象人数を数えるAPIも無いため、設計の選択済み条件と人数は作っていない。1440/1920pxとも横はみ出し0。',
+  },
+  hz9ti: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。#1073の固定応答から、タグ追加、対応マーク変更、テキスト送信の設定済み3動作を実行順に表示した。設計が選べる8種類に対し現行契約は5種類で、テンプレート送信・リマインダ操作・イベント予約操作などを保存できないため一致には上げない。1440/1920pxとも横はみ出し0。',
+  },
+  RUxNf: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。左に対象シナリオ・開始のきっかけ・配信方式・通数・購読中、右に4項目の配信前チェック、下に開始後の影響と操作を配置。#1073はテスト送信履歴、送信枠、開始予定人数、開始日時を追加しておらず、APIが返さない値は「—」のまま確認済みにしていない。1440/1920pxとも横はみ出し0。',
+  },
+  g2UNV: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API結果待ち。送信先、#1073で4通になった日時・種別、本物のLINEへ送る警告、戻る・テスト送信開始を確認する段を表示。現行APIは合計送信数だけを返し1通ごとの成否を返さないため、設計の通別結果は送信前に作っていない。1440/1920pxとも横はみ出し0。',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -3760,6 +3800,13 @@ for (const screen of SCREENS) {
     screen.verdictSource = issue294Review.source
     screen.verdictHead = '9294bdeeb'
   }
+  const issue325Review = ISSUE_325_REVIEW[screen.node]
+  if (screen.feature === 5 && issue325Review) {
+    screen.verdict = issue325Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #325で固定データ反映後に再判定。** 設計1920pxと実装1920pxを同じ比較画像に並べ、実装1440/1920pxも確認。${issue325Review.note}`
+    screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png + 2026-09-07 same-input comparison`
+    screen.verdictHead = '31c2fddcc'
+  }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
     screen.verdict = issue267Review.verdict
@@ -3931,6 +3978,8 @@ export const CAPTURED_AT = {
   26: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['k3WxrO','M0Gb7','KNG00','f8SBSh'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
+    { pr: 1083, head: 'd9eff7d7d', on: '2026-09-07', screens: ['k3WxrO','M0Gb7','f8SBSh'],
+      note: 'Issue #303 第2周。送信一覧と受信詳細の骨格、通常・読込中・0件・取得失敗を3107/8794で撮り直した。**絵は版に残さない**ので、証拠は `.txt` と判定の注記。' },
   ],
   27: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['TV2DI','cpdDi','SbuUI'],
@@ -4154,6 +4203,7 @@ export const CAPTURED_AT = {
     { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
+    { pr: 1082, head: 'c1355bb54', on: '2026-09-07', screens: ['K7vg2', 'nzWIX', 'ivDoe', 'U9hzqH', 't7UtYQ'], note: 'Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。' },
     { pr: 955, head: '564c91d0fe', on: '2026-09-06', screens: ['g46ja', 'Yj6CQ', 'e6iJG'], note: '競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。' },
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
@@ -4162,6 +4212,9 @@ export const CAPTURED_AT = {
     { pr: 596, head: 'edb94936', on: '2026-08-30', screens: ['U9hzqH', 'g46ja', 'Yj6CQ', 'e6iJG'], note: 'Claudeが実装した。#595 の契約の上に公開までの4段。実装した本人が比較している' },
   ],
   5: [
+    { pr: 1084, head: '31c2fddcc', on: '2026-09-07',
+      screens: ['TC1b1', 'kk8dz', 'bV5Vs', 'r6Gzsu', 'hz9ti', 'RUxNf', 'g2UNV'],
+      note: 'Issue #325。#1073の固定データを含む木を3104/8791で1440・1920px撮影し、設計1920pxと同じ状態で横並び比較した。全14枚で横はみ出し0。固定データで差が解消した2画面を一致へ更新し、残る5画面は不足する固定値またはAPI契約を理由に残した。' },
     { pr: 1069, head: '9294bdeeb', on: '2026-09-07',
       screens: ['TC1b1', 'cCB7r', 'kk8dz', 'bV5Vs', 'xfYLn', 'r6Gzsu', 'hz9ti', 'RUxNf', 'g2UNV'],
       note: 'Issue #294。3104/8791で9画面を1440・1920px撮影し、正本と同じ状態・同じ横幅で横並び比較した。全18枚で横はみ出し0。2画面は一致、7画面は存在しないAPI値を作らず理由つきの構造一致・データ待ち。' },

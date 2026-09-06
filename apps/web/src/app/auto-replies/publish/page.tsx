@@ -39,7 +39,7 @@ type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 type FriendLoadState = 'loading' | 'ready' | 'error'
 
 const PAGE_TITLES: Record<PublishStage, string> = {
-  conflicts: '自動応答・競合と優先順位',
+  conflicts: '自動応答ルール・競合確認',
   test: '自動応答をテスト',
   confirm: '自動応答ルール・最終確認',
   done: '自動応答・有効化完了',
@@ -148,7 +148,7 @@ function LinePreview({
       <span>{lead}</span>
       <div>
         <p>{message}</p>
-        <span>{actionLabel}</span>
+        {actionLabel ? <span>{actionLabel}</span> : null}
       </div>
     </section>
   )
@@ -347,52 +347,101 @@ function AutoReplyPublishInner() {
       ) : null}
 
       {stage === 'conflicts' ? (
-        <section className={"arp-panel"}>
-          <PanelHeading title="競合と優先順位" description="同じメッセージに反応する自動応答を確認します。上にあるものが先に動きます。" />
-          {conflicts.length === 0 ? (
-            <ListState kind="empty" title="重なる自動応答はありません" description="この下書きだけが反応します。" />
-          ) : (
-            <ul className={"arp-conflictList"}>
-              {conflicts.map((conflict) => {
-                const tone = conflictTone(conflict, draft.autoReplyId)
-                const checked = acknowledged.has(conflict.autoReplyId)
-                return (
-                  <li key={conflict.autoReplyId}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        aria-label={`${conflict.name}の重なりを確認した`}
-                        onChange={() => {
-                          setAcknowledged((current) => {
-                            const next = new Set(current)
-                            if (next.has(conflict.autoReplyId)) next.delete(conflict.autoReplyId)
-                            else next.add(conflict.autoReplyId)
-                            return next
-                          })
-                        }}
-                      />
-                      <span>
-                        <strong>{conflict.name}</strong>
-                        <small>{tone.label}・{conflict.reason}</small>
-                      </span>
-                    </label>
+        <>
+          <div className={"arp-columns"}>
+            <div className={"arp-mainColumn"}>
+              <section className={"arp-panel"}>
+                <PanelHeading title="競合・優先順位" description="同じメッセージに複数ルールが一致する場合の動作を確認します。" />
+                {conflicts.length > 0 ? (
+                  <div className={"arp-conflictNotice"}>
+                    <AlertTriangle aria-hidden="true" />
+                    <span><strong>競合するルールが{conflicts.length}件あります</strong><small>「{draft.settings.keyword}」という入力で複数ルールに一致します。</small></span>
+                  </div>
+                ) : null}
+                <ol className={"arp-priorityList"}>
+                  <li className={"arp-priorityWinner"}>
+                    <span>1</span>
+                    <div><strong>{ruleName}（このルール）</strong><small>{draft.settings.matchType === 'exact' ? '完全一致' : '部分一致'}：{draft.settings.keyword}</small></div>
+                    <em>最初に実行</em>
                   </li>
-                )
-              })}
-            </ul>
-          )}
-          <div className={"arp-inlineActions"}>
-            <Button
-              data-qa-open="g46ja"
-              variant="primary"
-              disabled={busy || acknowledged.size !== conflicts.length}
-              onClick={openTestStage}
-            >
-              自動応答をテストへ
-            </Button>
+                  {conflicts.map((conflict, index) => {
+                    const tone = conflictTone(conflict, draft.autoReplyId)
+                    const checked = acknowledged.has(conflict.autoReplyId)
+                    return (
+                      <li key={conflict.autoReplyId}>
+                        <span>{index + 2}</span>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            aria-label={`${conflict.name}の重なりを確認した`}
+                            onChange={() => {
+                              setAcknowledged((current) => {
+                                const next = new Set(current)
+                                if (next.has(conflict.autoReplyId)) next.delete(conflict.autoReplyId)
+                                else next.add(conflict.autoReplyId)
+                                return next
+                              })
+                            }}
+                          />
+                          <span><strong>{conflict.name}</strong><small>{tone.label}・{conflict.reason}</small></span>
+                        </label>
+                        <em>{conflict.certainty === 'certain' ? '停止' : '対象外'}</em>
+                      </li>
+                    )
+                  })}
+                </ol>
+                <div className={"arp-conflictSettings"}>
+                  <div><span>一致後の動作</span><strong>最初の1件だけ実行</strong></div>
+                  <div><span>優先順位</span><strong>手動で並び替え</strong></div>
+                </div>
+              </section>
+              <section className={"arp-panel"}>
+                <PanelHeading title="ループ防止" description="自動応答が自動応答を呼び続けないよう制御します。" />
+                <ul className={"arp-loopList"}>
+                  <li><CheckCircle2 aria-hidden="true" />自動返信メッセージには反応しない</li>
+                  <li><CheckCircle2 aria-hidden="true" />同じ友だちへ{draft.settings.cooldownMinutes ?? 5}分間は再実行しない</li>
+                  <li><CheckCircle2 aria-hidden="true" />Webhookの再送は同一IDで除外</li>
+                </ul>
+              </section>
+            </div>
+            <aside className={"arp-sideColumn"}>
+              <section className={"arp-panel"}>
+                <PanelHeading title="判定例" />
+                <SummaryRows rows={[
+                  { label: '入力', value: '予約を変更したい' },
+                  { label: '一致したルール', value: `${conflicts.length}件` },
+                  { label: '実行されるもの', value: ruleName },
+                  { label: '停止', value: '1件目の実行後' },
+                ]} />
+              </section>
+              <section className={"arp-panel"}>
+                <PanelHeading title="運用監視" description="問題発生時はSlackへ通知します。" />
+                <ul className={"arp-monitorList"}>
+                  {['競合件数の急増', 'ループ検知', '実行失敗', '担当者引継ぎ失敗'].map((label) => (
+                    <li key={label}><Bell aria-hidden="true" />{label}</li>
+                  ))}
+                </ul>
+              </section>
+              <LinePreview lead="1番目のルールだけが実行されます" message={previewMessage} actionLabel="" />
+            </aside>
           </div>
-        </section>
+          <div className={"arp-stickyBar"}>
+            <div />
+            <div className={"arp-stickyActions"}>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}&step=response`}>下書き保存</Button>
+              <Button
+                data-qa-open="g46ja"
+                variant="primary"
+                disabled={busy || acknowledged.size !== conflicts.length}
+                onClick={openTestStage}
+              >
+                テストへ
+              </Button>
+            </div>
+            <div />
+          </div>
+        </>
       ) : null}
 
       {stage === 'test' ? (
