@@ -3575,6 +3575,41 @@ const ISSUE_294_REVIEW = {
 }
 
 /**
+ * board #325。#315 / PR #1073 の固定データを含む development 31c2fddcc を
+ * 3104/8791 で起動し、#294 でデータ待ちにした7 Nodeを再判定した。
+ */
+const ISSUE_325_REVIEW = {
+  TC1b1: {
+    verdict: 'match',
+    note: '一致。#1073の固定応答から「初回案内・購入後・予約フォロー」3分類と未分類を表示し、案内、4指標、フォルダ、検索・絞り込み、5行の一覧、状態と行操作が設計と同じ役割・順序になった。1440/1920pxとも横はみ出し0。',
+  },
+  kk8dz: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・固定データ待ち。3段の現在地、配信対象、日時・種別・本文、LINEプレビュー、配信の流れ、設定サマリーは設計と同じ左右構成。#1073はこの画面の1通目本文を変更しておらず、設計の名前差し込みを含む例文は固定応答に無いため、実値を作らず既存本文を表示した。1440/1920pxとも横はみ出し0。',
+  },
+  bV5Vs: {
+    verdict: 'match',
+    note: '一致。#1073の固定応答から設計と同じ4通目「7日間フォロー完了のお知らせ」を表示し、開始前の注意、5枚の設定札、購読中・読了済・離脱、4行のステップ表、各操作、下部操作が設計と同じ役割・順序になった。1440/1920pxとも横はみ出し0。',
+  },
+  r6Gzsu: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。個別ステップ編集を背景に、条件面、AND/OR、15軸、条件追加、絞り込み要約、戻る・保存を表示。#1073は条件と対象人数を追加しておらず、固定ステップの条件は空で対象人数を数えるAPIも無いため、設計の選択済み条件と人数は作っていない。1440/1920pxとも横はみ出し0。',
+  },
+  hz9ti: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。#1073の固定応答から、タグ追加、対応マーク変更、テキスト送信の設定済み3動作を実行順に表示した。設計が選べる8種類に対し現行契約は5種類で、テンプレート送信・リマインダ操作・イベント予約操作などを保存できないため一致には上げない。1440/1920pxとも横はみ出し0。',
+  },
+  RUxNf: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。左に対象シナリオ・開始のきっかけ・配信方式・通数・購読中、右に4項目の配信前チェック、下に開始後の影響と操作を配置。#1073はテスト送信履歴、送信枠、開始予定人数、開始日時を追加しておらず、APIが返さない値は「—」のまま確認済みにしていない。1440/1920pxとも横はみ出し0。',
+  },
+  g2UNV: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API結果待ち。送信先、#1073で4通になった日時・種別、本物のLINEへ送る警告、戻る・テスト送信開始を確認する段を表示。現行APIは合計送信数だけを返し1通ごとの成否を返さないため、設計の通別結果は送信前に作っていない。1440/1920pxとも横はみ出し0。',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -3759,6 +3794,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #294で修正・再判定。** ${issue294Review.note}`
     screen.verdictSource = issue294Review.source
     screen.verdictHead = '9294bdeeb'
+  }
+  const issue325Review = ISSUE_325_REVIEW[screen.node]
+  if (screen.feature === 5 && issue325Review) {
+    screen.verdict = issue325Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #325で固定データ反映後に再判定。** 設計1920pxと実装1920pxを同じ比較画像に並べ、実装1440/1920pxも確認。${issue325Review.note}`
+    screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png + 2026-09-07 same-input comparison`
+    screen.verdictHead = '31c2fddcc'
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
