@@ -39,6 +39,7 @@ import {
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
+  FRIEND_ADD_EVENTS,
   FRIEND_ADD_LIFECYCLE_DRAFT,
   FRIEND_ADD_LIFECYCLE_PUBLISHED,
   FRIEND_ADD_LIFECYCLE_TEST_RESULT,
@@ -53,7 +54,7 @@ import {
   IDENTITY_CANDIDATE_LISTS,
   MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
-  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, REMINDER_RUNS,
@@ -1273,6 +1274,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     return { success: true, data: BROADCAST_FOLDERS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
+    return { success: true, data: SCENARIO_FOLDERS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
     return { success: true, data: REMINDER_FOLDERS }
   }
@@ -1323,7 +1327,31 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
+  if (pathname === '/api/friend-add-routing/events') {
+    const kind = query.get('kind')
+    const attributionStatus = query.get('attribution_status')
+    const routingStatus = query.get('routing_status')
+    const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
+    const limit = Number.isFinite(requestedLimit) && requestedLimit >= 0
+      ? requestedLimit
+      : FRIEND_ADD_EVENTS.items.length
+    const items = FRIEND_ADD_EVENTS.items
+      .filter((item) => !kind || item.kind === kind)
+      .filter((item) => !attributionStatus || item.attributionStatus === attributionStatus)
+      .filter((item) => !routingStatus || item.routingStatus === routingStatus)
+      .slice(0, limit)
+    return { success: true, data: { ...FRIEND_ADD_EVENTS, items } }
+  }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
+  const scenarioActions = pathname.match(/^\/api\/scenarios\/([^/]+)\/actions$/)
+  if (scenarioActions) {
+    return {
+      success: true,
+      data: SCENARIO_ACTIONS
+        .filter((action) => action.scenarioId === scenarioActions[1])
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+    }
+  }
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
   if (scenario) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
