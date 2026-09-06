@@ -684,7 +684,7 @@ export const SCREENS = [
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 一覧のKPIをLINEアカウントで絞った `/api/broadcasts` の集計へ接続し、下書き数も実値表示できるようにした。保存した検索も読込・保存へ接続。1440/1920pxで横はみ出し0。撮影用固定データは一覧KPIを返さず、旧 `/api/broadcasts/stats` も詳細ID扱いになるため、4枚の数だけ証拠待ち。',
+    verdictNote: '**2026-09-07 Issue #384で再撮影。** 一覧KPI・保存した検索・ページ情報は実API契約の固定データで表示でき、1440/1920pxで横はみ出し0。固定データの平均開封率がAPI契約の69.4ではなく0.694のため画面も0.694%となる。画面側で推測補正すると本番の0.7%を70%に誤表示するため行わず、共通担当 #388 の修正待ち。',
     verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png',
     verdictHead: '02ec27d0d', route: '/broadcasts',
     // ---- 2026-09-02 `df3f4e3b` で撮り直した（#674 マージ後）。**絵を見て確かめた範囲だけ書く。** ----
@@ -714,10 +714,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 事前確認APIの条件一致・送信可能・除外内訳・代表的な友だちを表示する口へ接続し、条件付きURLで撮影。1440/1920pxで横はみ出し0。撮影用固定データが旧形式の人数だけを返すため、3枚の人数と友だち行は証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 事前確認APIの条件一致1,248人・送信可能1,213人・除外35人と代表友だち3人を表示。別の件数取得が失敗しても事前確認の確定人数を右側要約へ再利用し、本文との「1,213人 / —人」の食い違いを解消。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/cPk8A.txt + broadcasts-v6/cPk8A-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
+    verdictHead: '55b3531ecb', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
     /*
       **「詳細条件で絞り込んで配信する」を選ばないと保存の口が開かない。**
       条件がひとつも無いうちは「この条件を保存」が押せない（押せない理由も
@@ -749,10 +749,10 @@ export const SCREENS = [
       ここは `page` で撮って、開いた欄まで写す。
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 実テンプレートを選び、確認窓から本文へ読み込む導線を1440/1920pxで撮影し、横はみ出し0。撮影用固定データのテンプレート名・利用回数が設計と異なるため、行データだけ証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 固定データの予約確認テンプレートを選び、更新日・使用回数・本文と読み込み前チェックを確認窓へ表示。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message`,
+    verdictHead: '55b3531ecb', route: `${NEW_BC}?step=message`,
     mode: 'viewport', height: 1080, steps: [
       { click: 'テンプレートから選ぶ' },
       { click: '予約確認', after: 700 },
@@ -761,10 +761,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 事前確認APIの月間使用数・残り送信枠・同時刻の配信を送信設定へ接続し、予約日時を入れて1440/1920pxで撮影、横はみ出し0。撮影用固定データが旧形式のため、送信枠と同時刻配信の実値は証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 事前確認APIの月間使用1,842通・上限5,000通・残り3,158通・予定1,213通と同時刻の配信を表示。予約日時・分散送信・開封計測・配信スケジュールを1440/1920pxで撮影し、横はみ出し0。',
     verdictSource: 'broadcasts-v6/Bw0zt.txt + broadcasts-v6/Bw0zt-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=schedule&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
+    verdictHead: '55b3531ecb', route: `${NEW_BC}?step=schedule&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
     mode: 'viewport', height: 1136, steps: [{ wait: 1800 }],
 
   },
@@ -776,10 +776,10 @@ export const SCREENS = [
       撮り直すまで判定は入れない。
     */
     ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** テスト送信前に同じ下書きを保存し、担当者のLINEへ送る確認窓を1440/1920pxで撮影、横はみ出し0。撮影用固定データが送信先を配列で返さないため、担当者2行だけ証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** LINE連携済み担当者2人を固定データから確認窓へ表示し、選択して送る導線と送信前の説明を1440/1920pxで撮影。横はみ出し0。',
     verdictSource: 'broadcasts-v6/h0kahp.txt + broadcasts-v6/h0kahp-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '55b3531ecb', route: `${NEW_BC}?step=message&templateId=template-11`,
     mode: 'viewport', height: 1080,
     /*
       **本文の入れ物には名札が無い。** `textarea` は `placeholder` だけなので
@@ -795,10 +795,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 対象・日時・テスト送信・LINEプレビューと、事前確認APIの送信枠を同じ確認窓へ接続。1440/1920pxで横はみ出し0。撮影用固定データが旧形式のため、残り送信枠だけ証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 対象・日時・テスト送信・LINEプレビューと、事前確認APIの残り送信枠3,158通を同じ確認窓へ表示。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
+    verdictHead: '55b3531ecb', route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -822,10 +822,10 @@ export const SCREENS = [
       `steps` で埋めてから撮る。
     */
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 管理名・対象・日時・メッセージ・開封計測・配信後アクションを保存できる契約へ接続し、予約日時入りで1440/1920px撮影、横はみ出し0。撮影用固定データが事前確認の新しい内訳を返さないため、送信枠だけ証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 管理名・対象1,213人・日時・メッセージ・開封計測・配信後アクションと残り送信枠3,158通を最終確認へ表示。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
-    verdictHead: '02ec27d0d',
+    verdictHead: '55b3531ecb',
     route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
     steps: [
       { wait: 1800 },
@@ -840,9 +840,9 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** 5段の完了帯、予約日時を含む完了文、4項目の要約、次にできる操作を正本配置へ調整。開始・完了・エラーをSlackへ通知するAPIがないため、その1文は虚偽表示せず構造一致・データ未接続。設計画像なし（`bPF0s.txt` と照合）。',
+    verdictNote: '**2026-09-07 Issue #384で再撮影。** 予約済み固定データから5段の完了帯、予約日時・対象人数・4項目の要約、次にできる操作、取消確認を1440/1920pxで表示し、横はみ出し0。設計画像と照合したが、開始・完了・エラーをSlackへ通知するAPIがないため、その1文は虚偽表示せず構造一致・データ未接続のまま。',
     verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
-    verdictHead: '02ec27d0d',
+    verdictHead: '55b3531ecb',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -852,10 +852,10 @@ export const SCREENS = [
 
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 結果詳細を概要タブ、送信成功・開封、リンク別反応、エラー、配信した設定、LINEプレビューの正本構成へ変更し、インサイトAPIの開封内訳とリンク別クリックへ接続。1440/1920pxで横はみ出し0。撮影用固定データにインサイトが無いため数値とリンク2行は証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** インサイトAPIの到達624人・開封444人・リンク別クリック2行を、概要・クリック・友だち・エラー・配信内容の各タブとLINEプレビューへ接続。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/u6gHt.txt + broadcasts-v6/u6gHt-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: '/broadcasts/detail?id=broadcast-2',
+    verdictHead: '55b3531ecb', route: '/broadcasts/detail?id=broadcast-2',
 
   },
   {
@@ -869,10 +869,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** 条件付きURLから条件編集窓を開き、保存・呼び出し変種まで1440/1920pxで撮影、横はみ出し0。標準条件は保存APIへ接続済み。撮影用固定データが事前確認の代表友だちを返さないため、背景の友だち3行だけ証拠待ち。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #384で一致判定。** 条件付きURLから条件編集窓を開き、15標準軸・6配信専用軸、代表友だち3行、保存済み条件の読込と新規保存まで1440/1920pxで撮影。横はみ出し0。`sqFXf-save` は設計画像なしのため `.txt` と照合。',
     verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-save.txt + broadcasts-v6/sqFXf{,-save}-{1440,1920}.png',
-    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
+    verdictHead: '55b3531ecb', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [{ click: '条件を編集', after: 700 }],
@@ -890,9 +890,9 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #365で再判定。** KPI・フォルダ・検索・絞り込み・6列一覧に加え、保存した検索の読込と現在条件の保存を実APIへ接続。通常・操作メニュー・追加窓を1440/1920pxで撮影し、横はみ出し0。撮影用固定データに一覧KPIと保存検索が無いため、その実値だけ証拠待ち。', route: '/broadcasts',
+    verdictNote: '**2026-09-07 Issue #384で再撮影。** KPI・フォルダ・検索・絞り込み・6列一覧、保存した検索の読込と保存、操作メニューと追加窓を1440/1920pxで撮影し、横はみ出し0。固定データの平均開封率がAPI契約の69.4ではなく0.694のため画面も0.694%となり、共通担当 #388 の修正待ち。', route: '/broadcasts',
     verdictSource: 'broadcasts-v6/xkRDb.txt + broadcasts-v6/xkRDb-1440.png + broadcasts-v6/xkRDb-1920.png + broadcasts-v6/xkRDb-add-1440.png + broadcasts-v6/xkRDb-add-1920.png',
-    verdictHead: '02ec27d0d',
+    verdictHead: '55b3531ecb',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
