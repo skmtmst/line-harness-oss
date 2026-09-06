@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
-  it('配信内容を見る操作を、同じ画面の送信内容へ接続する', () => {
-    expect(PAGE).toContain("contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })")
+  it('概要から配信内容まで、同じ結果画面のタブとして示す', () => {
+    expect(PAGE).toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
     expect(PAGE).toContain('id="broadcast-content"')
     expect(PAGE).not.toContain('配信内容の別画面は準備中です')
   })

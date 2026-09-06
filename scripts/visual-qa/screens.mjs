@@ -684,9 +684,9 @@ export const SCREENS = [
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 送る範囲を正本の3択へ直し、6列表・フォルダ・検索/絞り込みの構造と文言は一致。1440/1920pxで横はみ出し0。撮影用モックの `/api/broadcasts/stats` が詳細ID扱いになり404のため、KPI実値だけ比較できず構造一致・データ未接続。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 一覧のKPIをLINEアカウントで絞った `/api/broadcasts` の集計へ接続し、下書き数も実値表示できるようにした。保存した検索も読込・保存へ接続。1440/1920pxで横はみ出し0。撮影用固定データは一覧KPIを返さず、旧 `/api/broadcasts/stats` も詳細ID扱いになるため、4枚の数だけ証拠待ち。',
     verdictSource: 'broadcasts-v6/q76C35.txt + broadcasts-v6/q76C35-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: '/broadcasts',
+    verdictHead: '02ec27d0d', route: '/broadcasts',
     // ---- 2026-09-02 `df3f4e3b` で撮り直した（#674 マージ後）。**絵を見て確かめた範囲だけ書く。** ----
     // 解決：**列が設計どおりの6列になった**（タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作）。
     //       上の P2「実装は8列」は解消。状態が独立した桁になり、削除が「操作」に入って、1列ずれも消えている。
@@ -701,10 +701,10 @@ export const SCREENS = [
     // 取得元：`broadcasts-v6/q76C35-1440.png`（`df3f4e3b`）
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** 配信名・フォルダ・社内メモ、配信方法3択、実APIから読む最近の配信、設定要約とLINEプレビューを正本配置へ追加。社内メモと途中下書きを保存するAPI契約がないため、構造一致・データ未接続。設計画像なし（`zZ9fA.txt` と照合）。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #365で一致判定。** 社内メモと段階付き下書きを保存APIへ接続し、配信方法3択・最近の配信・設定要約・LINEプレビューを設計画像と比較。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/zZ9fA.txt + broadcasts-v6/zZ9fA-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: NEW_BC,
+    verdictHead: '02ec27d0d', route: NEW_BC,
     steps: [
       { fill: 'input[placeholder="例：8月キャンペーンのお知らせ"]', selector: true, text: '8月キャンペーンのお知らせ' },
       { fill: '社内メモ', text: '8月の売上目標に向けた告知。反応が薄ければ 8/28 に再送する。' },
@@ -715,23 +715,31 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=audience` に対象条件だけを出し、右の設定内容・除外確認を正本配置へ変更。1440/1920pxで横はみ出し0。代表的な友だち3行と除外理由別人数を返す口が無いため、構造一致・データ未接続。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 事前確認APIの条件一致・送信可能・除外内訳・代表的な友だちを表示する口へ接続し、条件付きURLで撮影。1440/1920pxで横はみ出し0。撮影用固定データが旧形式の人数だけを返すため、3枚の人数と友だち行は証拠待ち。',
     verdictSource: 'broadcasts-v6/cPk8A.txt + broadcasts-v6/cPk8A-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=audience`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
     /*
       **「詳細条件で絞り込んで配信する」を選ばないと保存の口が開かない。**
       条件がひとつも無いうちは「この条件を保存」が押せない（押せない理由も
       吹き出しに書いてある）。設計の見どころは**保存と呼び出しの2つの口**
       なので、そこまで進めてから撮る。
     */
-    steps: [{ click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 }],
+    steps: [{ wait: 1200 }],
 
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** 9種の送信形式、差し込み、文字数、ボタン・URL・PDFの設定面、メッセージ追加、配信後アクション、LINEプレビューを正本配置へ追加。現在の配信保存APIはボタンと配信後アクションを受け取らないため、誤って保存できる表示にはせず構造一致・データ未接続。設計画像なし（`XQfMD.txt` と照合）。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #365で一致判定。** URL/PDFボタンと公開済み共通アクションの版を保存APIへ接続し、本文・ボタン・短縮URL・配信後アクション・LINEプレビューを同じ状態で撮影。1440/1920pxで横はみ出し0。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&templateId=template-11`,
+    steps: [
+      { wait: 1800 },
+      { fill: 'textarea[placeholder="テキストを入力"]', selector: true, text: '{{name}}さんへ\n新商品が本日発売になりました。\nhttps://nen.example/aug' },
+      { click: '＋ ボタンを追加' },
+      { fill: 'ボタン1のラベル', text: 'キャンペーンを見る' },
+      { fill: 'ボタン1のURL', text: 'https://nen.example/aug' },
+      { select: '配信後のアクション', label: '来店後のご案内（第3版）' },
+    ],
 
   },
   {
@@ -742,22 +750,22 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** フォルダ・実テンプレート一覧と、選択後の確認事項を持つ重なり窓を正本どおり分離。撮影用固定データは正本のテンプレート名・利用回数を返さないため、構造一致・データ未接続。設計画像なし（`p97Tf.txt` と照合）。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 実テンプレートを選び、確認窓から本文へ読み込む導線を1440/1920pxで撮影し、横はみ出し0。撮影用固定データのテンプレート名・利用回数が設計と異なるため、行データだけ証拠待ち。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message`,
     mode: 'viewport', height: 1080, steps: [
       { click: 'テンプレートから選ぶ' },
-      { click: '未分類のひな形 1', after: 700 },
+      { click: '予約確認', after: 700 },
     ],
 
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=schedule` に日時・分散・集計上限・LINEプレビューを分離表示し、1440/1920pxで横はみ出し0。月間使用数、送信枠、同時刻の他配信を返す口が無く実値を置けないため、構造一致・データ未接続。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 事前確認APIの月間使用数・残り送信枠・同時刻の配信を送信設定へ接続し、予約日時を入れて1440/1920pxで撮影、横はみ出し0。撮影用固定データが旧形式のため、送信枠と同時刻配信の実値は証拠待ち。',
     verdictSource: 'broadcasts-v6/Bw0zt.txt + broadcasts-v6/Bw0zt-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=schedule`,
-    mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=schedule&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
+    mode: 'viewport', height: 1136, steps: [{ wait: 1800 }],
 
   },
   {
@@ -769,9 +777,9 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 送信前に担当者一覧を読み合わせる確認窓、説明、LINEプレビューを実装。1440/1920pxで横はみ出し0。撮影用モックが送信先を配列で返さず登録0件扱いのため、担当者行だけ比較できず構造一致・データ未接続。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** テスト送信前に同じ下書きを保存し、担当者のLINEへ送る確認窓を1440/1920pxで撮影、横はみ出し0。撮影用固定データが送信先を配列で返さないため、担当者2行だけ証拠待ち。',
     verdictSource: 'broadcasts-v6/h0kahp.txt + broadcasts-v6/h0kahp-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=message&templateId=template-11`,
     mode: 'viewport', height: 1080,
     /*
       **本文の入れ物には名札が無い。** `textarea` は `placeholder` だけなので
@@ -788,9 +796,9 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** 対象・日時・テスト送信・送信枠・LINEプレビューの確認面と、実APIの事前確認を読む重なり窓を追加。月間送信枠の残数はAPIが返さないため、固定値を作らず構造一致・データ未接続。設計画像なし（`vW4Es.txt` と照合）。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 対象・日時・テスト送信・LINEプレビューと、事前確認APIの送信枠を同じ確認窓へ接続。1440/1920pxで横はみ出し0。撮影用固定データが旧形式のため、残り送信枠だけ証拠待ち。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=confirm&templateId=template-11`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-24&scheduledTime=10%3A00`,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -815,9 +823,9 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** 最終確認を画面本体へ戻し、管理名・対象・日時・メッセージ・開封計測・配信後とLINEプレビューを正本配置へ追加。配信後アクションと途中下書きの保存APIがないため、固定値を作らず構造一致・データ未接続。設計画像なし（`FpgxH.txt` と照合）。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 管理名・対象・日時・メッセージ・開封計測・配信後アクションを保存できる契約へ接続し、予約日時入りで1440/1920px撮影、横はみ出し0。撮影用固定データが事前確認の新しい内訳を返さないため、送信枠だけ証拠待ち。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
-    verdictHead: '4a69f0e4e',
+    verdictHead: '02ec27d0d',
     route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
     steps: [
       { wait: 1800 },
@@ -834,7 +842,7 @@ export const SCREENS = [
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #298で再実装。** 5段の完了帯、予約日時を含む完了文、4項目の要約、次にできる操作を正本配置へ調整。開始・完了・エラーをSlackへ通知するAPIがないため、その1文は虚偽表示せず構造一致・データ未接続。設計画像なし（`bPF0s.txt` と照合）。',
     verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
-    verdictHead: '4a69f0e4e',
+    verdictHead: '02ec27d0d',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -845,9 +853,9 @@ export const SCREENS = [
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 壊れ値を解消し、CSV、配信設定、LINEプレビューの但し書きを追加。1440/1920pxで横はみ出し0。リンク別クリック・開封の内訳を返す口が無く、説明文と `—` で代替しているため構造一致・データ未接続。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 結果詳細を概要タブ、送信成功・開封、リンク別反応、エラー、配信した設定、LINEプレビューの正本構成へ変更し、インサイトAPIの開封内訳とリンク別クリックへ接続。1440/1920pxで横はみ出し0。撮影用固定データにインサイトが無いため数値とリンク2行は証拠待ち。',
     verdictSource: 'broadcasts-v6/u6gHt.txt + broadcasts-v6/u6gHt-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: '/broadcasts/detail?id=broadcast-2',
+    verdictHead: '02ec27d0d', route: '/broadcasts/detail?id=broadcast-2',
 
   },
   {
@@ -862,14 +870,12 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** 条件編集を重なり窓へ分離し、現在条件・条件1・標準15軸・この画面だけの6軸・AND/OR案内を追加。既存APIが受け取れない条件軸は選択不能にして明記したため、構造一致・データ未接続。設計画像なし（`sqFXf.txt` と照合）。',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** 条件付きURLから条件編集窓を開き、保存・呼び出し変種まで1440/1920pxで撮影、横はみ出し0。標準条件は保存APIへ接続済み。撮影用固定データが事前確認の代表友だちを返さないため、背景の友だち3行だけ証拠待ち。',
     verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-save.txt + broadcasts-v6/sqFXf{,-save}-{1440,1920}.png',
-    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=audience`,
+    verdictHead: '02ec27d0d', route: `${NEW_BC}?step=audience&scoreMin=20&scoreMax=80`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
-    steps: [
-      { click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 },
-    ],
+    steps: [{ click: '条件を編集', after: 700 }],
     variants: [{
       suffix: '-save', mode: 'viewport',
       steps: [
@@ -884,9 +890,9 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #298で再実装。** KPI、作成操作、フォルダ、検索・絞り込み、6列一覧を正本順へ調整し、設計にない上部テンプレート操作を除去。保存した検索とページ送りのAPIがないため、固定表示せず構造一致・データ未接続。設計画像なし（`xkRDb.txt` と照合）。', route: '/broadcasts',
+    verdictNote: '**2026-09-07 Issue #365で再判定。** KPI・フォルダ・検索・絞り込み・6列一覧に加え、保存した検索の読込と現在条件の保存を実APIへ接続。通常・操作メニュー・追加窓を1440/1920pxで撮影し、横はみ出し0。撮影用固定データに一覧KPIと保存検索が無いため、その実値だけ証拠待ち。', route: '/broadcasts',
     verdictSource: 'broadcasts-v6/xkRDb.txt + broadcasts-v6/xkRDb-1440.png + broadcasts-v6/xkRDb-1920.png + broadcasts-v6/xkRDb-add-1440.png + broadcasts-v6/xkRDb-add-1920.png',
-    verdictHead: '4a69f0e4e',
+    verdictHead: '02ec27d0d',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
@@ -1496,13 +1502,9 @@ export const SCREENS = [
     verdictHead: 'f2be359e5', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200,
-    steps: [
-      { fill: 'メニュー名', text: '通常メニュー（会員向け）' },
-      { fill: 'メニューを開くボタンの文字', text: 'メニュー' },
-    ],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・下書き保存後の編集口待ち。設計画像と実装画像を同じ比較入力で見比べ、3段の進み方、名称・フォルダ・14字までのボタン文字、大小の寸法、切替タブ、A〜Fの7レイアウト、LINEプレビュー、面Fの未設定警告を確認した。画像と開閉状態は新規作成時に存在しないIDへ書かず、下書き保存後の編集画面で登録する旨を表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/XtfO3.txt` と同Node画像。',
-    verdictHead: 'f2be359e5', route: '/rich-menus/new', },
+    verdictHead: 'f2be359e5', route: '/rich-menus/edit?id=rmg-1', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
@@ -3913,6 +3915,38 @@ const ISSUE_305_REVIEW = {
   },
 }
 
+/**
+ * board #367。機能12の読取APIを画面へ接続し、割当ポート3104/8791で
+ * 5画面を1440/1920px撮影してPencil 1920pxと比較した。
+ */
+const ISSUE_367_REVIEW = {
+  GO8RQ: {
+    verdict: 'structure_match_data_pending',
+    note: '一覧APIが返す月間タップ数とのべ人数を直接表示し、記録開始前を含まない人数には「記録開始後」と添える接続へ直した。共有の画面確認用固定応答にはまだ月間人数が無いため、今回の画像では従来どおり「のべ人数は未取得」となり、設計の8,140人を作っていない。実API接続は完了したが、同じ状態の画像比較ができないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/GO8RQ.txt + rich-menus-v6/GO8RQ-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  XtfO3: {
+    verdict: 'structure_match_data_pending',
+    note: '新規作成の仮画面ではなく、保存済みIDを読む編集画面で撮影するようにし、固定データの名称・タブ・面の動き・画像登録済み状態を表示した。共有モックは画像キーを返す一方で画像本体を配信しないため、キャンバス画像だけは読み込めず、Pencilと同じ完成状態では比較できない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/XtfO3.txt + rich-menus-v6/XtfO3-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  UMiJ9: {
+    verdict: 'structure_match_data_pending',
+    note: '保存済みメニューの固定データから画像登録済みを読み、対象人数、期間指定、終了後の戻し先、公開前チェックまで実APIの値で表示した。Pencilは面Fが未設定の状態だが、固定データは全ボタン設定済みのため、今回の画像はその警告状態を再現しない。存在しない未設定を作らず、同じ状態で比較できないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/UMiJ9.txt + rich-menus-v6/UMiJ9-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  TL7tp: {
+    verdict: 'structure_match_data_pending',
+    note: '外部メニューAPIのareasを読み、面ごとのURL・送信文・切替先・未対応の動きを、取り込み前に安全に表示する接続へ直した。共有の画面確認用固定応答はareasをまだ返さないため、今回の画像では取得できない旨を表示し、設計のURLや送信文を作っていない。実API接続は完了したが、同じ状態の画像比較ができないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/TL7tp.txt + rich-menus-v6/TL7tp-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  szXsT: {
+    verdict: 'structure_match_data_pending',
+    note: '削除影響APIが返す割当台帳の現在人数を表示し、部分集計には記録開始前を含まない説明を添える接続へ直した。共有の画面確認用固定応答は旧契約の未取得値のままなので、今回の画像では「—（未取得）」を保ち、設計の8,140人を作っていない。実API接続は完了したが、同じ状態の画像比較ができないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/szXsT.txt + rich-menus-v6/szXsT-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -4083,6 +4117,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #305で修正・再判定。** ${issue305Review.note}`
     screen.verdictSource = issue305Review.source
     screen.verdictHead = issue305Review.head
+  }
+  const issue367Review = ISSUE_367_REVIEW[screen.node]
+  if (screen.feature === 12 && issue367Review) {
+    screen.verdict = issue367Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #367で実API接続後に再判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue367Review.note}`
+    screen.verdictSource = issue367Review.source
+    delete screen.verdictHead
   }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
@@ -4357,6 +4398,7 @@ export const CAPTURED_AT = {
       note: 'Issue #219。作成を正本の5段へ分け、対象13画面と状態別を3104/8791の1440・1920pxで撮影。全画像で横はみ出し0。一致2、構造一致・データ未接続5、要修正6。' },
   ],
   12: [
+    { pr: 1129, head: 'af74a0bbd', on: '2026-09-07', screens: ['GO8RQ', 'XtfO3', 'UMiJ9', 'TL7tp', 'szXsT'], note: 'Issue #367。統合済みの月間人数・外部メニュー面アクション・削除影響人数を画面へ接続し、3104/8791で1440・1920pxを撮影。全10枚で横はみ出し0。共有固定応答に残る不足を理由付きで5画面の判定へ記録した。' },
     { pr: 1007, head: 'f2be359e5', on: '2026-09-06', screens: ['GO8RQ', 'XtfO3', 'TL7tp', 'RW5Tb'], note: 'Issue #225。3102/8789で1440・1920と一覧4状態を撮影し、全画像で横スクロール0。要修正4枚を、一致1・構造一致／不足API待ち3へ更新した。' },
     { pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' },
     { pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' },
