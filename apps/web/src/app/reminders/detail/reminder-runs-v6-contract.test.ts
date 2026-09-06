@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const LIST_PAGE = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6 7-1-H リマインダ実行結果', () => {
@@ -20,7 +21,31 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(PAGE).not.toMatch(/<h1[\s>]/)
     expect(PAGE).not.toContain('リマインダの実行結果</h1>')
     expect(PAGE).not.toContain('data-page-title')
-    expect(PAGE).toContain("usePageTitle(data?.reminder.name ? `${data.reminder.name}・実行結果` : null)")
+    expect(PAGE).toContain("`${data.reminder.name}・${isPlannedView ? '配信予定' : '実行結果'}`")
+  })
+
+  it('一覧から予定と履歴を選べ、予定は公開APIのplannedで絞る', () => {
+    expect(LIST_PAGE).toContain('status=planned')
+    expect(LIST_PAGE).toContain("label: '配信予定を確認'")
+    expect(LIST_PAGE).toContain("label: '実行履歴を見る'")
+    expect(LIST_PAGE).toContain('<ActionMenu')
+    expect(LIST_PAGE).toContain('<MoreHorizontal />')
+    expect(LIST_PAGE).toContain('<Trash2 />')
+    expect(PAGE).toContain("const isPlannedView = searchParams.get('status') === 'planned'")
+    expect(PAGE).toContain("setStatus(isPlannedView ? 'planned' : '')")
+    expect(PAGE).toContain('status: status || undefined')
+    expect(PAGE).toContain('>配信予定を見る</Button>')
+    expect(PAGE).toContain('>実行履歴を見る</Button>')
+    expect(PAGE).toContain("!isPlannedView && (data?.summary.errors ?? 0) > 0")
+    expect(PAGE).toContain('予約や対象条件が変わると、予定も変わります。')
+    expect(PAGE).not.toContain("data-design-node={isPlannedView ? 'JCz6J' : 'GC4St'}")
+  })
+
+  it('画面へ返す状態はplannedで、DB内部のqueuedを公開契約へ漏らさない', () => {
+    const statusType = API.match(/export type ReminderDeliveryRunStatus =[\s\S]*?\n\n/)?.[0] ?? ''
+    expect(statusType).toContain("| 'planned'")
+    expect(statusType).not.toContain("| 'queued'")
+    expect(PAGE).toContain("planned: { label: '配信予定', tone: 'info' }")
   })
 
   it('実行結果APIを読み、固定の設計値を画面へ埋め込まない', () => {

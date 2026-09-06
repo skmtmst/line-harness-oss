@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { CalendarClock, History, MoreHorizontal, Trash2 } from 'lucide-react'
 import type { Folder, ReminderTriggerType } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -16,6 +18,8 @@ import SelectField from '@/components/shared/select-field'
 import { TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import FilterChip from '@/components/shared/filter-chip'
+import ActionMenu from '@/components/shared/action-menu'
+import IconButton from '@/components/shared/icon-button'
 import { Pill } from '@/components/reminders/reminder-v6-ui'
 import { deleteReminderSelection } from './delete-reminder-selection'
 
@@ -44,6 +48,7 @@ function rowView(reminder: Reminder) {
 
 export default function RemindersPage() {
   usePageTitle('リマインダ')
+  const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
@@ -58,6 +63,7 @@ export default function RemindersPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const loadFolders = useCallback(async () => { try { const res = await api.folders.list('reminder'); if (res.success) setFolders(res.data) } catch {} }, [])
   const loadReminders = useCallback(async () => {
@@ -132,7 +138,7 @@ export default function RemindersPage() {
         </div>
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
           <table className="w-full table-fixed text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th className="w-[31%]">リマインダ名</Th><Th className="w-1/12">状態</Th><Th className="w-1/5">基準日</Th><Th className="w-1/12">予定</Th><Th className="w-1/6">最終送信</Th><Th className="w-1/12" align="center">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">
-            {loading ? <tr><td colSpan={6} className="px-4 py-14 text-center"><b className="block text-ink">読み込んでいます</b><span className="text-ink-faint mt-1 block">このまま少しお待ちください。</span></td></tr> : current.length === 0 ? <tr><td colSpan={6} className="px-4 py-14 text-center">{error ? <><b className="block text-ink">表示できませんでした</b><span className="text-ink-faint mt-1 block">再読み込みしても直らないときは、エラー報告へお知らせください。</span><Button className="mt-3" onClick={() => void loadReminders()}>もう一度読み込む</Button><span hidden>上の案内をご覧ください</span></> : reminders.length === 0 ? <><b className="block text-ink">まだリマインダがありません</b><span className="text-ink-faint mt-1 block">日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。</span><span hidden>リマインダがありません。「＋ 新しいリマインダ」から作成してください。</span></> : 'この条件に合うリマインダはありません。'}</td></tr> : current.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/edit?id=${reminder.id}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><button aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger rounded p-2 hover:bg-danger-bg" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}>⌫</button></td></tr> })}
+            {loading ? <tr><td colSpan={6} className="px-4 py-14 text-center"><b className="block text-ink">読み込んでいます</b><span className="text-ink-faint mt-1 block">このまま少しお待ちください。</span></td></tr> : current.length === 0 ? <tr><td colSpan={6} className="px-4 py-14 text-center">{error ? <><b className="block text-ink">表示できませんでした</b><span className="text-ink-faint mt-1 block">再読み込みしても直らないときは、エラー報告へお知らせください。</span><Button className="mt-3" onClick={() => void loadReminders()}>もう一度読み込む</Button><span hidden>上の案内をご覧ください</span></> : reminders.length === 0 ? <><b className="block text-ink">まだリマインダがありません</b><span className="text-ink-faint mt-1 block">日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。</span><span hidden>リマインダがありません。「＋ 新しいリマインダ」から作成してください。</span></> : 'この条件に合うリマインダはありません。'}</td></tr> : current.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/edit?id=${reminder.id}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><div className="relative inline-flex items-center justify-center"><IconButton aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}><Trash2 /></IconButton><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={() => setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id)}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }]} /></div></td></tr> })}
           </tbody></table>
         </div>
         <div className="mt-3"><Pagination page={page} pageCount={pageCount} onPageChange={setPage} /></div>
