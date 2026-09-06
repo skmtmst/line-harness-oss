@@ -49,7 +49,8 @@ const DESIGN_ROWS = [
   ['未契約', '', 37, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'manual', { savedSearches: 2 }, 0],
   ['誕生日クーポン対象', 'g-vip', 0, 20, 0, null, false, '2026-01-13T00:00:00.000Z', 'birthday', { broadcasts: 1 }, 2],
 ].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps, isStarred, createdAt, assignSource, usedIn, otherActionCount], index) => ({
-  id: `tag-${index}`,
+  // `tag-0` は編集画面の既存設定に使うため、一覧先頭の行とは分ける。
+  id: index === 0 ? 'tag-ec-customer' : `tag-${index}`,
   name: String(name),
   color: '#8b938d',
   groupId: String(groupId),
@@ -70,6 +71,29 @@ const DESIGN_ROWS = [
   ...(Object.keys(usedIn).length ? { usedIn } : {}),
   ...(otherActionCount ? { otherActionCount: Number(otherActionCount) } : {}),
 }))
+
+/** 設計 `ee0sk` / `VjXGX` の、保存済み「NEN会員（定期）」設定。 */
+export const TAG_EDITOR_NEN_SUBSCRIPTION = {
+  id: 'tag-0',
+  name: 'NEN会員（定期）',
+  color: '#8b938d',
+  groupId: 'g-purchase',
+  friendCount: 128,
+  mileageReward: 10,
+  referralMileageReward: 5,
+  mileageMultiplierBps: 15000,
+  mileageMultiplierPriority: 3,
+  isStarred: false,
+  assignSource: 'manual',
+  usedIn: { broadcasts: 4 },
+  otherActionCount: 3,
+  linkedActions: [
+    { id: 'tag-action-message', type: 'メッセージ', label: '「ご登録ありがとうございます。定期便の特典は…」を送信', timing: 'すぐに' },
+    { id: 'tag-action-add', type: 'タグ', label: '「定期便・稼働中」を追加', timing: 'すぐに' },
+    { id: 'tag-action-scenario', type: 'シナリオ', label: '「定期便オンボーディング」を開始', timing: '24時間後' },
+  ],
+  createdAt: '2026-01-13T00:00:00.000Z',
+}
 
 /**
  * タグ101件。設計の「1〜20 / 101件」に合わせる。
@@ -113,6 +137,18 @@ export const TAGS = (() => {
       n += 1
     }
   }
+
+  /*
+    編集用の `tag-0` は購入フォルダの埋め草1件と差し替える。
+    101件・フォルダ件数・先頭6行を変えず、`/tags/edit?id=tag-0` も
+    設計どおり保存済みの状態で開ける。
+  */
+  const editorRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase')
+  if (editorRow) Object.assign(editorRow, TAG_EDITOR_NEN_SUBSCRIPTION, { displayOrder: editorRow.displayOrder })
+  const vipRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-vip')
+  if (vipRow) Object.assign(vipRow, { id: 'tag-vip', name: 'VIP' })
+  const purchaseRow = rows.find((row, index) => index >= DESIGN_ROWS.length && row.groupId === 'g-purchase' && row.id !== 'tag-0')
+  if (purchaseRow) Object.assign(purchaseRow, { id: 'tag-purchase', name: '購入者' })
   /*
     整理候補の理由を付ける。**設計の絵に合わせて 未使用24・整理候補26。**
 
@@ -152,8 +188,8 @@ export const TAGS = (() => {
  */
 export const LIST_STATS = {
   tags: { total: 101, unused: 24, taggedFriends: 186, assignedThisMonth: 214 },
-  marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },
-  searches: { total: 0, limit: 5 },
+  marks: { total: 4, inUse: 4, unanswered: 23, inProgress: 19, resolved: 186, changedLast7: 74 },
+  searches: { total: 5, limit: 50 },
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
   // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
   scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
@@ -1408,6 +1444,73 @@ export const INBOX_SAVED_VIEWS = [
   createdAt: '2026-08-17T03:00:00.000Z',
 }))
 
+/**
+ * 機能4「保存した検索」。設計 `QKx8Q` の先頭5行と、編集画面 `XBkiQ` の
+ * `ss-1` を同じデータで開く。使用先と該当人数を省かず、0件と未取得を混ぜない。
+ */
+export const FRIEND_ATTRIBUTE_SAVED_SEARCHES = [
+  {
+    id: 'ss-1', name: 'VIPかつ未契約', scope: 'friends',
+    conditions: {
+      all: [
+        { kind: 'tag', op: 'includes', value: 'tag-vip' },
+        { kind: 'tag', op: 'includes', value: 'tag-4' },
+      ],
+      any: [], visibility: 'visible_only',
+      description: 'VIPだが契約していない人への案内用',
+      list: { columns: ['名前', 'タグ', '担当者'], sort: 'recent', limit: 20 },
+    },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 0, createdAt: '2026-08-20T19:20:00+09:00', matchCount: 18,
+    usedIn: [
+      { kind: 'broadcast', id: 'broadcast-vip', name: 'VIP未契約案内', mode: 'live', lastUsedAt: '2026-08-20T19:20:00+09:00' },
+      { kind: 'automation', id: 'automation-follow', name: '3日後フォロー', mode: 'live', lastUsedAt: '2026-08-20T19:20:00+09:00' },
+    ],
+    canDelete: false, callCountThisMonth: 31,
+  },
+  {
+    id: 'ss-2', name: '誕生日30日前', scope: 'friends',
+    conditions: { all: [{ kind: 'field', key: 'birthday', op: 'eq', value: '今日から30日以内' }], any: [], visibility: 'visible_only' },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: false,
+    displayOrder: 1, createdAt: '2026-08-20T18:10:00+09:00', matchCount: 12,
+    usedIn: [{ kind: 'other', id: 'reminder-birthday', name: '誕生日のお知らせ', mode: 'live', lastUsedAt: '2026-08-20T18:10:00+09:00' }],
+    canDelete: false, callCountThisMonth: 18,
+  },
+  {
+    id: 'ss-3', name: '未対応・担当なし', scope: 'friends',
+    conditions: { all: [{ kind: 'mark', op: 'eq', value: 'mark-default' }], any: [], visibility: 'visible_only' },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 2, createdAt: '2026-08-19T20:05:00+09:00', matchCount: 11,
+    usedIn: [{ kind: 'other', id: 'inbox-unassigned', name: '受信箱', mode: 'live', lastUsedAt: '2026-08-19T20:05:00+09:00' }],
+    canDelete: false, callCountThisMonth: 14,
+  },
+  {
+    id: 'ss-4', name: '購入者または予約者', scope: 'friends',
+    conditions: { all: [], any: [{ kind: 'tag', op: 'includes', value: 'tag-purchase' }], visibility: 'visible_only' },
+    createdBy: 'Masato', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 3, createdAt: '2026-08-18T14:30:00+09:00', matchCount: 42,
+    usedIn: [
+      { kind: 'broadcast', id: 'broadcast-purchase-1', name: '購入者へのご案内', mode: 'fixed', lastUsedAt: '2026-08-18T14:30:00+09:00' },
+      { kind: 'broadcast', id: 'broadcast-purchase-2', name: '予約者へのご案内', mode: 'fixed', lastUsedAt: '2026-08-18T14:30:00+09:00' },
+      { kind: 'broadcast', id: 'broadcast-purchase-3', name: '来店前のお知らせ', mode: 'fixed', lastUsedAt: '2026-08-18T14:30:00+09:00' },
+    ],
+    canDelete: false, callCountThisMonth: 12,
+  },
+  {
+    id: 'ss-5', name: '離脱注意', scope: 'friends',
+    conditions: {
+      all: [
+        { kind: 'created_at', op: 'between', value: { to: '2026-06-18' } },
+        { kind: 'following', op: 'eq', value: true },
+      ],
+      any: [], visibility: 'visible_only',
+    },
+    createdBy: 'Kenta', lineAccountId: 'visual-qa-account', isShared: false,
+    displayOrder: 4, createdAt: '2026-08-17T11:22:00+09:00', matchCount: 0,
+    usedIn: [], canDelete: true, callCountThisMonth: 9,
+  },
+]
+
 /*
   対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
 
@@ -1419,17 +1522,26 @@ export const SUPPORT_MARKS = [
   {
     id: 'mark-default', name: '未対応', color: '#F59E0B', isDefault: true,
     autoOnInbound: true, displayOrder: 0, createdAt: '2026-01-01T00:00:00.000Z',
-    isInherited: false, friendCount: 8,
+    isInherited: false, friendCount: 23, automaticChangeLabel: '受信時・期限超過',
+    usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 1, savedSearches: 1, automations: 1 },
+  },
+  {
+    id: 'mark-in-progress', name: '対応中', color: '#3B82F6', isDefault: false,
+    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
+    isInherited: false, friendCount: 19, automaticChangeLabel: '担当者割当時',
+    usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 1 },
+  },
+  {
+    id: 'mark-resolved', name: '対応済み', color: '#10B981', isDefault: false,
+    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
+    isInherited: false, friendCount: 186, automaticChangeLabel: '手動・返信完了時',
+    usedIn: { broadcasts: 1, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
   },
   {
     id: 'mark-hold', name: '保留', color: '#94A3B8', isDefault: false,
-    autoOnInbound: false, displayOrder: 1, createdAt: '2026-01-02T00:00:00.000Z',
-    isInherited: false, friendCount: 3,
-  },
-  {
-    id: 'mark-unused', name: '確認待ち', color: '#3B82F6', isDefault: false,
-    autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-03T00:00:00.000Z',
-    isInherited: false, friendCount: 0,
+    autoOnInbound: false, displayOrder: 3, createdAt: '2026-01-04T00:00:00.000Z',
+    isInherited: false, friendCount: 3, automaticChangeLabel: '条件一致時',
+    usedIn: { broadcasts: 0, scenarios: 0, autoReplies: 0, savedSearches: 0, automations: 0 },
   },
 ]
 
@@ -1981,6 +2093,45 @@ export const FRIEND_FIELDS = [
     type: 'select', options: ['ライト', 'スタンダード', 'プレミアム'], defaultValue: null,
     source: 'manual', ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
     displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+  },
+]
+
+/**
+ * 機能4「友だち情報欄」。設計 `HBTk0` に見えている4行。
+ * リマインダ等が使う `FRIEND_FIELDS` とは分け、`withUsage=1` の一覧だけで返す。
+ */
+export const FRIEND_ATTRIBUTE_FIELDS = [
+  {
+    id: 'field-dog-name', folderId: null, name: '愛犬のお名前', fieldKey: 'dog_name',
+    type: 'text', options: null, defaultValue: null, source: 'form',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 1, usageCount: 187, formUsageCount: 3,
+    displayTargets: ['友だち詳細', 'テンプレート差し込み'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'field-prefecture', folderId: null, name: 'お住まい', fieldKey: 'prefecture',
+    type: 'select', options: ['北海道', '東京都', '大阪府', '福岡県'], defaultValue: null, source: 'form',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 2, usageCount: 164, formUsageCount: 2,
+    displayTargets: ['友だち詳細', '配信の絞り込み'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z',
+  },
+  {
+    id: 'field-birthday', folderId: null, name: '生年月日', fieldKey: 'birthday',
+    type: 'date', options: null, defaultValue: null, source: 'form',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 3, usageCount: 141, formUsageCount: 1,
+    displayTargets: ['友だち詳細', '誕生日配信'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    id: 'field-delivery-status', folderId: null, name: '便の状態', fieldKey: 'delivery_status',
+    type: 'select', options: ['準備中', '配送中', 'お届け済み'], defaultValue: null, source: 'automation',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
+    displayOrder: 4, usageCount: 72, formUsageCount: 2,
+    displayTargets: ['友だち詳細', 'オートメーション'],
+    createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
   },
 ]
 
