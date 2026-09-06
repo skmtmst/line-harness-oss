@@ -32,9 +32,19 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('段の見出しを設計の言葉にする', () => {
+    expect(PAGE).toContain('title="1通目を設定"')
     expect(PAGE).toContain('この1通目を誰に送るか')
     expect(PAGE).toContain('1通目の内容')
     expect(PAGE).not.toContain('>配信対象の絞り込み</h2>')
+  })
+
+  it('作成の現在地と保存前の要点を同時に確認できる', () => {
+    expect(PAGE).toContain('aria-label="シナリオ作成の進み方"')
+    expect(PAGE).toContain('label="シナリオ情報" state="done"')
+    expect(PAGE).toContain('label="配信方式" state="done"')
+    expect(PAGE).toContain('label="1通目を設定" state="current"')
+    expect(PREVIEW).toContain('LINEプレビュー')
+    expect(PREVIEW).toContain('設定サマリー')
   })
 
   it('下見は「配信の流れ」1枚にまとめる', () => {

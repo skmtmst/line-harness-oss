@@ -140,6 +140,28 @@ export default function StepPreview({
       aria-label="1通目の下見"
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
+      <section className={`${styles.linePreview} p-4`}>
+        <h3 className="text-center text-sm font-bold text-white">LINEプレビュー</h3>
+        <p className="mt-3 flex justify-center">
+          <span className={`${styles.previewBand} rounded-pill flex items-center gap-1 px-2.5 py-1 text-micro font-semibold text-white`}>
+            <Clock aria-hidden size={13} strokeWidth={1.75} />
+            {words}に届きます（1通目）
+          </span>
+        </p>
+        <div className="mt-4">
+          {templateName ? (
+            <Bubble>
+              <span className="text-ink-faint text-micro">テンプレート</span>
+              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+            </Bubble>
+          ) : body.trim() ? (
+            <Bubble>{body}</Bubble>
+          ) : (
+            <Placeholder>本文を書くと、ここに出ます</Placeholder>
+          )}
+        </div>
+      </section>
+
       <h3 className="text-ink text-sm font-bold">配信の流れ</h3>
       <p className="text-ink-faint mt-0.5 text-micro leading-relaxed">
         いま購読が始まったとして計算しています（購読開始 {formatJst(start)}）。
@@ -305,7 +327,29 @@ export default function StepPreview({
       <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-micro leading-relaxed">
         2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
       </p>
+
+      <section className="border-hairline mt-3 border-t pt-3">
+        <h3 className="text-ink text-sm font-bold">設定サマリー</h3>
+        <dl className="mt-2 divide-y divide-hairline text-xs">
+          <SummaryRow label="配信対象" value={audienceLabel} />
+          <SummaryRow label="配信日時" value={`${words}・${formatJst(at)}`} />
+          <SummaryRow
+            label="送信数"
+            value={templateName ? 'テンプレート 1通' : `${kind === 'text' ? 'テキスト' : 'メッセージ'} 1通`}
+          />
+          <SummaryRow label="配信後" value="次のステップへ進む" />
+        </dl>
+      </section>
     </aside>
+  )
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+      <dt className="text-ink-faint shrink-0">{label}</dt>
+      <dd className="text-ink text-right font-semibold">{value}</dd>
+    </div>
   )
 }
 
