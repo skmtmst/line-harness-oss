@@ -334,16 +334,33 @@ export async function recordFriendSnapshot(
   db: D1Database,
   accountId: string | null,
   date?: string,
+  limit = 1_000,
 ): Promise<void> {
   const day = date ?? jstDate(0);
   if (accountId === null) {
-    const accounts = await db
-      .prepare('SELECT id FROM line_accounts')
+    const batchLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+      : 1_000;
+    const targets = await db
+      .prepare(
+        `SELECT targets.id
+           FROM (
+             SELECT id FROM line_accounts
+             UNION ALL SELECT ? AS id
+           ) targets
+           LEFT JOIN friend_daily_snapshots snapshots
+             ON snapshots.date = ? AND snapshots.line_account_id = targets.id
+          ORDER BY
+            CASE WHEN snapshots.updated_at IS NULL THEN 0 ELSE 1 END ASC,
+            snapshots.updated_at ASC,
+            targets.id ASC
+          LIMIT ?`,
+      )
+      .bind(UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day, batchLimit)
       .all<{ id: string }>();
-    await Promise.all([
-      ...accounts.results.map((account) => recordFriendSnapshot(db, account.id, day)),
-      recordFriendSnapshot(db, UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day),
-    ]);
+    await Promise.all(
+      targets.results.map((target) => recordFriendSnapshot(db, target.id, day)),
+    );
     return;
   }
 

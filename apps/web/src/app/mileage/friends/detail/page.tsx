@@ -39,6 +39,7 @@ type MileageDetail = {
 function FriendMileageInner() {
   const searchParams = useSearchParams()
   const friendId = searchParams.get('id') ?? ''
+  const openAdjustment = searchParams.get('adjust') === '1'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const requestRef = useRef(0)
   const [friend, setFriend] = useState<FriendDetail | null>(null)
@@ -88,6 +89,10 @@ function FriendMileageInner() {
     if (accountLoading) return
     void load()
   }, [accountLoading, load])
+
+  useEffect(() => {
+    if (openAdjustment && canAdjust && friend && mileage) setAdjustmentOpen(true)
+  }, [canAdjust, friend, mileage, openAdjustment])
 
   if (accountLoading || loading) {
     return <div data-design-node="HIU5O"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>

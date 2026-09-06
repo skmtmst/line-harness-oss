@@ -70,6 +70,18 @@ export interface LineAccount {
   updated_at: string;
 }
 
+/** Non-secret fields required to resolve admin account visibility. */
+export type LineAccountScopeEntry = Pick<
+  LineAccount,
+  | 'id'
+  | 'tenant_id'
+  | 'parent_line_account_id'
+  | 'is_active'
+  | 'archived_at'
+  | 'login_channel_id'
+  | 'liff_id'
+>;
+
 export type LineCredentialField = 'channel_access_token' | 'channel_secret';
 
 export type LineCredentialFailureReason =
@@ -344,6 +356,50 @@ export async function getLineAccounts(
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const result = await db
     .prepare(`SELECT * FROM line_accounts ORDER BY display_order ASC, created_at ASC`)
+    .all<LineAccount>();
+  return Promise.all(
+    result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
+  );
+}
+
+/**
+ * Returns only the non-secret account fields used by authorization scope checks.
+ * The tenant wall is applied by D1 before rows enter Worker memory.
+ */
+export async function getLineAccountScopeEntries(
+  db: D1Database,
+  tenantId: string,
+): Promise<LineAccountScopeEntry[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, tenant_id, parent_line_account_id, is_active, archived_at,
+              login_channel_id, liff_id
+         FROM line_accounts
+        WHERE COALESCE(tenant_id, ?) = ?
+        ORDER BY display_order ASC, created_at ASC`,
+    )
+    .bind(DEFAULT_TENANT_ID, tenantId)
+    .all<LineAccountScopeEntry>();
+  return result.results;
+}
+
+/** Load and decrypt only accounts that a caller has already authorized. */
+export async function getLineAccountsByIds(
+  db: D1Database,
+  ids: readonly string[],
+  credentialEncryptionKey?: string,
+): Promise<LineAccount[]> {
+  if (ids.length === 0) return [];
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const result = await db
+    .prepare(
+      `SELECT account.*
+         FROM line_accounts account
+         INNER JOIN json_each(?) requested
+           ON account.id = CAST(requested.value AS TEXT)
+        ORDER BY account.display_order ASC, account.created_at ASC`,
+    )
+    .bind(JSON.stringify(ids))
     .all<LineAccount>();
   return Promise.all(
     result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, type AnalyticsUsageOverview } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
   FEATURE_SETTINGS_UPDATED_EVENT,
@@ -95,9 +96,48 @@ function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
   return `${total}機能中 ${enabled}つが有効`
 }
 
-function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }: {
+type UsageCategory = AnalyticsUsageOverview['data']['categories'][number]
+
+const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
+  templates: ['templates'],
+  scenarios: ['scenarios'],
+  forms: ['forms'],
+  rich_menus: ['rich-menus'],
+  friend_attributes: ['friend-attributes'],
+  inflow_conversion: ['inflow', 'conversions'],
+  automations: ['automations'],
+  media_vars: ['common-vars', 'contents'],
+}
+
+function UsageBadge({ category }: { category: UsageCategory }) {
+  const created = category.created.value
+  const inUse = category.inUse.value
+  if (created === null || inUse === null) {
+    return (
+      <span
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        title={category.inUse.reason ?? category.created.reason ?? '利用状況を取得できません'}
+      >
+        利用数は未取得
+      </span>
+    )
+  }
+  return (
+    <span
+      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+      title={`${category.label}：作成 ${created.toLocaleString('ja-JP')}、利用中 ${inUse.toLocaleString('ja-JP')}`}
+    >
+      利用中 {inUse.toLocaleString('ja-JP')} / 作成 {created.toLocaleString('ja-JP')}
+    </span>
+  )
+}
+
+function FeatureRow({ item, features, ordering, usage, sharedSwitch, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
+  ordering: boolean
+  usage?: UsageCategory
+  sharedSwitch: boolean
   canMoveUp: boolean
   canMoveDown: boolean
   onMove: (itemId: string, direction: -1 | 1) => void
@@ -105,46 +145,53 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
-    <li className="flex min-h-[62px] items-center justify-between gap-4 px-4 py-3 sm:px-5">
+    <li className="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
       <div className="flex min-w-0 items-start gap-2.5">
-        <span className="mt-0.5"><GripIcon /></span>
+        {ordering && <span className="mt-0.5"><GripIcon /></span>}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-bold text-[#565656]">{item.label}</p>
+            <p className="whitespace-nowrap text-sm font-bold text-ink">{item.label}</p>
+            {sharedSwitch && (
+              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-[9px] font-bold text-ink-faint">
+                同じスイッチ
+              </span>
+            )}
             {item.badge && (
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                 {item.badge}
               </span>
             )}
+            {usage && <UsageBadge category={usage} />}
           </div>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-[#777]">{item.note}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-relaxed text-ink-faint" title={item.note}>{item.note}</p>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2.5">
-        <button
-          type="button"
-          aria-label={`${item.label}を上へ`}
-          title="上へ移動"
-          disabled={!canMoveUp}
-          onClick={() => onMove(item.id, -1)}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          aria-label={`${item.label}を下へ`}
-          title="下へ移動"
-          disabled={!canMoveDown}
-          onClick={() => onMove(item.id, 1)}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          ↓
-        </button>
-        <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
-        <span className={`text-xs font-bold ${enabled && !item.required ? 'text-[#00b84f]' : 'text-[#777]'}`}>
-          {item.required ? '必須' : enabled ? 'オン' : 'オフ'}
-        </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {ordering && (
+          <>
+            <button
+              type="button"
+              aria-label={`${item.label}を上へ`}
+              title="上へ移動"
+              disabled={!canMoveUp}
+              onClick={() => onMove(item.id, -1)}
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              aria-label={`${item.label}を下へ`}
+              title="下へ移動"
+              disabled={!canMoveDown}
+              onClick={() => onMove(item.id, 1)}
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              ↓
+            </button>
+          </>
+        )}
+        {item.required && <span className="text-xs font-bold text-ink-faint">必須</span>}
         {item.required && <LockIcon />}
         <Switch
           checked={enabled}
@@ -157,9 +204,11 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
   )
 }
 
-function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }: {
+function FeatureSection({ group, features, ordering, usageByItemId, onItemToggle, onGroupToggle, onMove }: {
   group: FeatureGroup
   features: Record<string, boolean>
+  ordering: boolean
+  usageByItemId: Map<string, UsageCategory>
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
   onMove: (groupId: string, itemId: string, direction: -1 | 1) => void
@@ -167,8 +216,8 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }
   const total = groupFeatureCount(group)
   const allEnabled = total === 0 || groupEnabledCount(group, features) === total
   return (
-    <section className="overflow-hidden rounded-[18px] border border-[#dedede] bg-white">
-      <div className="flex min-h-[42px] items-center justify-between gap-4 border-b border-[#e5e5e5] bg-[#fafafa] px-4 py-2.5 sm:px-5">
+    <section className="border-hairline overflow-hidden rounded-xl border bg-canvas">
+      <div className="border-hairline bg-canvas-sunken flex min-h-12 items-center justify-between gap-3 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="text-sm font-bold text-[#202020]">{group.label}</h2>
           <p className="text-[10px] text-[#777]">{groupSummary(group, features)}</p>
@@ -180,7 +229,7 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }
             onClick={() => total > 0 && onGroupToggle(group, !allEnabled)}
             className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
           >
-            グループごと切替
+            まとめて切替
           </button>
         </div>
       </div>
@@ -190,6 +239,9 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }
             key={item.id}
             item={item}
             features={features}
+            ordering={ordering}
+            usage={usageByItemId.get(item.id)}
+            sharedSwitch={Boolean(item.keys[0]) && group.items.filter((candidate) => candidate.keys[0] === item.keys[0]).length > 1}
             canMoveUp={index > 0}
             canMoveDown={index < group.items.length - 1}
             onMove={(itemId, direction) => onMove(group.id, itemId, direction)}
@@ -263,6 +315,8 @@ export default function SettingsPage() {
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
   const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [usageCategories, setUsageCategories] = useState<UsageCategory[]>([])
+  const [ordering, setOrdering] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -276,7 +330,10 @@ export default function SettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const response = await api.featureSettings.get(selectedAccountId)
+      const [response, usageResponse] = await Promise.all([
+        api.featureSettings.get(selectedAccountId),
+        api.analytics.usageOverview(selectedAccountId).catch(() => null),
+      ])
       if (!response.success) {
         setError(response.error)
         return
@@ -288,6 +345,7 @@ export default function SettingsPage() {
       setSavedItemOrder(nextOrder)
       setItemOrder(nextOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
+      setUsageCategories(usageResponse?.success ? usageResponse.data.data.categories : [])
     } catch {
       setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
     } finally {
@@ -299,7 +357,7 @@ export default function SettingsPage() {
 
   /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
   const groups = useMemo(() => {
-    return visibleFeatureGroups({ specializedFeatureKeys }).map((group) => {
+    return visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }).map((group) => {
       const order = itemOrder[group.id]
       if (!order || order.length === 0) return group
       const byId = new Map(group.items.map((item) => [item.id, item]))
@@ -316,7 +374,7 @@ export default function SettingsPage() {
   const dirty =
     Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key]) ||
     JSON.stringify(currentOrder) !== JSON.stringify(itemOrderFromGroups(
-      visibleFeatureGroups({ specializedFeatureKeys }).map((group) => {
+      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }).map((group) => {
         const order = savedItemOrder[group.id]
         if (!order || order.length === 0) return group
         const byId = new Map(group.items.map((item) => [item.id, item]))
@@ -328,6 +386,25 @@ export default function SettingsPage() {
         return { ...group, items: [...sorted, ...group.items.filter((item) => !sorted.includes(item))] }
       }),
     ))
+
+  const usageByItemId = useMemo(() => {
+    const result = new Map<string, UsageCategory>()
+    for (const category of usageCategories) {
+      for (const itemId of USAGE_ITEM_IDS_BY_KEY[category.key] ?? []) result.set(itemId, category)
+    }
+    return result
+  }, [usageCategories])
+
+  const groupColumns = useMemo(() => {
+    const ids = [
+      ['basic', 'delivery', 'contents'],
+      ['results', 'automation', 'booking', 'specialized'],
+      ['settings', 'restaurant-test'],
+    ]
+    return ids.map((column) => column
+      .map((id) => groups.find((group) => group.id === id))
+      .filter((group): group is FeatureGroup => Boolean(group)))
+  }, [groups])
 
   const toggleItem = (item: FeatureItem, next: boolean) => {
     if (item.required || item.keys.length === 0) return
@@ -397,9 +474,16 @@ export default function SettingsPage() {
         className="mb-5"
         breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
         title="機能設定"
-        description="使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。並び順は↑↓で、同じ区分の中だけ入れ替えられます。"
+        description=""
         actions={(
           <>
+          <Button
+            variant="secondary"
+            onClick={() => setOrdering((current) => !current)}
+            disabled={loading || saving}
+          >
+            {ordering ? '並び替えを閉じる' : '並びを変える'}
+          </Button>
           <button
             type="button"
             onClick={() => {
@@ -421,7 +505,7 @@ export default function SettingsPage() {
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {saving ? '保存中…' : '保存'}
+            {saving ? '保存中…' : '機能設定を保存'}
           </button>
           </>
         )}
@@ -432,7 +516,7 @@ export default function SettingsPage() {
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
           <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         </svg>
-        <p>オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。APIも動いたままなので、管理画面から隠れるだけです。</p>
+        <p>使わない機能をオフにすると、サイドメニューから消えます。オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順はここでは変えません。「並びを変える」から入れ替えてください。</p>
       </div>
 
       {!selectedAccountId ? (
@@ -449,39 +533,56 @@ export default function SettingsPage() {
           {loading ? (
             <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">読み込み中…</div>
           ) : (
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className={ordering ? 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
               {/*
                 区分ごとの印は付けない。区分と項目はサイドメニューと同じ一覧
                 （src/lib/menu.ts）から作るので、並びと顔ぶれは
                 sidebar-design.test.ts が見ている。ここで二重に縛ると、
                 項目を1つ足すたびに2か所直すことになる。
               */}
-              <div data-design="機能の一覧" className="space-y-5">
-                {groups.map((group) => (
-                  <div key={group.id}>
-                    <FeatureSection
-                      group={group}
-                      features={features}
-                      onItemToggle={toggleItem}
-                      onGroupToggle={toggleGroup}
-                      onMove={moveItem}
-                    />
+              <div
+                data-design="機能の一覧"
+                className={ordering ? 'space-y-4' : 'grid items-start gap-4 xl:grid-cols-3'}
+              >
+                {(ordering ? [groups] : groupColumns).map((column, columnIndex) => (
+                  <div key={columnIndex} className="space-y-4">
+                    {column.map((group) => (
+                      <FeatureSection
+                        key={group.id}
+                        group={group}
+                        features={features}
+                        ordering={ordering}
+                        usageByItemId={usageByItemId}
+                        onItemToggle={toggleItem}
+                        onGroupToggle={toggleGroup}
+                        onMove={moveItem}
+                      />
+                    ))}
+                    {!ordering && columnIndex === 2 && (
+                      <div data-design="運営" className="border-hairline rounded-xl border bg-canvas p-4">
+                        <p className="text-sm font-bold text-ink">運営</p>
+                        <p className="mt-1 text-xs leading-5 text-ink-faint">お客さまの組織からは見えません。</p>
+                        <Link href="/settings/manual-links" className="mt-2 inline-block text-sm font-bold text-[#087d3d]">
+                          マニュアルの正本表
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
-              <SidebarPreview groups={groups} features={features} />
+              {ordering && <SidebarPreview groups={groups} features={features} />}
               {/*
                 運営だけが触る表への入口。要件 v6-34 §5-2「呼び出し元: 31 機能設定の
                 『運営』区分」。**入口をここに 1 つだけ置く。**
                 画面の中身は開いた先で権限を確かめる（運営以外には出さない）。
               */}
-              <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
+              {ordering && <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
                 <p className="text-ink text-sm font-bold">運営</p>
                 <p className="text-ink-secondary mt-1 text-xs leading-5">お客さまの組織からは見えません。</p>
                 <Link href="/settings/manual-links" className="text-accent-deep mt-3 inline-block text-sm font-bold">
                   マニュアルの正本表
                 </Link>
-              </div>
+              </div>}
             </div>
           )}
         </>
