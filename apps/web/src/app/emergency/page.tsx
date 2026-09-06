@@ -3,21 +3,22 @@
 import SelectField from '@/components/shared/select-field'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import type { ApiResponse, LineAccount } from '@line-crm/shared'
+import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
 import {
   api,
-  type DashboardOverview,
   type OperationCapability,
   type OperationControl,
+  type OperationHealthCheckKey,
+  type OperationHealthSnapshot,
+  type OperationHistoryEntry,
   type OperationImpactPreview,
-  type OperationIncident,
 } from '@/lib/api'
-import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
-import { apiCheckDetail } from './api-check-detail'
+import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import releaseLog from '@/generated/release-log.json'
+import { useAccount } from '@/contexts/account-context'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -70,9 +71,8 @@ interface HealthCheckItem {
   description: string
   threshold: string
   href: string
+  observedAt: string | null
 }
-
-type HealthCheckResult = Pick<HealthCheckItem, 'id' | 'label' | 'detail' | 'severity' | 'icon'>
 
 const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | 'description' | 'threshold' | 'href'>> = [
   { id: 'line', label: 'LINE接続', icon: 'L', description: 'LINEのアカウントとつながっているか', threshold: '応答がない状態が5分つづくと「エラー」', href: '/accounts' },
@@ -82,6 +82,15 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | '
   { id: 'delivery', label: '配信処理', icon: '▷', description: '予約した配信が時刻どおりに出ているか', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
   { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか', threshold: '1日で5%以上減ると「注意」', href: '/friends' },
 ]
+
+const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
+  line_connection: 'line',
+  message_quota: 'quota',
+  external_integrations: 'api',
+  webhook: 'webhook',
+  dispatch_jobs: 'delivery',
+  friend_change: 'friends',
+}
 
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
   normal: { label: '正常', badge: 'bg-success-bg text-success', panel: 'border-success bg-success-bg' },
@@ -93,12 +102,6 @@ const severityStyle: Record<OperationSeverity, { label: string; badge: string; p
 function StatusPill({ severity }: { severity: OperationSeverity }) {
   const style = severityStyle[severity]
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span>
-}
-
-async function apiData<T>(request: Promise<ApiResponse<T>>): Promise<T> {
-  const response = await request
-  if (!response.success) throw new Error(response.error)
-  return response.data
 }
 
 function mostSevere(items: HealthCheckItem[]): OperationSeverity {
@@ -154,170 +157,85 @@ function OperationPageHeader({ description, action }: { description: string; act
   )
 }
 
-function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity) => void }) {
+function HealthPanel({
+  accountId,
+  manualRunRequest,
+  onSeverity,
+}: {
+  accountId: string | null
+  manualRunRequest: number
+  onSeverity: (severity: OperationSeverity) => void
+}) {
   const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
-    CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown' })),
+    CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown', observedAt: null })),
   )
   const [loading, setLoading] = useState(true)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
+  const [nextCheckedAt, setNextCheckedAt] = useState<string | null>(null)
+  const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    const dashboardRequest = apiData(api.dashboard.organizationOverview({ period: 'today' }))
-    const lineRequest = apiData(api.health.accounts()).then(async (accounts) => {
-      const activeAccounts = accounts.filter((account) => account.isActive)
-      const health = await Promise.all(
-        activeAccounts.map((account) => apiData(api.health.getHealth(account.id))),
-      )
-      return { activeAccounts, health }
-    })
-    const apiRequest = Promise.all([
-      apiData(api.system.health()),
-      apiData(api.ecCommerce.overview()),
-    ])
-    const webhookRequest = apiData(api.health.accounts()).then(async (accounts) => {
-      const visibleAccountIds = accounts.filter((account) => account.isActive).map((account) => account.id)
-      const rows = await Promise.all(visibleAccountIds.map(async (lineAccountId) => Promise.all([
-        apiData(api.webhooks.incoming.list(lineAccountId)),
-        apiData(api.webhooks.outgoing.list(lineAccountId)),
-      ])))
-      return [rows.flatMap(([incoming]) => incoming), rows.flatMap(([, outgoing]) => outgoing)] as const
-    })
-    const deliveryRequest = apiData(api.broadcasts.list())
-
-    const [dashboardResult, lineResult, apiResult, webhookResult, deliveryResult] =
-      await Promise.allSettled([
-        dashboardRequest,
-        lineRequest,
-        apiRequest,
-        webhookRequest,
-        deliveryRequest,
-      ])
-
-    const nextChecks: HealthCheckResult[] = []
-
-    if (lineResult.status === 'fulfilled') {
-      const { activeAccounts, health } = lineResult.value
-      const risks = health.map((item) => item.riskLevel)
-      const lineSeverity: OperationSeverity = activeAccounts.length === 0
-        ? 'unknown'
-        : risks.some((risk) => risk === 'danger')
-          ? 'danger'
-          : risks.some((risk) => risk === 'warning')
-            ? 'warning'
-            : risks.some((risk) => risk !== 'normal')
-              ? 'unknown'
-              : 'normal'
-      /*
-        **バッジと本文で違うことを言わない。**
-
-        `lineSeverity` は、`normal`／`warning`／`danger` のどれでもない危険度が
-        1つでもあると `unknown`（＝未確認）に落ちる。ところが本文は
-        「アカウントが0件かどうか」だけで分けていたので、判定できなかったときにも
-        「確認しました」と書いていた。検証環境で
-        **本文「確認しました（3アカウント）」・バッジ「未確認」**という
-        食い違いが出ている。ほかの2項目（月間配信数・友だち変化）は
-        本文もバッジも「取れなかった」で揃っているので、ここだけずれていた。
-
-        判定できなかった件数を本文に出して、バッジと同じことを言わせる。
-      */
-      const undeterminedCount = risks.filter((risk) =>
-        risk !== 'normal' && risk !== 'warning' && risk !== 'danger').length
-      nextChecks.push({
-        id: 'line',
-        label: 'LINE接続',
-        icon: 'L',
-        severity: lineSeverity,
-        detail: activeAccounts.length === 0
-          ? '有効なLINEアカウントが登録されていません'
-          : undeterminedCount > 0
-            ? `${activeAccounts.length}アカウントのうち${undeterminedCount}件は接続状態を判定できませんでした`
-            : `LINE APIの認証エラーと接続状態を確認しました（${activeAccounts.length}アカウント）`,
-      })
-    } else {
-      nextChecks.push({ id: 'line', label: 'LINE接続', icon: 'L', severity: 'unknown', detail: 'LINE接続状態を取得できませんでした' })
-    }
-
-    if (dashboardResult.status === 'fulfilled') {
-      const dashboard = dashboardResult.value as DashboardOverview
-      const quota = monthlyQuotaStatus(dashboard.delivery.quotaLimit, dashboard.delivery.quotaUsed)
-      const quotaDetail = quota.remaining == null || dashboard.delivery.quotaLimit == null
-        ? '配信上限なしとして、今月の配信数を確認しました'
-        : `残り${quota.remaining.toLocaleString('ja-JP')}通 / 上限${dashboard.delivery.quotaLimit.toLocaleString('ja-JP')}通（残り${Math.floor(quota.remainingPercent ?? 0)}%）`
-      nextChecks.push({ id: 'quota', label: '月間配信数', icon: '↗', severity: quota.severity, detail: quotaDetail })
-      const today = dashboard.trend.at(-1)
-      nextChecks.push({
-        id: 'friends',
-        label: '友だち変化',
-        icon: '人',
-        severity: 'normal',
-        detail: today
-          ? `直近日の追加${today.added.toLocaleString('ja-JP')}人・ブロック${today.blocked.toLocaleString('ja-JP')}人を確認しました`
-          : '友だち数と日次変化を確認しました（変化なし）',
-      })
-      setCheckedAt(dashboard.generatedAt ?? new Date().toISOString())
-    } else {
-      nextChecks.push({ id: 'quota', label: '月間配信数', icon: '↗', severity: 'unknown', detail: '月間配信数を取得できませんでした' })
-      nextChecks.push({ id: 'friends', label: '友だち変化', icon: '人', severity: 'unknown', detail: '友だちの日次変化を取得できませんでした' })
-      setCheckedAt(new Date().toISOString())
-    }
-
-    if (apiResult.status === 'fulfilled') {
-      const [, commerce] = apiResult.value
-      nextChecks.push({
-        id: 'api',
-        label: 'API・外部連携',
-        icon: '↔',
-        severity: 'normal',
-        detail: apiCheckDetail((commerce as { last24h?: unknown } | null)?.last24h),
-      })
-    } else {
-      nextChecks.push({ id: 'api', label: 'API・外部連携', icon: '↔', severity: 'unknown', detail: '管理APIまたはEC連携データを取得できませんでした' })
-    }
-
-    if (webhookResult.status === 'fulfilled') {
-      const [incoming, outgoing] = webhookResult.value
-      const invalidSecrets = [...incoming, ...outgoing].filter((item) => item.isActive && !item.hasSecret).length
-      const failedOutgoing = outgoing.filter((item) => item.isActive && (item.consecutiveFailures ?? 0) > 0)
-      const webhookSeverity: OperationSeverity = invalidSecrets > 0 ? 'danger' : failedOutgoing.length > 0 ? 'warning' : 'normal'
-      const webhookDetail = invalidSecrets > 0
-        ? `有効なWebhookの署名設定不足が${invalidSecrets}件あります`
-        : failedOutgoing.length > 0
-          ? `送信に連続失敗しているWebhookが${failedOutgoing.length}件あります`
-          : `受信${incoming.length}件・送信${outgoing.length}件の設定と送信失敗を確認しました`
-      nextChecks.push({ id: 'webhook', label: 'Webhook', icon: 'W', severity: webhookSeverity, detail: webhookDetail })
-    } else {
-      nextChecks.push({ id: 'webhook', label: 'Webhook', icon: 'W', severity: 'unknown', detail: 'Webhook設定と送信失敗を取得できませんでした' })
-    }
-
-    if (deliveryResult.status === 'fulfilled') {
-      const scheduled = deliveryResult.value.filter((item) => item.status === 'scheduled').length
-      const sending = deliveryResult.value.filter((item) => item.status === 'sending').length
-      nextChecks.push({
-        id: 'delivery',
-        label: '配信処理',
-        icon: '▷',
-        severity: 'normal',
-        detail: `配信処理を確認しました（予約${scheduled}件・送信中${sending}件）`,
-      })
-    } else {
-      nextChecks.push({ id: 'delivery', label: '配信処理', icon: '▷', severity: 'unknown', detail: '配信処理の状態を取得できませんでした' })
-    }
-
-    setChecks(CHECK_DEFINITIONS.map((definition) => ({
-      ...definition,
-      ...(nextChecks.find((item) => item.id === definition.id) ?? { detail: '確認できませんでした', severity: 'unknown' as const }),
-    })))
-    setLoading(false)
+  const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
+    const results = snapshot.latestRun?.results ?? []
+    setChecks(CHECK_DEFINITIONS.map((definition) => {
+      const result = results.find((item) => HEALTH_CHECK_ID[item.checkKey] === definition.id)
+      return {
+        ...definition,
+        detail: result?.summary ?? 'サーバーに確認記録がありません',
+        severity: result?.status ?? 'unknown',
+        observedAt: result?.observedAt ?? snapshot.lastCheckedAt,
+      }
+    }))
+    setCheckedAt(snapshot.lastCheckedAt)
+    setNextCheckedAt(snapshot.nextCheckAt)
+    setSnapshotStatus(snapshot.overallStatus)
   }, [])
 
+  const load = useCallback(async (manual: boolean) => {
+    setLoading(true)
+    if (!accountId) {
+      setChecks(CHECK_DEFINITIONS.map((definition) => ({
+        ...definition,
+        detail: '上のバーでLINEアカウントを選択してください',
+        severity: 'unknown',
+        observedAt: null,
+      })))
+      setCheckedAt(null)
+      setNextCheckedAt(null)
+      setSnapshotStatus('unknown')
+      setLoading(false)
+      return
+    }
+    try {
+      const response = manual
+        ? await api.operations.runHealth(accountId)
+        : await api.operations.health(accountId)
+      if (!response.success) throw new Error(response.error)
+      applySnapshot(response.data)
+    } catch {
+      setChecks(CHECK_DEFINITIONS.map((definition) => ({
+        ...definition,
+        detail: 'サーバーの確認記録を取得できませんでした',
+        severity: 'unknown',
+        observedAt: null,
+      })))
+      setCheckedAt(null)
+      setNextCheckedAt(null)
+      setSnapshotStatus('unknown')
+    } finally {
+      setLoading(false)
+    }
+  }, [accountId, applySnapshot])
+
   useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => { void load() }, 5 * 60 * 1000)
+    void load(manualRunRequest > 0)
+  }, [load, manualRunRequest])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => { void load(false) }, 5 * 60 * 1000)
     return () => window.clearInterval(timer)
   }, [load])
 
-  const displayedSeverity = loading ? 'unknown' : mostSevere(checks)
+  const displayedSeverity = loading || snapshotStatus === 'stale' ? 'unknown' : mostSevere(checks)
   const isNormal = displayedSeverity === 'normal'
   const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : displayedSeverity === 'danger' ? 'エラー' : '確認できない項目があります'
   const resultDescription = isNormal
@@ -331,10 +249,6 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
   const statusIconClass = isNormal ? 'text-success' : displayedSeverity === 'warning' ? 'text-warning' : displayedSeverity === 'danger' ? 'text-danger' : 'text-ink-faint'
 
   useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
-
-  const nextCheckedAt = checkedAt
-    ? new Date(Date.parse(checkedAt) + 5 * 60 * 1000).toISOString()
-    : null
 
   return (
     <div className="space-y-4" data-design="V3 Health">
@@ -374,7 +288,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
                 <StatusPill severity={check.severity} />
                 <p className="text-xs leading-relaxed text-ink-secondary">{check.detail}</p>
                 <p className="text-xs leading-relaxed text-ink-faint">{check.threshold}</p>
-                <p className="text-xs text-ink-faint">{formatOperationDate(checkedAt)}</p>
+                <p className="text-xs text-ink-faint">{formatOperationDate(check.observedAt)}</p>
                 <Link href={check.href} className="rounded-control border-hairline inline-flex min-h-9 items-center justify-center border bg-canvas px-3 text-xs font-bold text-ink-secondary hover:bg-canvas-sunken">中身を見る</Link>
               </div>
             )
@@ -400,6 +314,9 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [reasonDetail, setReasonDetail] = useState('')
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null)
   const [confirmWord, setConfirmWord] = useState('')
+  const [stepUpMode, setStepUpMode] = useState<Exclude<ConfirmMode, null> | null>(null)
+  const [stepUpCode, setStepUpCode] = useState('')
+  const [requestKey, setRequestKey] = useState('')
   const [running, setRunning] = useState(false)
   const [message, setMessage] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null)
   const [control, setControl] = useState<OperationControl | null>(null)
@@ -458,13 +375,15 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
     if (!control || impactFailed || !impact) { setMessage({ tone: 'warning', text: '停止状態と影響を確認できるまで実行できません。' }); return }
     if (!canControl) { setMessage({ tone: 'warning', text: '緊急停止を実行する権限がありません。' }); return }
     if (selectedTargets.length === 0) { setMessage({ tone: 'warning', text: '停止する配信を1つ以上選んでください。' }); return }
-    setConfirmWord(''); setConfirmMode('stop')
+    setConfirmWord(''); setStepUpCode(''); setRequestKey(crypto.randomUUID()); setConfirmMode('stop')
   }
 
   const runStop = async () => {
-    if (confirmWord !== '停止' || !control) return
+    if (!/^\d{6}$/.test(stepUpCode) || !control || !requestKey) return
     setRunning(true); setMessage(null)
     try {
+      const grant = await api.operations.stepUp(stepUpCode)
+      if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.stop({
         lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
         capabilities: selectedCapabilities,
@@ -472,28 +391,30 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
         detail: reasonDetail.trim() || null,
         confirmation: '停止',
         expectedVersion: control.version,
-      })
+      }, grant.data.token, requestKey)
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
-      setConfirmMode(null); setConfirmWord('')
+      setStepUpMode(null); setStepUpCode(''); setRequestKey('')
     } catch {
       setMessage({ tone: 'danger', text: '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
     } finally { setRunning(false) }
   }
 
   const runRestore = async () => {
-    if (!control?.activeIncidentId || confirmWord !== '復旧') return
+    if (!control?.activeIncidentId || !/^\d{6}$/.test(stepUpCode) || !requestKey) return
     setRunning(true); setMessage(null)
     try {
+      const grant = await api.operations.stepUp(stepUpCode)
+      if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.restore(control.activeIncidentId, {
         confirmation: '復旧',
         expectedVersion: control.version,
-      })
+      }, grant.data.token, requestKey)
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
       setMessage({ tone: 'success', text: 'サーバー共通の停止状態を復旧しました。期限を過ぎた予約は自動では送りません。' })
-      setConfirmMode(null); setConfirmWord('')
+      setStepUpMode(null); setStepUpCode(''); setRequestKey('')
     } catch {
       setMessage({ tone: 'danger', text: '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。' })
     } finally { setRunning(false) }
@@ -520,7 +441,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           </section>
 
           <section className={`rounded-card border p-4 ${isStopped ? 'border-info bg-info-bg' : impactFailed ? 'border-warning bg-warning-bg' : 'border-info bg-info-bg'}`}>
-            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className={`text-base font-bold ${impactFailed ? 'text-warning' : 'text-info'}`}>復旧</h2><p className={`mt-1 text-xs ${impactFailed ? 'text-warning' : 'text-info'}`}>{isStopped ? '停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。' : impactFailed ? '停止状態を確認できないため、停止・復旧を実行できません。' : `いまは止めていません。復旧できるものはありません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>{isStopped && <button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button>}</div>
+            <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className={`text-base font-bold ${impactFailed ? 'text-warning' : 'text-info'}`}>復旧</h2><p className={`mt-1 text-xs ${impactFailed ? 'text-warning' : 'text-info'}`}>{isStopped ? '停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。' : impactFailed ? '停止状態を確認できないため、停止・復旧を実行できません。' : `いまは止めていません。復旧できるものはありません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>{isStopped && <button onClick={() => { setConfirmWord(''); setStepUpCode(''); setRequestKey(crypto.randomUUID()); setConfirmMode('restore') }} disabled={running || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button>}</div>
           </section>
         </div>
 
@@ -531,7 +452,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
             <p><strong>受信箱からの手の返信と予約の受付は止まりません</strong></p>
           </OperationSideCard>
           <OperationSideCard title="止めたあとにすること">
-            <p><strong>ログインユーザー全員へ知らせます</strong><br />通知基盤の接続後、LINEとメールへ停止した人と理由を届けます。</p>
+            <p><strong>ログインユーザー全員へ知らせます</strong><br />LINEとメールへ停止した人と理由を届けます。</p>
             <p><strong>更新履歴に残ります</strong><br />いつ・だれが・何を・なぜ止めたかを記録します。</p>
             <p><strong>直したら復旧します</strong><br />止める前に動いていたものだけを戻します。</p>
           </OperationSideCard>
@@ -548,13 +469,14 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
         <div className="flex items-center gap-2"><button type="button" onClick={() => { setTargets({ broadcasts: true, scenarios: true, reminders: true, automations: false }); setReason('障害対応'); setReasonDetail('') }} disabled={running || isStopped} className="rounded-control min-h-10 px-4 text-xs font-bold text-action hover:bg-action-soft disabled:opacity-50">キャンセル</button><button onClick={openStopConfirm} disabled={running || isStopped || impactFailed || !impact || !control || !canControl} className="rounded-control min-h-10 bg-danger px-4 text-xs font-bold text-on-accent hover:opacity-90 disabled:opacity-50">緊急停止する</button></div>
       </div>
 
-      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-3xl overflow-hidden bg-canvas shadow-2xl"><div className="border-hairline flex items-start gap-3 border-b px-6 py-5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-bg font-bold text-danger">×</span><div><h2 id="emergency-confirm-title" className="text-lg font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-xs text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div></div><div className="space-y-4 p-6"><div className={`rounded-control border p-4 text-sm ${confirmMode === 'stop' ? 'border-danger bg-danger-bg text-danger' : 'border-info bg-info-bg text-info'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactText(key)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></>}</div>{confirmMode === 'stop' && <div className="rounded-control bg-success-bg px-4 py-3 text-xs font-bold text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</div>}<label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control min-h-11 w-full border px-3 text-sm" /></div><div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4"><p className="max-w-sm text-xs text-ink-faint">通知基盤の接続後は、ログインユーザー全員のLINEとメールへ停止を知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '実行中...' : confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div></div></div>}
+      {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-3xl overflow-hidden bg-canvas shadow-2xl"><div className="border-hairline flex items-start gap-3 border-b px-6 py-5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-bg font-bold text-danger">×</span><div><h2 id="emergency-confirm-title" className="text-lg font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-xs text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div></div><div className="space-y-4 p-6"><div className={`rounded-control border p-4 text-sm ${confirmMode === 'stop' ? 'border-danger bg-danger-bg text-danger' : 'border-info bg-info-bg text-info'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><div className="mt-3 space-y-2">{selectedTargets.map((key) => <div key={key} className="flex items-start justify-between gap-3"><span>{targetLabels[key].label}</span><strong className="text-right">{impactText(key)}</strong></div>)}</div><p className="mt-3">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></>}</div>{confirmMode === 'stop' && <div className="rounded-control bg-success-bg px-4 py-3 text-xs font-bold text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</div>}<label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control min-h-11 w-full border px-3 text-sm" /></div><div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4"><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div></div></div>}
+      {stepUpMode && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title"><div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl"><h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">認証アプリで本人確認</h2><p className="mt-2 text-xs leading-relaxed text-ink-faint">この操作専用に、5分以内に1回だけ使える6桁コードを確認します。</p><label className="mt-5 block text-sm font-bold text-ink-secondary" htmlFor="emergency-step-up-code">認証アプリの6桁コード</label><input id="emergency-step-up-code" value={stepUpCode} onChange={(event) => setStepUpCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-center text-lg font-bold tracking-[0.4em]" placeholder="000000" /><div className="mt-6 flex justify-end gap-2"><button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={running} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button><button onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={running || !/^\d{6}$/.test(stepUpCode)} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}</button></div></div></div>}
     </div>
   )
 }
 
 function HistoryPanel() {
-  const [operations, setOperations] = useState<OperationIncident[]>([])
+  const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [period, setPeriod] = useState<'year' | '30days'>('year')
 
@@ -563,7 +485,7 @@ function HistoryPanel() {
     api.operations.history(200)
       .then((response) => {
         if (cancelled) return
-        if (response.success && Array.isArray(response.data)) { setOperations(response.data); setState('ready') }
+        if (response.success && Array.isArray(response.data)) { setHistory(response.data); setState('ready') }
         else setState('error')
       })
       .catch(() => { if (!cancelled) setState('error') })
@@ -571,6 +493,8 @@ function HistoryPanel() {
   }, [])
 
   const cutoff = Date.now() - (period === '30days' ? 30 : 365) * 24 * 60 * 60 * 1000
+  const operations = history.filter((item) => item.historyKind !== 'deployment')
+  const deployments = history.filter((item) => item.historyKind === 'deployment' && item.deployment)
   const entries = operations.filter((item) => Date.parse(item.createdAt) >= cutoff)
   const longestMinutes = operations.reduce((longest, item) => {
     if (!item.stoppedAt || !item.resolvedAt) return longest
@@ -581,10 +505,22 @@ function HistoryPanel() {
     released: string | null
     entries: Array<{ kind: string; text: string; by: string | null; pr: number | null; at: string | null }>
   }> }).releases ?? []
-  const currentVersion = releases.find((item) => item.released)?.version ?? '—'
-  const updateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + item.entries.length, 0)
-  const recentUpdates = releases
+  const releaseUpdateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + item.entries.length, 0)
+  const deployedVersion = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
+  const currentVersion = deployedVersion ?? releases.find((item) => item.released)?.version ?? '—'
+  const updateCount = deployments.length > 0 ? deployments.filter((item) => Date.parse(item.occurredAt ?? item.createdAt) >= Date.now() - 30 * 24 * 60 * 60 * 1000).length : releaseUpdateCount
+  const releaseUpdates = releases
     .flatMap((release) => release.entries.map((entry) => ({ ...entry, version: release.version, released: release.released })))
+  const deploymentUpdates = deployments.map((entry) => ({
+    kind: 'deployment',
+    text: entry.reason,
+    by: entry.deployment?.actor ?? entry.actorId,
+    pr: entry.deployment?.pullRequest ?? null,
+    at: entry.occurredAt ?? entry.createdAt,
+    version: entry.deployment?.version ?? entry.deployment?.environment ?? '—',
+    released: entry.occurredAt ?? entry.createdAt,
+  }))
+  const recentUpdates = [...deploymentUpdates, ...releaseUpdates]
     .toSorted((left, right) => Date.parse(right.at ?? right.released ?? '') - Date.parse(left.at ?? left.released ?? ''))
     .slice(0, 10)
 
@@ -651,7 +587,9 @@ function HistoryPanel() {
 
 function EmergencyPageInner() {
   const tab = useMergedTab(TABS)
+  const { selectedAccountId } = useAccount()
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
+  const [manualRunRequest, setManualRunRequest] = useState(0)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   useEffect(() => { api.health.accounts().then((response) => { if (response.success) setAccounts(response.data) }).catch(() => undefined) }, [])
   const description = tab === 'health'
@@ -660,9 +598,9 @@ function EmergencyPageInner() {
       ? '止める配信を選び、理由を入力して緊急停止します。'
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const headerAction = tab === 'health'
-    ? <button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent">↻ いますぐ確かめる</button>
+    ? <button type="button" onClick={() => setManualRunRequest((current) => current + 1)} disabled={!selectedAccountId} className="rounded-control min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent disabled:opacity-50">↻ いますぐ確かめる</button>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 export default function EmergencyPage() {

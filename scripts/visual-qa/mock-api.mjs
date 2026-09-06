@@ -80,7 +80,7 @@ import {
   FORM_FOLDERS, FORMS, FORM_DETAIL,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
-  OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
+  OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
 } from './fixtures.mjs'
@@ -1100,6 +1100,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
+  }
+  if (pathname === '/api/operations/health') {
+    return { success: true, data: OPERATION_HEALTH }
   }
   if (pathname === '/api/operations/history') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)

@@ -337,6 +337,57 @@ export type OperationIncident = {
   updatedAt: string
 }
 
+export type OperationHealthCheckKey =
+  | 'line_connection'
+  | 'message_quota'
+  | 'external_integrations'
+  | 'webhook'
+  | 'dispatch_jobs'
+  | 'friend_change'
+
+export type OperationHealthResult = {
+  id: string
+  runId: string
+  checkKey: OperationHealthCheckKey
+  status: 'normal' | 'warning' | 'danger' | 'unknown'
+  summary: string
+  value: Record<string, unknown> | null
+  threshold: Record<string, unknown> | null
+  source: string
+  observedAt: string
+}
+
+export type OperationHealthSnapshot = {
+  latestRun: {
+    id: string
+    lineAccountId: string | null
+    source: 'scheduled' | 'manual'
+    status: 'running' | 'completed' | 'failed'
+    overallStatus: 'normal' | 'warning' | 'danger' | 'unknown'
+    startedAt: string
+    completedAt: string | null
+    results: OperationHealthResult[]
+  } | null
+  overallStatus: 'normal' | 'warning' | 'danger' | 'unknown' | 'stale'
+  lastCheckedAt: string | null
+  nextCheckAt: string | null
+  serverNow: string
+}
+
+export type OperationHistoryEntry = OperationIncident & {
+  historyKind?: 'incident' | 'deployment'
+  occurredAt?: string
+  deployment?: {
+    deploymentId: string
+    phase: 'queued' | 'deploying' | 'verifying' | 'succeeded' | 'failed' | 'rolled_back'
+    environment: string
+    version: string | null
+    pullRequest: number | null
+    actor: string
+    occurredAt: string
+  }
+}
+
 export type FormDeleteImpact = {
   form: {
     id: string
@@ -7159,6 +7210,20 @@ export const api = {
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
   /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
+    health: (accountId: string) =>
+      fetchApi<ApiResponse<OperationHealthSnapshot>>(
+        `/api/operations/health?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    runHealth: (accountId: string) =>
+      fetchApi<ApiResponse<OperationHealthSnapshot>>('/api/operations/health/runs', {
+        method: 'POST',
+        body: JSON.stringify({ lineAccountId: accountId }),
+      }),
+    stepUp: (code: string) =>
+      fetchApi<ApiResponse<{ token: string; purpose: 'operations.control'; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose: 'operations.control' }) },
+      ),
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
       return fetchApi<ApiResponse<{
@@ -7170,7 +7235,7 @@ export const api = {
       }>>(`/api/operations/control/preview${query}`)
     },
     history: (limit = 100) =>
-      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+      fetchApi<ApiResponse<OperationHistoryEntry[]>>(`/api/operations/history?limit=${limit}`),
     stop: (input: {
       lineAccountId: string | null
       capabilities: OperationCapability[]
@@ -7178,20 +7243,28 @@ export const api = {
       detail?: string | null
       confirmation: '停止'
       expectedVersion: number
-    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+    }, stepUpToken: string, idempotencyKey: string) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
       '/api/operations/incidents',
       {
         method: 'POST',
-        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        headers: {
+          'X-Confirm-Irreversible': 'operation-stop',
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify(input),
       },
     ),
-    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }, stepUpToken: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
         `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
         {
           method: 'POST',
-          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          headers: {
+            'X-Confirm-Irreversible': 'operation-restore',
+            'X-Step-Up-Token': stepUpToken,
+            'Idempotency-Key': idempotencyKey,
+          },
           body: JSON.stringify(input),
         },
       ),
