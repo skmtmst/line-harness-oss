@@ -66,6 +66,8 @@ export interface LineAccount {
   tenant_id: string | null;
   /** V6の日時指定と日別分析で使うIANAタイムゾーン。 */
   timezone?: string;
+  /** 楽観ロックに使う版番号。変更の保存ごとに1増える。 */
+  revision?: number;
   created_at: string;
   updated_at: string;
 }
@@ -135,6 +137,9 @@ export interface CreateLineAccountInput {
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
   officialProfileUrl?: string | null;
+  timezone?: string;
+  country?: string | null;
+  role?: string | null;
   parentLineAccountId?: string | null;
   tenantId?: string | null;
 }
@@ -169,7 +174,7 @@ export async function createLineAccount(
           login_channel_id, login_channel_secret, liff_id,
           is_active, is_default, display_order,
           og_site_name, og_default_image_url, og_default_description,
-          official_profile_url,
+          official_profile_url, timezone, country, role,
           parent_line_account_id, tenant_id,
           created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
@@ -177,7 +182,7 @@ export async function createLineAccount(
            SELECT 1 FROM line_accounts
             WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
           ) THEN 0 ELSE 1 END,
-          ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -200,6 +205,9 @@ export async function createLineAccount(
       input.ogDefaultImageUrl ?? null,
       input.ogDefaultDescription ?? null,
       input.officialProfileUrl ?? null,
+      input.timezone ?? 'Asia/Tokyo',
+      input.country ?? null,
+      input.role ?? null,
       input.parentLineAccountId ?? null,
       input.tenantId ?? DEFAULT_TENANT_ID,
       now,
@@ -208,6 +216,137 @@ export async function createLineAccount(
     .run();
 
   return (await getLineAccountById(db, id, encryptionKey))!;
+}
+
+export type LineAccountConnectionCheckKind =
+  | 'bot_info'
+  | 'webhook_endpoint'
+  | 'webhook_test'
+  | 'liff_config'
+  | 'token_refresh';
+
+export type LineAccountConnectionCheckResult =
+  | 'matched'
+  | 'mismatched'
+  | 'unconfigured'
+  | 'unknown'
+  | 'ok'
+  | 'failed';
+
+export interface LineAccountConnectionCheck {
+  id: string;
+  line_account_id: string;
+  check_kind: LineAccountConnectionCheckKind;
+  result: LineAccountConnectionCheckResult;
+  expected_url: string | null;
+  registered_url: string | null;
+  webhook_active: number | null;
+  http_status: number | null;
+  checked_by: string;
+  checked_at: string;
+  correlation_id: string;
+  idempotency_key: string;
+  account_revision: number;
+}
+
+export interface SaveLineAccountConnectionChecksInput {
+  lineAccountId: string;
+  expectedRevision: number;
+  checkedBy: string;
+  checkedAt: string;
+  correlationId: string;
+  idempotencyKey: string;
+  checks: Array<{
+    kind: LineAccountConnectionCheckKind;
+    result: LineAccountConnectionCheckResult;
+    expectedUrl?: string | null;
+    registeredUrl?: string | null;
+    webhookActive?: boolean | null;
+    httpStatus?: number | null;
+  }>;
+}
+
+export class LineAccountRevisionConflictError extends Error {
+  constructor() {
+    super('REVISION_CONFLICT');
+    this.name = 'LineAccountRevisionConflictError';
+  }
+}
+
+export async function getLineAccountConnectionChecksByIdempotencyKey(
+  db: D1Database,
+  lineAccountId: string,
+  idempotencyKey: string,
+): Promise<LineAccountConnectionCheck[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM line_account_connection_checks
+        WHERE line_account_id = ? AND idempotency_key = ?
+        ORDER BY CASE check_kind
+          WHEN 'bot_info' THEN 1
+          WHEN 'webhook_endpoint' THEN 2
+          WHEN 'webhook_test' THEN 3
+          WHEN 'liff_config' THEN 4
+          ELSE 5 END`,
+    )
+    .bind(lineAccountId, idempotencyKey)
+    .all<LineAccountConnectionCheck>();
+  return result.results;
+}
+
+/**
+ * Saves one complete check run and advances the account revision in one D1 batch.
+ * The INSERTs only select a row after the guarded UPDATE succeeded.
+ */
+export async function saveLineAccountConnectionChecks(
+  db: D1Database,
+  input: SaveLineAccountConnectionChecksInput,
+): Promise<LineAccountConnectionCheck[]> {
+  const nextRevision = input.expectedRevision + 1;
+  const statements = [
+    db.prepare(
+      `UPDATE line_accounts
+          SET revision = revision + 1, updated_at = ?
+        WHERE id = ? AND revision = ? AND archived_at IS NULL`,
+    ).bind(input.checkedAt, input.lineAccountId, input.expectedRevision),
+    ...input.checks.map((check) => db.prepare(
+      `INSERT INTO line_account_connection_checks (
+         id, line_account_id, check_kind, result, expected_url, registered_url,
+         webhook_active, http_status, checked_by, checked_at, correlation_id,
+         idempotency_key, account_revision
+       )
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM line_accounts
+           WHERE id = ? AND revision = ? AND archived_at IS NULL
+        )`,
+    ).bind(
+      crypto.randomUUID(),
+      input.lineAccountId,
+      check.kind,
+      check.result,
+      check.expectedUrl ?? null,
+      check.registeredUrl ?? null,
+      check.webhookActive == null ? null : (check.webhookActive ? 1 : 0),
+      check.httpStatus ?? null,
+      input.checkedBy,
+      input.checkedAt,
+      input.correlationId,
+      input.idempotencyKey,
+      nextRevision,
+      input.lineAccountId,
+      nextRevision,
+    )),
+  ];
+  const results = await db.batch(statements);
+  if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
+    throw new LineAccountRevisionConflictError();
+  }
+  return getLineAccountConnectionChecksByIdempotencyKey(
+    db,
+    input.lineAccountId,
+    input.idempotencyKey,
+  );
 }
 
 /**
