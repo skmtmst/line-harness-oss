@@ -306,7 +306,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
   const body = await c.req.json<{ code?: string; purpose?: string }>()
     .catch(() => ({} as { code?: string; purpose?: string }));
   const code = body.code?.trim() ?? '';
-  if (body.purpose !== 'operations.control' || !/^\d{6}$/.test(code)) {
+  if ((body.purpose !== 'operations.control' && body.purpose !== 'affiliate.payout.export') || !/^\d{6}$/.test(code)) {
     return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
   }
   const staff = await getStaffById(c.env.DB, staffContext.id);
