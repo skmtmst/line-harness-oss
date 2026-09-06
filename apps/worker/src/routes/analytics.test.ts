@@ -39,6 +39,7 @@ const mocks = {
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccounts: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => mocks.getLineAccounts(...args)),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
   FUNNEL_STEP_KINDS: [
