@@ -143,6 +143,33 @@ export interface WebinarCreateInput {
   tagOnCtaClick?: string | null;
 }
 
+export type WebinarActionTrigger = 'completed' | 'cta_clicked' | 'unviewed';
+export type WebinarActionType =
+  | 'add_tag' | 'remove_tag'
+  | 'start_scenario' | 'stop_scenario' | 'resume_scenario'
+  | 'send_message' | 'send_webhook'
+  | 'switch_rich_menu' | 'remove_rich_menu';
+
+export interface WebinarAction {
+  id: string;
+  webinar_id: string;
+  trigger: WebinarActionTrigger;
+  action_type: WebinarActionType;
+  config_json: string;
+  position: number;
+  version: number;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebinarActionInput {
+  trigger: WebinarActionTrigger;
+  actionType: WebinarActionType;
+  config: Record<string, unknown>;
+  enabled?: boolean;
+}
+
 export async function getWebinars(db: D1Database): Promise<Webinar[]> {
   const { results } = await db
     .prepare('SELECT * FROM webinars ORDER BY created_at DESC')
@@ -270,16 +297,64 @@ export async function updateWebinar(
   return getWebinarById(db, id);
 }
 
-export async function deleteWebinar(db: D1Database, id: string): Promise<void> {
-  // D1 は FK OFF がデフォルトのことがあるので子テーブルも明示削除
-  await db.batch([
-    db.prepare('DELETE FROM webinar_user_comments WHERE webinar_id = ?').bind(id),
-    db.prepare('DELETE FROM webinar_funnel_events WHERE webinar_id = ?').bind(id),
-    db.prepare('DELETE FROM webinar_viewers WHERE webinar_id = ?').bind(id),
-    db.prepare('DELETE FROM webinar_comments WHERE webinar_id = ?').bind(id),
-    db.prepare('DELETE FROM webinar_ctas WHERE webinar_id = ?').bind(id),
-    db.prepare('DELETE FROM webinars WHERE id = ?').bind(id),
-  ]);
+/**
+ * ウェビナーを一覧から外す。申込・視聴・CTA・分析の記録は消さない。
+ *
+ * V6では物理削除を禁止しているため、従来のDELETE経路もこの更新へ寄せる。
+ */
+export async function archiveWebinar(db: D1Database, id: string): Promise<Webinar | null> {
+  const existing = await getWebinarById(db, id);
+  if (!existing) return null;
+  await db
+    .prepare("UPDATE webinars SET status = 'archived', updated_at = ? WHERE id = ?")
+    .bind(jstNow(), id)
+    .run();
+  return getWebinarById(db, id);
+}
+
+export async function getWebinarActions(db: D1Database, webinarId: string): Promise<WebinarAction[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM webinar_actions
+       WHERE webinar_id = ? AND enabled = 1
+       ORDER BY trigger, position`,
+    )
+    .bind(webinarId)
+    .all<WebinarAction>();
+  return results ?? [];
+}
+
+/**
+ * 下書きのアクション一式を置き換える。実行履歴が参照する旧版は消さず、
+ * 無効化して新版を追加する。
+ */
+export async function replaceWebinarActions(
+  db: D1Database,
+  webinarId: string,
+  actions: WebinarActionInput[],
+): Promise<WebinarAction[]> {
+  const now = jstNow();
+  // 有効な行をすべて外した後でも版番号を巻き戻さない。旧版との UNIQUE
+  // 衝突を避けるだけでなく、実行履歴から設定変更の順序を追えるようにする。
+  const latest = await db
+    .prepare('SELECT COALESCE(MAX(version), 0) AS version FROM webinar_actions WHERE webinar_id = ?')
+    .bind(webinarId)
+    .first<{ version: number }>();
+  const nextVersion = Number(latest?.version ?? 0) + 1;
+  const statements = [
+    db.prepare('UPDATE webinar_actions SET enabled = 0, updated_at = ? WHERE webinar_id = ? AND enabled = 1')
+      .bind(now, webinarId),
+    ...actions.map((action, position) => db.prepare(
+      `INSERT INTO webinar_actions
+         (id, webinar_id, trigger, action_type, config_json, position, version, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), webinarId, action.trigger, action.actionType,
+      JSON.stringify(action.config), position, nextVersion, now, now,
+    )),
+  ];
+  await db.batch(statements);
+  return getWebinarActions(db, webinarId);
 }
 
 export async function getWebinarComments(

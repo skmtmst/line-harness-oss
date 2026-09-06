@@ -1211,9 +1211,7 @@ export const SCREENS = [
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・空・失敗・権限不足を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装の通常状態は一覧が空で、設計の6件・申込428人等の指標、フォルダ、6行の状態を確認できない。**推奨修正**：正常データを表示し、設計の指標・フォルダ・一覧配置へ合わせる。取得元 `webinars-v6/ZC13r*.txt` と同Node画像。',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 #251。** 実在する一覧APIと4状態へ接続。設計との判定はlaneで行うため未判定。',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1225,7 +1223,7 @@ export const SCREENS = [
         一度も当たらず、素の絵が `-empty` という名前で保存されていた。
         一覧が読むのは `/api/webinars`（`zCQXe` と同じ）。
       */
-      apis: ['**/api/webinars*', '**/api/webinars/**'],
+      apis: ['**/api/webinars?*', '**/api/webinars/overview?*'],
       kinds: ['normal', 'empty', 'error', 'forbidden'],
     }, },
   { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成',
@@ -1234,41 +1232,35 @@ export const SCREENS = [
     verdictHead: '49e1341c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計は縦の5段と右側要約だが、実装は横タブで入力項目・プレビュー・下部操作の配置が異なる。**推奨修正**：動画と公開設定をSTEP 2の構成へ合わせる。取得元 `webinars-v6/PV1Vh.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
+    verdictNote: '**2026-09-06 #251。** 動画・公開設定を実在する詳細APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装はCTAが未設定の空欄中心で、設計のCTA・申込フォーム選択、右側要約、LINEプレビューが無い。**推奨修正**：STEP 3の選択状態とプレビューを設計どおり出す。取得元 `webinars-v6/d3rFGD.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
+    verdictNote: '**2026-09-06 #251。** CTA・フォームを実在するCTA APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は「通知の設定を表示できません」で止まり、設計の申込完了・前日・1時間前・見逃し配信を選べない。**推奨修正**：通知設定の正常データとLINEプレビューを接続する。取得元 `webinars-v6/Ho8z4.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT,
+    verdictNote: '**2026-09-06 #251。** 通知・リマインドを実在する通知APIへ接続。設計判定は未判定。', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計の完視聴・途中離脱・未視聴ごとのアクションが無く、通知取得失敗の面が出る。**推奨修正**：視聴後アクションを独立区画として実装し、設定要約へ反映する。取得元 `webinars-v6/Xjk8q.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'Ho8z4' }],
+    verdictNote: '**2026-09-06 #251。** 視聴完了・CTAクリック・未視聴の共通アクション版を保存するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '視聴後アクション' }],
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は基本設定の入力欄で、設計の公開URL・案内内容・申込/再生ページのプレビューになっていない。**推奨修正**：公開ページ確認を独立状態として表示する。取得元 `webinars-v6/GB0NR.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT,
+    verdictNote: '**2026-09-06 #251。** 実データから公開URLと表示内容を組み立てる画面へ接続。設計判定は未判定。', route: WEBINAR_EDIT,
     mode: 'viewport', height: 1080,
+    steps: [{ click: '公開プレビュー' }],
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装の確認欄は設計より情報が少なく、LINEプレビュー・公開前チェック・設定要約の配置も異なる。**推奨修正**：STEP 5で不足項目と公開可否を一括確認できる構成へ合わせる。取得元 `webinars-v6/D6yO7e.txt` と同Node画像。',
-    verdictHead: '350f9636a',
+    verdictNote: '**2026-09-06 #251。** 公開前検査を実データから表示。設計判定は未判定。',
     route: '/webinars/edit?id=webinar-1', mode: 'page',
     steps: [{ qaOpen: 'D6yO7e' }],
 
@@ -1288,29 +1280,24 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「参加者」タブが0件で、設計の参加者一覧・状態・CSV出力へ到達できない。**推奨修正**：編集画面に参加者管理の導線を追加し、設計の一覧状態を表示する。取得元 `webinars-v6/Q8sHa.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ click: '参加者' }],
+    verdictNote: '**2026-09-06 #251。** 参加者集計と監査付きCSVを実在するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '参加者' }], mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は多指標の分析ダッシュボードだが、設計の視聴維持率・離脱箇所・CTA反応・LINEプレビュー・CSV配置と構造が異なる。**推奨修正**：必要指標を残しつつ設計の区画と名称へ合わせる。取得元 `webinars-v6/yxyzQ.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ click: '分析' }],
+    verdictNote: '**2026-09-06 #251。** 申込・視聴・離脱・CTA・フォーム分析を実在するAPIへ接続。設計判定は未判定。', route: WEBINAR_EDIT, steps: [{ click: '分析' }], mode: 'viewport', height: 1080,
 
   },
   {
-    ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（api）。視聴履歴の物理削除を禁じる要件（V6詳細 §11・§14）と現行 `deleteWebinar` が噛み合わない。横断レビュー §7 の18番で「アーカイブ確認」へ設計変更する話。',
-    gap: 'drop',
-    gapNote: '物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない',
-    status: 'unimplemented',
-    why: 'V6詳細要件 §11・§14 は視聴履歴の物理削除を禁止している。現行 `deleteWebinar` は viewer・funnel・コメント等を物理削除し、`webinar_registrations` は残すため、削除確認を足すだけでは履歴消失と孤児データを発生させる。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
+    ...WEBINAR, node: 'LKuAQ', name: '10-1-K アーカイブ確認',
+    verdictNote: '**2026-09-06 #251。** 物理削除を廃止し、申込・視聴・CTA・分析を保持するアーカイブ確認へ接続。設計画像なしのためテキスト設計で照合し、判定は未判定。',
+    route: '/webinars', mode: 'viewport', height: 1080,
+    steps: [{ click: 'アーカイブ', nth: 0 }],
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態も空で、設計の状態別一覧とページ送りの配置が再現されない。**推奨修正**：通常データを出したうえで、空・読込・失敗を同じ一覧骨格にそろえる。取得元 `webinars-v6/zCQXe*.txt` と同Node画像。', verdictHead: '350f9636a',
-    states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
+    verdictNote: '**2026-09-06 #251。** 一覧の読込・空・失敗を実在するAPI契約と同じ器で撮影。設計判定は未判定。',
+    states: { apis: ['**/api/webinars?*', '**/api/webinars/overview?*'], kinds: ['loading', 'empty', 'error'] },
 
   },
 
@@ -3194,6 +3181,7 @@ export const CAPTURED_AT = {
         + '`GMvBd`（「保留」）と `zGZMA`（「対応中を保管」）は、固定データにその行やボタンが出ず撮れていない。' },
   ],
   10: [
+    { pr: 917, head: 'c5e1095e', on: '2026-09-06', screens: ['ZC13r', 'PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ', 'LKuAQ', 'zCQXe'], note: '#251 の11画面を実データへ接続して1440・1920pxで撮影。最終判定はlane確認待ちのため未判定のまま' },
     { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
     { pr: 546, head: 'de0848b9', on: '2026-08-29', screens: ['Ho8z4'], note: '通知とリマインド。既存の申込と5分ごとの仕掛けを使う' },
     { pr: 623, head: '988cc37a', on: '2026-08-31', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'D6yO7e', 'Q8sHa', 'yxyzQ'], note: 'Claudeが実装して撮った。編集画面を設計の段（STEP 1〜5）へ。#546 の上（#546 は #524 → #508 → #507 を含む）。**`Xjk8q` はそれまで「いつ見られるようにするか」タブを撮っていて、視聴後の話が写っていなかった**' },
