@@ -139,7 +139,7 @@ export default function AccountMigration() {
         </div>)}
       </div>
 
-      <div className="bg-success-soft text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
+      <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
       <section className="bg-warning-bg border-warning mb-4 rounded-card border p-4">
         <h2 className="text-warning text-sm font-bold">別のLINEプロバイダーのUIDは、自動では対応づけできません。</h2>
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">プロバイダーが違うと同じ人でも別のUIDになり、LINE側に変換する仕組みがありません。確認済みの対応表を取り込み、利用目的・規約・同意も確認してください。</p>
@@ -171,7 +171,7 @@ export default function AccountMigration() {
         <div className="bg-canvas rounded-card border-hairline mb-4 overflow-hidden border">
           <div className="border-hairline flex items-center justify-between border-b px-4 py-3"><div><h2 className="text-ink text-sm font-bold">テスト移行の状態</h2><p className="text-ink-faint text-xs">実データはまだ変更していません。</p></div><StatusBadge tone={active.status === 'ready' || active.status === 'completed' ? 'success' : 'warning'}>{active.status === 'completed' ? '本移行済み' : unresolved === 0 ? '確認完了' : `要確認 ${unresolved ?? '—'}件`}</StatusBadge></div>
           {(active.items?.length ?? 0) === 0 ? <ListState kind="empty" title="対応表に結果がありません" description="別のCSVを選んでテスト移行してください。" /> : <table className="w-full table-fixed">
-            <thead><TableHeadRow><Th className="w-[18%]">旧UID</Th><Th className="w-[18%]">候補ユーザー</Th><Th className="w-[15%]">一致根拠</Th><Th>競合内容</Th><Th className="w-[12%]">判断</Th><Th className="w-[18%]">操作</Th></TableHeadRow></thead>
+            <thead><TableHeadRow><Th className="w-1/6">旧UID</Th><Th className="w-1/6">候補ユーザー</Th><Th className="w-1/6">一致根拠</Th><Th>競合内容</Th><Th className="w-1/12">判断</Th><Th className="w-1/6">操作</Th></TableHeadRow></thead>
             <tbody>{active.items?.slice(0, 20).map((item) => <tr key={item.id} className="border-hairline border-t align-top">
               <td className="truncate px-4 py-3 text-sm" title={item.oldUid}>{item.oldUid}</td><td className="px-4 py-3 text-sm">{item.candidateName ?? '候補なし'}</td>
               <td className="px-4 py-3"><StatusBadge tone={item.classification === 'auto' ? 'success' : item.classification === 'unmatched' ? 'neutral' : 'warning'}>{classLabel[item.classification]}</StatusBadge></td>
