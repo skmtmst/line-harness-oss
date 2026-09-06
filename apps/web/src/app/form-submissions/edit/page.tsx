@@ -433,6 +433,8 @@ function FormEditInner() {
           description="ブロックを積んでフォームを作ります。選択肢ごとにタグを付けたり、答えを友だち情報へ入れたりできます。"
           action={
             <div className="flex flex-wrap gap-2">
+              <Button href="/support">マニュアル</Button>
+              <Button onClick={() => void save()} disabled={saving}>下書き保存</Button>
               <Button
                 href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
                 variant={editorTab === 'basic' ? 'primary' : 'secondary'}

@@ -571,7 +571,7 @@ export default function FormSubmissionsPage() {
 
                   <div className="absolute right-3 top-3 flex items-center gap-1">
                     <Link
-                      href={`/form-submissions/${encodeURIComponent(form.id)}/responses`}
+                      href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
                       className="text-ink-faint hover:bg-accent-soft hover:text-accent rounded-md p-1 opacity-60 transition group-hover:opacity-100"
                       aria-label={`${normalizedName}の集まった回答を見る`}
                       title="集まった回答を見る"
@@ -913,7 +913,7 @@ export default function FormSubmissionsPage() {
               </div>
             )}
             {deleteImpact.submissionCount > 0 && (
-              <Button href={`/form-submissions/${encodeURIComponent(deleteImpact.form.id)}/responses`}>
+              <Button href={`/form-submissions/responses?id=${encodeURIComponent(deleteImpact.form.id)}`}>
                 回答をCSVで書き出す画面へ
               </Button>
             )}

@@ -8,7 +8,7 @@ import {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
-import { Field, inputClass } from '@/components/shared/form-controls'
+import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 
 const COLOR_ROLES: Array<{
   key: keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
@@ -102,7 +102,6 @@ export default function FormDesignSettings({
                 { value: 'sans', label: 'ゴシック体' },
                 { value: 'serif', label: '明朝体' },
               ]}
-              className={inputClass}
             />
           </Field>
           <Field label="角の丸み" htmlFor="form-theme-radius">
@@ -115,7 +114,6 @@ export default function FormDesignSettings({
                 { value: 'medium', label: 'ふつう' },
                 { value: 'round', label: '大きめ' },
               ]}
-              className={inputClass}
             />
           </Field>
         </div>
@@ -126,13 +124,12 @@ export default function FormDesignSettings({
             htmlFor="form-theme-background"
             note="HTTPSの画像URLだけを指定できます。空なら背景色を使います。"
           >
-            <input
+            <TextInput
               id="form-theme-background"
               type="url"
               value={theme.backgroundImageUrl ?? ''}
               onChange={(event) => patch('backgroundImageUrl', event.target.value || null)}
               placeholder="https://example.com/background.jpg"
-              className={inputClass}
             />
           </Field>
         </div>
@@ -142,13 +139,13 @@ export default function FormDesignSettings({
         <h2 className="text-ink text-base font-bold">SNSで共有したときの表示</h2>
         <div className="mt-4 grid gap-4">
           <Field label="タイトル" htmlFor="form-og-title">
-            <input id="form-og-title" value={ogTitle} onChange={(event) => onOgTitleChange(event.target.value)} className={inputClass} />
+            <TextInput id="form-og-title" value={ogTitle} onChange={(event) => onOgTitleChange(event.target.value)} />
           </Field>
           <Field label="説明" htmlFor="form-og-description">
-            <textarea id="form-og-description" rows={3} value={ogDescription} onChange={(event) => onOgDescriptionChange(event.target.value)} className={`${inputClass} resize-y`} />
+            <TextArea id="form-og-description" rows={3} value={ogDescription} onChange={(event) => onOgDescriptionChange(event.target.value)} />
           </Field>
           <Field label="画像URL" htmlFor="form-og-image">
-            <input id="form-og-image" type="url" value={ogImageUrl} onChange={(event) => onOgImageUrlChange(event.target.value)} className={inputClass} />
+            <TextInput id="form-og-image" type="url" value={ogImageUrl} onChange={(event) => onOgImageUrlChange(event.target.value)} />
           </Field>
         </div>
       </div>

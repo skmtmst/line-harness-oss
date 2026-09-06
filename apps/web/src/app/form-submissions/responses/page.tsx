@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import type { FormLayout } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -79,10 +79,9 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
   URL.revokeObjectURL(url)
 }
 
-export default function FormResponsesPage() {
-  usePageTitle('集まった回答')
-  const params = useParams<{ id: string }>()
-  const formId = params.id
+function FormResponsesInner() {
+  const searchParams = useSearchParams()
+  const formId = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [form, setForm] = useState<FormDetail | null>(null)
   const [items, setItems] = useState<Submission[]>([])
@@ -98,7 +97,7 @@ export default function FormResponsesPage() {
   const [exportError, setExportError] = useState('')
 
   const load = useCallback(async (nextPage = 1, nextLimit = 20) => {
-    if (!selectedAccountId) {
+    if (!selectedAccountId || !formId) {
       setLoading(false)
       return
     }
@@ -193,6 +192,7 @@ export default function FormResponsesPage() {
   }
 
   if (accountLoading || loading) return <ListState kind="loading" title="集まった回答を読み込んでいます" />
+  if (!formId) return <ListState kind="empty" title="回答フォームが指定されていません" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" />
   if (error) return <ListState kind="error" title={error} description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load(page, pageSize)} />
   if (!form) return <ListState kind="empty" title="回答フォームが見つかりません" />
@@ -256,7 +256,7 @@ export default function FormResponsesPage() {
         <>
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <table className="w-full table-fixed">
-              <thead><TableHeadRow><Th className="w-[30%]">答えた人</Th><Th className="w-[14%]">答えた日時</Th>{fieldKeys.slice(0, 3).map((key) => <Th key={key}>{labels[key] ?? key}</Th>)}<Th className="w-16"><span className="sr-only">操作</span></Th></TableHeadRow></thead>
+              <thead><TableHeadRow><Th style={{ width: '30%' }}>答えた人</Th><Th style={{ width: '14%' }}>答えた日時</Th>{fieldKeys.slice(0, 3).map((key) => <Th key={key}>{labels[key] ?? key}</Th>)}<Th className="w-16"><span className="sr-only">操作</span></Th></TableHeadRow></thead>
               <tbody className="divide-hairline divide-y">
                 {shown.map((item) => (
                   <tr key={item.id} className="hover:bg-canvas-sunken cursor-pointer" onClick={() => setSelected(item)}>
@@ -284,6 +284,15 @@ export default function FormResponsesPage() {
   )
 }
 
+export default function FormResponsesPage() {
+  usePageTitle('集まった回答')
+  return (
+    <Suspense fallback={<ListState kind="loading" title="集まった回答を読み込んでいます" />}>
+      <FormResponsesInner />
+    </Suspense>
+  )
+}
+
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
   return <section className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-faint text-xs font-medium">{label}</p><p className="text-ink mt-2 text-2xl font-bold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></section>
 }
@@ -291,7 +300,7 @@ function Kpi({ label, value, note }: { label: string; value: string; note: strin
 function ResponseDetail({ item, fieldKeys, labels, onClose }: { item: Submission; fieldKeys: string[]; labels: Record<string, string>; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <button type="button" className="absolute inset-0 bg-black/30" onClick={onClose} aria-label="回答詳細を閉じる" />
+      <button type="button" className="bg-ink/30 absolute inset-0" onClick={onClose} aria-label="回答詳細を閉じる" />
       <aside className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-xl">
         <div className="border-hairline flex items-center justify-between border-b pb-4"><h2 className="text-ink text-base font-bold">回答詳細</h2><button type="button" onClick={onClose} className="text-ink-faint text-xl" aria-label="閉じる">×</button></div>
         <dl className="mt-5 space-y-4">

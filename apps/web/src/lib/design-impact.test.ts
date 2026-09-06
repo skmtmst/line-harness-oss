@@ -10,9 +10,9 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする113ファイルを利用先に数える', () => {
-    // NEN配信のV6一覧と、リッチメニューの対象・公開設定を共通Buttonへ寄せた実測値。
-    expect(directImporters(files, button)).toHaveLength(113)
+  it('共通Buttonを直接importする116ファイルを利用先に数える', () => {
+    // 回答フォームの編集・デザイン・回答専用画面を共通Buttonへ寄せた実測値。
+    expect(directImporters(files, button)).toHaveLength(116)
   })
 
   it('import先が実ファイルと一致する場合は検知する', () => {
@@ -37,6 +37,7 @@ describe('共通部品の影響範囲', () => {
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/page.tsx',
       'app/form-submissions/page.tsx',
+      'app/form-submissions/responses/page.tsx',
       'app/inflow-links/page.tsx',
       'app/mileage/action-score-tab.tsx',
       'app/mileage/mileage-history-tab.tsx',

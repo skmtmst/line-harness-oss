@@ -1539,7 +1539,7 @@ export const SCREENS = [
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
     verdict: 'unjudged',
     verdictNote: '**#254 実装後の撮影待ち。** 専用ルートで実回答をAPI側ページングし、全回答CSV・詳細・表示中の集計を備える。取得口が無い割合・書き込み結果は0にせず `—` と理由を表示する。取得元 `forms-v6/v9tYhl.txt` と同Node画像。',
-    route: '/form-submissions/form-visit/responses',
+    route: '/form-submissions/responses?id=form-visit',
     states: {
       apis: ['**/api/forms/form-visit', '**/api/forms/form-visit/submissions*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
