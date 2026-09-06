@@ -1563,8 +1563,8 @@ export const SCREENS = [
   */
   { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で再照合。** 構造一致・データ待ち。設計画像と実装画像を同じ比較入力で見比べ、上部3操作、左のフォルダ、検索、保存した検索、20件表示、6列の一覧表を設計順へ合わせた。`/api/forms` の画面確認データが0件のため、設計の6行・フォルダ別件数は作らず、空状態で撮影した。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/EMBIK*.txt` と同Node画像。',
-    verdictHead: 'db85cae2b', /*
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・データ待ち。設計画像と実装画像を同じ比較入力で見比べ、上部3操作、左のフォルダ、検索、保存した検索、20件表示、6列の一覧表を設計順へ合わせた。`/api/forms` の画面確認データが0件のため、設計の6行・フォルダ別件数は作らず、空状態で撮影した。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/EMBIK*.txt` と同Node画像。',
+    verdictHead: '79257c7bd', /*
       **#586 の受入条件。**通常・読込・空・失敗を言い分けられるかを見る。
       読む口はフォームの一覧と帯。
     */
@@ -1574,8 +1574,8 @@ export const SCREENS = [
     }, },
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で再照合。** 構造一致・画面確認データ待ち。「ブロックを追加（12種）」から実装済み12種類を選べる口、顧客プレビュー、作成元アカウント、保存操作を追加し、未設定URLの説明から内部語 `LIFF` を除いた。画面確認用 `/api/forms/form-1` がフォーム定義を返さず、設計の9ブロックと実値は表示できないため固定値で埋めていない。1440・1920とも横はみ出し0。取得元 `forms-v6/vCqUj.txt` と同Node画像。',
-    verdictHead: 'db85cae2b', route: `${FORM_EDIT}&tab=basic`, },
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・画面確認データ待ち。「ブロックを追加（12種）」から実装済み12種類を選べる口、顧客プレビュー、作成元アカウント、保存操作を追加し、未設定URLの説明から内部語 `LIFF` を除いた。画面確認用 `/api/forms/form-1` がフォーム定義を返さず、設計の9ブロックと実値は表示できないため固定値で埋めていない。1440・1920とも横はみ出し0。取得元 `forms-v6/vCqUj.txt` と同Node画像。',
+    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=basic`, },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定',
     verdict: 'unjudged',
@@ -1587,8 +1587,8 @@ export const SCREENS = [
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で再照合。** 構造一致・設定値待ち。専用URLでオプション窓を開き、回答後アクション、お礼ページURLと代替文、1人1回、前回答復元、期限、送信前確認、表示文言を設計順へ寄せ、「保存する」でフォーム保存APIへ接続した。画面確認用フォーム定義と参照データが無いため、設計のタグ・マイル・お礼URLは作らず未設定のまま撮影した。1440・1920とも横はみ出し0。取得元 `forms-v6/cSqvP.txt` と同Node画像。',
-    verdictHead: 'db85cae2b', route: `${FORM_EDIT}&tab=options`,
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で再照合。** 構造一致・設定値待ち。専用URLでオプション窓を開き、回答後アクション、お礼ページURLと代替文、1人1回、前回答復元、期限、送信前確認、表示文言を設計順へ寄せ、「保存する」でフォーム保存APIへ接続した。画面確認用フォーム定義と参照データが無いため、設計のタグ・マイル・お礼URLは作らず未設定のまま撮影した。1440・1920とも横はみ出し0。取得元 `forms-v6/cSqvP.txt` と同Node画像。',
+    verdictHead: '79257c7bd', route: `${FORM_EDIT}&tab=options`,
     mode: 'viewport', height: 1080,
 
   },
@@ -1613,8 +1613,8 @@ export const SCREENS = [
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     verdict: 'match',
-    verdictNote: '**2026-09-06 Issue #226 / UI HEAD db85cae2b で一致。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込みを保ったまま、読込・空・取得失敗を同じ一覧枠で表示することを確認した。空状態の2つの案内文、作成ボタン、失敗時の再読込も設計文言へ合わせた。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/ZOPyc*.txt` と同Nodeの状態別実装画像。',
-    verdictHead: 'db85cae2b',
+    verdictNote: '**2026-09-06 Issue #226 / PR #1003 / UI HEAD 79257c7bd で一致。** 設計画像と実装画像を同じ比較入力で見比べ、上部操作、フォルダ、検索・絞り込みを保ったまま、読込・空・取得失敗を同じ一覧枠で表示することを確認した。空状態の2つの案内文、作成ボタン、失敗時の再読込も設計文言へ合わせた。通常・読込・空・失敗を1440・1920で撮影し、全画像で横はみ出し0。取得元 `forms-v6/ZOPyc*.txt` と同Nodeの状態別実装画像。',
+    verdictHead: '79257c7bd',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
 
   },
