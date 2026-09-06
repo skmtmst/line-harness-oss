@@ -15,11 +15,11 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain('href="/friend-add-settings">← 友だち追加時の配信</Link>')
   })
 
-  it('選択中のアカウントと3つの絞り込みだけをAPIへ渡す', () => {
-    expect(PAGE).toContain('api.friendAddRouting.events(selectedAccountId')
-    expect(PAGE).toContain("kind: kind === 'all' ? undefined : kind")
-    expect(PAGE).toContain("attributionStatus: attribution === 'all' ? undefined : attribution")
-    expect(PAGE).toContain("routingStatus: routing === 'all' ? undefined : routing")
+  it('選択中のアカウントと実行状態を新しい実行結果APIへ渡す', () => {
+    expect(PAGE).toContain('api.friendAddRules.runs(selectedAccountId')
+    expect(PAGE).toContain("status: routing === 'all' ? undefined : routing")
+    expect(PAGE).toContain("kind === 'all' || item.friendKind === kind")
+    expect(PAGE).toContain("attribution === 'all' || item.attribution.status === attribution")
     expect(PAGE).not.toContain('accounts[0]')
   })
 
@@ -39,7 +39,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
 
   it('未取得の経路を0件や推測した経路として表示しない', () => {
     expect(PAGE).toContain("'経路は取得できません'")
-    expect(PAGE).toContain("item.entryRouteName || item.refCode || '選択した経路'")
+    expect(PAGE).toContain("item.attribution.routeName || item.attribution.reason || '選択した経路'")
     expect(PAGE).not.toContain('entryRouteId}')
     expect(PAGE).not.toContain("'公式QRから追加'")
   })
@@ -66,9 +66,11 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain('担当者シナリオ開始')
   })
 
-  it('取得できない集計値を0件で埋めない', () => {
-    expect(PAGE).toContain('<dd className="font-bold">未取得</dd>')
-    expect(PAGE).toContain('担当者への引き継ぎ結果を集計する口は未接続です。')
-    expect(PAGE).toContain('失敗した記録の詳細口は未接続です。')
+  it('実配信・シナリオ開始・平均送信時間をAPI集計で表示する', () => {
+    expect(PAGE).toContain('summary?.cumulativeDeliveries')
+    expect(PAGE).toContain('summary?.scenarioStarts')
+    expect(PAGE).toContain('summary?.averageSendTimeMs')
+    expect(PAGE).toContain('summary?.staffHandoffs.reason')
+    expect(PAGE).toContain('使用ルール・版・処理結果と一緒に一覧で確認できます。')
   })
 })

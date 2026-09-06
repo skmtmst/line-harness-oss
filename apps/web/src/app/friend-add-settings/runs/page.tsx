@@ -5,11 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,
   FriendAddEventKind,
-  FriendAddEventList,
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, type FriendAddRunList } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -72,9 +71,11 @@ export default function FriendAddRunsPage() {
   const [attribution, setAttribution] = useState<AttributionFilter>('all')
   const [routing, setRouting] = useState<RoutingFilter>('all')
   const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
-  const [data, setData] = useState<FriendAddEventList | null>(null)
+  const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [stopBusy, setStopBusy] = useState(false)
+  const [stopMessage, setStopMessage] = useState('')
   const requestSequence = useRef(0)
   const cursor = cursorStack[cursorStack.length - 1]
 
@@ -89,12 +90,10 @@ export default function FriendAddRunsPage() {
     setLoading(true)
     setError('')
     try {
-      const response = await api.friendAddRouting.events(selectedAccountId, {
+      const response = await api.friendAddRules.runs(selectedAccountId, {
         limit: 20,
         cursor: cursor ?? undefined,
-        kind: kind === 'all' ? undefined : kind,
-        attributionStatus: attribution === 'all' ? undefined : attribution,
-        routingStatus: routing === 'all' ? undefined : routing,
+        status: routing === 'all' ? undefined : routing,
       })
       if (requestId !== requestSequence.current) return
       if (!response.success) {
@@ -125,28 +124,50 @@ export default function FriendAddRunsPage() {
   const routeBreakdown = useMemo(() => {
     const counts = new Map<string, number>()
     for (const item of data?.items ?? []) {
-      const route = item.attributionStatus === 'captured'
-        ? item.entryRouteName || item.refCode || '選択した経路'
+      const route = item.attribution.status === 'captured'
+        ? item.attribution.routeName || item.attribution.reason || '選択した経路'
         : '経路は取得できません'
       counts.set(route, (counts.get(route) ?? 0) + 1)
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
   }, [data])
   const latestProcessedAt = data?.items.find((item) => item.processedAt)?.processedAt ?? null
+  const visibleItems = useMemo(() => (data?.items ?? []).filter((item) => (
+    (kind === 'all' || item.friendKind === kind)
+    && (attribution === 'all' || item.attribution.status === attribution)
+  )), [attribution, data, kind])
+  const activeRuleId = data?.items.find((item) => item.rule)?.rule?.id ?? null
+
+  const stopDelivery = async () => {
+    if (!selectedAccountId || !activeRuleId || stopBusy) return
+    if (!window.confirm('この配信を一時停止しますか？')) return
+    setStopBusy(true)
+    setStopMessage('')
+    try {
+      const detail = await api.friendAddRules.get(selectedAccountId, activeRuleId)
+      if (!detail.success) throw new Error('rule detail missing')
+      const response = await api.friendAddRules.stop(selectedAccountId, activeRuleId, detail.data.rule.version)
+      setStopMessage(response.success ? '配信を一時停止しました。' : '配信を停止できませんでした。')
+    } catch {
+      setStopMessage('配信を停止できませんでした。状態を読み直してください。')
+    } finally {
+      setStopBusy(false)
+    }
+  }
 
   const exportCsv = () => {
     if (!data?.items.length) return
     const header = ['受信日時', '友だち', '追加の種類', '確定した流入経路', '配信・処理', '処理日時']
     const rows = data.items.map((item) => {
-      const routeName = item.attributionStatus === 'captured'
-        ? item.entryRouteName || item.refCode || '選択した経路'
+      const routeName = item.attribution.status === 'captured'
+        ? item.attribution.routeName || item.attribution.reason || '選択した経路'
         : '経路は取得できません'
       return [
-        formatJstDateTime(item.occurredAt),
-        item.displayName || '名前は未取得',
-        item.kind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
+        formatJstDateTime(item.receivedAt),
+        item.friend.displayName || '名前は未取得',
+        item.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
         routeName,
-        ROUTING_LABELS[item.routingStatus].label,
+        ROUTING_LABELS[item.status].label,
         formatJstDateTime(item.processedAt),
       ]
     })
@@ -210,9 +231,9 @@ export default function FriendAddRunsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="直近28日の追加" value={summary?.total ?? null} unit="人" detail="友だち追加の合計" loading={loading} />
-        <SummaryCard variant="v6" title="累計配信" value={null} unit="通" detail="集計は未取得" loading={loading} />
-        <SummaryCard variant="v6" title="シナリオ開始" value={null} unit="件" detail="集計は未取得" loading={loading} />
+        <SummaryCard variant="v6" title="直近28日の追加" value={summary?.totalRuns ?? null} unit="人" detail="友だち追加の合計" loading={loading} />
+        <SummaryCard variant="v6" title="累計配信" value={summary?.cumulativeDeliveries ?? null} unit="通" detail="実際に送った通数" loading={loading} />
+        <SummaryCard variant="v6" title="シナリオ開始" value={summary?.scenarioStarts ?? null} unit="件" detail="登録できた件数" loading={loading} />
         <SummaryCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
       </div>
 
@@ -233,7 +254,7 @@ export default function FriendAddRunsPage() {
           description={error}
           action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
         />
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || visibleItems.length === 0 ? (
         <ListState
           kind="empty"
           title="条件に合う実行結果はありません"
@@ -247,24 +268,32 @@ export default function FriendAddRunsPage() {
               <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。</p>
             </div>
             <div className="divide-y divide-hairline px-4">
-              {data.items.map((item) => {
-                const status = ROUTING_LABELS[item.routingStatus]
-                const routeName = item.attributionStatus === 'captured'
-                  ? item.entryRouteName || item.refCode || '選択した経路'
+              {visibleItems.map((item) => {
+                const status = ROUTING_LABELS[item.status]
+                const routeName = item.attribution.status === 'captured'
+                  ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                   : '経路は取得できません'
-                const displayName = item.displayName || '名前は未取得'
+                const displayName = item.friend.displayName || '名前は未取得'
+                const action = item.scenario?.started
+                  ? `シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
+                  : item.deliveryCount > 0
+                    ? `初回案内を${item.deliveryCount}通送信`
+                    : item.actions.total > 0
+                      ? `${item.actions.total}件の処理を実行`
+                      : ROUTING_ACTIONS[item.status]
                 return (
                   <div key={item.id} className="flex min-w-0 items-center gap-3 py-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
                       {displayName.slice(0, 1)}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} title={displayName}>{displayName}</Link>
+                      <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
                       <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
+                      {item.rule && <p className="truncate text-xs text-ink-faint" title={`${item.rule.name ?? '名前は未取得'} 第${item.rule.versionNumber ?? '—'}版`}>{item.rule.name ?? '名前は未取得'}・第{item.rule.versionNumber ?? '—'}版</p>}
                     </div>
-                    <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{ROUTING_ACTIONS[item.routingStatus]}</div>
+                    <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{action}</div>
                     <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
-                    <time className="w-12 shrink-0 text-right text-xs text-ink-secondary" dateTime={item.occurredAt} title={formatJstDateTime(item.occurredAt)}>{formatJstTime(item.occurredAt)}</time>
+                    <time className="w-12 shrink-0 text-right text-xs text-ink-secondary" dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)}>{formatJstTime(item.receivedAt)}</time>
                   </div>
                 )
               })}
@@ -314,7 +343,7 @@ export default function FriendAddRunsPage() {
               <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{summary && summary.failed > 0 ? '要確認' : '稼働中'}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">有効</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstTime(latestProcessedAt)}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">未取得</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
             </dl>
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
@@ -322,23 +351,21 @@ export default function FriendAddRunsPage() {
             <p className="mt-1 text-xs text-ink-faint">未処理の問題だけ表示します。</p>
             <div className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-status-danger-deep">
               <strong>未送信 {summary?.failed ?? '—'}件</strong>
-              <p className="mt-1 text-xs">失敗した記録の詳細口は未接続です。</p>
+              <p className="mt-1 text-xs">失敗した記録は使用ルール・版・処理結果と一緒に一覧で確認できます。</p>
             </div>
             <Button className="mt-3 w-full" href="/friend-add-settings?view=edit&id=rule-referral&step=preview">友だち追加時配信をテスト</Button>
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">担当者シナリオ開始</h2>
-            <p className="mt-1 text-xs text-ink-faint">担当者への引き継ぎ結果を集計する口は未接続です。</p>
+            <p className="mt-1 text-xs text-ink-faint">{summary?.staffHandoffs.reason ?? '担当者への引き継ぎ結果を集計します。'}</p>
             <dl className="mt-4 divide-y divide-hairline text-sm">
-              <div className="flex justify-between gap-3 py-3"><dt>テスト待ち</dt><dd className="font-bold">{summary?.pending ?? '—'}件</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>対応中</dt><dd className="font-bold">未取得</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>完了</dt><dd className="font-bold">未取得</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>実行結果</dt><dd className="font-bold">{summary?.staffHandoffs.value ?? '未取得'}</dd></div>
             </dl>
           </section>
         </aside>
       </div>
 
-      <StickyBar actions={<><Button disabled title="一時停止の操作口は未接続です">配信を一時停止</Button><Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button></>} />
+      <StickyBar status={stopMessage || undefined} actions={<><Button disabled={!activeRuleId || stopBusy} onClick={() => void stopDelivery()}>{stopBusy ? '停止中…' : '配信を一時停止'}</Button><Button href="/friend-add-settings?view=edit&id=rule-referral&step=basic" variant="primary">友だち追加時の設定を編集</Button></>} />
     </div>
   )
 }

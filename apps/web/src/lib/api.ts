@@ -2483,6 +2483,18 @@ export type FriendAddRuleDefinition = {
   activeUntil: string | null
   returningMode?: 'none' | 'same' | 'other'
   startPosition?: 'beginning' | 'resume'
+  deliveryChoices?: {
+    sendWelcomeMessage: boolean
+    startScenario: boolean
+    runActions: boolean
+  }
+  resendSuppressionHours?: number
+  unknownRouteAction?: {
+    sendCommonGuidance: boolean
+    notifyStaff: boolean
+  }
+  weekdays?: number[]
+  timeWindows?: Array<{ start: string; end: string }>
 }
 export type FriendAddRule = {
   id: string
@@ -2500,6 +2512,7 @@ export type FriendAddRule = {
   lastTestedAt: string | null
   publishedAt: string | null
   matchedLast7Days: number | null
+  version: number
   definition: FriendAddRuleDefinition
   routeNames: string[]
   scenarioName: string | null
@@ -2508,9 +2521,12 @@ export type FriendAddRuleOptions = {
   routes: Array<{ id: string; name: string; kind: string }>
   scenarios: Array<{ id: string; name: string }>
   tags: Array<{ id: string; name: string }>
+  folders: Array<{ id: string; name: string }>
 }
 export type FriendAddRuleListData = {
   items: FriendAddRule[]
+  total: number
+  nextCursor: string | null
   summary: {
     rules: number
     active: number
@@ -2524,7 +2540,58 @@ export type FriendAddRuleListData = {
 }
 export type FriendAddRuleInput = Pick<FriendAddRule, 'friendKind' | 'name' | 'folderName' | 'priority'> & {
   accountId: string
+  version?: number
   definition: FriendAddRuleDefinition
+}
+
+export type FriendAddRuleConflictData = {
+  conflicts: Array<{
+    code: string
+    ruleIds: string[]
+    message: string
+    matchedLast28Days: Record<string, number>
+  }>
+  rules: Array<{
+    id: string
+    name: string
+    priority: number
+    weekdays: number[]
+    timeWindows: Array<{ start: string; end: string }>
+    friendCondition: string | null
+    matchedLast28Days: number
+  }>
+}
+
+export type FriendAddRunList = {
+  items: Array<{
+    id: string
+    receivedAt: string
+    processedAt: string | null
+    friend: { id: string; displayName: string | null }
+    friendKind: FriendAddRuleKind
+    attribution: {
+      status: FriendAddEventAttributionStatus
+      routeId: string | null
+      routeName: string | null
+      reason: string | null
+    }
+    rule: { id: string; name: string | null; versionId: string | null; versionNumber: number | null } | null
+    scenario: { id: string; name: string | null; enrollmentId: string | null; started: boolean } | null
+    actions: { total: number; failed: number }
+    deliveryCount: number
+    status: FriendAddEventRoutingStatus
+    errorCode: string | null
+  }>
+  total: number
+  nextCursor: string | null
+  summary: {
+    totalRuns: number
+    cumulativeDeliveries: number
+    scenarioStarts: number
+    averageSendTimeMs: number | null
+    failed: number
+    staffHandoffs: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
+  }
 }
 
 export const api = {
@@ -5220,12 +5287,54 @@ export const api = {
     },
   },
   friendAddRules: {
-    list: (accountId: string, kind: FriendAddRuleKind) =>
-      fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?account_id=${encodeURIComponent(accountId)}&kind=${kind}`),
+    list: (accountId: string, kind: FriendAddRuleKind, params?: {
+      status?: FriendAddRuleStatus
+      cursor?: string
+      limit?: number
+    }) => {
+      const query = new URLSearchParams({ account_id: accountId, kind })
+      if (params?.status) query.set('status', params.status)
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      return fetchApi<ApiResponse<FriendAddRuleListData>>(`/api/friend-add-rules?${query}`)
+    },
     get: (accountId: string, ruleId: string) =>
-      fetchApi<ApiResponse<{ rule: FriendAddRule; options: FriendAddRuleOptions }>>(
+      fetchApi<ApiResponse<{
+        rule: FriendAddRule
+        options: FriendAddRuleOptions
+        staffNotification: {
+          status: 'connected' | 'disconnected' | 'unconfigured' | null
+          reason: string | null
+        }
+      }>>(
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
       ),
+    conflicts: (accountId: string, kind: FriendAddRuleKind) =>
+      fetchApi<ApiResponse<FriendAddRuleConflictData>>(
+        `/api/friend-add-rules/conflicts?account_id=${encodeURIComponent(accountId)}&kind=${kind}`,
+      ),
+    createFolder: (accountId: string, name: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; name: string; createdAt: string | null }>>(
+        '/api/friend-add-rules/folders',
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ accountId, name }),
+        },
+      ),
+    runs: (accountId: string, params?: {
+      status?: FriendAddEventRoutingStatus
+      ruleId?: string
+      cursor?: string
+      limit?: number
+    }) => {
+      const query = new URLSearchParams({ account_id: accountId })
+      if (params?.status) query.set('status', params.status)
+      if (params?.ruleId) query.set('rule_id', params.ruleId)
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      return fetchApi<ApiResponse<FriendAddRunList>>(`/api/friend-add-runs?${query}`)
+    },
     createDraft: (input: FriendAddRuleInput, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/friend-add-rules/drafts', {
         method: 'POST',
@@ -5262,10 +5371,14 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}/publish?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),
-    stop: (accountId: string, ruleId: string) =>
+    stop: (accountId: string, ruleId: string, version: number) =>
       fetchApi<{ success: boolean }>(
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}/stop?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({ version }),
+        },
       ),
     archive: (accountId: string, ruleId: string) =>
       fetchApi<{ success: boolean }>(

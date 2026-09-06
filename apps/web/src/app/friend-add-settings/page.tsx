@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -63,6 +63,10 @@ function FriendAddSettingsList() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [search, setSearch] = useState('')
+  const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
+  const [folderBusy, setFolderBusy] = useState(false)
+  const folderKey = useRef(crypto.randomUUID())
+  const cursor = cursorStack[cursorStack.length - 1]
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -73,7 +77,10 @@ function FriendAddSettingsList() {
     setLoading(true)
     setError('')
     try {
-      const response = await api.friendAddRules.list(selectedAccountId, kind)
+      const response = await api.friendAddRules.list(selectedAccountId, kind, {
+        cursor: cursor ?? undefined,
+        limit: 20,
+      })
       if (!response.success) {
         setError(response.error)
         setData(null)
@@ -86,9 +93,11 @@ function FriendAddSettingsList() {
     } finally {
       setLoading(false)
     }
-  }, [kind, selectedAccountId])
+  }, [cursor, kind, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => { setCursorStack([null]) }, [kind, selectedAccountId])
 
   useEffect(() => {
     if (!requestedDeleteId || !data) return
@@ -97,12 +106,34 @@ function FriendAddSettingsList() {
 
   const folders = useMemo(() => {
     const counts = new Map<string, number>()
+    for (const folder of data?.options.folders ?? []) counts.set(folder.name, 0)
     for (const rule of data?.items ?? []) {
       const name = rule.folderName || '未分類'
       counts.set(name, (counts.get(name) ?? 0) + 1)
     }
     return Array.from(counts.entries())
   }, [data])
+
+  const createFolder = async () => {
+    if (!selectedAccountId || folderBusy) return
+    const name = window.prompt('追加するフォルダ名を入力してください')?.trim()
+    if (!name) return
+    setFolderBusy(true)
+    setError('')
+    try {
+      const response = await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current)
+      if (!response.success) {
+        setError(response.error)
+        return
+      }
+      folderKey.current = crypto.randomUUID()
+      await load()
+    } catch {
+      setError('フォルダを追加できませんでした。通信を確認して、もう一度お試しください。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
 
   const visibleItems = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ja-JP')
@@ -171,15 +202,15 @@ function FriendAddSettingsList() {
 
       <div className="grid items-start gap-4 xl:grid-cols-[190px_minmax(0,1fr)]">
         <aside className="bg-canvas rounded-card border-hairline overflow-hidden border" aria-label="流入の束">
-          <div className="border-hairline flex justify-between border-b px-4 py-3 text-xs font-bold"><span>流入の束</span><span>{data?.items.length ?? 0}件</span></div>
-          <div className="bg-accent-soft text-accent-deep flex justify-between px-4 py-3 text-xs font-bold"><span>すべて</span><span>{data?.items.length ?? 0}</span></div>
+          <div className="border-hairline flex justify-between border-b px-4 py-3 text-xs font-bold"><span>流入の束</span><span>{data?.total ?? data?.items.length ?? 0}件</span></div>
+          <div className="bg-accent-soft text-accent-deep flex justify-between px-4 py-3 text-xs font-bold"><span>すべて</span><span>{data?.total ?? data?.items.length ?? 0}</span></div>
           {folders.map(([name, count]) => <div key={name} className="text-ink-secondary flex justify-between px-4 py-3 text-xs"><span>{name}</span><span>{count}</span></div>)}
         </aside>
 
         <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
           <ListToolbar searchPlaceholder="設定名・流入リンクで検索" searchValue={search} onSearchChange={setSearch}>
-            <Button variant="secondary" disabled>フォルダを追加</Button>
+            <Button variant="secondary" onClick={() => void createFolder()} disabled={folderBusy}><Plus size={14} />フォルダを追加</Button>
             <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
           </ListToolbar>
           {!data || data.items.length === 0 ? (
@@ -208,9 +239,9 @@ function FriendAddSettingsList() {
                 </tbody>
               </DataTable>
               <div className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
-                <Button disabled>前へ</Button>
-                <Button variant="primary" aria-current="page">1</Button>
-                <Button disabled>次へ</Button>
+                <Button disabled={cursorStack.length === 1 || loading} onClick={() => setCursorStack((current) => current.slice(0, -1))}>前へ</Button>
+                <Button variant="primary" aria-current="page">{cursorStack.length}</Button>
+                <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && setCursorStack((current) => [...current, data.nextCursor])}>次へ</Button>
               </div>
             </>
           )}

@@ -25,7 +25,8 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
   })
 
   it('モック固定値ではなく友だち追加時配信APIで読み書きする', () => {
-    expect(LIST_PAGE).toContain('api.friendAddRules.list(selectedAccountId, kind)')
+    expect(LIST_PAGE).toContain('api.friendAddRules.list(selectedAccountId, kind, {')
+    expect(LIST_PAGE).toContain('api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current)')
     expect(LIST_PAGE).toContain('api.friendAddRules.archive(selectedAccountId, deleting.id)')
     expect(EDITOR).toContain('api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)')
     expect(EDITOR).toContain('api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)')
@@ -81,11 +82,13 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(LIST_PAGE).toContain('次へ')
   })
 
-  it('保存先がない条件を作り物で埋めず、未接続と明記する', () => {
-    expect(EDITOR).toContain('曜日・時間帯・友だち条件')
-    expect(EDITOR).toContain('過去28日の追加人数は未取得')
-    expect(EDITOR).toContain('再追加時の制限・経路不明時の動作')
-    expect(EDITOR).toContain('24時間の再送制限')
+  it('曜日・時間帯・友だち条件・再送制限を保存済み契約で編集する', () => {
+    expect(EDITOR).toContain("weekdays: [0, 1, 2, 3, 4, 5, 6]")
+    expect(EDITOR).toContain("timeWindows: [{ start: '08:00', end: '21:00' }]")
+    expect(EDITOR).toContain('この初回案内を使う友だち')
+    expect(EDITOR).toContain('resendSuppressionHours')
+    expect(EDITOR).toContain('unknownRouteAction')
+    expect(EDITOR).toContain('matchedLast28Days')
   })
 
   it('確認画面は案内と後続処理の2段にまとめる', () => {

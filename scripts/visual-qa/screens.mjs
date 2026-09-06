@@ -1200,7 +1200,7 @@ export const SCREENS = [
     verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
     verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
-    states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    states: { apis: ['**/api/friend-add-rules*', '**/api/friend-add-rules/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
 
   },
   {
@@ -1216,7 +1216,7 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
     route: '/friend-add-settings/runs', mode: 'page',
-    states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    states: { apis: ['**/api/friend-add-runs*', '**/api/friend-add-runs/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-07 Issue #290・UI HEAD `f13421d869` を固定ポート3105/8792で再実装・再判定。** 正常4件、読込、空、失敗を1440/1920pxで撮影し、Pencilの1920px設計画像と横並び比較（全状態で横はみ出し0）。4指標、コンパクトな友だち追加履歴、流入経路内訳、稼働状況、要テスト、担当者シナリオ開始、CSV、絞り込み、必要時だけのページ送り、下部操作をそろえた。通常URL・公式QRの経路は推測せず未取得と表示する。現行APIが返さない累計配信、シナリオ開始件数、平均送信時間、担当者引き継ぎ集計、実行したルール・版・アクション詳細と一時停止操作は未取得または未接続と明示しているためデータ待ち。',
     verdictSource: 'friend-add-v6/P2J0Te.txt + P2J0Te-{normal,loading,empty,error}-{1440,1920}.png',
