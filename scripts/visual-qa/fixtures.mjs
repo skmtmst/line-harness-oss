@@ -806,6 +806,102 @@ export const FORM_DELETE_IMPACT_FIXTURES = {
   },
 }
 
+/** 回答フォームのフォルダ。設計 `EMBIK` の総数18件と内訳。 */
+export const FORM_FOLDERS = [
+  { id: 'form-folder-visit', kind: 'form', name: '01_来店・予約', parentId: null, displayOrder: 0, color: null, formCount: 6, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-request', kind: 'form', name: '02_資料請求', parentId: null, displayOrder: 1, color: null, formCount: 5, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-survey', kind: 'form', name: '03_アンケート', parentId: null, displayOrder: 2, color: null, formCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+]
+
+const FORM_BASE_LAYOUT = {
+  version: 2,
+  header: [],
+  sections: [{ id: 'form-section-1', name: 'セクション1', blocks: [] }],
+  options: {
+    thanksUrl: null, thanksText: 'ご回答ありがとうございました。', restorePrevious: false,
+    pageTitle: null, submitLabel: '送信', prevLabel: '前へ', nextLabel: '次へ',
+    sectionHeader: 'pageNumber', confirmDialog: { enabled: false },
+    deadline: { enabled: false }, oncePerFriend: { enabled: false },
+    totalLimit: { enabled: false }, afterActions: [],
+  },
+}
+
+const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationCount) => ({
+  id, name, description, folderId,
+  fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
+  onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
+  onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
+  saveToMetadata: destinationCount > 0, isActive, status: 'active', archivedAt: null,
+  revision: 1, submitCount, weeklySubmitCount, createdAt: updatedAt, updatedAt, lastSubmittedAt,
+  usedByAccounts: [], accountScopeReviewRequired: false, destinationCount,
+})
+
+/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。 */
+export const FORMS = [
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', 5),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', 6),
+  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', 1),
+  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', 4),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', 7),
+  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', 2), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+]
+
+/** 来店アンケートの9ブロックと公開設定。設計 `vCqUj` / `cSqvP`。 */
+export const FORM_DETAIL = {
+  ...FORMS[0],
+  fields: [
+    { name: 'real_name', label: 'お名前（漢字）', type: 'text', required: true },
+    { name: 'satisfaction', label: '満足度', type: 'radio', required: true, options: ['大変満足', '満足', 'ふつう', '不満'] },
+    { name: 'good_points', label: 'よかった点', type: 'checkbox', options: ['接客', '仕上がり', '店内', '説明'] },
+    { name: 'opinion', label: 'ご意見', type: 'textarea' },
+    { name: 'next_visit', label: '次回来店の希望日', type: 'date' },
+  ],
+  layout: {
+    version: 2,
+    header: [{ id: 'form-header-image', kind: 'image', mediaUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400"><rect width="1200" height="400" fill="%23eaf5ee"/></svg>', size: 'full' }],
+    sections: [{
+      id: 'form-section-visit', name: '来店アンケート', blocks: [
+        { id: 'form-heading', kind: 'heading', text: 'ご来店ありがとうございました', level: 1 },
+        { id: 'form-intro', kind: 'text', text: '30秒で終わります' },
+        { id: 'form-name', kind: 'input', type: 'text', name: 'real_name', label: 'お名前（漢字）', required: true, destinations: { realName: true } },
+        { id: 'form-satisfaction', kind: 'input', type: 'radio', name: 'satisfaction', label: '満足度', required: true, choiceMode: 'tag', choices: [
+          { id: 'sat-1', label: '大変満足', tagId: 'tag-satisfaction-great' },
+          { id: 'sat-2', label: '満足', tagId: 'tag-satisfaction-good' },
+          { id: 'sat-3', label: 'ふつう', tagId: 'tag-satisfaction-normal' },
+          { id: 'sat-4', label: '不満', tagId: 'tag-satisfaction-low' },
+        ] },
+        { id: 'form-good-points', kind: 'input', type: 'checkbox', name: 'good_points', label: 'よかった点', destinations: { friendFieldIds: ['friend-field-good-points'] }, choices: [
+          { id: 'good-1', label: '接客' }, { id: 'good-2', label: '仕上がり' },
+          { id: 'good-3', label: '店内' }, { id: 'good-4', label: '説明' },
+        ] },
+        { id: 'form-opinion', kind: 'input', type: 'textarea', name: 'opinion', label: 'ご意見', destinations: { friendFieldIds: ['friend-field-opinion'] } },
+        { id: 'form-next-visit', kind: 'input', type: 'date', name: 'next_visit', label: '次回来店の希望日', destinations: { friendFieldIds: ['friend-field-next-visit'] } },
+        { id: 'form-button', kind: 'button', label: '送信する', url: 'https://example.co.jp/thanks', style: 'default' },
+      ],
+    }],
+    options: {
+      thanksUrl: 'https://example.co.jp/thanks',
+      thanksText: 'ありがとうございました。またのご来店をお待ちしています。',
+      restorePrevious: true, pageTitle: '来店アンケート', submitLabel: '送信する',
+      prevLabel: '前へ', nextLabel: '次へ', sectionHeader: 'name',
+      confirmDialog: { enabled: true, text: 'この内容で送信しますか？', okLabel: '送信する', cancelLabel: '戻る' },
+      deadline: { enabled: true, endsAt: '2026-09-30T23:59:00+09:00', message: '回答の受付は終了しました。' },
+      oncePerFriend: { enabled: true, message: 'このフォームには回答済みです。' },
+      totalLimit: { enabled: false },
+      afterActions: [
+        { kind: 'tag', op: 'add', tagIds: ['tag-visit-survey-answered'] },
+        { kind: 'reminder', reminderId: 'reminder-next-visit' },
+        { kind: 'send_text', text: 'ありがとうございました。またのご来店をお待ちしています。' },
+      ],
+    },
+  },
+  referenceData: {
+    tags: [{ id: 'tag-visit-survey-answered', name: '来店アンケート回答済み' }],
+    mileage: [{ id: 'mileage-visit-survey', label: '回答で50マイル', amount: 50 }],
+    reminders: [{ id: 'reminder-next-visit', name: '次回来店の希望日をお知らせ' }],
+  },
+}
+
 /**
  * V6 `ymXJK` NENコラム下書き作成。Workerの公開契約と同じ6項目だけを持つ。
  * 画面側は通常・入力エラー・重複・保存失敗を、このstatus/bodyで描き分ける。
@@ -1332,14 +1428,14 @@ const richMenuArea = (id, label, targetPageId, boundsX) => ({
   trackedLinkId: null,
 })
 
-const richMenuPage = (id, orderIndex, name, areas = []) => ({
+const richMenuPage = (id, orderIndex, name, areas = [], imageR2Key = null) => ({
   id,
   orderIndex,
   name,
   aliasId: `visual-${id}`,
   lineRichmenuId: `line-${id}`,
-  imageR2Key: null,
-  imageContentType: null,
+  imageR2Key,
+  imageContentType: imageR2Key ? 'image/png' : null,
   areas,
 })
 
@@ -1411,14 +1507,14 @@ export const RICH_MENU_GROUP_DETAILS = {
       richMenuPage('rmg-1-top', 0, 'トップ', [
         richMenuArea('rmg-1-top-product', '商品を見る', 'rmg-1-product', 0),
         richMenuArea('rmg-1-top-booking', '予約する', 'rmg-1-booking', 833),
-      ]),
+      ], 'visual-qa/rich-menus/rmg-1-top.png'),
       richMenuPage('rmg-1-product', 1, '商品を見る', [
         richMenuArea('rmg-1-product-top', 'トップ', 'rmg-1-top', 0),
         richMenuArea('rmg-1-product-booking', '予約する', 'rmg-1-booking', 1666),
-      ]),
+      ], 'visual-qa/rich-menus/rmg-1-product.png'),
       richMenuPage('rmg-1-booking', 2, '予約する', [
         richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
-      ]),
+      ], 'visual-qa/rich-menus/rmg-1-booking.png'),
     ],
   },
   'rmg-2': {
@@ -1668,23 +1764,37 @@ export const TEMPLATES = (() => {
     for (let i = 0; i < count; i += 1) {
       rows.push({
         id: `template-${n}`,
-        name: n === 0 ? '7日間フォロー完了のお知らせ' : `${label}のひな形 ${i + 1}`,
-        category: 'text',
+        name: n === 0 ? '予約確認'
+          : n === 1 ? 'お問い合わせフォロー'
+            : n === 2 ? 'EC購入のお礼'
+              : `${label}のひな形 ${i + 1}`,
+        category: n === 0 ? '予約日時と注意事項を案内'
+          : n === 1 ? '返信後の追加案内'
+            : n === 2 ? '購入商品と配送予定を案内'
+              : 'text',
         messageType: 'text',
         messageContent: n === 0
-          ? '7日間のご案内は以上です。ご不明な点はいつでもご返信ください。'
+          ? 'ご予約ありがとうございます。以下の内容をご確認ください。'
           : `${label}のご連絡です。内容をご確認ください。`,
         folderId,
+        usageCount: n === 0 ? 38 : Math.max(0, 12 - n),
+        tapCount: 0,
         monthlySendCount: sendCounts[n][0],
         totalSendCount: sendCounts[n][1],
         createdAt: '2026-01-13T00:00:00.000Z',
-        updatedAt: '2026-01-13T00:00:00.000Z',
+        updatedAt: n === 0 ? '2026-08-22T09:20:00.000Z' : '2026-01-13T00:00:00.000Z',
       })
       n += 1
     }
   }
   return rows
 })()
+
+/** テスト送信先。設計 `h0kahp` のLINE連携済み2人。 */
+export const TEMPLATE_TEST_RECIPIENTS = [
+  { id: 'friend-test-kenta', displayName: 'Kenta Kawano', pictureUrl: null },
+  { id: 'friend-test-masato', displayName: 'Masato S.', pictureUrl: null },
+]
 
 /**
  * 受信箱の保存した検索。設計 `ASsb3`（2-13 保存した検索を開く）の並び。
@@ -2269,7 +2379,7 @@ export const SCENARIO_STEPS = [
     id: 'step-0', scenarioId: 'scenario-0', stepOrder: 1, delayMinutes: 0,
     offsetDays: 0, offsetMinutes: null, deliveryTime: '10:00', templateId: null,
     onReachTagId: null, afterSend: 'continue', messageType: 'text',
-    messageContent: 'ご登録ありがとうございます。7日間で使い方をご案内します。',
+    messageContent: '{{name}}さん、ご登録ありがとうございます。\n7日間でサービスの使い方を順番にご案内します。',
     targetCondition: null, question: null, isDraft: false,
     createdAt: '2026-08-16T00:00:00.000Z',
   },
@@ -2555,6 +2665,39 @@ export const FRIEND_ATTRIBUTE_FIELDS = [
     createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
   },
 ]
+
+/**
+ * 友だち情報欄を変える前の固定確認。#1092 の保存契約と同じ器で、
+ * 値は変えずに「そのまま／人が確認／空欄」と使用先を返す。
+ */
+export const FRIEND_FIELD_MIGRATION_PREVIEW = {
+  source: {
+    ...FRIEND_ATTRIBUTE_FIELDS.find((field) => field.id === 'field-birthday'),
+    status: 'active', version: 3, canInsertText: true,
+  },
+  target: {
+    id: 'field-birthday-new', folderId: null, name: '生年月日（新）', fieldKey: 'birthday_new',
+    type: 'date', options: null, optionDefinitions: null, defaultValue: null, source: 'manual',
+    ecFieldPath: null, ecIsMaster: false, isPersonal: true, isStarred: false,
+    displayOrder: 4, status: 'active', version: 1, canInsertText: true,
+    createdAt: '2026-09-07T00:00:00.000Z', updatedAt: '2026-09-07T00:00:00.000Z',
+  },
+  summary: { total: 141, convertible: 137, review: 3, invalid: 1 },
+  rows: [
+    { friendId: 'friend-birthday-review-1', sourceValue: '8月13日', convertedValue: null, status: 'review', reason: '年を含む日付か確認してください' },
+    { friendId: 'friend-birthday-review-2', sourceValue: '2026/2/31', convertedValue: null, status: 'review', reason: '存在する日付か確認してください' },
+    { friendId: 'friend-birthday-review-3', sourceValue: '平成5年4月2日', convertedValue: null, status: 'review', reason: '西暦の日付へ直してください' },
+    { friendId: 'friend-birthday-invalid-1', sourceValue: '', convertedValue: null, status: 'invalid', reason: '値が空欄です' },
+  ],
+  usageTargets: [
+    { kind: 'form', fieldId: 'field-birthday', id: 'form-5', name: '会員登録', switchable: true },
+    { kind: 'reminder', fieldId: 'field-birthday', id: 'reminder-birthday', name: '誕生日のお知らせ', switchable: true },
+    { kind: 'saved_search', fieldId: 'field-birthday', id: 'saved-search-birthday', name: '誕生日30日前', switchable: true },
+  ],
+  runId: 'field-migration-run-birthday-1',
+  previewToken: 'visual-qa-field-migration-preview-token',
+  previewExpiresAt: '2026-09-07T15:15:00.000Z',
+}
 
 /**
  * 機能8 自動応答。設計 `cmDfJ` の5行。
@@ -3237,13 +3380,37 @@ export const COMMON_ACTION_DETAIL = {
   **`is_active` は 0/1 の数**（この口は DB の行をそのまま返す）。
 */
 export const BOOKING_MENUS = [
-  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 90, buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
-  { id: 'bm-2', name: 'トリミング（大型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
-  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 45, buffer_after_minutes: 10, base_price: 4200, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12 },
-  { id: 'bm-4', name: '爪切りだけ', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
-  { id: 'bm-5', name: '歯みがき', category_label: 'お手入れ', description: null, duration_minutes: 30, buffer_after_minutes: 5, base_price: 2800, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6 },
-  { /* 設計の「止めているもの 2つ」。 */ id: 'bm-6', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null },
+  { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
+  { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24 },
+  { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12 },
+  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
+  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12 },
+  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6 },
+  { id: 'bm-7', name: '足裏ケア', category_label: 'お手入れ', description: null, duration_minutes: 20, buffer_after_minutes: 5, base_price: 1800, sort_order: 7, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2 },
+  { id: 'bm-8', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, sort_order: 8, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null },
 ]
+
+/** 予約の店舗共通設定。設計 `W6465r` の受付期間・承認・営業時間。 */
+export const BOOKING_SETTINGS = {
+  lineAccountId: 'visual-qa-account', organizationName: '然-NEN- 本店', timeZone: 'Asia/Tokyo',
+  bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440,
+  maxActiveBookingsPerFriend: 1, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
+  menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
+  businessHours: [
+    { weekday: 0, intervals: [{ start: '10:00', end: '17:00' }] },
+    { weekday: 1, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
+    { weekday: 2, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
+    { weekday: 3, intervals: [] },
+    { weekday: 4, intervals: [{ start: '09:00', end: '12:00' }, { start: '13:00', end: '19:00' }] },
+    { weekday: 5, intervals: [{ start: '09:00', end: '20:00' }] },
+    { weekday: 6, intervals: [{ start: '09:00', end: '18:00' }] },
+  ],
+  exceptions: [
+    { date: '2026-09-23', kind: 'open', intervals: [{ start: '10:00', end: '17:00' }], note: '祝日営業' },
+    { date: '2026-12-30', kind: 'closed', intervals: [], note: '年末休業' },
+  ],
+  updatedAt: '2026-08-22T09:20:00.000Z',
+}
 
 /** 予約スタッフ。設計 `tksPc` の押し口「佐々木」を含む。 */
 export const BOOKING_STAFF = [
@@ -3489,11 +3656,86 @@ export const ADMIN_EVENTS = [
   **同伴のペット**も入れる（設計は「ももちゃん（犬・4歳）」のように出す）。
 */
 export const EVENT_BOOKINGS = [
+  { id: 'eb-requested', event_id: 'ev-1', friend_id: 'friend-requested', friend_name: '山本 京平', status: 'requested', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, requested_at: '2026-09-03T01:30:00.000Z', decided_at: null, decided_by_staff_id: null, cancelled_at: null, created_at: '2026-09-03T01:30:00.000Z', updated_at: '2026-09-03T01:30:00.000Z' },
   { id: 'eb-1', event_id: 'ev-1', friend_id: 'friend-1', friend_name: '高橋 直人', status: 'confirmed', companion_count: 1, companion_note: 'ももちゃん（犬・4歳）', is_first_time: 1, created_at: '2026-09-01T02:00:00.000Z' },
   { id: 'eb-2', event_id: 'ev-1', friend_id: 'friend-2', friend_name: '前田 さくら', status: 'confirmed', companion_count: 1, companion_note: 'そらくん（猫・2歳）', is_first_time: 0, created_at: '2026-09-01T03:00:00.000Z' },
   { id: 'eb-3', event_id: 'ev-1', friend_id: 'friend-3', friend_name: '木村 亮', status: 'confirmed', companion_count: 1, companion_note: 'こむぎちゃん（犬・7歳）', is_first_time: 1, created_at: '2026-09-01T04:00:00.000Z' },
   { /* キャンセル待ち。全部が確定だと、その札が撮れない。 */ id: 'eb-4', event_id: 'ev-1', friend_id: 'friend-4', friend_name: '中村 彩', status: 'waitlist', companion_count: 1, companion_note: 'ぷりんちゃん（うさぎ・3歳）', is_first_time: 1, created_at: '2026-09-02T01:00:00.000Z' },
   { /* 取り消した1件。 */ id: 'eb-5', event_id: 'ev-1', friend_id: 'friend-5', friend_name: '石田 未来', status: 'cancelled', companion_count: 1, companion_note: 'レオくん（犬・1歳）', is_first_time: 0, created_at: '2026-09-01T05:00:00.000Z' },
+]
+
+const lineAccount = (id, channelId, name, displayOrder, options = {}) => ({
+  id, channelId, name,
+  channelAccessTokenConfigured: true, channelSecretConfigured: true,
+  loginChannelId: `login-${channelId}`, loginChannelSecretConfigured: true,
+  liffId: `liff-${channelId}`, isActive: true,
+  channelAccessTokenLast4: null, channelAccessTokenUpdatedAt: null,
+  channelSecretLast4: null, channelSecretUpdatedAt: null,
+  loginChannelSecretLast4: null, loginChannelSecretUpdatedAt: null,
+  isDefault: false, archivedAt: null, friendCapacity: 50000, capacityWarnAt: 45000,
+  iconUrl: null, country: '日本', role: '店舗', displayOrder,
+  ogSiteName: null, ogDefaultDescription: null, ogDefaultImageUrl: null,
+  parentLineAccountId: null,
+  createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z',
+  webhook: {
+    expectedUrl: 'https://api.example/webhook', actualUrl: 'https://api.example/webhook',
+    active: true, status: 'matched', checkedAt: '2026-08-22T00:00:00.000Z',
+  },
+  stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0 },
+  ...options,
+})
+
+/** LINEアカウント一覧。設計 `QT91v` の稼働3・停止1・保管2と親子関係。 */
+export const LINE_ACCOUNTS = [
+  lineAccount('visual-qa-account', '2007123456', '然-NEN- TEST', 0, {
+    isDefault: true, role: '検証用。本番の配信には使わない',
+    stats: { friendCount: 231, activeScenarios: 4, messagesThisMonth: 1842 },
+  }),
+  lineAccount('visual-qa-account-prod', '2007111222', '然-NEN- 本店', 1, {
+    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 186, activeScenarios: 3, messagesThisMonth: 1260 },
+  }),
+  lineAccount('visual-qa-account-store', '2007333444', '然-NEN- 渋谷店', 2, {
+    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 42, activeScenarios: 1, messagesThisMonth: 286 },
+    webhook: { expectedUrl: 'https://api.example/webhook', actualUrl: 'https://old.example/webhook', active: true, status: 'mismatched', checkedAt: '2026-08-22T00:00:00.000Z' },
+  }),
+  lineAccount('visual-qa-account-old', '2007555666', '旧キャンペーン', 3, {
+    isActive: false, stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0 },
+    webhook: { expectedUrl: 'https://api.example/webhook', actualUrl: null, active: null, status: 'unknown', checkedAt: '2026-08-12T00:00:00.000Z' },
+  }),
+  lineAccount('visual-qa-account-event-2025', '2007777888', '2025年イベント', 4, {
+    isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', stats: { friendCount: 18, activeScenarios: 0, messagesThisMonth: 0 },
+  }),
+  lineAccount('visual-qa-account-archive', '2007999000', '旧テストアカウント', 5, {
+    isActive: false, archivedAt: '2026-02-01T00:00:00.000Z', stats: { friendCount: 4, activeScenarios: 0, messagesThisMonth: 0 },
+  }),
+]
+
+/** アカウント詳細。資格情報の末尾だけを持ち、秘密値そのものは置かない。 */
+export const LINE_ACCOUNT_DETAIL = {
+  ...LINE_ACCOUNTS[0],
+  channelAccessTokenLast4: '4f0d', channelAccessTokenUpdatedAt: '2026-08-12T01:10:00.000Z',
+  channelSecretLast4: 'a91c', channelSecretUpdatedAt: '2026-08-12T01:12:00.000Z',
+  loginChannelSecretLast4: '77b2', loginChannelSecretUpdatedAt: '2026-08-12T01:14:00.000Z',
+  connection: {
+    lastTestAt: '2026-08-13T00:12:00.000Z', lastTestStatus: 'succeeded',
+    lastReceivedAt: '2026-08-19T02:02:00.000Z',
+  },
+}
+
+/** 乗り換え事前確認。4区分の合計は元の友だち231人と一致させる。 */
+export const ACCOUNT_HANDOVER = {
+  id: 'account-handover-1', fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-account-prod',
+  code: 'NEN-4F2K-8H1Q', codeExpiresAt: '2026-09-08T03:00:00.000Z', status: 'previewed',
+  providerMatch: 'different', counts: { sourceTotal: 231, auto: 186, review: 23, unmatched: 18, lookalike: 4 },
+  movedCount: 0, failedCount: 0, failureReason: null,
+  createdAt: '2026-09-07T01:00:00.000Z', linkedAt: '2026-09-07T01:10:00.000Z',
+  previewedAt: '2026-09-07T01:15:00.000Z', resolvedAt: null, executedAt: null, completedAt: null,
+}
+
+export const ACCOUNT_HANDOVER_DECISIONS = [
+  { id: 'handover-decision-1', handover_id: 'account-handover-1', from_friend_id: 'friend-kyohei-yamamoto', to_friend_id: 'friend-kyohei-y', decision: 'link', bucket: 'review', note: 'メールアドレスが一致', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:18:00.000Z', sourceName: 'Kyohei Yamamoto', candidateName: 'Kyohei Y.', evidenceLabel: 'メールアドレスが一致' },
+  { id: 'handover-decision-2', handover_id: 'account-handover-1', from_friend_id: 'friend-masato-sakamoto', to_friend_id: null, decision: 'skip', bucket: 'unmatched', note: '候補なし', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:19:00.000Z', sourceName: '坂本 真人', candidateName: null, evidenceLabel: '候補なし' },
+  { id: 'handover-decision-3', handover_id: 'account-handover-1', from_friend_id: 'friend-ryo-kanno', to_friend_id: 'friend-kanno-candidate', decision: 'skip', bucket: 'lookalike', note: '別人', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:20:00.000Z', sourceName: '菅野 亮', candidateName: '菅野', evidenceLabel: '名前と画像が似ています' },
 ]
 
 /*
@@ -3554,8 +3796,8 @@ const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 
 
 export const NEN_PHOTO_PUBLICATIONS = {
   summary: {
-    publishedCount: 8, placementCount: 4,
-    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 8,
+    publishedCount: 62, placementCount: 4,
+    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 62,
   },
   items: [
     publicationPhoto('pub-1', 'ph-11', 'ももちゃん', '高橋 直人 さま', 1240, 'リッチメニュー', 'rich_menu'),
@@ -3563,7 +3805,7 @@ export const NEN_PHOTO_PUBLICATIONS = {
     publicationPhoto('pub-3', 'ph-13', 'こむぎちゃん', '木村 亮 さま', 642, 'サイトのトップ', 'site'),
     publicationPhoto('pub-4', 'ph-14', 'ぷりんちゃん', '中村 彩 さま', 418, '回答フォーム', 'form'),
     publicationPhoto('pub-5', 'ph-15', 'だいふく', '松本 圭 さま', 286, 'コラム「フード」'),
-    publicationPhoto('pub-6', 'ph-16', 'ここちゃん', '新田 遥 さま', null, ''),
+    publicationPhoto('pub-6', 'ph-16', 'ここちゃん', '新田 遥 さま', 204, ''),
     publicationPhoto('pub-7', 'ph-17', 'まるくん', '石田 未来 さま', 186, 'リッチメニュー', 'rich_menu'),
     publicationPhoto('pub-8', 'ph-18', 'レオくん', null, 92, 'リッチメニュー', 'rich_menu'),
   ],

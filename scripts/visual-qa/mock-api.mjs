@@ -49,9 +49,9 @@ import {
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS,
-  FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE,
+  FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
-  TEMPLATES, TEMPLATE_FOLDERS,
+  TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
@@ -69,11 +69,13 @@ import {
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
-  BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY,
+  BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY,
   BOOKING_AVAILABILITY_RULES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, ADMIN_EVENTS, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, MILEAGE_RULES,
+  FORM_FOLDERS, FORMS, FORM_DETAIL,
+  LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   OPERATION_CONTROL_PREVIEW, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_ANALYTICS,
@@ -917,6 +919,9 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && /^\/api\/friend-fields\/[^/]+\/migration-preview$/.test(pathname)) {
+    return FRIEND_FIELD_MIGRATION_PREVIEW
+  }
   if (method === 'POST' && pathname === '/api/inbox/saved-views') {
     return {
       id: 'inbox-view-preview',
@@ -1017,7 +1022,11 @@ const RAW = {
  * `29-1-B 申込者の一覧` が `.filter` で「画面を表示できませんでした」になっていた。
  */
 const RAW_PATTERNS = [
-  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, { items: EVENT_BOOKINGS }],
+  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
+    items: url.searchParams.get('status')
+      ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))
+      : EVENT_BOOKINGS,
+  })],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
   /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
@@ -1142,6 +1151,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       data: status ? CONVERSION_APPROVALS.filter((item) => item.approvalStatus === status) : CONVERSION_APPROVALS,
     }
   }
+  if (pathname === `/api/line-accounts/${ACCOUNT.id}/handovers`) {
+    return { success: true, data: [ACCOUNT_HANDOVER] }
+  }
+  if (pathname === `/api/account-handovers/${ACCOUNT_HANDOVER.id}`) {
+    return {
+      success: true,
+      data: { ...ACCOUNT_HANDOVER, decisions: ACCOUNT_HANDOVER_DECISIONS, unresolvedReviews: 20 },
+    }
+  }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*
       1件を返す口。**詳細（★V6 33-3）が読む。**
@@ -1152,15 +1170,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return {
       success: true,
       data: {
-        ...ACCOUNT,
-        webhook: { status: 'matched', expectedUrl: `${'https://api.example'}/webhook`, actualUrl: `${'https://api.example'}/webhook`, active: true, checkedAt: `${FIXED_TO}T00:00:00.000Z` },
-        channelAccessTokenConfigured: true,
-        channelSecretConfigured: true,
-        loginChannelSecretConfigured: true,
-        friendCapacity: 50000,
-        capacityWarnAt: 45000,
-        country: '日本',
-        role: '検証用。本番の配信には使わない',
+        ...(LINE_ACCOUNTS.find((account) => account.id === pathname.split('/')[3]) ?? LINE_ACCOUNT_DETAIL),
+        ...(pathname.split('/')[3] === LINE_ACCOUNT_DETAIL.id ? LINE_ACCOUNT_DETAIL : {}),
       },
     }
   }
@@ -1169,7 +1180,7 @@ function bodyFor(pathname, query = new URLSearchParams()) {
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
       設計の「正常」と並べたときに実装の差に見えてしまう。
     */
-    return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+    return { success: true, data: LINE_ACCOUNTS }
   }
   if (pathname === '/api/friends/migrations') {
     return { success: true, data: [{
@@ -1281,6 +1292,14 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
   if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  if (pathname === '/api/account-settings/test-recipients') {
+    return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  if (pathname === '/api/forms') return { success: true, data: FORMS }
+  if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  if (pathname === '/api/folders' && query.get('kind') === 'form') {
+    return { success: true, data: FORM_FOLDERS }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
   }
@@ -1308,6 +1327,9 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
     return { success: true, data: WEBINAR_FOLDERS }
+  }
+  if (pathname === '/api/booking/admin/settings') {
+    return { success: true, data: BOOKING_SETTINGS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
   if (pathname === '/api/auto-reply-runs') {
@@ -2165,7 +2187,8 @@ const server = createServer((req, res) => {
   }
   const rawPattern = RAW_PATTERNS.find(([re]) => re.test(url.pathname))
   if (rawPattern) {
-    res.writeHead(200).end(JSON.stringify(rawPattern[1]))
+    const fixed = typeof rawPattern[1] === 'function' ? rawPattern[1](url) : rawPattern[1]
+    res.writeHead(200).end(JSON.stringify(fixed))
     return
   }
   res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname, url.searchParams)))
