@@ -65,4 +65,3 @@ describe('migration 300 tag linked actions', () => {
     ).run()).toThrow(/CHECK/);
   });
 });
-

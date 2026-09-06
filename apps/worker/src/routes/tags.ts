@@ -33,7 +33,11 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { CommonActionValidationError, validateActionShape } from '../services/common-actions.js';
+import {
+  CommonActionValidationError,
+  validateActionShape,
+  validateTagAddedActionResources,
+} from '../services/common-actions.js';
 
 const tags = new Hono<Env>();
 
@@ -727,6 +731,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
       const actions = parseActions(
         body.actions ?? (body.automationDraft as Record<string, unknown> | undefined)?.actions,
       );
+      if (actions) await validateTagAddedActionResources(c.env.DB, lineAccountId, actions);
       const detail = await updateTagDefinition(c.env.DB, {
         tagId: c.req.param('id'),
         lineAccountId,
@@ -886,6 +891,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
         ? body.automationDraft as Record<string, unknown>
         : {};
       const actions = parseActions(automationDraft.actions ?? body.actions) ?? [];
+      await validateTagAddedActionResources(c.env.DB, lineAccountId, actions);
       const detail = await createTagDefinition(c.env.DB, {
         lineAccountId,
         name,

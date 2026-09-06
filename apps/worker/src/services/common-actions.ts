@@ -185,6 +185,126 @@ async function requireResource(
   return id;
 }
 
+/** タグ連動の下書き保存時にも、別アカウントの選択肢を混ぜない。 */
+export async function validateTagAddedActionResources(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+): Promise<ActionDefinition[]> {
+  for (const [index, action] of actions.entries()) {
+    const field = `actions.${index}.params`;
+    if (action.type === 'add_tag' || action.type === 'remove_tag') {
+      await requireResource(db, {
+        table: 'tags', id: action.params.tagId, lineAccountId,
+        field: `${field}.tagId`, label: 'タグ',
+      });
+    } else if (action.type === 'start_scenario'
+      || action.type === 'stop_scenario'
+      || action.type === 'resume_scenario') {
+      await requireResource(db, {
+        table: 'scenarios', id: action.params.scenarioId, lineAccountId,
+        field: `${field}.scenarioId`, label: 'シナリオ',
+      });
+    } else if (action.type === 'send_message') {
+      if (action.params.templateId !== undefined || action.params.template_id !== undefined) {
+        await requireResource(db, {
+          table: 'templates', id: action.params.templateId ?? action.params.template_id,
+          lineAccountId, field: `${field}.templateId`, label: 'テンプレート',
+        });
+      } else {
+        requiredString(action.params.content, `${field}.content`, '送信内容');
+      }
+    } else if (action.type === 'set_metadata') {
+      if (action.params.fieldId !== undefined) {
+        throw new CommonActionValidationError(
+          'resource_scope_unavailable',
+          '友だち情報欄のアカウント範囲が整うまで、この処理は選べません',
+          `${field}.fieldId`,
+        );
+      }
+      const values = action.params.values ?? action.params.data;
+      if (!isRecord(values) || Object.keys(values).length === 0) {
+        throw new CommonActionValidationError(
+          'metadata_values_required', '設定する友だち情報を入力してください', `${field}.values`,
+        );
+      }
+    } else if (action.type === 'set_support_mark') {
+      const markId = requiredString(action.params.markId, `${field}.markId`, '対応マーク');
+      const mark = await db.prepare(
+        `SELECT sm.id
+           FROM support_marks sm
+           JOIN support_mark_scopes sms ON sms.mark_id = sm.id
+           JOIN line_accounts la ON la.id = ? AND la.tenant_id = sms.tenant_id
+          WHERE sm.id = ? AND sm.archived_at IS NULL
+            AND (sms.line_account_id IS NULL OR sms.line_account_id = ?)
+          LIMIT 1`,
+      ).bind(lineAccountId, markId, lineAccountId).first<{ id: string }>();
+      if (!mark) {
+        throw new CommonActionValidationError(
+          'resource_not_found', '対応マークが見つからないか、別のLINE公式アカウントにあります',
+          `${field}.markId`,
+        );
+      }
+    } else if (action.type === 'start_reminder' || action.type === 'stop_reminder') {
+      const reminderId = requiredString(action.params.reminderId, `${field}.reminderId`, 'リマインダ');
+      const reminder = await db.prepare(
+        `SELECT id FROM reminders
+          WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL LIMIT 1`,
+      ).bind(reminderId, lineAccountId).first<{ id: string }>();
+      if (!reminder) {
+        throw new CommonActionValidationError(
+          'resource_not_found', 'リマインダが見つからないか、別のLINE公式アカウントにあります',
+          `${field}.reminderId`,
+        );
+      }
+    } else if (action.type === 'switch_rich_menu') {
+      const pageId = requiredString(
+        action.params.richMenuPageId ?? action.params.richMenuId,
+        `${field}.richMenuPageId`,
+        'リッチメニュー',
+      );
+      const page = await db.prepare(
+        `SELECT p.id FROM rich_menu_pages p
+          JOIN rich_menu_groups g ON g.id = p.group_id
+         WHERE p.id = ? AND g.account_id = ? AND g.status = 'published' LIMIT 1`,
+      ).bind(pageId, lineAccountId).first<{ id: string }>();
+      if (!page) {
+        throw new CommonActionValidationError(
+          'resource_not_found',
+          '公開済みのリッチメニューが見つからないか、別のLINE公式アカウントにあります',
+          `${field}.richMenuPageId`,
+        );
+      }
+    } else if (action.type === 'notify_staff') {
+      const ruleId = requiredString(
+        action.params.notificationRuleId,
+        `${field}.notificationRuleId`,
+        '担当者通知',
+      );
+      const rule = await db.prepare(
+        `SELECT id FROM notification_rules
+          WHERE id = ? AND line_account_id = ? AND is_active = 1 LIMIT 1`,
+      ).bind(ruleId, lineAccountId).first<{ id: string }>();
+      if (!rule) {
+        throw new CommonActionValidationError(
+          'resource_not_found', '担当者通知が見つからないか、別のLINE公式アカウントにあります',
+          `${field}.notificationRuleId`,
+        );
+      }
+      requiredString(action.params.message, `${field}.message`, '通知文');
+    } else if (action.type === 'grant_mileage') {
+      const amount = Number(action.params.amount);
+      if (!Number.isInteger(amount) || amount < 1 || amount > 1_000_000) {
+        throw new CommonActionValidationError(
+          'mileage_amount_invalid', '付けるマイルは1〜1000000の整数で指定してください',
+          `${field}.amount`,
+        );
+      }
+    }
+  }
+  return actions;
+}
+
 async function pinAndValidateReferences(
   db: D1Database,
   lineAccountId: string,

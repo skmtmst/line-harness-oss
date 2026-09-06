@@ -162,6 +162,28 @@ describe('V6 タグ定義と共通アクション連動', () => {
     expect(missing.status).toBe(404);
   });
 
+  it('別アカウントの連動先を下書きにも保存しない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('foreign-tag', '別店舗', 'account-2')`,
+    ).run();
+    const response = await app(testDb.db).request('/api/tags', json('POST', {
+      lineAccountId: 'account-1',
+      name: '範囲確認',
+      linkedEnabled: true,
+      mileage: { self: 0, referrer: 0, multiplier: null, priority: 0 },
+      automationDraft: {
+        actions: [{
+          id: 'foreign',
+          type: 'add_tag',
+          params: { tagId: 'foreign-tag' },
+          onFailure: 'stop',
+        }],
+      },
+    }));
+    expect(response.status).toBe(422);
+    expect(testDb.raw.prepare(`SELECT id FROM tags WHERE name = '範囲確認'`).get()).toBeUndefined();
+  });
+
   it('削除影響は明細・連動・マイル・版を同じrevisionで返す', async () => {
     const created = await app(testDb.db).request('/api/tags', json('POST', {
       lineAccountId: 'account-1',
@@ -206,4 +228,3 @@ describe('V6 タグ定義と共通アクション連動', () => {
     )).status).toBe(403);
   });
 });
-
