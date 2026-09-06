@@ -98,8 +98,16 @@ async function requireVisibleAccount(c: {
  */
 async function fetchQuota(
   token: string | undefined,
-): Promise<{ limit: number | null; used: number | null; failed: boolean }> {
-  if (!token) return { limit: null, used: null, failed: false };
+): Promise<{
+  limit: number | null;
+  used: number | null;
+  failed: boolean;
+  reason: 'not_connected' | 'fetch_failed' | null;
+  asOf: string | null;
+}> {
+  if (!token) {
+    return { limit: null, used: null, failed: false, reason: 'not_connected', asOf: null };
+  }
   try {
     const [quota, consumption] = await Promise.all([
       fetch('https://api.line.me/v2/bot/message/quota', {
@@ -111,17 +119,20 @@ async function fetchQuota(
         signal: AbortSignal.timeout(10_000),
       }),
     ]);
-    if (!quota.ok || !consumption.ok) return { limit: null, used: null, failed: true };
+    if (!quota.ok || !consumption.ok) {
+      return { limit: null, used: null, failed: true, reason: 'fetch_failed', asOf: null };
+    }
     // type が 'none' のときは上限なし。数字が入らないので null のままにする。
     const q = (await quota.json()) as { type?: string; value?: number };
     const c = (await consumption.json()) as { totalUsage?: number };
-    return {
-      limit: q.type === 'limited' && typeof q.value === 'number' ? q.value : null,
-      used: typeof c.totalUsage === 'number' ? c.totalUsage : null,
-      failed: false,
-    };
+    const limit = q.type === 'limited' && typeof q.value === 'number' ? q.value : null;
+    const used = typeof c.totalUsage === 'number' ? c.totalUsage : null;
+    if ((q.type !== 'limited' && q.type !== 'none') || used === null || (q.type === 'limited' && limit === null)) {
+      return { limit: null, used: null, failed: true, reason: 'fetch_failed', asOf: null };
+    }
+    return { limit, used, failed: false, reason: null, asOf: new Date().toISOString() };
   } catch {
-    return { limit: null, used: null, failed: true };
+    return { limit: null, used: null, failed: true, reason: 'fetch_failed', asOf: null };
   }
 }
 
@@ -143,7 +154,30 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     if (quota.failed) {
       overview.partialFailures.push('quota');
     }
-    overview.sections.quota.status = quota.failed ? 'unavailable' : 'ok';
+    const quotaAvailable = quota.reason === null;
+    overview.sections.quota.status = quotaAvailable ? 'ok' : 'unavailable';
+    overview.sections.quota.asOf = quota.asOf ?? overview.generatedAt;
+    overview.metrics.monthlyQuota = {
+      value: quotaAvailable ? {
+        used: quota.used,
+        limit: quota.limit,
+        remaining: quota.limit === null || quota.used === null
+          ? null
+          : Math.max(quota.limit - quota.used, 0),
+      } : null,
+      state: quotaAvailable ? 'available' : 'unavailable',
+      reason: quota.reason,
+      asOf: quota.asOf,
+      period: 'this-month',
+    };
+    const officialProfileUrl = selectedAccount.official_profile_url?.trim() || null;
+    overview.metrics.officialProfileUrl = {
+      value: officialProfileUrl,
+      state: officialProfileUrl ? 'available' : 'unavailable',
+      reason: officialProfileUrl ? null : 'not_connected',
+      asOf: officialProfileUrl ? selectedAccount.updated_at : null,
+      period: 'latest',
+    };
 
     return c.json({
       success: true as const,
@@ -172,17 +206,42 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
     if (quotaFailed) {
       overview.partialFailures.push('quota');
     }
-    overview.sections.quota.status = quotaFailed ? 'unavailable' : 'ok';
+    const quotaUnavailable = quotas.length === 0
+      || quotaFailed
+      || quotas.some((quota) => quota.reason !== null);
+    overview.sections.quota.status = quotaUnavailable ? 'unavailable' : 'ok';
     const everyLimitKnown = quotas.length > 0 && quotas.every((quota) => quota.limit !== null);
     const everyUsageKnown = quotas.length > 0 && quotas.every((quota) => quota.used !== null);
+    const quotaLimit = everyLimitKnown ? quotas.reduce((sum, quota) => sum + (quota.limit ?? 0), 0) : null;
+    const quotaUsed = everyUsageKnown ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0) : null;
+    overview.metrics.monthlyQuota = {
+      value: quotaUnavailable ? null : {
+        used: quotaUsed,
+        limit: quotaLimit,
+        remaining: quotaLimit === null || quotaUsed === null ? null : Math.max(quotaLimit - quotaUsed, 0),
+      },
+      state: quotaUnavailable ? 'unavailable' : 'available',
+      reason: quotaUnavailable
+        ? (quotas.some((quota) => quota.reason === 'fetch_failed') ? 'fetch_failed' : 'not_connected')
+        : null,
+      asOf: quotaUnavailable ? null : new Date().toISOString(),
+      period: 'this-month',
+    };
+    overview.metrics.officialProfileUrl = {
+      value: null,
+      state: 'unavailable',
+      reason: 'not_applicable',
+      asOf: null,
+      period: 'latest',
+    };
     return c.json({
       success: true as const,
       data: {
         ...overview,
         delivery: {
           ...overview.delivery,
-          quotaLimit: everyLimitKnown ? quotas.reduce((sum, quota) => sum + (quota.limit ?? 0), 0) : null,
-          quotaUsed: everyUsageKnown ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0) : null,
+          quotaLimit,
+          quotaUsed,
         },
       },
     });
