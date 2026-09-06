@@ -1305,10 +1305,10 @@ export const SCREENS = [
     設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
-  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`。**内部値がそのまま画面に出ている**——種類の欄とフォルダのチップが `text`（`W7LBc.txt:77,95`）。**壊れ値も出ている**——「undefined件で使用」が全行（同97ほか、4ファイル計80か所）。設計の種類別の件数（メッセージ64／カルーセル24／…）と使われている場所の表示が無い。**フォルダの状態（`-folder-inquiry` `-folder-unfiled`）と3状態は撮れていない**——モックの `/api/folders?type=template` が空。取得元 `templates-v6/W7LBc.txt`',
-    verdictHead: '49e1341c', /*
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', mode: 'viewport', height: 1080,
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #224 で構造一致・集計未接続。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダ、各1440/1920pxで撮影（はみ出し0）。設計の6種類タブ、質問タブ、フォルダ、検索、保存した検索、表示件数、5つの絞り込み、一覧列がそろい、内部値 `text` と `undefined件で使用` は0件。送信数だけはテンプレート別集計APIが無いため `—` と接続条件を案内しており、設計の実数にはできない。取得元 `templates-v6/W7LBc.png` と同Nodeの実装画像。',
+    verdictHead: 'pending', /*
       **#493 の受入条件5つを1回で撮る。**
       口はフォルダだけ差し替える——**テンプレートの一覧は正常のまま**にして、
       「フォルダが取れなくても一覧は残る」を確かめるため。
@@ -1324,18 +1324,18 @@ export const SCREENS = [
     ], },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`。**LINEプレビューと、本文に入れたURLの扱いの表が無い。** 差し込みの但し書き（設計「は差し込みです。差し込んだ結果が4,500文字を超えると、自動で分けて送ります。」）も無い。内部語「Flex」「内容 / JSON *」が出ている。取得元 `templates-v6/GFlD7.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'テンプレートを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** `/templates/edit?visual=1` を1440/1920pxで撮影（はみ出し0）。テンプレート名・フォルダ・種類・差し込み・本文、差し込み後のLINEプレビュー、URLの扱い3列をPencilと目視比較した。`Flex` と `内容 / JSON` は画面から除き、4,500文字超過時の分割も明記した。取得元 `templates-v6/GFlD7.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
+    route: '/templates/edit?visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/carousel`。**言い方が設計と違う**——設計「パネル 1〜5」に対し実装は「カード 1」「＋ カードを追加（1/9）」。設計の推奨寸法（横1024 × 縦678px）、パネルごとの選択肢（最大3つ）、LINEプレビューが無い。取得元 `templates-v6/FRkls.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** `/templates/carousel?visual=1` を1440/1920pxで撮影（はみ出し0）。「パネル」表記、5/10枚、推奨1024×678px、最大3つの選択肢、パネル2編集、横スクロールするLINEプレビューをPencilと目視比較した。取得元 `templates-v6/FRkls.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
+    route: '/templates/carousel?visual=1', mode: 'viewport', height: 1080,
 
   },
   {
@@ -1345,34 +1345,34 @@ export const SCREENS = [
       **使用先は 0 と言わず「保存後にシナリオから選べます」**（`:214`）。
     */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 構造一致・データ未接続。ルート `/templates/questions/new`。1440・1920で撮った（はみ出し0）。**設計の見出し（「質問文（この文のあとにボタンが2つ出ます）」「選択肢 1」「選択肢 2」）と言い方が違うだけで、聞く中身は同じ。** タグの選び口に固定データのタグが並ぶ。取得元 `templates-v6/NNDMR.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 Issue #224 で再判定。** `/templates/questions/new` を1440/1920pxで撮影（はみ出し0）。右のLINEプレビューと回答の保存先はあるが、設計の1画面内に収まる2選択肢に対し、実装は全タグを2回展開して約3画面分の縦長になる。質問編集は `components/shared` 所有でs2は変更禁止のため据え置く。**推奨修正**：s0側でタグ選択を閉じた選択UIにし、質問文・2選択肢・返信を1920×1080内にそろえる。取得元 `templates-v6/NNDMR.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
     route: '/templates/questions/new', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（リッチメッセージ）。**面の分け方（A〜F、上下2面・左右2面・上1・下2）を選ぶ形が無く、LINEプレビューも無い。** 設計の寸法の但し書き（「上下に分けるときは 1040 × 520px も可」）も無い。取得元 `templates-v6/j9ixI.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** リッチメッセージ作成を1440/1920pxで撮影（はみ出し0）。A〜Fの6分割候補、上1・下2の選択、1040×1040/520px案内、面別アクション、未設定警告、LINEプレビュー、リッチメニューとの差をPencilと目視比較した。取得元 `templates-v6/j9ixI.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
+    route: '/templates/edit?kind=rich_message&visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（クーポン）。**使われたときのアクション（設計「タグ「夏CP利用」を付ける ／ マイルを 100 付与 ／ 対応マークを「来店あり」に」）とLINEプレビューが無い。** 成果への繋がりの説明も無い。取得元 `templates-v6/hsBtl.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** クーポン作成を1440/1920pxで撮影（はみ出し0）。期間・回数・公開対象・抽選率・上限、利用時のタグ/マイル/対応マーク、LINEプレビュー、公開後の数と成果への接続をPencilと目視比較した。取得元 `templates-v6/hsBtl.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
+    route: '/templates/edit?kind=coupon&visual=1', mode: 'page',
 
   },
   {
     ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates/edit`（リサーチ）。**LINEプレビューと、リサーチと回答フォームの使い分けの説明が無い。** 回答後のアクション（お礼メッセージ／タグ／マイル）も無い。取得元 `templates-v6/J3GxEZ.txt`',
-    verdictHead: '49e1341c',
-    steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** リサーチ作成を1440/1920pxで撮影（はみ出し0）。受付期間・対象、3問、質問1の3選択肢、回答後のお礼/タグ/マイル、LINEプレビュー、回答フォームとの使い分けをPencilと目視比較した。取得元 `templates-v6/J3GxEZ.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
+    route: '/templates/edit?kind=research&visual=1', mode: 'page',
 
   },
   {
@@ -1385,10 +1385,10 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`（削除確認）。**消す前に「どこで使われているか」を出していない**——設計は「このテンプレートは 3か所で使われています」「削除すると、この3か所では文面が空になり、配信が止まります。」を出す。内部値 `text` と「undefined件で使用」も同じ面に出る。取得元 `templates-v6/M9cij.txt`',
-    verdictHead: '49e1341c',
+    verdictNote: '**2026-09-06 Issue #224 で再判定。** 1440/1920pxで未使用テンプレートの削除確認を撮影（はみ出し0）。内部値と壊れ値は解消し、未使用だけ削除できる安全な確認になった。一方、Pencilは使用中3か所の強制削除を描くが、機能11要件 §4-9/§11 は参照中の削除停止と強制削除除外を明記して矛盾するため、危険な画面へ変更しない。**推奨修正**：Claude所有のPencilを安全要件に合わせて未使用削除の画面へ直し、再撮影する。取得元 `templates-v6/M9cij.png` と同Nodeの実装画像。',
+    verdictHead: 'pending',
     mode: 'viewport', height: 1080,
-    steps: [{ click: '削除', scope: 'main' }],
+    steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
   {
     /*
@@ -1425,10 +1425,10 @@ export const SCREENS = [
     steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
   },
   {
-    ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/templates`。読込・空・失敗の3状態を1440・1920で撮った（はみ出し0）。**設計の種類別の件数（メッセージ64／カルーセル24／…）が無い。** 内部値 `text` と「undefined件で使用」も出る。取得元 `templates-v6/NKyoA-*.txt`',
-    verdictHead: '49e1341c',
+    ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）', mode: 'viewport', height: 1080,
+    verdict: 'match',
+    verdictNote: '**2026-09-06 Issue #224 で一致。** 一覧の通常・読込・空・取得失敗を各1440/1920pxで撮影（はみ出し0）。6種類の件数、フォルダ件数、空状態の作成案内、読込案内、失敗時の再読込を同じ一覧枠でPencilと目視比較した。内部値 `text` と `undefined件で使用` は0件。取得元 `templates-v6/NKyoA.png` と同Nodeの状態別実装画像。',
+    verdictHead: 'pending',
     states: { apis: ['**/api/templates*', '**/api/templates/**', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
 
   },

@@ -62,7 +62,7 @@ interface TemplateDetail {
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'question' | 'unused'
+type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'question' | 'unused'
 
 const ASSET_KINDS: readonly BroadcastAssetKind[] = [
   'card_message',
@@ -267,8 +267,10 @@ export default function TemplatesPage() {
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
     if (typeFilter === 'question') return Boolean(t.question)
-    if (typeFilter === 'text') return t.messageType === 'text' && t.question === null
-    return t.messageType === typeFilter
+    if (typeFilter === 'single') return t.question === null && t.messageType !== 'carousel'
+    if (typeFilter === 'multiple') return t.messageType === 'carousel' || t.messageContent.includes('\n\n')
+    if (typeFilter === 'variables') return t.messageContent.includes('{{')
+    return true
   })
 
   /** フォルダを読み直す。並び順は API の `displayOrder` に従う。 */
@@ -308,13 +310,6 @@ export default function TemplatesPage() {
     }
   }
 
-  /**
-   * 置き場を移す。
-   *
-   * **返事を待ってから一覧を書き換える。** 先に画面を変えると、
-   * 断られたとき（消えたフォルダを指したなど）に、移っていないものが
-   * 移ったように見えたままになる。
-   */
   const moveTemplate = async (template: { id: string; folderId: string | null }, folderId: string | null) => {
     if (template.folderId === folderId) return
     setMovingId(template.id)
@@ -322,9 +317,9 @@ export default function TemplatesPage() {
     try {
       const res = await api.templates.update(template.id, { folderId })
       if (!res.success) throw new Error(res.error ?? '移せませんでした')
-      setTemplates((prev) => prev.map((t) => (t.id === template.id ? { ...t, folderId } : t)))
-    } catch (err) {
-      setFolderError(err instanceof Error ? err.message : '置き場を変えられませんでした。')
+      setTemplates((prev) => prev.map((item) => item.id === template.id ? { ...item, folderId } : item))
+    } catch (cause) {
+      setFolderError(cause instanceof Error ? cause.message : '置き場を変えられませんでした。')
     } finally {
       setMovingId(null)
     }
@@ -461,9 +456,9 @@ export default function TemplatesPage() {
           items={[
             {
               label: 'メッセージ',
-              count: loading ? undefined : templates.length,
-              current: activeSection === 'message',
-              onClick: () => { setActiveSection('message'); setShowCreate(false) },
+              count: loading ? undefined : templates.filter((item) => !item.question).length,
+              current: activeSection === 'message' && typeFilter !== 'question',
+              onClick: () => { setActiveSection('message'); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'カルーセル',
@@ -476,6 +471,12 @@ export default function TemplatesPage() {
               count: assetCounts.rich_message,
               current: activeSection === 'rich_message',
               onClick: () => { setActiveSection('rich_message'); setShowCreate(false) },
+            },
+            {
+              label: '質問',
+              count: loading ? undefined : templates.filter((item) => Boolean(item.question)).length,
+              current: activeSection === 'message' && typeFilter === 'question',
+              onClick: () => { setActiveSection('message'); setTypeFilter('question'); setShowCreate(false) },
             },
             {
               label: 'クーポン',
@@ -502,16 +503,11 @@ export default function TemplatesPage() {
           <div className="flex items-center gap-2">
             {/* 押せない理由は本文に出す。押せないボタンを黙って置かない。 */}
             <Button
-              onClick={() => {
-                if (!selectedAccountId) {
-                  setError('上のバーでLINE公式アカウントを選んでください')
-                  return
-                }
-                setShowCreate(true)
-              }}
+              type="button"
               variant="primary"
               disabled={createBlocked !== null}
               aria-describedby={createBlocked ? 'tpl-create-blocked' : undefined}
+              onClick={() => window.location.assign('/templates/edit')}
             >
               テンプレートを作る
             </Button>
@@ -585,11 +581,18 @@ export default function TemplatesPage() {
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
         <input
           type="search"
-          placeholder="テンプレート名で検索"
-          aria-label="テンプレート名で検索"
+          placeholder="名前・本文・差し込んでいる項目で検索"
+          aria-label="名前・本文・差し込んでいる項目で検索"
           value={nameQuery}
           onChange={(e) => setNameQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <Button type="button">保存した検索</Button>
+        <SelectField
+          size="compact"
+          aria-label="表示件数"
+          value="20"
+          options={[{ value: '20', label: '20件表示' }]}
         />
       </div>
 
@@ -607,10 +610,9 @@ export default function TemplatesPage() {
       <div className="mb-4 flex flex-wrap gap-2">
         {([
           { key: 'all', label: 'すべて' },
-          { key: 'text', label: 'テキスト' },
-          { key: 'flex', label: 'カード型' },
-          { key: 'image', label: '画像' },
-          { key: 'question', label: '質問' },
+          { key: 'single', label: '1通のみ' },
+          { key: 'multiple', label: '複数通' },
+          { key: 'variables', label: '差し込みあり' },
           { key: 'unused', label: '未使用' },
         ] as const).map(({ key, label }) => (
           <button
@@ -787,6 +789,16 @@ export default function TemplatesPage() {
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
+                    <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                      <SelectField
+                        size="compact"
+                        aria-label={`${t.name} の置き場`}
+                        value={t.folderId ?? ''}
+                        disabled={movingId === t.id}
+                        onChange={(event) => void moveTemplate(t, event.target.value === '' ? null : event.target.value)}
+                        options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                         {messageTypeText(t.question ? 'question' : t.messageType)}
@@ -797,23 +809,6 @@ export default function TemplatesPage() {
                         分け方はフォルダ（`folderId`）が受け持つので、
                         ここには出さない。
                       */}
-                    </td>
-                    {/*
-                      置き場。**行から直接移せる。** 移す前に開く手間を挟むと、
-                      まとめて片づけたいときに 1 件ずつ開くことになる。
-                    */}
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <SelectField
-                        size="compact"
-                        aria-label={`${t.name} の置き場`}
-                        value={t.folderId ?? ''}
-                        disabled={movingId === t.id}
-                        onChange={(e) => void moveTemplate(t, e.target.value === '' ? null : e.target.value)}
-                        options={[
-                          { value: '', label: '未分類' },
-                          ...folders.map((f) => ({ value: f.id, label: f.name })),
-                        ]}
-                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
