@@ -2333,7 +2333,7 @@ export const SCREENS = [
       設計にはあるので、差として記録だけしておく。
     */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` で新規実装。** 既存の `GET /api/automation-runs` から4指標・検索・結果絞り込み・実行一覧を読み、通常・読込・空・失敗を区別する。1440px・1920pxの状態画像は横はみ出し0。通常状態の固定データは #264（実作業 #308 / PR #1051）へ依頼済みで列車待ち。安全な再実行API・実行詳細画面・CSV書き出しも未接続なので押せる操作を出さず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/DkPY0-error.txt + DkPY0-loading.txt + DkPY0-empty.txt', verdictHead: '380cd6631',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影。** PR #1051 の固定データを `GET /api/automation-runs` から読み、設計と同じ4指標・7行の通常表示、検索、結果絞り込み、読込・空・失敗を確認した。1440px・1920pxの全状態で横はみ出し0。安全な再実行API・実行詳細画面・CSV書き出しは未接続なので押せる操作を出さず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/DkPY0-normal.txt + DkPY0-loading.txt + DkPY0-empty.txt + DkPY0-error.txt', verdictHead: '380cd6631',
     route: '/automations/runs',
     states: {
       apis: ['**/api/automation-runs*'],
