@@ -1,4 +1,4 @@
-# 30-1 ログインユーザー
+# 30-1 ログインユーザー-normal
 # /staff?tab=members
 
 画

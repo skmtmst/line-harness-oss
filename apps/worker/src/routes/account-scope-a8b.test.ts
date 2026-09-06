@@ -53,8 +53,8 @@ describe('A-8b omitted account scope', () => {
 
     expect(response.status).toBe(200);
     expect(records).toHaveLength(1);
-    expect(records[0].sql).toContain('f.line_account_id IN (?,?)');
-    expect(records[0].binds).toEqual(['account-a', 'account-b', 100, 0]);
+    expect(records[0].sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(records[0].binds).toEqual(['["account-a","account-b"]', 100, 0]);
   });
 
   test('ref-summary applies the same scope and binds to the list and both totals', async () => {
