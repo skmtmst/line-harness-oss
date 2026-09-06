@@ -84,6 +84,16 @@ type DecisionEventRow = {
 
 export type MergedPersonActor = { id: string; name: string; tenantId: string };
 
+export type MergedPersonListItem = {
+  id: string;
+  status: MergedPersonStatus;
+  revision: number;
+  primaryDisplayName: string;
+  linkedFriendCount: number;
+  lineAccounts: Array<{ id: string; name: string }>;
+  updatedAt: string;
+};
+
 export class MergedPersonError extends Error {
   constructor(
     public readonly status: 400 | 403 | 404 | 409 | 422,
@@ -297,6 +307,67 @@ export async function mergedPersonAccountIds(
   await findUser(db, tenantId, id);
   const rows = await linkedRows(db, tenantId, id);
   return [...new Set(rows.map((row) => row.line_account_id))];
+}
+
+export async function listMergedPeople(
+  db: D1Database,
+  tenantId: string,
+  allowedAccountIds: string[],
+  limit: number,
+  offset: number,
+): Promise<{ items: MergedPersonListItem[]; total: number; limit: number; offset: number }> {
+  if (allowedAccountIds.length === 0) return { items: [], total: 0, limit, offset };
+  const result = await db.prepare(
+    `SELECT u.id, u.status, u.revision, u.primary_display_name, u.display_name,
+            u.updated_at, f.id AS friend_id, f.display_name AS friend_display_name,
+            f.line_account_id, la.name AS line_account_name
+       FROM users u
+       JOIN friends f ON f.user_id = u.id
+       JOIN line_accounts la ON la.id = f.line_account_id
+      WHERE COALESCE(la.tenant_id, '00000000-0000-4000-8000-000000000001') = ?
+        AND (u.tenant_id = ? OR u.tenant_id IS NULL)
+      ORDER BY u.updated_at DESC, u.id, f.id`,
+  ).bind(tenantId, tenantId).all<{
+    id: string;
+    status: MergedPersonStatus;
+    revision: number;
+    primary_display_name: string | null;
+    display_name: string | null;
+    updated_at: string;
+    friend_id: string;
+    friend_display_name: string | null;
+    line_account_id: string;
+    line_account_name: string;
+  }>();
+  const grouped = new Map<string, MergedPersonListItem & { accountIds: Set<string> }>();
+  for (const row of result.results) {
+    const current = grouped.get(row.id) ?? {
+      id: row.id,
+      status: row.status,
+      revision: Number(row.revision),
+      primaryDisplayName: row.primary_display_name || row.display_name
+        || row.friend_display_name || '統合ユーザー',
+      linkedFriendCount: 0,
+      lineAccounts: [],
+      updatedAt: row.updated_at,
+      accountIds: new Set<string>(),
+    };
+    current.linkedFriendCount += 1;
+    if (!current.accountIds.has(row.line_account_id)) {
+      current.accountIds.add(row.line_account_id);
+      current.lineAccounts.push({ id: row.line_account_id, name: row.line_account_name });
+    }
+    grouped.set(row.id, current);
+  }
+  const allowed = new Set(allowedAccountIds);
+  const visible = [...grouped.values()].filter((item) =>
+    [...item.accountIds].every((accountId) => allowed.has(accountId)));
+  return {
+    items: visible.slice(offset, offset + limit).map(({ accountIds: _accountIds, ...item }) => item),
+    total: visible.length,
+    limit,
+    offset,
+  };
 }
 
 export async function getMergedPerson(
@@ -556,4 +627,53 @@ export async function updateMergedPersonDeliveryPriorities(
   const results = await db.batch(statements);
   if (changes(results.at(-1)) !== 1) throw staleError();
   return getMergedPerson(db, actor.tenantId, id);
+}
+
+export async function unlinkMergedPersonFriend(
+  db: D1Database,
+  actor: MergedPersonActor,
+  id: string,
+  friendId: string,
+  request: { expectedRevision: number; reason: string },
+): Promise<{ personId: string; friendId: string; revision: number; unlinkedAt: string }> {
+  const user = await findUser(db, actor.tenantId, id);
+  if (user.revision !== request.expectedRevision) throw staleError();
+  const reason = safeText(request.reason, '解除理由', 3, 500);
+  const friend = await db.prepare(
+    `SELECT f.id, f.line_account_id
+       FROM friends f JOIN line_accounts la ON la.id = f.line_account_id
+      WHERE f.id = ? AND f.user_id = ?
+        AND COALESCE(la.tenant_id, '00000000-0000-4000-8000-000000000001') = ?`,
+  ).bind(friendId, id, actor.tenantId).first<{ id: string; line_account_id: string }>();
+  if (!friend) {
+    throw new MergedPersonError(404, 'PERSON_LINK_NOT_FOUND', '解除する友だちの結び付けが見つかりません');
+  }
+  const now = nowIso();
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE friend_identity_links
+          SET unlinked_by = ?, unlinked_at = ?, unlink_reason = ?
+        WHERE tenant_id = ? AND user_id = ? AND friend_id = ? AND unlinked_at IS NULL`,
+    ).bind(actor.id, now, reason, actor.tenantId, id, friendId),
+    db.prepare(
+      'UPDATE friends SET user_id = NULL, updated_at = ? WHERE id = ? AND user_id = ?',
+    ).bind(now, friendId, id),
+    db.prepare(
+      `INSERT INTO identity_events (
+        id, tenant_id, user_id, event_type, summary, before_json, after_json,
+        actor_staff_id, actor_name, occurred_at, correlation_id
+      ) VALUES (?, ?, ?, 'unlink', ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), actor.tenantId, id, '統合ユーザーから友だちを解除しました',
+      JSON.stringify({ friendId, lineAccountId: friend.line_account_id }),
+      JSON.stringify({ friendId, linked: false, reason }),
+      actor.id, actor.name, now, crypto.randomUUID(),
+    ),
+    db.prepare(
+      `UPDATE users SET revision = revision + 1, updated_at = ?
+        WHERE id = ? AND revision = ? AND (tenant_id = ? OR tenant_id IS NULL)`,
+    ).bind(now, id, user.revision, actor.tenantId),
+  ]);
+  if (changes(results.at(-1)) !== 1) throw staleError();
+  return { personId: id, friendId, revision: user.revision + 1, unlinkedAt: now };
 }

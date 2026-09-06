@@ -499,11 +499,18 @@ export type SavedSearchConditionKind =
   | "form"
   | "purchase"
   | "mark"
+  | "assignee"
   | "scenario"
+  | "event_booking"
+  | "calendar_booking"
   | "chat_status"
+  | "last_activity"
+  | "reminder"
+  | "memo"
   | "following"
   | "status_message"
-  | "created_at";
+  | "created_at"
+  | "common_event";
 
 /** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
 export interface SavedSearchCondition {

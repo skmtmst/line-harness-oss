@@ -17,10 +17,15 @@ import {
   jstNow,
   getTagAddedScenarioIds,
   getSavedSearchById,
+  getSavedSearches,
+  createSavedSearch,
+  countSavedSearches,
   recordSavedSearchUsage,
   validateSearchConditions,
+  SAVED_SEARCH_LIMIT,
 } from '@line-crm/db';
-import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
+import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess } from '@line-crm/db';
+import type { SavedSearchConditions } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
@@ -34,6 +39,7 @@ import {
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
 import { compileSavedSearch } from '../services/saved-search-filter.js';
+import { getSavedSearchMatchPreview } from '../services/saved-search-insights.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
 const friends = new Hono<Env>();
@@ -148,10 +154,145 @@ function serializeTag(row: DbTag) {
   };
 }
 
+async function friendSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.allowedAccountIds.includes(lineAccountId)) {
+    return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+  }
+  const staff = c.get('staff');
+  return {
+    lineAccountId,
+    staffId: staff.id,
+    canManageAll: staff.role === 'owner' || staff.role === 'admin',
+  };
+}
+
+async function serializeFriendSavedView(db: D1Database, row: SavedSearch) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.conditions_json);
+  } catch {
+    parsed = null;
+  }
+  const validated = validateSearchConditions(parsed);
+  const match = validated.ok && row.line_account_id
+    ? await getSavedSearchMatchPreview(db, validated.value, row.line_account_id)
+    : {
+        total: null,
+        byChannel: { line: null, mail: null },
+        calculatedAt: jstNow(),
+        error: validated.ok ? 'LINE公式アカウントを確認できません' : validated.error,
+      };
+  return {
+    id: row.id,
+    name: row.name,
+    conditions: parsed,
+    revision: Number(row.revision ?? 1),
+    isShared: Boolean(row.is_shared),
+    ownerId: row.created_by,
+    lineAccountId: row.line_account_id,
+    displayOrder: row.display_order,
+    match,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
+  };
+}
+
+// V6 機能3の正規URL。旧 /api/saved-searches は互換口として残す。
+friends.get('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await friendSavedViewAccess(c);
+    if (access instanceof Response) return access;
+    const id = c.req.query('id')?.trim();
+    if (id) {
+      const row = await getSavedSearchById(c.env.DB, id, access.lineAccountId);
+      if (!row || row.scope !== 'friends' || (row.condition_format ?? 'search_v1') !== 'search_v1'
+          || (!access.canManageAll && !row.is_shared && row.created_by !== access.staffId)) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      return c.json({ success: true, data: await serializeFriendSavedView(c.env.DB, row) });
+    }
+    const rows = await getSavedSearches(c.env.DB, 'friends', access, 'search_v1');
+    const items = await Promise.all(rows.map((row) => serializeFriendSavedView(c.env.DB, row)));
+    return c.json({ success: true, data: { items, total: items.length } });
+  } catch (error) {
+    console.error('GET /api/friends/saved-views error:', error);
+    return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
+  }
+});
+
+friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await friendSavedViewAccess(c);
+    if (access instanceof Response) return access;
+    const body = await c.req.json<Record<string, unknown>>();
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 40) {
+      return c.json({ success: false, error: '名前は1文字以上40文字以内で入力してください' }, 422);
+    }
+    if (body.isShared === true && !access.canManageAll) {
+      return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
+    }
+    const validated = validateSearchConditions(body.conditions);
+    if (!validated.ok) return c.json({ success: false, error: validated.error }, 422);
+    const compiled = compileSavedSearch(validated.value);
+    if (!compiled.ok) return c.json({ success: false, error: compiled.error }, 422);
+    const count = await countSavedSearches(c.env.DB, {
+      scope: 'friends',
+      conditionFormat: 'search_v1',
+      createdBy: access.staffId,
+      lineAccountId: access.lineAccountId,
+    });
+    if (count >= SAVED_SEARCH_LIMIT) {
+      return c.json({ success: false, error: `保存できる検索は${SAVED_SEARCH_LIMIT}件までです` }, 422);
+    }
+    const saved = await createSavedSearch(c.env.DB, {
+      name,
+      scope: 'friends',
+      conditionFormat: 'search_v1',
+      conditions: validated.value,
+      createdBy: access.staffId,
+      lineAccountId: access.lineAccountId,
+      isShared: body.isShared === true,
+    });
+    return c.json({ success: true, data: await serializeFriendSavedView(c.env.DB, saved) }, 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/unique/i.test(message)) {
+      return c.json({ success: false, error: '同じ名前の保存した検索があります' }, 409);
+    }
+    if (error instanceof SyntaxError) {
+      return c.json({ success: false, error: '送信内容のJSONが正しくありません' }, 400);
+    }
+    console.error('POST /api/friends/saved-views error:', error);
+    return c.json({ success: false, error: '保存した検索を作成できませんでした' }, 500);
+  }
+});
+
 // GET /api/friends - list with pagination
 friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = listLimit(c.req.query('limit'), 50);
+    const rawConditions = c.req.query('conditions');
+    let directConditions: SavedSearchConditions | undefined;
+    if (rawConditions) {
+      if (rawConditions.length > 16_000) {
+        return c.json({ success: false, error: '検索条件が大きすぎます' }, 422);
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawConditions);
+      } catch {
+        return c.json({ success: false, error: '検索条件のJSONが正しくありません' }, 422);
+      }
+      const validated = validateSearchConditions(parsed);
+      if (!validated.ok) return c.json({ success: false, error: validated.error }, 422);
+      directConditions = validated.value;
+    }
+    const limit = listLimit(c.req.query('limit'), directConditions?.list?.limit ?? 50);
     const offset = listOffset(c.req.query('offset'));
     const tagId = c.req.query('tagId');
     const lineAccountId = c.req.query('lineAccountId');
@@ -172,7 +313,8 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     // ?sort=oldest reverses default created_at DESC. Default = recent-first.
     // Search mode (when `search` is set) overrides both — we keep the
     // match-quality ranking and only flip the secondary `created_at` tier.
-    const sort: 'recent' | 'oldest' = c.req.query('sort') === 'oldest' ? 'oldest' : 'recent';
+    const requestedSort = c.req.query('sort') ?? directConditions?.list?.sort;
+    const sort: 'recent' | 'oldest' = requestedSort === 'oldest' ? 'oldest' : 'recent';
     // ?handled=unhandled filters to friends whose latest activity is an
     // incoming message (mirroring the L-step "未対応" tab). Done in SQL so
     // pagination + total counts are correct; client-side filter would only
@@ -194,6 +336,9 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       return c.json({ success: false, error: 'scoreMin and scoreMax must be integers with min <= max' }, 400);
     }
     const savedSearchId = c.req.query('savedSearchId');
+    if (savedSearchId && directConditions) {
+      return c.json({ success: false, error: '保存した検索と直接指定した条件は同時に使えません' }, 400);
+    }
 
     const db = c.env.DB;
     const staff = c.get('staff');
@@ -276,6 +421,12 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       conditions.push(compiled.value.sql);
       binds.push(...compiled.value.binds);
       appliedSavedSearchRevision = Number(row.revision ?? 1);
+    }
+    if (directConditions) {
+      const compiled = compileSavedSearch(directConditions);
+      if (!compiled.ok) return c.json({ success: false, error: compiled.error }, 422);
+      conditions.push(compiled.value.sql);
+      binds.push(...compiled.value.binds);
     }
     if (search) {
       conditions.push('f.display_name LIKE ?');
@@ -954,6 +1105,104 @@ friends.get('/api/friends/:id/messages', requireVisibleFriend, async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+friends.get(
+  '/api/friends/:id/timeline',
+  requireRole('owner', 'admin', 'staff'),
+  requireVisibleFriend,
+  async (c) => {
+    try {
+      const limitRaw = Number(c.req.query('limit') ?? 50);
+      const offsetRaw = Number(c.req.query('cursor') ?? 0);
+      if (!Number.isInteger(limitRaw) || limitRaw < 1 || limitRaw > 100
+          || !Number.isInteger(offsetRaw) || offsetRaw < 0) {
+        return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);
+      }
+      const friendId = c.req.param('id');
+      const result = await c.env.DB.prepare(
+        `SELECT timeline.id, timeline.event_type, timeline.summary,
+                timeline.source_kind, timeline.source_id, timeline.occurred_at,
+                timeline.line_account_id, la.name AS line_account_name
+           FROM (
+             SELECT ml.id,
+                    CASE WHEN ml.direction = 'incoming' THEN 'message_received' ELSE 'message_sent' END AS event_type,
+                    CASE WHEN ml.direction = 'incoming' THEN 'メッセージを受信しました' ELSE 'メッセージを送信しました' END AS summary,
+                    'message' AS source_kind, ml.id AS source_id, ml.created_at AS occurred_at,
+                    COALESCE(ml.line_account_id, f.line_account_id) AS line_account_id
+               FROM messages_log ml JOIN friends f ON f.id = ml.friend_id
+              WHERE ml.friend_id = ? AND (ml.delivery_type IS NULL OR ml.delivery_type != 'test')
+             UNION ALL
+             SELECT fs.id, 'form_submitted', '回答フォームへ回答しました',
+                    'form_submission', fs.id, fs.created_at, f.line_account_id
+               FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
+              WHERE fs.friend_id = ?
+             UNION ALL
+             SELECT b.id, 'booking', 'カレンダー予約が更新されました',
+                    'booking', b.id, COALESCE(b.updated_at, b.created_at), b.line_account_id
+               FROM bookings b WHERE b.friend_id = ?
+             UNION ALL
+             SELECT eb.id, 'event_booking', 'イベント予約が更新されました',
+                    'event_booking', eb.id, COALESCE(eb.updated_at, eb.requested_at), eb.line_account_id
+               FROM event_bookings eb WHERE eb.friend_id = ?
+             UNION ALL
+             SELECT fr.id, 'reminder', 'リマインダが更新されました',
+                    'friend_reminder', fr.id, COALESCE(fr.updated_at, fr.created_at), f.line_account_id
+               FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id
+              WHERE fr.friend_id = ?
+             UNION ALL
+             SELECT ie.id, ie.event_type, ie.summary,
+                    'identity_event', ie.id, ie.occurred_at, f.line_account_id
+               FROM identity_events ie JOIN friends f ON f.user_id = ie.user_id
+              WHERE f.id = ? AND ie.tenant_id = COALESCE(
+                (SELECT la2.tenant_id FROM line_accounts la2 WHERE la2.id = f.line_account_id),
+                '00000000-0000-4000-8000-000000000001'
+              )
+             UNION ALL
+             SELECT ae.id, ae.event_type, '共通イベントを記録しました',
+                    ae.source_kind, ae.source_id, ae.occurred_at, ae.line_account_id
+               FROM analytics_events ae WHERE ae.friend_id = ?
+           ) timeline
+           LEFT JOIN line_accounts la ON la.id = timeline.line_account_id
+          ORDER BY timeline.occurred_at DESC, timeline.id DESC
+          LIMIT ? OFFSET ?`,
+      ).bind(
+        friendId, friendId, friendId, friendId, friendId, friendId, friendId,
+        limitRaw + 1, offsetRaw,
+      ).all<{
+        id: string;
+        event_type: string;
+        summary: string;
+        source_kind: string;
+        source_id: string;
+        occurred_at: string;
+        line_account_id: string | null;
+        line_account_name: string | null;
+      }>();
+      const hasNextPage = result.results.length > limitRaw;
+      const items = result.results.slice(0, limitRaw).map((row) => ({
+        id: row.id,
+        type: row.event_type,
+        summary: row.summary,
+        source: { kind: row.source_kind, id: row.source_id },
+        occurredAt: row.occurred_at,
+        lineAccount: row.line_account_id
+          ? { id: row.line_account_id, name: row.line_account_name ?? null }
+          : null,
+      }));
+      return c.json({
+        success: true,
+        data: {
+          items,
+          limit: limitRaw,
+          nextCursor: hasNextPage ? String(offsetRaw + limitRaw) : null,
+        },
+      });
+    } catch (error) {
+      console.error('GET /api/friends/:id/timeline error:', error);
+      return c.json({ success: false, error: '友だちの履歴を読み込めませんでした' }, 500);
+    }
+  },
+);
 
 // POST /api/friends/:id/messages - send message to friend
 friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), requireIdempotencyKey, requireVisibleFriend, async (c) => {
