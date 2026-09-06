@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Trash2 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -14,6 +15,7 @@ import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SelectField from '@/components/shared/select-field'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -22,7 +24,7 @@ const statusConfig: Record<
   draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
   scheduled: { label: '予約済み', className: 'bg-info-bg text-info' },
   sending: { label: '送信中', className: 'bg-warning-bg text-warning' },
-  sent: { label: '送信完了', className: 'bg-success-bg text-success' },
+  sent: { label: '送信済み', className: 'bg-success-bg text-success' },
 }
 
 /**
@@ -36,9 +38,8 @@ function formatDatetime(iso: string | null): string {
   if (!iso) return '未設定'
   return new Date(iso).toLocaleString('ja-JP', {
     timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -56,8 +57,6 @@ function BroadcastsPageContent() {
   return <BroadcastList />
 }
 
-type BroadcastTab = 'single' | 'dedup' | 'all'
-
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
@@ -74,8 +73,7 @@ function BroadcastList() {
    * 同じ枠で「もう一度試す」を出すと、何度押しても直らない道へ誘う。
    */
   const [forbidden, setForbidden] = useState(false)
-  /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
-  const [scheduledOnly, setScheduledOnly] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'draft'>('all')
   const [showCreate, setShowCreate] = useState(false)
   const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
@@ -99,7 +97,6 @@ function BroadcastList() {
   const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
   /**
    * 削除の確認。ブラウザの `confirm()` は「この配信を削除してもよいですか？」
    * としか言えず、予約が取り消されることも、送った記録が残ることも読めない。
@@ -239,11 +236,11 @@ function BroadcastList() {
   // 全件タブは未フィルタ。サイドバー account context のフィルタは API 側で済んでる。
   const visibleBroadcasts = broadcasts.filter((b) => {
     // タイトルは手元で絞る。打つたびに取り直すと重い。
-    if (titleQuery.trim() && !b.title.toLowerCase().includes(titleQuery.trim().toLowerCase())) {
+    const query = titleQuery.trim().toLowerCase()
+    if (query && !`${b.title} ${b.messageContent}`.toLowerCase().includes(query)) {
       return false
     }
-    // まだ送っていない予約だけを見る。送る前に中身を直せるのはこれだけ。
-    if (scheduledOnly && b.status !== 'scheduled') return false
+    if (statusFilter !== 'all' && b.status !== statusFilter) return false
     if (folderFilter === UNFILED) {
       if (b.folderId) return false
     } else if (folderFilter && b.folderId !== folderFilter) {
@@ -258,9 +255,7 @@ function BroadcastList() {
       if (dateFrom && ymd < dateFrom) return false
       if (dateTo && ymd > dateTo) return false
     }
-    if (activeTab === 'all') return true
-    if (activeTab === 'dedup') return b.targetType === 'multi-account-dedup'
-    return b.targetType !== 'multi-account-dedup'
+    return true
   })
 
   return (
@@ -293,25 +288,10 @@ function BroadcastList() {
       <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          disabled
-          title="マニュアルは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-        >
-          マニュアル
-        </button>
-        <button
-          type="button"
           onClick={() => setFolderDialogOpen(true)}
           className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
         >
           フォルダを追加
-        </button>
-        <button
-          type="button"
-          onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-        >
-          テンプレートから配信
         </button>
         <button
           type="button"
@@ -361,23 +341,25 @@ function BroadcastList() {
 
             <div>
 
-          {/* 検索と並び順（設計 `Body` の上）。 */}
-          <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <input
               type="search"
-              placeholder="タイトルで検索"
-              aria-label="タイトルで検索"
+              placeholder="タイトル・内容で検索"
+              aria-label="タイトル・内容で検索"
               value={titleQuery}
               onChange={(e) => setTitleQuery(e.target.value)}
               className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-            {/*
-              **押しても何も起きない並び替えを出さない**（`v6-common-rules` §5-5
-              「動くまで描かない」）。一覧は配信日が新しい順に固定なので、
-              選べない選び口を置いても、いつ使えるようになるのか読めない。
-            */}
-            <span className="text-ink-faint text-xs whitespace-nowrap">配信日</span>
+            <button type="button" disabled title="保存した検索のAPI契約は未接続です" className="border-hairline rounded-control border px-3 py-2 text-sm font-semibold text-action disabled:opacity-50">保存した検索</button>
+            <SelectField aria-label="表示件数" defaultValue="20" size="compact" options={[{ value: '20', label: '20件表示' }]} />
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'scheduled' || undefined} onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}>✓ 予約中のみ</button>
+            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'draft' || undefined} onClick={() => setStatusFilter(statusFilter === 'draft' ? 'all' : 'draft')}>○ 下書き</button>
+            <button type="button" className="broadcast-filter-chip" disabled title="非表示状態は現在の契約にありません">○ 非表示</button>
+            <button type="button" className="broadcast-filter-chip" disabled title="開封率による絞り込みは未接続です">○ 開封率が低い</button>
+            <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
             <input
               type="date"
               value={dateFrom}
@@ -393,79 +375,9 @@ function BroadcastList() {
               aria-label="配信日（終了）"
               className="border-hairline rounded-control border px-2 py-2 text-sm"
             />
-            {(dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={() => { setDateFrom(''); setDateTo('') }}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm"
-              >
-                日付を外す
-              </button>
-            )}
-            <button
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-            >
-              保存した条件
-            </button>
+            <SelectField aria-label="並び順" defaultValue="newest" options={[{ value: 'newest', label: '配信日が新しい順' }]} />
+            {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
           </div>
-
-          {/*
-            よく使う絞り込み。数え方が決まっているのは「予約中のみ」だけ。
-            開封率の低さと今月分は、比べる相手や区切りを決める前に押せる
-            ようにすると、押した人ごとに違うものを想像する。
-          */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs">よく使う</span>
-            <button
-              onClick={() => setScheduledOnly((v) => !v)}
-              className={`rounded-pill px-3 py-1 text-xs transition-colors ${
-                scheduledOnly
-                  ? 'bg-accent-soft text-accent'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-              }`}
-            >
-              予約中のみ
-            </button>
-            {['開封率が低い', '今月分'].map((label) => (
-              <button
-                key={label}
-                disabled
-                title="この絞り込みはまだ数えられません"
-                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {!loading && broadcasts.length > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-ink-faint text-xs">送る範囲</span>
-              {([
-                { id: 'all', label: 'すべて' },
-                { id: 'single', label: '1つのアカウントだけに送る' },
-                { id: 'dedup', label: '複数アカウントで同じ人を2回数えない' },
-              ] as const).map((tab) => (
-                <label
-                  key={tab.id}
-                  className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${activeTab === tab.id ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}
-                >
-                  <input
-                    type="radio"
-                    name="broadcast-range"
-                    value={tab.id}
-                    checked={activeTab === tab.id}
-                    onChange={() => setActiveTab(tab.id)}
-                    className="sr-only"
-                  />
-                  <span className="inline-flex min-w-[20px] items-center justify-center">{tab.label}</span>
-                </label>
-              ))}
-              {activeTab === 'dedup' && <span className="text-xs text-ink-faint">同じ人が2つのアカウントの友だちでも、1回だけ送ります</span>}
-            </div>
-          )}
 
       {/* 読み込み失敗の帯。**権限不足のときは出さない**（下で別の1枚を出す）。 */}
       {error && !forbidden && (
@@ -519,7 +431,7 @@ function BroadcastList() {
       ) : visibleBroadcasts.length === 0 ? (
         <ListState
           kind="empty"
-          title={activeTab === 'dedup' ? '複数アカウントの重複除外配信はまだありません' : 'このタブに該当する配信はありません'}
+          title="条件に該当する配信はありません"
           description="絞り込みを変えるか、新しく作成してください。"
         />
       ) : (
@@ -670,9 +582,11 @@ function BroadcastList() {
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
                             onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}
-                            className="px-3 py-1 min-h-[44px] whitespace-nowrap text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
+                            className="rounded-control p-2 text-danger transition-colors hover:bg-danger-bg"
+                            aria-label={`${broadcast.title}を削除`}
+                            title="削除"
                           >
-                            削除
+                            <Trash2 size={16} aria-hidden="true" />
                           </button>
                         )}
                       </div>
@@ -728,6 +642,23 @@ function BroadcastList() {
           setDeleteError('')
         }}
       />
+      <style jsx global>{`
+        .broadcast-filter-chip {
+          min-height: 32px;
+          border: 1px solid var(--color-hairline);
+          border-radius: 999px;
+          background: var(--color-canvas);
+          padding: 0 12px;
+          color: var(--color-ink-secondary);
+          font-size: 12px;
+        }
+        .broadcast-filter-chip[data-active='true'] {
+          border-color: var(--color-accent);
+          background: var(--color-accent-soft);
+          color: var(--color-accent);
+        }
+        .broadcast-filter-chip:disabled { cursor: not-allowed; opacity: .5; }
+      `}</style>
     </div>
   )
 }

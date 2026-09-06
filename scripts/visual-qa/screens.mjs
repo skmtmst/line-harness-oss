@@ -701,10 +701,15 @@ export const SCREENS = [
     // 取得元：`broadcasts-v6/q76C35-1440.png`（`df3f4e3b`）
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** STEP 1だけを表示し、右のLINE案内3文と次段への操作を正本どおり追加。1440/1920pxで横はみ出し0。社内メモ・配信方法3択・最近の配信は保存契約が無く、まだ表示できないため要修正。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** 配信名・フォルダ・社内メモ、配信方法3択、実APIから読む最近の配信、設定要約とLINEプレビューを正本配置へ追加。社内メモと途中下書きを保存するAPI契約がないため、構造一致・データ未接続。設計画像なし（`zZ9fA.txt` と照合）。',
     verdictSource: 'broadcasts-v6/zZ9fA.txt + broadcasts-v6/zZ9fA-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: NEW_BC,
+    verdictHead: '4a69f0e4e', route: NEW_BC,
+    steps: [
+      { fill: 'input[placeholder="例：8月キャンペーンのお知らせ"]', selector: true, text: '8月キャンペーンのお知らせ' },
+      { fill: '社内メモ', text: '8月の売上目標に向けた告知。反応が薄ければ 8/28 に再送する。' },
+      { select: 'フォルダ', label: 'キャンペーン' },
+    ],
 
   },
   {
@@ -723,10 +728,10 @@ export const SCREENS = [
 
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=message` に編集面とLINEプレビューだけを表示し、1440/1920pxで横はみ出し0。ボタン最大4件・URL/PDF別の扱い・配信後アクションを保存する契約が無く、正本の編集面をまだ作れないため要修正。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** 9種の送信形式、差し込み、文字数、ボタン・URL・PDFの設定面、メッセージ追加、配信後アクション、LINEプレビューを正本配置へ追加。現在の配信保存APIはボタンと配信後アクションを受け取らないため、誤って保存できる表示にはせず構造一致・データ未接続。設計画像なし（`XQfMD.txt` と照合）。',
     verdictSource: 'broadcasts-v6/XQfMD.txt + broadcasts-v6/XQfMD-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=message&templateId=template-11`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message&templateId=template-11`,
 
   },
   {
@@ -736,11 +741,14 @@ export const SCREENS = [
       ここは `page` で撮って、開いた欄まで写す。
     */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** LINEプレビューと但し書きを追加し、実テンプレート一覧を1440/1920pxで撮影（横はみ出し0）。正本は選択内容・確認項目を持つ重なり窓だが、実装は編集面内の一覧のままで構造が違うため要修正。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** フォルダ・実テンプレート一覧と、選択後の確認事項を持つ重なり窓を正本どおり分離。撮影用固定データは正本のテンプレート名・利用回数を返さないため、構造一致・データ未接続。設計画像なし（`p97Tf.txt` と照合）。',
     verdictSource: 'broadcasts-v6/p97Tf.txt + broadcasts-v6/p97Tf-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=message`,
-    mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=message`,
+    mode: 'viewport', height: 1080, steps: [
+      { click: 'テンプレートから選ぶ' },
+      { click: '未分類のひな形 1', after: 700 },
+    ],
 
   },
   {
@@ -779,10 +787,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=confirm` と「LINEプレビュー確認済み」を追加し、チェック後を1440/1920pxで撮影（横はみ出し0）。正本の対象・日時・送信枠の4行要約に対し、未入力の直リンクではURL確認など別の行が残るため要修正。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** 対象・日時・テスト送信・送信枠・LINEプレビューの確認面と、実APIの事前確認を読む重なり窓を追加。月間送信枠の残数はAPIが返さないため、固定値を作らず構造一致・データ未接続。設計画像なし（`vW4Es.txt` と照合）。',
     verdictSource: 'broadcasts-v6/vW4Es.txt + broadcasts-v6/vW4Es-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=confirm&templateId=template-11`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=confirm&templateId=template-11`,
     /*
       **確かめました（2026-08-28）。実装は在ります。**
       置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
@@ -793,7 +801,8 @@ export const SCREENS = [
     */
     steps: [
       { wait: 1800 },
-      { click: 'LINEプレビュー確認済み', role: 'checkbox', after: 500 },
+      { click: 'LINEプレビューが未確認です', role: 'checkbox', after: 300 },
+      { click: '配信前チェックを確認', after: 700 },
     ],
 
   },
@@ -805,15 +814,14 @@ export const SCREENS = [
       `steps` で埋めてから撮る。
     */
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** 日時・テンプレートを入れたSTEP 5から、対象/除外/日時/内容/集計/未確認とLINEプレビューを持つ最終確認窓を1440/1920pxで撮影（横はみ出し0）。正本の設定要約が画面本体、実装は確認窓に集約されており構造差が残るため要修正。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** 最終確認を画面本体へ戻し、管理名・対象・日時・メッセージ・開封計測・配信後とLINEプレビューを正本配置へ追加。配信後アクションと途中下書きの保存APIがないため、固定値を作らず構造一致・データ未接続。設計画像なし（`FpgxH.txt` と照合）。',
     verdictSource: 'broadcasts-v6/FpgxH.txt + broadcasts-v6/FpgxH-{1440,1920}.png',
-    verdictHead: '3c6e4ec948',
+    verdictHead: '4a69f0e4e',
     route: `${NEW_BC}?step=confirm&templateId=template-11&scheduledDate=2026-08-27&scheduledTime=10%3A00`, mode: 'viewport', height: 1080,
     steps: [
       { wait: 1800 },
-      { click: '配信を予約する', scope: 'main' },
-      { wait: 900 },
+      { click: 'LINEプレビューが未確認です', role: 'checkbox', after: 300 },
     ],
   },
   {
@@ -823,10 +831,10 @@ export const SCREENS = [
       固定データの `broadcast-0` が予約済みなので、そこを見る。
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #247 再判定。** 5段の完了表示、管理名・配信対象・送信予定・状態の要約、右側の「次にできること」を実装した。予約内容の確認、予約中のテスト送信、設定を保った複製、確認窓を経た取消はいずれも実APIへ接続した。通常・取消確認を1440・1920で撮影し、別画面・画面エラー・横はみ出しは0。**残る設計差**：共通STEP帯は外枠付きで、設計のSlack通知は送信口が無いため表示していない。また設計の「配信内容を編集」は専用操作ではなく「予約内容を確認」から扱う。このため要修正のまま。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** 5段の完了帯、予約日時を含む完了文、4項目の要約、次にできる操作を正本配置へ調整。開始・完了・エラーをSlackへ通知するAPIがないため、その1文は虚偽表示せず構造一致・データ未接続。設計画像なし（`bPF0s.txt` と照合）。',
     verdictSource: 'broadcasts-v6/bPF0s.txt + broadcasts-v6/bPF0s-1440.png + broadcasts-v6/bPF0s-1920.png + broadcasts-v6/bPF0s-cancel-1440.png + broadcasts-v6/bPF0s-cancel-1920.png',
-    verdictHead: 'e9180c24a',
+    verdictHead: '4a69f0e4e',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -853,30 +861,20 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #219 / PR #979で再判定。** `?step=audience` で保存条件の呼出し・再保存を1440/1920px撮影し、横はみ出し0。正本の「条件1」、標準15軸/この画面だけの6軸の区別、AND/OR結合案内が編集本体に無いため要修正。',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** 条件編集を重なり窓へ分離し、現在条件・条件1・標準15軸・この画面だけの6軸・AND/OR案内を追加。既存APIが受け取れない条件軸は選択不能にして明記したため、構造一致・データ未接続。設計画像なし（`sqFXf.txt` と照合）。',
     verdictSource: 'broadcasts-v6/sqFXf.txt + broadcasts-v6/sqFXf-save.txt + broadcasts-v6/sqFXf{,-save}-{1440,1920}.png',
-    verdictHead: '3c6e4ec948', route: `${NEW_BC}?step=audience`,
+    verdictHead: '4a69f0e4e', route: `${NEW_BC}?step=audience`,
     /* 保存する窓と、呼び出す窓。**窓はビューポートで撮る。** */
     mode: 'viewport', height: 1080,
     steps: [
       { click: '詳細条件で絞り込んで配信する', role: 'radio', after: 700 },
-      { click: '保存した条件から選ぶ', after: 900 },
     ],
     variants: [{
       suffix: '-save', mode: 'viewport',
-      /*
-        **変種の手順は、上の `steps` の続きとして足される**（`capture-screens.mjs`
-        が `[...s.steps, ...variant.steps]` で繋ぐ）。ここで「詳細条件で…」を
-        もう一度書くと、**開いた窓の上から下のラジオを押すことになり**、
-        「見つかった数 1」のまま時間切れになる。続きだけを書く。
-      */
       steps: [
-        /*
-          **条件が揃うまで「この条件を保存」は押せない。**
-          空の欄を足しただけでは `pruneCondition` で落ちる。保存済みを
-          いったん読み込んで、**呼び出して保存し直す**道を通す。
-        */
+        { click: 'この条件を反映', after: 700 },
+        { click: '保存した条件から選ぶ', after: 900 },
         { click: 'この条件を使う', after: 900 },
         { click: 'この条件を保存', after: 900 },
       ],
@@ -885,10 +883,10 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 #247 再判定。** フォルダ追加と「…」内の名前変更・色変更・上下移動・削除を実APIへ接続し、一覧APIがフォルダ所属と開封計測設定を返すようにした。別LINEアカウントを指定した一覧取得は403で拒否する。画面は重複見出しを外し、KPI→作成操作→フォルダ・一覧の順へ合わせた。通常・追加窓・操作メニューを1440・1920で撮影し、メニュー切れ・画面エラー・横はみ出しは0。**残る設計差**：撮影用モックではKPIが未取得表示となる。設計に無いテンプレート操作が一覧上部にあり、絞り込み・ページ送り・一覧情報量にも差がある。このため要修正のまま。', route: '/broadcasts',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #298で再実装。** KPI、作成操作、フォルダ、検索・絞り込み、6列一覧を正本順へ調整し、設計にない上部テンプレート操作を除去。保存した検索とページ送りのAPIがないため、固定表示せず構造一致・データ未接続。設計画像なし（`xkRDb.txt` と照合）。', route: '/broadcasts',
     verdictSource: 'broadcasts-v6/xkRDb.txt + broadcasts-v6/xkRDb-1440.png + broadcasts-v6/xkRDb-1920.png + broadcasts-v6/xkRDb-add-1440.png + broadcasts-v6/xkRDb-add-1920.png',
-    verdictHead: 'e9180c24a',
+    verdictHead: '4a69f0e4e',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
