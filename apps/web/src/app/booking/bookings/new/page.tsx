@@ -512,7 +512,7 @@ export default function NewProxyBookingPage() {
                 <Summary label="Googleカレンダー" value={result.calendar_sync === 'synced' ? '反映済み' : result.calendar_sync === 'failed' ? '反映に失敗' : result.calendar_sync === 'pending' ? '確認中' : '未設定'} />
               </Card>
               <Card title="このあと自動で動くもの">
-                <NoticeRow title="いま LINE に案内を送りました" detail="開かれたかどうかは台帳から見られます" />
+                <NoticeRow title="いま LINE への案内処理を始めました" detail="送信結果と開封状況は台帳から確認します" />
                 {reminderScheduleLabels(date, time).map((label) => <NoticeRow key={label} title={`${label} にお知らせ`} detail="リマインダから自動で送ります" />)}
                 <Summary label="リマインダの時刻" value={reminderScheduleLabels(date, time).join(' ／ ') || '今後の送信予定はありません'} />
                 <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
