@@ -199,6 +199,24 @@ describe('V6受信箱の保存検索', () => {
     expect(invalid.status).toBe(422);
   });
 
+  test('よく使う検索は既存の並び順を使って先頭へ保存する', async () => {
+    const created = { ...saved('favorite', '毎朝見る', 'staff-1', 0), display_order: -1 };
+    mocks.createSavedSearch.mockResolvedValue(created);
+    const conditions = { ...JSON.parse(created.conditions_json), due: 'overdue' };
+    const response = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '毎朝見る', conditions, isFavorite: true }),
+    }, { DB: {} as D1Database } as Env['Bindings']);
+
+    expect(response.status).toBe(201);
+    expect(mocks.createSavedSearch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      displayOrder: -1,
+      conditions: expect.objectContaining({ due: 'overdue' }),
+    }));
+    expect(await response.json()).toMatchObject({ data: { isFavorite: true } });
+  });
+
   test('他人の個人検索と別アカウントIDは更新・削除できない', async () => {
     mocks.getSavedSearchById.mockResolvedValue(saved('private', '他人用', 'staff-2', 0));
     const patchResponse = await app().request('/api/inbox/saved-views/private?lineAccountId=account-1', {

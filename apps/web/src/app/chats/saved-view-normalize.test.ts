@@ -23,6 +23,7 @@ describe('古い形の保存した検索でも落ちない', () => {
     expect(conditions.assignees).toEqual([])
     expect(conditions.unread).toBe('all')
     expect(conditions.sort).toBe('newest')
+    expect(conditions.due).toBe('all')
   })
 
   it('null・undefined・文字列でも落ちない', () => {
@@ -44,6 +45,7 @@ describe('古い形の保存した検索でも落ちない', () => {
       receivedFrom: '2026-08-01',
       receivedTo: null,
       sort: 'waiting_desc',
+      due: 'overdue',
     })
     expect(conditions.query).toBe('ペット')
     expect(conditions.channels).toEqual(['line'])
@@ -51,6 +53,7 @@ describe('古い形の保存した検索でも落ちない', () => {
     expect(conditions.assignees).toEqual(['operator-kenta'])
     expect(conditions.unread).toBe('mine')
     expect(conditions.sort).toBe('waiting_desc')
+    expect(conditions.due).toBe('overdue')
   })
 
   it('知らない値は捨てる（そのまま画面へ流さない）', () => {
@@ -62,10 +65,12 @@ describe('古い形の保存した検索でも落ちない', () => {
       statuses: ['unread', 'archived'],
       channels: ['line', 'sms'],
       sort: 'oldest',
+      due: 'tomorrow',
     })
     expect(conditions.statuses).toEqual(['unread'])
     expect(conditions.channels).toEqual(['line'])
     expect(conditions.sort).toBe('newest')
+    expect(conditions.due).toBe('all')
   })
 
   it('画面は形をそろえてから読む', () => {
