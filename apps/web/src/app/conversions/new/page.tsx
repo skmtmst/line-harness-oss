@@ -58,6 +58,17 @@ interface ReportRow {
   totalValue: number
 }
 
+/**
+ * 既存の連携が保存した細かな出来事を、作成画面の3分類へ読み替える。
+ * 文字列が完全一致するものだけ数えると、実績があるのに「0件」と見えてしまう。
+ */
+function eventTypeGroup(eventType: string): string {
+  if (eventType === 'ec_order_confirmed') return 'purchase'
+  if (eventType === 'form_submitted') return 'form_submit'
+  if (eventType === 'reservation_confirmed' || eventType === 'webinar_completed') return 'visit'
+  return eventType
+}
+
 function past30DaysRange(): { startDate: string; endDate: string } {
   const end = new Date()
   end.setHours(23, 59, 59, 999)
@@ -95,7 +106,9 @@ export default function NewConversionPointPage() {
   }, [])
 
   const sameKind = useMemo(() => {
-    const ids = new Set(points.filter((p) => p.eventType === eventType).map((p) => p.id))
+    const ids = new Set(
+      points.filter((p) => eventTypeGroup(p.eventType) === eventType).map((p) => p.id),
+    )
     const rows = report.filter((r) => ids.has(r.conversionPointId))
     return {
       points: ids.size,
