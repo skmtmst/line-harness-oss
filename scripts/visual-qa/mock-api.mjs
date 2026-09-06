@@ -380,6 +380,94 @@ const FEATURES = Object.fromEntries(FEATURE_KEYS.map((k) => [k, true]))
 /** 分析の指標1つ。`state` と `reason` を持つのが契約。 */
 const METRIC = (value, state = 'available', reason = null) => ({ value, state, reason })
 
+/*
+  分析の後半3画面。空の器だけでは、行列・時系列ファネル・保存履歴を
+  設計画像と比較できない。固定時刻と架空の集計結果だけを返し、保存や
+  再集計そのものは行わない。
+*/
+const ANALYTICS_CROSS_RESULT = {
+  lineAccountId: 'visual-qa-account',
+  timeZone: 'Asia/Tokyo',
+  rowValues: [
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'store-qr', label: '店頭のQR' },
+    { key: 'referral', label: '紹介リンク' },
+    { key: 'meta', label: '広告（Meta）' },
+    { key: 'unknown', label: '分からない' },
+  ],
+  columnValues: [
+    { key: 'tagged', label: '付いている' },
+    { key: 'untagged', label: '付いていない' },
+  ],
+  cells: [
+    ['instagram', 'Instagram', 'tagged', '付いている', 86, 79],
+    ['instagram', 'Instagram', 'untagged', '付いていない', 318, 306],
+    ['store-qr', '店頭のQR', 'tagged', '付いている', 142, 104],
+    ['store-qr', '店頭のQR', 'untagged', '付いていない', 96, 91],
+    ['referral', '紹介リンク', 'tagged', '付いている', 54, 49],
+    ['referral', '紹介リンク', 'untagged', '付いていない', 171, 168],
+    ['meta', '広告（Meta）', 'tagged', '付いている', 31, 26],
+    ['meta', '広告（Meta）', 'untagged', '付いていない', 208, 201],
+    ['unknown', '分からない', 'tagged', '付いている', 12, 9],
+    ['unknown', '分からない', 'untagged', '付いていない', 286, 277],
+  ].map(([rowKey, rowLabel, columnKey, columnLabel, value, previousValue]) => ({
+    rowKey, rowLabel, columnKey, columnLabel, value, uniqueFriends: value,
+    totalRatio: value / 1404, previousValue, difference: value - previousValue,
+  })),
+  totalValue: 1404,
+  totalFriends: 1404,
+  previousTotalValue: 1310,
+  periodFrom: '2026-06-06T00:00:00.000Z',
+  periodTo: '2026-09-03T00:00:00.000Z',
+  previousPeriodFrom: '2026-03-08T00:00:00.000Z',
+  previousPeriodTo: '2026-06-05T23:59:59.999Z',
+  dataCutoffAt: '2026-09-03T02:40:00.000Z',
+  state: 'available',
+  stateReason: null,
+}
+
+const ANALYTICS_FUNNEL_RUN = {
+  runId: 'visual-funnel-run-1',
+  funnelId: 'visual-funnel-1',
+  versionId: 'visual-funnel-version-1',
+  versionNumber: 3,
+  lineAccountId: 'visual-qa-account',
+  cohortFrom: '2026-06-06T00:00:00.000Z',
+  cohortTo: '2026-09-03T00:00:00.000Z',
+  timeZone: 'Asia/Tokyo',
+  dataCutoffAt: '2026-09-03T02:40:00.000Z',
+  state: 'available',
+  stateReason: null,
+  groups: [{
+    key: 'all', label: 'すべての経路', entrants: 1404, completed: 96,
+    steps: [
+      { stepOrder: 1, label: '友だちになった', reached: 1404, conversionFromPrevious: null, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: '1回でも反応した', reached: 886, conversionFromPrevious: 0.631, droppedAfter: 518, inProgressAfter: 0, averageSecondsFromPrevious: 86400, medianSecondsFromPrevious: 72000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 412, conversionFromPrevious: 0.465, droppedAfter: 474, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 151200 },
+      { stepOrder: 4, label: '予約か購入をした', reached: 238, conversionFromPrevious: 0.578, droppedAfter: 174, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 5, label: 'くり返し買った', reached: 96, conversionFromPrevious: 0.403, droppedAfter: 142, inProgressAfter: 0, averageSecondsFromPrevious: 604800, medianSecondsFromPrevious: 518400 },
+    ],
+  }],
+}
+
+const ANALYTICS_SAVED = [
+  ['saved-1', '経路 × 体験申込', 'cross', '佐々木', 12, '2026-08-25T11:20:00+09:00'],
+  ['saved-2', '友だちになってからの5段', 'funnel', '佐々木', 9, '2026-08-25T09:40:00+09:00'],
+  ['saved-3', '広告ごとの費用対効果', 'cross', '田中', 6, '2026-08-24T18:05:00+09:00'],
+  ['saved-4', 'コラムの読まれ方', 'cross', '山口', 4, '2026-08-23T14:30:00+09:00'],
+  ['saved-5', 'タグ × 予約', 'cross', '田中', 21, '2026-08-12T10:15:00+09:00'],
+  ['saved-6', '旧・流入の内訳', 'cross', '佐々木', 3, '2026-07-28T16:40:00+09:00'],
+].map(([id, name, kind, createdByName, snapshotCount, updatedAt], index) => ({
+  id, name, kind, status: 'active', currentVersionNumber: index === 5 ? 1 : 2,
+  createdBy: `visual-owner-${index + 1}`, createdByName,
+  createdAt: '2026-06-01T09:00:00+09:00', updatedAt, snapshotCount,
+  latestSnapshot: {
+    id: `${id}-snapshot-latest`, state: index === 5 ? 'unavailable' : 'available',
+    periodFrom: '2026-08-05T00:00:00+09:00', periodTo: '2026-09-03T00:00:00+09:00',
+    dataCutoffAt: '2026-09-03T02:40:00.000Z', createdAt: updatedAt,
+  },
+}))
+
 const SHAPES = {
   '/api/public/brand': { name: '画面確認アカウント', iconUrl: null },
   /*
@@ -678,6 +766,9 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
+  if (method === 'POST' && pathname === '/api/analytics/cross/query') {
+    return { id: 'visual-cross-result-1', state: 'pending' }
+  }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
     return AUTO_REPLY_PUBLISH_TEST
   }
@@ -823,6 +914,49 @@ function reminderStepsOf(reminder) {
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+  }
+  if (pathname === '/api/analytics/cross/results/visual-cross-result-1') {
+    return {
+      success: true,
+      data: {
+        id: 'visual-cross-result-1', state: 'available', errorCode: null,
+        result: ANALYTICS_CROSS_RESULT, createdAt: '2026-09-03T02:40:00.000Z',
+      },
+    }
+  }
+  if (pathname === '/api/analytics/funnels') {
+    return {
+      success: true,
+      data: [{
+        id: 'visual-funnel-1', name: '友だちになってからの5段', windowDays: 30,
+        createdAt: '2026-06-01T09:00:00+09:00',
+        currentVersion: { id: 'visual-funnel-version-1', versionNumber: 3, createdAt: '2026-08-20T09:00:00+09:00' },
+        migrationState: 'ready',
+      }],
+    }
+  }
+  if (pathname === '/api/analytics/funnels/visual-funnel-1/runs/latest') {
+    return { success: true, data: ANALYTICS_FUNNEL_RUN }
+  }
+  if (pathname === '/api/analytics/saved') {
+    return { success: true, data: ANALYTICS_SAVED }
+  }
+  const savedSnapshots = /^\/api\/analytics\/saved\/([^/]+)\/snapshots$/.exec(pathname)
+  if (savedSnapshots) {
+    const saved = ANALYTICS_SAVED.find((item) => item.id === savedSnapshots[1])
+    return {
+      success: true,
+      data: saved ? [0, 1, 2].map((offset) => ({
+        id: `${saved.id}-snapshot-${offset + 1}`, savedAnalysisId: saved.id,
+        analysisVersionId: `${saved.id}-version-${saved.currentVersionNumber}`,
+        sourceKind: saved.kind, sourceResultId: `visual-result-${offset + 1}`,
+        periodFrom: `2026-0${Math.max(6, 8 - offset)}-05T00:00:00+09:00`,
+        periodTo: `2026-0${Math.max(7, 9 - offset)}-03T00:00:00+09:00`,
+        timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-03T02:40:00.000Z',
+        state: offset === 2 ? 'partial' : 'available', result: {},
+        createdBy: saved.createdBy, createdAt: saved.updatedAt,
+      })) : [],
+    }
   }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*
