@@ -49,6 +49,8 @@ export type AuditAction =
   | 'dashboard.preference.reset'
   | 'dashboard.preference.default.update'
   | 'conversion.approval.update'
+  | 'conversion.definition.usage.create'
+  | 'conversion.report.export'
   | 'ec.connector.update'
   | 'line_notification.definition.create'
   | 'line_notification.definition.update'

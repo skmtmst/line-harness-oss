@@ -21,6 +21,8 @@ export interface ConversionPoint {
   attribution_days: number | null;
   /** 集計対象を1アカウントに絞る場合。NULL なら全アカウント */
   line_account_id: string | null;
+  /** 画面からの更新・利用先追加で使う楽観ロック版。 */
+  version: number;
   status: 'active' | 'stopped';
   stopped_at: string | null;
   updated_at: string;
@@ -144,6 +146,7 @@ export async function updateConversionPoint(
   if ('attributionDays' in input) put('attribution_days', input.attributionDays ?? null);
   if ('lineAccountId' in input) put('line_account_id', input.lineAccountId ?? null);
   if (sets.length === 0) return getConversionPointById(db, id);
+  sets.push('version = version + 1');
   put('updated_at', jstNow());
   values.push(id);
   await db

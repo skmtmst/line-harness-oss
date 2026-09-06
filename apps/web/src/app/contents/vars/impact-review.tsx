@@ -30,6 +30,13 @@ export function impactBreakdown(impact: CommonVarChangeImpact): string {
 }
 
 export function urgentImpactCount(impact: CommonVarChangeImpact): number | null {
+  const connected = impact as CommonVarChangeImpact & {
+    scheduledUsageCount?: number
+    publishedUsageCount?: number
+  }
+  if (typeof connected.scheduledUsageCount === 'number' && typeof connected.publishedUsageCount === 'number') {
+    return connected.scheduledUsageCount + connected.publishedUsageCount
+  }
   const items = impact.items.filter((item) => item.changesOnSave)
   if (items.some((item) => item.status === '使われています')) return null
   return items.filter((item) => /予約中|公開中/.test(item.status)).length

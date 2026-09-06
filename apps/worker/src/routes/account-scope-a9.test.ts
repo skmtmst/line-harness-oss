@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createLink: vi.fn(), deleteLink: vi.fn(), getLink: vi.fn(), getLinks: vi.fn(), updateLink: vi.fn(),
   createPoint: vi.fn(), deletePoint: vi.fn(), getPoint: vi.fn(), getPoints: vi.fn(), updatePoint: vi.fn(),
   getEvents: vi.fn(), getReport: vi.fn(), getApprovals: vi.fn(), setApproval: vi.fn(), trackConversion: vi.fn(),
+  getDefinitionReport: vi.fn(),
   canAccess: vi.fn(), getScope: vi.fn(),
 }));
 
@@ -41,6 +42,12 @@ vi.mock('@line-crm/db', () => ({
   getConversionApprovalQueue: mocks.getApprovals,
   setConversionApproval: mocks.setApproval,
   getConversionApprovalNotifyInfo: vi.fn(), syncAffiliateConversionMileage: vi.fn(),
+  listConversionDefinitions: vi.fn(), getConversionDefinitionDetail: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
+  getConversionDefinitionReport: mocks.getDefinitionReport,
+  listConversionDefinitionsForExport: vi.fn(),
+  ConversionDefinitionError: class ConversionDefinitionError extends Error {},
+  CONVERSION_DEFINITION_USAGE_KINDS: [],
 }));
 
 const [{ broadcastMessageAssets }, { trackedLinks }, { conversions }] = await Promise.all([
@@ -95,6 +102,10 @@ beforeEach(() => {
   mocks.getReport.mockResolvedValue([
     { conversionPointId: 'own-point' }, { conversionPointId: 'other-point' },
   ]);
+  mocks.getDefinitionReport.mockResolvedValue({
+    kpis: { netCount: 1 }, daily: [],
+    byDefinition: [{ conversionPointId: 'own-point' }], byRoute: [],
+  });
   mocks.getApprovals.mockResolvedValue([{ eventId: 'own-event' }]);
   mocks.trackConversion.mockResolvedValue({
     id: 'event', conversion_point_id: 'own-point', friend_id: 'own-friend', user_id: null,

@@ -101,6 +101,78 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type CommonVarHistoryItem = {
+  id: string
+  version: number
+  name: string
+  value: string
+  memo: string
+  changeReason: string | null
+  actorId: string | null
+  createdAt: string
+}
+
+export type CommonVarDetail = CommonVar & {
+  memo: string
+  version: number
+  archivedAt: string | null
+  usages: CommonVarDeleteImpact['items']
+  usagePage: {
+    total: number
+    shown: number
+    hasMore: boolean
+    unavailableCount: number
+  }
+  history: CommonVarHistoryItem[]
+}
+
+export type CommonVarChangeImpactDetail = CommonVarChangeImpact & {
+  version: number
+  usageByKind: CommonVarChangeImpact['byKind']
+  scheduledUsageCount: number
+  publishedUsageCount: number
+  usageRevision: string
+}
+
+export type CommonVarReplacementCandidate = {
+  id: string
+  name: string
+  varKey: string
+  type: CommonVar['type']
+  value: string
+  version: number
+}
+
+export type CommonVarReplacementCandidates = {
+  source: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  candidates: CommonVarReplacementCandidate[]
+}
+
+export type CommonVarReplacementImpact = {
+  source: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  replacement: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  usageTotal: number
+  replaceableTotal: number
+  blockedTotal: number
+  historicalTotal: number
+  unscopedFormTotal: number
+  byKind: Record<string, number>
+  canReplace: boolean
+  revision: string
+  checkedAt: string
+}
+
+export type CommonVarReplacementResult = {
+  runId: string
+  replacedUsageCount: number
+  archivedVersion: number
+  sourceId: string
+  replacementId: string
+  remainingUsageCount: number | null
+  verification: 'verified' | 'partial' | 'unavailable'
+  completedAt: string
+}
+
 /**
  * タグを消したときに失われるもの（`GET /api/tags/:id/delete-impact`）。
  *
@@ -335,6 +407,57 @@ export type OperationIncident = {
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type OperationHealthCheckKey =
+  | 'line_connection'
+  | 'message_quota'
+  | 'external_integrations'
+  | 'webhook'
+  | 'dispatch_jobs'
+  | 'friend_change'
+
+export type OperationHealthResult = {
+  id: string
+  runId: string
+  checkKey: OperationHealthCheckKey
+  status: 'normal' | 'warning' | 'danger' | 'unknown'
+  summary: string
+  value: Record<string, unknown> | null
+  threshold: Record<string, unknown> | null
+  source: string
+  observedAt: string
+}
+
+export type OperationHealthSnapshot = {
+  latestRun: {
+    id: string
+    lineAccountId: string | null
+    source: 'scheduled' | 'manual'
+    status: 'running' | 'completed' | 'failed'
+    overallStatus: 'normal' | 'warning' | 'danger' | 'unknown'
+    startedAt: string
+    completedAt: string | null
+    results: OperationHealthResult[]
+  } | null
+  overallStatus: 'normal' | 'warning' | 'danger' | 'unknown' | 'stale'
+  lastCheckedAt: string | null
+  nextCheckAt: string | null
+  serverNow: string
+}
+
+export type OperationHistoryEntry = OperationIncident & {
+  historyKind?: 'incident' | 'deployment'
+  occurredAt?: string
+  deployment?: {
+    deploymentId: string
+    phase: 'queued' | 'deploying' | 'verifying' | 'succeeded' | 'failed' | 'rolled_back'
+    environment: string
+    version: string | null
+    pullRequest: number | null
+    actor: string
+    occurredAt: string
+  }
 }
 
 export type FormDeleteImpact = {
@@ -3999,6 +4122,10 @@ export const api = {
       fetchApi<ApiResponse<CommonVar[]>>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
       ),
+    detail: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarDetail>>(
+        `/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`,
+      ),
     create: (data: {
       accountId: string
       name: string
@@ -4012,7 +4139,14 @@ export const api = {
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, accountId: string, data: { name?: string; value?: string; folderId?: string | null }) =>
+    update: (id: string, accountId: string, data: {
+      name?: string
+      value?: string
+      memo?: string
+      folderId?: string | null
+      expectedVersion?: number
+      changeReason?: string
+    }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -4023,15 +4157,33 @@ export const api = {
       **`nextValue` を渡して問い合わせるだけで、値は保存されない。**
       口が `POST` なのは長い本文を投げるためで、書き換えではない。
     */
-    impactPreview: (id: string, accountId: string, nextValue: string) =>
-      fetchApi<ApiResponse<CommonVarChangeImpact>>(`/api/common-vars/${id}/impact-preview`, {
+    impactPreview: (id: string, accountId: string, nextValue: string, expectedVersion?: number) =>
+      fetchApi<ApiResponse<CommonVarChangeImpactDetail>>(`/api/common-vars/${id}/impact-preview`, {
         method: 'POST',
-        body: JSON.stringify({ accountId, nextValue }),
+        body: JSON.stringify({ accountId, nextValue, expectedVersion }),
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    replacementCandidates: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarReplacementCandidates>>(`/api/common-vars/${id}/replace`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
+    replacementImpact: (id: string, accountId: string, replacementId: string) =>
+      fetchApi<ApiResponse<CommonVarReplacementImpact>>(`/api/common-vars/${id}/replace`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, replacementId }),
+      }),
+    replace: (
+      id: string,
+      accountId: string,
+      input: { replacementId: string; expectedVersion: number; expectedRevision: string },
+    ) => fetchApi<ApiResponse<CommonVarReplacementResult>>(`/api/common-vars/${id}/replace`, {
+      method: 'POST',
+      body: JSON.stringify({ accountId, ...input, apply: true }),
+    }),
     schedules: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarSchedule[]>>(`/api/common-vars/${id}/schedules?accountId=${encodeURIComponent(accountId)}`),
     addSchedule: (id: string, accountId: string, data: { effectiveFrom: string; value: string }) =>
@@ -7278,6 +7430,20 @@ export const api = {
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
   /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
+    health: (accountId: string) =>
+      fetchApi<ApiResponse<OperationHealthSnapshot>>(
+        `/api/operations/health?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    runHealth: (accountId: string) =>
+      fetchApi<ApiResponse<OperationHealthSnapshot>>('/api/operations/health/runs', {
+        method: 'POST',
+        body: JSON.stringify({ lineAccountId: accountId }),
+      }),
+    stepUp: (code: string) =>
+      fetchApi<ApiResponse<{ token: string; purpose: 'operations.control'; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose: 'operations.control' }) },
+      ),
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
       return fetchApi<ApiResponse<{
@@ -7289,7 +7455,7 @@ export const api = {
       }>>(`/api/operations/control/preview${query}`)
     },
     history: (limit = 100) =>
-      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+      fetchApi<ApiResponse<OperationHistoryEntry[]>>(`/api/operations/history?limit=${limit}`),
     stop: (input: {
       lineAccountId: string | null
       capabilities: OperationCapability[]
@@ -7297,20 +7463,28 @@ export const api = {
       detail?: string | null
       confirmation: '停止'
       expectedVersion: number
-    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+    }, stepUpToken: string, idempotencyKey: string) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
       '/api/operations/incidents',
       {
         method: 'POST',
-        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        headers: {
+          'X-Confirm-Irreversible': 'operation-stop',
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify(input),
       },
     ),
-    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }, stepUpToken: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
         `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
         {
           method: 'POST',
-          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          headers: {
+            'X-Confirm-Irreversible': 'operation-restore',
+            'X-Step-Up-Token': stepUpToken,
+            'Idempotency-Key': idempotencyKey,
+          },
           body: JSON.stringify(input),
         },
       ),
