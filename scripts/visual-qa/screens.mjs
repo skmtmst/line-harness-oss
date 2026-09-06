@@ -2909,8 +2909,8 @@ export const SCREENS = [
     steps: [
       { fill: '表示名', text: '然-NEN- TEST' },
       { fill: '役割メモ（任意）', text: '検証用。本番の配信には使わない' },
-      { fill: 'チャネルID', text: '2007123456' },
-      { fill: 'チャネルシークレット', text: 'visual-channel-secret' },
+      { fill: 'input[placeholder="例：123456789"]', text: '2007123456', selector: true },
+      { fill: 'label:has-text("チャネルシークレット必須") input', text: 'visual-channel-secret', selector: true },
       { fill: 'チャネルアクセストークン', text: 'visual-channel-access-token' },
       { fill: 'LoginチャネルID', text: '2007999888' },
       { fill: 'Loginチャネルシークレット', text: 'visual-login-secret' },
