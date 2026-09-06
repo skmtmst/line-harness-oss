@@ -6,21 +6,24 @@ import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'reac
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
-import { api, type DashboardOverview } from '@/lib/api'
+import {
+  api,
+  type DashboardOverview,
+  type OperationCapability,
+  type OperationControl,
+  type OperationImpactPreview,
+  type OperationIncident,
+} from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
 import { apiCheckDetail } from './api-check-detail'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
-import type { OperationImpactPreview } from '@/lib/api'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
   { key: 'control', label: '緊急コントロール' },
   { key: 'history', label: '更新履歴' },
 ]
-
-const SNAPSHOT_KEY = 'nen_emergency_snapshot_v1'
-const OPERATION_HISTORY_KEY = 'nen_operation_history_v1'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -39,37 +42,6 @@ const IMPACT_KEY: Record<StopTarget, EmergencyStopTarget> = {
 }
 type ConfirmMode = 'stop' | 'restore' | null
 
-interface EmergencySnapshot {
-  id: string
-  stoppedAt: string
-  accountId: string | null
-  accountName: string
-  reason: string
-  broadcasts: Array<{ id: string; scheduledAt: string | null }>
-  scenarios: string[]
-  reminders: string[]
-  automations: string[]
-}
-
-interface OperationHistoryEntry {
-  id: string
-  occurredAt: string
-  kind: 'stop' | 'restore'
-  title: string
-  detail: string
-  status: 'success' | 'partial' | 'failed'
-}
-
-interface UpdateHistoryRow {
-  id: string
-  started_at: number
-  completed_at: number | null
-  from_version: string
-  to_version: string
-  status: string
-  error: string | null
-}
-
 type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
 
 interface HealthCheckItem {
@@ -78,15 +50,20 @@ interface HealthCheckItem {
   detail: string
   severity: OperationSeverity
   icon: string
+  description: string
+  threshold: string
+  href: string
 }
 
-const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon'>> = [
-  { id: 'line', label: 'LINE接続', icon: 'L' },
-  { id: 'quota', label: '月間配信数', icon: '↗' },
-  { id: 'api', label: 'API・外部連携', icon: '↔' },
-  { id: 'webhook', label: 'Webhook', icon: 'W' },
-  { id: 'delivery', label: '配信処理', icon: '▷' },
-  { id: 'friends', label: '友だち変化', icon: '人' },
+type HealthCheckResult = Pick<HealthCheckItem, 'id' | 'label' | 'detail' | 'severity' | 'icon'>
+
+const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | 'description' | 'threshold' | 'href'>> = [
+  { id: 'line', label: 'LINE接続', icon: 'L', description: 'LINEのアカウントとつながっているか', threshold: '応答がない状態が5分つづくと「エラー」', href: '/accounts' },
+  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEの上限に近づいていないか', threshold: '80%で「注意」・95%で「エラー」', href: '/broadcasts' },
+  { id: 'api', label: 'API・外部連携', icon: '↔', description: '管理画面とEC連携が動いているか', threshold: '応答なし・取り込み0件で「注意」', href: '/ec-commerce' },
+  { id: 'webhook', label: 'Webhook', icon: 'W', description: '合言葉が入り、送信が通っているか', threshold: '合言葉なしが1本でもあれば「注意」', href: '/webhooks' },
+  { id: 'delivery', label: '配信処理', icon: '▷', description: '予約した配信が時刻どおりに出ているか', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
+  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか', threshold: '1日で5%以上減ると「注意」', href: '/friends' },
 ]
 
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
@@ -94,29 +71,6 @@ const severityStyle: Record<OperationSeverity, { label: string; badge: string; p
   warning: { label: '注意', badge: 'bg-amber-100 text-amber-800', panel: 'border-amber-200 bg-amber-50' },
   danger: { label: 'エラー', badge: 'bg-red-100 text-red-700', panel: 'border-red-200 bg-red-50' },
   unknown: { label: '未確認', badge: 'bg-gray-100 text-gray-600', panel: 'border-gray-200 bg-gray-50' },
-}
-
-function readSnapshot(): EmergencySnapshot | null {
-  try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY)
-    return raw ? (JSON.parse(raw) as EmergencySnapshot) : null
-  } catch {
-    return null
-  }
-}
-
-function readOperationHistory(): OperationHistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(OPERATION_HISTORY_KEY)
-    return raw ? (JSON.parse(raw) as OperationHistoryEntry[]) : []
-  } catch {
-    return []
-  }
-}
-
-function addOperationHistory(entry: OperationHistoryEntry): void {
-  localStorage.setItem(OPERATION_HISTORY_KEY, JSON.stringify([entry, ...readOperationHistory()].slice(0, 100)))
-  window.dispatchEvent(new Event('nen-operation-history-updated'))
 }
 
 function StatusPill({ severity }: { severity: OperationSeverity }) {
@@ -206,7 +160,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         deliveryRequest,
       ])
 
-    const nextChecks: HealthCheckItem[] = []
+    const nextChecks: HealthCheckResult[] = []
 
     if (lineResult.status === 'fulfilled') {
       const { activeAccounts, health } = lineResult.value
@@ -316,7 +270,10 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
       nextChecks.push({ id: 'delivery', label: '配信処理', icon: '▷', severity: 'unknown', detail: '配信処理の状態を取得できませんでした' })
     }
 
-    setChecks(CHECK_DEFINITIONS.map((definition) => nextChecks.find((item) => item.id === definition.id) ?? { ...definition, detail: '確認できませんでした', severity: 'unknown' }))
+    setChecks(CHECK_DEFINITIONS.map((definition) => ({
+      ...definition,
+      ...(nextChecks.find((item) => item.id === definition.id) ?? { detail: '確認できませんでした', severity: 'unknown' as const }),
+    })))
     setLoading(false)
   }, [])
 
@@ -341,39 +298,54 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
 
   useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
+  const nextCheckedAt = checkedAt
+    ? new Date(Date.parse(checkedAt) + 5 * 60 * 1000).toISOString()
+    : null
+
   return (
     <div className="space-y-4" data-design="V3 Health">
-      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-gray-900">{resultTitle}</p>
-          <p className="mt-0.5 text-xs text-gray-600">{loading ? '確認しています…' : resultDescription}</p>
-        </div>
-      </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
       </div>
+      <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">
+        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。赤が出たら「緊急コントロール」で止められます。
+      </div>
+      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold text-gray-900">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
+          <p className="mt-0.5 text-xs text-gray-600">
+            {loading ? '最新の状態を読み込んでいます。' : `${resultDescription} 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}
+          </p>
+        </div>
+        <Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急コントロールへ</Link>
+      </div>
       <section className="border-hairline rounded-card overflow-hidden border bg-white">
         <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">6項目を常に表示し、確認内容と最新結果を示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
+        <div className="hidden grid-cols-[1.35fr_88px_1.15fr_1.1fr_104px_88px] gap-3 bg-gray-50 px-4 py-3 text-[11px] font-bold text-gray-500 lg:grid">
+          <span>確認する項目</span><span>結果</span><span>いまの数字</span><span>目安</span><span>最後の確認</span><span>操作</span>
+        </div>
         <div className="divide-y divide-gray-100">
           {checks.map((check) => {
             const style = severityStyle[check.severity]
             const iconClass = check.severity === 'normal' ? 'bg-emerald-100 text-emerald-700' : check.severity === 'warning' ? 'bg-amber-100 text-amber-800' : check.severity === 'danger' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
             return (
-              <div key={check.id} className={`flex items-center gap-3 px-4 py-4 ${check.severity === 'normal' ? 'bg-emerald-50/50' : style.panel}`}>
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${iconClass}`}>{check.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-gray-900">{check.label}</p>
-                  <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
+              <div key={check.id} className={`grid gap-3 px-4 py-4 lg:grid-cols-[1.35fr_88px_1.15fr_1.1fr_104px_88px] lg:items-center ${check.severity === 'normal' ? 'bg-white' : style.panel}`}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${iconClass}`}>{check.icon}</span>
+                  <div className="min-w-0"><p className="text-sm font-bold text-gray-900">{check.label}</p><p className="mt-1 text-xs text-gray-600">{check.description}</p></div>
                 </div>
                 <StatusPill severity={check.severity} />
+                <p className="text-xs leading-relaxed text-gray-700">{check.detail}</p>
+                <p className="text-xs leading-relaxed text-gray-600">{check.threshold}</p>
+                <p className="text-xs text-gray-600">{formatOperationDate(checkedAt)}</p>
+                <Link href={check.href} className="rounded-control border-hairline inline-flex min-h-9 items-center justify-center border bg-white px-3 text-xs font-bold text-gray-700 hover:bg-gray-50">中身を見る</Link>
               </div>
             )
           })}
         </div>
-        {!isNormal && <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"><p className="text-xs text-gray-600">配信予定を確認し、必要な場合だけ配信を停止してください。</p><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止を確認</Link></div>}
       </section>
     </div>
   )

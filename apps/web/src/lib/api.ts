@@ -184,6 +184,37 @@ export type OperationControl = {
   updatedAt: string | null
 }
 
+export type OperationControlSnapshot = {
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  capturedAt: string
+}
+
+export type OperationIncident = {
+  id: string
+  scopeKey: string
+  lineAccountId: string | null
+  status: 'preparing' | 'stopped' | 'resolved' | 'failed'
+  capabilities: OperationCapability[]
+  reason: string
+  detail: string | null
+  actorId: string
+  resolvedByActorId: string | null
+  controlVersion: number | null
+  beforeSnapshot: OperationControlSnapshot
+  stoppedSnapshot: OperationControlSnapshot | null
+  restoredSnapshot: OperationControlSnapshot | null
+  errorMessage: string | null
+  stoppedAt: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type FormDeleteImpact = {
   form: {
     id: string
@@ -5923,6 +5954,32 @@ export const api = {
         calculatedAt: string
       }>>(`/api/operations/control/preview${query}`)
     },
+    history: (limit = 100) =>
+      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+    stop: (input: {
+      lineAccountId: string | null
+      capabilities: OperationCapability[]
+      reason: string
+      detail?: string | null
+      confirmation: '停止'
+      expectedVersion: number
+    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      '/api/operations/incidents',
+      {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        body: JSON.stringify(input),
+      },
+    ),
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+        `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          body: JSON.stringify(input),
+        },
+      ),
   },
   adPlatforms: {
     list: () =>
