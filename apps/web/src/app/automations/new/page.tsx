@@ -242,18 +242,38 @@ export default function NewAutomationPage() {
         />
       </div>
 
+      <div className={styles.summaryBar} aria-label="いまの決めごと">
+        <SummaryStep number={1} label="きっかけ" value={selectedEvent.label} />
+        <SummaryStep number={2} label="だれに" value={targetSummary} />
+        <SummaryStep number={3} label="すること" value={actionSummary || '処理を選んでください'} active />
+      </div>
+
       <div data-design="Body" className={styles.body}>
         <div data-design="Left" className={styles.stack}>
           <Step
             step={1}
             done={Boolean(name.trim())}
-            title="どのルールか"
-            note="一覧に表示される名前です。"
+            title="どんなときに動かしますか"
+            note="実際につながっているきっかけだけを選べます。"
           >
-            <label className={styles.label} htmlFor="au-name">
-              ルール名<span className={styles.required}>必須</span>
-            </label>
-            <div className={styles.field}>
+            <div className={styles.eventCards}>
+              {EVENTS.map((event) => (
+                <button
+                  key={event.value}
+                  type="button"
+                  className={`${styles.eventCard} ${eventType === event.value ? styles.eventCardSelected : ''}`}
+                  onClick={() => setEventType(event.value)}
+                >
+                  <span className={styles.eventCardTitle}>{event.label}</span>
+                  <span className={styles.eventCardNote}>{event.note}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.nameRow}>
+              <label className={styles.label} htmlFor="au-name">
+                名前（あとで見分けるため）<span className={styles.required}>必須</span>
+              </label>
               <TextField
                 id="au-name"
                 value={name}
@@ -267,23 +287,9 @@ export default function NewAutomationPage() {
           <Step
             step={2}
             done
-            title="何が起きたら動かすか"
-            note="ここで選んだ出来事が起きた人だけが対象になります。"
+            title="だれに動かしますか"
+            note="条件を付けないと、きっかけに当てはまった人全員に動きます。"
           >
-            <label className={styles.label} htmlFor="au-event">
-              きっかけ<span className={styles.required}>必須</span>
-            </label>
-            <div className={styles.field}>
-              <SelectField
-                id="au-event"
-                value={eventType}
-                onChange={(event) => setEventType(event.target.value)}
-                options={EVENTS.map((event) => ({ value: event.value, label: event.label }))}
-                className={styles.select}
-              />
-              <p className={styles.note}>{selectedEvent.note}</p>
-            </div>
-
             {usesKeyword ? (
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="au-keyword">
@@ -301,9 +307,11 @@ export default function NewAutomationPage() {
                 </div>
               </div>
             ) : null}
-            <p>
-              条件を足す（15の軸から選べます）: 共通の条件編集を接続後に利用できます。現在は上の条件だけで動きます。
-            </p>
+            <div className={styles.conditionRow}>
+              {usesKeyword && keyword.trim() ? <span className={styles.conditionChip}>「{keyword.trim()}」を含む</span> : <span className={styles.conditionChip}>条件なし</span>}
+              <button type="button" disabled className={styles.conditionAdd}>条件を足す（15の軸から選べます）</button>
+            </div>
+            <p className={styles.targetCount}>いまの条件に当てはまる友だち　—（見込み人数の集計は未接続）</p>
           </Step>
 
           <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
@@ -324,6 +332,7 @@ export default function NewAutomationPage() {
                     </button>
                   </div>
 
+                  <div className={styles.actionFields}>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor={`au-action-${row.key}`}>
                       すること<span className={styles.required}>必須</span>
@@ -385,6 +394,7 @@ export default function NewAutomationPage() {
                       </div>
                     </div>
                   )}
+                  </div>
                   <p>
                     失敗したとき: 現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
                   </p>
@@ -530,5 +540,14 @@ function Step({
       </div>
       <div className={styles.field}>{children}</div>
     </section>
+  )
+}
+
+function SummaryStep({ number, label, value, active = false }: { number: number; label: string; value: string; active?: boolean }) {
+  return (
+    <div className={styles.summaryStep}>
+      <span className={`${styles.stepBadge} ${active ? '' : styles.stepBadgeIdle}`}>{number}</span>
+      <span className={styles.summaryText}><small>{label}</small><strong title={value}>{value}</strong></span>
+    </div>
   )
 }

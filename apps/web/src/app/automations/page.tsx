@@ -4,13 +4,13 @@ import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import ListState from '@/components/shared/list-state'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -113,6 +113,25 @@ const initialForm: CreateFormState = {
   priority: 0,
 }
 
+function actionLabel(action: AutomationAction): string {
+  const labels: Record<AutomationAction['type'], string> = {
+    add_tag: 'タグを付ける',
+    remove_tag: 'タグを外す',
+    start_scenario: 'シナリオを始める',
+    send_message: 'メッセージを送る',
+    send_webhook: '外部連携に知らせる',
+    switch_rich_menu: 'リッチメニューを切り替える',
+  }
+  return labels[action.type]
+}
+
+function conditionLabel(conditions: Record<string, unknown>): string {
+  const keyword = typeof conditions.keyword === 'string' ? conditions.keyword.trim() : ''
+  if (keyword) return `「${keyword}」を含む人`
+  if (Object.keys(conditions).length === 0) return '条件なし'
+  return '登録した条件'
+}
+
 /*
   設計 `gief7` のタブ帯。**「見本」は別の画面ではなく、同じ帯の中の1本。**
   台帳の `WjYAC`（25-1-C 見本から作る）は `/automations?tab=templates` を指しているが、
@@ -129,6 +148,7 @@ const MERGED_TABS = [
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
+  usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
@@ -152,6 +172,9 @@ export default function AutomationsPage() {
   const [estimatedHoursSaved, setEstimatedHoursSaved] = useState<number | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
+  const [sortOrder, setSortOrder] = useState<'priority' | 'name'>('priority')
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
   const accountChanged = pending !== null && pending.accountId !== selectedAccountId
   const loadRequestRef = useRef(0)
@@ -329,11 +352,37 @@ export default function AutomationsPage() {
               : item.label,
     }))
     return (
-      <div>
+      <div data-design-node="WjYAC">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
+          <Button href="/automations/new">はじめから作る</Button>
+        </div>
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
         </div>
+        <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
+          見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。
+        </div>
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
+        <style jsx global>{`
+          [data-design-node="WjYAC"] [aria-label="きっかけで絞り込む"] { display: none; }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] > div:first-child {
+            display: none;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article:nth-of-type(n + 10) {
+            display: none;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article {
+            padding: 16px;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article p {
+            display: none;
+          }
+          [data-design-node="WjYAC"] [data-automation-template-gallery="v6"] article button {
+            width: auto;
+            margin-left: auto;
+          }
+        `}</style>
       </div>
     )
   }
@@ -352,26 +401,34 @@ export default function AutomationsPage() {
             ? `共通アクション ${commonActionCount ?? '—'}`
             : item.label,
   }))
-  const visibleAutomations = automations.filter((item) => tab === 'stopped' ? !item.isActive : item.isActive)
+  const visibleAutomations = (() => {
+    const requestedStatus = tab === 'stopped' ? 'stopped' : statusFilter
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase('ja')
+    return automations
+      .filter((item) => requestedStatus === 'all' || (requestedStatus === 'active' ? item.isActive : !item.isActive))
+      .filter((item) => {
+        if (!normalizedQuery) return true
+        const actions = item.actions.map((action) => actionLabel(action)).join(' ')
+        return `${item.name} ${item.description ?? ''} ${eventTypeLabelMap[item.eventType]} ${actions}`
+          .toLocaleLowerCase('ja')
+          .includes(normalizedQuery)
+      })
+      .sort((a, b) => sortOrder === 'name'
+        ? a.name.localeCompare(b.name, 'ja')
+        : a.priority - b.priority || a.name.localeCompare(b.name, 'ja'))
+  })()
 
   return (
     <div>
       <div className="mb-4">
         <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
-      <div data-design="Head">
-        <Header
-          title="オートメーション"
-          description="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button href="/common-actions">共通アクションを見る</Button>
-              <Button href="/automations?tab=templates">見本から作る</Button>
-              <Button href="/automations/new" variant="primary">ルールを作成</Button>
-              <Button href="/support">マニュアル</Button>
-            </div>
-          }
-        />
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
+        <div className="flex flex-wrap gap-2">
+          <Button href="/automations?tab=templates">見本から作る</Button>
+          <Button href="/automations/new" variant="primary">ルールを作成</Button>
+        </div>
       </div>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -384,7 +441,7 @@ export default function AutomationsPage() {
           <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
+          <p className="text-ink-faint text-xs">この30日に動いた</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
@@ -394,11 +451,65 @@ export default function AutomationsPage() {
           <p className="text-ink-faint mt-0.5 text-xs">未接続: 失敗回数の集計口が必要です</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">手動実行・減らせた手作業</p>
+          <p className="text-ink-faint text-xs">減らせた手作業</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </div>
+
+      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
+        上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="名前・きっかけ・することで検索"
+          className="h-10 w-full max-w-[460px] rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
+        />
+        <div className="flex gap-2">
+          <SelectField
+            aria-label="表示期間"
+            value="30"
+            onChange={() => undefined}
+            options={[{ value: '30', label: 'この30日' }]}
+            className="h-10 min-w-32"
+          />
+          <SelectField
+            aria-label="並び順"
+            value={sortOrder}
+            onChange={(event) => setSortOrder(event.target.value as 'priority' | 'name')}
+            options={[
+              { value: 'priority', label: '動く順' },
+              { value: 'name', label: '名前順' },
+            ]}
+            className="h-10 min-w-36"
+          />
+        </div>
+      </div>
+
+      {tab !== 'stopped' ? (
+        <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
+          {([
+            ['all', `すべて ${automations.length}`],
+            ['active', `動いている ${activeCount ?? '—'}`],
+            ['stopped', `止めている ${stoppedCount ?? '—'}`],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              className={`h-9 rounded-full border px-4 text-sm font-semibold ${statusFilter === value ? 'border-accent bg-success-bg text-accent-deep' : 'border-hairline bg-canvas text-ink-secondary'}`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint" title="オートメーション別の失敗集計は未接続です">失敗あり —</span>
+          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint" title="最終実行日時は未接続です">30日 動いていない —</span>
+        </div>
+      ) : null}
 
       {/* Error */}
       {error && (
@@ -504,91 +615,37 @@ export default function AutomationsPage() {
       ) : visibleAutomations.length === 0 && !showCreate ? (
         <ListState
           kind="empty"
-          title={tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。'}
-          description="きっかけ・だれに・することの3つを決めると動きます。"
+          title={automations.length === 0
+            ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
+            : '条件に合うオートメーションはありません。'}
+          description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
           action={tab === 'active' ? <Button href="/automations/new" variant="primary">オートメーションをつくる</Button> : undefined}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {visibleAutomations.map((automation) => (
-            <div
-              key={automation.id}
-              className="bg-canvas rounded-card border border-hairline p-5 hover:shadow-md transition-shadow"
-            >
-              {/* Header row */}
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="text-sm font-semibold text-ink leading-tight">{automation.name}</h3>
-                <button
-                  onClick={() => void handleToggleActive(automation)}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    automation.isActive ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
-                  title={automation.isActive ? '有効 - クリックで無効化' : '無効 - クリックで有効化'}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      automation.isActive ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+          <div className="grid grid-cols-[minmax(180px,1.35fr)_minmax(150px,1fr)_minmax(200px,1.35fr)_100px_118px_184px] gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
+            <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
+          </div>
+          {visibleAutomations.slice(0, 6).map((automation) => (
+            <div key={automation.id} className="grid min-h-[58px] grid-cols-[minmax(180px,1.35fr)_minmax(150px,1fr)_minmax(200px,1.35fr)_100px_118px_184px] items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink" title={automation.name}>{automation.name}</p>
+                <p className="truncate text-xs text-ink-faint" title={eventTypeLabelMap[automation.eventType]}>{eventTypeLabelMap[automation.eventType]}</p>
               </div>
-
-              {/* Description */}
-              {automation.description && (
-                <p className="text-xs text-ink-faint mb-3 line-clamp-2">{automation.description}</p>
-              )}
-
-              {/* Event type badge */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${eventTypeBadgeColor[automation.eventType]}`}>
-                  {eventTypeLabelMap[automation.eventType]}
-                </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  automation.isActive ? 'bg-green-50 text-green-700' : 'bg-canvas-sunken text-ink-faint'
-                }`}>
-                  {automation.isActive ? '有効' : '無効'}
-                </span>
-                {/* lineAccountId === null = global; label it so the account-scoped
-                   list cannot disguise an all-accounts rule as account-local. */}
-                {automation.lineAccountId === null && (
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
-                    title="全アカウントに適用されるオートメーションです"
-                  >
-                    全アカウント共通
-                  </span>
-                )}
-              </div>
-
-              {/* Meta info */}
-              {(() => {
-                const sendMsgWithTpl = automation.actions.filter(
-                  (a) => a.type === 'send_message' && (a.params as { template_id?: string }).template_id,
-                ).length
-                return (
-                  <div className="flex items-center gap-4 text-xs text-ink-faint mb-3">
-                    <span>アクション: {automation.actions.length}件</span>
-                    {sendMsgWithTpl > 0 && (
-                      <a href="/templates" className="text-blue-600 hover:underline" title="template_id 参照を含む send_message action あり">
-                        template×{sendMsgWithTpl}
-                      </a>
-                    )}
-                    <span>優先度: {automation.priority}</span>
-                  </div>
-                )
-              })()}
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
-                <button
-                  onClick={() => handleDelete(automation)}
-                  className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
-                >
-                  削除
-                </button>
+              <p className="truncate text-ink-secondary" title={conditionLabel(automation.conditions)}>{conditionLabel(automation.conditions)}</p>
+              <p className="truncate text-ink-secondary" title={automation.actions.map(actionLabel).join('、')}>{automation.actions.map(actionLabel).join('、') || '処理なし'}</p>
+              <div><span className="text-ink-faint">—</span><span className="block text-[11px] text-ink-faint">未接続</span></div>
+              <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
+              <div className="flex justify-end gap-2">
+                <button type="button" disabled className="h-9 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-faint" title="詳細画面は未接続です">中身を見る</button>
+                <button type="button" onClick={() => void handleToggleActive(automation)} className="h-9 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary">止める・動かす</button>
               </div>
             </div>
           ))}
+          <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
+            <span>オートメーション {visibleAutomations.length}本中 1〜{Math.min(6, visibleAutomations.length)}本を表示</span>
+            <span>前へ　<strong className="text-accent-deep">1</strong>　2　3　次へ</span>
+          </div>
         </div>
       )}
 

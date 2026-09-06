@@ -2331,11 +2331,7 @@ export const SCREENS = [
       設計にはあるので、差として記録だけしておく。
     */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
-    status: 'unimplemented',
-    gap: 'pending',
-    gapNote: '画面 `/automations/runs` が development に無い。判定は未マージ枝 `75b010fc` で書かれたもの',
-    why: '`/automations/runs` の page.tsx が development に存在しない。実装は未マージのPRの中にある',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 一致', verdictSource: 'automations-v6/design-qa-execution-results-502.md', verdictHead: '75b010fc',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 で画面を実装。** 既存の `GET /api/automation-runs` から4指標・検索・結果絞り込み・実行一覧を読み、空・読込・失敗を区別する。撮影用の通常データを #264 へ依頼中のため、通常状態の画像比較は未完了。安全な再実行API・実行詳細画面・CSV書き出しも未接続なので、押せる操作は出していない。', verdictSource: 'automations-v6/DkPY0.txt', verdictHead: 'pending',
     route: '/automations/runs',
     states: {
       apis: ['**/api/automation-runs*'],
