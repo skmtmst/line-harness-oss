@@ -391,6 +391,7 @@ export const SCREENS = [
       共通の `Select` に寄せれば開いた姿も残せる（P2）。
     */
     ...FRIENDS, node: 'LT8RS', name: '3-1-A 友だち（表示件数を開く）',
+    steps: [{ qaOpen: 'LT8RS' }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#22 トップバーに人名が入っていたのを画面名へ（`I6UAdr`「友だち詳細」／`w8W4Eh`「統合ユーザー」）／#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#42 青の主ボタンを緑へ（`r7eSi` の「詳細を見る」4件、`w8W4Eh` の「プロフィールを編集」ほか）／#47 `[sticker]`→スタンプ／#48 表記の統一。設計画像は `docs/design-reference/friends-v6/` を撮り直した。**実装との突き合わせはこれから。** 一致', verdictSource: 'v6-recheck-496-and-classification.md', verdictHead: '7b509106',
   },
   {
@@ -421,6 +422,8 @@ export const SCREENS = [
       {
         // 操作を選ぶ前。まだ何も数えていない面。
         suffix: 'pick',
+        // 基本手順は確認画面まで進むため、この変種は一覧から開き直す。
+        standalone: true,
         steps: [
           { click: '表示中の友だちをすべて選ぶ', role: 'checkbox' },
           { qaOpen: 'IAf7j' },
@@ -3204,6 +3207,63 @@ const ISSUE_210_REVIEW = {
 }
 
 /**
+ * board #265。2026-09-06 に development 9b8f7451 から機能3を直し、
+ * 3102/8789 で10 Node・全状態を1440/1920px撮影して設計画像と比較した。
+ */
+const ISSUE_265_REVIEW = {
+  PhxG6: {
+    verdict: 'match',
+    note: '一致。4指標、検索・4絞り込み・状態チップ、7列の一覧、4行、ページ送りを設計順に表示した。残っていた日時の区切りを `2026/08/14 07:58` にそろえ、内部種別 `[sticker]` を「スタンプ」へ直した。1440・1920pxとも横はみ出し0、壊れ値・内部IDは0件。',
+    source: 'friends-v6/PhxG6.txt + PhxG6-{1440,1920}.png',
+  },
+  LT8RS: {
+    verdict: 'match',
+    note: '一致。表示件数を開いた状態で10・20・30・40・50件を設計と同じ順に並べ、現在の20件を色とチェックで示した。安定した押し口 `data-qa-open="LT8RS"` から2幅とも実際に開いて撮影し、横はみ出し0。',
+    source: 'friends-v6/LT8RS.txt + LT8RS-{1440,1920}.png',
+  },
+  Igi72: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ未接続。AND条件、ORの11軸、表示する友だち、対象・並び順・表示件数、保存済み条件の入口、該当人数と操作を設計順にそろえた。未接続の軸は押せるように見せず、必要なAPIを各項目の本文に表示した。設計の選択済み固定値と126人は実データ/APIが揃わないため再現していない。2幅とも横はみ出し0。',
+    source: 'friends-v6/Igi72.txt + Igi72-{1440,1920}.png',
+  },
+  IAf7j: {
+    verdict: 'needs_fix',
+    note: '要修正。通常・取得失敗・権限不足・操作選択・一部失敗を2幅で撮影し、横はみ出し0。撮影定義が基本手順を二重実行していた `pick` は単独手順に直し、全状態を取得できた。実装は一覧上の小窓でタグ付与・解除に限られ、設計の専用ページ、9操作タイル、右側の実行内容、対象一覧が無い。**推奨修正**：一括操作APIが揃った段階で、専用ページの全体構成と操作分類を実装する。',
+    source: 'friends-v6/IAf7j-{normal,error,forbidden,pick,result}.txt + 同名-{1440,1920}.png',
+  },
+  I6UAdr: {
+    verdict: 'needs_fix',
+    note: '要修正。2幅とも横はみ出し0で、空欄は未登録・まだありませんと意味を表示し、マイルは利用可能と確定待ちを分けている。ただし設計の左プロフィール＋中央履歴＋右判断情報に対し、実装は基本情報と機能別タブの旧構成。進行中の配信・自動処理、同じ人としてつながる情報、この友だちに行う操作が無い。**推奨修正**：EC履歴等のAPI接続後、設計の3領域へ再構成する。',
+    source: 'friends-v6/I6UAdr.txt + I6UAdr-{1440,1920}.png',
+  },
+  bzDn6: {
+    verdict: 'needs_fix',
+    note: '要修正。通常・読込中・0件・取得失敗を2幅ずつ撮影し、未取得の指標を `—人`、取得失敗を「友だちを表示できませんでした」と出し分け、再読み込みも表示した。全状態で横はみ出し0。ただし設計は表の骨組みを保った同一面に3状態を置くのに対し、実装は表全体を大きな状態面へ差し替え、寸法・余白・案内位置が異なる。**推奨修正**：表ヘッダーとページ送りを保って状態本文だけ差し替える。',
+    source: 'friends-v6/bzDn6-{loading,empty,error}.txt + 同名-{1440,1920}.png',
+  },
+  YzxU1: {
+    verdict: 'needs_fix',
+    note: '要修正。2幅とも横はみ出し0。集計は総数・ユニーク人数・重複行を実値で出し、未接続の配信コストは作り物の金額にせず `—` と理由を表示する。アカウント別内訳と重複マトリックスも表示できた。一方、設計の候補行、根拠・確信度、候補ごとの確認操作が無い。**推奨修正**：候補一覧APIを接続し、集計の下で候補を1件ずつ判断できるようにする。',
+    source: 'friends-v6/YzxU1.txt + YzxU1-{1440,1920}.png',
+  },
+  InCDe: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ未接続。通常・読込中・0件・取得失敗・権限不足・判定窓を2幅で撮影し、横はみ出し0。候補2人、マスク済み連絡先、根拠の強さ、3判断、理由必須、履歴と取り消せない影響を表示する。設計の項目ごとの採用値選択は、契約が decision と reason しか受け取らず保存できないため未接続。',
+    source: 'friends-v6/InCDe-{normal,loading,empty,error,forbidden,decide}.txt + 同名-{1440,1920}.png',
+  },
+  r7eSi: {
+    verdict: 'needs_fix',
+    note: '要修正。通常・読込中・0件・取得失敗を2幅で撮影し、横はみ出し0。生のUIDは出さず「UIDで連携」「未連携」と状態で表示し、内部IDも0件。ただし設計の4指標と実装の指標の意味が異なり、作成・CSV・重複候補確認、UID/所属の絞り込み、4行の一覧が不足する。**推奨修正**：集計と作成APIを接続し、設計の指標・絞り込み・主操作をそろえる。',
+    source: 'friends-v6/r7eSi-{normal,loading,empty,error}.txt + 同名-{1440,1920}.png',
+  },
+  w8W4Eh: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・データ未接続。通常・読込中・0件・取得失敗・権限不足・編集・版競合を2幅で撮影し、横はみ出し0。上段プロフィール、結び付く友だち、統合属性、横断履歴、配信元の優先順、409の再読込を表示する。解除API、項目ごとの候補値、タグ、履歴のアカウント列が契約に無いため、設計の解除・採用値変更は未接続。',
+    source: 'friends-v6/w8W4Eh-{normal,loading,empty,error,forbidden,edit,conflict}.txt + 同名-{1440,1920}.png',
+  },
+}
+
+/**
  * board #266。2026-09-06 に latest development（14b61d52）を取り込んだ
  * UI HEAD ff1fbfc37 / capture HEAD c03ebf864 を 3102/8789 で起動し、
  * 機能5の14 Node・全状態を設計1920pxと実装1440/1920pxで比較した結果。
@@ -3359,6 +3419,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-06 #210で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue210Note}`
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     screen.verdictHead = 'f4296e63'
+  }
+  const issue265Review = ISSUE_265_REVIEW[screen.node]
+  if (screen.feature === 3 && issue265Review) {
+    screen.verdict = issue265Review.verdict
+    screen.verdictNote = `**2026-09-06 Issue #265で修正・再判定。** ${issue265Review.note}`
+    screen.verdictSource = issue265Review.source
+    delete screen.verdictHead
   }
   const issue266Review = ISSUE_266_REVIEW[screen.node]
   if (screen.feature === 5 && issue266Review) {
@@ -3804,6 +3871,7 @@ export const CAPTURED_AT = {
     { pr: 628, head: '846be01f', on: '2026-08-31', screens: ['PhxG6', 'Igi72', 'I6UAdr', 'bzDn6', 'YzxU1', 'r7eSi'], note: 'Claudeが実装して撮った。#520 の上（`/friends/page.tsx` を触る唯一の開いているPR）。**#565 が development 経由で入っていることを確かめてから撮った**' },
     { pr: 628, head: '846be01f', on: '2026-09-01', screens: ['bzDn6'], note: '**#628 が codex/development へマージされた**（#520 の取り込み後）。私の画面修正が初めて本流に入った1本' },
     { pr: 645, head: '6e9ed4d6', on: '2026-09-01', screens: ['IAf7j'], note: 'Claudeが実装して撮った。#606 の契約の上（development 直結）。**ACCOUNT に role が無く、権限で出し分ける画面がすべて権限なし側に倒れていた**のを固定データ側で直した' },
+    { pr: 966, head: 'baa097e99', on: '2026-09-06', screens: ['PhxG6','LT8RS','Igi72','IAf7j','I6UAdr','bzDn6','YzxU1','InCDe','r7eSi','w8W4Eh'], note: 'Issue #265。10 Node・68枚を1440/1920pxと全状態で撮影し、全画像で横はみ出し0。一覧と表示件数を一致へ更新し、詳細検索は不足APIを明示して構造一致へ更新。IAf7j-pick の撮影手順二重実行も直して再撮影した。' },
   ],
   28: [
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },

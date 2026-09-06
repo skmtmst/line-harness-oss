@@ -51,6 +51,8 @@ const NOT_YET: Array<{ label: string; why: string }> = [
   { label: 'リマインダ', why: 'この友だちのぶんを引く口がありません' },
   { label: '回答フォーム', why: '回答から友だちを引く口がありません' },
   { label: '最終反応日', why: '最終反応の日付を持っていません' },
+  { label: 'ステータスメッセージ', why: 'OR条件として組み立てる口がありません' },
+  { label: '友だち登録日', why: 'OR条件として組み立てる口がありません' },
   { label: 'その他', why: '何を入れるか決まっていません' },
 ]
 
@@ -81,6 +83,7 @@ export default function AdvancedSearchDialog({
   tags,
   fieldNames,
   onClose,
+  onLoadSaved,
   onApply,
 }: {
   open: boolean
@@ -89,6 +92,7 @@ export default function AdvancedSearchDialog({
   /** 友だち情報の項目名。取れないときは空でよい（自由入力にする）。 */
   fieldNames: string[]
   onClose: () => void
+  onLoadSaved?: () => void
   onApply: (result: AdvancedSearchResult) => void
 }) {
   const [blocks, setBlocks] = useState<Block[]>([
@@ -262,7 +266,7 @@ export default function AdvancedSearchDialog({
             </div>
           </section>
 
-          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+          <section className="rounded-card border border-hairline bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
             <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
               AND
@@ -410,10 +414,10 @@ export default function AdvancedSearchDialog({
               `NOT_YET` は理由の文をもう持っているので、札の下に出す。
             */}
             <div className="mt-3 flex flex-wrap gap-3">
-              {NOT_YET.filter((item) => ['対応状況', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
+              {NOT_YET.map((item) => (
                 <div key={item.label} className="flex max-w-xs flex-col gap-1">
                   <button type="button" disabled className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
-                    ＋ {item.label === 'イベント予約' ? '予約' : item.label}
+                    ＋ {item.label}
                   </button>
                   {/* 任意値の class を足さない。10px は `--text-nano`、色は `--color-ink-faint`
                       （#8b938d）が同じ値を既に持っている。design-debt を増やさずに済む。 */}
@@ -421,6 +425,37 @@ export default function AdvancedSearchDialog({
                 </div>
               ))}
             </div>
+          </section>
+
+          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-bold text-ink">表示する友だち</span>
+              <span className="text-nano text-ink-faint">既定は「表示中」のみ</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-ink-secondary">
+              {[
+                { value: 'following', label: '表示中' },
+                { value: '', label: '非表示' },
+                { value: 'blocked', label: 'ブロックした人' },
+              ].map((item) => (
+                <label key={item.label} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={visibility === item.value}
+                    onChange={() => setVisibility(item.value as '' | 'following' | 'blocked')}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+            <label className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink-secondary">
+              友だちの状態
+              <select disabled className="min-w-64 rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-faint">
+                <option>このアカウントをブロックしていない</option>
+              </select>
+              <span className="text-nano font-normal text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
+            </label>
           </section>
 
           <div className="grid gap-2 sm:grid-cols-3">
@@ -453,6 +488,11 @@ export default function AdvancedSearchDialog({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-[#EAEBED] px-6 py-4">
+          {onLoadSaved ? (
+            <Button type="button" onClick={onLoadSaved}>
+              保存した検索から読み込む
+            </Button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
