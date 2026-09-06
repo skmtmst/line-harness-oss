@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 42,
-  "match": 113,
-  "structureMatchDataPending": 129,
+  "match": 114,
+  "structureMatchDataPending": 128,
   "needsFix": 21,
   "unjudged": 5,
-  "remaining": 155,
+  "remaining": 154,
   "features": [
     {
       "feature": 1,
@@ -1737,12 +1737,23 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 4,
+      "match": 1,
+      "structureMatchDataPending": 3,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 3,
       "capturedAt": [
+        {
+          "pr": 1099,
+          "head": "bb8a139b3",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "yPkWe"
+          ],
+          "note": "Issue #327。PR #1077の固定データを使い、3104/8791で一覧・会社名変更後・使用中／未使用の削除確認を1440px・1920px撮影。Pencil 1920pxと同じ比較画像で確認し、全画像で横はみ出し0。一覧を一致へ更新し、編集と削除確認に残るAPI差を記録した。"
+        },
         {
           "pr": 1075,
           "head": "24313778e",
