@@ -2227,18 +2227,19 @@ export const SCREENS = [
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
-    gap: 'api',
-    gapNote: 'Stripe定期便本体の接続。実装に「接続後に有効化します」と明記',
-    status: 'unimplemented',
-    why: '定期便のタブが無い。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）',
-    verdictNote: '**判断済み（2026-08-30）：Stripe接続待ちとして今回のV6対象外候補。仮画面は作らない。** ルート `/ec-commerce`。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）。**受け口はできていて、外の接続だけが残っている。** **仮画面を作らない**——中身の無いタブを足すと、使える機能があるように見える。**この状態のまま据え置く。** 接続が済んだら、`ec_events` の定期便イベントを読む一覧として作る。',
+    route: '/ec-commerce?tab=subscriptions',
+    states: { apis: ['**/api/ec-commerce/subscriptions?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #258 で実装。設計画像なし。** `nen_ec_member_snapshots` の定期便契約をLINEアカウントで絞って表示し、通常・読込・空・失敗・権限不足を分けた。取得できない月別集計は0件にせず「—／未取得」。支払い確認はECの決済状態だけを根拠にし、将来止めるという予測はしていない。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictSource: 'ec-v6/bfB50.txt + ec-v6/bfB50-normal-1920.png',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
-    gap: 'api',
-    gapNote: 'つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記',
-    status: 'unimplemented',
-    why: 'つなぎ先も、人を見分ける決めごとも画面から変えられない。「接続先や突合キーを画面から変える口が無い」と書いてある（`page.tsx:174`）',
+    route: '/ec-commerce?tab=connector',
+    states: { apis: ['**/api/ec-commerce/connector?**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    verdict: 'unjudged',
+    verdictNote: '**2026-09-06 #258 で実装。設計画像なし。** LINEアカウントごとにECの種類・ドメイン・取り込む出来事・会員照合ルールを保存できる。鍵は暗号文と末尾4文字だけを保存し、画面へ値を返さない。通常・読込・空・失敗・権限不足を分け、取得できない影響件数は「— 未取得」。設計画像が無いため、同じ幅の画像比較は未判定。',
+    verdictSource: 'ec-v6/oHAN4.txt + ec-v6/oHAN4-normal-1920.png',
   },
 
   // ── 機能24 LINE通知 ─────────────────────────────────────
@@ -3559,6 +3560,7 @@ export const DESIGN_SIZE = {
   ee0sk: [1920, 1590], VjXGX: [1920, 1590], byqIW: [1920, 1080],
   A1ZYeP: [1920, 1080], KoT6c: [1920, 1080], GMvBd: [1920, 1080],
   zGZMA: [1920, 1080], XBkiQ: [1920, 1136],
+  bfB50: [1920, 1080], oHAN4: [1920, 1080],
   uLQQc: [1920, 1080], s9gAx: [1920, 1080], W1wzCa: [1920, 1080],
   K0Dbr2: [1920, 1080], txMO9: [1920, 1080], U3SI5: [1920, 1080], Q3qP1r: [1920, 1080],
 }
