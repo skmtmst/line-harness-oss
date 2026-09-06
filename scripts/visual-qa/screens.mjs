@@ -1253,7 +1253,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。Pencil画像は動画名・再生時間・公開期間・視聴条件を1画面に要約するが、実装は基本情報・配信枠・従来CTAの長い編集フォームで、見出し・配置・操作が一致しないため要修正。取得元 `webinars-v6/PV1Vh.png`、`PV1Vh-1920.png`、`PV1Vh.txt`。',
     verdictSource: 'webinars-v6/PV1Vh.png + PV1Vh-1920.png + PV1Vh.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=video`,
 
   },
   {
@@ -1261,7 +1261,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。Pencil画像は表示時刻・ボタン文言・申込フォーム・完了アクションを要約するが、実装は未選択のフォーム欄と編集用入力を直接並べ、設定サマリーとLINEプレビューも無いため要修正。取得元 `webinars-v6/d3rFGD.png`、`d3rFGD-1920.png`、`d3rFGD.txt`。',
     verdictSource: 'webinars-v6/d3rFGD.png + d3rFGD-1920.png + d3rFGD.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=cta`,
 
   },
   {
@@ -1269,8 +1269,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。通知件数と申込直後・前日・開始前・開始時・見逃し後の設定は実データで表示されるが、Pencil画像の2つの要約カード、右の設定サマリー、LINEプレビューとは寸法・構成が異なるため要修正。取得元 `webinars-v6/Ho8z4.png`、`Ho8z4-1920.png`、`Ho8z4.txt`。',
     verdictSource: 'webinars-v6/Ho8z4.png + Ho8z4-1920.png + Ho8z4.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT,
-    steps: [{ qaOpen: 'Ho8z4' }],
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=notifications`,
 
   },
   {
@@ -1278,7 +1277,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。視聴完了・CTAクリック・未視聴の後続処理は保存できるが、Pencil画像の完了メッセージ、LINEプレビュー、実行時点、再取得時の選択がなく、`tagId`・`scenarioId` の内部入力も残るため要修正。取得元 `webinars-v6/Xjk8q.png`、`Xjk8q-1920.png`、`Xjk8q.txt`。',
     verdictSource: 'webinars-v6/Xjk8q.png + Xjk8q-1920.png + Xjk8q.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT, steps: [{ click: '視聴後アクション' }],
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=actions`,
 
   },
   {
@@ -1286,9 +1285,8 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。タイトル・動画・公開状態は実データで確認でき、LIFF未設定理由も表示するが、Pencil画像の公開期間・対象・申込フォーム要約、右の設定サマリー、LINEプレビューがなく要修正。取得元 `webinars-v6/GB0NR.png`、`GB0NR-1920.png`、`GB0NR.txt`。',
     verdictSource: 'webinars-v6/GB0NR.png + GB0NR-1920.png + GB0NR.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT,
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=preview`,
     mode: 'viewport', height: 1080,
-    steps: [{ click: '公開プレビュー' }],
 
   },
   {
@@ -1297,8 +1295,7 @@ export const SCREENS = [
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。必要項目の合否とタイトル・URL・動画長・配信枠は確認できるが、Pencil画像の4チェック、公開期間・対象・CTA/フォーム・アクション・通知重複、右の設定サマリーとLINEプレビューがなく要修正。取得元 `webinars-v6/D6yO7e.png`、`D6yO7e-1920.png`、`D6yO7e.txt`。',
     verdictSource: 'webinars-v6/D6yO7e.png + D6yO7e-1920.png + D6yO7e.txt',
     verdictHead: '9b8f7451',
-    route: '/webinars/edit?id=webinar-1', mode: 'page',
-    steps: [{ qaOpen: 'D6yO7e' }],
+    route: '/webinars/edit?id=webinar-1&pane=review', mode: 'page',
 
   },
   {
@@ -1319,7 +1316,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。4指標・参加者4人・CSV操作は表示されるが、Pencil画像の実行結果・時刻・状態札、右の稼働状況・要分析・担当者視聴完了、参加状況内訳がなく要修正。取得元 `webinars-v6/Q8sHa.png`、`Q8sHa-1920.png`、`Q8sHa.txt`。',
     verdictSource: 'webinars-v6/Q8sHa.png + Q8sHa-1920.png + Q8sHa.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT, steps: [{ click: '参加者' }], mode: 'viewport', height: 1080,
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=participants`, mode: 'viewport', height: 1080,
 
   },
   {
@@ -1327,7 +1324,7 @@ export const SCREENS = [
     verdict: 'needs_fix',
     verdictNote: '**2026-09-06 Issue #211 で判定。** 3104/8791で1440/1920px撮影（横はみ出し0）。申込・参加率・90%以上視聴・フォーム送信・ファネルを実データで表示するが、Pencil画像の概要/視聴/離脱/CTA/申込タブ、右の設定サマリーとLINEプレビュー、CSV操作とは別構成で要修正。取得元 `webinars-v6/yxyzQ.png`、`yxyzQ-1920.png`、`yxyzQ.txt`。',
     verdictSource: 'webinars-v6/yxyzQ.png + yxyzQ-1920.png + yxyzQ.txt',
-    verdictHead: '9b8f7451', route: WEBINAR_EDIT, steps: [{ click: '分析' }], mode: 'viewport', height: 1080,
+    verdictHead: '9b8f7451', route: `${WEBINAR_EDIT}&pane=analytics`, mode: 'viewport', height: 1080,
 
   },
   {

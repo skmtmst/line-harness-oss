@@ -3,7 +3,6 @@
 import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
@@ -55,6 +54,22 @@ function scheduleSummary(w: Webinar): string {
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft'
 
+type WebinarListRow = Webinar & {
+  registrations?: number
+  viewers?: number
+  folderName?: string | null
+  publicPeriod?: string | null
+  displayStatus?: string | null
+}
+
+const WEBINAR_FOLDERS = ['商品説明', '導入事例', 'セミナー', 'アーカイブ'] as const
+
+function measuredCount(value: number | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toLocaleString('ja-JP')}人`
+    : '—'
+}
+
 export default function WebinarsPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const requestGeneration = useRef(0)
@@ -75,7 +90,7 @@ export default function WebinarsPage() {
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
 
-  const visibleItems = loadedAccountId === selectedAccountId ? items : []
+  const visibleItems = (loadedAccountId === selectedAccountId ? items : []) as WebinarListRow[]
   const visibleOverview = loadedOverviewAccountId === selectedAccountId ? overview : null
   const visibleOverviewFailure = loadedOverviewAccountId === selectedAccountId ? overviewFailure : null
 
@@ -190,32 +205,8 @@ export default function WebinarsPage() {
 
   return (
     <>
-      <div data-design="Head">
-        <Header
-          title="ウェビナー"
-          description="動画セミナーの申込から視聴、視聴後のフォロー配信までを管理します。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/webinars/new"
-                className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium"
-              >
-                ウェビナーを作成
-              </Link>
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-            </div>
-          }
-        />
-      </div>
-
       {visibleOverviewFailure ? (
-        <div className="mx-auto mb-4 max-w-6xl px-6">
+        <div className="mx-auto mb-4 max-w-[1600px] px-6 pt-4">
           <ListState
             kind={visibleOverviewFailure.kind}
             title={visibleOverviewFailure.title}
@@ -228,7 +219,7 @@ export default function WebinarsPage() {
           />
         </div>
       ) : (
-        <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div data-design="KPIs" className="mx-auto mb-4 grid max-w-[1600px] grid-cols-1 gap-4 px-6 pt-4 sm:grid-cols-2 xl:grid-cols-4">
           {overviewCards(visibleOverview).map((card) => (
             <div key={card.key} className="bg-canvas rounded-card border-hairline border p-4">
               <p className="text-ink-faint text-xs">{card.title}</p>
@@ -245,140 +236,85 @@ export default function WebinarsPage() {
           ))}
         </div>
       )}
-      <div className="p-6 max-w-6xl mx-auto">
-        <div
-          data-design="Bar"
-          className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-        >
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ウェビナー名で検索"
-            aria-label="ウェビナー名で検索"
-            className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-          />
-          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: "updated", label: "更新が新しい順" }, { value: "created", label: "作成が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
-          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-          <SelectField
-            size="compact"
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-            aria-label="表示件数"
-            options={[
-              { value: '20', label: '20件表示' },
-              { value: '50', label: '50件表示' },
-              { value: '100', label: '100件表示' },
-            ]}
-          />
+      <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>
+          <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
         </div>
 
-        <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-          {([
-            { key: 'active', label: '公開中のみ' },
-            { key: 'draft', label: '下書きのみ' },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setSavedFilter(savedFilter === key ? '' : key)}
-              aria-pressed={savedFilter === key}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                savedFilter === key
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {label}
+        <div className="grid min-h-[640px] gap-4 lg:grid-cols-[252px_minmax(0,1fr)]">
+          <aside className="border-hairline bg-canvas rounded-card border p-4" aria-label="ウェビナーのフォルダ">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-ink text-sm font-bold">フォルダ</h2>
+              <span className="text-ink-faint text-xs">未接続</span>
+            </div>
+            <button type="button" className="bg-accent-soft text-accent mt-3 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-xs font-semibold">
+              <span>すべて</span><span>{hasListData ? visibleItems.length : '—'}</span>
             </button>
-          ))}
-        </div>
+            <ul className="mt-2 space-y-1">
+              {WEBINAR_FOLDERS.map((folder, index) => (
+                <li key={folder} className="text-ink-secondary flex items-center justify-between rounded-control px-3 py-2 text-xs">
+                  <span className="flex min-w-0 items-center gap-2"><span className={`h-2 w-2 rounded-full ${['bg-blue-500', 'bg-amber-400', 'bg-violet-500', 'bg-indigo-500'][index]}`} /><span className="truncate">{folder}</span></span>
+                  <span className="text-ink-faint">—</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-ink-faint mt-4 text-[11px] leading-relaxed">フォルダ名と件数は一覧APIへの接続後に表示します。</p>
+          </aside>
 
-        {accountLoading || loading ? (
-          <ListState kind="loading" />
-        ) : !selectedAccountId ? (
-          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-            <div className="text-ink font-medium">
-              {accounts.length > 0
-                ? '上のバーでLINE公式アカウントを選んでください'
-                : 'LINE公式アカウントが登録されていません'}
+          <section className="min-w-0">
+            <div data-design="Bar" className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+              <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
+              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+              <SelectField size="compact" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="表示件数" options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]} />
             </div>
-          </div>
-        ) : loadFailure ? (
-          /*
-            権限不足と読み込み失敗を1枚ずつ言い分ける。**押しても直らない
-            ときは読み直しの口を出さない。**
-          */
-          <ListState
-            kind={loadFailure.kind}
-            title={loadFailure.title}
-            description={loadFailure.description}
-            action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined}
-          />
-        ) : visibleItems.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
-            <p className="text-sm text-gray-500 mb-4">
-              録画動画をアップロードしてスケジュールを設定すると、友だちが毎回「今始まったばかり」の疑似ライブとして視聴できます。
-            </p>
-            <Link
-              href="/webinars/new"
-              className="inline-block px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-            >
-              最初のウェビナーを作成
-            </Link>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-            <div className="text-ink font-medium">条件に合うウェビナーはありません</div>
-            <p className="text-ink-faint mt-2 text-sm">検索文字か保存した条件を変えてください。</p>
-          </div>
-        ) : (
-          <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
-            <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
-              <span className="col-span-4">ウェビナー名</span><span className="col-span-2">状態</span><span>申込</span><span>視聴</span><span className="col-span-2">公開期間</span><span className="col-span-2">操作</span>
-            </div>
-            <div className="divide-hairline divide-y">
-              {visible.map((w) => (
-                <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
-                  <div className="min-w-0 md:col-span-4">
-                    <Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link>
-                    <span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span>
-                  </div>
-                  <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{STATUS_LABEL[w.status]}</span></div>
-                  <div className="text-ink-secondary text-sm tabular-nums" title="一覧では未取得です。参加者管理で確認できます。"><span className="text-ink-faint md:hidden">申込 </span>—</div>
-                  <div className="text-ink-secondary text-sm tabular-nums" title="一覧では未取得です。参加者管理で確認できます。"><span className="text-ink-faint md:hidden">視聴 </span>—</div>
-                  <div className="text-ink-secondary truncate text-sm md:col-span-2" title={scheduleSummary(w)}>{scheduleSummary(w)}</div>
-                  <div className="flex items-center gap-2 md:col-span-2">
-                    <Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link>
-                    <button
-                      type="button"
-                      onClick={() => { setArchiveError(''); setArchiveTarget(w) }}
-                      className="text-danger text-xs font-semibold"
-                      aria-label={`${w.title}をアーカイブ`}
-                    >
-                      アーカイブ
-                    </button>
-                  </div>
-                </div>
+
+            <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+              {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
+                <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
               ))}
             </div>
-          </div>
-        )}
-        {hasListData && filtered.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-ink-faint text-xs tabular-nums">
-              {visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件
-            </p>
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              onPageChange={setPage}
-              ariaLabel="ウェビナー一覧のページ送り"
-            />
-          </div>
-        )}
+
+            <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
+              {accountLoading || loading ? (
+                <ListState kind="loading" />
+              ) : !selectedAccountId ? (
+                <div className="p-12 text-center text-sm font-medium text-ink">{accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}</div>
+              ) : loadFailure ? (
+                <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
+              ) : visibleItems.length === 0 ? (
+                <ListState kind="empty" title="まだウェビナーがありません" description="動画セミナーの申込と視聴を、ここで管理します。" action={<Button variant="primary" href="/webinars/new">ウェビナーを作る</Button>} />
+              ) : filtered.length === 0 ? (
+                <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字か保存した条件を変えてください。" />
+              ) : (
+                <>
+                  <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
+                    <span className="col-span-4">ウェビナー名</span><span className="col-span-2">状態</span><span>申込</span><span>視聴</span><span className="col-span-2">公開期間</span><span className="col-span-2">操作</span>
+                  </div>
+                  <div className="divide-hairline divide-y">
+                    {visible.map((w) => (
+                      <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
+                        <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
+                        <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{w.displayStatus || STATUS_LABEL[w.status]}</span></div>
+                        <div className="text-ink-secondary text-sm tabular-nums" title={w.registrations === undefined ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrations)}</div>
+                        <div className="text-ink-secondary text-sm tabular-nums" title={w.viewers === undefined ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewers)}</div>
+                        <div className="text-ink-secondary truncate text-sm md:col-span-2" title={w.publicPeriod ?? scheduleSummary(w)}>{w.publicPeriod ?? scheduleSummary(w)}</div>
+                        <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link><button type="button" onClick={() => { setArchiveError(''); setArchiveTarget(w) }} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {hasListData && filtered.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+            )}
+          </section>
+        </div>
       </div>
       <ConfirmDialog
         open={archiveTarget !== null}
@@ -391,6 +327,27 @@ export default function WebinarsPage() {
         onCancel={() => { if (!archiving) setArchiveTarget(null) }}
         onConfirm={() => void archiveSelected()}
       >
+        {archiveTarget ? (
+          <div className="space-y-3" data-design-node="LKuAQ">
+            <section className="border-hairline rounded-control border p-3"><p className="text-ink-faint text-xs">アーカイブする対象</p><p className="text-ink mt-1 font-bold">{archiveTarget.title}</p><p className="text-ink-secondary mt-1 text-xs">申込者 {measuredCount((archiveTarget as WebinarListRow).registrations)}</p></section>
+            <section className="border-hairline rounded-control border p-3"><p className="text-ink text-sm font-bold">アーカイブしたあと</p><dl className="divide-hairline mt-2 divide-y text-xs"><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">公開ページ</dt><dd className="text-ink text-right">公開URLが無効になります</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">分析結果</dt><dd className="text-ink text-right">視聴履歴とCTAの結果は消えません</dd></div><div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">復元</dt><dd className="text-ink text-right">あとから戻せます</dd></div></dl></section>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <section className="border-hairline rounded-control border p-3">
+                <p className="text-ink text-sm font-bold">設定サマリー</p>
+                <dl className="divide-hairline mt-2 divide-y text-xs">
+                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{STATUS_LABEL[archiveTarget.status]}</dd></div>
+                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">申込</dt><dd className="text-ink font-semibold">{measuredCount((archiveTarget as WebinarListRow).registrations)}</dd></div>
+                  <div className="flex justify-between gap-3 py-2"><dt className="text-ink-faint">視聴</dt><dd className="text-ink font-semibold">{measuredCount((archiveTarget as WebinarListRow).viewers)}</dd></div>
+                </dl>
+              </section>
+              <section className="bg-accent-soft rounded-control p-3">
+                <p className="text-accent text-xs font-bold">LINEプレビュー</p>
+                <div className="bg-canvas text-ink mt-3 rounded-control p-3 text-xs shadow-card">このウェビナーは{archiveTarget.status === 'active' ? '公開中' : '非公開'}です。</div>
+                <div className="mt-3 flex gap-2"><Button disabled>テスト送信</Button><Button disabled>公開ページを見る</Button></div>
+              </section>
+            </div>
+          </div>
+        ) : null}
         {archiveError ? <p className="text-danger text-sm">{archiveError}</p> : null}
       </ConfirmDialog>
     </>
