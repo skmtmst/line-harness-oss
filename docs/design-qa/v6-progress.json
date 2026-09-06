@@ -7,8 +7,8 @@
   "elsewhere": 0,
   "missing": 32,
   "match": 121,
-  "structureMatchDataPending": 125,
-  "needsFix": 17,
+  "structureMatchDataPending": 117,
+  "needsFix": 25,
   "unjudged": 5,
   "remaining": 147,
   "features": [
@@ -499,11 +499,27 @@
       "elsewhere": 0,
       "missing": 0,
       "match": 6,
-      "structureMatchDataPending": 8,
-      "needsFix": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 8,
       "unjudged": 0,
       "remaining": 8,
       "capturedAt": [
+        {
+          "pr": 0,
+          "head": "9889bca8bf",
+          "on": "2026-09-07",
+          "screens": [
+            "kk8dz",
+            "r6Gzsu",
+            "hz9ti",
+            "EvVO5",
+            "RUxNf",
+            "g2UNV",
+            "NrBkW",
+            "M2b2B"
+          ],
+          "note": "Issue #366。統合 #1110 後の機能5を3104/8791で1440・1920px撮影し、★V6 1920pxと目視比較。全16枚で横はみ出し0。開始条件・下書き・開始記録の新APIが画面から未接続など、残る差を8 Nodeすべて理由付き要修正として記録した。"
+        },
         {
           "pr": 1084,
           "head": "31c2fddcc",
