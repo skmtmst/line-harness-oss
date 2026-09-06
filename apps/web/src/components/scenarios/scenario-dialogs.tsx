@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 import ConditionBuilder, {
   isEmptyCondition,
   pruneCondition,
@@ -365,22 +366,16 @@ export function TestSendDialog({
       footer={
         confirming ? (
           <>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              disabled={sending}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-            >
+            <Button onClick={() => setConfirming(false)} disabled={sending}>
               戻る
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               disabled={!selected || sending}
               onClick={() => void sendTest()}
-              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
             >
               {sending ? '送信中…' : 'テスト送信を開始'}
-            </button>
+            </Button>
           </>
         ) : (
           <>

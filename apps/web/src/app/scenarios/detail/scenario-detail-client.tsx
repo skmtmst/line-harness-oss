@@ -1343,21 +1343,16 @@ export default function ScenarioDetailClient({
           action={
             editingStepId ? (
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={closeStepForm}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium"
-                >
+                <Button onClick={closeStepForm}>
                   編集を閉じる
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="primary"
                   onClick={() => void handleSaveStep()}
                   disabled={stepSaving}
-                  className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-bold disabled:opacity-40"
                 >
                   {stepSaving ? '保存中…' : '変更を保存'}
-                </button>
+                </Button>
               </div>
             ) : (
               /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
@@ -1590,9 +1585,12 @@ export default function ScenarioDetailClient({
                 <button
                   type="button"
                   onClick={() => void handleConcurrentChange(!(scenario.allowConcurrent ?? true))}
+                  title="別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。"
                   className="text-info mt-1 text-left text-xs hover:underline"
                 >
-                  {(scenario.allowConcurrent ?? true) ? '重複購読を許可中' : '重複購読を防止中'}
+                  {(scenario.allowConcurrent ?? true)
+                    ? '同時購読を許可中'
+                    : '同時に購読できるシナリオは 1つ'}
                 </button>
               </SettingCard>
 

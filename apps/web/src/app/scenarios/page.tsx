@@ -60,8 +60,8 @@ function StartScenarioDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div className="bg-canvas border-hairline max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-card border shadow-xl">
+    <div className="bg-ink/45 fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
+      <div className="bg-canvas border-hairline max-h-screen w-full max-w-5xl overflow-y-auto rounded-card border shadow-xl">
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
@@ -107,8 +107,8 @@ function StartScenarioDialog({
         </div>
         {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
         <div className="border-hairline flex justify-end gap-3 border-t px-6 py-4">
-          <button type="button" onClick={onCancel} disabled={busy} className="border-hairline text-ink-secondary rounded-control border px-5 py-2 text-sm">戻る</button>
-          <button type="button" onClick={onConfirm} disabled={busy} className="bg-accent-deep text-on-accent rounded-control px-5 py-2 text-sm font-bold disabled:opacity-50">{busy ? '開始中…' : 'シナリオを開始'}</button>
+          <Button onClick={onCancel} disabled={busy}>戻る</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy}>{busy ? '開始中…' : 'シナリオを開始'}</Button>
         </div>
       </div>
     </div>
