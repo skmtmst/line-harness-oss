@@ -436,15 +436,18 @@
   },
   "app/webinars/edit/page.tsx": {
     "direct-th": 13,
-    "unresolved-classname": 8,
-    "arbitrary-value": 22,
+    "unresolved-classname": 9,
+    "arbitrary-value": 26,
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
     "direct-primary-button": 1,
     "direct-secondary-button": 2,
-    "unresolved-classname": 1,
-    "arbitrary-value": 2
+    "unresolved-classname": 2,
+    "arbitrary-value": 9
+  },
+  "app/webinars/published/page.tsx": {
+    "arbitrary-value": 5
   },
   "components/accounts/account-form-fields.tsx": {
     "arbitrary-value": 3

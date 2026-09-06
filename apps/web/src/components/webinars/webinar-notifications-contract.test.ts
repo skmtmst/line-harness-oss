@@ -94,7 +94,8 @@ describe('読めなかったとき', () => {
 
 describe('編集画面の STEP 4', () => {
   it('段の中身が「まだ繋がっていません」から実物へ変わった', () => {
-    expect(EDIT).toContain('<WebinarNotifications webinarId={webinar.id} />')
+    expect(EDIT).toContain('<NotificationDesignStep webinarId={webinar.id} registrations={registrations} />')
+    expect(EDIT).toContain('<WebinarNotifications webinarId={webinarId} />')
     expect(STEPS, '未接続の印が残っている').not.toContain("notConnected: '通知・リマインドの設定'")
   })
 })

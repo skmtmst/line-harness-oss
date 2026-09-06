@@ -18,10 +18,12 @@ describe('V6 シナリオ開始・停止確認', () => {
     expect(PAGE).toContain('これまでの配信履歴は残ります。')
   })
 
-  it('開始と停止で動詞と危険度を分ける', () => {
-    expect(PAGE).toContain("confirmLabel={toggleTarget.isActive ? 'シナリオを停止' : 'シナリオを開始'}")
-    expect(PAGE).toContain('destructive={toggleTarget.isActive}')
-    expect(PAGE).toContain('開始後に登録された友だちから配信対象になります。')
+  it('開始は広い事前確認、停止は危険操作の共通窓に分ける', () => {
+    expect(PAGE).toContain('<StartScenarioDialog')
+    expect(PAGE).toContain('開始するシナリオ')
+    expect(PAGE).toContain('開始後に起きること')
+    expect(PAGE).toContain('confirmLabel="シナリオを停止"')
+    expect(PAGE).toContain('destructive')
   })
 
   it('失敗時は窓を閉じず、内部エラーを出さずに再試行できる', () => {

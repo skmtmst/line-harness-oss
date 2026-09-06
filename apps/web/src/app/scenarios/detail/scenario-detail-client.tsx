@@ -13,6 +13,8 @@ import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import StepPreview from '@/components/scenarios/step-preview'
+import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
   emptyMessageKindState,
   parseMessageKind,
@@ -1200,34 +1202,27 @@ export default function ScenarioDetailClient({
         以前は編集を閉じて表へ戻らないと、前後の通が見えなかった。
       */}
       <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
-        <div className="bg-canvas border-hairline rounded-card border p-4">
-          <h4 className="text-ink text-sm font-bold">配信の流れ</h4>
-          <p className="text-ink-faint mt-0.5 text-xs">いま編集しているのは緑の行です。</p>
-          {sortedSteps.length === 0 ? (
-            <p className="text-ink-faint mt-3 text-xs">保存すると、ここに並びます。</p>
-          ) : (
-            <ol className="mt-3 space-y-1.5">
-              {sortedSteps.map((row) => {
-                const current = editingStepId === row.id
-                const rowTitle =
-                  (row.templateId ? templates.find((t) => t.id === row.templateId)?.name : null) ??
-                  (row.messageContent || '').split('\n')[0].slice(0, 24)
-                return (
-                  <li
-                    key={row.id}
-                    className={`rounded-control flex items-center gap-2 px-2 py-1.5 text-xs ${
-                      current ? 'bg-accent-soft text-accent font-semibold' : 'bg-canvas-sunken text-ink-secondary'
-                    }`}
-                  >
-                    <span className="shrink-0 tabular-nums">{row.stepOrder}通目</span>
-                    <span className="shrink-0">{formatScheduleLabel(deliveryMode, row)}</span>
-                    <span className="min-w-0 flex-1 truncate">{rowTitle}</span>
-                  </li>
-                )
-              })}
-            </ol>
-          )}
-        </div>
+        <StepPreview
+          deliveryMode={deliveryMode}
+          offsetDays={stepForm.schedule.offsetDays}
+          deliveryTime={stepForm.schedule.deliveryTime}
+          offsetHours={stepForm.schedule.offsetHours}
+          kind={(stepForm.question
+            ? 'question'
+            : stepForm.messageType === 'flex'
+              ? 'text'
+              : stepForm.messageType) as StepMessageKind}
+          templateName={
+            stepForm.templateId
+              ? templates.find((template) => template.id === stepForm.templateId)?.name
+              : null
+          }
+          body={stepForm.messageContent}
+          imageUrl={null}
+          question={stepForm.question}
+          kindState={kindState}
+          audienceLabel={describeStepAudience(stepForm.targetCondition, tags)}
+        />
 
         <div className="bg-canvas border-hairline rounded-card border p-4">
           <h4 className="text-ink text-sm font-bold">設定内容</h4>
@@ -1339,13 +1334,31 @@ export default function ScenarioDetailClient({
 
       <div data-design="Head">
         <Header
-          title="シナリオ編集"
-          description="配信のタイミングと内容を並べます。開始するには友だち追加時の配信やアクションから呼び出します。"
+          title={editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ編集'}
+          description={
+            editingStepId
+              ? `${scenario.name}の配信タイミング・メッセージ・対象・送信後の動きをまとめて編集します。`
+              : '配信のタイミングと内容を並べます。開始するには友だち追加時の配信やアクションから呼び出します。'
+          }
           action={
-            /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
-               一覧へ戻る導線は設計では最下部にあり、ここには置かない
-               （下の「シナリオ一覧に戻る」がそれ）。 */
-            <div className="flex flex-wrap items-center gap-2">
+            editingStepId ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={closeStepForm}>
+                  編集を閉じる
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => void handleSaveStep()}
+                  disabled={stepSaving}
+                >
+                  {stepSaving ? '保存中…' : '変更を保存'}
+                </Button>
+              </div>
+            ) : (
+              /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
+                 一覧へ戻る導線は設計では最下部にあり、ここには置かない
+                 （下の「シナリオ一覧に戻る」がそれ）。 */
+              <div className="flex flex-wrap items-center gap-2">
               <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
               <button
                 disabled
@@ -1380,11 +1393,18 @@ export default function ScenarioDetailClient({
               >
                 {saving ? '保存中…' : '保存'}
               </button>
-            </div>
+              </div>
+            )
           }
         />
       </div>
 
+      {editingStepId ? (
+        <section data-design-node="xfYLn" className="bg-canvas rounded-card border-hairline border p-5">
+          {renderStepForm()}
+        </section>
+      ) : (
+      <>
       {showStarted ? (
         <div
           data-design-node="NrBkW"
@@ -1419,43 +1439,6 @@ export default function ScenarioDetailClient({
         <span className="text-ink-secondary text-xs">
           このすぐ下の「開始のきっかけ」から設定できます。
         </span>
-      </section>
-
-      {/*
-        同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
-
-        右で切り替えられる。これまでは文だけ置いて「許可しない」と書いて
-        いたが、実際は列（allow_concurrent）で持っていて、作るときにしか
-        決められなかった。読むだけの説明の隣に、それを決める場所が無い。
-      */}
-      <section className="bg-info-bg rounded-card mb-4 flex flex-wrap items-start gap-4 p-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
-          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-            別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
-          </p>
-        </div>
-        <div className="border-hairline bg-canvas rounded-control flex shrink-0 overflow-hidden border">
-          {[
-            { value: false, label: '重複を許可しない' },
-            { value: true, label: '許可する' },
-          ].map((opt) => {
-            const on = (scenario.allowConcurrent ?? true) === opt.value
-            return (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => void handleConcurrentChange(opt.value)}
-                aria-pressed={on}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  on ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-                }`}
-              >
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
       </section>
 
       {error && (
@@ -1599,6 +1582,16 @@ export default function ScenarioDetailClient({
                       ? '配信を一時停止する'
                       : '配信を再開する'}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => void handleConcurrentChange(!(scenario.allowConcurrent ?? true))}
+                  title="別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。"
+                  className="text-info mt-1 text-left text-xs hover:underline"
+                >
+                  {(scenario.allowConcurrent ?? true)
+                    ? '同時購読を許可中'
+                    : '同時に購読できるシナリオは 1つ'}
+                </button>
               </SettingCard>
 
               {/*
@@ -1625,20 +1618,12 @@ export default function ScenarioDetailClient({
                     {triggerCount === 0 ? 'アクションなどから開始できます' : '押すと足せます'}
                   </span>
                 </button>
-              </SettingCard>
-
-              <SettingCard label="対象の絞り込み">
                 <button
                   type="button"
                   onClick={() => setAudienceOpen(true)}
-                  className="text-left"
+                  className="text-info mt-1 block text-left text-xs hover:underline"
                 >
-                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
-                    {describeCondition((scenario.audienceCondition as SegmentCondition | null) ?? null)}
-                  </span>
-                  <span className="text-ink-faint mt-0.5 block text-xs">
-                    押すと条件を組み立てられます
-                  </span>
+                  対象：{describeCondition((scenario.audienceCondition as SegmentCondition | null) ?? null)}
                 </button>
               </SettingCard>
 
@@ -2037,6 +2022,8 @@ export default function ScenarioDetailClient({
           このシナリオを削除
         </button>
       </div>
+      </>
+      )}
 
       <BulkPreviewModal
         open={previewOpen}
