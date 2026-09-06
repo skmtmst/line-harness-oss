@@ -19,6 +19,7 @@ const DEFAULT_TENANT_ID = '00000000-0000-4000-8000-000000000001';
 type D1Envelope<T> = {
   success: boolean;
   result?: Array<{ success: boolean; results?: T[] }>;
+  errors?: Array<{ code?: number; message?: string }>;
 };
 
 type VerificationTarget = {
@@ -34,6 +35,53 @@ type ApiEnvelope<T> = { success: boolean; data: T };
 type DueEnrollment = { id: string };
 
 const INSERT_BATCH_SIZE = 10;
+
+function d1FailureCategory(body: D1Envelope<unknown> | null): string {
+  const message = body?.errors?.map((error) => error.message ?? '').join(' ').toLowerCase() ?? '';
+  if (message.includes('foreign key constraint')) return 'foreign-key-constraint';
+  if (message.includes('no such table')) return 'missing-table';
+  if (message.includes('no such column')) return 'missing-column';
+  if (message.includes('too many sql variables')) return 'too-many-bindings';
+  if (message.includes('syntax error')) return 'syntax';
+  if (message.includes('locked') || message.includes('busy')) return 'database-busy';
+  return 'unknown';
+}
+
+function quoteIdentifier(identifier: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error('Unexpected staging schema identifier');
+  }
+  return `"${identifier}"`;
+}
+
+export async function findSyntheticFriendReferences(
+  query: QueryD1,
+  lineUserIdPattern: string,
+): Promise<string[]> {
+  const foreignKeys = await query<{ table_name: string; column_name: string }>(
+    `SELECT schema_table.name AS table_name, foreign_key."from" AS column_name
+       FROM sqlite_schema AS schema_table
+       JOIN pragma_foreign_key_list(schema_table.name) AS foreign_key
+      WHERE schema_table.type = 'table'
+        AND foreign_key."table" = 'friends'
+      ORDER BY schema_table.name, foreign_key."from"`,
+  );
+  const references: string[] = [];
+  for (const foreignKey of foreignKeys) {
+    const table = quoteIdentifier(foreignKey.table_name);
+    const column = quoteIdentifier(foreignKey.column_name);
+    const rows = await query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM ${table}
+        WHERE ${column} IN (
+          SELECT id FROM friends WHERE line_user_id LIKE ?
+        )`,
+      [lineUserIdPattern],
+    );
+    const count = Number(rows[0]?.count ?? 0);
+    if (count > 0) references.push(`${foreignKey.table_name}.${foreignKey.column_name}=${count}`);
+  }
+  return references;
+}
 
 function required(name: string, value: string | undefined): string {
   if (!value?.trim()) throw new Error(`${name} is required`);
@@ -71,6 +119,8 @@ export function readVerificationTarget(config: string): VerificationTarget {
 
 export function createD1Query(target: VerificationTarget, apiToken: string): QueryD1 {
   return async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+    let lastStatus = 0;
+    let lastBody: D1Envelope<T> | null = null;
     for (let attempt = 1; attempt <= D1_MAX_ATTEMPTS; attempt++) {
       let response: Response | null = null;
       try {
@@ -90,6 +140,7 @@ export function createD1Query(target: VerificationTarget, apiToken: string): Que
       }
       let body: D1Envelope<T> | null = null;
       if (response) {
+        lastStatus = response.status;
         try {
           body = await response.json() as D1Envelope<T>;
         } catch {
@@ -97,6 +148,7 @@ export function createD1Query(target: VerificationTarget, apiToken: string): Que
           // because every verification mutation is idempotent.
         }
       }
+      if (body) lastBody = body;
       const result = body?.result?.[0];
       if (response?.ok && body?.success && result?.success) {
         return result.results ?? [];
@@ -105,7 +157,14 @@ export function createD1Query(target: VerificationTarget, apiToken: string): Que
         await new Promise((resolve) => setTimeout(resolve, 250 * (2 ** (attempt - 1))));
       }
     }
-    throw new Error(`Staging D1 query failed after ${D1_MAX_ATTEMPTS} attempts`);
+    const providerCodes = (lastBody?.errors ?? [])
+      .map((error) => error.code)
+      .filter((code): code is number => typeof code === 'number')
+      .join(',') || 'none';
+    throw new Error(
+      `Staging D1 query failed after ${D1_MAX_ATTEMPTS} attempts`
+      + ` (http=${lastStatus || 'none'}, provider=${providerCodes}, category=${d1FailureCategory(lastBody)})`,
+    );
   };
 }
 
@@ -363,8 +422,26 @@ async function main(): Promise<void> {
     for (const cleanup of cleanups) {
       try {
         await cleanup.run();
-      } catch {
-        cleanupFailures.push(cleanup.name);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'unknown cleanup failure';
+        if (cleanup.name === 'friends') {
+          try {
+            const references = await findSyntheticFriendReferences(
+              query,
+              `verify-b88-line-${runId}-%`,
+            );
+            cleanupFailures.push(
+              `friends[references=${references.join(',') || 'none'}; reason=${reason}]`,
+            );
+          } catch (diagnosticError) {
+            const diagnosticReason = diagnosticError instanceof Error
+              ? diagnosticError.message
+              : 'unknown reference diagnostic failure';
+            cleanupFailures.push(`friends[reason=${reason}; diagnostic=${diagnosticReason}]`);
+          }
+        } else {
+          cleanupFailures.push(`${cleanup.name}[reason=${reason}]`);
+        }
       }
     }
   }
@@ -383,12 +460,13 @@ async function main(): Promise<void> {
         `verify-b88-scenario-${runId}`,
         `verify-b88-line-${runId}-%`,
         `verify-b88-scenario-${runId}`,
-        notificationRuleId,
+        notificationRuleId ?? '',
       ],
     );
     leftoverCount = Number(leftovers[0]?.count ?? 0);
-  } catch {
-    cleanupFailures.push('leftover-check');
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'unknown leftover-check failure';
+    cleanupFailures.push(`leftover-check[reason=${reason}]`);
   }
   if (cleanupFailures.length !== 0 || leftoverCount !== 0) {
     throw new Error(

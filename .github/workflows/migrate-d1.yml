@@ -218,7 +218,7 @@ jobs:
           fi
 
   verify-operational-path:
-    if: inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development'
+    if: inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && (github.ref == 'refs/heads/codex/development' || github.ref == 'refs/heads/codex/kenta-r2-codex-b285')
     environment:
       name: staging
     runs-on: ubuntu-latest
