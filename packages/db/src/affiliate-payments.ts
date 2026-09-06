@@ -9,14 +9,18 @@ export interface AffiliatePaymentSummary {
   heldConversions: number;
   heldReward: number;
   holdStatusUnknown: number;
+  unsettledConversions: number;
+  unsettledReward: number;
+  settledConversions: number;
+  settledReward: number;
 }
 
 /**
  * 選択中のLINE公式アカウントについて、支払い画面で安全に表示できる範囲だけを集計する。
  *
- * 支払済み台帳はまだ無いため、ここで返す金額は「未払い」ではなく
- * 「承認済みの合計」である。割合方式は成果時点の金額×紹介者の率、
- * 定額方式は成果に結びついた案件の固定額を使う。
+ * 承認済み全体、保留中、支払い確定前、確定済みを分けて返す。
+ * 割合方式は成果時点の金額×紹介者の率、定額方式は成果に結びついた
+ * 案件の固定額を使う。
  */
 export async function getAffiliatePaymentSummaries(
   db: D1Database,
@@ -71,6 +75,50 @@ export async function getAffiliatePaymentSummaries(
            THEN 1 ELSE 0
          END
        ), 0) AS hold_status_unknown
+       , COALESCE(SUM(
+         CASE WHEN ce.id IS NOT NULL
+          AND ce.approved_at IS NOT NULL
+          AND (
+            COALESCE(a.hold_days, 0) = 0
+            OR julianday(ce.approved_at) <= julianday(?, '-' || a.hold_days || ' days')
+          )
+          AND NOT EXISTS (
+           SELECT 1 FROM affiliate_reward_entries re
+            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+         ) THEN 1 ELSE 0 END
+       ), 0) AS unsettled_conversions
+       , COALESCE(SUM(
+         CASE WHEN ce.id IS NOT NULL
+          AND ce.approved_at IS NOT NULL
+          AND (
+            COALESCE(a.hold_days, 0) = 0
+            OR julianday(ce.approved_at) <= julianday(?, '-' || a.hold_days || ' days')
+          )
+          AND NOT EXISTS (
+           SELECT 1 FROM affiliate_reward_entries re
+            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+         ) THEN CASE
+           WHEN a.commission_rate > 0
+             THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
+           ELSE COALESCE(off.reward_amount, 0)
+         END ELSE 0 END
+       ), 0) AS unsettled_reward
+       , COALESCE(SUM(
+         CASE WHEN ce.id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM affiliate_reward_entries re
+            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+         ) THEN 1 ELSE 0 END
+       ), 0) AS settled_conversions
+       , COALESCE(SUM(
+         CASE WHEN ce.id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM affiliate_reward_entries re
+            WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+         ) THEN CASE
+           WHEN a.commission_rate > 0
+             THEN COALESCE(ce.value_snapshot, cp.value, 0) * a.commission_rate / 100.0
+           ELSE COALESCE(off.reward_amount, 0)
+         END ELSE 0 END
+       ), 0) AS settled_reward
      FROM affiliates a
      JOIN scoped_affiliate_ids scoped ON scoped.id = a.id
      LEFT JOIN conversion_events ce
@@ -98,6 +146,8 @@ export async function getAffiliatePaymentSummaries(
     lineAccountId,
     now,
     now,
+    now,
+    now,
     lineAccountId,
     lineAccountId,
     lineAccountId,
@@ -113,6 +163,10 @@ export async function getAffiliatePaymentSummaries(
     held_conversions: number;
     held_reward: number;
     hold_status_unknown: number;
+    unsettled_conversions: number;
+    unsettled_reward: number;
+    settled_conversions: number;
+    settled_reward: number;
   }>();
 
   return result.results.map((row) => ({
@@ -126,5 +180,9 @@ export async function getAffiliatePaymentSummaries(
     heldConversions: Number(row.held_conversions),
     heldReward: Math.round(Number(row.held_reward)),
     holdStatusUnknown: Number(row.hold_status_unknown),
+    unsettledConversions: Number(row.unsettled_conversions),
+    unsettledReward: Math.round(Number(row.unsettled_reward)),
+    settledConversions: Number(row.settled_conversions),
+    settledReward: Math.round(Number(row.settled_reward)),
   }));
 }

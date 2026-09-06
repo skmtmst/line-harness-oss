@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
 const NEW_AFFILIATE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const NEW_OFFER = readFileSync(new URL('../affiliate-offers/new/page.tsx', import.meta.url), 'utf8')
+const ACTION_DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
 
 function section(source: string, start: string, end: string): string {
   const from = source.indexOf(start)
@@ -54,6 +55,25 @@ describe('機能16 V6の一覧', () => {
     ]) {
       expect(approvals).toContain(word)
     }
+  })
+})
+
+describe('機能16 V6の確認画面', () => {
+  it('紹介者の停止・アーカイブは影響を読んで記録を残す', () => {
+    expect(TABS).toContain('<AffiliateArchiveDialog')
+    expect(ACTION_DIALOGS).toContain('designNode="QX70l"')
+    expect(ACTION_DIALOGS).toContain('api.affiliates.archiveImpact')
+    expect(ACTION_DIALOGS).toContain('api.affiliates.archive')
+    expect(ACTION_DIALOGS).toContain('過去の成果・報酬・支払いの記録は消えません')
+    expect(ACTION_DIALOGS).toContain('確認のため「{target?.name}」と打ってください')
+  })
+
+  it('影響確認は読込・通常・空・失敗を分ける', () => {
+    expect(ACTION_DIALOGS).toContain('使われている場所を確認しています')
+    expect(ACTION_DIALOGS).toContain('使われている場所を確認できませんでした')
+    expect(ACTION_DIALOGS).toContain('確認できる情報がありません')
+    expect(ACTION_DIALOGS).toContain("phase === 'loading'")
+    expect(ACTION_DIALOGS).toContain("phase === 'error'")
   })
 })
 

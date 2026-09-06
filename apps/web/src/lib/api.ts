@@ -364,6 +364,40 @@ export type AffiliatePaymentSummary = {
   heldConversions: number
   heldReward: number
   holdStatusUnknown: number
+  unsettledConversions: number
+  unsettledReward: number
+  settledConversions: number
+  settledReward: number
+}
+
+export type AffiliateArchiveImpact = {
+  affiliateId: string
+  affiliateName: string
+  lifecycle: 'active' | 'paused' | 'archived'
+  activeLinks: number
+  unsettledConversions: number
+  unsettledReward: number
+  pendingConversions: number
+  checkedAt: string
+}
+
+export type AffiliateSettlementPreview = {
+  affiliateId: string
+  affiliateName: string
+  code: string
+  amount: number
+  conversionCount: number
+  periodFrom: string | null
+  periodTo: string
+  closeDate: string | null
+  paymentDate: string | null
+  bankDestination: string | null
+  breakdown: Array<{
+    offerName: string
+    conversions: number
+    unitReward: number | null
+    subtotal: number
+  }>
 }
 
 /** Broadcast type from API (now camelCase after worker serialization) */
@@ -4049,6 +4083,17 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    archiveImpact: (id: string) =>
+      fetchApi<ApiResponse<AffiliateArchiveImpact>>(`/api/affiliates/${id}/archive-impact`),
+    archive: (id: string, data: { mode: 'pause' | 'archive'; confirmationName?: string }) =>
+      fetchApi<ApiResponse<{
+        affiliateId: string
+        lifecycle: 'paused' | 'archived'
+        recordsPreserved: true
+      }>>(`/api/affiliates/${id}/archive`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     report: (id: string, params?: { startDate?: string; endDate?: string }) =>
       fetchApi<ApiResponse<{ affiliateId: string; affiliateName: string; code: string; commissionRate: number; totalClicks: number; totalConversions: number; totalRevenue: number }>>(
         `/api/affiliates/${id}/report?` + new URLSearchParams(params as Record<string, string>),
@@ -4125,11 +4170,29 @@ export const api = {
         data: AffiliatePaymentSummary[]
         limitations: {
           payoutHistory: false
+          settlementHistory: true
           bankDestination: false
           settlementSchedule: false
         }
         error?: string
       }>(`/api/affiliate-payments?${new URLSearchParams({ lineAccountId })}`),
+    paymentPreview: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<AffiliateSettlementPreview>>(
+        `/api/affiliate-payments/${id}/preview?${new URLSearchParams({ lineAccountId })}`,
+      ),
+    confirmPayment: (
+      id: string,
+      data: { lineAccountId: string; expectedAmount: number; idempotencyKey: string },
+    ) => fetchApi<ApiResponse<{
+      kind: 'created' | 'duplicate'
+      settlementId: string
+      amount: number
+      conversionCount: number
+      closedAt: string
+    }>>(`/api/affiliate-payments/${id}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   },
   templates: {
     list: (category?: string, accountId?: string) => {
