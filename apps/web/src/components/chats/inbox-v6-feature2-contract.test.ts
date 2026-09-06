@@ -150,9 +150,11 @@ describe('Xi4x9 右パネルの表示項目', () => {
     expect(panel).toContain('右パネルの表示項目')
   })
 
-  it('掴んで動かす形は無いので「ドラッグ」と書かない', () => {
-    expect(panel).not.toContain('ドラッグ')
-    expect(panel).toContain('上へ／下へ')
+  it('設計どおり掴んで順番を変えられる', () => {
+    expect(panel).toContain('ドラッグで順番変更')
+    expect(panel).toContain('draggable')
+    expect(panel).toContain('onDragStart')
+    expect(panel).toContain('moveGroupBefore')
   })
 
   it('出し入れは素のチェックを土台にした入／切で読み上げにも伝わる', () => {
@@ -167,7 +169,7 @@ describe('Xi4x9 右パネルの表示項目', () => {
 
   it('全部隠しても戻せる道と、閉じる道を置く', () => {
     expect(panel).toContain('初期状態に戻す')
-    expect(panel).toContain('setSectionOrder(DETAIL_SECTIONS.map((item) => item.key))')
+    expect(panel).toContain('setSectionOrder(DEFAULT_SECTION_ORDER)')
     expect(panel).toContain('setHiddenSections([])')
     expect(panel).toContain('完了')
   })

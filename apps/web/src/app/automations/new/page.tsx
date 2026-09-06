@@ -242,48 +242,57 @@ export default function NewAutomationPage() {
         />
       </div>
 
+      <div className="mb-3 grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
+        <SummaryStep number={1} label="きっかけ" value={selectedEvent.label} />
+        <SummaryStep number={2} label="だれに" value={targetSummary} />
+        <SummaryStep number={3} label="すること" value={actionSummary || '処理を選んでください'} active />
+      </div>
+
       <div data-design="Body" className={styles.body}>
         <div data-design="Left" className={styles.stack}>
           <Step
             step={1}
             done={Boolean(name.trim())}
-            title="どのルールか"
-            note="一覧に表示される名前です。"
+            title="どんなときに動かしますか"
+            note="何が起きたら動かすか。ここで選んだ出来事が起きた人だけが対象になります。"
           >
-            <label className={styles.label} htmlFor="au-name">
-              ルール名<span className={styles.required}>必須</span>
-            </label>
-            <div className={styles.field}>
-              <TextField
-                id="au-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="例: 「予約」と送られたらタグを付ける"
-                maxLength={120}
-              />
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              {EVENTS.map((event) => (
+                <button
+                  key={event.value}
+                  type="button"
+                  className={`${styles.eventCard} ${eventType === event.value ? styles.eventCardSelected : ''}`}
+                  onClick={() => setEventType(event.value)}
+                >
+                  <span className="text-sm font-bold text-ink">{event.label}</span>
+                  <span className="line-clamp-2 text-xs leading-5 text-ink-faint">{event.note}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 grid items-center gap-3 lg:grid-cols-3">
+              <label className={styles.label} htmlFor="au-name">
+                名前（あとで見分けるため）<span className={styles.required}>必須</span>
+                <span className="mt-1 block text-xs font-normal text-ink-faint">どのルールか。一覧に表示される名前です。</span>
+              </label>
+              <div className="lg:col-span-2">
+                <TextField
+                  id="au-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="例: 「予約」と送られたらタグを付ける"
+                  maxLength={120}
+                />
+              </div>
             </div>
           </Step>
 
           <Step
             step={2}
             done
-            title="何が起きたら動かすか"
-            note="ここで選んだ出来事が起きた人だけが対象になります。"
+            title="だれに動かしますか"
+            note="条件を付けないと、きっかけに当てはまった人全員に動きます。"
           >
-            <label className={styles.label} htmlFor="au-event">
-              きっかけ<span className={styles.required}>必須</span>
-            </label>
-            <div className={styles.field}>
-              <SelectField
-                id="au-event"
-                value={eventType}
-                onChange={(event) => setEventType(event.target.value)}
-                options={EVENTS.map((event) => ({ value: event.value, label: event.label }))}
-                className={styles.select}
-              />
-              <p className={styles.note}>{selectedEvent.note}</p>
-            </div>
-
             {usesKeyword ? (
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="au-keyword">
@@ -301,9 +310,11 @@ export default function NewAutomationPage() {
                 </div>
               </div>
             ) : null}
-            <p>
-              条件を足す（15の軸から選べます）: 共通の条件編集を接続後に利用できます。現在は上の条件だけで動きます。
-            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {usesKeyword && keyword.trim() ? <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span> : <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>}
+              <button type="button" disabled className={styles.conditionAdd}>条件を足す（15の軸から選べます）</button>
+            </div>
+            <p className="mt-3 text-xs font-bold text-info">いまの条件に当てはまる友だち　—（見込み人数の集計は未接続）</p>
           </Step>
 
           <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
@@ -324,6 +335,7 @@ export default function NewAutomationPage() {
                     </button>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3">
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor={`au-action-${row.key}`}>
                       すること<span className={styles.required}>必須</span>
@@ -385,6 +397,7 @@ export default function NewAutomationPage() {
                       </div>
                     </div>
                   )}
+                  </div>
                   <p>
                     失敗したとき: 現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
                   </p>
@@ -530,5 +543,14 @@ function Step({
       </div>
       <div className={styles.field}>{children}</div>
     </section>
+  )
+}
+
+function SummaryStep({ number, label, value, active = false }: { number: number; label: string; value: string; active?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span className={`${styles.stepBadge} ${active ? '' : styles.stepBadgeIdle}`}>{number}</span>
+      <span className="flex min-w-0 flex-col"><small className="text-xs font-bold text-ink-faint">{label}</small><strong className="truncate text-sm text-ink" title={value}>{value}</strong></span>
+    </div>
   )
 }
