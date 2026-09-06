@@ -1037,33 +1037,34 @@ export const SCREENS = [
     #221 で5段と右サマリーを足した。各段の入力分割は次の修正点として残る。
   */
   { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #221 / PR #956 で構造一致・集計未接続。** `/auto-replies` を割当ポート3104/8791で1440/1920px撮影（はみ出し0）。設計の4指標、フォルダ、検索、保存した条件、6列表を同Node画像と比較し、行に「部分一致 3語 / テンプレート＋対応マーク」形式の副題を追加。「準備中」は0件。アクション実行数と競合要確認数は一覧APIに集計が無いため `—` と接続条件を表示しており、設計の実数にはできない。取得元 `auto-replies-v6/cmDfJ.txt`。',
-    verdictHead: '235d99f10', },
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 一覧APIと全体競合集計APIへ接続し、ルール数・今月の応答・累計、アクション実行214回、要確認3件、フォルダ別件数と5行の実データを表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並びで4指標、案内帯、検索・並び順、フォルダ、6列表を比較。両幅とも横はみ出し0で、未接続の `—` は解消した。',
+    verdictSource: 'auto-replies-v6/cmDfJ.png + docs/design-qa/auto-replies-v6/cmDfJ-{1440,1920}.png + cmDfJ.txt',
+    verdictHead: '06d05c170', },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 基本設定だけを独立した段に分け、ルール名・フォルダ・優先順位、反応条件要約、ひな形3件、右の設定内容・LINEプレビュー、固定操作帯を設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは社内メモを保存せず、競合件数も基本設定の取得口に無いため、その2値は未接続表示。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・公開版・テンプレート・競合集計APIへ接続し、自動応答名、フォルダ、優先順位、社内メモ、反応条件要約、ひな形3件、過去28日の応答214件、同時に当たるルール2件を実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、社内メモと競合件数の未接続表示は解消した。',
     verdictSource: 'auto-replies-v6/K7vg2.png + docs/design-qa/auto-replies-v6/K7vg2-{1440,1920}.png + K7vg2.txt',
-    verdictHead: '1a0b0291e',
+    verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=basic',
 
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 反応条件だけを独立した段に分け、複数キーワードのOR/AND、一致方法、曜日・時間帯・受信元、友だち条件、右の判定要約と過去28日欄を設計順に配置した。友だち条件は「条件を編集」で実際の条件ビルダーを開ける。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。固定データはキーワード1件で、現行APIは受信元と過去28日の該当件数を返さないためデータ待ち。',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で構造一致・契約データ待ち。** 下書きと集計APIへ接続し、キーワード、一致方法、曜日・時間帯、友だち条件、28日間の一致214件、実測受信5,842件と種別内訳（テキスト5,740・画像76・スタンプ26）を表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較、両幅とも横はみ出し0。現行契約は受信メッセージ種別の集計を返すが、設計の「受信元 LINE・メール」の保存値を返さないため、その1項目だけ作り物にせず未表示とした。',
     verdictSource: 'auto-replies-v6/nzWIX.png + docs/design-qa/auto-replies-v6/nzWIX-{1440,1920}.png + nzWIX.txt',
-    verdictHead: '1a0b0291e',
+    verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=trigger',
 
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #292 / UI HEAD `1a0b0291e` で構造一致・データ未接続。** 返信と後続処理だけを独立した段に分け、返し方、テンプレート/本文、差し込み項目、配信後アクション、待ち時間・連続返信・未一致時、右の返信要約とLINEプレビューを設計順に配置した。3106/8793で1440/1920px撮影し、同Node画像と横並び比較、横はみ出し0。現行APIは返信遅延と未一致時の別動作を保存しないため、画面では作り物を保存せず未接続理由を表示。',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #375 / UI HEAD `06d05c170` で一致。** 下書き・テンプレートAPIへ接続し、返し方、テンプレート選択、後続処理2件、返信待ち時間、連続返信5分、未一致時の担当者引き継ぎ、有効状態とLINEプレビューを実データで表示した。統合 #1132 の固定データを使って3101/8788で1440/1920px撮影し、同Node画像と横並び比較。両幅とも横はみ出し0で、返信遅延と未一致時動作の未接続表示は解消した。',
     verdictSource: 'auto-replies-v6/ivDoe.png + docs/design-qa/auto-replies-v6/ivDoe-{1440,1920}.png + ivDoe.txt',
-    verdictHead: '1a0b0291e',
+    verdictHead: '06d05c170',
     route: '/auto-replies/edit?id=ar-2&step=response',
 
   },
