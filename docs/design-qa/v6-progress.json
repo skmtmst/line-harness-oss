@@ -8,8 +8,8 @@
   "missing": 18,
   "match": 6,
   "structureMatchDataPending": 36,
-  "needsFix": 126,
-  "unjudged": 83,
+  "needsFix": 178,
+  "unjudged": 31,
   "remaining": 262,
   "features": [
     {
@@ -53,8 +53,8 @@
       "missing": 0,
       "match": 3,
       "structureMatchDataPending": 1,
-      "needsFix": 1,
-      "unjudged": 13,
+      "needsFix": 14,
+      "unjudged": 0,
       "remaining": 15,
       "capturedAt": [
         {
@@ -159,8 +159,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 10,
+      "needsFix": 10,
+      "unjudged": 0,
       "remaining": 12,
       "capturedAt": [
         {
@@ -256,8 +256,8 @@
       "missing": 4,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 15,
+      "needsFix": 17,
+      "unjudged": 0,
       "remaining": 17,
       "capturedAt": [
         {
@@ -417,8 +417,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 14,
+      "needsFix": 14,
+      "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
         {
