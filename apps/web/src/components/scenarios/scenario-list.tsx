@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
+import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
+import Button from '@/components/shared/button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
@@ -43,6 +45,7 @@ interface ScenarioListProps {
   /** 掴んで並べ替えたときに、見えている順で呼ばれる。 */
   onReorder?: (ids: string[]) => void
   loading?: boolean
+  onCreate?: () => void
 }
 
 /**
@@ -60,6 +63,7 @@ export default function ScenarioList({
   onMoveFolder,
   onReorder,
   loading,
+  onCreate,
 }: ScenarioListProps) {
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
@@ -174,9 +178,18 @@ export default function ScenarioList({
     return (
       <>
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <p className="text-ink-faint text-sm">
-            シナリオがありません。「＋ シナリオを作成」から作ってください。
-          </p>
+          <ListPlus aria-hidden className="text-ink-faint mx-auto" size={24} />
+          <p className="text-ink mt-3 text-sm font-bold">まだシナリオがありません</p>
+          <p className="text-ink-faint mt-1 text-xs">1つ作ると、順番に届く配信をここで管理できます。</p>
+          {onCreate ? (
+            <Button
+              variant="primary"
+              onClick={onCreate}
+              className="mt-3"
+            >
+              ＋ シナリオを作る
+            </Button>
+          ) : null}
         </div>
         {confirmDialog}
       </>
