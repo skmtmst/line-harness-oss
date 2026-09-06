@@ -2539,6 +2539,7 @@ const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = 
   id, owner_name: owner, pet_name: pet, caption,
   image_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="%23eef6f0"/></svg>',
   status,
+  review_version: 1,
   created_at: new Date(Date.parse('2026-08-25T09:00:00.000Z') - hours * 3600 * 1000).toISOString(),
   publication_consent_at: '2026-08-20T00:00:00.000Z',
   publication_withdrawn_at: null,
@@ -2557,11 +2558,47 @@ export const NEN_PHOTOS = [
   petPhoto('ph-1', '高橋 直人', 'もも', '朝のおさんぽ', 'pending', 48),
   petPhoto('ph-2', '前田 さくら', 'そら', 'はじめてのトリミング', 'pending', 44),
   petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
-  petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'approved', 14),
-  petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'approved', 8),
+  petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'adopted', 14),
+  petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'adopted', 8),
   /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。** */
   petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'other_person', '人の顔が写っています'),
 ]
+
+export const NEN_PHOTO_DETAIL = {
+  ...NEN_PHOTOS[0], pet_name: 'レオくん', owner_name: '大西 健一（LINE 本店）',
+  caption: 'はじめて海に行きました', image_width: 2048, image_height: 1536,
+  image_byte_size: 1887437, captured_device: 'iPhone 15', animal_type: 'dog',
+  breed: 'ラブラドール', birthday: '2025-08-24', submission_count: 3, returned_count: 0,
+  risks: [
+    { flag: 'face', confidence: 0.78, note: 'うしろに人の顔', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
+    { flag: 'blur', confidence: 0.04, note: '明るさ・ぶれは問題ありません', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
+  ],
+}
+
+const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 'column') => ({
+  id, photo_id: photoId, status: 'published', show_owner_name: ownerName ? 1 : 0,
+  view_count: count, version: 1, published_at: '2026-08-20T00:00:00.000Z',
+  image_url: NEN_PHOTOS[0].image_url, publication_consent_at: '2026-08-20T00:00:00.000Z',
+  pet_name: petName, owner_name: ownerName,
+  placements: label ? [{ id: `${id}-place`, placement_type: type, placement_label: label, view_count: count }] : [],
+})
+
+export const NEN_PHOTO_PUBLICATIONS = {
+  summary: {
+    publishedCount: 8, placementCount: 4,
+    topPhoto: { pet_name: 'ももちゃん', view_count: 1240 }, consentedCount: 8,
+  },
+  items: [
+    publicationPhoto('pub-1', 'ph-11', 'ももちゃん', '高橋 直人 さま', 1240, 'リッチメニュー', 'rich_menu'),
+    publicationPhoto('pub-2', 'ph-12', 'そらくん', '前田 さくら さま', 860, 'コラム「歯みがき」'),
+    publicationPhoto('pub-3', 'ph-13', 'こむぎちゃん', '木村 亮 さま', 642, 'サイトのトップ', 'site'),
+    publicationPhoto('pub-4', 'ph-14', 'ぷりんちゃん', '中村 彩 さま', 418, '回答フォーム', 'form'),
+    publicationPhoto('pub-5', 'ph-15', 'だいふく', '松本 圭 さま', 286, 'コラム「フード」'),
+    publicationPhoto('pub-6', 'ph-16', 'ここちゃん', '新田 遥 さま', null, ''),
+    publicationPhoto('pub-7', 'ph-17', 'まるくん', '石田 未来 さま', 186, 'リッチメニュー', 'rich_menu'),
+    publicationPhoto('pub-8', 'ph-18', 'レオくん', null, 92, 'リッチメニュー', 'rich_menu'),
+  ],
+}
 
 /*
   ECの取り込み記録。設計 `eI3gs` の一覧。

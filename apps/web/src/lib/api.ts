@@ -4779,9 +4779,30 @@ export const api = {
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    photo: (id: string, accountId: string) => fetchApi<ApiResponse<Record<string, unknown>>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+    ),
+    photoPublications: (accountId: string) => fetchApi<ApiResponse<{
+      summary: { publishedCount: number; placementCount: number; topPhoto: Record<string, unknown> | null; consentedCount: number }
+      items: Array<Record<string, unknown>>
+    }>>(`/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`),
+    withdrawPhotoPublication: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ status: 'withdrawn'; version: number }>>(
+        `/api/nen-members/photos/publications/${encodeURIComponent(id)}/withdraw`,
+        { method: 'PUT', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+      ),
+    updatePhotoPublicationPlacements: (id: string, data: {
+      accountId: string
+      expectedVersion: number
+      placements: Array<{ type: 'rich_menu' | 'column' | 'form' | 'site'; label: string }>
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{ version: number; placementCount: number }>>(
+      `/api/nen-members/photos/publications/${encodeURIComponent(id)}/placements`,
+      { method: 'PUT', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+    ),
     reviewPhoto: (id: string, data: {
       accountId: string
       status: 'adopted' | 'rejected'
+      expectedVersion: number
       reasonCode?: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
       reasonNote?: string
     }) => fetchApi<ApiResponse<{

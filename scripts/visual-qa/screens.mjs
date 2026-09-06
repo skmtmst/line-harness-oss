@@ -2180,10 +2180,11 @@ export const SCREENS = [
   { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。**写真の固定データが空**で「審査待ち（0）／通したもの（0）／戻したもの（0）／すべて（0）」。格子は比べられない。**状態の札に件数を出す形は設計と同じ。** 枠で見ると、帯4本（見ていないもの18／通したもの486／戻したもの24／出しているもの62、いちばん古いもの 2日前、この30日に見た、平均22秒）と「通したら 100 付ける」（採用時にマイルを付ける決め）が無い。実装の「まだ繋がっていません。自動審査の口が接続されると表示されます。公開するかどうかは、いまも人が決めます。」は**未接続の断りと、人が決めることの明示として正しい**。※ `/api/nen-members/overview` は `pendingPhotos: 1` を返すのに一覧は0件で、モックの中で数と一覧が食い違っている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 写真審査の一覧。作りは設計に近い。P0から下げる。** ルート `/photos`。帯4つ（未審査3件／承認済1件／見送り1件／投稿の合計5件）に**それぞれ説明が付き**、タブも「審査待ち（3）採用済み（1）見送り（1）すべて（5）」と件数を持つ。行は 投稿者・日時・状態・本文・「見送る」「採用して5pt付与」。**良い点**：本文が無い投稿を「コメントなし」と書き、空欄にしていない。付与するマイル数をボタンの文言に出している。**P2 残る差**：設計は審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。実装は「審査ルールを設定」への導線まで。**写真そのものは撮影用の固定データで、実在の投稿ではない。** 取得元：`photos-v6/Qu6Vk.txt`。1440・1920とも横スクロール0 **推奨修正**：審査ルール（自動でNGにする条件）の効き具合をこの面に出し、承認時に流れるお礼の配信の下見を置く。**写真は撮影用の固定データで、実在の投稿ではない。**', verdictSource: 'photos-v6/Qu6Vk.txt' , verdictHead: '31293424' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
-    gap: 'api',
-    gapNote: '一覧写真を拡大するだけでは完成しない。非公開original、review/public派生画像、crop/rotateの版、risk flag、同意、審査競合、original download権限を持つasset・decision API/DBが要る',
-    status: 'unimplemented',
-    why: '現行 `/api/nen-members/photos` は公開URL相当と簡単な採否だけで、設計が求める派生画像、原本保護、crop/rotateを原本と分離する版、risk flag、同意、同時審査409を持たない。正式要件 §4〜§6・§9〜§10 が先',
+    states: { apis: ['**/api/nen-members/photos/ph-1*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    steps: [{ qaOpen: 'hHrz8', after: 700 }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・派生画像生成待ち。** `hHrz8.txt` の一枚表示、前後移動、警告、画像操作、投稿者・pet・日時・言葉、risk候補、つながる先、下部の採否操作を同じ順で確認した。通常・読込・空・失敗・権限不足を撮り分け、1440・1920とも横スクロール0。個別APIは審査用派生画像だけを返し、原本URLを返さない。採否はexpectedVersionで409競合、採用時の5ポイントはDBのoutboxへ一度だけ積む。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。crop派生画像の生成と、原本download専用権限・再認証は未接続なので、誤って原本を出さないよう押し口を無効にした。',
+    verdictSource: 'photos-v6/hHrz8.txt + photos-v6/hHrz8-normal-1440.png + photos-v6/hHrz8-normal-1920.png',
   },
   {
     /*
@@ -2203,10 +2204,12 @@ export const SCREENS = [
   },
   {
     ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
-    gap: 'api',
-    gapNote: '通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る',
-    status: 'unimplemented',
-    why: '通した写真をどこで使っているか（リッチメニュー・コラム・サイト）を並べるタブが無い。状態の札は4本（審査待ち／採用済み／見送り／すべて）で「出しているもの」が無い',
+    states: { apis: ['**/api/nen-members/photos/publications*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
+    steps: [{ click: '出しているもの', scope: 'main', after: 700 }],
+    variants: [{ suffix: '-placements', steps: [{ click: '出しているもの', scope: 'main', after: 700 }, { qaOpen: 'J3Wxl8-placements', after: 500 }] }],
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**#257で新規実装し、2026-09-06にPlaywrightで撮影・目視判定。構造一致・実運用データ待ち。** `J3Wxl8.txt` の4つの帯、同意案内、写真カード、表示回数、氏名非表示、掲載先、使う場所、外す操作、決めごとを同じ順で確認した。通常・読込・空・失敗・権限不足と掲載先ダイアログを撮り分け、1440・1920とも横スクロール0。APIは採用・公開同意済みだけをaccount scopeで返し、未取得の表示回数は0でなく「—（未取得）」。掲載先保存と全掲載解除はexpectedVersion＋Idempotency-Keyを持ち、解除後も審査・同意履歴を残す。**設計画像なし**のためテキスト正本との構造照合であり、pixel一致は未判定。',
+    verdictSource: 'photos-v6/J3Wxl8.txt + photos-v6/J3Wxl8-normal-1440.png + photos-v6/J3Wxl8-normal-1920.png + photos-v6/J3Wxl8-placements-1920.png',
   },
 
   // ── 機能23 EC連携 ───────────────────────────────────────
