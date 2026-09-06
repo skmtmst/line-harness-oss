@@ -1434,7 +1434,7 @@ export const SCREENS = [
     verdictHead: '49e1341c', route: '/rich-menus/new', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: 'bec0d4c6f', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
+    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
   {
     /*
       **#509 で `/rich-menus/connections?id=` が入った。**
@@ -1444,7 +1444,7 @@ export const SCREENS = [
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり',
     verdict: 'match',
     verdictNote: '**2026-09-06 #253 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、切替元・切替先を図と表で確認できる構成、トップへ戻るタブが無い警告、LINEプレビュー、固定の保存操作を確認した。グループ詳細の実データから線と戻り道を計算している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/DIUbO.txt` と同Node画像。',
-    verdictHead: 'bec0d4c6f',
+    verdictHead: '89166aa03',
     route: '/rich-menus/connections?id=rmg-1', mode: 'viewport', height: 1080,
 
   },
@@ -1452,7 +1452,7 @@ export const SCREENS = [
     ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし',
     verdict: 'match',
     verdictNote: '**2026-09-06 #253 で再照合。** 一致。設計画像と実装画像を同じ比較入力で見比べ、つながりが無い理由、切替先を追加する次の操作、LINEプレビューを確認した。通常・読込中・0件・取得失敗の4状態を1440・1920で撮影し、取得失敗を0件として扱っていない。全画像で横スクロール0。取得元 `rich-menus-v6/NXdDk*.txt` と同Node画像。',
-    verdictHead: 'bec0d4c6f',
+    verdictHead: '89166aa03',
     route: '/rich-menus/connections?id=rmg-2', mode: 'viewport', height: 1080,
     /*
       **通常・空・失敗を本文まで取る。**読む口は `api.richMenuGroups.get(groupId)`
@@ -1463,7 +1463,7 @@ export const SCREENS = [
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた',
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・一部データ未登録。設計画像と実装画像を同じ比較入力で見比べ、STEP 3、今すぐ・日時指定・期間指定、終了後に戻すメニュー、公開前確認、対象の要約、LINEプレビューを確認した。予約は実行キー付きでDBへ保存し、予約時点の定義を固定する。固定データには画像が無いため、設計の「画像登録済み」を作らず「未設定」と表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/UMiJ9.txt` と同Node画像。', verdictHead: 'bec0d4c6f', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
+    verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・一部データ未登録。設計画像と実装画像を同じ比較入力で見比べ、STEP 3、今すぐ・日時指定・期間指定、終了後に戻すメニュー、公開前確認、対象の要約、LINEプレビューを確認した。予約は実行キー付きでDBへ保存し、予約時点の定義を固定する。固定データには画像が無いため、設計の「画像登録済み」を作らず「未設定」と表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/UMiJ9.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=publish', mode: 'viewport', height: 1080,
     steps: [
       { click: '期間を決める', role: 'radio' },
       { fill: '出しはじめ', text: '2026-08-25T10:00' },
@@ -1482,7 +1482,7 @@ export const SCREENS = [
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・割当人数は未接続。設計画像と実装画像を同じ比較入力で見比べ、公開中メニューの影響確認、次に出る候補、切替元、配信などの参照を確認した。現在の表示人数を確定する割当台帳が無いため、設計の8,140人を作らず `—（未取得）` と表示する。公開中は安全のため「LINEから取り下げる」を先に行い、取り下げ完了後だけ管理画面から削除できる。1440・1920とも横スクロール0。取得元 `rich-menus-v6/szXsT.txt` と同Node画像。',
-    verdictHead: 'bec0d4c6f',
+    verdictHead: '89166aa03',
     route: '/rich-menus', mode: 'viewport', height: 1080,
     steps: [{ qaOpen: 'szXsT' }],
   },
