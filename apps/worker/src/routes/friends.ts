@@ -17,6 +17,7 @@ import {
   jstNow,
   getTagAddedScenarioIds,
   getSavedSearchById,
+  recordSavedSearchUsage,
   validateSearchConditions,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
@@ -221,6 +222,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     // Build WHERE conditions
     const conditions: string[] = [];
     const binds: unknown[] = [];
+    let appliedSavedSearchRevision: number | null = null;
     if (tagId) {
       conditions.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
       binds.push(tagId);
@@ -273,6 +275,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       }
       conditions.push(compiled.value.sql);
       binds.push(...compiled.value.binds);
+      appliedSavedSearchRevision = Number(row.revision ?? 1);
     }
     if (search) {
       conditions.push('f.display_name LIKE ?');
@@ -603,6 +606,21 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
           handled,
         };
       });
+    }
+
+    if (savedSearchId && lineAccountId && appliedSavedSearchRevision !== null) {
+      try {
+        await recordSavedSearchUsage(db, {
+          savedSearchId,
+          lineAccountId,
+          revision: appliedSavedSearchRevision,
+          referenceKind: 'friends',
+          usedBy: staff.id,
+        });
+      } catch (error) {
+        // 集計台帳の一時失敗で、友だち一覧そのものを表示不能にしない。
+        console.error('saved search usage record error:', error);
+      }
     }
 
     return c.json({

@@ -2032,7 +2032,14 @@ export const SCREENS = [
   // ── 機能19 コンバージョン ───────────────────────────────
   { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。**成果地点の固定データが空**で「まだ成果地点がありません」。タブ名が設計「成果地点」に対し実装「成果地点（CV）」。帯・期間・札・「成果地点 12個中 1〜6個を表示」が無い。CSVは「書き出しはまだ繋がっていません。CSVを作る口が接続されると、この場所に操作が出ます。」と**未接続の断り方としては正しい**。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」） **ルート**：`/conversions?tab=points`。**取得元**：`conversions-v6/ZrpKn.txt`。**推奨修正**：**「使う場所を足す」を先に足す**——作った成果地点を分析へつなぐ導線がこの画面に無いと、成果地点を作っただけで終わる。**未取得と0件の描き分け（「金額なし」「どこからも使われていません」）はそのまま残す。**', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: '31293424' },
   { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは帯（この30日の成果 ¥1,284,000／前の30日 ¥1,092,000／単価 ¥2,642）、**日ごとの成果の棒グラフ**、この30日／前の30日の比較、成果地点ごとの行、「この画面をCSVで書き出す」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P1 レポートのタブを開くと、成果地点（CV）の表がそのまま出る。** ルート `/conversions?tab=report`。撮った本文はタブ5本と「成果地点（CV）名／種別／CV数／金額」の表で、**「成果地点（CV）」タブ（`sZLDm`）と同じ中身**。設計のレポートは期間で区切って アフィリエイター別／案件別／時系列 を出す面で、CV一覧ではない。**良い点**：金額が無いものを `—`、CV数0のものを `0` と言い分けている（「資料ダウンロード 58 —」「旧キャンペーンの申込 0 —」）。合計 ¥1,284,000 も出る。**推奨修正**：レポートのタブに期間の選び口と集計軸の切り替えを置く。取得元：`conversions-v6/GUxsj.txt`。1440・1920とも横スクロール0', verdictSource: 'conversions-v6/GUxsj.txt' , verdictHead: '31293424' },
-  { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは**「この決めごとを過去30日にあてはめると ¥612,400」の試算**（作る前に効果が見える）と「同じ意味の成果地点を2つ作らない」の注意。実装の「前方一致で判定します。パラメータは無視されます。」「空欄なら既定の90日。」は残す。※ **「準備中」**「率での指定は準備中です。」／**内部語**「Webhookで受け取ったできごとを使います」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 構造一致・データ未接続', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: '31293424' },
+  {
+    ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new',
+    steps: [
+      { fill: '成果地点の名前', text: '商品を買った（確認用）' },
+      { fill: '決まった金額（円）', text: '1587' },
+    ],
+    verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは**「この決めごとを過去30日にあてはめると ¥612,400」の試算**（作る前に効果が見える）と「同じ意味の成果地点を2つ作らない」の注意。実装の「前方一致で判定します。パラメータは無視されます。」「空欄なら既定の90日。」は残す。※ **「準備中」**「率での指定は準備中です。」／**内部語**「Webhookで受け取ったできごとを使います」。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 構造一致・データ未接続', verdictSource: 'conversions-v6/design-qa.md' , verdictHead: '31293424',
+  },
   {
     /*
       **#444（head `ccbd0975`）で窓が入った。** それまでは削除がブラウザの
@@ -2042,7 +2049,7 @@ export const SCREENS = [
     */
     ...CONVERSION, node: 'd8d3Mz', name: '19-1-C 成果地点の削除確認',
     route: '/conversions?tab=points', mode: 'viewport', height: 1080,
-    steps: [{ click: '削除', scope: 'main' }],
+    steps: [{ click: '停止・削除', scope: 'main' }],
     verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** 成果地点の固定データが空で行が無く、「削除」が0件。固定データが入ってから撮る。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P2 使っている場所を挙げるところまでは同じだが、設計は場所ごとに「何が止まるか」（紹介リンク11本が実質止まる／自動返信が動かなくなる／分析の線が消える）と「開く」の導線を付ける。実装は文だけで導線が無い。設計の3択（数えるのをやめる／別の成果地点に差し替えてから削除する／このまま削除する）のうち「数えるのをやめる」だけを出す作りで、消せない代わりに安全。過去の成果と金額を「そのまま残るもの」として出しているのは正しい **ルート**：`/conversions?tab=points`（削除の窓）。**取得元**：`conversions-v6/d8d3Mz.txt`。**推奨修正**：使っている場所ごとに「何が止まるか」と「開く」の導線を足す。**`uNBlA`（変える前に影響を見る）が同じ形を既に持っている**ので写す。**過去の成果と金額を「そのまま残るもの」として出しているのは正しいので変えない。**',
     verdictSource: 'conversions-v6/d8d3Mz-1920.png', verdictHead: '31293424',
   },
@@ -2427,7 +2434,7 @@ export const SCREENS = [
   { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'match', verdictNote: '**2026-09-06、PR #TBD の実装を1440px・1920pxで撮影し、★V6設計と見比べた。** 時間（縦）×担当（横）の格子、LINE予約（緑）と電話予約（青）の同居、4つの集計、読み方の青帯、注意事項・今日の内訳・関連導線の右欄がそろった。固定データの予約件数と日付は撮影用データに従うが、情報の位置・余白・色・枠・角丸と操作の骨格は一致。両幅とも横はみ出し0。', verdictSource: 'booking-v6/TV2DI.txt', verdictHead: 'ed3e365aa' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 予約の詳細の面が設計とそろわない。代理で入れた予約をLINEの予約と同じ扱いにする道（前日・当日のお知らせ、成果地点「予約が入った」を数える）が無い **ルート**：`/booking/bookings`（予約の詳細）。**取得元**：`booking-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**代理で入れた予約をLINEの予約と同じ扱いにするのが先**（前日・当日のお知らせ、成果地点「予約が入った」を数える）。`GfceK`（代理予約の登録完了）でも同じ要点が確かめられていないので、**同じ束で直す**。', verdictSource: 'booking-v6/design-qa.md',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・顧客カルテ連携データ待ち。** 狭い引き出しを全面詳細へ広げ、予約内容、現在の履歴、予約で動いたこと、顧客・ペット、当日の注意、関連先、状態操作を設計位置へ配置した。1440px・1920pxとも横はみ出し0。予約一覧APIはペット・電話・タグ・マイル・過去予約・通知開封・前回申し送りを返さないため、推測せず「友だち情報で確認」と表示し一致扱いにしない。', verdictSource: 'booking-v6/TnDbq.txt + TnDbq-{1440,1920}.png',
     mode: 'viewport', height: 1136, /*
       **`role: 'text'` は当たらない。** ARIA にその役は無く
       `getByRole('text', …)` は0件になる。表の名前は桁なので `cell` で探す。
@@ -2437,7 +2444,7 @@ export const SCREENS = [
       { click: '一覧' },
       { click: '詳細', nth: 0 },
     ],
-    verdictHead: '7b509106',
+    verdictHead: 'ff26e0f1f',
   },
   /*
     **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた
@@ -2481,10 +2488,10 @@ export const SCREENS = [
       { select: '空いている時間', label: '10:00〜11:45' },
       { click: '予約内容を確認する', after: 700 },
     ],
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** 予約メニューの固定データに設計の「トリミング（小型犬）」が無く、選ぶ手順が通らない。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#587 `425a6b1a` で、前に挙げたP2（重なりの事前警告が無い）が解消した。実際に操作して撮った。** ルート `/booking/bookings/new`（内容確認）。1440・1920とも横スクロール0。 **① 確認へ進む直前に空きを再取得する**：`page.tsx:192` が `latest.by_staff …slots.some((slot) => slot.date === date && slot.start === time)` で見直す。**登録を試すまで気づけなかった**のが、確認の段で分かるようになった。 **③ 画面にもそう書く**：「**この日時は、確認画面を開く直前に空きを再確認しました。**」。**いつ確かめた値かが分かる。** **確認の面は送った値をそのまま出す**：菅野 亮／2026年9月3日(木) 10:00／トリミング（小型犬）／佐々木／¥8,400。「お客様に届く内容」も本文で見せる。**まだ決まっていないことを決まったように書かない**形（「予約確認LINE 登録後に送信」「リマインダ 予約設定から計算」）は維持されている。 **押し口に `data-qa-open="GFDqW"` が入った**ので、文言に頼らず開ける。 **`undefined`・`NaN`・`Invalid Date`・`API error`・内部ID（`bs-` `bm-`）・`409` は0件。** **撮影用の固定データを直した（実装は変えていない）**：`bookingAvailability()` が `slots[].date` を空文字で返していた。確認は `slot.date === date` で見直すので、**空のままではどの枠も一致せず常に「埋まりました」になる**。実装の不具合に見えるが固定データの穴。PR本文の要件どおり `date` を入れ、枠が消えた状態（`slots: []`）も同じ器で返せるようにした。 取得元：`booking-v6/GFDqW.txt`',
-    verdictSource: 'booking-v6/GFDqW.txt + page.tsx:192',
-    verdictHead: '31293424',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・顧客連携データ待ち。** 左にお客様・予約内容・要望・通知予定、右にLINEプレビュー・注意・関連先・空き再確認を配置し、実際の枠を使って10:00〜11:45の105分を表示した。1440px・1920pxとも横はみ出し0。友だち一覧APIは電話・ペット・店舗・来店回数を返さず、撮影時計では前日と2時間前の通知時刻が過去になるため、存在しない値や過ぎた送信予定を作らず一致扱いにしない。',
+    verdictSource: 'booking-v6/GFDqW.txt + GFDqW-{1440,1920}.png',
+    verdictHead: 'ff26e0f1f',
   },
   {
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
@@ -2499,10 +2506,10 @@ export const SCREENS = [
       { click: '予約内容を確認する', after: 700 },
       { click: 'この内容で予約を入れる', after: 1200 },
     ],
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `GFDqW` と同じ理由。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#587 `425a6b1a` で、前に挙げたP1（リマインダの具体時刻と、電話の予約も同じ台帳に入ることが出ない）が解消した。実際に登録して撮った。** ルート `/booking/bookings/new`（登録完了）。1440・1920とも横スクロール0。 **④ 前日・開始2時間前の日本時間が具体的に出る**：「リマインダの時刻 **前日：9月2日(水) 10:00 ／ 開始2時間前：9月3日(木) 08:00**」。9月3日(木) 10:00 の予約に対して**24時間前と2時間前**で計算が合う。`reminderScheduleLabels()` が `+09:00` で組み立て、`timeZone: \'Asia/Tokyo\'` で書く。**過ぎた予定は出さない**（`scheduledAt <= now` を落とす）——Worker も登録しないので、画面だけが約束することがない。 **⑤ 作り物の成果数を出さず、台帳の事実だけ書く**：「予約台帳 **1件追加（電話で受けた予約も同じ台帳へ記録します）**」。**設計の要点（代理で入れた予約がLINEの予約と同じ扱いになる）が、ここで確かめられるようになった。** 成果地点の件数は**出していない**（取得元が無いため）。 **予約IDは口の返事をそのまま出す**（`3f2b9c14-…`）。Googleカレンダーは「未設定」と、`calendar_sync` の値を読み分ける。 **押し口に `data-qa-open="GfceK"` が入った。** **禁止語は0件。** 取得元：`booking-v6/GfceK.txt` ＋ `proxy-booking-schedule.ts`',
-    verdictSource: 'booking-v6/GfceK.txt + proxy-booking-schedule.ts',
-    verdictHead: '31293424',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・通知実績データ待ち。** PR #1088の固定応答で実際に登録完了まで進み、返された予約ID・カレンダー状態、お客様・日時・メニュー・担当・受付方法、LINE処理開始、同じ予約台帳への記録、次の操作、LINEプレビューと関連先を表示した。1440px・1920pxとも横はみ出し0。登録結果APIは送信・開封実績、登録者、予定通知の実行結果、成果計上結果を返さないため、送信済みと作らず一致扱いにしない。',
+    verdictSource: 'booking-v6/GfceK.txt + GfceK-{1440,1920}.png',
+    verdictHead: 'ff26e0f1f',
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
@@ -2540,10 +2547,10 @@ export const SCREENS = [
         { click: 'この内容で予約を入れる', after: 1500 },
       ],
     }],
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** `GFDqW` と同じ理由。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#587 `425a6b1a` でも、#562 で入った競合回復が保たれている。枠を消して実際に確かめた。** ルート `/booking/bookings/new`（重なりと入力エラー）。1440・1920とも横スクロール0。 **② 枠が消えたら予約を作らず回復画面へ進み、入力を保つ**：「選んだ時間は、ほかの予約で埋まりました」→「**この時間には予約を入れられません／最新の空き時間を読み直して、別の時間を選んでください。入力したお客様・メニュー・担当者・要望は残っています。**」＋「空いている時間を選び直す」。**何が残るかを明記している**ので、最初からやり直すのかが分かる。 **選び直したあと登録まで通る**——`-recovered` の絵で「予約を登録しました」まで進み、予約IDとリマインダの時刻が出る。 **`API error: 409` は出ない。** `ApiError.code` で機械コードと人へ見せる文を分ける形（#562）が効いている。**禁止語は0件。** **撮影用の固定データに「枠が消えた状態」を足した（実装は変えていない）**：`bookingAvailability(date, staffId, { empty: true })` で `slots: []` を返す。**器は同じにして、中身だけ空にする**——別の形で返すと、実装が落ちたのか枠が無いのか見分けられない。 取得元：`booking-v6/Lg8ff.txt` ＋ `Lg8ff-recovered.txt`',
-    verdictSource: 'booking-v6/Lg8ff.txt + Lg8ff-recovered.txt',
-    verdictHead: '31293424',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #304 / PR #1095 / UI HEAD `ff26e0f1f` を3105/8792で再撮影。構造一致・重複詳細データ待ち。** 実際のHTTP 409から赤い要約、保持した入力、選択日だけの空き候補、別担当の確認案内、注意、関連先を表示し、選び直した後は登録完了まで到達した。競合・回復を各1440px・1920pxで撮影し、全4枚とも横はみ出し0。エラーAPIは機械コードだけで、重複時間の範囲・件数・別担当の候補を返さないため、入力へ戻って確認と表示し一致扱いにしない。',
+    verdictSource: 'booking-v6/Lg8ff.txt + Lg8ff-recovered.txt + Lg8ff-{1440,1920}.png + Lg8ff-recovered-{1440,1920}.png',
+    verdictHead: 'ff26e0f1f',
   },
 
   // ── 機能28 予約設定 ─────────────────────────────────────
@@ -3199,6 +3206,23 @@ const FEATURE_19_AUDIT = {
   },
 }
 
+// Issue #296（機能19 第2周）。3104/8791で同じ入力・同じ幅を撮り、
+// Pencil 1920pxと1枚に並べた比較画像で、残る差を契約未接続として再判定した。
+const ISSUE_296_REVIEW = {
+  GtylA: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #296で修正・再判定。** 6つの起点、名前、対象商品、同じ人を数える3択、金額・取消、利用先、保存前試算を設計と同じ4区画＋右欄へ組み直した。3104/8791で入力済み状態を1440px・1920px撮影し、Pencil 1920pxと同じ比較画像で確認。両幅とも横はみ出し0。注文・フォーム・予約・ページ到達は既存契約へ接続したが、動画・タグ、30日に1回、取消処理、利用先、入力内容だけの試算は保存・取得APIが無く、値を作らず無効表示または接続条件を示すため一致にはしない。**推奨修正：起点と回数条件の保存契約を拡張し、次に取消・利用先・保存前試算APIを接続する。**',
+    verdictSource: 'conversions-v6/GtylA.txt + conversions-v6/GtylA-1440.png + conversions-v6/GtylA-1920.png + 2026-09-07 same-input comparison',
+    verdictHead: 'bfff7afa0',
+  },
+  d8d3Mz: {
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-07 Issue #296で修正・再判定。** 計測停止・別地点への差し替え・物理削除の3択、過去記録を残す説明、利用先の影響欄を設計順に表示した。3104/8791で同じ成果地点の確認状態を1440px・1920px撮影し、Pencil 1920pxと同じ比較画像で確認。両幅とも横はみ出し0。既定操作の「数えるのをやめる」は既存の停止契約へ接続したが、利用先一覧、差し替え、物理削除の可否判定・実行APIが無く、件数を0と作らず未接続と明示して操作を無効にしているため一致にはしない。**推奨修正：利用先と停止影響を返すAPIを先に接続し、その後に差し替えと未使用時だけの物理削除契約を追加する。**',
+    verdictSource: 'conversions-v6/d8d3Mz.txt + conversions-v6/d8d3Mz-1440.png + conversions-v6/d8d3Mz-1920.png + 2026-09-07 same-input comparison',
+    verdictHead: 'bfff7afa0',
+  },
+}
+
 // Issue #234（機能21）の実装後監査。
 // 設計画像と実装構造は照合したが、ChromiumがMachPort権限で起動できず、
 // 更新後の1440px・1920px画像は未取得。一致判定には上げない。
@@ -3723,6 +3747,19 @@ const ISSUE_212_REVIEW = {
   },
 }
 
+/**
+ * board #305。development bb8a139b3 を取り込んだ枝を 3107/8794 で起動し、
+ * tksPc の通常・読込中・取得失敗を1440/1920pxで再撮影して設計と比較した。
+ */
+const ISSUE_305_REVIEW = {
+  tksPc: {
+    verdict: 'structure_match_data_pending',
+    note: '曜日別の受付時間、担当者の切替、特別な休み・営業、予約ルール、顧客向けカレンダープレビュー、困りごと、関連画面、Googleカレンダー連携を設計順へそろえた。通常・読込中・取得失敗を1440/1920pxで撮影し、全6枚で横はみ出し0。残る差は、店舗共通の営業時間と複数休憩、休業理由つき例外日、店舗・設備単位の同時受付数、顧客向け○△×休プレビューを返すAPIがないこと。存在しない値を作らず、現在取得できる担当者別時間・特別営業時間・メニュー別ルール・Google連携だけを表示しているため一致にはしない。',
+    source: 'booking-settings-v6/tksPc-{normal,loading,error}.txt + 2026-09-07 1440/1920px screenshots',
+    head: 'a89279ce7',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -3864,6 +3901,13 @@ for (const screen of SCREENS) {
     screen.verdictHead = issue212Review.head ?? 'bf7434ff'
     if (issue212Review.states) screen.states = issue212Review.states
   }
+  const issue305Review = ISSUE_305_REVIEW[screen.node]
+  if (screen.feature === 28 && issue305Review) {
+    screen.verdict = issue305Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #305で修正・再判定。** ${issue305Review.note}`
+    screen.verdictSource = issue305Review.source
+    screen.verdictHead = issue305Review.head
+  }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])
     delete screen.verdictHead
@@ -3876,6 +3920,9 @@ for (const screen of SCREENS) {
   }
   if (screen.feature === 19 && FEATURE_19_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_19_AUDIT[screen.node])
+  }
+  if (screen.feature === 19 && ISSUE_296_REVIEW[screen.node]) {
+    Object.assign(screen, ISSUE_296_REVIEW[screen.node])
   }
   if (screen.feature === 21 && FEATURE_21_AUDIT[screen.node]) {
     Object.assign(screen, FEATURE_21_AUDIT[screen.node])
@@ -3986,6 +4033,8 @@ export const CAPTURED_AT = {
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
     { pr: 981, head: '83be84278', on: '2026-09-06', screens: ['ZrpKn','GUxsj','GtylA'],
       note: 'Issue #232。3 Nodeを1440px・1920pxで撮影し、★V6設計の1920px画像と並べて確認。全6枚で横はみ出し0。実数表示を接続し、残るAPI・保存契約の差を判定注記へ記録した。' },
+    { pr: 1093, head: 'bfff7afa0', on: '2026-09-07', screens: ['GtylA','d8d3Mz'],
+      note: 'Issue #296。入力済みの作成画面と停止確認を3104/8791で1440px・1920px撮影し、★V6設計1920pxと1枚に並べて確認。両幅とも横はみ出し0。既存契約で扱える操作を接続し、残るAPI差を理由付き構造一致として記録した。' },
   ],
   20: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Zxezb','J6Inc','YBGtm','QQ1SR','f5HsX','C2I7ry','Fh2Qj','dfwD4'],
@@ -4323,6 +4372,7 @@ export const CAPTURED_AT = {
     { pr: 983, head: '36e8b070b', on: '2026-09-06', screens: ['IAf7j','I6UAdr','bzDn6','YzxU1','r7eSi'], note: 'Issue #265 続き。残り5画面を設計構造へ直し、3102/8789で定義済み全状態32枚を1440/1920px撮影。5画面を一致へ更新し、全画像で横はみ出し0、壊れ値・内部ID0。' },
   ],
   28: [
+    { pr: 1096, head: 'a89279ce7', on: '2026-09-07', screens: ['tksPc'], note: 'Issue #305。3107/8794で通常・読込中・取得失敗を1440/1920px撮影し、全6枚で横はみ出し0。曜日別受付時間と右側プレビューをV6構造へそろえ、未提供APIに依存する値は作らず理由つきの構造一致・データ未接続とした。' },
     { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['QSLEH', 'GhOb3'], note: 'development そのもので撮った' },
