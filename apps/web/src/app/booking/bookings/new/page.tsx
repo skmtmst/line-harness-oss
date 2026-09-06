@@ -43,6 +43,15 @@ function dateLabel(date: string, time: string): string {
   })
 }
 
+function timeRangeLabel(date: string, time: string, minutes: number): string {
+  if (!date || !time) return '—'
+  const startsAt = new Date(`${date}T${time}:00+09:00`)
+  const endsAt = new Date(startsAt.getTime() + minutes * 60_000)
+  return `${dateLabel(date, time)} 〜 ${endsAt.toLocaleTimeString('ja-JP', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
+  })}`
+}
+
 export default function NewProxyBookingPage() {
   const { selectedAccountId } = useAccount()
   const [step, setStep] = useState<Step>('input')
@@ -69,6 +78,10 @@ export default function NewProxyBookingPage() {
 
   const menu = menus.find((item) => item.id === menuId) ?? null
   const selectedStaff = staff.find((item) => item.id === staffId) ?? null
+  const selectedSlot = slots.find((item) => item.date === date && item.start === time) ?? null
+  const occupiedMinutes = selectedSlot
+    ? (new Date(`${date}T${selectedSlot.end}:00+09:00`).getTime() - new Date(`${date}T${selectedSlot.start}:00+09:00`).getTime()) / 60_000
+    : selectedStaff?.duration_minutes ?? 0
 
   useEffect(() => {
     setStep('input')
@@ -262,10 +275,10 @@ export default function NewProxyBookingPage() {
         <span className="mx-2">›</span>
         <Link href="/booking/bookings" className="text-accent">予約管理</Link>
         <span className="mx-2">›</span>
-        <span>電話の予約を入れる</span>
+        <span>{step === 'confirm' ? '内容を確認' : step === 'done' ? '登録が終わりました' : step === 'conflict' ? '入れられません' : '電話の予約を入れる'}</span>
       </nav>
 
-      {error && (
+      {error && step !== 'conflict' && (
         <div className="border-danger bg-danger-bg text-danger rounded-card border px-4 py-3 text-sm">
           {error}
         </div>
@@ -413,80 +426,124 @@ export default function NewProxyBookingPage() {
       )}
 
       {step === 'confirm' && friend && menu && selectedStaff && (
-        <div className="grid gap-4 xl:flex">
-          <div className="min-w-0 flex-1 space-y-4">
-            <Card title="だれの予約か"><Summary label="お客様" value={friend.displayName} /></Card>
-            <Card title="いつ・何を予約するか">
-              <Summary label="日時" value={dateLabel(date, time)} />
-              <Summary label="メニュー" value={menu.name} />
-              <Summary label="担当" value={selectedStaff.display_name} />
-              <Summary label="料金" value={yen(selectedStaff.price)} />
+        <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
+          <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
+            <Card title="だれの予約か">
+              <Summary label="お客様" value={friend.displayName} />
+              <Summary label="電話番号" value="友だち情報欄で確認" />
+              <Summary label="ペットの名前" value="未取得" />
+              <Summary label="LINEとの結びつき" value="結びついています" />
             </Card>
-            <Card title="何を送るか"><Summary label="予約確認LINE" value="登録後に送信" /><Summary label="リマインダ" value="予約設定から計算" /></Card>
-            <p
-              data-booking-slot-check="available"
-              className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-sm"
-            >
+            <Card title="いつ・何を">
+              <Summary label="日時" value={timeRangeLabel(date, time, occupiedMinutes)} />
+              <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
+              <Summary label="担当" value={selectedStaff.display_name} />
+              <Summary label="お客様からのご希望" value={customerNote.trim() || '記入なし'} />
+            </Card>
+            <Card title="お客様に送るもの">
+              <NoticeRow title="いますぐ LINE に送る" detail="日時・メニュー・担当を書いた案内が届きます" />
+              {reminderScheduleLabels(date, time).map((label) => (
+                <NoticeRow key={label} title={`${label} に思い出してもらう`} detail="リマインダから自動で送ります" />
+              ))}
+            </Card>
+            <p data-booking-slot-check="available" className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-xs">
               この日時は、確認画面を開く直前に空きを再確認しました。
             </p>
           </div>
-          <div className="w-full xl:flex-none" style={{ maxWidth: 390 }}>
-            <Card title="お客様に届く内容">
-              <div className="bg-success-bg rounded-card p-4 text-sm leading-6">
-                <p>予約が確定しました。</p>
-                <p>メニュー: {menu.name}</p>
-                <p>担当: {selectedStaff.display_name}</p>
-                <p>日時: {dateLabel(date, time)}</p>
-              </div>
+          <aside data-design="Right" className="space-y-4">
+            <Card title={`${friend.displayName}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
+              <LinePreview friendName={friend.displayName} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} sent={false} />
             </Card>
-          </div>
+            <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
+            <RelatedLinks includeConversion={false} />
+          </aside>
         </div>
       )}
 
-      {step === 'conflict' && (
-        <Card title="この時間には予約を入れられません">
-          <p className="text-ink-secondary text-sm">最新の空き時間を読み直して、別の時間を選んでください。入力したお客様・メニュー・担当者・要望は残っています。</p>
-          <Button variant="primary" onClick={() => void recoverConflict()} className="mt-4">空いている時間を選び直す</Button>
-        </Card>
-      )}
-
-      {step === 'done' && result && (
-        <div className="mx-auto max-w-3xl space-y-4">
-          <Card title="予約を登録しました">
-            <Summary label="予約ID" value={result.booking_id} />
-            <Summary label="状態" value="確定" />
-            <Summary label="Googleカレンダー" value={result.calendar_sync === 'synced' ? '反映済み' : result.calendar_sync === 'failed' ? '反映に失敗' : result.calendar_sync === 'pending' ? '確認中' : '未設定'} />
-          </Card>
-          <Card title="このあと自動で動くもの">
-            <Summary label="予約確認LINE" value="送信処理を開始" />
-            <Summary
-              label="リマインダの時刻"
-              value={reminderScheduleLabels(date, time).join(' ／ ') || '今後の送信予定はありません'}
-            />
-            <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
-          </Card>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="primary" href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>予約の詳細を見る</Button>
-            <Button href="/booking/bookings">今日の予約台帳へ戻る</Button>
+      {step === 'conflict' && friend && menu && selectedStaff && (
+        <>
+          <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
+            <div><p className="text-sm font-semibold">{dateLabel(date, time)} は {selectedStaff.display_name} がふさがっています</p><p className="mt-1 text-xs">同じ担当が同じ時間に2件受けることはできません。時間か担当を変えてください。</p></div>
+            <Button onClick={() => void recoverConflict()}>空いている時間を見る</Button>
+          </section>
+          <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
+            <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
+              <Card title="だれの予約か"><Summary label="お客様" value={friend.displayName} /><Summary label="LINEとの結びつき" value="結びついています" /></Card>
+              <Card title="いつ・何を" note="時間が重なっています。右の空いている時間から選べます。">
+                <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
+                <Summary label="日付" value={dateLabel(date, time).split(' ')[0]} />
+                <Summary label="時刻" value={time} />
+                <Summary label="担当" value={selectedStaff.display_name} />
+                <p className="text-danger mt-3 text-xs">選んだ時間は、ほかの予約で埋まりました。</p>
+              </Card>
+              <Card title="お客様に何を送りますか" note="LINEと結びついているため、時間を選び直して登録すると案内が届きます。">
+                <NoticeRow title="予約を受け付けたことを、いますぐLINEに送る" detail="日時・メニュー・担当を書いた案内が届きます" />
+                <NoticeRow title="前日と開始2時間前に思い出してもらう" detail="リマインダから自動で送ります" />
+              </Card>
+            </div>
+            <aside data-design="Right" className="space-y-4">
+              <Card title="空いている時間" note={`${selectedStaff.display_name}の ${date || '選択日'} で、続けて取れるところです。`}>
+                <div className="space-y-2">
+                  {slots.filter((slot) => slot.start !== time).slice(0, 3).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setError('') }}>この時間に変える</Button></div>)}
+                </div>
+              </Card>
+              <Card title="ほかの担当なら入れられます"><p className="text-ink-faint text-xs">担当別の空きは、入力へ戻って確認してください。</p></Card>
+              <WarningCard title="気をつけること" lines={['重なったまま予約を入れることはできません', '入力したお客様・メニュー・担当・要望は残っています']} />
+              <RelatedLinks includeConversion={false} />
+            </aside>
           </div>
-        </div>
+        </>
       )}
 
-      {(step === 'input' || step === 'confirm') && (
+      {step === 'done' && result && friend && menu && selectedStaff && (
+        <>
+          <section className="bg-action-soft text-action rounded-card px-4 py-3 text-xs font-semibold">
+            {timeRangeLabel(date, time, occupiedMinutes)} の枠を押さえました。お知らせはリマインダから自動で届きます。
+          </section>
+          <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
+            <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
+              <Card title="入れた予約">
+                <Summary label="お客様" value={friend.displayName} />
+                <Summary label="日時" value={timeRangeLabel(date, time, occupiedMinutes)} />
+                <Summary label="メニュー" value={`${menu.name}（${occupiedMinutes}分）`} />
+                <Summary label="担当" value={selectedStaff.display_name} />
+                <Summary label="受けかた" value="電話（代理で入力）" />
+                <Summary label="予約ID" value={result.booking_id} />
+                <Summary label="Googleカレンダー" value={result.calendar_sync === 'synced' ? '反映済み' : result.calendar_sync === 'failed' ? '反映に失敗' : result.calendar_sync === 'pending' ? '確認中' : '未設定'} />
+              </Card>
+              <Card title="このあと自動で動くもの">
+                <NoticeRow title="いま LINE に案内を送りました" detail="開かれたかどうかは台帳から見られます" />
+                {reminderScheduleLabels(date, time).map((label) => <NoticeRow key={label} title={`${label} にお知らせ`} detail="リマインダから自動で送ります" />)}
+                <Summary label="リマインダの時刻" value={reminderScheduleLabels(date, time).join(' ／ ') || '今後の送信予定はありません'} />
+                <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
+              </Card>
+              <Card title="次にすること">
+                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey('') }}>続けてもう1件入れる</Button></div>
+              </Card>
+            </div>
+            <aside data-design="Right" className="space-y-4">
+              <Card title="お客様に届いたもの" note="送った案内をそのまま残しています。"><LinePreview friendName={friend.displayName} menuName={menu.name} staffName={selectedStaff.display_name} date={date} time={time} sent /></Card>
+              <RelatedLinks includeConversion />
+            </aside>
+          </div>
+        </>
+      )}
+
+      {(step === 'input' || step === 'confirm' || step === 'conflict') && (
         <StickyBar
-          status={step === 'input' ? 'まだ入っていません。保存すると台帳に並び、お客様にもお知らせします。' : '内容を確認してから予約を入れます。'}
+          status={step === 'input' ? 'まだ入っていません。保存すると台帳に並び、お客様にもお知らせします。' : step === 'confirm' ? 'まだ入っていません。「予約を入れる」を押すと台帳に並びます。' : '直すところがあります。時間を選び直すまで台帳には入りません。'}
           actions={(
             <>
-              {step === 'confirm' && <Button onClick={() => setStep('input')}>予約入力に戻る</Button>}
+              {(step === 'confirm' || step === 'conflict') && <Button onClick={() => { setStep('input'); setError('') }}>入力に戻る</Button>}
               {step === 'input' ? (
                 <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()}>
                   {loading ? '空きを再確認しています' : '予約内容を確認する'}
                 </Button>
-              ) : (
+              ) : step === 'confirm' ? (
                 <Button variant="primary" disabled={loading} data-qa-open="GfceK" onClick={() => void createBooking()}>
                   {loading ? '登録中です' : 'この内容で予約を入れる'}
                 </Button>
-              )}
+              ) : <Button variant="primary" disabled>この内容で予約を入れる</Button>}
             </>
           )}
         />
@@ -505,4 +562,58 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Summary({ label, value }: { label: string; value: string }) {
   return <div className="border-hairline grid gap-3 border-b py-2 text-sm last:border-b-0" style={{ gridTemplateColumns: '140px minmax(0, 1fr)' }}><span className="text-ink-faint">{label}</span><span className="text-ink">{value}</span></div>
+}
+
+function NoticeRow({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="mb-3 flex gap-3 last:mb-0">
+      <span className="text-success font-bold">✓</span>
+      <div><p className="text-ink text-sm font-medium">{title}</p><p className="text-ink-faint mt-0.5 text-xs">{detail}</p></div>
+    </div>
+  )
+}
+
+function LinePreview({ friendName, menuName, staffName, date, time, sent }: {
+  friendName: string
+  menuName: string
+  staffName: string
+  date: string
+  time: string
+  sent: boolean
+}) {
+  return (
+    <div className="bg-action rounded-card p-4">
+      <p className="text-on-action text-center text-xs font-semibold">LINEプレビュー</p>
+      <p className="bg-ink/25 text-on-action mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-xs">{sent ? '送信済み・配信状況は台帳で確認できます' : '「予約を入れる」を押すと、すぐに届きます'}</p>
+      <div className="bg-canvas rounded-card mt-3 p-4 text-sm leading-6">
+        <p>{friendName}さま</p>
+        <p>{dateLabel(date, time)} から、{menuName}をお受けしました。</p>
+        <p>担当は{staffName}です。ご来店をお待ちしています。</p>
+        <Button href="/booking/bookings" variant="primary" className="mt-3 w-full">予約内容を確認する</Button>
+      </div>
+    </div>
+  )
+}
+
+function WarningCard({ title, lines }: { title: string; lines: string[] }) {
+  return (
+    <section className="border-warning bg-warning-bg rounded-card border p-4">
+      <h2 className="text-warning text-sm font-semibold">{title}</h2>
+      <ul className="text-warning mt-3 space-y-2 text-xs">{lines.map((line) => <li key={line}>・{line}</li>)}</ul>
+    </section>
+  )
+}
+
+function RelatedLinks({ includeConversion }: { includeConversion: boolean }) {
+  return (
+    <Card title="つながる先">
+      <div className="text-ink-secondary space-y-2 text-xs">
+        <p><Link href="/booking/bookings" className="text-accent font-semibold">→ 予約管理</Link>　今日の台帳</p>
+        <p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと空き枠</p>
+        <p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>
+        <p><Link href="/friends" className="text-accent font-semibold">→ 友だち</Link>　顧客カルテに残ります</p>
+        {includeConversion ? <p><Link href="/conversions" className="text-accent font-semibold">→ コンバージョン</Link>　予約の成果を確認</p> : null}
+      </div>
+    </Card>
+  )
 }

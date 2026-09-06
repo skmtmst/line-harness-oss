@@ -744,35 +744,36 @@ function BookingDetailPanel({
   onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div data-design-node="TnDbq" className="fixed inset-y-0 right-0 left-0 z-50 flex justify-end xl:left-64">
       <button
         type="button"
         aria-label="閉じる"
         onClick={onClose}
         className="absolute inset-0 bg-black/30"
       />
-      <aside className="relative h-full w-full max-w-md overflow-y-auto bg-white shadow-xl">
-        <div className="border-hairline sticky top-0 flex items-center justify-between gap-3 border-b bg-white px-5 py-4">
+      <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
+        <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
-            <p className="text-ink-faint text-xs">予約の詳細</p>
-            <h2 className="text-ink truncate text-base font-semibold">{b.menu_name}</h2>
+            <p className="text-accent text-xs font-semibold">予約管理　›　今日　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
+            <h2 className="text-ink mt-1 truncate text-xl font-semibold">{b.friend_name ?? 'お客様'} ／ {b.menu_name}</h2>
           </div>
-          <span
-            className={`shrink-0 rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
-          >
-            {statusLabel[b.status] ?? b.status}
-          </span>
-          <button
-            onClick={onClose}
-            className="text-ink-faint hover:bg-canvas-sunken shrink-0 rounded-md px-2 py-1 text-sm"
-          >
-            閉じる
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className={`rounded-pill px-3 py-1 text-xs font-semibold ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>{statusLabel[b.status] ?? b.status}</span>
+            <Button href={`/chats?friend=${b.friend_id}`} variant="primary">この人と話す</Button>
+            <Button disabled title="日時変更は準備中です">時間や担当を変える</Button>
+            <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
+            <Button onClick={onClose}>閉じる</Button>
+          </div>
         </div>
 
-        <div className="px-5 py-4">
+        <div data-design="Body" className="grid gap-4 px-6 py-4 xl:grid-cols-4">
+          <main className="min-w-0 xl:col-span-3">
           <section className="mb-6">
-            <h3 className="text-ink mb-1 text-sm font-semibold">予約内容</h3>
+            <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
+            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ LINEから入りました。</p>
+            <div className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink mb-1 text-base font-semibold">予約の中身</h3>
+            <DetailRow label="メニュー">{b.menu_name}</DetailRow>
             <DetailRow label="日時">
               {formatJpDateTime(b.starts_at)} 〜 {formatJpTime(b.ends_at)}
             </DetailRow>
@@ -783,44 +784,40 @@ function BookingDetailPanel({
             <DetailRow label="予約番号">
               <span className="text-ink-secondary font-mono text-xs">{b.id}</span>
             </DetailRow>
+            <DetailRow label="お客様からのご希望">{b.customer_note ?? <span className="text-ink-faint">記入なし</span>}</DetailRow>
+            </div>
           </section>
 
-          <section className="mb-6">
-            <h3 className="text-ink mb-1 text-sm font-semibold">お客様</h3>
-            <DetailRow label="お名前">
-              <Link href={`/chats?friend=${b.friend_id}`} className="text-blue-600 hover:underline">
-                {b.friend_name ?? '名前未設定'}
-              </Link>
-            </DetailRow>
-            <DetailRow label="ご要望">
-              {b.customer_note ? (
-                <span className="whitespace-pre-wrap">{b.customer_note}</span>
-              ) : (
-                <span className="text-ink-faint">記入なし</span>
-              )}
-            </DetailRow>
+          <section className="bg-canvas rounded-card border-hairline mb-4 border p-5">
+            <h3 className="text-ink text-base font-semibold">この方のこれまで</h3>
+            <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
+            <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>
+            <div className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(b.starts_at)} {b.menu_name}</span><span>{b.staff_name}</span><span>¥{b.price_at_booking.toLocaleString()}</span><span>{b.customer_note ?? '記入なし'}</span></div>
+            <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-accent text-xs font-semibold">顧客カルテで以前の予約を見る →</Link>
           </section>
 
-          <section className="mb-6">
-            <h3 className="text-ink mb-1 text-sm font-semibold">記録</h3>
-            <DetailRow label="申込日時">{formatJpDateTime(b.requested_at)}</DetailRow>
-            <DetailRow label="決定日時">
-              {b.decided_at ? (
-                formatJpDateTime(b.decided_at)
-              ) : (
-                <span className="text-ink-faint">未決定</span>
-              )}
-            </DetailRow>
-            <DetailRow label="カレンダー">
-              {b.external_event_id ? (
-                <span className="text-green-700">Googleカレンダーに登録済み</span>
-              ) : (
-                <span className="text-ink-faint">未連携</span>
-              )}
-            </DetailRow>
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink text-base font-semibold">この予約で動いたこと</h3>
+            <div className="mt-3 space-y-3 text-sm"><p>✓ {formatJpDateTime(b.requested_at)} 予約を受け付けました</p>{b.decided_at ? <p>✓ {formatJpDateTime(b.decided_at)} 予約を「{statusLabel[b.status] ?? b.status}」にしました</p> : null}<p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p></div>
           </section>
+          </main>
 
-          <div className="border-hairline border-t pt-4">
+          <aside className="space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-bold">{b.friend_name?.charAt(0) ?? '?'}</span><div><Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link><p className="text-ink-faint text-xs">LINEの友だち情報と来店履歴</p></div></div>
+            <DetailRow label="ペット">友だち情報欄で確認</DetailRow>
+            <DetailRow label="連絡先">友だち情報欄で確認</DetailRow>
+          </section>
+          <section className="border-warning bg-warning-bg rounded-card border p-5">
+            <h3 className="text-warning text-sm font-semibold">当日 気をつけること</h3>
+            <p className="text-warning mt-3 text-xs">申し送り情報は顧客カルテで確認してください。取得できない値は、この画面で推測して表示しません。</p>
+          </section>
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <h3 className="text-ink text-sm font-semibold">つながる先</h3>
+            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p><p><Link href={`/chats?friend=${b.friend_id}`} className="text-accent font-semibold">→ 受信箱</Link>　この方とのやりとり</p><p><Link href="/mileage" className="text-accent font-semibold">→ マイル</Link>　来店時の付与</p></div>
+          </section>
+          <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink-faint mb-2 text-xs">
               承認するとお客様のLINEに確定のお知らせが届きます。
             </p>
@@ -832,7 +829,9 @@ function BookingDetailPanel({
               予約の詳細ページを開く
             </Link>
           </div>
+          </aside>
         </div>
+        <div className="border-hairline sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t bg-canvas px-6 py-3"><p className="text-ink-faint text-xs">ここでの状態変更は、お客様のLINEにも自動で知らせます。</p><div className="flex gap-2"><Button onClick={() => onAction('cancel')}>キャンセル</Button><Button onClick={() => onAction('complete')}>来ていただきました にする</Button><Button variant="primary" disabled>変更を保存する</Button></div></div>
       </aside>
     </div>
   )
