@@ -277,7 +277,7 @@ export default function WebinarsPage() {
         </div>
       )}
       <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div data-design="Head" className="mb-4 flex flex-wrap gap-2">
           <Button disabled title="フォルダの保存契約を接続後に使えます">フォルダを追加</Button>
           <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
         </div>

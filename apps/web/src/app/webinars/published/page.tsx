@@ -111,7 +111,7 @@ function PublishedWebinarContent() {
       <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-full">✓</span><span><span className="text-accent block text-[10px]">STEP {index + 1}</span>{label}</span></li>)}</ol>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="border-hairline bg-canvas min-h-[720px] rounded-card border p-8 shadow-card">
-          <div className="text-center"><CheckCircle2 className="mx-auto text-accent" size={48} aria-hidden="true" /><h1 className="text-ink mt-5 text-2xl font-bold">公開しました</h1><p className="text-ink-secondary mt-3 text-sm">申込・配信条件に合う友だちが、このウェビナーを視聴できます。</p></div>
+          <div className="text-center"><CheckCircle2 className="mx-auto text-accent" size={48} aria-hidden="true" /><h2 className="text-ink mt-5 text-2xl font-bold">公開しました</h2><p className="text-ink-secondary mt-3 text-sm">申込・配信条件に合う友だちが、このウェビナーを視聴できます。</p></div>
           <dl className="border-hairline divide-hairline mx-auto mt-6 max-w-3xl divide-y rounded-control border">{[
             ['ウェビナー名', webinar.title], ['動画・公開', '申込者向け'], ['対象', publicPeriod], ['公開URL', `/webinar/${webinar.slug}`], ['状態', '稼働中'],
           ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-[70%] truncate text-sm font-bold" title={value}>{value}</dd></div>)}</dl>
