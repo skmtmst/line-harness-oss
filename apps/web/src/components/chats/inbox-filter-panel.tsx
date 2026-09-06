@@ -83,7 +83,8 @@ export default function InboxFilterPanel({
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        className="bg-canvas rounded-panel fixed top-[238px] right-[120px] flex max-h-[640px] w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden shadow-2xl"
+        style={{ top: 238, right: 120, width: 420, maxHeight: 640 }}
+        className="bg-canvas rounded-panel fixed flex max-w-[calc(100vw-2rem)] flex-col overflow-hidden shadow-2xl"
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
           <Filter aria-hidden="true" size={18} className="text-ink" />

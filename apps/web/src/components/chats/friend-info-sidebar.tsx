@@ -275,7 +275,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
         {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
             data-inbox-v6="detail-sections-panel"
-            className="bg-canvas border-hairline rounded-panel shadow-float fixed top-[430px] right-14 z-[90] w-[360px] border p-4"
+            style={{ top: 430 }}
+            className="bg-canvas border-hairline rounded-panel shadow-float fixed right-14 z-50 w-[360px] border p-4"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">

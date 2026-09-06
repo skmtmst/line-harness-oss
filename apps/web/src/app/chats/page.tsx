@@ -1222,7 +1222,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       {savedViewSuccess ? (
         <div
           role="status"
-          className="bg-accent-soft text-accent-deep border-accent fixed top-20 left-1/2 z-[120] flex min-w-[520px] -translate-x-1/2 items-center gap-2 rounded-control border px-4 py-3 text-sm font-bold shadow-float"
+          style={{ minWidth: 520 }}
+          className="bg-accent-soft text-accent-deep border-accent fixed top-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-control border px-4 py-3 text-sm font-bold shadow-float"
         >
           <CheckCircle2 aria-hidden="true" size={18} />
           保存した検索を作成しました
