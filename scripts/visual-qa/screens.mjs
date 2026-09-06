@@ -572,7 +572,8 @@ export const SCREENS = [
   },
   {
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: '条件なし' }],
+    mode: 'viewport', height: 1080,
+    steps: [{ click: '編集', nth: 1 }, { click: '条件を編集', after: 700 }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態（`g2UNV` `M2b2B`）／#32 結果画面から作成中の操作を外し「設定サマリー」→「配信した設定」（`M2b2B`）／#40 主ボタンの緑を `$accent-deep` へ／#41 `bV5Vs` の削除欄を「このシナリオを削除」へ、複製枠を「配信を開始」へ。`kk8dz` から削除の押し口を消す／#43 メッセージ種別タブを9種・同じ並びに（`Flex`→リッチメッセージ）／#44 CSV書き出しを副次ボタンに統一（`M2b2B`）／#46 行に「その他操作（…）」／#48 表記統一。設計画像は `docs/design-reference/scenarios-v6/` を撮り直した。**実装との突き合わせはこれから。** **P2 シナリオ編集の1枚に、複数のNodeが同居している。** ルート `/scenarios/detail?id=scenario-0`。`hz9ti`（送信後アクション）`EvVO5`（開始条件）`g2UNV`（一括テスト送信）と**同じ1枚**。設計はそれぞれ別の窓や段。取得元：`scenarios-v6/r6Gzsu.txt`。1440・1920とも横スクロール0 **推奨修正**：`hz9ti` `EvVO5` `g2UNV` と同じ1枚なので、**4つまとめて段へ分ける**。1枚ずつ直すと同じ画面を4回触ることになる。',
     verdictSource: 'scenarios-v6/r6Gzsu.txt', verdictHead: '7b509106',
   },
@@ -585,7 +586,8 @@ export const SCREENS = [
       撮り直すまで判定は入れない。
     */
     ...SCENARIO, node: 'hz9ti', name: '5-1-F シナリオ・送信後アクションを開く', route: EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: 'アクション', nth: 1 }],
+    mode: 'viewport', height: 1080,
+    steps: [{ click: '編集', nth: 1 }, { click: '＋ アクションを追加', after: 700 }],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態（`g2UNV` `M2b2B`）／#32 結果画面から作成中の操作を外し「設定サマリー」→「配信した設定」（`M2b2B`）／#40 主ボタンの緑を `$accent-deep` へ／#41 `bV5Vs` の削除欄を「このシナリオを削除」へ、複製枠を「配信を開始」へ。`kk8dz` から削除の押し口を消す／#43 メッセージ種別タブを9種・同じ並びに（`Flex`→リッチメッセージ）／#44 CSV書き出しを副次ボタンに統一（`M2b2B`）／#46 行に「その他操作（…）」／#48 表記統一。設計画像は `docs/design-reference/scenarios-v6/` を撮り直した。**実装との突き合わせはこれから。** **P1 選べる動作が設計の8つのうち5つ。** ルート `/scenarios/detail?id=scenario-0`（アクション）。設計は テキスト送信・テンプレート送信・タグ操作・友だち情報操作・シナリオ操作・リマインダ操作・対応マーク/表示操作・イベント予約操作 の8つ。**テキスト送信・テンプレート送信・リマインダ操作・イベント予約操作が無い。** 実行の順番も、動作ごとの条件分岐も、保存済みセットの呼び出しも、「発動2回目以降も各動作を実行」も無い。取得元：`scenarios-v6/hz9ti.txt`。1440・1920とも横スクロール0 **推奨修正**：**足りない4つの動作（テキスト送信・テンプレート送信・リマインダ操作・イベント予約操作）を先に足す**。実行の順番と条件分岐は、共通アクション（`py5CG`）が既に12種類の処理と順番を持っているので、**その作りを写す**のが早い。',
     verdictSource: 'scenarios-v6/hz9ti.txt', verdictHead: '7b509106',
   },
@@ -636,7 +638,11 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
     mode: 'viewport', height: 1080, /* **#427 で「一括テスト送信」が1つになった**（前は2つあり2番目を押していた）。 */
-    steps: [{ click: '一括テスト送信' }],
+    steps: [
+      { click: '一括テスト送信' },
+      { click: 'Kenta Kawano(Obama)', after: 300 },
+      { click: '内容を確認', after: 700 },
+    ],
     verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態（`g2UNV` `M2b2B`）／#32 結果画面から作成中の操作を外し「設定サマリー」→「配信した設定」（`M2b2B`）／#40 主ボタンの緑を `$accent-deep` へ／#41 `bV5Vs` の削除欄を「このシナリオを削除」へ、複製枠を「配信を開始」へ。`kk8dz` から削除の押し口を消す／#43 メッセージ種別タブを9種・同じ並びに（`Flex`→リッチメッセージ）／#44 CSV書き出しを副次ボタンに統一（`M2b2B`）／#46 行に「その他操作（…）」／#48 表記統一。設計画像は `docs/design-reference/scenarios-v6/` を撮り直した。**実装との突き合わせはこれから。** **#427 `5f09837c` で一括テスト送信が入り、撮れるようになった。** 以前は同じ名前のボタンが2つあり2番目を押していたが、1つに整理された（撮影の段もあわせて直した）。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計のテスト送信は送信先を選び、結果を1通ずつ確かめる。実装は一括で送るところまで **ルート**：`/scenarios/detail?id=scenario-0`（一括テスト送信）。**取得元**：`scenarios-v6/g2UNV.txt`。**推奨修正**：送信先を選び、結果を1通ずつ確かめられるようにする。**この注記は誤りだった（2026-09-02 に訂正）。** 「`W98zZQ` が『本番の登録は増えません／配信予定は作りません』を既に持っている」と書いたが、**その文字列はリポジトリのどこにも無く**、リマインダにテスト送信自体が無い。写す先が存在しないものを「写せばよい」と書いていた。#675 でシナリオ側に起こした。',
     verdictSource: 'scenarios-v6/g2UNV-1440.png', verdictHead: '7b509106',
   },
@@ -3418,6 +3424,58 @@ const ISSUE_266_REVIEW = {
 }
 
 /**
+ * board #294。3104/8791 で1440/1920pxを撮影し、設計と実装を同じ画像へ
+ * 横並びにして再判定した。値を返す口が無い項目は作らず、理由を残す。
+ */
+const ISSUE_294_REVIEW = {
+  TC1b1: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・固定データ待ち。案内、4指標、フォルダ、検索・絞り込み、5行の一覧、状態と行操作を設計順に表示した。シナリオ用フォルダAPIの固定応答が空のため、設計の「初回案内・購入後・予約フォロー」3分類だけは作らず「すべて・未分類」を実値で表示した。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/TC1b1.txt + TC1b1-{1440,1920}.png',
+  },
+  cCB7r: {
+    verdict: 'match',
+    note: '一致。3段の現在地、下書き作成の案内、シナリオ名・フォルダ、時刻指定・経過時間の2カード、2人の具体例、選択操作を設計と同じ順にそろえた。現在地を案内より先へ移し、2幅とも横はみ出し0。',
+    source: 'scenarios-v6/cCB7r.txt + cCB7r-{1440,1920}.png',
+  },
+  kk8dz: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・固定データ待ち。3段の現在地、配信対象、日時・種別・本文、LINEプレビュー、配信の流れ、設定サマリーを同じ左右構成で表示した。作成途中へ戻るとAPIの既存1通目を入力済みで再表示し、重複追加せず更新する。設計の例文そのものは固定応答に無いため、実際の1通目を表示した。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/kk8dz.txt + kk8dz-{1440,1920}.png',
+  },
+  bV5Vs: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・固定データ待ち。開始前の注意、5枚の設定札、購読中・読了済・離脱、ステップ表、追加・編集・プレビュー・テスト・アクション・削除、下部操作を設計順にそろえた。設計は4通、固定応答は3通のため、存在しない4通目は作らず3行を表示した。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/bV5Vs.txt + bV5Vs-{1440,1920}.png',
+  },
+  xfYLn: {
+    verdict: 'match',
+    note: '一致。ステップ編集時はシナリオ全体の一覧を隠し、対象の1通だけを編集する専用面に切り替えた。左に配信タイミング・メッセージ・対象・送信後アクション、右にLINEプレビュー・配信の流れ・設定サマリー、上部に閉じる・保存を配置した。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/xfYLn.txt + xfYLn-{1440,1920}.png',
+  },
+  r6Gzsu: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。個別ステップ編集を背景に、幅広の条件面、AND/OR、15軸、条件追加、絞り込み要約、戻る・保存を設計順に表示した。固定ステップの条件は空で、対象人数を数えるAPIも無いため、設計の選択済み条件と人数は作っていない。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/r6Gzsu.txt + r6Gzsu-{1440,1920}.png',
+  },
+  hz9ti: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API契約待ち。個別ステップ編集を背景に、幅1240pxの面、動作選択、実行順、条件、保存を表示した。現行契約が扱える5種類だけを操作可能にし、設計の8種類のうちテキスト・テンプレート・リマインド・イベント予約と、設定済み3動作はAPIと固定応答に無いため作っていない。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/hz9ti.txt + hz9ti-{1440,1920}.png',
+  },
+  RUxNf: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・APIデータ待ち。開始確認を幅広の面にし、左に対象シナリオ・開始のきっかけ・配信方式・通数・購読中、右に4項目の配信前チェック、下に開始後の影響と戻る・開始を配置した。テスト送信履歴、送信枠、開始予定人数、開始日時はAPIが返さないため「—」のまま確認済みにしていない。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/RUxNf.txt + RUxNf-{1440,1920}.png',
+  },
+  g2UNV: {
+    verdict: 'structure_match_data_pending',
+    note: '構造一致・API結果待ち。宛先を選んだ次に、送信先、全3通の日時・種別、本物のLINEへ送る警告、戻る・テスト送信開始を確認する段を追加した。現行APIは合計送信数しか返さず1通ごとの成否を返さないため、設計の通別結果は送信前に作っていない。2幅とも横はみ出し0。',
+    source: 'scenarios-v6/g2UNV.txt + g2UNV-{1440,1920}.png',
+  },
+}
+
+/**
  * board #267。development b5693059a を取り込んだ枝を 3102/8789 で起動し、
  * 機能1に残る2 Nodeを設計1920pxと実装1440/1920pxで比較した結果。
  */
@@ -3525,6 +3583,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-06 #266で判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue266Review.note}`
     screen.verdictSource = `${screen.dir}/${screen.node}.txt + ${screen.dir}/${screen.node}-{1440,1920}.png`
     screen.verdictHead = 'c03ebf864'
+  }
+  const issue294Review = ISSUE_294_REVIEW[screen.node]
+  if (screen.feature === 5 && issue294Review) {
+    screen.verdict = issue294Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #294で修正・再判定。** ${issue294Review.note}`
+    screen.verdictSource = issue294Review.source
+    screen.verdictHead = '766e312f6'
   }
   const issue267Review = ISSUE_267_REVIEW[screen.node]
   if (screen.feature === 1 && issue267Review) {
