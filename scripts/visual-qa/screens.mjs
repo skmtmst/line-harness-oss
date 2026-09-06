@@ -2875,26 +2875,26 @@ const FEATURE_15_REVIEW = {
 const FEATURE_16_REVIEW = {
   PouPn: {
     verdict: 'match',
-    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で再撮影し、一致。** 1440px・1920pxとも横はみ出し0。支払い集計APIを接続し、4指標、5段の成果の流れ、検索・並び順・表示件数・CSV・状態札、設計と同じ6列表を目視比較した。支払済み台帳がまだ無い「未払い残高」だけは金額を作らず `—` と接続条件を表示する。',
+    verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で再撮影し、一致。** 1440px・1920pxとも横はみ出し0。支払い集計APIを接続し、4指標、5段の成果の流れ、検索・並び順・表示件数・CSV・状態札、設計と同じ6列表を目視比較した。支払済み台帳がまだ無い「未払い残高」だけは金額を作らず `—` と接続条件を表示する。',
     verdictSource: 'affiliates-v6/PouPn.txt + PouPn-1440.png + PouPn-1920.png',
     verdictHead: '9a4c4d520',
   },
   GH8VL: {
     verdict: 'match',
-    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で再撮影し、一致。** 1440px・1920pxとも横はみ出し0。承認データを案件別に集計し、4指標と「案件・報酬・成果時の動き・紹介している人・成果・操作」の6列へ整理した。5案件の公開状態と未設定警告も設計画像と目視比較した。',
+    verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で再撮影し、一致。** 1440px・1920pxとも横はみ出し0。承認データを案件別に集計し、4指標と「案件・報酬・成果時の動き・紹介している人・成果・操作」の6列へ整理した。5案件の公開状態と未設定警告も設計画像と目視比較した。',
     verdictSource: 'affiliates-v6/GH8VL.txt + GH8VL-1440.png + GH8VL-1920.png',
     verdictHead: '9a4c4d520',
   },
   n5VVTb: {
     verdict: 'match',
-    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で通常・詳細を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。8件の承認待ち、3件の要確認、状態札、6列表、まとめ承認・まとめ却下、行ごとの認める・却下・見るを設計画像と目視比較した。却下理由そのものは保存口が無いため、状態だけ保存することを画面に明記する。',
+    verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で通常・詳細を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。8件の承認待ち、3件の要確認、状態札、6列表、まとめ承認・まとめ却下、行ごとの認める・却下・見るを設計画像と目視比較した。却下理由そのものは保存口が無いため、状態だけ保存することを画面に明記する。',
     verdictSource: 'affiliates-v6/n5VVTb.txt + n5VVTb-1440.png + n5VVTb-1920.png + n5VVTb-detail-1440.png + n5VVTb-detail-1920.png',
     verdictHead: '9a4c4d520',
     variants: [{ suffix: '-detail', steps: [{ click: '見る', nth: 0, after: 500 }] }],
   },
   xqT1Z: {
     verdict: 'match',
-    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。主欄を3区画、右欄を成果時動作・関連先・注意へ整理し、友だち候補API、名前・メール・コード、報酬方式、保留・支払サイクル、末尾4桁だけを扱う振込先の接続条件を設計画像と目視比較した。',
+    verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。主欄を3区画、右欄を成果時動作・関連先・注意へ整理し、友だち候補API、名前・メール・コード、報酬方式、保留・支払サイクル、末尾4桁だけを扱う振込先の接続条件を設計画像と目視比較した。',
     verdictSource: 'affiliates-v6/xqT1Z.txt + xqT1Z-1440.png + xqT1Z-1920.png',
     verdictHead: '9a4c4d520',
     steps: [
@@ -2907,7 +2907,7 @@ const FEATURE_16_REVIEW = {
   },
   GPWzq: {
     verdict: 'match',
-    verdictNote: '**2026-09-06、Issue #229 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。案件・成果条件・報酬・成果時動作の4区画、右欄プレビュー、対象LINEアカウント、現金とマイル、タグ・シナリオを設計画像と目視比較した。成果地点・期間・二重計上・自動承認は保存口が無いため、各欄に接続条件を表示する。',
+    verdictNote: '**2026-09-06、Issue #229 / PR #965 / HEAD 9a4c4d520 で入力済み状態を再撮影し、一致。** 1440px・1920pxとも横はみ出し0。案件・成果条件・報酬・成果時動作の4区画、右欄プレビュー、対象LINEアカウント、現金とマイル、タグ・シナリオを設計画像と目視比較した。成果地点・期間・二重計上・自動承認は保存口が無いため、各欄に接続条件を表示する。',
     verdictSource: 'affiliates-v6/GPWzq.txt + GPWzq-1440.png + GPWzq-1920.png',
     verdictHead: '9a4c4d520',
     steps: [
