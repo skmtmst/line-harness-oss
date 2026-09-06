@@ -1292,6 +1292,17 @@
       "remaining": 2,
       "capturedAt": [
         {
+          "pr": 1024,
+          "head": "031081d69",
+          "on": "2026-09-07",
+          "screens": [
+            "W7LBc",
+            "NNDMR",
+            "M9cij"
+          ],
+          "note": "Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外"
+        },
+        {
           "pr": 944,
           "head": "98abf756a",
           "on": "2026-09-06",

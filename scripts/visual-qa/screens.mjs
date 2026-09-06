@@ -1354,7 +1354,7 @@ export const SCREENS = [
   */
   { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', mode: 'viewport', height: 1080,
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #224 / UI HEAD 031081d69 で一致。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダの各1440/1920pxを再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。6種類タブ、フォルダ、検索、保存した検索、5つの絞り込み、設計と同じ6列表に加え、実送信台帳からテスト送信を除いた今月の送信数を接続した。累計は同じ値を水増しせずツールチップで確認できる。全14枚で横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で一致。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダの各1440/1920pxを再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。6種類タブ、フォルダ、検索、保存した検索、5つの絞り込み、設計と同じ6列表に加え、実送信台帳からテスト送信を除いた今月の送信数を接続した。累計は同じ値を水増しせずツールチップで確認できる。全14枚で横はみ出し0。',
     verdictSource: 'templates-v6/W7LBc.txt + W7LBc-1440.png + W7LBc-1920.png',
     verdictHead: '031081d69', /*
       **#493 の受入条件5つを1回で撮る。**
@@ -1394,7 +1394,7 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
     verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #224 / UI HEAD 031081d69 で一致。** `/templates/questions/new` を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。#275 / PR #1014 の共通質問編集修正により、タグ・友だち情報・シナリオの詳しい設定は閉じた選択UIになり、質問文、2選択肢、各返信、右のLINEプレビューを同じ画面で確認できる。両幅とも横はみ出し0。',
+    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で一致。** `/templates/questions/new` を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。#275 / PR #1014 の共通質問編集修正により、タグ・友だち情報・シナリオの詳しい設定は閉じた選択UIになり、質問文、2選択肢、各返信、右のLINEプレビューを同じ画面で確認できる。両幅とも横はみ出し0。',
     verdictSource: 'templates-v6/NNDMR.txt + NNDMR-1440.png + NNDMR-1920.png',
     verdictHead: '031081d69',
     route: '/templates/questions/new', mode: 'page',
@@ -1434,7 +1434,7 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-07 Issue #224 / UI HEAD 031081d69 で再判定。** 未使用テンプレートの削除確認を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。両幅とも横はみ出し0。実装は要件 §4-9 / §11 どおり未使用だけを安全に削除できるが、Pencil M9cij は使用中3か所の強制削除を描いたままで一致しない。危険な画面へ戻さず `needs_fix` を維持する。**残る依存**：オーナーIssue #276でPencilを要件に合わせて直した後、同じ2幅で再撮影する。',
+    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で再判定。** 未使用テンプレートの削除確認を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。両幅とも横はみ出し0。実装は要件 §4-9 / §11 どおり未使用だけを安全に削除できるが、Pencil M9cij は使用中3か所の強制削除を描いたままで一致しない。危険な画面へ戻さず `needs_fix` を維持する。**残る依存**：オーナーIssue #276でPencilを要件に合わせて直した後、同じ2幅で再撮影する。',
     verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
     verdictHead: '031081d69',
     mode: 'viewport', height: 1080,
@@ -3759,6 +3759,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '96ed41b6', on: '2026-09-01', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Q8sHa'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   11: [
+    { pr: 1024, head: '031081d69', on: '2026-09-07', screens: ['W7LBc', 'NNDMR', 'M9cij'], note: 'Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外' },
     { pr: 944, head: '98abf756a', on: '2026-09-06', screens: ['W7LBc', 'GFlD7', 'FRkls', 'NNDMR', 'j9ixI', 'hsBtl', 'J3GxEZ', 'M9cij', 'NKyoA'], note: '割当ポート3104/8791で通常・状態別を含む36枚を撮影。対象9画面は一致6、構造一致・集計未接続1、要修正2。横はみ出し0' },
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
