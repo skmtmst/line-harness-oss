@@ -587,7 +587,7 @@ export default function TemplatesPage() {
           onChange={(e) => setNameQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <Button type="button">保存した検索</Button>
+        <span className="bg-canvas-sunken rounded-control px-3 py-2 text-sm font-medium">保存した検索</span>
         <SelectField
           size="compact"
           aria-label="表示件数"

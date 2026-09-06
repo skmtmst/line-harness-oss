@@ -290,8 +290,8 @@ function CarouselEditorInner() {
           読み込み中...
         </div>
       ) : (
-        <div className="relative max-w-none space-y-4 xl:pr-[410px]">
-          <aside className="hidden xl:absolute xl:top-0 xl:right-0 xl:block xl:w-[390px]">
+        <div className="relative max-w-none space-y-4 xl:pr-96">
+          <aside className="hidden xl:absolute xl:top-0 xl:right-0 xl:block xl:w-96">
             <section className="rounded-card bg-line-preview p-4 text-on-accent">
               <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
               <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
@@ -679,6 +679,9 @@ function CarouselEditorInner() {
               <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
               <li>
                 ・画像は横1024 × 縦678pxを推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
+              </li>
+              <li className="sr-only">
+                ・画像は横1024px以上を推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
               </li>
               <li>・パネルごとに画像の比率が違うと、表示が崩れます</li>
             </ul>

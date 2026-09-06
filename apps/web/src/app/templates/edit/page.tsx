@@ -124,7 +124,7 @@ function TemplateEditInner() {
   }
 
   return (
-    <div>
+    <div aria-label="テンプレート編集">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/templates" className="hover:underline">
           テンプレート
@@ -257,7 +257,7 @@ function TemplateEditInner() {
             </p>
           </Field>
 
-          <section className="border-hairline rounded-card border p-4">
+          <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p>
               <span className="text-accent-deep text-xs font-semibold">短縮して、クリックを数える</span>
@@ -265,10 +265,10 @@ function TemplateEditInner() {
             {/* テンプレートの本文と短縮URLを結ぶ記録が無い。配信時に短縮
                 されるが、テンプレート単位のクリック数は追えない。 */}
             <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">
-              <div className="bg-canvas-sunken grid grid-cols-[minmax(0,1fr)_180px_150px] gap-3 px-3 py-2 font-semibold text-ink-secondary">
+              <div className="bg-canvas-sunken grid grid-cols-3 gap-3 px-3 py-2 font-semibold text-ink-secondary">
                 <span>本文の中のURL</span><span>リンク名（計測に出る名前）</span><span>流入リンクにする</span>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_180px_150px] gap-3 px-3 py-3 text-ink">
+              <div className="grid grid-cols-3 gap-3 px-3 py-3 text-ink">
                 <span className="truncate">https://example.co.jp/first-delivery</span><span>初回お届け案内</span><span className="text-accent-deep">18-x で発行済み</span>
               </div>
             </div>
@@ -308,10 +308,10 @@ function TemplateEditInner() {
           </div>
         </div>
 
-        <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-[390px]">
+        <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
           <section className="bg-line-preview rounded-card border-hairline border p-4">
             <p className="text-on-accent text-center text-sm font-semibold">LINEプレビュー</p>
-            <p className="text-on-accent mx-auto mt-2 mb-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">差し込みを当てた見え方（山田 太郎さんの場合）</p>
+            <p className="text-on-accent mx-auto mt-2 mb-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">差し込み後の見え方（山田 太郎さんの場合）</p>
             <div className="bg-canvas-sunken rounded-card mt-3 p-3">
               <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
               <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">

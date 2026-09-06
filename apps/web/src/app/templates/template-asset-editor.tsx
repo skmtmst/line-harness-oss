@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { api, type BroadcastAssetKind } from '@/lib/api'
-import Button from '@/components/shared/button'
+import Button from './template-button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
@@ -16,8 +16,6 @@ const META: Record<AssetKind, { title: string; folder: string }> = {
   coupon: { title: 'クーポン', folder: '03_販促・クーポン' },
   research: { title: 'リサーチ', folder: '02_健康フォロー' },
 }
-
-const inputClass = 'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 
 function Field({ label, children, note }: { label: string; children: React.ReactNode; note?: string }) {
   return (
@@ -76,10 +74,10 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
 
       {error ? <p role="alert" className="bg-danger-bg text-danger rounded-control mb-4 px-4 py-3 text-sm">{error}</p> : null}
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <main className="min-w-0 space-y-4">
-          <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]">
-            <Field label={`${meta.title}名　必須`}><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
+        <main className="min-w-0 flex-1 space-y-4">
+          <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
+            <div className="md:col-span-2"><Field label={`${meta.title}名　必須`}><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field></div>
             <Field label="フォルダ"><TextField className="mt-2" value={folder} onChange={(event) => setFolder(event.target.value)} /></Field>
           </section>
 
@@ -90,9 +88,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 <p className="text-caption mt-1 text-ink-faint">選んだ形に合わせて、下の設定が増えます</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-6">
                   {[['1','1面'],['2v','上下2面'],['2h','左右2面'],['3','上1・下2'],['4','4面'],['6','6面']].map(([value, label]) => (
-                    <button key={value} type="button" onClick={() => setShape(value)} className={`rounded-control border p-3 text-sm font-semibold ${shape === value ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas'}`}>
-                      <span className="mb-2 block text-lg tracking-[.35em]">{value === '6' ? 'A B C\nD E F' : value === '4' ? 'A B\nC D' : value.startsWith('2') ? 'A B' : value === '3' ? 'A\nB C' : 'A'}</span>{label}
-                    </button>
+                    <Button key={value} type="button" variant={shape === value ? 'primary' : 'secondary'} onClick={() => setShape(value)}>
+                      <span className="mb-2 block text-lg tracking-widest">{value === '6' ? 'A B C\nD E F' : value === '4' ? 'A B\nC D' : value.startsWith('2') ? 'A B' : value === '3' ? 'A\nB C' : 'A'}</span>{label}
+                    </Button>
                   ))}
                 </div>
               </section>
@@ -100,7 +98,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 <Field label="画像" note="1040 × 1040px 推奨。上下に分けるときは 1040 × 520px も選べます。">
                   <div className="border-hairline rounded-control mt-2 border border-dashed p-5 text-center">
                     <Button type="button">登録メディアから選ぶ</Button>
-                    <input className={`${inputClass} mt-3`} value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="画像URL" />
+                    <input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-3 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="画像URL" />
                   </div>
                 </Field>
               </section>
@@ -114,26 +112,26 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
             <>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-2">
                 <Field label="画像"><Button type="button" className="mt-2 w-full">登録メディアから選ぶ</Button><span className="text-caption mt-1 block font-normal text-ink-faint">1029 × 1029px 推奨</span></Field>
-                <Field label="使える期間　必須"><div className="mt-2 flex items-center gap-2"><input className={inputClass} value="2026/08/25 00:00" readOnly /><span>から</span><input className={inputClass} value="2026/09/30 23:59" readOnly /></div></Field>
-                <Field label="使い方のご案内（お客さまに見えます）"><textarea className={`${inputClass} mt-2 resize-y`} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
-                <div className="grid gap-3 text-sm"><Field label="使える回数"><select className={`${inputClass} mt-2`}><option>1人1回だけ</option><option>期間中なら何回でも</option></select></Field><Field label="だれに見えるか"><select className={`${inputClass} mt-2`}><option>友だちだけ</option><option>リンクを知っている人</option></select></Field></div>
+                <Field label="使える期間　必須"><div className="mt-2 flex items-center gap-2"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/08/25 00:00" readOnly /><span>から</span><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/09/30 23:59" readOnly /></div></Field>
+                <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+                <div className="grid gap-3 text-sm"><Field label="使える回数"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>1人1回だけ</option><option>期間中なら何回でも</option></select></Field><Field label="だれに見えるか"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>友だちだけ</option><option>リンクを知っている人</option></select></Field></div>
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
-                <Field label="抽選にする"><select className={`${inputClass} mt-2`}><option>する</option><option>しない</option></select></Field><Field label="当たる確率"><input className={`${inputClass} mt-2`} value="20%" readOnly /></Field><Field label="当選人数の上限"><input className={`${inputClass} mt-2`} value="500人" readOnly /></Field>
+                <Field label="抽選にする"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>する</option><option>しない</option></select></Field><Field label="当たる確率"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="20%" readOnly /></Field><Field label="当選人数の上限"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="500人" readOnly /></Field>
               </section>
               <section className="bg-canvas border-hairline rounded-card shadow-card border p-4"><div className="flex items-center justify-between"><h2 className="font-bold">クーポンが使われたときに実行すること</h2><Button type="button">アクションを設定</Button></div><p className="mt-3 text-sm">タグ「夏CP利用」を付ける ／ マイルを 100 付与 ／ 対応マークを「来店あり」に</p></section>
             </>
           ) : (
             <>
-              <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3"><Field label="受付の開始"><input className={`${inputClass} mt-2`} value="2026/08/25 10:00" readOnly /></Field><Field label="受付の終了"><input className={`${inputClass} mt-2`} value="2026/09/07 23:59" readOnly /></Field><Field label="答えてもらう人"><input className={`${inputClass} mt-2`} value="タグ「定期便」を持つ人（1,284人）" readOnly /></Field></section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4"><div className="flex items-center justify-between"><div><h2 className="font-bold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">3 / 10 問</p></div><Button type="button">質問を追加（あと7問）</Button></div><div className="mt-3 grid gap-2">{['1　1つだけ選ぶ　来月も定期便を続けたいと思いますか？','2　いくつでも選ぶ　よく使っている商品を教えてください','3　自由に書く　改善してほしいところがあれば教えてください'].map((text) => <button type="button" key={text} className="border-hairline rounded-control border p-3 text-left text-sm">{text}</button>)}</div></section>
-              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4"><Field label="質問 1 の中身"><textarea className={`${inputClass} mt-2 resize-y`} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field><div className="mt-3 grid gap-2 md:grid-cols-3">{['続けたい','どちらともいえない','止めたい'].map((choice) => <input key={choice} className={inputClass} value={choice} readOnly />)}</div></section>
+              <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3"><Field label="受付の開始"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/08/25 10:00" readOnly /></Field><Field label="受付の終了"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/09/07 23:59" readOnly /></Field><Field label="答えてもらう人"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="タグ「定期便」を持つ人（1,284人）" readOnly /></Field></section>
+              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4"><div className="flex items-center justify-between"><div><h2 className="font-bold">質問（上から順に出ます）</h2><p className="text-caption mt-1 text-ink-faint">3 / 10 問</p></div><Button type="button">質問を追加（あと7問）</Button></div><div className="mt-3 grid gap-2">{['1　1つだけ選ぶ　来月も定期便を続けたいと思いますか？','2　いくつでも選ぶ　よく使っている商品を教えてください','3　自由に書く　改善してほしいところがあれば教えてください'].map((text) => <Button type="button" variant="secondary" key={text}>{text}</Button>)}</div></section>
+              <section className="bg-canvas border-hairline rounded-card shadow-card border p-4"><Field label="質問 1 の中身"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field><div className="mt-3 grid gap-2 md:grid-cols-3">{['続けたい','どちらともいえない','止めたい'].map((choice) => <input key={choice} className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={choice} readOnly />)}</div></section>
               <section className="bg-canvas border-hairline rounded-card shadow-card border p-4"><div className="flex items-center justify-between"><h2 className="font-bold">答え終わったときに実行すること</h2><Button type="button">アクションを設定</Button></div><p className="mt-3 text-sm">お礼メッセージを送る ／ タグ「アンケート回答済み」を付ける ／ マイルを 50 付与</p></section>
             </>
           )}
         </main>
 
-        <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:self-start">
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:w-96 xl:shrink-0 xl:self-start">
           <section className="rounded-card bg-line-preview p-4 text-on-accent">
             <h2 className="text-center font-bold">LINEプレビュー</h2>
             <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">{meta.title}の見え方</p>
