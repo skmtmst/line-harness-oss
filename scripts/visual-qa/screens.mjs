@@ -799,7 +799,9 @@ export const SCREENS = [
       固定データの `broadcast-0` が予約済みなので、そこを見る。
     */
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 一斉配信・予約完了',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（設計と比べられない）。**`/broadcasts/reserved` は 2026-09-03 夜のマージで入ったので、未実装ではなくなった**（前の注記を取り消す）。撮れたが、出ているのは面ではなく**アカウント違いの止め画面**——「選択中のアカウントの配信ではありません」。モックの `broadcast-0` が `lineAccountId` を持たず、撮影ハーネスが選ぶ `visual-qa-account` と一致しないため（`reserved/page.tsx:47` の `broadcast.lineAccountId === selectedAccountId`）。**撮影ハーネス側の不足。** `-cancel`（予約を取り消す）も同じ理由で押せない。**設計側に `bPF0s.txt` が無く**、文字の突き合わせはそもそもできない（画像のみ）。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は「選択中のアカウントの配信ではありません」で止まり、設計の5段表示・予約内容・Slack通知・次の操作が出ない。取消ボタンも無く確認状態を撮れない。**推奨修正**：撮影アカウントと予約データを一致させ、設計の完了要約と取消導線を出す。取得元 `broadcasts-v6/bPF0s.txt` と同Node画像。',
+    verdictHead: '350f9636a',
     route: '/broadcasts/reserved?id=broadcast-0', mode: 'page',
     /* 押した先の確認窓。**窓はビューポートで撮る**（`fullPage` だと下へ流れる）。 */
     variants: [{
@@ -855,7 +857,9 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/broadcasts`。**実装に `data-qa-open="xkRDb"` の押しどころが無く、フォルダごとの「…」を開けない。** 一覧に出ているのは「フォルダを追加」だけ。台帳の注記は #602 で「…」が入ったとしているが、いまの `codex/development`（`49e1341c`）では見つからない。**古い絵（committed）は残っているが、それをこの head の判定には使わない。**', route: '/broadcasts',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも `data-qa-open="xkRDb"` が0件で、設計のフォルダ操作メニューを開けない。「フォルダを追加」だけは表示される。**推奨修正**：各フォルダへ「…」の操作口を戻し、名称変更・移動・削除を設計どおり確認できるようにする。取得元 `broadcasts-v6/xkRDb.txt` と撮影失敗ログ。', route: '/broadcasts',
+    verdictHead: '350f9636a',
     mode: 'viewport', height: 1080, steps: [{ qaOpen: 'xkRDb', after: 700 }],
     variants: [{ suffix: '-add', steps: [{ click: 'フォルダを追加', after: 700 }] }],
 
@@ -1044,7 +1048,9 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/auto-replies/publish`（試験）。**画面は入った**が、モックに `/api/auto-replies/:id/conflicts` の固定データが無く、重なりの行を押せない。`scripts/visual-qa/` は S0 の所有。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも、設計の重なり確認「営業時間への一律返信」が表示されず、テスト段へ進めない。**推奨修正**：競合結果を画面に出し、2項目の確認後に試験入力へ進めるようにする。取得元 `auto-replies-v6/g46ja.txt` と撮影失敗ログ。',
+    verdictHead: '350f9636a',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 「確認したので次へ」で試す段へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }],
@@ -1052,7 +1058,9 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/auto-replies/publish`（最終確認）。`g46ja` と同じ理由。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。重なり確認の項目が表示されないため、1440・1920とも最終確認へ進めない。**推奨修正**：競合確認と試験を通過した後、設計の条件・応答・優先順位の要約を表示する。取得元 `auto-replies-v6/Yj6CQ.txt` と撮影失敗ログ。',
+    verdictHead: '350f9636a',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 試してから最後の確認へ */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }],
@@ -1060,7 +1068,9 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/auto-replies/publish`（有効化完了）。`g46ja` と同じ理由。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。重なり確認の項目が表示されないため、1440・1920とも公開完了へ進めない。**推奨修正**：前段の確認を接続し、公開後は設計の有効状態・優先順位・次の操作を表示する。取得元 `auto-replies-v6/e6iJG.txt` と撮影失敗ログ。',
+    verdictHead: '350f9636a',
     route: '/auto-replies/publish?id=ar-2', mode: 'page',
     /* 公開まで押し切る */
     steps: [{ click: '「営業時間」への一律返信の重なりを確認した', role: 'checkbox', after: 250 }, { click: '予約の問い合わせの重なりを確認した', role: 'checkbox', after: 250 }, { qaOpen: 'g46ja', after: 700 }, { click: '実際に試す', after: 900 }, { qaOpen: 'Yj6CQ', after: 900 }, { click: 'この内容で公開する', after: 1200 }],
@@ -1077,7 +1087,9 @@ export const SCREENS = [
       固定データに2行入れてある。
     */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
-    verdict: 'unjudged', verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** 一致', verdictSource: 'auto-replies-v6/design-qa-execution-results-501.md', verdictHead: '93edbe17',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態でも件数がすべて「—件」で一覧が取得失敗となり、設計の実行履歴・見送り理由・右側の集計を確認できない。**推奨修正**：固定データを正常表示し、設計の4指標・履歴・ルール別集計を同じ配置で出す。取得元 `auto-replies-v6/t7UtYQ*.txt` と同Node画像。',
+    verdictSource: 'auto-replies-v6/t7UtYQ.txt', verdictHead: '350f9636a',
     route: '/auto-replies/runs?id=rule-a',
     states: {
       apis: ['**/api/auto-reply-runs*'],
@@ -1116,7 +1128,9 @@ export const SCREENS = [
     流入リンクで出し分ける仕組みがそもそも無い。
   */
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れた絵が使えない）。ルート `/friend-add-settings`。**「設定を表示できませんでした」で止まった画面を撮っていた**（`uLQQc.txt:62`）。撮影ハーネスの落ちた文言の一覧（`capture-screens.mjs` の `FAILURE_TEXTS`）にこの文が無いため「撮影OK」と出ていた。原因は**モックの返す形**——画面は `res.data.routing` を読む（`page.tsx:102`）が、モックは `routing` を持たない器を返す。Workerは `{ ..., routing }` を返す（`friend-add-routing.ts:224`）ので、**実装ではなく撮影ハーネス側の不足**。', },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装はアカウント共通の1枚設定で、設計の設定一覧・4指標・フォルダ・優先順位・行操作が無い。**推奨修正**：機能9の要件に沿って、一覧と設定編集の役割を分ける。取得元 `friend-add-v6/uLQQc.txt` と同Node画像。',
+    verdictHead: '350f9636a', },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（drop）。設定はアカウントに1枚で、設計の4画面（9-1-A/B/C/I）は横断レビュー §7 の17番で削除候補。',
@@ -1142,10 +1156,14 @@ export const SCREENS = [
     why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
   },
   { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れた絵が使えない）。ルート `/friend-add-settings`（アクション追加）。`uLQQc` と同じ理由で「設定を表示できませんでした」を撮っていた（`txMO9.txt:62`）。', },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計はアクション追加ダイアログだが、実装は設定本体のままで追加操作が開かない。**推奨修正**：配信・タグ・シナリオ等を選ぶ追加ダイアログを設計どおり接続する。取得元 `friend-add-v6/txMO9.txt` と同Node画像。',
+    verdictHead: '350f9636a', },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/friend-add-settings`（プレビューとテスト）。`uLQQc` と同じ理由で面が出ず、「テスト実行」に届かない。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。「テスト実行」は押せるが、設計の5段表示・LINEプレビュー・テスト対象と確認結果の面にならず、設定本体に通知だけが出る。**推奨修正**：プレビューと担当者テストを独立した段として表示する。取得元 `friend-add-v6/U3SI5.txt` と同Node画像。',
+    verdictHead: '350f9636a',
     mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
 
   },
@@ -1171,13 +1189,12 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/friend-add-settings/runs` の page.tsx が `codex/development` に無い。台帳Issue #100 が同じ話。',
     route: '/friend-add-settings/runs', mode: 'page',
     states: { apis: ['**/api/friend-add-routing/events*', '**/api/friend-add-routing/events/**'], kinds: ['normal', 'loading', 'empty', 'error'] },
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **2026-09-03 に確かめ直した：まだ本流に無い。** `/friend-add-settings/runs` は HTTP 404 で、`apps/web/src/app/friend-add-settings/runs/page.tsx` も無い。以前ここには「#506 で実行結果の画面が入った」と書いていたが、**それは未マージのPRの枝で見たもの**だった。以下の観察も同じ枝のもの。 未取得の扱いが設計より丁寧で、上の案内に「LINE公式アカウントの通常URLや公式QRから追加された場合、正確な流入経路は取得できません。**取得できない記録は0件にせず「経路は取得できません」と表示します。**」と書き、実際に行でもそう出る。処理できなかった行の処理日時は「—」。P1 設計の右側3枚（稼働状況＝状態・二重送信防止・最終配信・平均送信0.8秒／要テスト＝未送信3件とテストの導線／担当者シナリオ開始＝テスト待ち8・対応中21・完了7）が無い。「流入経路別の内訳」（予約128回59.8%／Webサイト54回25.2%／紹介キャンペーン32回15.0%）も無い。実行結果をCSVで書き出す、配信を一時停止 の導線も無い。P2 帯4つの中身が設計と違う（設計は 直近28日の追加214人／累計配信1,842通／シナリオ開始198件／エラー3件） **ルート**：`/friend-add-settings/runs`。**取得元**：`friend-add-v6/P2J0Te.txt`。**推奨修正**：**「取得できない記録は0件にせず『経路は取得できません』と表示します」の断りはそのまま残す**（束4の手本）。右側3枚と流入経路別の内訳は、`Q4bkTg`（流入と計測）の「経路が分かる何人か」と同じ口が要るので、そちらと同時に。',
-    verdictSource: '/friend-add-settings/runs が HTTP 404（2026-09-03 確認）＋ apps/web/src/app/friend-add-settings/runs/page.tsx が無い',
-    verdictHead: '5dc99107',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態でも4指標が「—件」で一覧が空になり、設計の稼働状況・要テスト・担当者シナリオ開始・流入経路別内訳が無い。**推奨修正**：正常データを表示し、設計の集計カードと履歴を配置する。取得不能を0件にしない説明は維持する。',
+    verdictSource: 'friend-add-v6/P2J0Te.txt',
+    verdictHead: '350f9636a',
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
@@ -1194,7 +1211,9 @@ export const SCREENS = [
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
   { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars`。**面が `TypeError: narrowed is not iterable`（`page.tsx:125`）で落ちる。** 原因は**モックの返す形**——Workerは `{ success, data: [...] }` と配列を返す（`webinars.ts:767`）が、モックは `/api/webinars` に固定データが無く空の器 `{items:[],total:0,…}` を返す。画面は `setItems(res.data)` で配列を期待している。**撮影ハーネス側の不足**（`scripts/visual-qa/` は S0 の所有）。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・空・失敗・権限不足を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装の通常状態は一覧が空で、設計の6件・申込428人等の指標、フォルダ、6行の状態を確認できない。**推奨修正**：正常データを表示し、設計の指標・フォルダ・一覧配置へ合わせる。取得元 `webinars-v6/ZC13r*.txt` と同Node画像。',
+    verdictHead: '350f9636a',
     /*
       帯は `GET /api/webinars/overview` を読む。通常・0件・取得失敗・
       権限不足を混ぜないので、口を差し替えて1つずつ撮る。
@@ -1215,34 +1234,41 @@ export const SCREENS = [
     verdictHead: '49e1341c', route: '/webinars/new', },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`ZC13r` と同じ——モックに `/api/webinars` の固定データが無く、`webinar.schedule` が無いまま `.length` を読んで落ちる（`edit/page.tsx:950`）。**撮影ハーネス側の不足。**', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計は縦の5段と右側要約だが、実装は横タブで入力項目・プレビュー・下部操作の配置が異なる。**推奨修正**：動画と公開設定をSTEP 2の構成へ合わせる。取得元 `webinars-v6/PV1Vh.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'PV1Vh' }],
 
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装はCTAが未設定の空欄中心で、設計のCTA・申込フォーム選択、右側要約、LINEプレビューが無い。**推奨修正**：STEP 3の選択状態とプレビューを設計どおり出す。取得元 `webinars-v6/d3rFGD.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'd3rFGD' }],
 
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。台帳Issue #93 が同じ話。', route: WEBINAR_EDIT,
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は「通知の設定を表示できません」で止まり、設計の申込完了・前日・1時間前・見逃し配信を選べない。**推奨修正**：通知設定の正常データとLINEプレビューを接続する。取得元 `webinars-v6/Ho8z4.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT,
     steps: [{ qaOpen: 'Ho8z4' }],
 
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ qaOpen: 'Ho8z4' }],
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。設計の完視聴・途中離脱・未視聴ごとのアクションが無く、通知取得失敗の面が出る。**推奨修正**：視聴後アクションを独立区画として実装し、設定要約へ反映する。取得元 `webinars-v6/Xjk8q.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ qaOpen: 'Ho8z4' }],
 
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT,
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は基本設定の入力欄で、設計の公開URL・案内内容・申込/再生ページのプレビューになっていない。**推奨修正**：公開ページ確認を独立状態として表示する。取得元 `webinars-v6/GB0NR.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT,
     mode: 'viewport', height: 1080,
 
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`。`PV1Vh` と同じ理由。台帳Issue #99 が同じ話。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装の確認欄は設計より情報が少なく、LINEプレビュー・公開前チェック・設定要約の配置も異なる。**推奨修正**：STEP 5で不足項目と公開可否を一括確認できる構成へ合わせる。取得元 `webinars-v6/D6yO7e.txt` と同Node画像。',
+    verdictHead: '350f9636a',
     route: '/webinars/edit?id=webinar-1', mode: 'page',
     steps: [{ qaOpen: 'D6yO7e' }],
 
@@ -1254,21 +1280,22 @@ export const SCREENS = [
       `status !== 'active'` のときは完了として出さない。
     */
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（route）。`/webinars/published` の page.tsx が `codex/development` に無い。',
     route: '/webinars/published?id=webinar-1', mode: 'page',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-03 Pencilを直したので未判定に戻した。** 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#41 完了画面の追従バー／#44 CSV書き出しの置き場／#48 表記統一／#49 工程名の統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **2026-09-03 に確かめ直した：まだ本流に無い。** `/webinars/published?id=webinar-1` は HTTP 404 で、`apps/web/src/app/webinars/published/page.tsx` も無い。以前ここには「#507 → #508 で公開完了が入った」と書いていたが、**それは未マージのPRの枝で見たもの**だった。以下の観察も同じ枝のもの。 「公開しました」＋公開状態・公開URL・動画の長さ43分・配信枠2件。**出せないものを出さない**のが良い：「所属するLINE公式アカウントのLIFF IDを確認できないため、公開ページのボタンは出していません。」と理由を添えて隠す。「公開後の申込数や視聴結果は、編集画面の「概要・分析」で確認できます。」も書いてある。完了画面へ渡すIDは公開の口が実際に返したものだけ（契約試験が `?status=success` を禁じている）。P2 設計との細かな差は未確認（設計 TimXl の面と1枚ずつ並べるのは次の回） **ルート**：`/webinars/published?id=webinar-1`。**取得元**：`webinars-v6/design-qa.md` ＋ #508 の契約試験。**推奨修正**：LIFF IDが無いときにボタンを隠して理由を書く形は、ほかの公開完了画面にも写せる。**残作業**：設計 `TimXl` の面と1枚ずつ並べる。',
-    verdictSource: '/webinars/published?id=webinar-1 が HTTP 404（2026-09-03 確認）＋ apps/web/src/app/webinars/published/page.tsx が無い',
-    verdictHead: '61eeb3c7',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は公開済み・URL・長さ・申込数だけで、設計の5段完了表示、詳細な設定要約、Slack通知、次にできることが不足する。**推奨修正**：設計の完了サマリーへ合わせ、LIFF未設定時の理由表示は維持する。取得元 `webinars-v6/TimXl.txt` と同Node画像。',
+    verdictSource: 'webinars-v6/TimXl.txt',
+    verdictHead: '350f9636a',
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`（参加者）。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ click: '参加者' }],
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「参加者」タブが0件で、設計の参加者一覧・状態・CSV出力へ到達できない。**推奨修正**：編集画面に参加者管理の導線を追加し、設計の一覧状態を表示する。取得元 `webinars-v6/Q8sHa.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ click: '参加者' }],
 
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars/edit`（分析）。`PV1Vh` と同じ理由。', route: WEBINAR_EDIT, steps: [{ click: '分析' }],
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は多指標の分析ダッシュボードだが、設計の視聴維持率・離脱箇所・CTA反応・LINEプレビュー・CSV配置と構造が異なる。**推奨修正**：必要指標を残しつつ設計の区画と名称へ合わせる。取得元 `webinars-v6/yxyzQ.txt` と同Node画像。', verdictHead: '350f9636a', route: WEBINAR_EDIT, steps: [{ click: '分析' }],
 
   },
   {
@@ -1281,7 +1308,8 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/webinars`。素の1枚が `ZC13r` と同じ理由で落ちる。読込・空・失敗の3状態だけは撮れたが、**素の絵が無いので比べられない。**',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態も空で、設計の状態別一覧とページ送りの配置が再現されない。**推奨修正**：通常データを出したうえで、空・読込・失敗を同じ一覧骨格にそろえる。取得元 `webinars-v6/zCQXe*.txt` と同Node画像。', verdictHead: '350f9636a',
     states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
 
   },
@@ -1393,7 +1421,9 @@ export const SCREENS = [
       木には入っていないので、撮るには #493 の木でサーバを起こす。
     */
     ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/templates`（フォルダ操作）。**フォルダごとの操作の押しどころが無い**（一覧に出るのは種類のタブと「すべて」「text」のチップだけ）。加えてモックの `/api/folders?type=template` が空で、設計のフォルダ（お問い合わせ・予約・EC）が並ばない。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「フォルダ『お問い合わせ』を操作」が0件で、設計の名称変更・移動・削除メニューを開けない。固定データには対象フォルダがあるため画面側の未接続。**推奨修正**：テンプレート一覧を共通のフォルダ操作へ接続する。取得元 `templates-v6/CzndJ.txt` と撮影失敗ログ。',
+    verdictHead: '350f9636a',
     mode: 'viewport', height: 1080,
     /*
       **撮れない理由は固定データではなく実装。**
@@ -1432,7 +1462,8 @@ export const SCREENS = [
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/new`。**3段のステッパー（STEP 1〜3）が無い。** 面の分け方の記号（A〜F）、トークの下に出る文字の説明（14字まで）、寸法（大 2500 × 1686px／小 2500 × 843px）、LINEプレビュー、公開前の注意（「面 F のアクションが未設定です。」）が無い。言い方も設計と違う（設計「上下2面」／実装「上下2分割」）。取得元 `rich-menus-v6/XtfO3.txt`',
     verdictHead: '49e1341c', route: '/rich-menus/new', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus/edit?id=rmg-1`。**モックの `/api/rich-menu-groups` が空で `rmg-1` が見つからず面が落ちる。** 撮影ハーネス側の不足（`scripts/visual-qa/` は S0 の所有）。', route: RM_EDIT, /*
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも「画面を表示できませんでした」で停止し、設計の対象条件・優先順位・LINEプレビューを確認できない。**推奨修正**：`rmg-1` を正常に読み、誰に出すかと条件別表示を描画する。取得元 `rich-menus-v6/kQ1bs.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: RM_EDIT, /*
       **「出す順番」は出し分けを入れたときだけ出る**（`edit/page.tsx:781` の
       `targetingEnabled && (`）。既定は切れているので、入れた状態も撮る。
     */
@@ -1444,13 +1475,17 @@ export const SCREENS = [
       `NXdDk` は同じ画面の「つながりが無い」状態。
     */
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus/connections?id=rmg-1`。`kQ1bs` と同じ理由。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも表示エラーで停止し、設計の切替元・切替先・循環警告を確認できない。**推奨修正**：グループ詳細を正常取得し、切替関係を設計の図と一覧で表示する。取得元 `rich-menus-v6/DIUbO.txt` と撮影失敗ログ。',
+    verdictHead: '350f9636a',
     route: '/rich-menus/connections?id=rmg-1', mode: 'page',
 
   },
   {
     ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus/connections?id=rmg-2`。`kQ1bs` と同じ理由。空・失敗の2状態だけは撮れたが、**素の絵が無いので比べられない。**',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。読込・空・失敗は1440・1920で撮れたが、通常状態は表示エラーで停止する。設計の「つながりなし」説明とLINEプレビューも出ない。**推奨修正**：通常データの形を直し、つながりが無い理由と次の操作を表示する。取得元 `rich-menus-v6/NXdDk*.txt` と撮影失敗ログ。',
+    verdictHead: '350f9636a',
     route: '/rich-menus/connections?id=rmg-2', mode: 'page',
     /*
       **通常・空・失敗を本文まで取る。**読む口は `api.richMenuGroups.get(groupId)`
@@ -1460,7 +1495,8 @@ export const SCREENS = [
 
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus/edit?id=rmg-1`（公開のしかた）。`kQ1bs` と同じ理由。', route: RM_EDIT, },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも表示エラーで停止し、設計の公開方法・対象・開始時刻・LINEプレビューを確認できない。**推奨修正**：編集データを正常取得し、STEP 3の公開設定を表示する。取得元 `rich-menus-v6/UMiJ9.txt` と撮影失敗ログ。', verdictHead: '350f9636a', route: RM_EDIT, },
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む',
     verdict: 'needs_fix',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/rich-menus/connections`（管理画面の外のメニューを取り込む）。**「LINEから読み直す」と、面ごとの動きの一覧（設計「A：URLを開く（https://example.co.jp/menu）」など）が無い。** 取り込まずに消したときの注意（「お客さまのメニューがすぐ消えます」）も無い。内部語 `rich menu` が帯に出る。取得元 `rich-menus-v6/TL7tp.txt`',
@@ -1472,7 +1508,9 @@ export const SCREENS = [
       両方を撮る。取り込みの標準 `confirm` は削除ではないので、この行では見ない。
     */
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/rich-menus`（削除確認）。**モックの `/api/rich-menu-groups` が空で行が1つも無く、削除の窓に届かない。** 設計にある「まず LINE から取り下げる（おすすめ）」の段取りは、いまの一覧の文字には現れていない。',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。基本状態を1440・1920で撮影しPencil画像と横並び比較（はみ出し0）したが、実装は0件の一覧で設計の削除確認窓にならない。管理内・LINE側・失敗の3変種も押し口0件。**推奨修正**：固定データを一覧へ出し、「LINEから取り下げる→管理画面から削除」の順を確認窓に示す。取得元 `rich-menus-v6/szXsT.txt` と同Node画像。',
+    verdictHead: '350f9636a',
     route: '/rich-menus', mode: 'page',
     /*
       **公開中のメニューは窓が出ない**（`handleDelete` が `alert` で止める）。
@@ -1536,7 +1574,8 @@ export const SCREENS = [
 
   },
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未判定（撮れていない）。ルート `/form-submissions`（集まった回答）。**モックの `/api/forms` が空で行が1つも無く、フォームを開けない。** 撮影ハーネス側の不足。', steps: [{ click: '来店アンケート' }], },
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 S2 判定。** 要修正。1440・1920とも一覧に「来店アンケート」が無く、設計の回答一覧・回答数・友だち情報・CSVへ到達できない。**推奨修正**：正常なフォーム一覧データを表示し、対象行から集まった回答を開けるようにする。取得元 `forms-v6/v9tYhl.txt` と撮影失敗ログ。', verdictHead: '350f9636a', steps: [{ click: '来店アンケート' }], },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
     verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 未実装（parts）。削除確認は共通の `ConfirmDialog` を当てるだけで作れる。',
