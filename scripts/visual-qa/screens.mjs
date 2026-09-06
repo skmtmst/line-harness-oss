@@ -1115,7 +1115,7 @@ export const SCREENS = [
   {
     /*
       **PR #501（head `93edbe17`）で `/auto-replies/runs` が入った。**
-      口は `GET /api/auto-reply-runs?ruleId=`。1本にそろっている。
+      口は `GET /api/auto-reply-runs?rule_id=`。1本にそろっている。
 
       **見送りの行がいちばん大事。** 選んだルールが条件で見送られ、
       後ろのルールが動いても、この画面は「選んだルールは何もしなかった」
@@ -1123,9 +1123,9 @@ export const SCREENS = [
       固定データに2行入れてある。
     */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 S2 判定。** 要修正。通常・読込・空・失敗を1440・1920で撮影し、Pencil画像と横並び比較（はみ出し0）。実装は通常状態でも件数がすべて「—件」で一覧が取得失敗となり、設計の実行履歴・見送り理由・右側の集計を確認できない。**推奨修正**：固定データを正常表示し、設計の4指標・履歴・ルール別集計を同じ配置で出す。取得元 `auto-replies-v6/t7UtYQ*.txt` と同Node画像。',
-    verdictSource: 'auto-replies-v6/t7UtYQ.txt', verdictHead: '350f9636a',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #292 / 固定データ PR #1077（統合 #1080・head `447da7646`）で一致。** 今月214回・累計1,842回・引継ぎ36件・エラー3件、最近の実行4行、きっかけ別3行、稼働状況、実行エラー、担当者引継ぎを実APIと同じ応答型で表示した。通常・読込・空・失敗を3106/8793で各1440/1920px撮影し、同Node画像と横並び比較、全10枚で横はみ出し0。見送り・成功・確認待ち・エラーの違いも0件や未取得へ潰していない。',
+    verdictSource: 'auto-replies-v6/t7UtYQ.png + docs/design-qa/auto-replies-v6/t7UtYQ*.png + t7UtYQ*.txt', verdictHead: '447da7646',
     route: '/auto-replies/runs?id=rule-a',
     states: {
       apis: ['**/api/auto-reply-runs*'],
@@ -4157,6 +4157,7 @@ export const CAPTURED_AT = {
     { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
+    { pr: 0, head: '209fd042f', on: '2026-09-07', screens: ['K7vg2', 'nzWIX', 'ivDoe', 'U9hzqH', 't7UtYQ'], note: 'Issue #292。編集3段を画面ごとに分割し、競合と実行結果を固定データへ接続。3106/8793で1440・1920と全状態を比較し、横はみ出し0。' },
     { pr: 955, head: '564c91d0fe', on: '2026-09-06', screens: ['g46ja', 'Yj6CQ', 'e6iJG'], note: '競合確認、実在する友だちでのdry-run、最終確認、冪等な有効化を通し、1440・1920pxで設計と目視比較。横はみ出し0。' },
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
