@@ -3,6 +3,7 @@
 import React from 'react'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import {
   IdentityAssurance,
@@ -81,32 +82,32 @@ export default function FriendIdentityCandidatesPage() {
               <h2 className="text-sm font-bold text-ink">統合プロフィールに採用する値</h2>
               <p className="mt-1 text-xs text-ink-faint">項目ごとに採用元を選び、判定と同じ履歴へ残します。</p>
               <div className="mt-3 overflow-hidden rounded-control border border-hairline">
-                <table className="w-full table-fixed text-left text-xs">
+                <DataTable className="table-fixed text-xs">
                   <thead className="bg-canvas-sunken text-ink-secondary">
-                    <tr><th className="p-2">項目</th><th className="p-2">候補A</th><th className="p-2">候補B</th><th className="p-2">採用する値</th></tr>
+                    <TableHeadRow><Th>項目</Th><Th>候補A</Th><Th>候補B</Th><Th>採用する値</Th></TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-hairline">
                     {profileCandidates.map((field) => {
                       const left = field.options.find((option) => option.sourceFriendId === detail.left.id)
                       const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
                       return (
-                        <tr key={field.fieldKey}>
-                          <td className="p-2 font-semibold text-ink">{field.fieldLabel}</td>
-                          <td className="p-2 text-ink-secondary">{left?.valuePreview ?? '—'}</td>
-                          <td className="p-2 text-ink-secondary">{right?.valuePreview ?? '—'}</td>
-                          <td className="p-2 text-ink-secondary">判定時に選択</td>
-                        </tr>
+                        <Tr key={field.fieldKey}>
+                          <Td><span className="font-semibold text-ink">{field.fieldLabel}</span></Td>
+                          <Td>{left?.valuePreview ?? '—'}</Td>
+                          <Td>{right?.valuePreview ?? '—'}</Td>
+                          <Td>判定時に選択</Td>
+                        </Tr>
                       )
                     })}
                     {tagCandidates.length > 0 ? (
-                      <tr>
-                        <td className="p-2 font-semibold text-ink">タグ</td>
-                        <td className="p-2 text-ink-secondary" colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</td>
-                        <td className="p-2 text-ink-secondary">元の友だちに保持</td>
-                      </tr>
+                      <Tr>
+                        <Td><span className="font-semibold text-ink">タグ</span></Td>
+                        <Td colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</Td>
+                        <Td>元の友だちに保持</Td>
+                      </Tr>
                     ) : null}
                   </tbody>
-                </table>
+                </DataTable>
               </div>
             </section>
           ) : null}
