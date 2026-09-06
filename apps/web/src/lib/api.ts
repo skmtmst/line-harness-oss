@@ -101,6 +101,78 @@ import type {
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared'
 
+export type CommonVarHistoryItem = {
+  id: string
+  version: number
+  name: string
+  value: string
+  memo: string
+  changeReason: string | null
+  actorId: string | null
+  createdAt: string
+}
+
+export type CommonVarDetail = CommonVar & {
+  memo: string
+  version: number
+  archivedAt: string | null
+  usages: CommonVarDeleteImpact['items']
+  usagePage: {
+    total: number
+    shown: number
+    hasMore: boolean
+    unavailableCount: number
+  }
+  history: CommonVarHistoryItem[]
+}
+
+export type CommonVarChangeImpactDetail = CommonVarChangeImpact & {
+  version: number
+  usageByKind: CommonVarChangeImpact['byKind']
+  scheduledUsageCount: number
+  publishedUsageCount: number
+  usageRevision: string
+}
+
+export type CommonVarReplacementCandidate = {
+  id: string
+  name: string
+  varKey: string
+  type: CommonVar['type']
+  value: string
+  version: number
+}
+
+export type CommonVarReplacementCandidates = {
+  source: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  candidates: CommonVarReplacementCandidate[]
+}
+
+export type CommonVarReplacementImpact = {
+  source: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  replacement: Pick<CommonVarReplacementCandidate, 'id' | 'name' | 'type' | 'version'>
+  usageTotal: number
+  replaceableTotal: number
+  blockedTotal: number
+  historicalTotal: number
+  unscopedFormTotal: number
+  byKind: Record<string, number>
+  canReplace: boolean
+  revision: string
+  checkedAt: string
+}
+
+export type CommonVarReplacementResult = {
+  runId: string
+  replacedUsageCount: number
+  archivedVersion: number
+  sourceId: string
+  replacementId: string
+  remainingUsageCount: number | null
+  verification: 'verified' | 'partial' | 'unavailable'
+  completedAt: string
+}
+
 /**
  * タグを消したときに失われるもの（`GET /api/tags/:id/delete-impact`）。
  *
@@ -335,6 +407,57 @@ export type OperationIncident = {
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type OperationHealthCheckKey =
+  | 'line_connection'
+  | 'message_quota'
+  | 'external_integrations'
+  | 'webhook'
+  | 'dispatch_jobs'
+  | 'friend_change'
+
+export type OperationHealthResult = {
+  id: string
+  runId: string
+  checkKey: OperationHealthCheckKey
+  status: 'normal' | 'warning' | 'danger' | 'unknown'
+  summary: string
+  value: Record<string, unknown> | null
+  threshold: Record<string, unknown> | null
+  source: string
+  observedAt: string
+}
+
+export type OperationHealthSnapshot = {
+  latestRun: {
+    id: string
+    lineAccountId: string | null
+    source: 'scheduled' | 'manual'
+    status: 'running' | 'completed' | 'failed'
+    overallStatus: 'normal' | 'warning' | 'danger' | 'unknown'
+    startedAt: string
+    completedAt: string | null
+    results: OperationHealthResult[]
+  } | null
+  overallStatus: 'normal' | 'warning' | 'danger' | 'unknown' | 'stale'
+  lastCheckedAt: string | null
+  nextCheckAt: string | null
+  serverNow: string
+}
+
+export type OperationHistoryEntry = OperationIncident & {
+  historyKind?: 'incident' | 'deployment'
+  occurredAt?: string
+  deployment?: {
+    deploymentId: string
+    phase: 'queued' | 'deploying' | 'verifying' | 'succeeded' | 'failed' | 'rolled_back'
+    environment: string
+    version: string | null
+    pullRequest: number | null
+    actor: string
+    occurredAt: string
+  }
 }
 
 export type FormDeleteImpact = {
@@ -676,7 +799,20 @@ export type CommonActionSummary = {
   actionCount: number;
   bindingCount: number;
   oldVersionBindingCount: number;
+  executionCountThisMonth: number;
+  failureCountThisMonth: number;
+  lastRunAt: string | null;
   updatedAt: string;
+};
+
+export type AutomationListItem = Automation & {
+  triggerConfig: Record<string, unknown>;
+  status: 'draft' | 'active' | 'stopped';
+  versionId: string;
+  version: number;
+  executionCount30d: number;
+  failureCount30d: number;
+  lastRunAt: string | null;
 };
 
 export type AnalyticsMetricState =
@@ -2582,6 +2718,77 @@ export type NenPetProfile = {
   lineUserId: string
 }
 
+export type NenUnavailableMetric = {
+  value: null
+  state: 'unavailable'
+  reason: string
+}
+
+export type NenMetricsRange = { days: number; from: string; to: string }
+
+export type NenFlowMetrics = {
+  range: NenMetricsRange
+  summary: { active: number; paused: number; planned: number; sent: number; associatedConversions: number }
+  flows: Array<{
+    campaignKey: string; label: string; category: string; isEnabled: boolean
+    planned: number; sent: number; failed: number; skipped: number
+    openRate: NenUnavailableMetric; associatedConversions: number; attribution: string
+  }>
+}
+
+export type NenColumnMetrics = {
+  range: NenMetricsRange
+  summary: { total: number; sent: number; drafts: number; scheduled: number; unread: number | null; associatedConversions: number }
+  columns: Array<{
+    id: string; title: string; category: string | null; deliveryStatus: string
+    publishedAt: string | null; deliveryAt: string | null
+    period: { from: string | null; to: string | null }
+    targeted: number; sent: number; pending: number; failed: number
+    articleOpened: { value: number | null; rate: number | null; state: 'available' | 'unavailable'; reason: string | null }
+    unread: number | null; completionRate: NenUnavailableMetric
+    associatedConversions: number; attribution: string
+  }>
+}
+
+export type NenPetMetrics = {
+  range: NenMetricsRange
+  summary: {
+    pets: number; birthdayRegistered: number; birthdayMissing: number; birthdayThisMonth: number
+    friends: number; friendsWithoutPet: number; birthdayOpenRate: NenUnavailableMetric
+    coupons: { issued: number; used: number; usageRate: number }
+  }
+  breeds: Array<{ name: string; count: number }>
+  pets: Array<{
+    id: string; name: string; animalType: string; breed: string | null; birthday: string | null
+    friendId: string; ownerName: string
+    ownerDeliveryHistory: { count: number; lastSentAt: string | null }
+    coupons: { issued: number; used: number }
+  }>
+}
+
+export type NenDelivery = {
+  id: string; campaignKey: string; label: string; friendId: string; friendName: string
+  lineAccountName: string; scheduledAt: string; sentAt: string | null; status: string
+  attempts: number; unmetReason: string | null; reaction: NenUnavailableMetric
+  version: number; updatedAt: string
+}
+
+export type NenDeliveryList = {
+  range: NenMetricsRange
+  summary: { pending: number; processing: number; sent: number; skipped: number; failed: number; cancelled: number; retryRequired: number }
+  deliveries: NenDelivery[]
+  pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
+}
+
+export type NenDeliveryDetail = Omit<NenDelivery, 'reaction'> & {
+  trigger: string
+  content: {
+    title: string | null; bodyText: string | null; buttonLabel: string | null
+    buttonUrl: string | null; imageUrl: string | null
+    state: 'available' | 'unavailable'; reason: string | null
+  }
+}
+
 export type NenFriendOverview = {
   friend: Record<string, unknown>
   member: Record<string, unknown> | null
@@ -3998,6 +4205,10 @@ export const api = {
       fetchApi<ApiResponse<CommonVar[]>>(
         `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
       ),
+    detail: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarDetail>>(
+        `/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`,
+      ),
     create: (data: {
       accountId: string
       name: string
@@ -4011,7 +4222,14 @@ export const api = {
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, accountId: string, data: { name?: string; value?: string; folderId?: string | null }) =>
+    update: (id: string, accountId: string, data: {
+      name?: string
+      value?: string
+      memo?: string
+      folderId?: string | null
+      expectedVersion?: number
+      changeReason?: string
+    }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -4022,15 +4240,33 @@ export const api = {
       **`nextValue` を渡して問い合わせるだけで、値は保存されない。**
       口が `POST` なのは長い本文を投げるためで、書き換えではない。
     */
-    impactPreview: (id: string, accountId: string, nextValue: string) =>
-      fetchApi<ApiResponse<CommonVarChangeImpact>>(`/api/common-vars/${id}/impact-preview`, {
+    impactPreview: (id: string, accountId: string, nextValue: string, expectedVersion?: number) =>
+      fetchApi<ApiResponse<CommonVarChangeImpactDetail>>(`/api/common-vars/${id}/impact-preview`, {
         method: 'POST',
-        body: JSON.stringify({ accountId, nextValue }),
+        body: JSON.stringify({ accountId, nextValue, expectedVersion }),
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    replacementCandidates: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarReplacementCandidates>>(`/api/common-vars/${id}/replace`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId }),
+      }),
+    replacementImpact: (id: string, accountId: string, replacementId: string) =>
+      fetchApi<ApiResponse<CommonVarReplacementImpact>>(`/api/common-vars/${id}/replace`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, replacementId }),
+      }),
+    replace: (
+      id: string,
+      accountId: string,
+      input: { replacementId: string; expectedVersion: number; expectedRevision: string },
+    ) => fetchApi<ApiResponse<CommonVarReplacementResult>>(`/api/common-vars/${id}/replace`, {
+      method: 'POST',
+      body: JSON.stringify({ accountId, ...input, apply: true }),
+    }),
     schedules: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarSchedule[]>>(`/api/common-vars/${id}/schedules?accountId=${encodeURIComponent(accountId)}`),
     addSchedule: (id: string, accountId: string, data: { effectiveFrom: string; value: string }) =>
@@ -5420,7 +5656,10 @@ export const api = {
   automations: {
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
-      return fetchApi<ApiResponse<Automation[]>>('/api/automations' + query)
+      return fetchApi<ApiResponse<AutomationListItem[]> & {
+        summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
+        freshness?: 'available'
+      }>('/api/automations' + query)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Automation & { logs?: AutomationLog[] }>>(`/api/automations/${id}`),
@@ -5487,12 +5726,21 @@ export const api = {
       accountId: string;
       status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
       query?: string;
+      limit?: number;
+      offset?: number;
     }) => {
       const query = new URLSearchParams({ account_id: params.accountId });
       if (params.status && params.status !== 'all') query.set('status', params.status);
       if (params.query) query.set('query', params.query);
-      return fetchApi<ApiResponse<CommonActionSummary[]>>(`/api/common-actions?${query}`);
+      if (params.limit !== undefined) query.set('limit', String(params.limit));
+      if (params.offset !== undefined) query.set('offset', String(params.offset));
+      return fetchApi<ApiResponse<CommonActionSummary[]> & {
+        pagination?: { total: number; limit: number | null; offset: number }
+        freshness?: 'available'
+      }>(`/api/common-actions?${query}`);
     },
+    csvUrl: (accountId: string) =>
+      `${API_URL}/api/common-actions?account_id=${encodeURIComponent(accountId)}&format=csv`,
     get: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonActionDetail>>(
         `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,
@@ -5878,6 +6126,29 @@ export const api = {
       ),
   },
   nenCampaigns: {
+    flowMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
+      `/api/nen-campaigns/metrics/flows?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    ),
+    columnMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenColumnMetrics>>(
+      `/api/nen-campaigns/metrics/columns?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    ),
+    petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
+      `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    ),
+    deliveries: (accountId: string, options: { days?: number; status?: string; cursor?: string; limit?: number } = {}) => {
+      const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
+      if (options.status) query.set('status', options.status)
+      if (options.cursor) query.set('cursor', options.cursor)
+      return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
+    },
+    delivery: (id: string, accountId: string) => fetchApi<ApiResponse<NenDeliveryDetail>>(
+      `/api/nen-campaigns/deliveries/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
+    retryDelivery: (id: string, data: { lineAccountId: string; expectedVersion: number; reason: string }) =>
+      fetchApi<ApiResponse<{ id: string; status: string; version: number; attempts: number }>>(
+        `/api/nen-campaigns/deliveries/${encodeURIComponent(id)}/retry`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
     overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
       jobs: { total: number; pending: number; sent: number; failed: number }
@@ -7242,6 +7513,20 @@ export const api = {
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
   /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
+    health: (accountId: string) =>
+      fetchApi<ApiResponse<OperationHealthSnapshot>>(
+        `/api/operations/health?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    runHealth: (accountId: string) =>
+      fetchApi<ApiResponse<OperationHealthSnapshot>>('/api/operations/health/runs', {
+        method: 'POST',
+        body: JSON.stringify({ lineAccountId: accountId }),
+      }),
+    stepUp: (code: string) =>
+      fetchApi<ApiResponse<{ token: string; purpose: 'operations.control'; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose: 'operations.control' }) },
+      ),
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
       return fetchApi<ApiResponse<{
@@ -7253,7 +7538,7 @@ export const api = {
       }>>(`/api/operations/control/preview${query}`)
     },
     history: (limit = 100) =>
-      fetchApi<ApiResponse<OperationIncident[]>>(`/api/operations/history?limit=${limit}`),
+      fetchApi<ApiResponse<OperationHistoryEntry[]>>(`/api/operations/history?limit=${limit}`),
     stop: (input: {
       lineAccountId: string | null
       capabilities: OperationCapability[]
@@ -7261,20 +7546,28 @@ export const api = {
       detail?: string | null
       confirmation: '停止'
       expectedVersion: number
-    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+    }, stepUpToken: string, idempotencyKey: string) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
       '/api/operations/incidents',
       {
         method: 'POST',
-        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        headers: {
+          'X-Confirm-Irreversible': 'operation-stop',
+          'X-Step-Up-Token': stepUpToken,
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify(input),
       },
     ),
-    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }) =>
+    restore: (incidentId: string, input: { confirmation: '復旧'; expectedVersion: number }, stepUpToken: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
         `/api/operations/incidents/${encodeURIComponent(incidentId)}/restore`,
         {
           method: 'POST',
-          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          headers: {
+            'X-Confirm-Irreversible': 'operation-restore',
+            'X-Step-Up-Token': stepUpToken,
+            'Idempotency-Key': idempotencyKey,
+          },
           body: JSON.stringify(input),
         },
       ),

@@ -6,11 +6,11 @@
   "unconfirmed": 0,
   "elsewhere": 0,
   "missing": 31,
-  "match": 153,
-  "structureMatchDataPending": 90,
+  "match": 163,
+  "structureMatchDataPending": 80,
   "needsFix": 20,
   "unjudged": 5,
-  "remaining": 115,
+  "remaining": 105,
   "features": [
     {
       "feature": 1,
@@ -1778,12 +1778,24 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 1,
-      "structureMatchDataPending": 3,
+      "match": 3,
+      "structureMatchDataPending": 1,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 3,
+      "remaining": 1,
       "capturedAt": [
+        {
+          "pr": 1150,
+          "head": "bc92f54ea",
+          "on": "2026-09-07",
+          "screens": [
+            "WuKzU",
+            "gBtaK",
+            "uNBlA",
+            "yPkWe"
+          ],
+          "note": "Issue #385。PR #1131の実APIとPR #1142の固定データへ4画面を接続し、3104/8791で1440px・1920pxの10枚を撮影。全画像で横はみ出し0。3画面を一致、履歴の担当者表示名が契約にない編集画面だけを理由付き構造一致とした。"
+        },
         {
           "pr": 1099,
           "head": "bb8a139b3",
@@ -2416,11 +2428,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 6,
-      "match": 0,
-      "structureMatchDataPending": 5,
+      "match": 1,
+      "structureMatchDataPending": 4,
       "needsFix": 2,
       "unjudged": 0,
-      "remaining": 7,
+      "remaining": 6,
       "capturedAt": [
         {
           "pr": 446,
@@ -2656,11 +2668,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 2,
-      "structureMatchDataPending": 5,
+      "match": 5,
+      "structureMatchDataPending": 2,
       "needsFix": 1,
       "unjudged": 0,
-      "remaining": 6,
+      "remaining": 3,
       "capturedAt": [
         {
           "pr": 502,
@@ -2741,6 +2753,22 @@
             "py5CG"
           ],
           "note": "Issue #299。5画面をV6の情報順と密度へそろえ、PR #1051 の通常データを含む通常・読込中・0件・取得失敗を固定ポート3105/8792で撮影。全30枚で1440・1920pxの横はみ出し0を確認し、一致1・構造一致4を記録した。"
+        },
+        {
+          "pr": 1151,
+          "head": "bd900c36d",
+          "on": "2026-09-07",
+          "screens": [
+            "gief7",
+            "Rv8Jv",
+            "DkPY0",
+            "WjYAC",
+            "Vdbv5",
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "Issue #377。30日実績、共通アクション集計、CSV、APIページ送り、版ごとの利用状況を接続し、3107/8794で全30枚を再撮影。1440・1920pxとも横はみ出し0。一致を3画面増やし、契約が無い2画面は理由付き構造一致を維持した。"
         }
       ]
     },
@@ -3061,11 +3089,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
-      "structureMatchDataPending": 4,
+      "match": 4,
+      "structureMatchDataPending": 0,
       "needsFix": 0,
       "unjudged": 0,
-      "remaining": 4,
+      "remaining": 0,
       "capturedAt": [
         {
           "pr": 482,

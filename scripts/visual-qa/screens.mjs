@@ -1639,8 +1639,8 @@ export const SCREENS = [
   // ── 機能14 共通情報 ─────────────────────────────────────
   {
     ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'match',
-    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定し、一致。** PR #1077の固定データで3フォルダ、先頭6件、空のまま使用中1件、行ごとの使用数、更新予約を表示した。上部操作、フォルダ、検索・4絞り込み、6列一覧、ページ送りを、Pencil 1920pxと実装1920pxを1枚に並べて確認。運用データで全件数と更新日時は変わるが、配置・項目・操作は一致する。1440px・1920pxとも横はみ出し0。',
-    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + 2026-09-07 same-input comparison', verdictHead: 'bb8a139b3',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の実APIとPR #1142の固定データを使い、3フォルダ、先頭6件、空のまま使用中1件、行ごとの使用数、更新予約を表示した。上部操作、フォルダ、検索・4絞り込み、6列一覧、ページ送りをPencil 1920pxと実装1920pxで目視比較した。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。',
+    verdictSource: 'common-vars-v6/WuKzU.txt + common-vars-v6/WuKzU-1440.png + common-vars-v6/WuKzU-1920.png + common-vars-v6-contract.test.ts', verdictHead: 'bc92f54ea',
   },
   {
     ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=common-var-delete-target', verdict: 'structure_match_data_pending',
@@ -1649,8 +1649,8 @@ export const SCREENS = [
       { fill: '#cv-value', selector: true, text: '株式会社NEN ホールディングス' },
       { wait: 1200 },
     ],
-    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定。構造一致・データ未接続。** 「株式会社NEN」から「株式会社NEN ホールディングス」へ変えた同じ状態を3104/8791で撮り、Pencil 1920pxと実装1920pxを1枚に並べて確認した。15使用先、変更前後の文、予約中・公開中・下書き、文字数超過、保存後プレビューが固定データで表示され、1440px・1920pxとも横はみ出し0。社内メモと追記型の変更履歴はAPIが無く、実装は値を作らず未接続理由を表示するため一致にはしない。**推奨修正：メモと変更前後・変更者を返す履歴APIを接続する。**',
-    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + change-impact.test.ts + 2026-09-07 same-input comparison', verdictHead: 'bb8a139b3',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定。構造一致・担当者名データ待ち。** PR #1131の実APIとPR #1142の固定データへ接続し、社内メモ、変更理由、版番号つき保存、追記型の変更履歴、15使用先、変更前後の文、予約中・公開中・下書き、文字数超過、保存後プレビューを確認した。履歴APIは内部の担当者IDだけを返すため画面へ露出せず「担当者記録あり」と表示する。担当者の表示名が契約に無い一点だけ設計どおりに出せないため一致にはしない。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。**残り：履歴APIが担当者の表示名を返す。**',
+    verdictSource: 'common-vars-v6/gBtaK.txt + common-vars-v6/gBtaK-1440.png + common-vars-v6/gBtaK-1920.png + api.test.ts + change-impact.test.ts', verdictHead: 'bc92f54ea',
   },
   {
     /*
@@ -1670,14 +1670,14 @@ export const SCREENS = [
       指定しても一覧の1件目に落ちるだけで、狙った行を撮れない。
     */
     steps: [
-      { fill: '#cv-value', selector: true, text: '9:00〜21:00' },
+      { fill: '#cv-value', selector: true, text: '株式会社NEN ホールディングス' },
       { wait: 1200 },
       { qaOpen: 'uNBlA', after: 900 },
     ],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 台帳 #227、実装 `cbddd12c7`。構造一致・データ未接続。** 値を変えた後に「Nか所を1件ずつ見る」で専用の影響確認へ進み、4つの集計札、6列の変更前後表、CSV出力、6件ごとのページ送り、固定の保存欄を実装した。1440・1920で設計と並べて目視し、横はみ出し0。文字数超過があれば保存を止める。**データ未接続**：現行APIの状態は「使われています」という大分類なので、予約中・公開中を数える「すぐ効くもの」は偽の0件にせず `—件` と理由を表示する。設計どおりの15件・状態別固定データが無く、数値までの一致は未確認。',
-    verdictSource: 'common-vars-v6/uNBlA-1920.png + common-vars-v6/uNBlA.txt + impact-review.test.ts',
-    verdictHead: '57477f85c',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の影響確認APIとPR #1142の固定データへ接続し、15か所、すぐ効く4件、文字数超過1件、送信済みは変わらない表示、6列の変更前後表、CSV出力、6件ごとのページ送り、保存停止を確認した。「株式会社NEN」から「株式会社NEN ホールディングス」へ変える同じ入力でPencilと目視比較した。3104/8791で1440px・1920pxを撮り、両方とも横はみ出し0。',
+    verdictSource: 'common-vars-v6/uNBlA-1920.png + common-vars-v6/uNBlA.txt + change-impact.test.ts + impact-review.test.ts',
+    verdictHead: 'bc92f54ea',
   },
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
@@ -1693,10 +1693,10 @@ export const SCREENS = [
       */
       { suffix: '-deletable', steps: [{ click: 'キャンセル', after: 500 }, { click: '削除', nth: 1, after: 900 }] },
     ],
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #327 / UI HEAD `bb8a139b3`で再判定。構造一致・データ未接続。** PR #1077の固定データで、会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線を表示し、Pencil 1920pxと実装1920pxを1枚に並べて確認した。使用中と未使用の両状態を1440px・1920pxで撮り、全画像で横はみ出し0。設計の推奨操作である別の共通情報への一括差し替えはAPIが無く、候補を作らず無効表示するため一致にはしない。使用中の物理削除は止め、未使用だけ確認入力後に削除できる。**推奨修正：互換候補の取得・影響確認・一括差し替えAPIを接続する。**',
-    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + delete-impact.test.ts',
-    verdictHead: 'bb8a139b3',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #385 / UI HEAD `bc92f54ea`で再判定し、一致。** PR #1131の削除影響・互換候補・差し替え影響・一括差し替えAPIと、PR #1142の固定データへ接続した。会社名が使われる15か所、予約中・公開中・下書きの6使用先、各画面を開く導線、互換候補の選択、差し替え後の15件、版競合時の再読込を確認した。使用中は安全な差し替え後削除だけ実行でき、未使用は確認入力後に削除できる。両状態を3104/8791で1440px・1920px撮影し、全画像で横はみ出し0。',
+    verdictSource: 'common-vars-v6/yPkWe.txt + common-vars-v6/yPkWe-{1440,1920}.png + common-vars-v6/yPkWe-deletable-{1440,1920}.png + api.test.ts + delete-screen-contract.test.ts',
+    verdictHead: 'bc92f54ea',
 
   },
 
@@ -2206,7 +2206,7 @@ export const SCREENS = [
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態', route: '/nen-campaigns?tab=columns',
     verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。`DEX0k` と同じ差。状態は撮れている。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **development `c275749d` で撮った。** 読込・空・失敗が分かれ、**失敗のとき0件と言わない**（P0解決済み）。残るのは実データの接続', verdictSource: 'nen-v6/i9sQP.txt + nen-v6/design-qa.md',
-    states: { apis: ['**/api/nen-campaigns/columns*', '**/api/nen-campaigns/overview*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/nen-campaigns/columns?*', '**/api/nen-campaigns/metrics/columns?*'], kinds: ['loading', 'empty', 'error'] },
     verdictHead: '31293424',
   },
 
@@ -2351,8 +2351,8 @@ export const SCREENS = [
     見本12／共通アクション14）で、オートメーションと共通アクションが
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
-  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を固定ポート3105/8792で再撮影し、★V6設計と同じ1920pxで比較。** 18本（稼働14・停止4）、4指標、説明帯、名前・きっかけ・処理の検索、状態絞り込み、期間、並び順、6行の一覧表へそろえた。1440px・1920pxとも横はみ出し0。オートメーション別の30日実行・失敗・最終実行日時と詳細画面はAPI未接続のため、値を作らず `—／未接続` とし、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/gief7.txt', verdictHead: '380cd6631' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影。** 3段の決めごと帯、接続済みきっかけのカード選択、名前、条件チップ、見込み人数枠、処理行、文章要約、関連導線、注意、追従操作を1画面へまとめ、1440px・1920pxで横はみ出し0。発火まで接続済みのきっかけは設計6種中4種、条件15軸・見込み人数・下書き・1人テストはAPI未接続のため、未接続選択肢や人数を作らず構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/Rv8Jv.txt', verdictHead: '380cd6631' },
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から18本（稼働14・停止4）、この30日8,420回・失敗6回・未実行3本、設計先頭6行の実行数と失敗表示、詳細導線を表示した。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/gief7.txt + automation-load-state-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影。** 3段の決めごと帯、名前、条件、処理、要約、注意、追従操作は1440px・1920pxで横はみ出し0。登録APIは接続済みだが、設計6種のきっかけのうち画面で選べるのは4種で、条件15軸・見込み人数・1人テストを返すAPI契約が無い。表現できない項目を作らず、理由付き構造一致・データ未接続を維持する。', verdictSource: 'automations-v6/Rv8Jv.txt + automation-create-v6-contract.test.ts', verdictHead: 'bd900c36d' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -2392,9 +2392,9 @@ export const SCREENS = [
     verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で通常・読込中・0件・取得失敗を再撮影し、設計の4状態と突き合わせて一致を維持。** 空は0本と作成導線、読込中は待機案内、取得失敗は登録済みルールが消えていない説明と再読込を表示し、未取得値を0にしない。全8枚で1440px・1920pxとも横はみ出し0。',
     verdictSource: 'automations-v6/Vdbv5.txt + Vdbv5-loading.txt + Vdbv5-empty.txt + Vdbv5-error.txt', verdictHead: '44e671b2c',
   },
-  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** 4指標、説明帯、検索、5種の絞り込み、版・呼び出し元・操作を含む一覧表を表示し、1440px・1920pxとも横はみ出し0。設計の14件に対して取得APIは5件で、今月2,847回・失敗6回を返す集計口とCSVが無いため一致にはしない。**推奨修正：全14件を返す一覧契約と、この30日の実行・失敗集計APIを接続する。次にCSVとページ送りを接続し、設計の6行密度へそろえる。**', verdictSource: 'automations-v6/xOpDs.txt', verdictHead: '44e671b2c' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #299 / UI HEAD `380cd6631` を3105/8792で再撮影。** 名前・説明を横並び、処理を上から並べる編集面、失敗時設定、待ち時間、版の決めごと、5つの利用先、注意、追従保存を設計の2列構造へそろえ、1440px・1920pxとも横はみ出し0。新規作成は仕様どおり空の下書き＋処理1件で始める。設計例の入力済み5処理を再現する複製・見本の受け渡し、1人テスト、条件分岐、公開はAPI未接続のため押せる形にせず、構造一致・データ未接続と判定する。', verdictSource: 'automations-v6/py5CG.txt', verdictHead: '380cd6631' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-06 Issue #238 / PR #989 / UI HEAD `44e671b2c` を3107/8794で再撮影し、★V6設計と同じ1920pxで並べて確認。** v4〜v1の4版、利用先5件、古い版1件を実データで表示し、1440px・1920pxとも横はみ出し0。版履歴と利用先を読む役割は一致したが、設計の今月1,284回・失敗2回と動作途中14件の集計口が無く、実装は版履歴と利用先を別表にしているため一致にはしない。**推奨修正：版ごとの実行・失敗・実行中・待機中を返す集計APIを接続し、利用先と版ラベルを設計の1行形式へまとめる。**', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts', verdictHead: '44e671b2c' },
+  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約から14件（公開11・下書き3）、呼び出し元38、今月2,847回・失敗6回、古い版2件・3か所を表示。5種の絞り込み、CSV、6行単位のAPIページ送りも接続し、1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/xOpDs.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影。** 名前・説明、処理順、失敗時設定、待ち時間、版の決めごと、利用先、注意、追従保存は1440px・1920pxで横はみ出し0。新規作成は仕様どおり空の下書き＋処理1件で始める。設計例を再現する複製・見本の受け渡し、1人テスト、条件分岐を返すAPI契約が無いため、押せる形や値を作らず理由付き構造一致・データ未接続を維持する。', verdictSource: 'automations-v6/py5CG.txt + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'match', verdictNote: '**2026-09-07 Issue #377 / UI HEAD `bd900c36d` を3107/8794で再撮影し、★V6設計と同じ1920pxで比較。** 実API契約からv4〜v1、利用先5件・古い版1件、今月1,284回・失敗2回、実行中18件・待機中6件を表示。利用先を版履歴より先に置き、機能名・固定版・進行中件数を1行で読める形へそろえた。1440px・1920pxとも横はみ出し0で一致。', verdictSource: 'automations-v6/syWp4.txt + usage-summary.test.ts + common-actions-v6-contract.test.ts', verdictHead: 'bd900c36d' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
@@ -2960,28 +2960,28 @@ export const SCREENS = [
 // Issue #245（機能32）。同じ実装headで4画面と全状態を撮り直した最新判定。
 const FEATURE_32_REVIEW = {
   UgonK: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06、PR #1001・`1121a74eee` を1440・1920で設計と目視比較。** 6列（確認する項目／結果／いまの数字／目安／最後の確認／操作）、次回確認時刻、判定の見方4種を追加し、横はみ出し0。画面を開いている間は5分ごとに再取得する。**残るもの**：サーバー側の定期実行結果を保存して共有する専用の健全性チェック口が無く、端末を閉じた状態の自動確認・異常履歴は未接続。',
-    verdictSource: 'operations-v6/UgonK.txt',
-    verdictHead: '1121a74eee',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 6列、次回確認時刻、判定の見方4種を設計の情報順で表示。サーバー保存の健全性結果と観測時刻を読み、古い結果を未確認にし、手動確認も同じ契約へ保存する。両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/UgonK.txt + operations-v6/UgonK-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
   b3HfZ: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` を通常・読込・失敗の各状態で1440・1920撮影し、設計と目視比較。** 停止対象ごとの件数・人数、理由とアカウント、補足、復旧、右欄の「止めるとどうなるか／止めたあとにすること／つながる先」、下部の固定操作帯を設計と同じ情報順で表示した。取得失敗時は0件にせず停止ボタンを無効化し、全画像で横はみ出し0。**残るもの**：ログインユーザー全員へのLINE・メール通知と操作専用の段階認証は未接続。',
-    verdictSource: 'operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt',
-    verdictHead: '875d5f74e',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` の通常・読込・失敗を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** サーバーの下見値で件数・人数・理由・アカウント・補足・復旧を表示し、取得失敗は0件にせず操作不可。停止・復旧は操作専用の6桁本人確認、重複防止、版番号確認を通し、ログインユーザーへのLINE・メール通知もサーバー契約へ接続した。全状態・両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/b3HfZ-normal.txt + operations-v6/b3HfZ-loading.txt + operations-v6/b3HfZ-error.txt + operations-v6/b3HfZ-*-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
   UhC2O: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` を1440・1920撮影し、設計と目視比較。** サーバー保存の停止・復旧履歴、期間、CSV、4つの概要、停止記録と管理画面更新の2表、右欄の監査説明・関連画面・注意事項を設計と同じ構造で表示し、横はみ出し0。**残るもの**：管理画面更新は反映時間・停止時間・移行詳細を持つ配備台帳とは未接続で、停止記録の詳細画面も未接続。',
-    verdictSource: 'operations-v6/UhC2O.txt',
-    verdictHead: '875d5f74e',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** サーバーが保存した停止・復旧と管理画面更新を統合履歴から読み、期間、CSV、4つの概要、停止記録と更新履歴の2表、右欄を設計の構造で表示する。反映時間・停止時間・移行内容を含む配備記録も同じ履歴へ接続済み。両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/UhC2O.txt + operations-v6/UhC2O-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
   U0BwS: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07、Issue #300・`875d5f74e` の最終確認を1440・1920撮影し、設計と目視比較。** 下見と同じ件数・人数、アカウント、選んだ対象、理由、止まらないもの、取り消せない配信を再計算せず表示し、「停止」入力と版番号つきサーバー保存で誤操作・同時更新を防ぐ。通知予定も窓の下部に明示し、横はみ出し0。**残るもの**：操作専用の段階認証と、ログインユーザー全員へのLINE・メール通知の実送信は未接続。',
-    verdictSource: 'operations-v6/U0BwS.txt',
-    verdictHead: '875d5f74e',
+    verdict: 'match',
+    verdictNote: '**2026-09-07、Issue #387・`88912c59c3` の最終確認を固定ポート3105/8792で1440・1920撮影し、設計と目視比較して一致。** 下見と同じ件数・人数、アカウント、対象、理由、止まらないもの、取り消せない配信を表示。「停止」入力後に操作専用の6桁本人確認を行い、重複防止キーと版番号を付けて停止する。ログインユーザーへのLINE・メール通知も実送信契約へ接続済み。両幅とも横はみ出し0。',
+    verdictSource: 'operations-v6/U0BwS.txt + operations-v6/U0BwS-{1440,1920}.png + 2026-09-07 visual comparison',
+    verdictHead: '88912c59c3',
   },
 }
 
@@ -3258,33 +3258,32 @@ const ISSUE_296_REVIEW = {
   },
 }
 
-// Issue #234（機能21）の実装後監査。
-// 設計画像と実装構造は照合したが、ChromiumがMachPort権限で起動できず、
-// 更新後の1440px・1920px画像は未取得。一致判定には上げない。
+// Issue #376（機能21）の実API接続後監査。
+// PR #1142 の固定データを使い、3102/8789で1440px・1920pxと全状態を撮影した。
 const FEATURE_21_AUDIT = {
   VLMGH: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #234 / PR #1050 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** KPI4枚、7段の購入後フロー、6配信の名称・時機・中身、プレビュー、動作切替、テスト送信が設計と同じ役割・順序で表示された。通常・読込・空・失敗を1440px・1920pxで撮影し、全8枚で横はみ出し0、失敗を0件に見せないことも確認した。この30日の送信数・反応率・成果、配信別の送信数・開封数は集計APIが無く、実装は値を作らず「集計未接続」と接続条件を示すため一致にはしない。**推奨修正：期間別・配信別の送信、開封、成果集計APIを接続する。**',
+    verdictNote: '**2026-09-07 Issue #376 / UI HEAD 15846e74aを3102/8789で再撮影・判定。** KPI4枚、7段の購入後フロー、6配信の名称・時機・中身、動作切替、テスト送信を設計と同じ役割・順序で表示し、実APIの30日送信2,486通・関連成果142件と配信別の予定／送信／関連成果を接続した。通常・読込・空・失敗の8枚を1440px・1920pxで撮影し、横はみ出し0、失敗を0件に見せないことも確認した。残る差は、LINEが個人の開封・押下を提供しないため反応率を出せないことと、成果金額を返す契約がないこと。値を作らず理由を表示するため構造一致・データ未接続とする。**推奨修正：成果金額の集計契約を追加する。個人開封・押下はLINE非提供のため設計側の表現を裁定する。**',
     verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
-    verdictHead: '8d3557ce0',
+    verdictHead: '15846e74a',
   },
   DEX0k: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #234 / PR #1050 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** コラム24本、状態内訳、次回予定、検索、状態絞り込み、1ページ6件、ページ送り、本文・配信結果・配信設定の導線を確認した。1440px・1920pxとも横はみ出し0。対象人数、読了率、成果、期間、未読件数はAPIが無く、値を作らず未接続と示しているため構造一致・データ未接続を維持する。**推奨修正：対象人数・読了・成果をコラム単位で返す集計APIと期間・未読条件を接続する。**',
+    verdictNote: '**2026-09-07 Issue #376 / UI HEAD 15846e74aを3102/8789で再撮影・判定。** コラム集計APIを接続し、24本、状態内訳、次回予定、対象／送信人数、記事計測数・率、関連成果、検索、5状態の絞り込み、6件表示、並び替え、4ページを実値で確認した。1440px・1920pxとも横はみ出し0。残る差は成果金額、記事のスクロール読了、複製APIが無いこと。複製は無効と接続条件を示し、金額・読了は値を作らないため構造一致・データ未接続とする。**推奨修正：成果金額・読了イベント・コラム複製の契約を追加する。**',
     verdictSource: 'nen-v6/DEX0k.txt + DEX0k-1440.png + DEX0k-1920.png',
-    verdictHead: '8d3557ce0',
+    verdictHead: '15846e74a',
   },
   q4lajm: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #234 / PR #1050 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** 誕生日3日前10:00、割引額・期限・クーポン頭文字、ペット5匹、飼い主・誕生日・次回配信、ももちゃんのLINEプレビュー、誕生日未登録の注意を同じ構成で確認した。1440px・1920pxとも横はみ出し0。品種、これまでの配信回数、友だち全体に対する未登録人数、開封率、利用率はAPIが無く、未取得・未接続と明示しているため一致にはしない。**推奨修正：ペット品種・配信履歴・友だちとの照合・開封・クーポン利用集計APIを接続する。**',
+    verdictNote: '**2026-09-07 Issue #376 / UI HEAD 15846e74aを3102/8789で再撮影・判定。** ペット集計APIを接続し、登録864匹、今月72匹、誕生日未登録42匹、クーポン利用28/73件、品種・飼い主・誕生日・次回配信・履歴、LINEプレビュー、注意、5つの「つながる先」を実値で確認した。各行の「中身を見る」「飼い主を見る」も設計どおり追加した。1440px・1920pxとも横はみ出し0。設計の62%は864/1,284と一致しないため実値67.3%を、9/2の3日前は設計9/1ではなく送信処理どおり8/30を表示した。残る差はLINEが個人開封を提供しない誕生日配信の開封率だけで、理由を表示するため構造一致・データ未接続とする。**推奨修正：個人開封はLINE非提供のため、設計の開封率を別の測定可能な指標へ裁定する。**',
     verdictSource: 'nen-v6/q4lajm.txt + q4lajm-1440.png + q4lajm-1920.png',
-    verdictHead: '8d3557ce0',
+    verdictHead: '15846e74a',
   },
   WeXbL: {
     verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #234 / PR #1050 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** 送信済み2,486、予定148、未達6、要再試行1、検索、状態絞り込み、7件の日時・宛先・LINEアカウント・配信・状態・きっかけ・反応を実データで確認した。日時は日本時間で、1440px・1920pxとも横はみ出し0。設計の30日限定集計、ブロック・退会内訳、期間選択、再送・内容表示の操作はAPIが無く未接続のため構造一致・データ未接続を維持する。**推奨修正：期間別履歴、未達理由、再送、配信内容取得APIを接続する。**',
+    verdictNote: '**2026-09-07 Issue #376 / UI HEAD 15846e74aを3102/8789で再撮影・判定。** 履歴APIを接続し、30日の送信済み2,486、予定148、未達6、再試行0、検索、状態絞り込み、7件の日本時間・宛先・LINEアカウント・配信・状態・きっかけ、2,640件のページ情報を実値で確認した。詳細APIと最大失敗時だけの理由付き再送契約も画面へ接続した。1440px・1920pxとも横はみ出し0。残る差は個人の反応をLINEから取得できないこと、ブロック／退会内訳、一括即時送信の契約が無いこと。値や操作を作らないため構造一致・データ未接続とする。**推奨修正：未達理由の内訳と一括即時送信契約を追加し、個人反応はLINE非提供として設計を裁定する。**',
     verdictSource: 'nen-v6/WeXbL.txt + WeXbL-1440.png + WeXbL-1920.png',
-    verdictHead: '8d3557ce0',
+    verdictHead: '15846e74a',
   },
   ymXJK: {
     verdict: 'needs_fix',
@@ -3293,10 +3292,10 @@ const FEATURE_21_AUDIT = {
     verdictHead: '8d3557ce0',
   },
   i9sQP: {
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-07 Issue #234 / PR #1050 / UI HEAD 8d3557ce0を3102/8789で撮り、★V6設計と1920pxで並べて確認。** 通常・読込・空・失敗を1440px・1920pxで撮影し、全8枚で横はみ出し0。通常は24本・6件表示・ページ送り、読込は待機表示、空は作成導線、失敗は再読込を出し、失敗を0件として扱わない。通常一覧の対象人数・読了・成果は集計APIが無いため構造一致・データ未接続を維持する。**推奨修正：DEX0kと同じコラム単位の対象人数・読了・成果集計APIを接続する。**',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #376 / UI HEAD 15846e74aを3102/8789で再撮影して一致。** このNodeの対象である通常・読込・空・失敗を1440px・1920pxの全8枚で確認し、横はみ出し0。通常はコラム集計APIの24本・6件表示・4ページ、読込は「読み込んでいます」、空は「まだコラムがありません」と作成導線、失敗は「表示できませんでした」と再読込を出す。空の説明と失敗時の説明・ボタンも設計語へそろえ、失敗を0件として扱わない。通常一覧そのものの測定不能項目はDEX0k側に理由付きで記録する。',
     verdictSource: 'nen-v6/i9sQP.txt + i9sQP-1440.png + i9sQP-1920.png + i9sQP-loading/empty/error screenshots',
-    verdictHead: '8d3557ce0',
+    verdictHead: '15846e74a',
   },
 }
 
@@ -4322,6 +4321,8 @@ export const CAPTURED_AT = {
       note: '#245。サーバー共通の停止・復旧・追記履歴へ接続し、通常・読込・失敗・最終確認を1440/1920で撮影。絵は版に残さず、追跡済みの `.txt` を証拠にする。' },
     { pr: 1064, head: '875d5f74e', on: '2026-09-07', screens: ['b3HfZ', 'UhC2O', 'U0BwS'],
       note: 'Issue #300。対象3画面と定義済み状態の12枚を固定ポート3105/8792で1440/1920px撮影。全画像で横はみ出し0。右欄・固定操作帯・履歴2表・最終確認をV6の情報順へそろえ、3画面を構造一致へ更新した。' },
+    { pr: 0, head: '88912c59c3', on: '2026-09-07', screens: ['UgonK', 'b3HfZ', 'UhC2O', 'U0BwS'],
+      note: 'Issue #387。固定ポート3105/8792で4画面14枚（通常・読込・失敗を含む）を1440/1920px撮影。全画像で横はみ出し0。健全性保存、停止・復旧、統合履歴、本人確認、通知の本流契約へ接続し、4画面を一致へ更新した。' },
   ],
   4: [
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
@@ -4423,6 +4424,8 @@ export const CAPTURED_AT = {
       { pr: 616, head: '0a11c9e8', on: '2026-08-31', screens: ['szXsT'], note: 'Claude実装。影響4つに加え、409の最新影響と別メニューの遅延応答も再監査で確認した' },
   ],
   14: [
+    { pr: 1150, head: 'bc92f54ea', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'uNBlA', 'yPkWe'],
+      note: 'Issue #385。PR #1131の実APIとPR #1142の固定データへ4画面を接続し、3104/8791で1440px・1920pxの10枚を撮影。全画像で横はみ出し0。3画面を一致、履歴の担当者表示名が契約にない編集画面だけを理由付き構造一致とした。' },
     { pr: 1099, head: 'bb8a139b3', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'yPkWe'],
       note: 'Issue #327。PR #1077の固定データを使い、3104/8791で一覧・会社名変更後・使用中／未使用の削除確認を1440px・1920px撮影。Pencil 1920pxと同じ比較画像で確認し、全画像で横はみ出し0。一覧を一致へ更新し、編集と削除確認に残るAPI差を記録した。' },
     { pr: 1075, head: '24313778e', on: '2026-09-07', screens: ['WuKzU', 'gBtaK', 'yPkWe'],
@@ -4590,6 +4593,7 @@ export const CAPTURED_AT = {
     { pr: 594, head: 'a389b70a', on: '2026-08-30', screens: ['syWp4'], note: 'Claudeが直した。使われている場所に何機能からかを添えた。直した本人が比較している' },
     { pr: 989, head: '44e671b2c', on: '2026-09-06', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5', 'xOpDs', 'py5CG', 'syWp4'], note: 'Issue #238。撮影用APIへ18本の通常一覧、見本12件、v4〜v1と利用先5件を接続し、通常・読込中・0件・取得失敗を含む全対象を1440・1920pxで再撮影。設計画像と同じ入力で比較し、一致1・構造一致2・要修正4を実態どおり記録した。' },
     { pr: 1055, head: '08369795c', on: '2026-09-07', screens: ['gief7', 'Rv8Jv', 'DkPY0', 'WjYAC', 'py5CG'], note: 'Issue #299。5画面をV6の情報順と密度へそろえ、PR #1051 の通常データを含む通常・読込中・0件・取得失敗を固定ポート3105/8792で撮影。全30枚で1440・1920pxの横はみ出し0を確認し、一致1・構造一致4を記録した。' },
+    { pr: 1151, head: 'bd900c36d', on: '2026-09-07', screens: ['gief7', 'Rv8Jv', 'DkPY0', 'WjYAC', 'Vdbv5', 'xOpDs', 'py5CG', 'syWp4'], note: 'Issue #377。30日実績、共通アクション集計、CSV、APIページ送り、版ごとの利用状況を接続し、3107/8794で全30枚を再撮影。1440・1920pxとも横はみ出し0。一致を3画面増やし、契約が無い2画面は理由付き構造一致を維持した。' },
   ],
   32: [
     { pr: 482, head: 'b346d467', on: '2026-08-29', screens: ['b3HfZ', 'U0BwS'], note: '緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）' },
