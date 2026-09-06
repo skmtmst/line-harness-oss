@@ -356,6 +356,7 @@ CREATE TABLE IF NOT EXISTS line_accounts (
   og_site_name           TEXT,
   og_default_image_url   TEXT,
   og_default_description TEXT,
+  official_profile_url   TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
