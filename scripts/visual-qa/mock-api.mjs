@@ -48,7 +48,9 @@ import {
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
-  BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_ATTRIBUTE_SAVED_SEARCHES, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  BROADCASTS, BROADCAST_FOLDERS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS,
+  FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE,
+  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
   TEMPLATES, TEMPLATE_FOLDERS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -58,9 +60,10 @@ import {
   OPERATORS, REMINDERS, REMINDER_FOLDERS, SCENARIO_ACTIONS, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
-  TAGS, TAG_GROUPS, TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
+  TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
+  TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
   ACTION_SCORE_RULES,
-  SUPPORT_MARKS, SUPPORT_MARK_AUTOMATION_RULES,
+  SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS,
   STAFF_MEMBERS, LOGIN_AUDIT,
@@ -969,6 +972,9 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && pathname === '/api/friend-add-routing/publish') {
     return FRIEND_ADD_LIFECYCLE_PUBLISHED
   }
+  if (method === 'POST' && pathname === '/api/saved-searches/preview') {
+    return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
+  }
   return null
 }
 
@@ -1431,9 +1437,36 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  const tagDependencies = /^\/api\/tags\/([^/]+)\/dependencies$/.exec(pathname)
+  if (tagDependencies) {
+    return {
+      success: true,
+      data: {
+        ...TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
+        tag: { ...TAG_DEPENDENCIES_NEN_SUBSCRIPTION.tag, id: tagDependencies[1] },
+      },
+    }
+  }
+  const tagDefinition = /^\/api\/tags\/([^/]+)$/.exec(pathname)
+  if (tagDefinition) {
+    const tag = { ...TAG_DEFINITION_NEN_SUBSCRIPTION.tag, id: tagDefinition[1] }
+    return query.get('withActions') === '1'
+      ? { success: true, data: { ...TAG_DEFINITION_NEN_SUBSCRIPTION, ...tag, tag } }
+      : { success: true, data: tag }
+  }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  if (/^\/api\/support-marks\/[^/]+\/archive-impact$/.test(pathname)) {
+    return { success: true, data: SUPPORT_MARK_ARCHIVE_IMPACT }
+  }
   if (pathname === '/api/saved-searches' && query.get('format') !== 'segment_v1') {
-    return { success: true, data: FRIEND_ATTRIBUTE_SAVED_SEARCHES }
+    return FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE
+  }
+  const savedSearchDetail = /^\/api\/saved-searches\/([^/]+)$/.exec(pathname)
+  if (savedSearchDetail) {
+    return {
+      success: true,
+      data: { ...FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, id: savedSearchDetail[1] },
+    }
   }
   /* 自動変更ルール（設計 `GMvBd` 4-3-A）。マークごとに返す。 */
   if (/^\/api\/support-marks\/[^/]+\/automation-rules$/.test(pathname)) {
