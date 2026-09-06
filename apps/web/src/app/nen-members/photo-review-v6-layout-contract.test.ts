@@ -83,6 +83,6 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
     expect(PAGE).toContain('まとめて通す')
     expect(PAGE).toContain('まとめて戻す')
     expect(PAGE).toContain('一括審査はAPI接続待ちです')
-    expect(PAGE).toContain('<Button disabled title="一括審査APIがつながると使えます">')
+    expect(PAGE).toContain('<Button variant="primary" disabled title="一括審査APIがつながると使えます">')
   })
 })
