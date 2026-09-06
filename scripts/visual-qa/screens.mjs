@@ -2950,64 +2950,72 @@ const FEATURE_17_REVIEW = {
 /*
  * board #231 の機能18再監査。
  *
- * 画面実装は更新したが、macOS のブラウザ起動制限と利用者側のローカル画面
- * アクセス拒否により、同じ幅の実装画像を撮れなかった。古い画像を根拠に
- * 合格へ上げないため、9画面とも未判定に戻す。未接続のAPIも画面ごとに分ける。
+ * PR #907 の画面実装を、1440px・1920pxと定義済みの全状態で撮影した。
+ * 設計画像と同じ幅で目視比較し、見た目の差と未接続APIを画面ごとに分ける。
  */
 const FEATURE_18_AUDIT = {
   Q4bkTg: {
     route: '/inflow-links?tab=links',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 4タブ、フォルダ、実際に動く4種の絞り込み、並び順、CSV、ページ送りを実装した。取得できない集計は0にしない。macOSのブラウザ起動制限に加え、アプリ内ブラウザのローカル画面アクセスが利用者側で拒否されたため、1440px・1920pxの実装画像は未取得。設計との差は画像で再確認する必要がある。',
-    verdictSource: 'inflow-v6/Q4bkTg.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。4タブ、4つの指標、説明帯、フォルダ、検索・絞り込み・並び順、CSV、一覧とページ送りは設計と同じ役割で並ぶ。撮影では流入元6件に対し、友だち追加・クリック・追加率は集計APIが無いため `—` と理由を表示し、一覧も1件だけ。**接続条件:** タブ件数、流入集計、一覧の追加数・クリック・最新追加を返すAPIを接続し、設計と同量の実データで再撮影する。',
+    verdictSource: 'inflow-v6/Q4bkTg.txt + Q4bkTg-1440.png + Q4bkTg-1920.png',
+    verdictHead: '87774763c',
   },
   IhSBB: {
     route: '/inflow-links?tab=script',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で実装を更新したが、画像未確認。** 貼るコード、受信確認、できること、WordPress・Shopify・制作会社向けの貼り方、届いたページの集計を実装し、押せない「準備中」操作を外した。設計のドメイン別許可・停止・不明ドメイン警告はドメイン管理APIが未接続のため表示できず、画面内に接続条件を明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/IhSBB.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。貼るコード、受信確認、できること、WordPress・Shopify・制作会社向け案内は出る。設計は主欄と右欄の2列で、届いた3ドメインと不明ドメイン警告を同時に見せるが、実装は縦1列で「まだ記録がありません」となり、つながる先も無い。**推奨修正:** 右欄の貼り方・つながる先・注意を設計位置へ戻す。ドメイン管理API接続後に許可・停止・不明警告を表示して再撮影する。',
+    verdictSource: 'inflow-v6/IhSBB.txt + IhSBB-1440.png + IhSBB-1920.png',
+    verdictHead: '87774763c',
   },
   v0HaI: {
     route: '/inflow-links?tab=ads',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で広告実績を独立画面へ分けたが、画像未確認。** 接続済み媒体は既存APIから表示し、広告費・友だち単価・成果単価は広告実績の取込APIが無いため0円を作らず `—` と接続条件を表示する。媒体・キャンペーン・広告グループ別の実績は同API接続後の課題。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/v0HaI.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。説明、4つの指標、広告アカウント、広告のまとまりの区画は設計と同じ順。広告実績と接続設定APIが無いため、接続数だけ実値0、広告費・友だち単価・成果単価は `—` と接続条件を表示し、架空の媒体行を出していない。**接続条件:** 媒体接続と広告実績APIを接続し、媒体・キャンペーン・広告グループの行を出して再撮影する。',
+    verdictSource: 'inflow-v6/v0HaI.txt + v0HaI-1440.png + v0HaI-1920.png',
+    verdictHead: '87774763c',
   },
   TEVk8: {
     route: '/inflow-links/new',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で作成画面を更新したが、画像未確認。** V6作成画面の寸法、流入元名・REF、友だち追加時の動き、追加先、4段階の流れ、注意3点、発行後に詳細へ進む動線を実装した。短いURLとQR画像は発行APIが未対応のため作り物を出さず、接続後に詳細へ出ることを明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/TEVk8.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。入力、友だち追加時の動き、追加先、発行後のURL案内、右欄の流れと注意は出るが、設計は入力を上段、発行URLとQRをその直下、動きをカードでまとめる2列構成。実装は4段の縦長フォームで、同じ位置・寸法になっていない。短いURLとQRは発行API未対応。**推奨修正:** 設計の主欄＋右欄と区画順へ再配置し、発行API接続後に通常URL・短縮URL・QRの状態を撮る。',
+    verdictSource: 'inflow-v6/TEVk8.txt + TEVk8-1440.png + TEVk8-1920.png',
+    verdictHead: '87774763c',
   },
   JupxW: {
     route: '/inflow-links/detail?ref=summer-ig',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で詳細画面を更新したが、画像未確認。** 既存の流入別友だちAPIを接続し、友だち名・来た日時・友だち詳細への導線を追加した。設計にある最初に見たページ、友だちごとの状態・成果・マイルは現行APIが返さないため表示していない。押せないQR保存操作は外した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/JupxW.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、要修正。** 撮影モックの1件取得を直して1440px・1920pxとも撮影、横はみ出し0。数値・段階・友だち・参照元・追加時の動作は表示できた。設計は上部4指標、横方向の成果段階、5列の友だち表と右欄を1画面に置くが、実装は左のリンク一覧と縦積みカードで別構成。最初に見たページ、状態、成果、マイルもAPIが返さず列が無い。**推奨修正:** 設計の主欄＋右欄へ再配置し、友だち詳細APIへ不足4項目を追加して再撮影する。',
+    verdictSource: 'inflow-v6/JupxW.txt + JupxW-1440.png + JupxW-1920.png',
+    verdictHead: '87774763c',
   },
   UIaM7: {
     route: '/inflow-links/detail?ref=summer-ig',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231でも画像未確認。** 対象名、消える設定、残る過去記録、取り消せないこと、失敗時の再試行案内は既存の画面内確認窓で維持した。設計が求める使用先の一覧・別リンクへの差し替え・アーカイブは影響確認APIが無いため未実装。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/UIaM7.txt + 実装コード（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を通常・確認・失敗で再撮影し、要修正。** 1440px・1920pxとも横はみ出し0。対象名、消える設定、残る過去記録、取り消せないこと、失敗後の再試行案内は出る。設計は使用中のURL・86人・分析への影響を分け、受け付け停止・別リンクへ転送・削除の3択を示すが、実装は説明1つと削除だけ。**推奨修正:** 使用先と現在の流入を返す影響確認APIを追加し、停止・転送・削除を設計の確認窓へ並べる。',
+    verdictSource: 'inflow-v6/UIaM7-open.txt + UIaM7-open-1440.png + UIaM7-open-1920.png + UIaM7-fail.txt',
+    verdictHead: '87774763c',
   },
   BMmxU: {
     route: '/inflow-links?tab=links',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で状態の契約を維持したが、画像未確認。** 読込中・0件・取得失敗を別の文と操作で表示し、帯の未取得値を0にしないことは契約テストで確認した。normal/loading/empty/errorの1440px・1920px画像は今回取得できていないため、見た目は未判定。',
-    verdictSource: 'inflow-v6/BMmxU.txt + 契約テスト（画像未確認）',
+    verdict: 'needs_fix',
+    verdictNote: '**2026-09-06 #231 / PR #907を通常・読込中・0件・取得失敗で再撮影し、要修正。** 全4状態の1440px・1920pxで横はみ出し0。読込中は「読み込んでいます」、0件は最初のフォルダ作成、失敗は再読み込みを出し、指標も未取得を0にしない。ただし設計の状態見本は共通の操作・ページ送りを残した同じ枠で、実装は選択フォルダ欄まで0件表示へ切り替わり、失敗文言と操作名も一致しない。**推奨修正:** 状態部分以外の枠を通常画面と共通にし、設計の文言・操作位置へそろえる。',
+    verdictSource: 'inflow-v6/BMmxU-normal.txt + BMmxU-loading.txt + BMmxU-empty.txt + BMmxU-error.txt + BMmxU-error-1440.png + BMmxU-error-1920.png',
+    verdictHead: '87774763c',
   },
   BuVDB: {
     route: '/inflow-links?tab=connections',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で「広告とのつなぎ」を広告実績から分離したが、画像未確認。** Meta・Google・X・TikTokのクリック目印、接続状態、成果を返す仕組み、個人情報を送らない注意を表示する。接続設定と成果名の対応付けはAPI未接続のため、操作や架空の行を出さず接続条件を明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/BuVDB.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。4媒体とクリック目印、成果名の対応区画、返す仕組み、注意、送信履歴への導線を設計と同じ役割で表示する。接続設定・成果対応APIが無いため、全媒体を未接続として理由を出し、対応表に架空の行や押せない操作を出していない。**接続条件:** 媒体接続と成果対応APIを接続し、状態・対応名・返した件数・操作を実データで再撮影する。',
+    verdictSource: 'inflow-v6/BuVDB.txt + BuVDB-1440.png + BuVDB-1920.png',
+    verdictHead: '87774763c',
   },
   Im2b1: {
     route: '/inflow-links?tab=connections&view=history',
-    verdict: 'unjudged',
-    verdictNote: '**2026-09-06 #231で送信履歴を独立表示したが、画像未確認。** 送れた・待っている・断られた件数、検索、状態絞り込み、CSV、履歴表を既存ログAPIから表示する。試行回数・次回試行日時・まとめて再試行は再試行APIが無いため操作を作らず、接続条件を明記した。1440px・1920pxの実装画像は未取得。',
-    verdictSource: 'inflow-v6/Im2b1.txt + 実装コード（画像未確認）',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 #231 / PR #907を再撮影し、構造一致・データ未接続。** 1440px・1920pxとも横はみ出し0。送った・待っている・断られた指標、説明、検索、状態絞り込み、CSV、履歴区画、戻る導線は設計と同じ役割で並ぶ。撮影APIは履歴0件のため表を比較できず、再試行成功の指標、試行回数、次回試行、まとめてやり直す操作も未接続理由を表示。**接続条件:** 送信履歴・再試行記録APIを接続し、成功・待機・失敗と再試行の行を同じ2幅で再撮影する。',
+    verdictSource: 'inflow-v6/Im2b1.txt + Im2b1-1440.png + Im2b1-1920.png',
+    verdictHead: '87774763c',
   },
 }
 
