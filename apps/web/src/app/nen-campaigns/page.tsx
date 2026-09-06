@@ -182,7 +182,7 @@ export default function NenCampaignsPage() {
   const changeTab = (next: NenTab) => { setTab(next); window.history.replaceState(window.history.state, '', next === 'flow' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`) }
 
   if (loading) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="loading" /></main></>
-  if (loadError) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="error" description={loadError} action={<Button variant="primary" onClick={() => void load()}>フォロー配信を再読み込み</Button>} /></main></>
+  if (loadError) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="error" description={tab === 'columns' ? '再読み込みしても直らないときは、エラー報告へお知らせください。' : loadError} action={<Button variant="primary" onClick={() => void load()}>{tab === 'columns' ? 'もう一度読み込む' : 'フォロー配信を再読み込み'}</Button>} /></main></>
 
   const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
     : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>

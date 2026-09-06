@@ -50,6 +50,8 @@ describe('V6 21 NEN配信の画面契約', () => {
 
   it('取得できる集計を表示し、LINEから取れない開封率は理由を示す', () => {
     expect(OVERVIEW).toContain('flowMetrics?.summary.sent')
+    expect(OVERVIEW).toContain("['order_thanks', 'order_confirmed']")
+    expect(OVERVIEW).toContain("['shipping_notice', 'shipping_confirmed']")
     expect(OVERVIEW).toContain('metric?.targeted.toLocaleString')
     expect(OVERVIEW).toContain('metric?.articleOpened.value?.toLocaleString')
     expect(OVERVIEW).toContain('openRate.reason')
@@ -60,7 +62,10 @@ describe('V6 21 NEN配信の画面契約', () => {
   it('読込失敗と空状態を共通状態部品で示す', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('再読み込みしても直らないときは、エラー報告へお知らせください。')
+    expect(PAGE).toContain('もう一度読み込む')
     expect(OVERVIEW).toContain('kind="empty"')
+    expect(OVERVIEW).toContain('売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。')
   })
 
   it('コラム作成では未接続の工程を明示し、実行できる操作だけを有効にする', () => {

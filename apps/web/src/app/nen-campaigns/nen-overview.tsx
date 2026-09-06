@@ -342,8 +342,12 @@ function FlowPanel({
             <thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '26%' }}>配信</Th><Th style={{ width: '16%' }}>いつ送るか</Th><Th style={{ width: '17%' }}>中身</Th><Th style={{ width: '14%' }}>この30日</Th><Th style={{ width: '12%' }}>反応</Th><Th style={{ width: '15%' }}>操作</Th></TableHeadRow></thead>
             <tbody>
               {deliverySettings.map((setting) => {
-                const metricKey = setting.campaignKey === 'order_thanks' ? 'order_confirmed' : setting.campaignKey === 'shipping_notice' ? 'shipping_confirmed' : setting.campaignKey
-                const metric = metrics?.flows.find((candidate) => candidate.campaignKey === metricKey)
+                const metricKeys = setting.campaignKey === 'order_thanks' || setting.campaignKey === 'order_confirmed'
+                  ? ['order_thanks', 'order_confirmed']
+                  : setting.campaignKey === 'shipping_notice' || setting.campaignKey === 'shipping_confirmed'
+                    ? ['shipping_notice', 'shipping_confirmed']
+                    : [setting.campaignKey]
+                const metric = metrics?.flows.find((candidate) => metricKeys.includes(candidate.campaignKey))
                 return <Fragment key={setting.campaignKey}>
                   <tr className="border-t border-hairline">
                     <td className="px-3 py-3"><p className="font-bold text-ink">{setting.label}</p><p className="mt-1 text-xs text-ink-faint">{categoryLabel[setting.category]} ／ {formatCampaignTiming(setting)}</p></td>
@@ -424,7 +428,7 @@ function ColumnsPanel({
         ...(metrics?.summary.unread === null ? [] : [['unread', `読まれていない ${metrics?.summary.unread ?? 0}`]]),
       ].map(([value, label]) => <FilterChip key={value} selected={status === value} onChange={(selected) => { setStatus(selected ? value as typeof status : 'all'); setPage(1) }}>{label}</FilterChip>)}</div><SelectField aria-label="コラムの並び順" value={sort} onChange={(event) => { setSort(event.target.value as typeof sort); setPage(1) }} options={[{ value: 'newest', label: '出した日が新しい順' }, { value: 'read', label: '読まれた数が多い順' }]} /></div>
       {shown.length === 0 ? (
-        <ListState kind="empty" title={columns.length === 0 ? 'まだコラムがありません' : '条件に合うコラムはありません'} description="外部サイトの記事へつなぐ下書きを作ると、ここに並びます。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
+        <ListState kind="empty" title={columns.length === 0 ? 'まだコラムがありません' : '条件に合うコラムはありません'} description="売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
       ) : (
         <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
           <table className="w-full table-fixed border-separate border-spacing-0 text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '27%' }}>コラム</Th><Th style={{ width: '11%' }}>出す日</Th><Th style={{ width: '11%' }}>届く人</Th><Th style={{ width: '11%' }}>読まれた</Th><Th style={{ width: '14%' }}>この記事からの成果</Th><Th style={{ width: '26%' }}>操作</Th></TableHeadRow></thead><tbody>
