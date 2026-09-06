@@ -9,6 +9,15 @@ import {
   getMediaDeleteImpact,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
+  getMediaStorageQuota,
+  createMediaUploadSession,
+  getMediaUploadSession,
+  failMediaUploadSession,
+  verifyMediaUploadSession,
+  completeNewMediaUpload,
+  createMediaVersionFromUpload,
+  getCurrentMediaVersionNo,
+  MediaVersionConflictError,
   jstNow,
   getCommonVars,
   getCommonVarUsageSummaries,
@@ -41,6 +50,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
+import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
 import type { MediaReplacementImpact } from '@line-crm/shared';
 
 /**
@@ -147,6 +157,13 @@ const ALLOWED: Record<string, { kind: MediaKind; ext: string[]; maxBytes: number
   'application/pdf': { kind: 'file', ext: ['pdf'], maxBytes: 20 * 1024 * 1024 },
 };
 
+const DIRECT_ALLOWED: Record<string, { kind: MediaKind; ext: string[]; maxBytes: number }> = {
+  ...ALLOWED,
+  'video/mp4': { kind: 'video', ext: ['mp4'], maxBytes: 200 * 1024 * 1024 },
+  'audio/mpeg': { kind: 'audio', ext: ['mp3'], maxBytes: 200 * 1024 * 1024 },
+  'audio/mp4': { kind: 'audio', ext: ['m4a'], maxBytes: 200 * 1024 * 1024 },
+};
+
 /**
  * 動画の上限を 90MB にしている理由。
  *
@@ -209,6 +226,407 @@ function serializeMedia(row: Media, workerUrl: string) {
     usageCount: row.usage_count === undefined ? undefined : Number(row.usage_count),
   };
 }
+
+function directUploadConfig(env: Env['Bindings']) {
+  const accountId = env.CF_ACCOUNT_ID?.trim();
+  const accessKeyId = env.MEDIA_R2_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = env.MEDIA_R2_SECRET_ACCESS_KEY?.trim();
+  const bucketName = env.MEDIA_R2_BUCKET_NAME?.trim();
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) return null;
+  return { accountId, accessKeyId, secretAccessKey, bucketName };
+}
+
+function normalizedEtag(value: string): string {
+  return value.trim().replace(/^"|"$/g, '');
+}
+
+async function mediaVersionPreview(
+  c: Context<Env>,
+  mediaId: string,
+  uploadSessionId: string,
+  accountId: string,
+) {
+  const [media, session, currentVersionNo] = await Promise.all([
+    getMediaById(c.env.DB, mediaId, accountId),
+    getMediaUploadSession(c.env.DB, uploadSessionId, accountId),
+    getCurrentMediaVersionNo(c.env.DB, mediaId, accountId),
+  ]);
+  if (!media || !session || currentVersionNo === null || session.target_media_id !== mediaId) {
+    return null;
+  }
+  const blockers = session.status === 'verified'
+    ? (session.kind === media.kind ? [] : ['different_kind'])
+    : ['upload_not_verified'];
+  const raw = [
+    media.id, media.r2_key, String(currentVersionNo), session.id, session.r2_key,
+    session.etag ?? '', session.kind, session.expected_mime, String(session.expected_size),
+    ...blockers,
+  ].join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const previewToken = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return {
+    media,
+    session,
+    currentVersionNo,
+    previewToken,
+    blockers,
+    canReplace: blockers.length === 0,
+  };
+}
+
+// 容量は現行ファイルだけでなく旧版と期限内アップロード予約も含める。
+contents.get('/api/media/quota', async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    return c.json({ success: true, data: await getMediaStorageQuota(c.env.DB, accountId) });
+  } catch (err) {
+    console.error('GET /api/media/quota error:', err);
+    return c.json({ success: false, error: '容量を確認できませんでした' }, 503);
+  }
+});
+
+contents.post(
+  '/api/media/upload-sessions',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{
+        accountId?: unknown;
+        files?: Array<{
+          filename?: unknown;
+          mimeType?: unknown;
+          sizeBytes?: unknown;
+          folderId?: unknown;
+          targetMediaId?: unknown;
+        }>;
+      }>().catch(() => null);
+      const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      if (!accountId || !Array.isArray(body?.files) || body.files.length < 1 || body.files.length > 20) {
+        return c.json({ success: false, error: 'accountId と1〜20件のfilesが必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const config = directUploadConfig(c.env);
+      if (!config) {
+        return c.json({
+          success: false,
+          code: 'media_direct_upload_unavailable',
+          error: '直接アップロードの設定が完了していません',
+        }, 503);
+      }
+      const validated: Array<{
+        filename: string;
+        mimeType: string;
+        sizeBytes: number;
+        folderId: string | null;
+        targetMediaId: string | null;
+        spec: { kind: MediaKind; ext: string[]; maxBytes: number };
+      }> = [];
+      for (const file of body.files) {
+        const filename = typeof file?.filename === 'string' ? file.filename.trim() : '';
+        const mimeType = typeof file?.mimeType === 'string' ? file.mimeType.trim().toLowerCase() : '';
+        const sizeBytes = Number(file?.sizeBytes);
+        const folderId = typeof file?.folderId === 'string' && file.folderId.trim()
+          ? file.folderId.trim()
+          : null;
+        const targetMediaId = typeof file?.targetMediaId === 'string' && file.targetMediaId.trim()
+          ? file.targetMediaId.trim()
+          : null;
+        const spec = DIRECT_ALLOWED[mimeType];
+        const ext = extensionOf(filename);
+        if (!filename || filename.length > 255 || /[\u0000-\u001f]/.test(filename)
+          || !spec || !spec.ext.includes(ext)
+          || !Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > spec.maxBytes) {
+          return c.json({
+            success: false,
+            code: 'media_file_invalid',
+            error: `${filename || 'ファイル'}の形式、拡張子、容量を確認してください`,
+          }, 400);
+        }
+        if (targetMediaId && !await getMediaById(c.env.DB, targetMediaId, accountId)) {
+          return c.json({ success: false, error: 'Not found' }, 404);
+        }
+        validated.push({ filename, mimeType, sizeBytes, folderId, targetMediaId, spec });
+      }
+      const quota = await getMediaStorageQuota(c.env.DB, accountId);
+      const requestedBytes = validated.reduce((total, file) => total + file.sizeBytes, 0);
+      if (requestedBytes > quota.remainingBytes) {
+        return c.json({
+          success: false,
+          code: 'media_quota_exceeded',
+          error: '保存容量が不足しています',
+          data: quota,
+        }, 409);
+      }
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+      const sessions = [];
+      for (const file of validated) {
+        const id = crypto.randomUUID();
+        const r2Key = `media/${accountId}/${crypto.randomUUID()}.${extensionOf(file.filename)}`;
+        await createMediaUploadSession(c.env.DB, {
+          id,
+          lineAccountId: accountId,
+          targetMediaId: file.targetMediaId,
+          folderId: file.folderId,
+          filename: file.filename,
+          kind: file.spec.kind,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          r2Key,
+          expiresAt,
+          createdBy: c.get('staff')?.id ?? null,
+        });
+        const signed = await createR2PresignedPutUrl(config, {
+          key: r2Key,
+          contentType: file.mimeType,
+          lineAccountId: accountId,
+          uploadSessionId: id,
+          expiresInSeconds: 900,
+          now,
+        });
+        sessions.push({
+          id,
+          filename: file.filename,
+          sizeBytes: file.sizeBytes,
+          targetMediaId: file.targetMediaId,
+          method: 'PUT',
+          uploadUrl: signed.url,
+          requiredHeaders: signed.headers,
+          expiresAt: signed.expiresAt,
+        });
+      }
+      return c.json({ success: true, data: { sessions } }, 201);
+    } catch (err) {
+      console.error('POST /api/media/upload-sessions error:', err);
+      return c.json({ success: false, error: 'アップロードを準備できませんでした' }, 500);
+    }
+  },
+);
+
+contents.post(
+  '/api/media/upload-sessions/:id/complete',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountIdFromBody = async () => c.req.json<{ accountId?: unknown; etag?: unknown }>()
+      .catch(() => null);
+    let accountId = '';
+    try {
+      const body = await accountIdFromBody();
+      accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      const suppliedEtag = typeof body?.etag === 'string' ? normalizedEtag(body.etag) : '';
+      if (!accountId || !suppliedEtag) {
+        return c.json({ success: false, error: 'accountId と etag が必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      let session = await getMediaUploadSession(c.env.DB, c.req.param('id'), accountId);
+      if (!session) return c.json({ success: false, error: 'Not found' }, 404);
+      if (session.status === 'completed') {
+        return c.json({
+          success: true,
+          data: { uploadSessionId: session.id, status: 'completed', mediaId: session.result_media_id },
+        });
+      }
+      if (session.status === 'verified') {
+        return c.json({
+          success: true,
+          data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
+        });
+      }
+      if (session.status !== 'pending') {
+        return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
+      }
+      if (Date.parse(session.expires_at) <= Date.now()) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
+        return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
+      }
+      const object = await c.env.IMAGES.head(session.r2_key);
+      const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
+      const contentType = object?.httpMetadata?.contentType ?? '';
+      const metadata = object?.customMetadata ?? {};
+      const metadataAccountId = metadata['line-account-id'] ?? metadata.lineAccountId;
+      const metadataSessionId = metadata['upload-session-id'] ?? metadata.uploadSessionId;
+      if (!object || Number(object.size) !== Number(session.expected_size)
+        || contentType !== session.expected_mime || objectEtag !== suppliedEtag
+        || metadataAccountId !== accountId || metadataSessionId !== session.id) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'object_mismatch');
+        await c.env.IMAGES.delete(session.r2_key);
+        return c.json({
+          success: false,
+          code: 'media_upload_mismatch',
+          error: 'アップロードしたファイルを確認できませんでした',
+        }, 409);
+      }
+      const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: 16 } });
+      const signatureBytes = bodyObject
+        ? new Uint8Array(await bodyObject.arrayBuffer())
+        : new Uint8Array();
+      if (!hasMediaSignature(signatureBytes, session.expected_mime)) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'signature_mismatch');
+        await c.env.IMAGES.delete(session.r2_key);
+        return c.json({
+          success: false,
+          code: 'media_signature_mismatch',
+          error: 'ファイルの実際の形式が申告と一致しません',
+        }, 409);
+      }
+      session = await verifyMediaUploadSession(c.env.DB, session.id, accountId, objectEtag);
+      if (!session) throw new Error('verified upload session is unavailable');
+      if (session.target_media_id) {
+        return c.json({
+          success: true,
+          data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
+        });
+      }
+      const media = await completeNewMediaUpload(c.env.DB, session);
+      return c.json({
+        success: true,
+        data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
+      }, 201);
+    } catch (err) {
+      console.error('POST /api/media/upload-sessions/:id/complete error:', err);
+      return c.json({ success: false, error: 'アップロードを確定できませんでした' }, 500);
+    }
+  },
+);
+
+contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      accountId?: unknown;
+      uploadSessionId?: unknown;
+      previewToken?: unknown;
+      changeReason?: unknown;
+    }>().catch(() => null);
+    const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+    const uploadSessionId = typeof body?.uploadSessionId === 'string'
+      ? body.uploadSessionId.trim()
+      : '';
+    const previewToken = typeof body?.previewToken === 'string' ? body.previewToken.trim() : '';
+    const changeReason = typeof body?.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!accountId || !uploadSessionId || !previewToken
+      || !changeReason || changeReason.length > 500) {
+      return c.json({
+        success: false,
+        error: 'accountId、確認済みuploadSessionId、previewToken、変更理由が必要です',
+      }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const preview = await mediaVersionPreview(
+      c, c.req.param('id'), uploadSessionId, accountId,
+    );
+    if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+    if (preview.previewToken !== previewToken) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_changed',
+        error: 'ファイルまたは現在版が変わりました。差し替え内容を確認し直してください。',
+        data: {
+          previewToken: preview.previewToken,
+          currentVersionNo: preview.currentVersionNo,
+          blockers: preview.blockers,
+          canReplace: preview.canReplace,
+        },
+      }, 409);
+    }
+    if (!preview.canReplace) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_blocked',
+        error: 'このファイルは現在のメディアと互換性がありません',
+        data: { blockers: preview.blockers },
+      }, 409);
+    }
+    const version = await createMediaVersionFromUpload(c.env.DB, {
+      mediaId: c.req.param('id'),
+      lineAccountId: accountId,
+      uploadSessionId,
+      expectedVersionNo: preview.currentVersionNo,
+      changeReason,
+      uploadedBy: c.get('staff')?.id ?? null,
+    });
+    return c.json({
+      success: true,
+      data: {
+        id: version.id,
+        mediaId: version.media_id,
+        versionNo: version.version_no,
+        mimeType: version.mime_type,
+        sizeBytes: version.size_bytes,
+        changeReason: version.change_reason,
+        createdAt: version.created_at,
+      },
+    }, 201);
+  } catch (err) {
+    if (err instanceof MediaVersionConflictError) {
+      return c.json({
+        success: false,
+        code: 'media_version_conflict',
+        error: '新しい版が追加されています。最新状態を読み直してください。',
+        currentVersionNo: err.currentVersionNo,
+      }, 409);
+    }
+    if (err instanceof Error && err.message === 'media_not_found') {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (err instanceof Error && err.message === 'media_upload_session_not_verified') {
+      return c.json({
+        success: false,
+        code: 'media_upload_not_verified',
+        error: '差し替え用ファイルの確認が完了していません',
+      }, 409);
+    }
+    console.error('POST /api/media/:id/versions error:', err);
+    return c.json({ success: false, error: '新しい版を追加できませんでした' }, 500);
+  }
+});
+
+contents.post(
+  '/api/media/:id/replacement-preview',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; uploadSessionId?: unknown }>()
+        .catch(() => null);
+      const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+      const uploadSessionId = typeof body?.uploadSessionId === 'string'
+        ? body.uploadSessionId.trim()
+        : '';
+      if (!accountId || !uploadSessionId) {
+        return c.json({ success: false, error: 'accountId と uploadSessionId が必要です' }, 400);
+      }
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      const preview = await mediaVersionPreview(c, c.req.param('id'), uploadSessionId, accountId);
+      if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+      return c.json({
+        success: true,
+        data: {
+          mediaId: preview.media.id,
+          uploadSessionId: preview.session.id,
+          currentVersionNo: preview.currentVersionNo,
+          previewToken: preview.previewToken,
+          blockers: preview.blockers,
+          canReplace: preview.canReplace,
+        },
+      });
+    } catch (err) {
+      console.error('POST /api/media/:id/replacement-preview error:', err);
+      return c.json({ success: false, error: '差し替え内容を確認できませんでした' }, 503);
+    }
+  },
+);
 
 contents.get('/api/media', async (c) => {
   try {
@@ -429,7 +847,10 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
     }
     const current = await replacementImpact(c, c.req.param('id'), replacementId, accountId);
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
-    return c.json({ success: true, data: current.impact });
+    return c.json({
+      success: true,
+      data: { ...current.impact, previewToken: current.impact.revision },
+    });
   } catch (err) {
     console.error('GET /api/media/:id/replacement-impact error:', err);
     return c.json({ success: false, error: '差し替えたときの影響を確認できませんでした' }, 503);
@@ -448,9 +869,9 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
     const replacementId = typeof body.replacementMediaId === 'string'
       ? body.replacementMediaId.trim()
       : '';
-    const expectedRevision = typeof body.expectedRevision === 'string'
-      ? body.expectedRevision.trim()
-      : '';
+    const expectedRevision = typeof body.previewToken === 'string'
+      ? body.previewToken.trim()
+      : (typeof body.expectedRevision === 'string' ? body.expectedRevision.trim() : '');
     if (!replacementId || !expectedRevision) {
       return c.json({ success: false, error: '差し替え先と、確認した版が必要です' }, 400);
     }
