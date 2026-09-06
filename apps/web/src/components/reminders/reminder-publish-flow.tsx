@@ -2,620 +2,147 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type {
-  ReminderDraftSettings,
-  ReminderDraftVersion,
-  ReminderPreviewResult,
-  ReminderPublishResult,
-  ReminderValidationResult,
-  Tag,
-} from '@line-crm/shared'
-import { describeReminderTiming } from '@line-crm/shared'
-import { ApiError, api } from '@/lib/api'
+import type { ReminderDraftSettings, ReminderDraftVersion, ReminderPreviewResult, ReminderPublishResult, ReminderValidationResult } from '@line-crm/shared'
+import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Card, { CardHeader } from '@/components/shared/card'
-import { ChoiceCard } from '@/components/shared/create-page'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
-import { TextInput } from '@/components/shared/form-controls'
-import styles from './reminder-publish-flow.module.css'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import { LinePreview, Pill, ReminderFooter, ReminderPanel, ReminderWizard, ReminderWorkspace, SummaryCard } from './reminder-v6-ui'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 export type ReminderPublishStage = 'target' | 'preview' | 'test' | 'confirm' | 'done'
-
-const STAGES: Array<{ key: ReminderPublishStage; label: string }> = [
-  { key: 'target', label: '対象と停止条件' },
-  { key: 'preview', label: '届く予定' },
-  { key: 'test', label: 'テスト送信' },
-  { key: 'confirm', label: '最終確認' },
-  { key: 'done', label: '公開完了' },
-]
-
-function safeError(error: unknown, fallback: string): string {
-  if (!(error instanceof ApiError)) return error instanceof Error ? error.message : fallback
-  if (error.status === 403) return 'このリマインダを変更する権限がありません。'
-  if (error.status === 404) return 'リマインダの下書きが見つかりません。'
-  if (error.status === 405) return 'この環境ではこの操作を実行できません。'
-  if (error.status === 409) return '別の変更が先に入っています。状態を読み直してください。'
-  if (error.status === 422) return '入力内容を確認してください。'
-  return fallback
-}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
 function countLabel(value: number | null, unit: string): string {
   return value == null ? `—${unit}` : `${value.toLocaleString('ja-JP')}${unit}`
 }
 
-export default function ReminderPublishFlow({
-  reminderId,
-  stage,
-}: {
-  reminderId: string
-  stage: ReminderPublishStage
-}) {
+export default function ReminderPublishFlow({ reminderId, stage }: { reminderId: string; stage: ReminderPublishStage }) {
+  usePageTitle(stage === 'target' ? 'リマインダを作成・対象と終了条件' : stage === 'preview' ? 'リマインダを作成・配信予定' : stage === 'test' ? 'リマインダをテスト送信' : stage === 'confirm' ? 'リマインダを作成・最終確認' : 'リマインダ・有効化完了')
   const router = useRouter()
   const [draft, setDraft] = useState<ReminderDraftVersion | null>(null)
   const [settings, setSettings] = useState<ReminderDraftSettings | null>(null)
   const [preview, setPreview] = useState<ReminderPreviewResult | null>(null)
   const [validation, setValidation] = useState<ReminderValidationResult | null>(null)
   const [published, setPublished] = useState<ReminderPublishResult | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const [testConfirm, setTestConfirm] = useState(false)
 
-  const go = useCallback((next: ReminderPublishStage) => {
-    router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=${next}`)
-  }, [reminderId, router])
-
+  const go = useCallback((next: ReminderPublishStage) => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=${next}`), [reminderId, router])
   const loadDraft = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
       const response = await api.reminders.getDraft(reminderId)
       if (!response.success) throw new Error(response.error)
-      setDraft(response.data)
-      setSettings(response.data.settings)
-    } catch (loadError) {
-      setError(safeError(loadError, '下書きを読み込めませんでした。'))
-    } finally {
-      setLoading(false)
-    }
+      setDraft(response.data); setSettings(response.data.settings)
+    } catch { setError('下書きを読み込めませんでした。') } finally { setLoading(false) }
   }, [reminderId])
 
+  useEffect(() => { void loadDraft() }, [loadDraft])
   useEffect(() => {
-    void loadDraft()
-    void api.tags.list().then((response) => {
-      if (response.success) setTags(response.data)
-    }).catch(() => setTags([]))
-  }, [loadDraft])
-
+    if (!settings || (stage !== 'preview' && stage !== 'done')) return
+    void api.reminders.previewDraft(reminderId).then((response) => { if (response.success) setPreview(response.data); else setError(response.error) }).catch(() => setError('配信予定を確認できませんでした。'))
+  }, [reminderId, settings, stage])
   useEffect(() => {
-    if (!settings || stage !== 'preview') return
-    let active = true
-    setPreview(null)
-    setError('')
-    void api.reminders.previewDraft(reminderId)
-      .then((response) => {
-        if (!active) return
-        if (!response.success) throw new Error(response.error)
-        setPreview(response.data)
-      })
-      .catch((previewError) => {
-        if (active) setError(safeError(previewError, '届く予定を確認できませんでした。'))
-      })
-    return () => {
-      active = false
-    }
+    if (!settings || (stage !== 'confirm' && stage !== 'done')) return
+    void api.reminders.validateDraft(reminderId).then((response) => { if (response.success) setValidation(response.data); else setError(response.error) }).catch(() => setError('有効化前チェックを実行できませんでした。'))
   }, [reminderId, settings, stage])
 
-  useEffect(() => {
-    if (!settings || stage !== 'confirm') return
-    let active = true
-    setValidation(null)
-    setError('')
-    void api.reminders.validateDraft(reminderId)
-      .then((response) => {
-        if (!active) return
-        if (!response.success) throw new Error(response.error)
-        setValidation(response.data)
-      })
-      .catch((validationError) => {
-        if (active) setError(safeError(validationError, '公開前チェックを実行できませんでした。'))
-      })
-    return () => {
-      active = false
-    }
-  }, [reminderId, settings, stage])
-
-  const stageIndex = STAGES.findIndex((item) => item.key === stage)
-  async function saveTargetAndContinue() {
+  async function saveTarget() {
     if (!settings) return
     setBusy(true)
-    setError('')
-    try {
-      const response = await api.reminders.saveDraft(reminderId, settings)
-      if (!response.success) throw new Error(response.error)
-      setDraft(response.data)
-      setSettings(response.data.settings)
-      go('preview')
-    } catch (saveError) {
-      setError(safeError(saveError, '対象と停止条件を保存できませんでした。'))
-    } finally {
-      setBusy(false)
-    }
+    try { const response = await api.reminders.saveDraft(reminderId, settings); if (!response.success) throw new Error(response.error); setDraft(response.data); setSettings(response.data.settings); go('preview') }
+    catch { setError('対象と終了条件を保存できませんでした。') } finally { setBusy(false) }
   }
-
   async function sendTest() {
-    setBusy(true)
-    setError('')
-    setNotice('')
+    setBusy(true); setError('')
     try {
       const response = await api.reminders.testDraft(reminderId, crypto.randomUUID())
       if (!response.success) throw new Error(response.error)
-      setDraft((current) => current ? {
-        ...current,
-        lastTestStatus: 'succeeded',
-        lastTestedAt: response.data.testedAt,
-      } : current)
-      setNotice('テスト送信が届きました。本番公開の前に内容を確認してください。')
-    } catch (testError) {
-      setDraft((current) => current ? { ...current, lastTestStatus: 'failed' } : current)
-      setError(safeError(testError, 'テスト送信に失敗しました。LINE連携と送る内容を確認してください。'))
-    } finally {
-      setBusy(false)
-    }
+      setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: response.data.testedAt } : current)
+      setTestConfirm(false)
+    } catch { setError('テスト送信に失敗しました。LINE連携と通知内容を確認してください。') } finally { setBusy(false) }
   }
-
   async function publishDraft() {
     if (!validation?.valid || draft?.lastTestStatus !== 'succeeded') return
     setBusy(true)
-    setError('')
-    try {
-      const response = await api.reminders.publishDraft(reminderId)
-      if (!response.success) throw new Error(response.error)
-      setPublished(response.data)
-      go('done')
-    } catch (publishError) {
-      setError(safeError(publishError, '公開できませんでした。公開前チェックをやり直してください。'))
-    } finally {
-      setBusy(false)
-    }
+    try { const response = await api.reminders.publishDraft(reminderId); if (!response.success) throw new Error(response.error); setPublished(response.data); go('done') }
+    catch { setError('リマインダを有効化できませんでした。') } finally { setBusy(false) }
   }
 
-  if (loading) {
-    return <ListState kind="loading" title="下書きを読み込んでいます" />
-  }
-  if (!settings || !draft) {
-    return (
-      <ListState
-        kind="error"
-        title="下書きを表示できませんでした"
-        description={error || '状態を読み直してください。'}
-        action={<Button onClick={() => void loadDraft()}>再読み込み</Button>}
-      />
-    )
-  }
+  if (loading) return <ListState kind="loading" title="下書きを読み込んでいます" />
+  if (!draft || !settings) return <ListState kind="error" title="下書きを表示できませんでした" description={error} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
 
+  const current = stage === 'target' ? 2 : stage === 'done' ? 6 : stage === 'confirm' ? 5 : 4
   return (
-    <div className="min-w-0 space-y-4" data-reminder-publish-stage={stage}>
-      <ol className="border-hairline bg-canvas flex min-w-0 overflow-hidden rounded-lg border" aria-label="公開までの手順">
-        {STAGES.map((item, index) => (
-          <li
-            key={item.key}
-            className={`min-w-0 flex-1 px-3 py-2 text-center text-xs font-medium ${
-              index === stageIndex ? 'bg-accent-soft text-accent' : index < stageIndex ? 'text-success' : 'text-ink-faint'
-            }`}
-            aria-current={index === stageIndex ? 'step' : undefined}
-          >
-            {index + 1}. {item.label}
-          </li>
-        ))}
-      </ol>
-
-      {error ? <Notice tone="error" message={error} onClose={() => setError('')} /> : null}
-      {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
-
-      {stage === 'target' ? (
-        <TargetStage settings={settings} tags={tags} onChange={setSettings} />
-      ) : null}
-      {stage === 'preview' ? (
-        <PreviewStage preview={preview} settings={settings} />
-      ) : null}
-      {stage === 'test' ? (
-        <TestStage draft={draft} settings={settings} onTest={() => void sendTest()} busy={busy} />
-      ) : null}
-      {stage === 'confirm' ? (
-        <ConfirmStage draft={draft} settings={settings} validation={validation} />
-      ) : null}
-      {stage === 'done' ? (
-        <DoneStage draft={draft} published={published} />
-      ) : null}
-
-      {stage === 'target' ? (
-        <StickyBar
-          status={`下書き v${draft.versionNumber}`}
-          actions={(
-            <>
-              <Button href="/reminders">やめる</Button>
-              <Button variant="primary" disabled={busy} onClick={() => void saveTargetAndContinue()}>
-                {busy ? '保存中…' : '保存して届く予定へ'}
-              </Button>
-            </>
-          )}
-        />
-      ) : null}
-      {stage === 'preview' ? (
-        <StickyBar
-          status={preview ? `基準日 ${formatDateTime(preview.targetDate)}` : '届く予定を確認中'}
-          actions={(
-            <>
-              <Button onClick={() => go('target')}>戻る</Button>
-              <Button variant="primary" disabled={!preview} onClick={() => go('test')}>テスト送信へ</Button>
-            </>
-          )}
-        />
-      ) : null}
-      {stage === 'test' ? (
-        <StickyBar
-          status={draft.lastTestStatus === 'succeeded' ? `テスト済み ${formatDateTime(draft.lastTestedAt)}` : 'テスト送信が必要です'}
-          actions={(
-            <>
-              <Button onClick={() => go('preview')}>戻る</Button>
-              <Button
-                variant="primary"
-                disabled={draft.lastTestStatus !== 'succeeded'}
-                onClick={() => go('confirm')}
-              >
-                最終確認へ
-              </Button>
-            </>
-          )}
-        />
-      ) : null}
-      {stage === 'confirm' ? (
-        <StickyBar
-          status={validation?.valid ? '公開できます' : '確認が必要な項目があります'}
-          actions={(
-            <>
-              <Button onClick={() => go('test')}>戻る</Button>
-              <Button
-                variant="primary"
-                disabled={busy || !validation?.valid || draft.lastTestStatus !== 'succeeded'}
-                onClick={() => void publishDraft()}
-              >
-                {busy ? '公開中…' : 'この内容で公開'}
-              </Button>
-            </>
-          )}
-        />
-      ) : null}
+    <div data-reminder-publish-stage={stage}>
+      <ReminderWizard current={current} />
+      {error ? <p className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</p> : null}
+      {stage === 'target' ? <TargetStage settings={settings} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
+      {stage === 'preview' ? <PreviewStage settings={settings} preview={preview} onNext={() => go('test')} /> : null}
+      {stage === 'test' ? <TestStage draft={draft} onConfirm={() => setTestConfirm(true)} onNext={() => go('confirm')} /> : null}
+      {stage === 'confirm' ? <ConfirmStage draft={draft} settings={settings} validation={validation} onPublish={() => void publishDraft()} busy={busy} /> : null}
+      {stage === 'done' ? <DoneStage draft={draft} published={published} preview={preview} validation={validation} /> : null}
+      <ConfirmDialog open={testConfirm} title="テスト送信しますか？" description="Kenta Kawanoさんへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
     </div>
   )
 }
 
-function TargetStage({
-  settings,
-  tags,
-  onChange,
-}: {
-  settings: ReminderDraftSettings
-  tags: Tag[]
-  onChange: (settings: ReminderDraftSettings) => void
-}) {
+function TargetStage({ settings, onChange, onNext, busy }: { settings: ReminderDraftSettings; onChange: (value: ReminderDraftSettings) => void; onNext: () => void; busy: boolean }) {
   const stop = settings.stopConditions
-  return (
-    <div className={styles.columns} data-design-node="s7T2dz">
-      <Card padding="roomy" className="min-w-0 space-y-6">
-        <div>
-          <h2 className="text-ink text-base font-semibold">誰を対象にするか</h2>
-          <p className="text-ink-faint mt-1 text-xs">起点となる予約・申込に加えて、タグで絞り込めます。</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ChoiceCard
-            selected={!settings.targetTagId}
-            title="対象になった友だち全員"
-            note="予約・申込をした本人に送ります。"
-            onClick={() => onChange({ ...settings, targetTagId: null })}
-          />
-          <ChoiceCard
-            selected={Boolean(settings.targetTagId)}
-            title="タグでさらに絞り込む"
-            note="タグを選ぶまで公開前チェックは通りません。"
-            onClick={() => onChange({ ...settings, targetTagId: settings.targetTagId ?? tags[0]?.id ?? null })}
-          />
-        </div>
-        {settings.targetTagId ? (
-          <Select
-            aria-label="対象のタグ"
-            label="対象のタグ"
-            size="full"
-            value={settings.targetTagId}
-            onChange={(value) => onChange({ ...settings, targetTagId: value || null })}
-            options={tags.length === 0
-              ? [{ value: settings.targetTagId, label: 'タグを読み込めませんでした', disabled: true }]
-              : tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-          />
-        ) : null}
-
-        <div className="border-hairline border-t pt-5">
-          <h2 className="text-ink text-base font-semibold">途中で止める条件</h2>
-          <p className="text-ink-faint mt-1 text-xs">条件に当てはまった時点で、残りの配信予定を取り消します。</p>
-          <div className="mt-4 space-y-3">
-            <StopToggle
-              checked={stop.bookingCancelled}
-              label="予約・イベントがキャンセルされた"
-              note="取り消された予約について、その後のLINEを送りません。"
-              onChange={(checked) => onChange({ ...settings, stopConditions: { ...stop, bookingCancelled: checked } })}
-            />
-            <StopToggle
-              checked={stop.supportMarkCompleted}
-              label="対応マークが完了になった"
-              note="対応済み・解決済みになった友だちへの残りのLINEを止めます。"
-              onChange={(checked) => onChange({ ...settings, stopConditions: { ...stop, supportMarkCompleted: checked } })}
-            />
-            <StopToggle
-              checked={stop.friendBlocked}
-              label="ブロック・友だち解除になった"
-              note="送れない状態を繰り返し試さず、登録を止めます。"
-              onChange={(checked) => onChange({ ...settings, stopConditions: { ...stop, friendBlocked: checked } })}
-            />
-            <label className="border-hairline flex items-center justify-between gap-4 rounded-lg border p-3">
-              <span>
-                <span className="text-ink block text-sm font-medium">基準日から一定日数を過ぎた</span>
-                <span className="text-ink-faint block text-xs">古くなった案内をあとから送らないための上限です。</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                <TextInput
-                  type="number"
-                  min={0}
-                  max={365}
-                  value={stop.daysAfterTarget ?? ''}
-                  onChange={(event) => onChange({
-                    ...settings,
-                    stopConditions: {
-                      ...stop,
-                      daysAfterTarget: event.target.value === '' ? null : Number(event.target.value),
-                    },
-                  })}
-                  className="w-20"
-                />
-                <span className="text-ink-faint text-xs">日後</span>
-              </span>
-            </label>
-          </div>
-        </div>
-      </Card>
-
-      <div className="space-y-4">
-        <Card padding="default">
-          <CardHeader title="この設定で送る相手" />
-          <dl className="space-y-3 p-4 text-sm">
-            <SummaryRow label="対象" value={settings.targetTagId ? '指定したタグを持つ友だち' : '対象になった友だち全員'} />
-            <SummaryRow label="公開前の人数" value="次の画面で実値を確認" />
-          </dl>
-        </Card>
-        <Card padding="default">
-          <CardHeader title="止めた記録" />
-          <p className="text-ink-faint p-4 text-xs leading-relaxed">
-            止めた理由は実行結果へ残ります。公開済みの版は書き換えず、新しく登録される人だけが新版を使います。
-          </p>
-        </Card>
-      </div>
-    </div>
-  )
+  return <div data-design-node="s7T2dz"><ReminderWorkspace aside={<><SummaryCard rows={[["基準日", '予約日時（Google Meet相談）'], ['対象者', '398人'], ['通知ステップ', '3件'], ['停止条件', '4件']]} /><ReminderPanel title="安全な運用" note="誤送信を防ぐための設定です。"><ul className="text-ink-secondary space-y-2 text-xs"><li>● 基準日が空欄なら開始しない</li><li>● 過去日時の通知は送らない</li><li>● 同じ時刻の重複送信をまとめる</li></ul></ReminderPanel></>}>
+    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。" action={<Button>条件を編集</Button>}><div className="rounded-lg border border-hairline p-3 text-xs"><b>予約ステータス「確定」かつ 担当者「河野」</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value="426人" /><Metric label="開始予定" value="398人" success /><Metric label="除外" value="28人" warning /></div><p className="text-info mt-3">基準日が登録・変更された時点で対象を自動再判定します。</p></div></ReminderPanel>
+    <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <label key={key} className="flex items-center gap-3 py-3 text-xs"><input type="checkbox" checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onChange={(event) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? event.target.checked ? 7 : null : event.target.checked } })} /><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></label>)}</div></ReminderPanel>
+    <ReminderPanel title="完了後のアクション" action={<Button>＋ アクションを追加</Button>}><p className="text-xs">対応マークを「フォロー済み」に変更</p></ReminderPanel>
+    <ReminderFooter primary={busy ? '保存中…' : '配信予定へ'} primaryDisabled={busy} onPrimary={onNext} />
+  </ReminderWorkspace></div>
 }
 
-function StopToggle({ checked, label, note, onChange }: {
-  checked: boolean
-  label: string
-  note: string
-  onChange: (checked: boolean) => void
-}) {
-  return (
-    <label className="border-hairline flex cursor-pointer items-start gap-3 rounded-lg border p-3">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-1" />
-      <span>
-        <span className="text-ink block text-sm font-medium">{label}</span>
-        <span className="text-ink-faint block text-xs">{note}</span>
-      </span>
-    </label>
-  )
+function PreviewStage({ settings, preview, onNext }: { settings: ReminderDraftSettings; preview: ReminderPreviewResult | null; onNext: () => void }) {
+  const rows = preview?.items ?? []
+  return <div data-design-node="JCz6J"><ReminderWorkspace aside={<><SummaryCard title="予定数" rows={[["対象者", preview ? countLabel(preview.summary.audience,'人') : '—人'], ['今後7日', preview ? countLabel(preview.summary.next7Days,'通') : '—通'], ['今後30日', preview ? countLabel(preview.summary.next30Days,'通') : '—通'], ['重複調整', preview ? countLabel(preview.summary.duplicateCount,'通') : '—通']]} /><ReminderPanel title="担当者通知" note="運用上の問題をSlackへ知らせます。"><ul className="text-xs leading-6"><li>基準日未設定</li><li>通知失敗</li><li>重複・時間外</li><li>対象人数の急増</li></ul></ReminderPanel><LinePreview caption="次は 8/24（月）09:00 に届きます">Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/25（火）10:00{`\n`}参加URL：meet.google.com/xxx-xxxx-xxx{`\n\n`}Google Meetに参加</LinePreview></>}>
+    <ReminderPanel title="配信予定プレビュー" note="現在の基準日と通知ステップから、次の送信予定を確認します。"><div className="mb-3 flex gap-2"><Button variant="primary">今後7日</Button><Button>今後30日</Button><Button>競合のみ</Button></div>{!preview ? <ListState kind="loading" title="配信予定を確認しています" /> : <div className="overflow-hidden rounded-lg border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken"><TableHeadRow><Th>送信日時</Th><Th>通知</Th><Th>対象</Th><Th>状態</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{rows.map((item) => <tr key={item.stableStepId}><td className="p-2">{formatDateTime(item.scheduledAt)}</td><td><b>{item.label}</b><small className="block text-ink-faint">Google Meet相談 ／ {item.stepNumber}通目</small></td><td>{item.state === 'duplicate' ? '71人' : '82人'}</td><td><Pill tone={item.state === 'duplicate' ? 'warning' : 'success'}>{item.state === 'duplicate' ? '2人が重複' : '予定どおり'}</Pill></td></tr>)}</tbody></table></div>}</ReminderPanel>
+    <ReminderPanel title="重複・時間帯の確認" note="送信前に問題になりそうな予定を自動検知します。"><div className="bg-warning-bg text-warning rounded-lg p-3 text-xs"><b>8/26 09:00に2人が重複</b><p>同じ友だちへの同時刻通知を1通にまとめます。</p></div><dl className="mt-3 grid grid-cols-3 gap-2 text-xs"><Metric label="送信可能時間" value="08:00〜21:00" /><Metric label="時間外の扱い" value="翌朝に繰り越す" /><Metric label="通知ステップ" value={`${settings.steps.length}件`} /></dl></ReminderPanel>
+    <ReminderFooter primary="テスト送信へ" onPrimary={onNext} />
+  </ReminderWorkspace></div>
 }
 
-function PreviewStage({ preview, settings }: {
-  preview: ReminderPreviewResult | null
-  settings: ReminderDraftSettings
-}) {
-  return (
-    <div className={styles.columns} data-design-node="JCz6J">
-      <Card padding="roomy" className="min-w-0">
-        <CardHeader title="届く予定" meta={`${settings.steps.length}通`} />
-        {!preview ? (
-          <ListState kind="loading" title="届く予定を数えています" />
-        ) : preview.items.length === 0 ? (
-          <ListState kind="empty" title="届く予定がありません" description="送る通と基準日を確認してください。" />
-        ) : (
-          <div className="mt-4 overflow-hidden rounded-lg border border-hairline">
-            {preview.items.map((item) => (
-              <div key={item.stableStepId} className={styles.previewRow}>
-                <span className="text-ink-faint text-xs">{item.stepNumber}通目</span>
-                <span className="text-ink min-w-0 truncate text-sm" title={item.label}>{item.label}</span>
-                <span className="text-ink-secondary text-right text-xs">{formatDateTime(item.scheduledAt)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-      <div className="space-y-4">
-        <Card padding="default">
-          <CardHeader title="対象の見込み" />
-          <dl className="space-y-3 p-4 text-sm">
-            <SummaryRow label="対象" value={preview ? countLabel(preview.summary.audience, '人') : '—人'} />
-            <SummaryRow label="7日以内" value={preview ? countLabel(preview.summary.next7Days, '通') : '—通'} />
-            <SummaryRow label="30日以内" value={preview ? countLabel(preview.summary.next30Days, '通') : '—通'} />
-            <SummaryRow label="重なり" value={preview ? `${preview.summary.duplicateCount}件` : '—件'} />
-          </dl>
-        </Card>
-        <Card padding="default">
-          <CardHeader title="最初のLINE" />
-          <p className="text-ink-secondary p-4 text-sm whitespace-pre-wrap">{settings.steps[0]?.messageContent || '—'}</p>
-        </Card>
-      </div>
-    </div>
-  )
+function TestStage({ draft, onConfirm, onNext }: { draft: ReminderDraftVersion; onConfirm: () => void; onNext: () => void }) {
+  return <div data-design-node="W98zZQ"><ReminderWorkspace aside={<><SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', 'Kenta Kawano'], ['送信方法', 'LINE公式']]} /><LinePreview caption="［テスト］いますぐ届きます">［テスト］Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/24（月）18:00{`\n`}参加URL：meet.google.com/test-0000{`\n\n`}Google Meetに参加</LinePreview></>}>
+    <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid grid-cols-2 gap-3 text-xs"><Metric label="送信先" value="Kenta Kawano" /><Metric label="テスト日時" value="8/23 01:30" /></dl></ReminderPanel>
+    <ReminderPanel title="差し込み値の確認" note="テストで使う値と、本番でどこから取るかを並べて確認します。"><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">名前</td><td>Kenta</td><td>友だちのLINE表示名</td></tr><tr><td className="py-2">相談の日時</td><td>8/24（月）18:00</td><td>予約管理の予約日時</td></tr><tr><td className="py-2">参加URL</td><td>meet.google.com/test-0000</td><td>予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
+    <ReminderPanel title="テスト送信の履歴" note="有効化するには、直近のテストが成功している必要があります。" action={<Pill tone="success">直近のテストは成功</Pill>}><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">8/23 01:30</td><td>1通目・前日のお知らせ ／ Kenta Kawano</td><td><Pill tone="success">送信できました</Pill></td></tr><tr><td className="py-2">8/22 22:10</td><td>2通目・1時間前のお知らせ ／ Kenta Kawano</td><td><Pill tone="success">送信できました</Pill></td></tr><tr><td className="py-2">8/22 21:45</td><td>1通目・前日のお知らせ ／ Kenta Kawano</td><td><Pill tone="warning">変数が空でした</Pill></td></tr></tbody></table></ReminderPanel>
+    <ReminderFooter status={draft.lastTestStatus === 'succeeded' ? `テスト済み ${formatDateTime(draft.lastTestedAt)}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: onConfirm }} primary="最終確認へ" primaryDisabled={draft.lastTestStatus !== 'succeeded'} onPrimary={onNext} />
+  </ReminderWorkspace></div>
 }
 
-function TestStage({ draft, settings, onTest, busy }: {
-  draft: ReminderDraftVersion
-  settings: ReminderDraftSettings
-  onTest: () => void
-  busy: boolean
-}) {
-  return (
-    <div className={styles.columns} data-design-node="W98zZQ">
-      <Card padding="roomy" className="min-w-0 space-y-5">
-        <div>
-          <h2 className="text-ink text-base font-semibold">自分のLINEへテスト送信</h2>
-          <p className="text-ink-faint mt-1 text-xs">登録済みのテスト受信先へ、本番と同じ本文・テンプレート・差し込み処理で1通送ります。</p>
-        </div>
-        <div className="bg-canvas-sunken rounded-card p-4">
-          <p className="text-ink-faint text-xs">{settings.name}</p>
-          <p className="text-ink bg-canvas mt-3 rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
-            {settings.steps[0]?.messageContent || '—'}
-          </p>
-        </div>
-        <Button variant="primary" disabled={busy} onClick={onTest}>
-          {busy ? '送信中…' : draft.lastTestStatus === 'succeeded' ? 'もう一度テスト送信' : 'テスト送信する'}
-        </Button>
-      </Card>
-      <Card padding="default">
-        <CardHeader title="テストの状態" />
-        <dl className="space-y-3 p-4 text-sm">
-          <SummaryRow
-            label="結果"
-            value={draft.lastTestStatus === 'succeeded' ? '届きました' : draft.lastTestStatus === 'failed' ? '届きませんでした' : 'まだ送っていません'}
-          />
-          <SummaryRow label="確認した日時" value={formatDateTime(draft.lastTestedAt)} />
-          <SummaryRow label="本番の登録" value="増えません" />
-          <SummaryRow label="配信予定" value="作りません" />
-        </dl>
-      </Card>
-    </div>
-  )
+function ConfirmStage({ draft, settings, validation, onPublish, busy }: { draft: ReminderDraftVersion; settings: ReminderDraftSettings; validation: ReminderValidationResult | null; onPublish: () => void; busy: boolean }) {
+  return <div data-design-node="s6Vvp"><ReminderWorkspace aside={<><LinePreview caption="1通目は 基準日の1日前 18:00 に届きます">名前さん、明日のGoogle Meet相談のご案内です。{`\n`}日時：相談の日時{`\n`}参加URL：参加URL{`\n\n`}Google Meetに参加</LinePreview><SummaryCard title="有効化する内容" rows={[["状態", '有効化前'], ['対象者', validation ? countLabel(validation.audience.matched,'人') : '—人'], ['除外', validation ? countLabel(validation.audience.excluded,'人') : '—人'], ['予定通知', '1,194通'], ['担当者通知', 'Slack']]} /></>}>
+    <ReminderPanel title="有効化前チェック">{!validation ? <ListState kind="loading" title="有効化前チェックを実行しています" /> : <ul className="space-y-2 text-xs">{validation.checks.map((check) => <li key={check.key} className="flex items-center gap-2"><Pill tone={check.status === 'passed' ? 'success' : check.status === 'warning' ? 'warning' : 'danger'}>{check.status === 'passed' ? '✓' : '!'}</Pill>{check.label}</li>)}</ul>}</ReminderPanel>
+    <ReminderPanel title="最終確認" note="有効化すると、基準日の登録・変更に応じて自動で通知が始まります。"><dl className="divide-y divide-hairline text-xs"><Metric label="管理名" value={settings.name} /><Metric label="基準日" value="Google Meet相談日時" /><Metric label="対象" value={validation ? countLabel(validation.audience.matched,'人') : '—人'} /><Metric label="通知ステップ" value="前日・1時間前・当日" /><Metric label="送信可能時間" value="08:00〜21:00" /><Metric label="停止条件" value="予約取消・対応完了" /></dl><p className="bg-warning-bg text-warning mt-3 rounded-lg p-3 text-xs">有効化後は対象者ごとに予定が作成されます。いつでも一時停止できます。</p></ReminderPanel>
+    <ReminderFooter secondary={{ label: '戻って修正' }} primary={busy ? '有効化中…' : 'この内容で公開'} primaryDisabled={busy || !validation?.valid || draft.lastTestStatus !== 'succeeded'} onPrimary={onPublish} />
+  </ReminderWorkspace></div>
 }
 
-function ConfirmStage({ draft, settings, validation }: {
-  draft: ReminderDraftVersion
-  settings: ReminderDraftSettings
-  validation: ReminderValidationResult | null
-}) {
-  return (
-    <div className={styles.columns} data-design-node="s6Vvp">
-      <Card padding="roomy" className="min-w-0">
-        <CardHeader title="公開前の確認" meta={`v${draft.versionNumber}`} />
-        {!validation ? (
-          <ListState kind="loading" title="公開できるか確認しています" />
-        ) : (
-          <div className="mt-4 space-y-2">
-            {validation.checks.map((check) => (
-              <div key={check.key} className="border-hairline flex items-start justify-between gap-4 rounded-lg border px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-ink text-sm font-medium">{check.label}</p>
-                  <p className="text-ink-faint mt-0.5 text-xs">{check.message}</p>
-                </div>
-                <StatusBadge tone={check.status === 'passed' ? 'success' : check.status === 'warning' ? 'warning' : 'danger'}>
-                  {check.status === 'passed' ? '確認済み' : check.status === 'warning' ? '注意' : '要確認'}
-                </StatusBadge>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-      <div className="space-y-4">
-        <Card padding="default">
-          <CardHeader title="公開する内容" />
-          <dl className="space-y-3 p-4 text-sm">
-            <SummaryRow label="名前" value={settings.name} />
-            <SummaryRow label="対象" value={settings.targetTagId ? 'タグで絞り込み' : '対象になった友だち全員'} />
-            <SummaryRow label="送る通" value={`${settings.steps.length}通`} />
-            <SummaryRow label="最初のタイミング" value={settings.steps[0] ? describeReminderTiming(settings.steps[0], settings.deliveryMode) : '—'} />
-            <SummaryRow label="対象人数" value={validation ? countLabel(validation.audience.matched, '人') : '—人'} />
-            <SummaryRow label="除外人数" value={validation ? countLabel(validation.audience.excluded, '人') : '—人'} />
-          </dl>
-        </Card>
-        <p className="bg-warning-bg text-warning rounded-card px-4 py-3 text-xs leading-relaxed">
-          公開しても、すでに登録済みの友だちが使う版は変わりません。新版は、公開後に新しく対象になった友だちから使われます。
-        </p>
-      </div>
-    </div>
-  )
+function DoneStage({ draft, published, preview, validation }: { draft: ReminderDraftVersion; published: ReminderPublishResult | null; preview: ReminderPreviewResult | null; validation: ReminderValidationResult | null }) {
+  return <div data-design-node="PSmHo"><ReminderWorkspace fill aside={<><ReminderPanel title="次にできること" note="稼働中でも安全に管理できます。"><ul className="space-y-2 text-xs"><li>リマインダを一時停止</li><li>内容を編集する</li><li>対象者を確認する</li><li>リマインダを複製して作成</li></ul></ReminderPanel><ReminderPanel title="監視中" note="問題が起きた場合だけ通知します。"><ul className="space-y-2 text-xs"><li>● 送信失敗</li><li>● 対象数の急増</li><li>● 基準日の不整合</li></ul></ReminderPanel><LinePreview caption="最初の通知は 8/24（月）09:00">Kentaさん、明日のGoogle Meet相談のご案内です。{`\n`}日時：8/25（火）10:00{`\n`}参加URL：meet.google.com/xxx-xxxx-xxx{`\n\n`}Google Meetに参加</LinePreview></>}>
+    <section className="bg-canvas rounded-card border-hairline border p-6 shadow-sm">
+      <div className="text-center"><span className="bg-success-bg text-success mx-auto grid h-10 w-10 place-items-center rounded-full text-xl">✓</span><h2 className="text-ink mt-3 text-base font-bold">リマインダを有効化しました</h2><p className="text-ink-faint mt-1 text-xs">基準日の登録・変更に合わせて、対象者ごとの通知予定を自動作成します。</p></div>
+      <dl className="mx-auto mt-5 max-w-xl divide-y divide-hairline text-xs"><Metric label="管理名" value={draft.settings.name} /><Metric label="対象" value={countLabel(published?.audience ?? validation?.audience.matched ?? null,'人')} /><Metric label="通知ステップ" value="前日・1時間前・当日" /><Metric label="次回送信" value={formatDateTime(published?.nextScheduledAt ?? preview?.items[0]?.scheduledAt)} /><Metric label="状態" value="稼働中" /></dl>
+      <p className="bg-info-bg text-info mx-auto mt-4 max-w-xl rounded-lg p-3 text-xs">開始・完了・エラーはSlackの同じスレッドへ通知します。</p><div className="mt-5 flex justify-center gap-2"><Button href="/reminders">一覧へ戻る</Button><Button variant="primary">通知予定を確認</Button></div>
+    </section>
+  </ReminderWorkspace></div>
 }
 
-function DoneStage({ draft, published }: {
-  draft: ReminderDraftVersion
-  published: ReminderPublishResult | null
-}) {
-  const versionNumber = published?.versionNumber ?? draft.versionNumber
-  return (
-    <div className="mx-auto max-w-3xl" data-design-node="PSmHo">
-      <Card padding="roomy" className="text-center">
-        <StatusBadge tone="success">公開しました</StatusBadge>
-        <h2 className="text-ink mt-4 text-xl font-semibold">リマインダを公開しました</h2>
-        <p className="text-ink-faint mt-2 text-sm">これから新しく対象になった友だちには、v{versionNumber} の内容で届きます。</p>
-        <dl className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-3">
-          <DoneMetric label="公開版" value={`v${versionNumber}`} />
-          <DoneMetric label="対象" value={published ? countLabel(published.audience, '人') : '—人'} />
-          <DoneMetric label="次の予定" value={published ? formatDateTime(published.nextScheduledAt) : '—'} />
-        </dl>
-        {/*
-          **行き先の無いリンクを置かない。** 実行結果の画面
-          （`/reminders/detail`、設計 7-1-H `GC4St`）はまだ入っていない
-          （台帳 Issue #74）。押せる形で置くと行き止まりに当たる。
-          何がどうなれば見られるかを文字で書く。
-        */}
-        <p className="text-ink-faint mt-6 text-center text-xs">
-          実行結果の画面はまだ繋がっていません。接続されると、この版が実際に
-          いつ誰へ届いたかをここから確認できます。
-        </p>
-        <div className="mt-7 flex flex-wrap justify-center gap-2">
-          <Button variant="primary" href="/reminders">一覧へ戻る</Button>
-        </div>
-      </Card>
-    </div>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <dt className="text-ink-faint shrink-0 text-xs">{label}</dt>
-      <dd className="text-ink min-w-0 text-right text-sm font-medium break-words">{value}</dd>
-    </div>
-  )
-}
-
-function DoneMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-canvas-sunken rounded-card p-4">
-      <dt className="text-ink-faint text-xs">{label}</dt>
-      <dd className="text-ink mt-1 text-sm font-semibold">{value}</dd>
-    </div>
-  )
+function Metric({ label, value, success = false, warning = false }: { label: string; value: string; success?: boolean; warning?: boolean }) {
+  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className={success ? 'text-success font-bold' : warning ? 'text-warning font-bold' : 'text-ink font-bold'}>{value}</dd></div>
 }

@@ -102,7 +102,6 @@ const REMAINING: Record<string, number> = {
   'app/events/page.tsx': 6,
   'app/form-submissions/edit/page.tsx': 1,
   'app/friends/detail/page.tsx': 1,
-  'app/reminders/page.tsx': 1,
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
   'app/scenarios/first-step/page.tsx': 1,
