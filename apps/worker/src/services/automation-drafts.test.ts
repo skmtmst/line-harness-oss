@@ -105,7 +105,7 @@ describe('オートメーションの見本と下書き', () => {
     const draft = await getAutomationDraft(testDb.db, { id: created.id, lineAccountId: 'account-1' });
     expect(draft).toMatchObject({
       name: '予約後フォロー',
-      triggerConfig: { tagId: 'tag-1', action: 'add' },
+      triggerConfig: { tagId: 'tag-1', action: 'remove' },
       actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-1' } }],
     });
     expect(testDb.raw.prepare('SELECT status FROM automation_definitions WHERE id = ?').get(created.id))

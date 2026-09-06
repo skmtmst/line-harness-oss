@@ -248,7 +248,10 @@ describe('自動応答の試験と公開', () => {
     const response = await app().request('/api/auto-replies/rule-draft/draft', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(settings({ responseContent: '下書きの新しい返事' })),
+      body: JSON.stringify({
+        ...settings({ responseContent: '下書きの新しい返事' }),
+        expectedVersion: 2,
+      }),
     }, bindings);
 
     expect(response.status).toBe(200);
