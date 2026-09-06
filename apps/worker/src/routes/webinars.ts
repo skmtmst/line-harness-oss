@@ -18,7 +18,7 @@ import {
   getWebinarBySlug,
   createWebinar,
   updateWebinar,
-  deleteWebinar,
+  archiveWebinar,
   getWebinarComments,
   getWebinarCtas,
   replaceWebinarCtas,
@@ -37,6 +37,8 @@ import {
   getWebinarDailyStats,
   getWebinarFormFunnelStats,
   getWebinarOverview,
+  getWebinarActions,
+  replaceWebinarActions,
   getFriendByLineUserId,
   getFriendByLineUserIdForAccount,
   getFormById,
@@ -44,6 +46,8 @@ import {
   getUpcomingWebinarRegistration,
   getWebinarRegistration,
   recordWebinarPickerOpen,
+  type WebinarActionInput,
+  type WebinarActionType,
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -67,6 +71,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { auditLog } from '../lib/audit-log.js';
 
 const webinarRoutes = new Hono<Env>();
 
@@ -747,6 +752,61 @@ interface WebinarBody {
   tagOnCtaClick?: string | null;
 }
 
+const WEBINAR_ACTION_TYPES = new Set<WebinarActionType>([
+  'add_tag', 'remove_tag',
+  'start_scenario', 'stop_scenario', 'resume_scenario',
+  'send_message', 'send_webhook',
+  'switch_rich_menu', 'remove_rich_menu',
+]);
+
+function requiredWebinarActionConfigKey(type: WebinarActionType): string | null {
+  if (type === 'add_tag' || type === 'remove_tag') return 'tagId';
+  if (type === 'start_scenario' || type === 'stop_scenario' || type === 'resume_scenario') {
+    return 'scenarioId';
+  }
+  if (type === 'send_message') return 'templateId';
+  if (type === 'send_webhook') return 'webhookId';
+  if (type === 'switch_rich_menu') return 'richMenuPageId';
+  return null;
+}
+
+function serializeWebinarAction(row: Awaited<ReturnType<typeof getWebinarActions>>[number]) {
+  let config: Record<string, unknown> = {};
+  try { config = JSON.parse(row.config_json) as Record<string, unknown>; } catch { config = {}; }
+  return {
+    id: row.id,
+    trigger: row.trigger,
+    actionType: row.action_type,
+    config,
+    position: row.position,
+    version: row.version,
+  };
+}
+
+function parseWebinarActions(value: unknown): WebinarActionInput[] | null {
+  if (!Array.isArray(value) || value.length > 30) return null;
+  const parsed: WebinarActionInput[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') return null;
+    const row = item as Record<string, unknown>;
+    if (!['completed', 'cta_clicked', 'unviewed'].includes(String(row.trigger))) return null;
+    if (!WEBINAR_ACTION_TYPES.has(row.actionType as WebinarActionType)) return null;
+    if (!row.config || typeof row.config !== 'object' || Array.isArray(row.config)) return null;
+    const actionType = row.actionType as WebinarActionType;
+    const config = row.config as Record<string, unknown>;
+    const requiredKey = requiredWebinarActionConfigKey(actionType);
+    if (requiredKey && (typeof config[requiredKey] !== 'string' || !config[requiredKey].trim())) {
+      return null;
+    }
+    parsed.push({
+      trigger: row.trigger as WebinarActionInput['trigger'],
+      actionType,
+      config,
+    });
+  }
+  return parsed;
+}
+
 // body → createWebinar/updateWebinar input。不正なら string (エラーコード) を返す
 function validateWebinarBody(
   body: WebinarBody,
@@ -812,7 +872,9 @@ webinarRoutes.get('/api/webinars', async (c) => {
     if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const listWhere = requestedAccountId ? 'account_id = ?' : where;
+    const listWhere = requestedAccountId
+      ? "account_id = ? AND status <> 'archived'"
+      : `(${where}) AND status <> 'archived'`;
     const bindings = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
     const items = await c.env.DB.prepare(
       `SELECT * FROM webinars WHERE ${listWhere} ORDER BY created_at DESC`,
@@ -860,7 +922,7 @@ webinarRoutes.get('/api/webinars/:id', async (c) => {
 
 webinarRoutes.get('/api/webinars/:id/notifications', async (c) => {
   try {
-    const id = c.req.param('id');
+    const id = c.req.param('id') ?? '';
     const [settings, overview] = await Promise.all([
       getWebinarNotificationSettings(c.env.DB, id),
       getWebinarNotificationOverview(c.env.DB, id),
@@ -1000,18 +1062,49 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
   }
 });
 
-webinarRoutes.delete('/api/webinars/:id', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.get('/api/webinars/:id/actions', async (c) => {
   try {
-    const id = c.req.param('id');
-    const row = await getWebinarById(c.env.DB, id);
-    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteWebinar(c.env.DB, id);
-    return c.json({ success: true, data: null });
+    const actions = await getWebinarActions(c.env.DB, c.req.param('id'));
+    return c.json({ success: true, data: actions.map(serializeWebinarAction) });
   } catch (err) {
-    console.error('DELETE /api/webinars/:id error:', err);
+    console.error('GET /api/webinars/:id/actions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+webinarRoutes.put('/api/webinars/:id/actions', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ actions?: unknown }>();
+    const actions = parseWebinarActions(body.actions);
+    if (!actions) return c.json({ success: false, error: 'invalid_actions' }, 400);
+    const saved = await replaceWebinarActions(c.env.DB, c.req.param('id'), actions);
+    return c.json({ success: true, data: saved.map(serializeWebinarAction) });
+  } catch (err) {
+    console.error('PUT /api/webinars/:id/actions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+async function archiveVisibleWebinar(c: Context<Env>) {
+  try {
+    const id = c.req.param('id') ?? '';
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    if (row.status === 'active') {
+      return c.json({ success: false, error: 'webinar_pause_required' }, 409);
+    }
+    const archived = await archiveWebinar(c.env.DB, id);
+    auditLog(c, 'webinar.archive', { kind: 'webinar', id });
+    return c.json({ success: true, data: serializeWebinar(archived!) });
+  } catch (err) {
+    console.error('Archive /api/webinars/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+}
+
+webinarRoutes.post('/api/webinars/:id/archive', requireRole('owner', 'admin'), archiveVisibleWebinar);
+// 旧クライアント互換。物理削除はせず、同じアーカイブ処理を行う。
+webinarRoutes.delete('/api/webinars/:id', requireRole('owner', 'admin'), archiveVisibleWebinar);
 
 webinarRoutes.get('/api/webinars/:id/comments', async (c) => {
   try {
@@ -1229,6 +1322,48 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+function csvCell(value: unknown): string {
+  let text = value === null || value === undefined ? '' : String(value);
+  // 表計算ソフトで式として実行されないようにする。
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+webinarRoutes.get(
+  '/api/webinars/:id/participants.csv',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const id = c.req.param('id');
+      const participants = await getWebinarParticipantStats(c.env.DB, id, 10_000);
+      const rows = participants.map((participant) => [
+        participant.friend_name ?? '',
+        participant.first_joined_at,
+        participant.latest_joined_at,
+        participant.max_watched_seconds,
+        participant.registered ? '申込あり' : '申込なし',
+        participant.cta_clicked_at ? 'クリック済み' : '未クリック',
+        participant.form_submitted_at ? '送信済み' : '未送信',
+      ].map(csvCell).join(','));
+      const csv = [
+        ['参加者', '初回視聴', '最終視聴', '最大視聴秒数', '申込', 'CTA', 'フォーム'].map(csvCell).join(','),
+        ...rows,
+      ].join('\r\n');
+      auditLog(c, 'webinar.participant.export', { kind: 'webinar', id });
+      return new Response(`\uFEFF${csv}`, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="webinar-${id}-participants.csv"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    } catch (err) {
+      console.error('GET /api/webinars/:id/participants.csv error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 webinarRoutes.get('/api/webinars/:id/user-comments', async (c) => {
   try {

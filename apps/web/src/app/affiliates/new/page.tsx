@@ -42,7 +42,7 @@ function Unavailable({ label, reason }: { label: string; reason: string }) {
 }
 
 /**
- * アフィリエイターを追加する（設計 V2 6-1-4）。
+ * アフィリエイターを追加する（設計 V6 `xqT1Z`）。
  *
  * 設計は「どなたを登録するか → どう支払うか → そのほか → 渡すURL」の順。
  *
@@ -99,7 +99,7 @@ export default function NewAffiliatePage() {
       title="アフィリエイターを追加する"
       description="紹介してくれる方に専用のリンクを渡し、成果と報酬を記録します。"
       parent={['成果とアフィリエイト', '/conversions?tab=affiliates']}
-      saveLabel="アフィリエイターを追加"
+      saveLabel="登録して、紹介リンクを発行する"
       variant="v6"
       designNode="xqT1Z"
       validate={() => {
@@ -182,6 +182,16 @@ export default function NewAffiliatePage() {
             </ul>
           </AsideCard>
 
+          <AsideCard title="つながる先">
+            <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
+              <li>・案件：この人に紹介してもらうもの</li>
+              <li>・流入と計測：発行する紹介リンク</li>
+              <li>・友だち属性：紹介で来た人に付くタグ</li>
+              <li>・成果承認：認めたあとに報酬へ反映</li>
+              <li>・支払い：締め日と振込先</li>
+            </ul>
+          </AsideCard>
+
           <AsideCard title="気をつけること">
             <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
               <li>・紹介コードはあとから変更できません</li>
@@ -192,7 +202,7 @@ export default function NewAffiliatePage() {
         </>
       }
     >
-      <FormSection step={1} label="どなたを登録するか">
+      <FormSection step={1} label="だれを登録するか">
         <Field label="名前・屋号" htmlFor="af-name" required>
           <TextInput
             id="af-name"
@@ -218,7 +228,7 @@ export default function NewAffiliatePage() {
         <Field
           label="紹介コード"
           htmlFor="af-code"
-          note="URLの末尾に使われます。英数字4文字以上。空欄にすると、推測されにくいコードを自動で作ります（そのほうが、他の人にコードを当てられて成果を横取りされる心配がありません）。"
+          note="登録したあとは変えられません。英数字4文字以上。空欄にすると、推測されにくいコードを自動で作ります（現在は - _ を利用できません）。"
         >
           <TextInput
             id="af-code"
@@ -232,12 +242,12 @@ export default function NewAffiliatePage() {
 
         {/* 設計 xqT1Z にある「友だち検索」。作成のAPIが友だちIDを受けない。 */}
         <Unavailable
-          label="友だちから選ぶ"
+          label="LINEの友だちと結びつける（任意）"
           reason="まだ繋がっていません。友だち検索が接続されると表示されます。"
         />
       </FormSection>
 
-      <FormSection step={2} label="どう支払うか">
+      <FormSection step={2} label="いくら払い、いつ締めるか">
         <div className="grid gap-2 sm:grid-cols-3">
           {PAYOUT_KINDS.map((k) => (
             <ChoiceCard
