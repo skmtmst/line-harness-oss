@@ -138,7 +138,7 @@ const AUTOMATION = { feature: 25, dir: 'automations-v6', mode: 'page' }
 const WEBHOOK = { feature: 26, dir: 'webhooks-v6', route: '/webhooks', mode: 'page' }
 
 /** 予約管理・予約設定。`/booking/bookings` `/booking/menus` `/booking/staff`。 */
-const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mode: 'page' }
+const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mode: 'page', clock: '2026-09-03T00:00:00.000Z' }
 
 /** 予約設定。メニュー・担当スタッフはタブ、受付時間は別ルート。 */
 const BOOKING_SET = { feature: 28, dir: 'booking-settings-v6', route: '/booking/menus', mode: 'page' }
@@ -2419,7 +2419,10 @@ export const SCREENS = [
       `getByRole('text', …)` は0件になる。表の名前は桁なので `cell` で探す。
       `jwrbf`（16-1-E）と同じ直し。
     */
-    steps: [{ click: '高橋 直人', role: 'cell' }],
+    steps: [
+      { click: '一覧' },
+      { click: '高橋 直人', role: 'cell' },
+    ],
     verdictHead: '7b509106',
   },
   /*
@@ -2428,6 +2431,14 @@ export const SCREENS = [
     「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。」
   */
   { ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる', route: '/booking/bookings/new',
+    steps: [
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
+      { click: '菅野 亮', after: 500 },
+      { select: '予約メニュー', label: 'トリミング（小型犬）' },
+      { select: '担当者', label: '佐々木' },
+      { fill: '日付', text: '2026-09-03', after: 900 },
+      { select: '空いている時間', label: '10:00〜11:45' },
+    ],
     verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正。設計に在って実装に無いのは「LINEの友だちなら、名前で探して結びつけてください。」、**「お名前（LINEにいない方）」**（LINEにいない人の受け皿）、**「予約を受け付けたことを、いますぐLINEに送る」と LINEプレビュー**、「前回は 7/28。だいたい1か月ごとにお越しです」（前回の来店）。実装の「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。別の友だちへ推測で結び付けません。」は**できないことと理由を書いていて正しい**ので、受け皿ができるまではこのまま。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 電話の予約を入れる画面なのに、電話番号もお名前も入れられない。設計は「お名前（LINEにいない方）／電話番号／ペットの名前」を持ち、LINE未連携の人をそのまま登録できる。実装はLINEの友だち検索だけで、未連携は登録できないと断っている（断り方は正直で正しい。足りないのは顧客台帳の受け皿）。P1 お客様に何を送るかを選べない（設計は 受付をすぐLINEに送る／前日19:00に思い出してもらう／当日8:00に「本日おまちしています」の3つのチェック。実装は説明が2つ並ぶだけ）。P2 空き確認の緑帯（何分かかり何時まで押さえるか）、LINEプレビュー、この方について（来店回数・前回の申し送り）、つながる先、保存前の注意文が無い **ルート**：`/booking/bookings/new`。**取得元**：`booking-settings-v6/design-qa.md`（この画面の `.txt` は取れていない）。**推奨修正**：**LINEにいない人を受ける顧客台帳が先**（お名前・電話番号・ペットの名前）。実装が「未連携は登録できない」と断っているのは正直で正しく、足りないのは受け皿。お知らせの3つの選択は、リマインダの口（`JCz6J` の予定計算）を使い回せる。',
     verdictSource: 'booking-v6/cpdDi-1920.png', verdictHead: '31293424',
   },
@@ -2448,7 +2459,7 @@ export const SCREENS = [
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
     route: '/booking/bookings/new', mode: 'page',
     steps: [
-      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
       { click: '菅野 亮', after: 500 },
       { select: '予約メニュー', label: 'トリミング（小型犬）' },
       { select: '担当者', label: '佐々木' },
@@ -2465,7 +2476,7 @@ export const SCREENS = [
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
     route: '/booking/bookings/new', mode: 'page',
     steps: [
-      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
       { click: '菅野 亮', after: 500 },
       { select: '予約メニュー', label: 'トリミング（小型犬）' },
       { select: '担当者', label: '佐々木' },
@@ -2483,7 +2494,7 @@ export const SCREENS = [
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
     route: '/booking/bookings/new', mode: 'page',
     steps: [
-      { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+      { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
       { click: '菅野 亮', after: 500 },
       { select: '予約メニュー', label: 'トリミング（小型犬）' },
       { select: '担当者', label: '佐々木' },
@@ -2501,7 +2512,7 @@ export const SCREENS = [
     variants: [{
       suffix: '-recovered',
       steps: [
-        { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+        { fill: 'input[placeholder="名前・電話番号で探す"]', selector: true, text: '菅野', after: 900 },
         { click: '菅野 亮', after: 500 },
         { select: '予約メニュー', label: 'トリミング（小型犬）' },
         { select: '担当者', label: '佐々木' },
