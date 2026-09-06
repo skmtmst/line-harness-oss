@@ -35,8 +35,21 @@ export interface FormSubmission {
   form_id: string;
   friend_id: string | null;
   data: string; // JSON string
+  destination_write_status: FormDestinationWriteStatus;
+  destination_write_attempted: number | null;
+  destination_write_succeeded: number | null;
+  destination_write_failed: number | null;
+  destination_write_completed_at: string | null;
   created_at: string;
 }
+
+export type FormDestinationWriteStatus =
+  | 'pending'
+  | 'succeeded'
+  | 'partial'
+  | 'failed'
+  | 'not_requested'
+  | 'unknown';
 
 export interface FriendFormSubmission extends FormSubmission {
   form_name: string;
@@ -549,7 +562,7 @@ export interface FormSubmissionPage {
 export async function getFormSubmissionsPage(
   db: D1Database,
   formId: string,
-  options: { page?: number; limit?: number } = {},
+  options: { page?: number; limit?: number; lineAccountId?: string } = {},
 ): Promise<FormSubmissionPage> {
   const requestedPage = options.page;
   const page = Number.isSafeInteger(requestedPage) && (requestedPage ?? 0) >= 1
@@ -557,19 +570,26 @@ export async function getFormSubmissionsPage(
     : 1;
   const limit = boundedListLimit(options.limit, 20);
   const offset = (page - 1) * limit;
+  const accountClause = options.lineAccountId ? ' AND f.line_account_id = ?' : '';
+  const accountBindings = options.lineAccountId ? [options.lineAccountId] : [];
   const count = await db
-    .prepare(`SELECT COUNT(*) AS total FROM form_submissions WHERE form_id = ?`)
-    .bind(formId)
+    .prepare(
+      `SELECT COUNT(*) AS total
+         FROM form_submissions fs
+         LEFT JOIN friends f ON f.id = fs.friend_id
+        WHERE fs.form_id = ?${accountClause}`,
+    )
+    .bind(formId, ...accountBindings)
     .first<{ total: number }>();
   const result = await db
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ?
+       WHERE fs.form_id = ?${accountClause}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ? OFFSET ?`,
     )
-    .bind(formId, limit, offset)
+    .bind(formId, ...accountBindings, limit, offset)
     .all<FormSubmission & { friend_name: string | null }>();
   return { items: result.results, total: count?.total ?? 0, page, limit };
 }
@@ -610,8 +630,9 @@ export async function createFormSubmission(
 
   await db
     .prepare(
-      `INSERT INTO form_submissions (id, form_id, friend_id, data, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO form_submissions
+         (id, form_id, friend_id, data, destination_write_status, created_at)
+       VALUES (?, ?, ?, ?, 'pending', ?)`,
     )
     .bind(id, input.formId, input.friendId ?? null, input.data, now)
     .run();
@@ -626,6 +647,167 @@ export async function createFormSubmission(
     .prepare(`SELECT * FROM form_submissions WHERE id = ?`)
     .bind(id)
     .first<FormSubmission>())!;
+}
+
+export interface FormDestinationWriteResult {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+}
+
+export async function updateFormSubmissionDestinationWriteResult(
+  db: D1Database,
+  submissionId: string,
+  result: FormDestinationWriteResult,
+): Promise<FormDestinationWriteStatus> {
+  const attempted = Math.max(0, Math.floor(result.attempted));
+  const succeeded = Math.max(0, Math.min(attempted, Math.floor(result.succeeded)));
+  const failed = Math.max(0, Math.min(attempted - succeeded, Math.floor(result.failed)));
+  const status: FormDestinationWriteStatus = attempted === 0
+    ? 'not_requested'
+    : failed === 0 && succeeded === attempted
+      ? 'succeeded'
+      : succeeded === 0
+        ? 'failed'
+        : 'partial';
+  await db
+    .prepare(
+      `UPDATE form_submissions
+          SET destination_write_status = ?,
+              destination_write_attempted = ?,
+              destination_write_succeeded = ?,
+              destination_write_failed = ?,
+              destination_write_completed_at = ?
+        WHERE id = ?`,
+    )
+    .bind(status, attempted, succeeded, failed, jstNow(), submissionId)
+    .run();
+  return status;
+}
+
+export interface FormDateFieldAnalytics {
+  key: string;
+  label: string;
+  answered: number;
+  uniqueFriends: number;
+  minDate: string | null;
+  maxDate: string | null;
+}
+
+export interface FormSubmissionAnalytics {
+  startedUnique: number;
+  submitted: number;
+  completionRate: number | null;
+  destinationWrites: Record<FormDestinationWriteStatus, number>;
+  dateAnsweredUniqueFriends: number;
+  dateFields: FormDateFieldAnalytics[];
+}
+
+/** 回答一覧のKPI。ページ内ではなく、選択中アカウントの全回答をD1で集計する。 */
+export async function getFormSubmissionAnalytics(
+  db: D1Database,
+  formId: string,
+  lineAccountId: string,
+  dateFields: Array<{ key: string; label: string }>,
+): Promise<FormSubmissionAnalytics> {
+  const [submissionSummary, openSummary] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS submitted,
+              COALESCE(SUM(CASE WHEN fs.destination_write_status = 'pending' THEN 1 ELSE 0 END), 0) AS write_pending,
+              COALESCE(SUM(CASE WHEN fs.destination_write_status = 'succeeded' THEN 1 ELSE 0 END), 0) AS write_succeeded,
+              COALESCE(SUM(CASE WHEN fs.destination_write_status = 'partial' THEN 1 ELSE 0 END), 0) AS write_partial,
+              COALESCE(SUM(CASE WHEN fs.destination_write_status = 'failed' THEN 1 ELSE 0 END), 0) AS write_failed,
+              COALESCE(SUM(CASE WHEN fs.destination_write_status = 'not_requested' THEN 1 ELSE 0 END), 0) AS write_not_requested,
+              COALESCE(SUM(CASE WHEN fs.destination_write_status = 'unknown' THEN 1 ELSE 0 END), 0) AS write_unknown
+         FROM form_submissions fs
+         JOIN friends f ON f.id = fs.friend_id
+        WHERE fs.form_id = ? AND f.line_account_id = ?`,
+    ).bind(formId, lineAccountId).first<{
+      submitted: number;
+      write_pending: number;
+      write_succeeded: number;
+      write_partial: number;
+      write_failed: number;
+      write_not_requested: number;
+      write_unknown: number;
+    }>(),
+    db.prepare(
+      `SELECT COUNT(DISTINCT fo.friend_id) AS started_unique
+         FROM form_opens fo
+         JOIN friends f ON f.id = fo.friend_id
+        WHERE fo.form_id = ? AND f.line_account_id = ?`,
+    ).bind(formId, lineAccountId).first<{ started_unique: number }>(),
+  ]);
+
+  const submitted = Number(submissionSummary?.submitted ?? 0);
+  const startedUnique = Number(openSummary?.started_unique ?? 0);
+  const normalizedDateFields = [...new Map(
+    dateFields.filter((field) => field.key).map((field) => [field.key, field]),
+  ).values()];
+  const dateFieldResults: FormDateFieldAnalytics[] = [];
+  for (const field of normalizedDateFields) {
+    const row = await db.prepare(
+      `SELECT COUNT(*) AS answered,
+              COUNT(DISTINCT fs.friend_id) AS unique_friends,
+              MIN(CAST(answer.value AS TEXT)) AS min_date,
+              MAX(CAST(answer.value AS TEXT)) AS max_date
+         FROM form_submissions fs
+         JOIN friends f ON f.id = fs.friend_id
+         JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
+        WHERE fs.form_id = ?
+          AND f.line_account_id = ?
+          AND answer.key = ?
+          AND answer.value IS NOT NULL
+          AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
+    ).bind(formId, lineAccountId, field.key).first<{
+      answered: number;
+      unique_friends: number;
+      min_date: string | null;
+      max_date: string | null;
+    }>();
+    dateFieldResults.push({
+      key: field.key,
+      label: field.label,
+      answered: Number(row?.answered ?? 0),
+      uniqueFriends: Number(row?.unique_friends ?? 0),
+      minDate: row?.min_date ?? null,
+      maxDate: row?.max_date ?? null,
+    });
+  }
+
+  let dateAnsweredUniqueFriends = 0;
+  if (normalizedDateFields.length > 0) {
+    const placeholders = normalizedDateFields.map(() => '?').join(', ');
+    const row = await db.prepare(
+      `SELECT COUNT(DISTINCT fs.friend_id) AS unique_friends
+         FROM form_submissions fs
+         JOIN friends f ON f.id = fs.friend_id
+         JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
+        WHERE fs.form_id = ?
+          AND f.line_account_id = ?
+          AND answer.key IN (${placeholders})
+          AND answer.value IS NOT NULL
+          AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
+    ).bind(formId, lineAccountId, ...normalizedDateFields.map((field) => field.key))
+      .first<{ unique_friends: number }>();
+    dateAnsweredUniqueFriends = Number(row?.unique_friends ?? 0);
+  }
+
+  return {
+    startedUnique,
+    submitted,
+    completionRate: startedUnique === 0 ? null : Math.round((submitted / startedUnique) * 1000) / 10,
+    destinationWrites: {
+      pending: Number(submissionSummary?.write_pending ?? 0),
+      succeeded: Number(submissionSummary?.write_succeeded ?? 0),
+      partial: Number(submissionSummary?.write_partial ?? 0),
+      failed: Number(submissionSummary?.write_failed ?? 0),
+      not_requested: Number(submissionSummary?.write_not_requested ?? 0),
+      unknown: Number(submissionSummary?.write_unknown ?? 0),
+    },
+    dateAnsweredUniqueFriends,
+    dateFields: dateFieldResults,
+  };
 }
 
 // ── 送信時の制限判定 ─────────────────────────────────────────────────────────
