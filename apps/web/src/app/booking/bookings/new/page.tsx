@@ -464,7 +464,7 @@ export default function NewProxyBookingPage() {
         <>
           <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
             <div><p className="text-sm font-semibold">{dateLabel(date, time)} は {selectedStaff.display_name} がふさがっています</p><p className="mt-1 text-xs">同じ担当が同じ時間に2件受けることはできません。時間か担当を変えてください。</p></div>
-            <Button onClick={() => void recoverConflict()}>空いている時間を見る</Button>
+            <Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>
           </section>
           <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
             <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
