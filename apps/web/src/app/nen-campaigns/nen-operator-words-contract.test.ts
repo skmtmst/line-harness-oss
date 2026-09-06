@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const OVERVIEW = fs.readFileSync(path.join(__dirname, 'nen-overview.tsx'), 'utf8')
 
 describe('V6 NEN配信の運用者向け文言契約', () => {
   it('メニューと画面でNEN配信の名前をそろえる', () => {
@@ -18,11 +19,11 @@ describe('V6 NEN配信の運用者向け文言契約', () => {
   })
 
   it('コラムの状態を内部値のまま表示しない', () => {
-    expect(PAGE).toContain("draft: '下書き'")
-    expect(PAGE).toContain("scheduled: '予約ずみ'")
-    expect(PAGE).toContain("queued: '配信待ち'")
-    expect(PAGE).toContain("sent: '出したもの'")
-    expect(PAGE).toContain("{columnDeliveryStatusLabel[column.deliveryStatus] ?? '—'}")
-    expect(PAGE).not.toContain('{column.deliveryStatus}</span>')
+    expect(OVERVIEW).toContain("draft: '下書き'")
+    expect(OVERVIEW).toContain("scheduled: '予約ずみ'")
+    expect(OVERVIEW).toContain("queued: '配信待ち'")
+    expect(OVERVIEW).toContain("sent: '出したもの'")
+    expect(OVERVIEW).toContain('{columnStatusLabel[column.deliveryStatus]}')
+    expect(OVERVIEW).not.toContain('{column.deliveryStatus}</span>')
   })
 })

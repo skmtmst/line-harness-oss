@@ -87,6 +87,11 @@ function NewNenColumnInner() {
         ]}
         title="コラムを書く"
         description="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
+        actions={(
+          <Button disabled title="コラム複製の接続後に使えます">
+            前のコラムを下敷きにする
+          </Button>
+        )}
       />
 
       {failure ? (
@@ -172,6 +177,21 @@ function NewNenColumnInner() {
             {/* 空のときに今日を補わない。補うと、書いただけのものが公開済みになる。 */}
             <p className={styles.note}>
               空のままなら公開日時は入りません。日本時間で保存します。
+            </p>
+          </Card>
+
+          <Card layout="vertical" className={styles.section} data-nen-part="delivery">
+            <CardHeader title="いつ・だれに出しますか" />
+            <p className={styles.note}>
+              配信日時と対象人数は、下書きを保存したあとNENコラムの一覧で確認します。
+              対象人数を確認してから配信予約できます。
+            </p>
+          </Card>
+
+          <Card layout="vertical" className={styles.section} data-nen-part="reaction">
+            <CardHeader title="読んだ人にすること" />
+            <p className={styles.note}>
+              読了イベントとタグ付けが接続されると設定できます。現在は下書き保存だけを行います。
             </p>
           </Card>
         </div>
