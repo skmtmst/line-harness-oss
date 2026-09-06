@@ -9,6 +9,8 @@ import {
   type BroadcastBubble,
   type BroadcastBubbleType,
   type BroadcastMessageAsset,
+  type BroadcastMessageButton,
+  type BroadcastPreflight,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -117,6 +119,12 @@ const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
+function formatScheduleTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ja-JP', {
+    timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit',
+  })
+}
+
 /**
  * 配信名の上限。設計 `zZ9fA` の「14 / 60文字」。
  *
@@ -179,10 +187,13 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
   </div>
 }
 
-function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
+function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[] }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
+  if (bubble.type === 'text') return <div className="max-w-[82%]">
+    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
+    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-bold" title={button.value}>{button.label || 'ボタン'}</div>)}
+  </div>
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
     return st?.packageId && st?.stickerId
@@ -304,11 +315,13 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
   </section>
 }
 
-function TextBubbleEditor({ bubble, index, trackLinks, onTrackLinksChange, onChange }: {
+function TextBubbleEditor({ bubble, index, trackLinks, buttons, onTrackLinksChange, onButtonsChange, onChange }: {
   bubble: BroadcastBubble
   index: number
   trackLinks: boolean
+  buttons: BroadcastMessageButton[]
   onTrackLinksChange: (enabled: boolean) => void
+  onButtonsChange: (buttons: BroadcastMessageButton[]) => void
   onChange: (bubble: BroadcastBubble) => void
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null)
@@ -319,7 +332,7 @@ function TextBubbleEditor({ bubble, index, trackLinks, onTrackLinksChange, onCha
     <section className="rounded-card border border-hairline bg-canvas p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h4 className="text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
-        <Button type="button" disabled title="URL・PDFボタンの保存契約は未接続です">URL・PDF</Button>
+        <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }].slice(0, 4))} disabled={buttons.length >= 4}>URL・PDF</Button>
       </div>
       <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
@@ -346,9 +359,19 @@ function TextBubbleEditor({ bubble, index, trackLinks, onTrackLinksChange, onCha
         <section className="rounded-control border border-hairline p-3">
           <div className="flex items-start justify-between gap-2">
             <div><h5 className="text-sm font-bold text-ink">ボタン</h5><p className="mt-1 text-xs text-ink-faint">メッセージの下に並びます。最大4つまで。</p></div>
-            <Button type="button" disabled title="ボタンの保存・配信契約は未接続です">＋ ボタンを追加</Button>
+            <Button type="button" onClick={() => onButtonsChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加</Button>
           </div>
-          <p className="bg-canvas-sunken mt-3 rounded-control p-3 text-xs text-ink-faint">ボタンの保存・配信はまだ接続されていません。</p>
+          <div className="mt-3 space-y-2">
+            {buttons.map((button, buttonIndex) => (
+              <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_8rem_auto] gap-2 rounded-control bg-canvas-sunken p-2">
+                <input aria-label={`ボタン${buttonIndex + 1}のラベル`} value={button.label} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
+                <select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: event.target.value as 'url' | 'pdf' } : item))} className="rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs"><option value="url">URLを開く</option><option value="pdf">PDFを開く</option></select>
+                <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onButtonsChange(buttons.filter((_, i) => i !== buttonIndex))} className="px-2 text-danger">×</button>
+                <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="col-span-3 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
+              </div>
+            ))}
+            {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
+          </div>
         </section>
         <section className="rounded-control border border-hairline p-3">
           <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
@@ -447,6 +470,9 @@ export default function BroadcastForm({
    * 変わるので、ドメインを見せたい配信では切れるようにしておく。
    */
   const [trackLinks, setTrackLinks] = useState(true)
+  const [messageButtons, setMessageButtons] = useState<BroadcastMessageButton[]>([])
+  const [afterActionVersionId, setAfterActionVersionId] = useState('')
+  const [publishedActions, setPublishedActions] = useState<Array<{ versionId: string; name: string; version: number }>>([])
   /** 分類。空なら未分類。 */
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
@@ -463,10 +489,7 @@ export default function BroadcastForm({
   const [counting, setCounting] = useState(false)
   // 送る前の確認。押すまで走らせない。入力のたびに投げると、
   // 書いている途中の本文で「二重送信では」と言われ続ける。
-  const [preflight, setPreflight] = useState<{
-    audienceCount: number
-    warnings: Array<{ level: 'info' | 'warning'; message: string }>
-  } | null>(null)
+  const [preflight, setPreflight] = useState<BroadcastPreflight | null>(null)
   // 何分かけて配るか。0（既定）は一気に送る。
   const [spreadMinutes, setSpreadMinutes] = useState('30')
   // 送る時間。設計は「今すぐ / 日時を指定 / 友だちごとの最適な時間」の3つ。
@@ -488,6 +511,7 @@ export default function BroadcastForm({
   const [testResult, setTestResult] = useState('')
   const [previewConfirmed, setPreviewConfirmed] = useState(false)
   const [error, setError] = useState('')
+  const [draftSaved, setDraftSaved] = useState(false)
 
   const stepTitle: Record<BroadcastStepKey, string> = {
     basic: '一斉配信を作成・基本設定',
@@ -562,6 +586,26 @@ export default function BroadcastForm({
       }
     }).catch(() => undefined)
   }, [initialContentTemplateId, initialTemplateId, selectedAccountId])
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setPublishedActions([])
+      setAfterActionVersionId('')
+      return
+    }
+    api.commonActions.resources(selectedAccountId)
+      .then(async (result) => {
+        if (!result.success) return
+        const details = await Promise.all((result.data.commonActions ?? []).map(async (action) => {
+          const detail = await api.commonActions.get(action.id, selectedAccountId)
+          return detail.success && detail.data.currentPublishedVersionId
+            ? { versionId: detail.data.currentPublishedVersionId, name: action.name, version: action.version }
+            : null
+        }))
+        setPublishedActions(details.filter((item): item is NonNullable<typeof item> => item !== null))
+      })
+      .catch(() => setPublishedActions([]))
+  }, [selectedAccountId])
   /*
    * 送る相手を、そのまま送信に使える条件の形で組み立てる。
    *
@@ -608,12 +652,11 @@ export default function BroadcastForm({
     const text = first?.type === 'text' ? String(first.content.text ?? '') : ''
     // 本文が空のうちは走らせない。何も書いていない状態で「文字数が足りません」
     // と出しても、直しようがない。
-    if (!text.trim()) return
     const timer = setTimeout(() => void runPreflight(true), 600)
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, tagId, condition, scenarioId, targetMode, selectedAccountId])
+  }, [bubbles, tagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
 
   const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
@@ -683,6 +726,8 @@ export default function BroadcastForm({
         segmentConditions: target.segmentConditions ?? null,
         lineAccountId: selectedAccountId || null,
         messageContent: content,
+        scheduledAt: scheduledAtIso(),
+        messageCount: bubbles.length,
       })
       if (res.success) setPreflight(res.data)
       else if (!silent) setError(res.error)
@@ -719,7 +764,7 @@ export default function BroadcastForm({
     return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
   }
 
-  const draftPayload = (scheduledAt: string | null) => {
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false) => {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -734,13 +779,20 @@ export default function BroadcastForm({
       folderId: folderId || null,
       measureOpens,
       stealthSpreadMinutes: Number(spreadMinutes) || 0,
+      internalMemo: internalMemo.trim() || null,
+      messageOptions: messageButtons.length > 0 ? { buttons: messageButtons } : null,
+      afterActionVersionId: afterActionVersionId || null,
+      ...(saveAsDraft ? {
+        saveAsDraft: true,
+        draftStep: currentStep ?? 'basic',
+      } : {}),
     }
   }
 
   /** テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。 */
-  const persistDraft = async (scheduledAt: string | null): Promise<ApiBroadcast> => {
+  const persistDraft = async (scheduledAt: string | null, saveAsDraft = false): Promise<ApiBroadcast> => {
     const accountId = selectedAccountId || null
-    const payload = draftPayload(scheduledAt)
+    const payload = draftPayload(scheduledAt, saveAsDraft)
     const result = await persistBroadcastDraft(
       draftSession.current,
       accountId,
@@ -752,6 +804,20 @@ export default function BroadcastForm({
     )
     draftSession.current = result.session
     return result.broadcast
+  }
+
+  const saveDraftNow = async () => {
+    setSaving(true)
+    setError('')
+    setDraftSaved(false)
+    try {
+      await persistDraft(scheduledAtIso(), true)
+      setDraftSaved(true)
+    } catch {
+      setError('下書きを保存できませんでした')
+    } finally {
+      setSaving(false)
+    }
   }
 
   /**
@@ -770,7 +836,7 @@ export default function BroadcastForm({
     setError('')
     setTestResult('')
     try {
-      const draft = await persistDraft(null)
+      const draft = await persistDraft(null, true)
       const res = await api.broadcasts.testSend(draft.id)
       if (res.success) {
         setTestResult(`テスト送信しました（${res.sent ?? 0}件）`)
@@ -820,7 +886,12 @@ export default function BroadcastForm({
     文が来ることはあるので、あればその文を出し、無ければ `—` にする。
     **0人と書かない。**「除外なし」と「数えられない」は別のこと。
   */
-  const exclusionNote = preflight?.warnings.find((w) => w.message.includes('除いて'))?.message ?? null
+  const exclusionNote = preflight?.exclusions
+    ? `ブロック ${preflight.exclusions.blocked.toLocaleString('ja-JP')}人・非表示 ${preflight.exclusions.hidden.toLocaleString('ja-JP')}人・重複 ${preflight.exclusions.duplicate.toLocaleString('ja-JP')}人を除外`
+    : preflight?.warnings.find((w) => w.message.includes('除いて'))?.message ?? null
+  const quota = preflight?.quota ?? null
+  const quotaAvailable = quota?.state === 'available'
+  const quotaInsufficient = quota?.state === 'insufficient'
   const scheduledLabel = sendMode === 'scheduled' && scheduledDate
     ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${Number(spreadMinutes) > 0 ? `（${spreadMinutes}分かけて配信）` : ''}`
     : null
@@ -1126,6 +1197,38 @@ export default function BroadcastForm({
               <Button type="button" onClick={openConditionDialog}>条件を編集</Button>
             </div>
           </div>}
+          {preflight?.audience && (
+            <>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {[
+                  ['条件一致', preflight.audience.matched, 'text-success'],
+                  ['送信可能', preflight.audience.sendable, 'text-action'],
+                  ['除外', preflight.exclusions?.total ?? 0, 'text-warning'],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-control border border-hairline bg-canvas-sunken p-3">
+                    <p className="text-xs font-bold text-ink-faint">{label}</p>
+                    <p className="text-ink mt-1 text-2xl font-black tabular-nums">{Number(value).toLocaleString('ja-JP')}人</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 rounded-control bg-info-bg p-3 text-xs text-info">重複アカウントは1人として数え、配信直前に再計算します。</p>
+              <section className="mt-4 border-t border-hairline pt-4">
+                <h4 className="text-sm font-bold text-ink">対象プレビュー</h4>
+                <p className="mt-1 text-xs text-ink-faint">代表的な友だちを確認できます。</p>
+                <div className="mt-2 divide-y divide-hairline">
+                  {preflight.audience.representatives.map((friend) => (
+                    <div key={friend.friendId} className="flex items-center gap-3 py-3">
+                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-full object-cover" /> : (
+                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{friend.displayName?.slice(0, 1) ?? '—'}</span>
+                      )}
+                      <div><p className="text-sm font-bold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
+                    </div>
+                  ))}
+                  {preflight.audience.representatives.length === 0 && <p className="py-3 text-xs text-ink-faint">表示できる友だちはいません。</p>}
+                </div>
+              </section>
+            </>
+          )}
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className={`${showTemplatePicker ? 'hidden' : ''} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
@@ -1202,7 +1305,9 @@ export default function BroadcastForm({
             bubble={bubble}
             index={index}
             trackLinks={trackLinks}
+            buttons={messageButtons}
             onTrackLinksChange={setTrackLinks}
+            onButtonsChange={setMessageButtons}
             onChange={(next) => updateBubble(index, next)}
           />
         ) : (
@@ -1216,9 +1321,15 @@ export default function BroadcastForm({
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4><p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p></div>
-            <Button type="button" disabled title="配信後アクションの保存契約は未接続です">＋ アクションを追加</Button>
+            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">アクションを管理</Link>
           </div>
-          <p className="mt-3 text-xs text-ink-faint">配信後アクションはまだ接続されていません。</p>
+          <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
+            <select aria-label="配信後のアクション" value={afterActionVersionId} onChange={(event) => setAfterActionVersionId(event.target.value)} className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal text-ink">
+              <option value="">実行しない</option>
+              {publishedActions.map((action) => <option key={action.versionId} value={action.versionId}>{action.name}（第{action.version}版）</option>)}
+            </select>
+          </label>
+          {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
         {/*
           2通目以降はまだ実際には送れない（送信が「複数吹き出しの実配信は
@@ -1338,9 +1449,27 @@ export default function BroadcastForm({
           <div className="border-hairline mt-4 border-t pt-4">
             <p className="text-sm font-bold text-ink">開封・クリックの集計</p>
             <p className="mt-1 text-xs text-ink-faint">
-              LINEの月間集計上限を使います（今月の使用数はまだ取得できません / 1,000 種類）。
+              {quota?.monthlyUsed !== null && quota?.monthlyUsed !== undefined && quota.monthlyLimit !== null
+                ? `LINEの月間送信枠を使います（今月 ${quota.monthlyUsed.toLocaleString('ja-JP')} / ${quota.monthlyLimit.toLocaleString('ja-JP')} 通）。`
+                : 'LINEの月間送信枠を確認しています。'}
             </p>
           </div>
+          {sendMode === 'scheduled' && (
+            <section className="mt-4 rounded-control border border-hairline p-4">
+              <h4 className="text-sm font-bold text-ink">配信スケジュール</h4>
+              <p className="mt-1 text-xs text-ink-faint">前後の配信と重ならないかを確認します。</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                {[-1, 0, 1, 2].map((offset) => {
+                  const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
+                  if (base) base.setDate(base.getDate() + offset)
+                  const ymd = base ? base.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }) : '日付未設定'
+                  const concurrent = offset === 0 ? preflight?.concurrentBroadcasts ?? [] : []
+                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-bold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
+                })}
+              </div>
+              {(preflight?.concurrentBroadcasts?.length ?? 0) > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
+            </section>
+          )}
         </section>
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? 'space-y-3' : 'hidden'}>
@@ -1356,7 +1485,7 @@ export default function BroadcastForm({
           <li className="flex items-center gap-2"><span className="text-success">✓</span><span>配信対象が設定されています</span></li>
           <li className="flex items-center gap-2"><span className={scheduledLabel ? 'text-success' : 'text-warning'}>{scheduledLabel ? '✓' : '!'}</span><span>配信日時が設定されています</span></li>
           <li className="flex items-center gap-2"><span className={testResult ? 'text-success' : 'text-warning'}>{testResult ? '✓' : '!'}</span><span>{testResult ? 'テスト送信が完了しています' : 'テスト送信がまだです'}</span></li>
-          <li className="flex items-center gap-2"><span className={lengthNotice.tone === 'error' ? 'text-danger' : 'text-success'}>{lengthNotice.tone === 'error' ? '!' : '✓'}</span><span>送信枠を超えていません</span></li>
+          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
         </ul>
         <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
           <input
@@ -1379,7 +1508,7 @@ export default function BroadcastForm({
             ['配信日時', scheduledLabel ?? '未設定'],
             ['メッセージ', `${typeLabel(bubbles[0]?.type ?? 'text')} ${bubbles.length}通`],
             ['開封計測', measureOpens ? '有効' : '無効'],
-            ['配信後', '未設定'],
+            ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
           ].map(([label, value]) => (
             <div key={label} className="flex items-center justify-between gap-6 py-4">
               <dt className="shrink-0 font-semibold text-ink-faint">{label}</dt>
@@ -1407,12 +1536,13 @@ export default function BroadcastForm({
         <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
       </div>
     )}
+    {draftSaved && <p role="status" className="mb-3 rounded-control bg-success-bg p-3 text-sm text-success">下書きを保存しました。</p>}
     <StickyBar actions={(
       <>
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled title="途中状態を保存するAPI契約は未接続です">下書き保存</Button>
+          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()}>{saving ? '保存中…' : '下書き保存'}</Button>
           {currentStep !== 'confirm' ? (
             <Button
               variant="primary"
@@ -1473,7 +1603,27 @@ export default function BroadcastForm({
           </div>
         ) : (
         <>
-        {currentStep === 'basic' ? (
+        {currentStep === 'schedule' ? (
+          <div className="space-y-3">
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-sm font-bold text-ink">設定内容</h3>
+              <dl className="mt-3 divide-y divide-hairline text-xs">
+                {[
+                  ['配信対象', `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信日時', scheduledLabel ?? '未設定'],
+                  ['送信数', `${bubbles.length}通`],
+                  ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
+                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
+              </dl>
+            </section>
+            <section className="rounded-card border border-hairline bg-canvas p-5">
+              <h3 className="text-sm font-bold text-ink">送信枠</h3>
+              <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
+              {quota ? <><p className="mt-3 text-sm font-bold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-bold ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+            </section>
+            <section className="broadcast-line-preview rounded-card p-5 text-on-accent"><h3 className="text-center text-sm font-bold">LINEプレビュー</h3><div className="mt-4 rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></section>
+          </div>
+        ) : currentStep === 'basic' ? (
           <div className="space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
@@ -1498,7 +1648,7 @@ export default function BroadcastForm({
         ) : (
         <>
         <h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3>
-        <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
+        <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
     {sendMode === 'scheduled' && scheduledDate && (
       <p className="text-ink-faint mt-1 text-center text-xs">
         {scheduledDate.replace(/-/g, '/')} {scheduledTime} から{' '}
@@ -1582,8 +1732,10 @@ export default function BroadcastForm({
 
     <ConfirmDialog
       open={preflightDialogOpen}
-      title="配信前チェック"
-      description="対象・メッセージ・日時を確認しました。送信枠の残数は現在のAPIでは取得できません。"
+      title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
+      description={quotaInsufficient
+        ? `現在の送信枠では${quota?.planned.toLocaleString('ja-JP')}通を送信できません。対象を絞るか、配信設定を確認してください。`
+        : '対象・メッセージ・日時・送信枠を確認しました。'}
       confirmLabel="対象を見直す"
       cancelLabel="戻る"
       designNode="vW4Es"
@@ -1598,7 +1750,7 @@ export default function BroadcastForm({
         <li className={previewConfirmed ? 'text-success' : 'text-warning'}>{previewConfirmed ? '✓' : '!'} メッセージ表示を確認しました</li>
         <li className={scheduledLabel ? 'text-success' : 'text-ink-faint'}>{scheduledLabel ? '✓' : '○'} 配信日時を確認しました</li>
       </ul>
-      <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">送信枠の残数を返す契約が無いため、不足数は表示できません。</p>
+      {quota ? <p className={`mt-3 rounded-control p-3 text-xs ${quotaInsufficient ? 'bg-danger-bg text-danger' : quotaAvailable ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています。` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です。` : quota.reason ?? '送信枠を確認できませんでした。'}</p> : <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
     </ConfirmDialog>
 
     <div data-design-node="FpgxH">

@@ -15,7 +15,7 @@ describe('V6 一斉配信の予約完了', () => {
   })
 
   it('テスト送信と最終予約は同じ下書きを更新する', () => {
-    expect(FORM).toContain('const draft = await persistDraft(null)')
+    expect(FORM).toContain('const draft = await persistDraft(null, true)')
     expect(FORM).toContain('api.broadcasts.testSend(draft.id)')
     expect(FORM).not.toContain('idempotencyKey: crypto.randomUUID()')
   })

@@ -11,9 +11,16 @@ import ProgressBar from '@/components/broadcasts/progress-bar'
 import SendConfirmDialog from '@/components/broadcasts/send-confirm-dialog'
 import SegmentBuilder from '@/components/broadcasts/segment-builder'
 import type { Tag } from '@line-crm/shared'
+import Button from '@/components/shared/button'
 
 interface BroadcastDetailProps {
   broadcastId: string
+}
+
+function percentText(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return '—'
+  const percentage = rate <= 1 ? rate * 100 : rate
+  return `${percentage.toFixed(1)}%`
 }
 
 export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
@@ -196,6 +203,119 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   const raw = broadcast as unknown as Record<string, unknown>
   const accountId = raw.lineAccountId as string | null
 
+  if (broadcast.status === 'sent') {
+    const delivered = insight?.delivered ?? broadcast.successCount
+    const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
+    const openRate = insight?.opens?.rate ?? insight?.openRate ?? null
+    const failed = Math.max(0, broadcast.totalCount - broadcast.successCount)
+
+    const exportCsv = () => {
+      const rows = [
+        ['項目', '人数', '割合'],
+        ['送信成功', String(delivered ?? ''), delivered != null && broadcast.totalCount > 0 ? percentText(delivered / broadcast.totalCount) : ''],
+        ['開封', String(opened ?? ''), percentText(openRate)],
+        ['クリック', String(insight?.uniqueClick ?? ''), percentText(insight?.clickRate)],
+        ['送信失敗', String(failed), broadcast.totalCount > 0 ? percentText(failed / broadcast.totalCount) : ''],
+      ]
+      const csv = rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')).join('\n')
+      const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${broadcast.title}-配信結果.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    }
+
+    return (
+      <div>
+        <Header
+          title={`配信結果：${broadcast.title}`}
+          action={(
+            <div className="flex items-center gap-2">
+              <Button href="/broadcasts">一斉配信一覧</Button>
+              <Button type="button" onClick={exportCsv}>CSVで書き出す</Button>
+            </div>
+          )}
+        />
+
+        <nav aria-label="配信結果の表示" className="border-hairline mb-5 flex gap-6 border-b text-sm font-semibold">
+          {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
+            <span key={label} className={index === 0 ? 'border-accent text-accent border-b-2 px-1 pb-3' : 'text-ink-secondary px-1 pb-3'}>{label}</span>
+          ))}
+        </nav>
+
+        <section className="mb-4">
+          <h2 className="text-ink text-lg font-bold">配信結果</h2>
+          <p className="text-ink-secondary mt-1 text-sm">送信・開封・クリック・ブロックを確認します。</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {[
+              { label: '送信成功', value: delivered, rate: broadcast.totalCount > 0 && delivered != null ? delivered / broadcast.totalCount : null, note: '届いた人' },
+              { label: '開封', value: opened, rate: openRate, note: '開いた人' },
+              { label: 'クリック', value: insight?.uniqueClick ?? null, rate: insight?.clickRate ?? null, note: '反応した人' },
+            ].map((item) => (
+              <div key={item.label} className="bg-canvas border-hairline rounded-card border p-4">
+                <p className="text-ink-secondary text-xs font-semibold">{item.label}</p>
+                <p className="text-ink mt-2 text-2xl font-bold">{percentText(item.rate)}</p>
+                <p className="text-ink mt-1 text-sm font-semibold">{item.value == null ? '—' : `${item.value.toLocaleString('ja-JP')}人`}</p>
+                <p className="text-ink-faint mt-1 text-xs">{item.note}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="space-y-4 xl:col-span-2">
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink text-base font-bold">反応</h2>
+              <p className="text-ink-secondary mt-1 text-sm">ボタンとリンクごとの結果です。</p>
+              {insight?.links?.length ? (
+                <div className="mt-3 divide-y divide-hairline">
+                  {insight.links.map((link) => (
+                    <div key={link.id} className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-ink truncate text-sm font-semibold" title={link.label}>{link.label}</p>
+                        <p className="text-ink-faint truncate text-xs" title={link.url}>{link.url}</p>
+                      </div>
+                      <p className="text-ink shrink-0 text-sm">クリック {link.uniqueClickCount.toLocaleString('ja-JP')}人（{percentText(link.clickRate)}）</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-ink-faint mt-3 text-sm">計測したボタン・リンクはありません。</p>
+              )}
+            </section>
+
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink text-base font-bold">エラー</h2>
+              <p className="text-ink-secondary mt-2 text-sm">送信失敗 {failed.toLocaleString('ja-JP')}人</p>
+            </section>
+
+            <section className="bg-canvas border-hairline rounded-card border p-4">
+              <h2 className="text-ink text-base font-bold">配信した設定</h2>
+              <p className="text-ink-secondary mt-1 text-sm">この配信で使った対象と送信方法です。</p>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div><dt className="text-ink-faint text-xs">配信済み</dt><dd className="text-ink mt-1 font-bold">{delivered?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-ink-faint text-xs">開封率</dt><dd className="text-ink mt-1 font-bold">{percentText(openRate)}</dd></div>
+                <div><dt className="text-ink-faint text-xs">クリック率</dt><dd className="text-ink mt-1 font-bold">{percentText(insight?.clickRate)}</dd></div>
+              </dl>
+            </section>
+          </div>
+
+          <section className="bg-canvas border-hairline rounded-card border p-4">
+            <h2 className="text-ink text-base font-bold">メッセージプレビュー</h2>
+            <p className="text-ink-secondary mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
+            <div className="bg-canvas-sunken mt-3 rounded-card p-4">
+              <div className="bg-success text-on-accent rounded-2xl rounded-tl-sm px-4 py-3 text-sm whitespace-pre-wrap">{broadcast.messageContent}</div>
+              {broadcast.messageOptions?.buttons?.map((button) => (
+                <div key={`${button.label}-${button.value}`} className="border-hairline bg-canvas text-action mt-2 truncate rounded-control border px-3 py-2 text-center text-sm font-semibold" title={button.value}>{button.label}</div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <Header
@@ -334,30 +454,9 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
         </div>
       )}
 
-      {/* Insight */}
-      {broadcast.status === 'sent' && insight && (
-        <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">
-          <h3 className="text-sm font-semibold text-ink-secondary mb-2">配信実績</h3>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-ink">{insight.delivered?.toLocaleString('ja-JP') ?? '-'}</p>
-              <p className="text-xs text-ink-faint">配信</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-600">{insight.uniqueImpression?.toLocaleString('ja-JP') ?? '-'}</p>
-              <p className="text-xs text-ink-faint">開封 {insight.openRate != null ? `(${(insight.openRate * 100).toFixed(1)}%)` : ''}</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{insight.uniqueClick?.toLocaleString('ja-JP') ?? '-'}</p>
-              <p className="text-xs text-ink-faint">クリック {insight.clickRate != null ? `(${(insight.clickRate * 100).toFixed(1)}%)` : ''}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Per-account breakdown — multi-account-dedup の sending/sent 状態でのみ表示 */}
+      {/* Per-account breakdown — 送信中だけ表示。完了後は上のV6結果画面に集約する。 */}
       {broadcast.targetType === 'multi-account-dedup' &&
-        (broadcast.status === 'sending' || broadcast.status === 'sent') &&
+        broadcast.status === 'sending' &&
         perAccountStats && perAccountStats.length > 0 && (
         <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">
           <h3 className="text-sm font-semibold text-ink-secondary mb-3">アカウント別内訳</h3>
@@ -466,13 +565,6 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               </tbody>
             </table>
           </div>
-          {broadcast.status === 'sent' && perAccountStats.some((r) => r.sent > 0 && r.uniqueImpression == null) && (
-            <p className="text-xs text-ink-faint mt-2">
-              開封・クリックは LINE 側の集計反映に〜30分程度かかります。後でリロードしてください。
-              <br />
-              送信数が約 200 未満のアカウントは LINE の仕様で per-account 数値が出ません。
-            </p>
-          )}
         </div>
       )}
 
