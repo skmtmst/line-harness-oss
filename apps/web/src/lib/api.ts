@@ -724,6 +724,52 @@ export type SavedAnalyticsSnapshot = {
   createdAt: string
 }
 
+export type AnalyticsReportSection = 'friends' | 'reactions' | 'routes' | 'usage' | 'mileage'
+export type AnalyticsReportRecipient = {
+  kind: 'staff' | 'email'
+  staffId?: string
+  email?: string
+  label: string
+}
+export type AnalyticsReportSchedule = {
+  id: string
+  lineAccountId: string
+  name: string
+  sections: AnalyticsReportSection[]
+  savedAnalysisIds: string[]
+  cadence: 'weekly' | 'monthly'
+  weekday: number | null
+  monthDay: number | null
+  sendTime: string
+  timeZone: string
+  periodDays: number
+  recipients: AnalyticsReportRecipient[]
+  channels: Array<'dashboard' | 'email' | 'line'>
+  alertRules: Array<{
+    metric: 'block_rate' | 'friend_adds' | 'conversions'
+    operator: 'greater_than' | 'decrease_percent' | 'zero_streak_days'
+    threshold: number
+    minimumSample: number
+  }>
+  status: 'active' | 'paused' | 'archived'
+  isOneTime: boolean
+  nextRunAt: string
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+export type AnalyticsReportScheduleOptions = {
+  timeZone: string
+  savedAnalyses: Array<{ id: string; name: string; kind: 'cross' | 'funnel' }>
+  recipients: Array<{
+    id: string
+    name: string
+    role: 'owner' | 'admin' | 'staff'
+    email: string | null
+    lineLinked: boolean
+  }>
+}
+
 export type CommonActionVersion = {
   id: string;
   versionNumber: number;
@@ -2779,6 +2825,19 @@ export const api = {
    * 外部APIを叩かないので、ここが外の障害で落ちることはない。
    */
   analytics: {
+    reportSchedules: {
+      list: (accountId: string) =>
+        fetchApi<ApiResponse<{ items: AnalyticsReportSchedule[]; options: AnalyticsReportScheduleOptions }>>(
+          `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      create: (accountId: string, data: Omit<
+        AnalyticsReportSchedule,
+        'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
+      > & { sendOnce?: boolean }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<ApiResponse<AnalyticsFriendsOverview>>(
         `/api/analytics/friends${rangeQuery({ ...params, accountId })}`,
@@ -4237,6 +4296,9 @@ export const api = {
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
+        /** Monthly and lifetime delivery totals. null when unavailable. */
+        monthlySendCount: number | null;
+        totalSendCount: number | null;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -4253,6 +4315,7 @@ export const api = {
         messageContent: string;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
+        folderId: string | null;
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */

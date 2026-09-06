@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getTemplatesWithUsageCount: vi.fn(),
+  getTemplateSendCounts: vi.fn(),
   getTemplateById: vi.fn(),
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
@@ -46,6 +47,7 @@ const EMPTY_USAGE = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getTemplateUsage.mockResolvedValue(EMPTY_USAGE);
+  mocks.getTemplateSendCounts.mockResolvedValue(new Map());
   mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1' });
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
@@ -127,5 +129,29 @@ describe('テンプレートのLINEアカウント境界', () => {
       accountIds: ['account-1'],
       includeUnassigned: false,
     });
+  });
+
+  it('一覧は当月・累計の実送信数を返す', async () => {
+    mocks.getTemplatesWithUsageCount.mockResolvedValue([{
+      id: 'tpl-1', line_account_id: 'account-1', name: '案内', category: 'general',
+      message_type: 'text', message_content: '本文', question_json: null,
+      question_status: 'published', folder_id: null, usage_count: 1,
+      created_at: '2026-09-01', updated_at: '2026-09-01',
+    }]);
+    mocks.getCarouselTapTotals.mockResolvedValue(new Map());
+    mocks.getTemplateSendCounts.mockResolvedValue(new Map([[
+      'tpl-1', { thisMonth: 12, total: 48 },
+    ]]));
+
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates?account_id=account-1'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: [{ id: 'tpl-1', monthlySendCount: 12, totalSendCount: 48 }],
+    });
+    expect(mocks.getTemplateSendCounts).toHaveBeenCalledWith(env.DB, ['tpl-1']);
   });
 });

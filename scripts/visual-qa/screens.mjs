@@ -1355,9 +1355,10 @@ export const SCREENS = [
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
   { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', mode: 'viewport', height: 1080,
-    verdict: 'structure_match_data_pending',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で構造一致・集計未接続。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダ、各1440/1920pxで撮影（はみ出し0）。設計の6種類タブ、質問タブ、フォルダ、検索、保存した検索、表示件数、5つの絞り込み、一覧列がそろい、内部値 `text` と `undefined件で使用` は0件。送信数だけはテンプレート別集計APIが無いため `—` と接続条件を案内しており、設計の実数にはできない。取得元 `templates-v6/W7LBc.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a', /*
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で一致。** `/templates` を割当ポート3104/8791で通常・読込・空・失敗・2フォルダの各1440/1920pxを再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。6種類タブ、フォルダ、検索、保存した検索、5つの絞り込み、設計と同じ6列表に加え、実送信台帳からテスト送信を除いた今月の送信数を接続した。累計は同じ値を水増しせずツールチップで確認できる。全14枚で横はみ出し0。',
+    verdictSource: 'templates-v6/W7LBc.txt + W7LBc-1440.png + W7LBc-1920.png',
+    verdictHead: '031081d69', /*
       **#493 の受入条件5つを1回で撮る。**
       口はフォルダだけ差し替える——**テンプレートの一覧は正常のまま**にして、
       「フォルダが取れなくても一覧は残る」を確かめるため。
@@ -1394,9 +1395,10 @@ export const SCREENS = [
       **使用先は 0 と言わず「保存後にシナリオから選べます」**（`:214`）。
     */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で再判定。** `/templates/questions/new` を1440/1920pxで撮影（はみ出し0）。右のLINEプレビューと回答の保存先はあるが、設計の1画面内に収まる2選択肢に対し、実装は全タグを2回展開して約3画面分の縦長になる。質問編集は `components/shared` 所有でs2は変更禁止のため据え置く。**推奨修正**：s0側でタグ選択を閉じた選択UIにし、質問文・2選択肢・返信を1920×1080内にそろえる。取得元 `templates-v6/NNDMR.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a',
+    verdict: 'match',
+    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で一致。** `/templates/questions/new` を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。#275 / PR #1014 の共通質問編集修正により、タグ・友だち情報・シナリオの詳しい設定は閉じた選択UIになり、質問文、2選択肢、各返信、右のLINEプレビューを同じ画面で確認できる。両幅とも横はみ出し0。',
+    verdictSource: 'templates-v6/NNDMR.txt + NNDMR-1440.png + NNDMR-1920.png',
+    verdictHead: '031081d69',
     route: '/templates/questions/new', mode: 'page',
 
   },
@@ -1434,8 +1436,9 @@ export const SCREENS = [
     */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     verdict: 'needs_fix',
-    verdictNote: '**2026-09-06 Issue #224 / PR #944 で再判定。** 1440/1920pxで未使用テンプレートの削除確認を撮影（はみ出し0）。内部値と壊れ値は解消し、未使用だけ削除できる安全な確認になった。一方、Pencilは使用中3か所の強制削除を描くが、機能11要件 §4-9/§11 は参照中の削除停止と強制削除除外を明記して矛盾するため、危険な画面へ変更しない。**推奨修正**：Claude所有のPencilを安全要件に合わせて未使用削除の画面へ直し、再撮影する。取得元 `templates-v6/M9cij.txt` と同Nodeの実装画像。',
-    verdictHead: '98abf756a',
+    verdictNote: '**2026-09-07 Issue #224 / PR #1024 / UI HEAD 031081d69 で再判定。** 未使用テンプレートの削除確認を割当ポート3104/8791で1440/1920px再撮影し、Pencil正本と実装1920pxを同じ比較画像で目視確認した。両幅とも横はみ出し0。実装は要件 §4-9 / §11 どおり未使用だけを安全に削除できるが、Pencil M9cij は使用中3か所の強制削除を描いたままで一致しない。危険な画面へ戻さず `needs_fix` を維持する。**残る依存**：オーナーIssue #276でPencilを要件に合わせて直した後、同じ2幅で再撮影する。',
+    verdictSource: 'templates-v6/M9cij.txt + M9cij-1440.png + M9cij-1920.png',
+    verdictHead: '031081d69',
     mode: 'viewport', height: 1080,
     steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
@@ -2069,11 +2072,15 @@ export const SCREENS = [
     verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と再比較し一致。** KPI4枚、未使用を整理する説明帯、利用状況表、中身を見る・片づける導線を確認した。未使用が0または未取得ならカードの片づける操作を出さない。通常・読込・空・失敗を1440px・1920pxで撮影し、横スクロール0。',
     verdictSource: 'analytics-v6/QQ1SR.txt + QQ1SR-loading.txt + QQ1SR-empty.txt + QQ1SR-error.txt + 1440/1920px screenshots', verdictHead: 'd7fe26794' },
   {
-    ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
-    gap: 'api',
-    gapNote: '決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る',
-    status: 'unimplemented',
-    why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
+    ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる', route: '/analytics/reports/new',
+    states: {
+      apis: ['**/api/analytics/report-schedules*'],
+      kinds: ['loading', 'empty', 'error'],
+    },
+    verdict: 'match',
+    verdictNote: '**設計画像なし。** 2026-09-07、`analytics-v6/URqOA.txt` と撮影HEAD `a17ccb396` を照合して一致。入れる内容、毎週・毎月と時刻・期間、ログインユーザーと追加できるメール宛先、LINE要約、変化通知、右側の到着見本・参照元・接続先・注意、下部の3操作を確認した。通常・読込・空・失敗を1440px・1920pxで撮影し、横スクロール0。APIはアカウント境界と権限を検証し、実行時の分析結果・締切時刻・配信成否を13か月保存する。',
+    verdictSource: 'analytics-v6/URqOA.txt + URqOA-1440.png + URqOA-1920.png + URqOA-loading/empty/error screenshots',
+    verdictHead: 'a17ccb396',
   },
   { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', steps: [{ click: 'この30日を集計', after: 1800 }, { click: '142', after: 500 }], verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、5経路×タグ有無の行列表、合計1,404人、選択マス142人、保存、CSV、対象者導線を実値で確認した。追加条件はAPIが `filters: []` 固定のため、最大15個の接続条件を本文に表示する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/f5HsX.txt + f5HsX-1440.png + f5HsX-1920.png', verdictHead: 'd7fe26794' },
   { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', steps: [{ click: 'フォームに答えたの段', after: 500 }], verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、5段の通過人数1,404→886→412→238→96、段ごとの離脱、最大離脱474人、対象者導線、保存、CSVを実値で確認した。比較条件が無い平均到達日数と差は `—` のまま表示する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/C2I7ry.txt + C2I7ry-1440.png + C2I7ry-1920.png', verdictHead: 'd7fe26794' },
@@ -2524,12 +2531,8 @@ export const SCREENS = [
   },
 
   // ── 機能28 予約設定 ─────────────────────────────────────
-  /*
-    設計のタブは4本（メニュー8／受付枠／休業日／予約のルール）。
-    実装はメニューと担当スタッフの2タブで、受付枠と休業日は
-    `/booking/staff/shifts` の別ルートにある。
-  */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。「まだ予約メニューがありません」。帯（メニュー8／止めているもの2つ）、期間（今日から 10/24 まで）、料金の列、「メニュー 8つのうち 6つを表示」が無い。実装に「CSVで書き出す」が在るのは設計より進んでいる（`§7 #44` の副次ボタンの置き場に合わせる）。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** P1 タブの分けかたが違う。設計は「メニュー8／受付枠／休業日／予約のルール」を1つの帯に並べるが、実装はメニューと担当スタッフの2タブで、**受付枠と休業日は /booking/staff/shifts の別ルート**。予約管理の画面からは飛べるが、予約設定の画面のタブには出てこない。「予約のルール」（先の予約が取れる範囲・締め切り・キャンセル期限）は BookingMenu が持っている（booking_window_days / cutoff_hours_before / cancel_deadline_hours_before）のに、**メニューごとに散っていてまとめて見る場所が無い**。P2 帯が設計と違う（設計は 出しているメニュー6つ／いちばん選ばれた トリミング小型犬142件／受け付けている時間9:00〜19:00／先の予約が取れる範囲60日先まで）。枠の稼働率が—なのは、受付時間の総枠数を数える仕組みが無いためで、正直な出し方 **取得元**：`booking-settings-v6/QSLEH.txt`。**推奨修正**：**「予約のルール」をまとめて見る場所を作るのが先**。先の予約が取れる範囲・締め切り・キャンセル期限は `BookingMenu` が持っている（`booking_window_days` / `cutoff_hours_before` / `cancel_deadline_hours_before`）が、**メニューごとに散っていて全体を見られない**。タブに受付枠・休業日を寄せるのはそのあと。枠の稼働率が `—` なのは受付時間の総枠数を数える仕組みが無いためで、**正直な出し方**。', verdictSource: 'booking-settings-v6/design-qa.md' , verdictHead: '31293424' },
+  /* 設計の4入口を同じ帯へ置き、受付枠・休業日は既存の勤務設定へつないだ。 */
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・店舗共通設定API待ち。** メニュー件数つきの4入口、出している数・最多・受付時間・受付範囲の4指標、設計順の6列表、担当者名、中身を見る・担当を決める・止める／出す、表示件数をそろえた。予約のルールでは全メニューの受付期間・締め切り・キャンセル期限を横並びで確認できる。1440・1920pxとも横はみ出し0。残る差は店舗共通値と営業時間・例外日を返すAPI、設計8件に対して撮影固定データが6件であること。', verdictSource: 'booking-settings-v6/QSLEH.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
   { ...BOOKING_SET, node: 'tksPc',
     /*
       スタッフを選ぶまで受付時間が出ない画面。選ばずに撮ると
@@ -2540,13 +2543,13 @@ export const SCREENS = [
       apis: ['**/api/booking/admin/staff/**'],
       kinds: ['normal', 'loading', 'error'],
     }, name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'unjudged', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** **撮れていないので判定しない。** スタッフの固定データが空で、押し口（設計の見本では「佐々木」）が0件。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** head `595c8359` で**受付時間を曜日×時間の格子**にした。1行ずつだと「何曜の何時なら受け付けるか」を見比べられない。受け付ける時間が入っている幅だけを出す。**特別な日を「休業」と決めつけない**——見出しは「特別な休み・営業」で、どちらかは口が言っていないので件数だけ示して一覧へ渡す。通常・読込中・取得失敗の3状態を撮った。**`getDay()` が閲覧側の時計で曜日を出す不具合を直した**（開発機がUTC+7で月曜が日曜に化けた）。残る差：設計はGoogleカレンダーの予定も格子に重ねる（予定を返す口が要る）', verdictSource: 'Claude実装' , verdictHead: '31293424' },
-  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 要修正（差は小さい）。設計に在って実装に無いのは**「マイルを 300 付ける」「予約で 300」**——予約が取れたときにマイルを付ける決め。それ以外は一致。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **P2 予約のルールをメニューの中だけで決める形。設計より作りは細かい。** ルート `/booking/menus/new`。段は 1 お客様に見える情報（名前・所要時間・料金・分類・説明）／2 予約の受け方（同時に受けられる件数・受付期間・締め切り・キャンセル期限・後の空き時間）／3 このメニューを担当できる人。**良い点**：どの欄にも**何を入れる欄か**が添えてある（「同じ時間帯に何組まで受けるかです。」「片づけや移動の時間です。次の予約はこのぶん後ろから入ります。」「空欄なら制限なし。」）。**P2 設計との差**：設計は受付期間・締め切りを**予約設定側の共通ルール**に置き、メニューでは上書きだけを許す。実装はメニューごとに全部決める形なので、**メニューが増えるとルールがばらける**。取得元：`booking-settings-v6/GhOb3.txt`。1440・1920とも横スクロール0 **推奨修正**：受付期間・締め切りを**予約設定側の共通ルール**へ寄せ、メニューでは上書きだけを許す（`QSLEH` の「予約のルールをまとめて見る場所」と同じ束）。**メニューが増えるとルールがばらける**のがこの差の重さ。欄ごとの説明はそのまま残す。', verdictSource: 'booking-settings-v6/GhOb3.txt' , verdictHead: '31293424' },
+  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で再撮影。構造一致・価格種別と共通設定API待ち。** 予約後の受付通知、前日・開始前リマインダ、実際の「予約してくれた」マイルルール300を同じ画面で確認でき、予約画面プレビュー・担当・質問・公開状態まで設計順に表示した。1440・1920pxとも横はみ出し0。残る差は固定額・無料・お問い合わせを区別して保存する価格種別と、店舗共通値を継承／上書きするAPI。値を作らず現在の保存契約に合わせているため一致にはしない。', verdictSource: 'booking-settings-v6/GhOb3.txt + 2026-09-07 1440/1920px screenshots', verdictHead: 'abae52d46' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     /* `**' + '/api/booking/admin/menus*` は `/menus/:id/staff` に届かない（`*` は `/` をまたがない）。この画面は呼ばないが、呼ぶようになったとき静かに素通りするのを防ぐ。 */
     states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/menus/**', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-04 撮り直して判定した（S3 第1段）。** 構造一致・データ未接続。4状態は撮れている。`QSLEH` と同じ差。 横断レビュー §7 の反映：#31 サイドメニューの選択状態／#40 主ボタンの緑を `$accent-deep` へ（白文字 2.26:1 → 5.44:1）／#44 CSV書き出しの置き場／#48 表記統一。設計画像を撮り直した。**実装との突き合わせはこれから。** **#532 `6cc74968` で、束1と束4の完了条件を満たした（コード上の修正を画像で確認済み）。** 失敗のとき帯は **メニュー `—件`／担当スタッフ `—人`／今月の予約 `—件`／枠の稼働率 `—%`** で、札ごとに「取得できませんでした」。空と失敗が `data-list-state` で分かれ、失敗のとき作成の誘いを出さない。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P1 設計のタブは4本（メニュー／受付枠／休業日／予約のルール）だが、実装はメニューと担当スタッフの2タブで、受付枠と休業日は `/booking/staff/shifts` の別ルートにある **取得元**：`booking-settings-v6/W6465r.txt`。**推奨修正**：タブを設計の4本にする（`QSLEH` と同じ束）。**受付枠と休業日が別ルートにあるのが根**なので、状態表示の直しとは別に、そちらを先に寄せる。',
-    verdictSource: 'booking-settings-v6/W6465r-error.txt', verdictHead: '31293424',
+    verdict: 'structure_match_data_pending', verdictNote: '**2026-09-07 Issue #241 / PR #1022 / UI HEAD abae52d46 を3105/8792で通常・読込・空・失敗を再撮影。構造一致・店舗設定API待ち。** 4入口とV6の4指標を全状態で同じ位置に保ち、読込・失敗は —、空は数えて0と未取得を分けた。失敗時は作成誘導を出さず再読込を表示する。1440・1920pxとも横はみ出し0、内部語・壊れ値0件。残る差は店舗営業時間・共通受付範囲を返すAPIと、設計見本と同量の固定データ。',
+    verdictSource: 'booking-settings-v6/W6465r-{loading,empty,error}.txt + 2026-09-07 screenshots', verdictHead: 'abae52d46',
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
@@ -3745,6 +3748,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '96ed41b6', on: '2026-09-01', screens: ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Q8sHa'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
   ],
   11: [
+    { pr: 1024, head: '031081d69', on: '2026-09-07', screens: ['W7LBc', 'NNDMR', 'M9cij'], note: 'Issue #224。割当ポート3104/8791で3画面を1440・1920px再撮影し、Pencil正本と同じ比較入力で照合。W7LBcとNNDMRを一致へ更新し、M9cijは要件とPencilの矛盾を根拠に要修正を維持。CzndJはPR #1019を正として差分から除外' },
     { pr: 944, head: '98abf756a', on: '2026-09-06', screens: ['W7LBc', 'GFlD7', 'FRkls', 'NNDMR', 'j9ixI', 'hsBtl', 'J3GxEZ', 'M9cij', 'NKyoA'], note: '割当ポート3104/8791で通常・状態別を含む36枚を撮影。対象9画面は一致6、構造一致・集計未接続1、要修正2。横はみ出し0' },
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
@@ -3973,6 +3977,7 @@ export const CAPTURED_AT = {
     { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['QSLEH', 'GhOb3'], note: 'development そのもので撮った' },
     { pr: 0, head: '595c8359', on: '2026-09-01', screens: ['tksPc'], note: 'Claudeが実装して撮った。**doctorが合格になったが、この3本はまだ push していない**' },
+    { pr: 1022, head: 'abae52d46', on: '2026-09-07', screens: ['QSLEH', 'GhOb3', 'W6465r'], note: 'Issue #241。予約設定の一覧・作成・一覧状態をV6構造へ直し、3105/8792で通常・読込・空・失敗を含む20枚を1440/1920px撮影。全画像で横はみ出し0。残るAPI差は各画面の判定注記へ記録した。' },
   ],
   29: [
     { pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' },

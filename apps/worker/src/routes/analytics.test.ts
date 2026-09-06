@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const mocks = {
+  ANALYTICS_REPORT_SECTIONS: ['friends', 'reactions', 'routes', 'usage', 'mileage'],
+  DEFAULT_TENANT_ID: 'tenant-default',
   getDailyMessageCounts: vi.fn(),
   getTrackedLinkStats: vi.fn(),
   getLinkClickSummary: vi.fn(),
@@ -30,6 +32,9 @@ const mocks = {
   createSavedAnalyticsFromResult: vi.fn(),
   getSavedAnalytics: vi.fn(),
   getSavedAnalyticsSnapshots: vi.fn(),
+  getAnalyticsReportSchedules: vi.fn(),
+  createAnalyticsReportSchedule: vi.fn(),
+  getStaffMembers: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
@@ -175,6 +180,14 @@ beforeEach(() => {
   });
   mocks.getSavedAnalytics.mockResolvedValue([]);
   mocks.getSavedAnalyticsSnapshots.mockResolvedValue([]);
+  mocks.getAnalyticsReportSchedules.mockResolvedValue([]);
+  mocks.createAnalyticsReportSchedule.mockImplementation(async (_db, input) => ({
+    id: 'report-1', ...input, status: 'active', isOneTime: Boolean(input.isOneTime),
+    lineAccountId: input.lineAccountId, createdAt: input.now, updatedAt: input.now,
+  }));
+  mocks.getStaffMembers.mockResolvedValue([
+    { id: 'u-1', name: 'テスト', role: 'owner', email: 'owner@example.com', line_user_id: 'U1', is_active: 1, invite_status: 'active', account_scope: 'all' },
+  ]);
   mocks.createAnalyticsCrossAudience.mockResolvedValue({
     id: 'audience-cross-1', memberCount: 2, expiresAt: '2026-08-27T00:00:00.000Z',
   });
@@ -597,5 +610,55 @@ describe('LINE公式アカウントの分離', () => {
     const res = await req(`/api/funnels?${ACCOUNT}`);
     expect(res.status).toBe(200);
     expect(mocks.getLegacyFunnels).toHaveBeenCalledWith(env.DB, 'account-a');
+  });
+});
+
+describe('V6 定期レポートAPI', () => {
+  const body = {
+    name: '週次まとめ', sections: ['friends', 'reactions'], savedAnalysisIds: [],
+    cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '09:00',
+    timeZone: 'Asia/Tokyo', periodDays: 7,
+    recipients: [{ kind: 'staff', staffId: 'u-1', label: 'テスト' }],
+    channels: ['dashboard', 'line'],
+    alertRules: [{ metric: 'friend_adds', operator: 'decrease_percent', threshold: 20, minimumSample: 20 }],
+  };
+
+  it('通常と空状態を同じアカウント境界で返す', async () => {
+    const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { items: [], options: { timeZone: 'Asia/Tokyo', recipients: [{ id: 'u-1' }] } },
+    });
+    expect(mocks.getAnalyticsReportSchedules).toHaveBeenCalledWith(env.DB, 'account-a');
+  });
+
+  it('統括は実在する保存分析と宛先だけで作れる', async () => {
+    const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', body);
+    expect(res.status).toBe(201);
+    expect(mocks.createAnalyticsReportSchedule).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ lineAccountId: 'account-a', name: '週次まとめ', isOneTime: false }),
+    );
+  });
+
+  it('運用担当は閲覧できるが作成できない', async () => {
+    expect((await reqAsStaff(`/api/analytics/report-schedules?${ACCOUNT}`)).status).toBe(200);
+    expect((await reqAsStaff(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', body)).status).toBe(403);
+  });
+
+  it('権限外の宛先と別アカウントは拒否する', async () => {
+    const badRecipient = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
+      ...body, recipients: [{ kind: 'staff', staffId: 'other', label: '別担当' }],
+    });
+    expect(badRecipient.status).toBe(422);
+    expect((await req('/api/analytics/report-schedules?account_id=account-b')).status).toBe(404);
+  });
+
+  it('読取失敗は500で返し、未取得を空に見せない', async () => {
+    mocks.getAnalyticsReportSchedules.mockRejectedValueOnce(new Error('db down'));
+    const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ success: false });
   });
 });

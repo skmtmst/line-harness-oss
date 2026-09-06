@@ -95,10 +95,10 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     実際に移せるようにした。**断り文言を残したまま操作を足さない。**
     残すと、動くのに「動きません」と書いてある画面になる。
   */
-  it('一覧の行から置き場を移せる', () => {
+  it('詳細から置き場を移せる', () => {
     expect(PAGE).not.toContain('テンプレートをフォルダへ移す操作は、まだ繋がっていません。')
-    expect(PAGE).toContain('<Th>置き場</Th>')
-    expect(PAGE).toContain('の置き場')
+    expect(PAGE).not.toContain('<Th>置き場</Th>')
+    expect(PAGE).toContain('aria-label="置き場"')
     expect(PAGE).toContain('api.templates.update(template.id, { folderId })')
   })
 
@@ -112,7 +112,7 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     expect(move.indexOf('if (!res.success)')).toBeLessThan(move.indexOf('setTemplates('))
   })
 
-  it('移している行は二重に押させない', () => {
-    expect(PAGE).toContain('disabled={movingId === t.id}')
+  it('移しているテンプレートは二重に押させない', () => {
+    expect(PAGE).toContain('disabled={movingId === drawerData.id}')
   })
 })

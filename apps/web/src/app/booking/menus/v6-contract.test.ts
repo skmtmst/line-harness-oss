@@ -17,7 +17,26 @@ describe('V6 予約設定', () => {
     expect(LIST).not.toContain('<Header')
     expect(CREATE).toContain('showHeader={false}')
     expect(LIST).toContain('予約メニューを作る')
-    expect(LIST).toContain('受付枠と休業日を設定')
+    expect(LIST).toContain('受付枠')
+    expect(LIST).toContain('休業日')
+  })
+
+  it('設計どおり4つの設定入口と、散らばっていた予約ルールの一覧を持つ', () => {
+    expect(LIST).toContain('受付枠')
+    expect(LIST).toContain('休業日')
+    expect(LIST).toContain('予約のルール')
+    expect(LIST).toContain('予約のルールをまとめて確認')
+    expect(LIST).toContain("key: 'booking_window_days'")
+    expect(LIST).toContain("key: 'cutoff_hours_before'")
+    expect(LIST).toContain("key: 'cancel_deadline_hours_before'")
+  })
+
+  it('作成画面で予約後の通知・リマインダ・マイルを実データから確認できる', () => {
+    expect(CREATE).toContain('予約を受けたときにすること')
+    expect(CREATE).toContain('予約を受け付けたことを知らせる')
+    expect(CREATE).toContain('前日・開始前に思い出してもらう')
+    expect(CREATE).toContain("item.eventType === 'booking_created'")
+    expect(CREATE).toContain('マイルを ${bookingMileage.toLocaleString()} 付ける')
   })
 
   it('表示している一覧操作は実際に使える', () => {
