@@ -574,6 +574,9 @@ function InflowLinksPageInner() {
 
   return (
     <div>
+      <p data-design="Head" className="mb-4 text-sm text-ink-faint">
+        どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
+      </p>
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
@@ -582,7 +585,7 @@ function InflowLinksPageInner() {
           detail={
             routeCountAvailable
               ? summary?.routeTotal != null
-                ? '4つのフォルダに分けています'
+                ? '4つのフォルダ・今月 8/01〜8/25'
                 : `稼働中 ${activeRouteCount}`
               : loading
                 ? '読み込んでいます'
@@ -617,7 +620,7 @@ function InflowLinksPageInner() {
           title="平均の追加率"
           value={addRate}
           unit="%"
-          detail={summaryAvailable ? 'クリックした人のうち' : loading ? '読み込んでいます' : '取得できません'}
+          detail={summaryAvailable ? 'クリックのうち' : loading ? '読み込んでいます' : '取得できません'}
         />
       </div>
 

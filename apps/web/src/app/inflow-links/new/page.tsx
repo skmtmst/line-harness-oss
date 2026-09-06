@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import type { Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
@@ -130,6 +131,15 @@ export default function NewInflowLinkPage() {
               <FlowStep step="4" title="あいさつとシナリオが届く" description="左で決めた動きが、この瞬間に始まります。" />
             </ol>
           </AsideCard>
+          <AsideCard title="つながる先">
+            <ul className="space-y-2 text-xs font-semibold text-action">
+              <li><Link href="/scenarios">→ シナリオ配信</Link></li>
+              <li><Link href="/tags">→ 友だち属性</Link></li>
+              <li><Link href="/mileage">→ マイル</Link></li>
+              <li><Link href="/conversions">→ コンバージョン</Link></li>
+              <li><Link href="/analytics">→ 分析</Link></li>
+            </ul>
+          </AsideCard>
           <AsideCard title="気をつけること">
             <ul className="space-y-2 text-xs leading-relaxed text-ink-faint">
               <li>REFを変えると別の経路になります。</li>
@@ -141,7 +151,7 @@ export default function NewInflowLinkPage() {
       }
     >
       <FormSection step={1} label="どこに置くリンクですか">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_1fr_0.8fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
           <input
             id="ir-name"
@@ -175,8 +185,8 @@ export default function NewInflowLinkPage() {
 
       <FormSection step={2} label="発行されるURL">
         <p className="text-xs text-ink-faint">この2つは同じ場所に飛びます。紙にはQRコード、Webにはリンクを使ってください。</p>
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_120px] gap-4">
-          <div className="space-y-2">
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <div className="space-y-2 sm:col-span-3">
             <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{issuedUrl}</span></div>
             <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{shortUrl}</span><span className="ml-2 text-xs text-ink-faint">短いほうは文字数の少ない場所（SMS・印刷）向け</span></div>
           </div>
@@ -189,6 +199,9 @@ export default function NewInflowLinkPage() {
       </FormSection>
 
       <FormSection step={3} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
+        <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
+          動きを追加する（あいさつの差し替え・対応マーク・通知・外部連携）内容は、下の項目で選びます。
+        </p>
         <Field
           label="タグを自動で付ける"
           htmlFor="ir-tag"

@@ -102,8 +102,8 @@ export default function SiteScript() {
           <section className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-base font-bold text-ink">サイトに貼るコード</h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-faint">ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
-            <div className="mt-3 rounded-control bg-neutral-950 p-4 text-white">
-              <p className="text-xs text-neutral-400">あなたのアカウント専用のコード</p>
+            <div className="mt-3 rounded-control bg-ink p-4 text-on-accent">
+              <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
               <div className="mt-2 flex items-center gap-3">
                 <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
                 <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
@@ -123,7 +123,7 @@ export default function SiteScript() {
 
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
-              <h2 className="text-base font-bold text-ink">届いているドメイン</h2>
+              <h2 className="text-base font-bold text-ink">いま届いているページ</h2>
               <p className="mt-1 text-xs text-ink-faint">知らないドメインが並んでいたら、コードが別のサイトにコピーされています。</p>
             </div>
             {loading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : pages.length === 0 ? (
@@ -160,6 +160,14 @@ export default function SiteScript() {
           <section className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-sm font-bold text-ink">つながる先</h2>
             <ul className="mt-3 space-y-3 text-xs"><li className="text-action">→ 流入と計測</li><li className="text-action">→ コンバージョン</li><li className="text-action">→ 友だち</li><li className="text-action">→ 分析</li></ul>
+          </section>
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-bold text-ink">どうやって友だちと結びつくか</h2>
+            <ol className="mt-3 space-y-2 text-xs text-ink-secondary">
+              <li><strong>1. LINEから開いた場合</strong> その場で経路を記録します。</li>
+              <li><strong>2. あとからLINEを追加した場合</strong> 同じブラウザの記録と結びつけます。</li>
+              <li><strong>3. 結びつかない場合</strong> 個人を推測せず経路不明として数えます。</li>
+            </ol>
           </section>
           <section className="rounded-card border border-status-warn bg-status-warn-soft p-5">
             <h2 className="text-sm font-bold text-status-warn-deep">気をつけること</h2>

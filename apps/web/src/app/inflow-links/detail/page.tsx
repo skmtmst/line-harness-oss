@@ -155,7 +155,7 @@ function InflowLinkDetailPageContent() {
   }, [funnel])
 
   return (
-    <div data-design-node="JupxW">
+    <div data-design-node="JupxW" data-design="Body">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/inflow-links" className="hover:underline">
           流入経路
@@ -166,24 +166,24 @@ function InflowLinkDetailPageContent() {
 
       {error && <p className="text-danger mb-3 text-sm">{error}</p>}
       {!route ? <div className="rounded-card border border-hairline bg-canvas p-12 text-center text-sm text-ink-faint">{loading ? '読み込み中…' : '流入元を表示できませんでした。'}</div> : <>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
           <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary">この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の削除を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteOpen(true) }}>この経路を削除</Button></div>
         </div>
         <div className="grid grid-cols-2 gap-4 xl:grid-cols-4"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="今月 240回" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={78} unit="人" detail="ブロック 8人（9.3%）" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたり ¥1,493" /></div>
-        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <main className="space-y-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
+          <main data-design="Left" className="space-y-4 xl:col-span-3">
             <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
             <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '取得できません'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '取得できません'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
           </main>
-          <aside className="space-y-4">
+          <aside data-design="Right" className="space-y-4">
             <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">この経路にしていること</h2><ul className="mt-3 space-y-3 text-xs text-ink-secondary"><li>シナリオ「{scenarioName ?? '体験前フォロー'}」を始める</li><li>タグ「{tagName ?? 'Instagram'}」を付ける</li><li>マイルを 100 付ける</li></ul></section>
             <section className="rounded-card border border-status-warn bg-status-warn-soft p-5"><h2 className="text-sm font-bold text-status-warn-deep">気づいたこと</h2><p className="mt-3 text-xs font-semibold text-status-warn-deep">7日 反応がない人が18人います</p><p className="mt-3 text-xs text-status-warn-deep">ブロック率 9.3%</p></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">つながる先</h2><ul className="mt-3 space-y-2 text-xs text-action"><li>→ シナリオ配信</li><li>→ 友だち</li><li>→ 成果とアフィリエイト</li><li>→ コンバージョン</li><li>→ 分析</li></ul></section>
           </aside>
         </div>
       </>}
-      {deleteOpen && route && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4" data-design-node="UIaM7" role="dialog" aria-modal="true">
+      {deleteOpen && route && <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" data-design-node="UIaM7" role="dialog" aria-modal="true">
         <div className="w-full max-w-4xl overflow-hidden rounded-card bg-canvas shadow-2xl"><div className="border-b border-hairline px-6 py-5"><h2 className="text-xl font-bold text-ink">「{route.name}」を削除しますか？</h2><p className="mt-1 text-sm text-ink-faint">このURLは {route.createdAt.slice(5, 10).replace('-', '/')} から使われています。</p></div>
           <div className="space-y-4 p-6"><section className="rounded-control border border-status-danger bg-danger-bg p-4 text-status-danger"><h3 className="text-sm font-bold">削除すると、次のことが起きます</h3><ul className="mt-2 space-y-2 text-xs"><li>URLが開けなくなります。貼ってある場所は先に別のURLへ差し替えてください。</li><li>この経路から来た {funnel?.friend_add_count ?? 0}人の記録が分析の経路別グラフから消えます。</li></ul></section><p className="rounded-control bg-success-bg px-4 py-3 text-xs font-semibold text-success">この経路から来た友だちと、付いたタグ・進んでいるシナリオは消えません。</p>
             <h3 className="text-sm font-bold text-ink">どうしますか？</h3>{([['stop','新しい人を受けるのをやめる（おすすめ）','URLは開きますが「受付を終了しました」と出します。'],['redirect','別の流入リンクへ送るようにする','印刷ずみのQRコードがあるときに使います。'],['delete','このまま削除する','URLが開けなくなり、元には戻せません。']] as const).map(([value,title,description]) => <button key={value} type="button" onClick={() => setDeleteChoice(value)} className={`w-full rounded-control border p-4 text-left ${deleteChoice === value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'}`}><span className="block text-sm font-semibold text-ink">{title}</span><span className="mt-1 block text-xs text-ink-faint">{description}</span></button>)}
