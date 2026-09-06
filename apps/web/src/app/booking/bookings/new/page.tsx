@@ -27,10 +27,6 @@ const NODE_BY_STEP: Record<Step, string> = {
   conflict: 'Lg8ff',
 }
 
-function yen(value: number): string {
-  return `¥${value.toLocaleString('ja-JP')}`
-}
-
 function toUtcIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00+09:00`).toISOString()
 }
