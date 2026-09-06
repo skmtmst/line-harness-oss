@@ -264,7 +264,9 @@ describe('Authenticator verification', () => {
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
   });
 
-  test('authenticated operator exchanges a TOTP code for a one-time step-up grant', async () => {
+  test.each(['operations.control', 'photo.original.download'])(
+    'authenticated operator exchanges a TOTP code for a one-time %s step-up grant',
+    async (purpose) => {
     const db = await import('@line-crm/db');
     const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
     const masterKey = 'test-master-key-which-is-longer-than-32-characters';
@@ -279,19 +281,20 @@ describe('Authenticator verification', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer staff-key' },
       body: JSON.stringify({
-        purpose: 'operations.control',
+        purpose,
         code: await totpAtStep(secret, Math.floor(Date.now() / 30_000)),
       }),
     }, env({ TOTP_ENCRYPTION_KEY: masterKey }));
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({
       success: true,
-      data: { token: expect.any(String), purpose: 'operations.control', expiresAt: expect.any(String) },
+      data: { token: expect.any(String), purpose, expiresAt: expect.any(String) },
     });
     expect(db.createStepUpGrant).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      staffId: 'staff-1', purpose: 'operations.control', tokenHash: expect.any(String),
+      staffId: 'staff-1', purpose, tokenHash: expect.any(String),
     }));
-  });
+    },
+  );
 });
 
 describe('topology guard', () => {

@@ -118,6 +118,7 @@ import { ecIntegrations } from './routes/ec-integrations.js';
 import { ecCommerce } from './routes/ec-commerce.js';
 import { nenCampaigns } from './routes/nen-campaigns.js';
 import { nenMembers } from './routes/nen-members.js';
+import { nenPhotoOperations } from './routes/nen-photo-operations.js';
 import { supportInbox } from './routes/support-inbox.js';
 import { searchConsole } from './routes/search-console.js';
 import { friendFields } from './routes/friend-fields.js';
@@ -301,6 +302,7 @@ export const ADMIN_REQUEST_HEADERS = [
   'X-Filename',
   'Idempotency-Key',
   'X-Confirm-Irreversible',
+  'X-Step-Up-Token',
 ] as const;
 
 // CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
@@ -401,6 +403,7 @@ app.route('/', ecIntegrations);
 // NEN EC連携の管理画面API（通常の管理者認証・CSRF保護対象）。
 app.route('/', ecCommerce);
 app.route('/', nenCampaigns);
+app.route('/', nenPhotoOperations);
 app.route('/', nenMembers);
 app.route('/', supportInbox);
 app.route('/', searchConsole);

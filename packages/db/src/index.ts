@@ -98,4 +98,5 @@ export * from './booking-customers';
 export * from './operation-audit';
 export * from './operations';
 export * from './operations-health';
+export * from './nen-photo-operations';
 export * from './friend-bulk-runs';

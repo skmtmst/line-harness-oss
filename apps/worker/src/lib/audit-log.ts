@@ -56,6 +56,11 @@ export type AuditAction =
   | 'line_notification.definition.stop'
   | 'line_notification.delivery.retry'
   | 'nen.delivery.retry'
+  | 'photo.assessment.request'
+  | 'photo.asset.request'
+  | 'photo.review.bulk'
+  | 'photo.original.issue'
+  | 'photo.original.download'
   | 'webinar.archive'
   | 'webinar.participant.export';
 
