@@ -1179,22 +1179,22 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/friend-add-settings`（最終確認）。読込・空・失敗の3状態を1440・1920で撮った。**LINEプレビューと、設計の「登録直後から5分以内」「Slack通知」が無い。** 内部語が2件——「LINEアカウントとWebhookイベントの組み合わせで、同じ通知を1回だけ処理します。」「webhookの記録で防ぎます」。取得元 `friend-add-v6/ec9vg.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #222 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で通常・読込・空・失敗・権限なしの5状態、各1440/1920pxで撮影（横はみ出し0）。設計本文の5段確認、登録直後から5分以内、LINEプレビュー、二重実行防止、Slack通知欄に構造・文言を合わせ、内部語を画面から除いた。現行APIは流入経路・設定名・初回案内本文・Slack接続状態を返さず、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictSource: 'friend-add-v6/ec9vg.txt + ec9vg-{normal,loading,empty,error,forbidden}-{1440,1920}.png',
+    verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
     states: { apis: ['**/api/friend-add-routing/draft*', '**/api/friend-add-routing/draft/**'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
-    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
 
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
-    verdict: 'needs_fix',
-    verdictNote: '**2026-09-04 S2 第1段（撮影と判定）。** 要修正。ルート `/friend-add-settings`（有効化完了）。**設計の「未送信・二重送信・シナリオ開始失敗はSlackへ通知します。」が無い。** 内部語「有効（webhookの記録で判定）」が出ている。取得元 `friend-add-v6/quhg6.txt`',
-    verdictHead: '49e1341c',
+    verdict: 'structure_match_data_pending',
+    verdictNote: '**2026-09-06 Issue #222 で再実装・再判定。** UI HEAD `3d6b7e7e8` を3104/8791で有効化操作後、1440/1920pxで撮影（横はみ出し0）。設計本文の全STEP完了、稼働状態、次の操作、未送信・二重送信・再追加・シナリオ開始失敗の監視欄に構造・文言を合わせ、内部語を画面から除いた。現行の公開結果APIは設定名・流入経路を返さず、Slack監視・停止・複製も未接続で、設計参照も本文 `.txt` のみで同寸法のPencil画像が無いためデータ待ち。',
+    verdictSource: 'friend-add-v6/quhg6.txt + quhg6-{1440,1920}.png',
+    verdictHead: '3d6b7e7e8',
     route: '/friend-add-settings/publish',
     steps: [{ qaOpen: 'ec9vg', after: 900 }],
-    /* 画像は `5873f18b` のまま。`5bfbd382` はコード監査で残存P1を確認した。 */
 
   },
   {
