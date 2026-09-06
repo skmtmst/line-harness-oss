@@ -4613,6 +4613,41 @@ const OPERATION_RUNNING_STATES = {
   ad_postback: 'running',
 }
 
+/** 機能32。5分ごとのサーバー確認を同じ時刻・同じ値で描く。 */
+export const OPERATION_HEALTH = {
+  latestRun: {
+    id: 'operation-health-20260825-1145',
+    lineAccountId: 'visual-qa-account',
+    source: 'scheduled',
+    status: 'completed',
+    overallStatus: 'normal',
+    startedAt: '2026-08-25T11:45:00+09:00',
+    completedAt: '2026-08-25T11:45:00+09:00',
+    results: [
+      ['line_connection', '3アカウントすべて 応答あり'],
+      ['message_quota', '86,420 / 200,000通'],
+      ['external_integrations', '管理API 応答あり ／ EC 148件/日'],
+      ['webhook', '送る 6本・受ける 3本 ／ 失敗 0'],
+      ['dispatch_jobs', '待っている 148通 ／ 遅れ 0分'],
+      ['friend_change', '今日 ＋16 ／ －6（純増 ＋10）'],
+    ].map(([checkKey, summary], index) => ({
+      id: `operation-health-result-${index + 1}`,
+      runId: 'operation-health-20260825-1145',
+      checkKey,
+      status: 'normal',
+      summary,
+      value: {},
+      threshold: {},
+      source: 'visual_qa_fixture',
+      observedAt: '2026-08-25T11:45:00+09:00',
+    })),
+  },
+  overallStatus: 'normal',
+  lastCheckedAt: '2026-08-25T11:45:00+09:00',
+  nextCheckAt: '2026-08-25T11:50:00+09:00',
+  serverNow: '2026-08-25T11:46:00+09:00',
+}
+
 export const OPERATION_CONTROL_PREVIEW = {
   control: {
     scopeKey: 'all', lineAccountId: null, version: 8,

@@ -25,6 +25,15 @@ describe('共通情報の変更影響', () => {
     } as CommonVarChangeImpact)).toBeNull()
   })
 
+  it('APIが返した予約中・公開中の件数を優先する', () => {
+    expect(urgentImpactCount({
+      ...impact,
+      scheduledUsageCount: 2,
+      publishedUsageCount: 3,
+      items: [{ ...impact.items[0], status: '使われています' }],
+    } as CommonVarChangeImpact & { scheduledUsageCount: number; publishedUsageCount: number })).toBe(5)
+  })
+
   it('CSVには送信済みを混ぜず、変更前後を出す', () => {
     const csv = impactCsv(impact)
     expect(csv).toContain('"予約配信","一斉配信","前","後"')
