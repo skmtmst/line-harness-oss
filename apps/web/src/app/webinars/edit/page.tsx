@@ -358,22 +358,27 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
             <h2 className="text-ink text-lg font-bold">参加者管理</h2>
             <p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p>
           </div>
-          <a href={webinarApi.participantsCsvUrl(webinarId)} className="border-hairline rounded-control border px-3 py-2 text-sm font-semibold">
+          <Button href={webinarApi.participantsCsvUrl(webinarId)}>
             参加者をCSVで書き出す
-          </a>
+          </Button>
         </div>
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ['申込', summary.reservations, '人', 'text-success'],
-            ['視聴開始', summary.viewers, '人', 'text-accent'],
-            ['視聴完了', summary.completed, '人', 'text-warning'],
-            ['エラー', analytics.formFunnel.submitErrors, '件', 'text-danger'],
-          ].map(([label, value, unit, tone]) => (
-            <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4">
-              <p className="text-ink-faint text-xs">{label}</p>
-              <p className={`mt-2 text-2xl font-bold tabular-nums ${tone}`}>{Number(value).toLocaleString('ja-JP')}{unit}</p>
-            </div>
-          ))}
+          <div className="border-hairline bg-canvas rounded-card border p-4">
+            <p className="text-ink-faint text-xs">申込</p>
+            <p className="text-success mt-2 text-2xl font-bold tabular-nums">{summary.reservations.toLocaleString('ja-JP')}人</p>
+          </div>
+          <div className="border-hairline bg-canvas rounded-card border p-4">
+            <p className="text-ink-faint text-xs">視聴開始</p>
+            <p className="text-accent mt-2 text-2xl font-bold tabular-nums">{summary.viewers.toLocaleString('ja-JP')}人</p>
+          </div>
+          <div className="border-hairline bg-canvas rounded-card border p-4">
+            <p className="text-ink-faint text-xs">視聴完了</p>
+            <p className="text-warning mt-2 text-2xl font-bold tabular-nums">{summary.completed.toLocaleString('ja-JP')}人</p>
+          </div>
+          <div className="border-hairline bg-canvas rounded-card border p-4">
+            <p className="text-ink-faint text-xs">エラー</p>
+            <p className="text-danger mt-2 text-2xl font-bold tabular-nums">{analytics.formFunnel.submitErrors.toLocaleString('ja-JP')}件</p>
+          </div>
         </section>
         <section className="border-hairline bg-canvas overflow-hidden rounded-card border">
           <div className="border-hairline border-b px-4 py-3">
@@ -389,7 +394,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics' }: { webi
                 const watchedRate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
                 const action = participant.formSubmittedAt ? 'フォーム送信' : participant.ctaClickedAt ? 'CTAクリック' : '視聴のみ'
                 return (
-                  <div key={participant.friendId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,1fr)_160px_150px_100px] md:items-center">
+                  <div key={participant.friendId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-4 md:items-center">
                     <div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div>
                     <span className="text-ink-secondary">視聴完了 {watchedRate}%</span>
                     <span className="text-ink-secondary">{action}</span>
@@ -938,7 +943,7 @@ function WebinarActionsTab({ webinarId }: { webinarId: string }) {
   useEffect(() => { load() }, [load])
 
   if (state === 'loading') return <div className="text-ink-faint py-12 text-center text-sm">読み込んでいます</div>
-  if (state === 'error') return <div className="text-danger py-12 text-center text-sm">視聴後アクションを読み込めませんでした。<button onClick={load} className="ml-2 underline">もう一度読み込む</button></div>
+  if (state === 'error') return <div className="text-danger py-12 text-center text-sm">視聴後アクションを読み込めませんでした。<span className="ml-2"><Button onClick={load}>もう一度読み込む</Button></span></div>
 
   const visible = actions.filter((action) => action.trigger === trigger)
   const update = (index: number, patch: Partial<WebinarAction>) => {
@@ -973,7 +978,7 @@ function WebinarActionsTab({ webinarId }: { webinarId: string }) {
         {visible.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">この条件のアクションはまだありません。</p> : visible.map((action, index) => {
           const referenceKey = actionReferenceKey(action.actionType)
           return (
-            <div key={action.id ?? `${trigger}-${index}`} className="bg-canvas grid gap-3 p-4 md:grid-cols-[260px_minmax(0,1fr)_auto] md:items-center">
+            <div key={action.id ?? `${trigger}-${index}`} className="bg-canvas grid gap-3 p-4 md:grid-cols-3 md:items-center">
               <SelectField
                 value={action.actionType}
                 onChange={(event) => update(index, { actionType: event.target.value as WebinarAction['actionType'], config: {} })}
@@ -982,7 +987,7 @@ function WebinarActionsTab({ webinarId }: { webinarId: string }) {
                 className="border-hairline rounded-control border px-3 py-2 text-sm"
               />
               {referenceKey ? <input value={String(action.config[referenceKey] ?? '')} onChange={(event) => update(index, { config: { [referenceKey]: event.target.value } })} placeholder={`${referenceKey}を入力`} className="border-hairline rounded-control border px-3 py-2 text-sm" /> : <span className="text-ink-faint text-xs">追加設定はありません</span>}
-              <button type="button" onClick={() => remove(index)} className="text-danger text-sm">外す</button>
+              <Button type="button" onClick={() => remove(index)}>外す</Button>
             </div>
           )
         })}
@@ -1008,7 +1013,7 @@ function PublicPreviewStep({ webinar, publicUrl }: { webinar: Webinar; publicUrl
           ['公開状態', webinar.status === 'active' ? '公開中' : webinar.status === 'draft' ? '下書き' : 'アーカイブ'],
         ].map(([label, value]) => <div key={label} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">{label}</dt><dd className="text-ink max-w-3xl break-all text-sm">{value}</dd></div>)}
       </dl>
-      <div className="bg-accent-muted rounded-2xl p-5 sm:p-8"><div className="bg-canvas mx-auto max-w-md rounded-2xl p-5 shadow-sm"><p className="text-ink font-bold">{webinar.title}</p><p className="text-ink-faint mt-2 text-sm">動画を視聴すると、視聴状況が友だちごとに記録されます。</p></div></div>
+      <div className="bg-accent-soft rounded-2xl p-5 sm:p-8"><div className="bg-canvas mx-auto max-w-md rounded-2xl p-5 shadow-sm"><p className="text-ink font-bold">{webinar.title}</p><p className="text-ink-faint mt-2 text-sm">動画を視聴すると、視聴状況が友だちごとに記録されます。</p></div></div>
       {publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <p className="text-ink-faint text-xs">公開URLはLIFF IDを設定すると開けます。</p>}
     </section>
   )

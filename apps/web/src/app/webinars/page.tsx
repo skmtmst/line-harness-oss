@@ -336,21 +336,21 @@ export default function WebinarsPage() {
           </div>
         ) : (
           <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
-            <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-[minmax(0,2fr)_110px_100px_100px_160px_96px] gap-3 px-4 py-3 text-xs font-semibold md:grid">
-              <span>ウェビナー名</span><span>状態</span><span>申込</span><span>視聴</span><span>公開期間</span><span>操作</span>
+            <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
+              <span className="col-span-4">ウェビナー名</span><span className="col-span-2">状態</span><span>申込</span><span>視聴</span><span className="col-span-2">公開期間</span><span className="col-span-2">操作</span>
             </div>
             <div className="divide-hairline divide-y">
               {visible.map((w) => (
-                <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,2fr)_110px_100px_100px_160px_96px] md:items-center">
-                  <div className="min-w-0">
+                <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
+                  <div className="min-w-0 md:col-span-4">
                     <Link href={`/webinars/edit?id=${w.id}`} className="text-accent block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link>
                     <span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span>
                   </div>
-                  <div><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{STATUS_LABEL[w.status]}</span></div>
+                  <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{STATUS_LABEL[w.status]}</span></div>
                   <div className="text-ink-secondary text-sm tabular-nums" title="一覧では未取得です。参加者管理で確認できます。"><span className="text-ink-faint md:hidden">申込 </span>—</div>
                   <div className="text-ink-secondary text-sm tabular-nums" title="一覧では未取得です。参加者管理で確認できます。"><span className="text-ink-faint md:hidden">視聴 </span>—</div>
-                  <div className="text-ink-secondary truncate text-sm" title={scheduleSummary(w)}>{scheduleSummary(w)}</div>
-                  <div className="flex items-center gap-2">
+                  <div className="text-ink-secondary truncate text-sm md:col-span-2" title={scheduleSummary(w)}>{scheduleSummary(w)}</div>
+                  <div className="flex items-center gap-2 md:col-span-2">
                     <Link href={`/webinars/edit?id=${w.id}`} className="text-accent text-xs font-semibold">編集</Link>
                     <button
                       type="button"
