@@ -54,6 +54,9 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(qrDialog).toContain('ダウンロード形式')
     expect(qrDialog).toContain('画像をダウンロード')
     expect(qrDialog).not.toContain('PNGをダウンロード')
+    expect(qrDialog).toContain("import QRCode from 'qrcode'")
+    expect(qrDialog).toContain('QRCode.toDataURL(link')
+    expect(qrDialog).toContain('src={qrDataUrl || qrSrc}')
   })
 
   it('新APIの指標を使い、旧Workerの値へだけ後方互換する', () => {

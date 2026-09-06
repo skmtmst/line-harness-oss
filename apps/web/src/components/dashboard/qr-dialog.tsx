@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -73,6 +74,7 @@ export default function QrDialog({
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
   const [copied, setCopied] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
   // 経路を変えていたら、次に開いたときはそちらが正。
@@ -96,11 +98,27 @@ export default function QrDialog({
     }
   }, [open])
 
-  if (!open) return null
-
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
+
+  useEffect(() => {
+    let cancelled = false
+    setQrDataUrl('')
+    void QRCode.toDataURL(link, {
+      width: 220,
+      margin: 1,
+      color: { dark: '#171717', light: '#ffffff' },
+    }).then((dataUrl) => {
+      if (!cancelled) setQrDataUrl(dataUrl)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [link])
+
+  if (!open) return null
+
   const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
   const saveHref = `${qrSrc}&download=1&filename=${encodeURIComponent(
     route ? `qr-${route.refCode}` : 'qr-friend-add',
@@ -190,7 +208,7 @@ export default function QrDialog({
             <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
               <img
-                src={qrSrc}
+                src={qrDataUrl || qrSrc}
                 alt="友だち追加QRコード"
                 width={220}
                 height={220}
