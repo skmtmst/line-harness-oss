@@ -146,6 +146,7 @@ export default function NewOperatorNotificationPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-sm font-semibold text-ink">だれが受け取るか</h2>
+            <p className="mt-1 text-xs text-ink-faint">LINEログインを済ませた人にだけ届きます。担当が決まっていないと届きません。</p>
             <p className="mt-1 text-xs text-ink-faint">いまは下書きにチーム名を保存します。実際のスタッフ人数は送信処理の接続後に確認します。</p>
             <div className="mt-4 max-w-xl">
               <Field label="受け取るチーム" htmlFor="operator-recipient" note="未入力の下書きは公開できません。">
@@ -170,7 +171,7 @@ export default function NewOperatorNotificationPage() {
             </label>
             <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary">
               <input type="checkbox" checked={fallbackEmail} onChange={(event) => setFallbackEmail(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
-              <span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">メール送信は実行処理の接続後に有効になります。</span></span>
+              <span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="block text-xs text-ink-faint">LINEにログインしていない人がいるときの代替手段です。</span><span className="block text-xs text-ink-faint">メール送信は実行処理の接続後に有効になります。</span></span>
             </label>
           </section>
 

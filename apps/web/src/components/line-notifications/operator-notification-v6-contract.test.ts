@@ -26,6 +26,7 @@ describe('V6 運用者へのお知らせ — 安全な下書き接続', () => {
     expect(list).toContain("const filterCountsAvailable = Boolean(lineAccountId) && state === 'ready'")
     expect(list).toContain("filterCountsAvailable ? rules.length : '—'")
     expect(list).toContain("filterCountsAvailable ? missingRecipientCount : '—'")
+    expect(list).toContain('data-list-state={listState}')
   })
 
   it('作成は下書きだけを保存し、公開・テスト送信を装わない', () => {
@@ -33,6 +34,8 @@ describe('V6 運用者へのお知らせ — 安全な下書き接続', () => {
     expect(create).toContain('下書きに保存')
     expect(create).not.toContain('運用者へのお知らせを公開')
     expect(create).not.toContain('自分へテスト送信')
+    expect(create).toContain('LINEログインを済ませた人にだけ届きます')
+    expect(create).toContain('LINEにログインしていない人がいるとき')
   })
 
   it('新しいルールはDBで明示的に停止状態へ置く', () => {
