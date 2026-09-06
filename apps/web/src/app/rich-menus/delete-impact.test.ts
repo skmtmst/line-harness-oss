@@ -30,7 +30,13 @@ describe('表示中の人数', () => {
   })
 
   it('実値はそのまま出す', () => {
-    expect(audienceText({ value: 1842, reason: 'assignment_ledger_unavailable' })).toBe('1,842人')
+    const audience = {
+      value: 1842,
+      state: 'partial' as const,
+      reason: 'preexisting_assignments_not_backfilled' as const,
+    }
+    expect(audienceText(audience)).toBe('1,842人')
+    expect(audienceReason(audience)).toContain('記録開始後')
   })
 })
 

@@ -1496,13 +1496,9 @@ export const SCREENS = [
     verdictHead: 'f2be359e5', },
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン',
     mode: 'viewport', height: 1200,
-    steps: [
-      { fill: 'メニュー名', text: '通常メニュー（会員向け）' },
-      { fill: 'メニューを開くボタンの文字', text: 'メニュー' },
-    ],
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #225 で再照合。** 構造一致・下書き保存後の編集口待ち。設計画像と実装画像を同じ比較入力で見比べ、3段の進み方、名称・フォルダ・14字までのボタン文字、大小の寸法、切替タブ、A〜Fの7レイアウト、LINEプレビュー、面Fの未設定警告を確認した。画像と開閉状態は新規作成時に存在しないIDへ書かず、下書き保存後の編集画面で登録する旨を表示している。1440・1920とも横スクロール0。取得元 `rich-menus-v6/XtfO3.txt` と同Node画像。',
-    verdictHead: 'f2be359e5', route: '/rich-menus/new', },
+    verdictHead: 'f2be359e5', route: '/rich-menus/edit?id=rmg-1', },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか',
     verdict: 'structure_match_data_pending',
     verdictNote: '**2026-09-06 #253 で再照合。** 構造一致・データ接続済み。設計画像と実装画像を同じ比較入力で見比べ、STEP 2、対象条件、優先順位、対象1,020人・上位と重なる180人・実際に出る840人、LINEプレビューを確認した。条件は保存済みの要約を先に出し、編集時だけ展開するため、設計の常時展開とは表示密度が異なる。実数は `/api/rich-menu-groups/:id/preview-targets` が現在の友だちと上位条件から数え、数えられない場合は0を作らない。1440・1920とも横スクロール0。取得元 `rich-menus-v6/kQ1bs.txt` と同Node画像。', verdictHead: '89166aa03', route: '/rich-menus/edit?id=rmg-1&step=targeting', mode: 'viewport', height: 1080, },
@@ -3837,6 +3833,38 @@ const ISSUE_305_REVIEW = {
   },
 }
 
+/**
+ * board #367。機能12の読取APIを画面へ接続し、割当ポート3104/8791で
+ * 5画面を1440/1920px撮影してPencil 1920pxと比較した。
+ */
+const ISSUE_367_REVIEW = {
+  GO8RQ: {
+    verdict: 'structure_match_data_pending',
+    note: '一覧APIが返す月間タップ数とのべ人数を直接表示し、記録開始前を含まない人数には「記録開始後」と添える接続へ直した。共有の画面確認用固定応答にはまだ月間人数が無いため、今回の画像では従来どおり「のべ人数は未取得」となり、設計の8,140人を作っていない。実API接続は完了したが、同じ状態の画像比較ができないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/GO8RQ.txt + rich-menus-v6/GO8RQ-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  XtfO3: {
+    verdict: 'structure_match_data_pending',
+    note: '新規作成の仮画面ではなく、保存済みIDを読む編集画面で撮影するようにし、固定データの名称・タブ・面の動き・画像登録済み状態を表示した。共有モックは画像キーを返す一方で画像本体を配信しないため、キャンバス画像だけは読み込めず、Pencilと同じ完成状態では比較できない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/XtfO3.txt + rich-menus-v6/XtfO3-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  UMiJ9: {
+    verdict: 'structure_match_data_pending',
+    note: '保存済みメニューの固定データから画像登録済みを読み、対象人数、期間指定、終了後の戻し先、公開前チェックまで実APIの値で表示した。Pencilは面Fが未設定の状態だが、固定データは全ボタン設定済みのため、今回の画像はその警告状態を再現しない。存在しない未設定を作らず、同じ状態で比較できないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/UMiJ9.txt + rich-menus-v6/UMiJ9-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  TL7tp: {
+    verdict: 'structure_match_data_pending',
+    note: '外部メニューAPIのareasを読み、面ごとのURL・送信文・切替先・未対応の動きを、取り込み前に安全に表示する接続へ直した。共有の画面確認用固定応答はareasをまだ返さないため、今回の画像では取得できない旨を表示し、設計のURLや送信文を作っていない。実API接続は完了したが、同じ状態の画像比較ができないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/TL7tp.txt + rich-menus-v6/TL7tp-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+  szXsT: {
+    verdict: 'structure_match_data_pending',
+    note: '削除影響APIが返す割当台帳の現在人数を表示し、部分集計には記録開始前を含まない説明を添える接続へ直した。共有の画面確認用固定応答は旧契約の未取得値のままなので、今回の画像では「—（未取得）」を保ち、設計の8,140人を作っていない。実API接続は完了したが、同じ状態の画像比較ができないため一致にはしない。1440・1920pxとも横はみ出し0。',
+    source: 'rich-menus-v6/szXsT.txt + rich-menus-v6/szXsT-{1440,1920}.png + 2026-09-07同一状態比較',
+  },
+}
+
 // Issue #293（機能2 第2周）。Pencil 1920pxと、割当ポート3104/8791で
 // 撮った実装1440/1920pxを横に並べ、同じ操作状態で再判定した。
 const FEATURE_2_R2_PREFIX = '**2026-09-07 Issue #293で修正・再判定し、一致。** 3104/8791で1440px・1920pxを撮影し、両幅とも横はみ出し0。Pencil 1920pxと実装1920pxを同じ比較画像で目視確認した。'
@@ -3992,6 +4020,13 @@ for (const screen of SCREENS) {
     screen.verdictNote = `**2026-09-07 Issue #305で修正・再判定。** ${issue305Review.note}`
     screen.verdictSource = issue305Review.source
     screen.verdictHead = issue305Review.head
+  }
+  const issue367Review = ISSUE_367_REVIEW[screen.node]
+  if (screen.feature === 12 && issue367Review) {
+    screen.verdict = issue367Review.verdict
+    screen.verdictNote = `**2026-09-07 Issue #367で実API接続後に再判定。** 設計1920pxと実装1440/1920pxを目視比較。${issue367Review.note}`
+    screen.verdictSource = issue367Review.source
+    delete screen.verdictHead
   }
   if (screen.feature === 16 && FEATURE_16_REVIEW[screen.node]) {
     Object.assign(screen, FEATURE_16_REVIEW[screen.node])

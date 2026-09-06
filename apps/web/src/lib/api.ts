@@ -365,8 +365,8 @@ export type FormDeleteImpact = {
 /**
  * リッチメニューを消したときの影響（`GET /api/rich-menu-groups/:id/delete-impact`）。
  *
- * LINEは友だちごとの現在表示を返さないため、currentAudience.value は取得できる
- * 口ができるまで null。0人と読み替えてはいけない。
+ * LINEは友だちごとの現在表示を返さないため、割当台帳に記録された人数を返す。
+ * 台帳の記録開始前は含まれないので、state が partial の値を確定値として扱わない。
  */
 export type RichMenuDeleteImpact = {
   group: {
@@ -377,7 +377,8 @@ export type RichMenuDeleteImpact = {
   }
   currentAudience: {
     value: number | null
-    reason: 'assignment_ledger_unavailable'
+    state?: 'available' | 'partial' | 'unavailable'
+    reason: 'preexisting_assignments_not_backfilled' | 'assignment_ledger_unavailable' | null
   }
   nextDisplay: {
     guaranteedGroupId: null
@@ -6101,6 +6102,16 @@ export const api = {
         /** 160: 自分で決める並び順。 */
         displayOrder: number;
         thumbnailR2Key: string | null;
+        monthlyStats?: {
+          from: string;
+          to: string;
+          taps: number;
+          uniqueAudience: {
+            value: number | null;
+            state: 'available' | 'partial' | 'unavailable';
+            reason: 'preexisting_assignments_not_backfilled' | null;
+          };
+        };
         createdAt: string;
         updatedAt: string;
       }>>>(`/api/rich-menu-groups?accountId=${encodeURIComponent(accountId)}`),
@@ -6233,6 +6244,24 @@ export const api = {
           chatBarText: string;
           size: { width: number; height: number };
           areasCount: number;
+          areas: Array<{
+            bounds: {
+              x: number | null;
+              y: number | null;
+              width: number | null;
+              height: number | null;
+            };
+            action: {
+              type: string;
+              label: string | null;
+              url: string | null;
+              text: string | null;
+              displayText: string | null;
+              richMenuAliasId: string | null;
+              supported: boolean;
+              unsupportedReason: 'unsupported_or_incomplete_action' | null;
+            };
+          }>;
           isCurrentDefault: boolean;
           adminManaged: boolean;
           adminInfo: {
