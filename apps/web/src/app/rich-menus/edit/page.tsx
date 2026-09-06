@@ -1,6 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -1220,10 +1221,10 @@ function StepHeader({ active, groupId }: { active: 2 | 3; groupId: string }) {
           }`}
         >
           <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-            step.number === active ? 'bg-accent text-white' : 'bg-canvas-sunken text-ink-faint'
+            step.number === active ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-faint'
           }`}>{step.number}</span>
           <span className="min-w-0">
-            <span className="block text-[10px] font-bold tracking-wider">STEP {step.number}</span>
+            <span className="block text-xs font-bold tracking-wider">STEP {step.number}</span>
             <span className="block truncate text-sm font-semibold">{step.label}</span>
           </span>
         </Link>
@@ -1281,8 +1282,8 @@ function TargetingStep({
       <Header description="条件と優先順位を決め、友だちごとに表示するメニューを1つ選びます。" />
       <StepHeader active={2} groupId={group.id} />
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm">
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className={`rounded-card cursor-pointer border p-4 ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
@@ -1297,7 +1298,7 @@ function TargetingStep({
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div><button type="button" onClick={() => setConditionEditorOpen((open) => !open)} className="border-hairline rounded-control border px-3 py-2 text-xs font-semibold">{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</button></div>
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div><Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button></div>
               {conditionEditorOpen ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
             </div>
           ) : null}
@@ -1312,7 +1313,7 @@ function TargetingStep({
           </div>
           {preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
-          <button type="button" onClick={onRefresh} className="text-accent mt-3 text-xs font-semibold hover:underline">人数をもう一度確認</button>
+          <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
 
         <aside className="space-y-4">
@@ -1328,7 +1329,7 @@ function TargetingStep({
         </aside>
       </div>
 
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Link href={`/rich-menus/edit?id=${group.id}`} className="border-hairline rounded-control border px-4 py-2 text-sm">前へ：形とボタン</Link><button onClick={onSave} disabled={saving} className="border-hairline rounded-control border px-4 py-2 text-sm">{saving ? '保存中…' : '下書きに保存'}</button><Link href={`/rich-menus/edit?id=${group.id}&step=publish`} className="bg-accent rounded-control px-4 py-2 text-sm font-semibold text-white">次へ：公開のしかた</Link></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button href={`/rich-menus/edit?id=${group.id}`}>前へ：形とボタン</Button><Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button><Button variant="primary" href={`/rich-menus/edit?id=${group.id}&step=publish`}>次へ：公開のしかた</Button></div></div>} />
     </main>
   )
 }
@@ -1386,8 +1387,8 @@ function PublishStep({
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <Header description="いつ公開し、期間終了後にどのメニューへ戻すかを決めます。" />
       <StepHeader active={3} groupId={group.id} />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm">
+      <div className="grid gap-5 xl:grid-cols-3">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">いつ出すか</h2>
           <div className="mt-4 space-y-3">
             {[
@@ -1425,7 +1426,7 @@ function PublishStep({
           <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
         </aside>
       </div>
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Link href={`/rich-menus/edit?id=${group.id}&step=targeting`} className="border-hairline rounded-control border px-4 py-2 text-sm">前へ：誰に出すか</Link><div className="flex gap-2"><button onClick={onSave} disabled={saving || publishing} className="border-hairline rounded-control border px-4 py-2 text-sm">下書きに保存</button><button onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)} className="bg-accent rounded-control px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
     </main>
   )
 }
