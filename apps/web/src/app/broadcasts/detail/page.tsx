@@ -375,7 +375,8 @@ function BroadcastDetailInner() {
             className="bg-canvas rounded-card border-hairline scroll-mt-20 border p-5"
           >
             <p className="text-ink text-sm font-semibold">送った内容</p>
-            <p className="text-ink-faint mt-0.5 mb-2 text-xs">実際に届いた形</p>
+            <p className="text-ink-faint mt-0.5 text-xs">実際に届いた形</p>
+            <p className="text-ink-faint mb-2 mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
             <div className="bg-canvas-sunken rounded-card p-3">
               <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                 {broadcast.messageContent}
