@@ -884,12 +884,12 @@ export const SCREENS = [
   /* 設計どおり、基本設定→対象者→通知ステップ→送信設定→確認を段ごとに撮る。 */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 一覧を正本 `M1EXwB` の4KPI・フォルダ・検索/状態/基準日・6列表・ページ送りへ統一。通常と全状態を1440/1920で撮影し、横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending', route: '/reminders', },
+    verdictNote: '**2026-09-06 S2 #220。** 一覧を正本 `M1EXwB` の4KPI・フォルダ・検索/状態/基準日・6列表・ページ送りへ統一。通常と全状態を1440/1920で撮影し、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d', route: '/reminders', },
   { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `uJP22` の5段ステッパー、基本設定、基準日、ひな形、設定内容、LINEプレビュー、テスト案内を同じ配置で実装。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending', route: '/reminders/new',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `uJP22` の5段ステッパー、基本設定、基準日、ひな形、設定内容、LINEプレビュー、テスト案内を同じ配置で実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d', route: '/reminders/new',
     steps: [
       { fill: 'input[maxlength="60"]', selector: true, text: 'Google Meet相談の前日案内' },
       { fill: 'textarea[placeholder="運用目的や注意点を入力"]', selector: true, text: 'Meet相談の無断キャンセルを減らす目的。前日・1時間前・当日の3回で運用する。' },
@@ -897,32 +897,32 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `J64xI` の通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューを実装。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `J64xI` の通知カード3件、時刻/繰越、差し込み分類、本文、送信後アクション、URL扱い、右プレビューを実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3',
 
   },
   {
     ...REMINDER, node: 's7T2dz', name: '7-1-C 対象と終了条件',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `s7T2dz` の対象条件・人数内訳、基準日、終了/停止条件4件、安全な運用を同じ構成で実装。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `s7T2dz` の対象条件・人数内訳、基準日、終了/停止条件4件、安全な運用を同じ構成で実装。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=target', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `JCz6J` の期間切替、配信予定表、重複/時間帯確認、設定内容、LINEプレビューを実装し、予定APIへ接続。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `JCz6J` の期間切替、配信予定表、重複/時間帯確認、設定内容、LINEプレビューを実装し、予定APIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=preview', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `W98zZQ` の送信先、差し込み値表、履歴、LINEプレビュー、画面内テスト確認窓を実装し、テストAPIへ接続。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `W98zZQ` の送信先、差し込み値表、履歴、LINEプレビュー、画面内テスト確認窓を実装し、テストAPIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=test', mode: 'page',
     steps: [{ click: 'テスト送信', after: 300 }],
 
@@ -930,16 +930,16 @@ export const SCREENS = [
   {
     ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `s6Vvp` の有効化前チェック、対象/基準日/通知順/停止条件の要約、LINEプレビュー、公開操作を実装し、検証/公開APIへ接続。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `s6Vvp` の有効化前チェック、対象/基準日/通知順/停止条件の要約、LINEプレビュー、公開操作を実装し、検証/公開APIへ接続。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=confirm', mode: 'page',
 
   },
   {
     ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `PSmHo` の完了表示、配信設定、次にできること、監視項目、LINEプレビューを実装。完了URLを直接開いても下書き/予定/検証の値を取得する。1440/1920で横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `PSmHo` の完了表示、配信設定、次にできること、監視項目、LINEプレビューを実装。完了URLを直接開いても下書き/予定/検証の値を取得する。1440/1920で横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders/edit?id=reminder-3&stage=done', mode: 'page',
 
   },
@@ -969,8 +969,8 @@ export const SCREENS = [
     */
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `Y0Sn3` と同じく対象名、消える予定、残る履歴、取消不可を示す画面内確認窓へ統一。一部失敗も窓を閉じず日本語で再操作できる。通常/失敗を1440/1920で撮影、横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `Y0Sn3` と同じく対象名、消える予定、残る履歴、取消不可を示す画面内確認窓へ統一。一部失敗も窓を閉じず日本語で再操作できる。通常/失敗を1440/1920で撮影、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d',
     route: '/reminders',
     mode: 'viewport', height: 1080,
     /* 撮れない理由: 一覧の選択チェックに aria-label が無く押せない。撮るには実装側に目印が要る */
@@ -988,8 +988,8 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）',
     verdict: 'match',
-    verdictNote: '**2026-09-06 S2 #220。** 正本 `dC0yg` の通常・読込・空・取得失敗を、同じ4KPI/フォルダ/絞り込み/6列表の骨格で実装。全状態を1440/1920で撮影し、横はみ出し0。PR番号と実装HEADは採番後に追記する。',
-    verdictHead: 'pending', route: '/reminders',
+    verdictNote: '**2026-09-06 S2 #220。** 正本 `dC0yg` の通常・読込・空・取得失敗を、同じ4KPI/フォルダ/絞り込み/6列表の骨格で実装。全状態を1440/1920で撮影し、横はみ出し0。PR #927 head `eb41ad0d` の実装を比較した。',
+    verdictHead: 'eb41ad0d', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
 
   },
@@ -3331,6 +3331,7 @@ export const CAPTURED_AT = {
     { pr: 514, head: 'd064bded', on: '2026-08-30', screens: ['Y0Sn3'], note: '一部失敗を1件ずつ扱う直し。窓の API error: 405 が日本語になった' },
     { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['M1EXwB'], note: 'development そのもので撮った' },
       { pr: 613, head: 'a504fec0', on: '2026-08-31', screens: ['dC0yg', 's6Vvp', 'JCz6J', 'W98zZQ', 'M1EXwB', 'uJP22', 'J64xI', 'PSmHo', 'GC4St'], note: 'Claudeが #551 の head で9枚を撮り直した。4枚が一致。文言の直しは dC0yg のみ' },
+    { pr: 927, head: 'eb41ad0d', on: '2026-09-06', screens: ['M1EXwB', 'uJP22', 'J64xI', 's7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo', 'Y0Sn3', 'dC0yg'], note: '★V6の対象10画面を1440・1920と全状態で比較。横はみ出し0。' },
   ],
   8: [
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
